@@ -1,0 +1,78 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ConfigProvider } from 'antd';
+import MainLayout from './layout/MainLayout';
+import Dashboard from './pages/Dashboard';
+import OrderList from './pages/orders/OrderList';
+import OrderForm from './pages/orders/OrderForm';
+import BOMList from './pages/bom/BOMList';
+import BOMForm from './pages/bom/BOMForm';
+import POList from './pages/po/POList';
+import POForm from './pages/po/POForm';
+import GRNList from './pages/grn/GRNList';
+import GRNForm from './pages/grn/GRNForm';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import MasterDashboard from './pages/master/MasterDashboard';
+import './index.css';
+
+const themeConfig = {
+  token: {
+    colorPrimary: '#6366f1',
+    colorSuccess: '#22c55e',
+    colorWarning: '#f59e0b',
+    colorError: '#ef4444',
+    colorInfo: '#3b82f6',
+    borderRadius: 10,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  },
+  components: {
+    Button: {
+      borderRadius: 10,
+      controlHeight: 40,
+    },
+    Input: {
+      controlHeight: 40,
+    },
+    Select: {
+      controlHeight: 40,
+    },
+    Table: {
+      borderRadius: 12,
+    },
+  },
+};
+
+function App() {
+  return (
+    <ConfigProvider theme={themeConfig}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Dashboard />} />
+            {/* Orders */}
+            <Route path="orders/list" element={<OrderList />} />
+            <Route path="orders/new" element={<OrderForm />} />
+            <Route path="orders/edit/:id" element={<OrderForm />} />
+            {/* BOM */}
+            <Route path="bom/list" element={<BOMList />} />
+            <Route path="bom/new" element={<BOMForm />} />
+            <Route path="bom/edit/:id" element={<BOMForm />} />
+            {/* Purchase Orders */}
+            <Route path="purchase-orders/list" element={<POList />} />
+            <Route path="purchase-orders/new" element={<POForm />} />
+            <Route path="purchase-orders/edit/:id" element={<POForm />} />
+            {/* GRN */}
+            <Route path="grn/list" element={<GRNList />} />
+            <Route path="grn/new" element={<GRNForm />} />
+            <Route path="grn/edit/:id" element={<GRNForm />} />
+            {/* Admin */}
+            <Route path="admin" element={<AdminDashboard />} />
+            {/* Master Data */}
+            <Route path="master" element={<MasterDashboard />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ConfigProvider>
+  );
+}
+
+export default App;
