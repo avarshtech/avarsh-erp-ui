@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Layout,
   Menu,
@@ -8,6 +8,7 @@ import {
   Space,
   Input,
   theme,
+  message,
 } from "antd";
 import {
   DashboardOutlined,
@@ -26,14 +27,39 @@ import {
   DatabaseOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { getCurrentUser, logoutUser } from "../services/authService";
+import avarshLogo from "../assets/images/avarsh-logo.png";
 
 const { Header, Sider, Content } = Layout;
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
+
+  // Load current user on mount
+  useEffect(() => {
+    const user = getCurrentUser();
+    setCurrentUser(user);
+  }, []);
+
+  const handleLogout = () => {
+    logoutUser();
+    message.success("Logged out successfully");
+    navigate("/login", { replace: true });
+  };
+
+  const handleUserMenuClick = ({ key }) => {
+    if (key === "logout") {
+      handleLogout();
+    } else if (key === "profile") {
+      navigate("/profile");
+    } else if (key === "settings") {
+      navigate("/settings");
+    }
+  };
 
   const menuItems = [
     {
@@ -86,6 +112,11 @@ const MainLayout = () => {
       key: "/admin",
       icon: <SettingOutlined />,
       label: "Admin",
+      children: [
+        { key: "/admin", label: "Dashboard" },
+        { key: "/admin/users", label: "Users" },
+        { key: "/admin/roles", label: "Role & Access" },
+      ],
     },
   ];
 
@@ -126,6 +157,7 @@ const MainLayout = () => {
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
     if (path.startsWith("/grn")) return ["/grn"];
+    if (path.startsWith("/admin")) return ["/admin"];
     return [];
   };
 
@@ -150,39 +182,23 @@ const MainLayout = () => {
             height: 64,
             display: "flex",
             alignItems: "center",
-            justifyContent: collapsed ? "center" : "flex-start",
-            padding: collapsed ? 0 : "0 24px",
+            justifyContent: "center",
+            padding: 0,
             borderBottom: "1px solid rgba(255,255,255,0.1)",
           }}
         >
-          <div
-            style={{
-              background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-              borderRadius: 10,
-              width: 40,
-              height: 40,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 700,
-              fontSize: 18,
-              color: "#fff",
-            }}
-          >
-            G
-          </div>
-          {!collapsed && (
-            <span
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+            <img
+              src={avarshLogo}
+              alt="Avarsh Logo"
               style={{
-                marginLeft: 12,
-                fontWeight: 600,
-                fontSize: 18,
-                color: "#fff",
+                height: collapsed ? 32 : 40,
+                width: collapsed ? 32 : 'auto',
+                objectFit: 'contain',
+                display: 'block'
               }}
-            >
-              Avarsh ERP
-            </span>
-          )}
+            />
+          </div>
         </div>
         <Menu
           theme="dark"
@@ -242,7 +258,7 @@ const MainLayout = () => {
                 }}
               />
             </Badge>
-            <Dropdown menu={{ items: userMenuItems }} trigger={["click"]}>
+            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={["click"]}>
               <Space style={{ cursor: "pointer" }}>
                 <Avatar
                   style={{
@@ -252,7 +268,7 @@ const MainLayout = () => {
                   icon={<UserOutlined />}
                 />
                 <span style={{ fontWeight: 500, color: "#1e293b" }}>
-                  Admin User
+                  {currentUser?.name || "User"}
                 </span>
               </Space>
             </Dropdown>

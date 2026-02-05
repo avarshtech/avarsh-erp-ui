@@ -1,0 +1,225 @@
+:root {
+  --primary-color: #6366f1;
+  --ant-modal-body-padding: 8px;
+}
+
+/* ============================================================
+   COMPREHENSIVE INPUT FOCUS OVERRIDES
+   Remove double outline/glow - single border color only
+   ============================================================ */
+
+/* Base: Remove ALL browser outlines and box-shadows on focus for ALL inputs */
+*:focus,
+*:focus-visible,
+*:focus-within {
+  outline: none !important;
+}
+
+/* Input fields - all states */
+.ant-input,
+.ant-input:hover,
+.ant-input:focus,
+.ant-input:focus-visible,
+.ant-input:focus-within,
+.ant-input:active,
+.ant-input-focused,
+.ant-input.ant-input-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input:focus,
+.ant-input:focus-visible,
+.ant-input:focus-within,
+.ant-input:active,
+.ant-input-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Input Number - all states */
+.ant-input-number,
+.ant-input-number:hover,
+.ant-input-number:focus,
+.ant-input-number:focus-visible,
+.ant-input-number:focus-within,
+.ant-input-number:active,
+.ant-input-number-focused,
+.ant-input-number.ant-input-number-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input-number:focus,
+.ant-input-number:focus-visible,
+.ant-input-number:focus-within,
+.ant-input-number:active,
+.ant-input-number-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Input Affix Wrapper (search, password, etc.) - all states */
+.ant-input-affix-wrapper,
+.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper:focus-visible,
+.ant-input-affix-wrapper:focus-within,
+.ant-input-affix-wrapper:active,
+.ant-input-affix-wrapper-focused,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper:focus-visible,
+.ant-input-affix-wrapper:focus-within,
+.ant-input-affix-wrapper:active,
+.ant-input-affix-wrapper-focused,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Also target the inner input inside affix wrapper */
+.ant-input-affix-wrapper .ant-input,
+.ant-input-affix-wrapper .ant-input:focus,
+.ant-input-affix-wrapper .ant-input:focus-visible,
+.ant-input-affix-wrapper .ant-input:active {
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+
+/* Select - all states */
+.ant-select-selector,
+.ant-select-selector:hover,
+.ant-select-selector:focus,
+.ant-select-selector:focus-visible,
+.ant-select-selector:focus-within,
+.ant-select-selector:active,
+.ant-select-focused .ant-select-selector,
+.ant-select.ant-select-focused .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-select-focused .ant-select-selector,
+.ant-select.ant-select-focused .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  border-color: var(--primary-color) !important;
+}
+
+/* DatePicker / TimePicker - all states */
+.ant-picker,
+.ant-picker:hover,
+.ant-picker:focus,
+.ant-picker:focus-visible,
+.ant-picker:focus-within,
+.ant-picker:active,
+.ant-picker-focused,
+.ant-picker.ant-picker-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-picker:focus,
+.ant-picker:focus-visible,
+.ant-picker:focus-within,
+.ant-picker:active,
+.ant-picker-focused,
+.ant-picker.ant-picker-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* TextArea - all states */
+.ant-input-textarea,
+.ant-input-textarea:hover,
+.ant-input-textarea:focus,
+.ant-input-textarea:focus-visible,
+.ant-input-textarea:focus-within,
+.ant-input-textarea:active,
+textarea.ant-input,
+textarea.ant-input:hover,
+textarea.ant-input:focus,
+textarea.ant-input:focus-visible,
+textarea.ant-input:focus-within,
+textarea.ant-input:active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+textarea.ant-input:focus,
+textarea.ant-input:focus-visible,
+textarea.ant-input:focus-within,
+textarea.ant-input:active {
+  border-color: var(--primary-color) !important;
+}
+
+/* Checkbox and Radio - no glow */
+.ant-checkbox-wrapper:focus,
+.ant-checkbox-wrapper:focus-within,
+.ant-checkbox:focus,
+.ant-checkbox-input:focus,
+.ant-checkbox-input:focus-visible,
+.ant-radio-wrapper:focus,
+.ant-radio-wrapper:focus-within,
+.ant-radio:focus,
+.ant-radio-input:focus,
+.ant-radio-input:focus-visible {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Button focus - keep subtle */
+.ant-btn:focus,
+.ant-btn:focus-visible,
+.ant-btn:active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* ============================================================
+   PERMISSIONS MATRIX TABLE STYLES
+   ============================================================ */
+
+/* Compact spacing and visible overflow to avoid badge cutoff */
+.permissions-matrix-table .ant-table-cell {
+  padding: 6px 8px;
+  white-space: nowrap;
+  overflow: visible !important;
+}
+
+.permissions-matrix-table .ant-table-tbody > tr > td {
+  vertical-align: middle;
+}
+
+.permissions-matrix-table .ant-checkbox-wrapper {
+  margin: 0;
+}
+
+/* Slightly smaller checkboxes inside permission table */
+.permissions-matrix-table .ant-checkbox-inner {
+  width: 14px;
+  height: 14px;
+}
+
+/* Media tweak: allow tighter table on small screens */
+@media (max-width: 768px) {
+  .permissions-matrix-table .ant-table-cell {
+    padding: 4px 6px;
+  }
+}
+
+/* Ensure tags/badges inside permissions table are visible and not clipped */
+.permissions-matrix-table .ant-tag,
+.permissions-matrix-table .ant-badge {
+  z-index: 50;
+  position: relative;
+}
+
+/* If any inner wrapper hides overflow, make sure table row allows visible overflow */
+.permissions-matrix-table .ant-table-row,
+.permissions-matrix-table .ant-table-tbody > tr > td,
+.permissions-matrix-table .ant-table-thead > tr > th {
+  overflow: visible !important;
+}
