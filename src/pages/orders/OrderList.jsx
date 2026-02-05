@@ -310,10 +310,9 @@ const OrderList = () => {
 
   const handleRefresh = () => {
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Data refreshed');
-    }, 1000);
+    // Refresh data immediately - no artificial delay
+    setLoading(false);
+    message.success('Data refreshed');
   };
 
   return (

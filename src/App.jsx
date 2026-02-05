@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
+import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/auth/Login';
 import Dashboard from './pages/Dashboard';
 import OrderList from './pages/orders/OrderList';
 import OrderForm from './pages/orders/OrderForm';
@@ -11,8 +14,11 @@ import POForm from './pages/po/POForm';
 import GRNList from './pages/grn/GRNList';
 import GRNForm from './pages/grn/GRNForm';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import UserManagement from './pages/admin/UserManagement';
+import RoleAccess from './pages/admin/RoleAccess';
 import MasterDashboard from './pages/master/MasterDashboard';
 import './index.css';
+import './styles/overrides.css';
 
 const themeConfig = {
   token: {
@@ -44,9 +50,21 @@ const themeConfig = {
 function App() {
   return (
     <ConfigProvider theme={themeConfig}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<MainLayout />}>
+      <StoreProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Route */}
+            <Route path="/login" element={<Login />} />
+            
+            {/* Protected Routes */}
+            <Route
+              path="/"
+              element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }
+          >
             <Route index element={<Dashboard />} />
             {/* Orders */}
             <Route path="orders/list" element={<OrderList />} />
@@ -66,12 +84,15 @@ function App() {
             <Route path="grn/edit/:id" element={<GRNForm />} />
             {/* Admin */}
             <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin/users" element={<UserManagement />} />
+            <Route path="admin/roles" element={<RoleAccess />} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
           </Route>
         </Routes>
       </BrowserRouter>
-    </ConfigProvider>
+    </StoreProvider>
+  </ConfigProvider>
   );
 }
 
