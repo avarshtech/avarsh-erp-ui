@@ -32,8 +32,7 @@ const MasterDashboard = () => {
       setLoading('categories', true);
       fetchPromises.push(
         getAllCategories()
-          .then(response => {
-            const data = Array.isArray(response) ? response : (response?.content || []);
+          .then(({ data }) => {
             setData('categories', data);
             console.debug('MasterDashboard: categories fetched, count=', data?.length);
           })
@@ -50,8 +49,7 @@ const MasterDashboard = () => {
       setLoading('subCategories', true);
       fetchPromises.push(
         getAllSubCategories()
-          .then(response => {
-            const data = Array.isArray(response) ? response : (response?.content || []);
+          .then(({ data }) => {
             setData('subCategories', data);
             console.debug('MasterDashboard: subCategories fetched, count=', data?.length);
           })
@@ -68,8 +66,7 @@ const MasterDashboard = () => {
       setLoading('itemTypes', true);
       fetchPromises.push(
         getAllItemTypes()
-          .then(response => {
-            const data = Array.isArray(response) ? response : (response?.content || []);
+          .then(({ data }) => {
             setData('itemTypes', data);
             console.debug('MasterDashboard: itemTypes fetched, count=', data?.length);
           })
@@ -86,8 +83,7 @@ const MasterDashboard = () => {
       setLoading('attributes', true);
       fetchPromises.push(
         getAllAttributes()
-          .then(response => {
-            const data = Array.isArray(response) ? response : (response?.content || []);
+          .then(({ data }) => {
             setData('attributes', data);
             console.debug('MasterDashboard: attributes fetched, count=', data?.length);
           })
@@ -104,8 +100,7 @@ const MasterDashboard = () => {
       setLoading('uoms', true);
       fetchPromises.push(
         getAllUOMs()
-          .then(response => {
-            const data = Array.isArray(response) ? response : (response?.content || []);
+          .then(({ data }) => {
             setData('uoms', data);
             console.debug('MasterDashboard: uoms fetched, count=', data?.length);
           })
@@ -117,21 +112,15 @@ const MasterDashboard = () => {
       );
     }
 
-    // Wait for all fetches to complete (use allSettled so one failing request
-    // doesn't short-circuit other metadata fetches)
+    // Wait for all fetches to complete
     if (fetchPromises.length > 0) {
-      const results = await Promise.allSettled(fetchPromises);
-      console.debug('MasterDashboard: fetchAllMetaData results', results);
+      await Promise.all(fetchPromises);
     }
   }, [categories, subCategories, itemTypes, attributes, uoms, isCacheValid, setData, setLoading]);
 
   useEffect(() => {
     fetchAllMetaData();
   }, []);
-
-  // Check if any metadata is still loading
-  const isMetaDataLoading = loading.categories || loading.subCategories || 
-                            loading.itemTypes || loading.attributes || loading.uoms;
 
   const items = [
     {

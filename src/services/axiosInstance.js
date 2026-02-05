@@ -28,7 +28,7 @@ axiosInstance.interceptors.request.use(
 // Response interceptor for error handling
 // Return `response.data` so service callers receive the payload directly
 axiosInstance.interceptors.response.use(
-  (response) => response.data,
+  (response) => response,
   (error) => {
     let errorMessage = 'An unexpected error occurred';
 

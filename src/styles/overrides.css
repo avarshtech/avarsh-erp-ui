@@ -223,3 +223,137 @@ textarea.ant-input:active {
 .permissions-matrix-table .ant-table-thead > tr > th {
   overflow: visible !important;
 }
+
+/* ============================================================
+   SIDEBAR / SIDER MENU OVERRIDES
+   ============================================================ */
+
+/* 1. Fix hover popup submenu background - solid dark background with proper styling */
+.ant-menu-submenu-popup {
+  padding: 0 !important;
+}
+
+.ant-menu-submenu-popup > .ant-menu,
+.ant-menu-submenu > .ant-menu,
+.ant-menu-dark .ant-menu-submenu-popup,
+.ant-menu-dark.ant-menu-submenu > .ant-menu,
+.ant-menu-submenu-popup .ant-menu-sub {
+  background: #001529 !important;
+  border-radius: 8px !important;
+  padding: 8px 0 !important;
+  min-width: 200px !important;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.2), 
+              0 3px 6px -4px rgba(0, 0, 0, 0.15), 
+              0 9px 28px 8px rgba(0, 0, 0, 0.1) !important;
+  overflow: visible !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item {
+  margin: 4px 8px !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  height: auto !important;
+  line-height: 1.5 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item-selected,
+.ant-menu-submenu-popup .ant-menu-item-selected:hover {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+/* 2. Fix collapsed sidebar - center icons with even padding */
+.ant-layout-sider-collapsed .ant-menu-inline-collapsed {
+  width: 80px !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-submenu-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 80px !important;
+  height: 48px !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  margin: 4px 0 !important;
+  text-align: center !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-item .anticon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: auto !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-title-content {
+  display: none !important;
+  width: 0 !important;
+  opacity: 0 !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-submenu-arrow {
+  display: none !important;
+}
+
+/* 3. Fix expanded sidebar - align icon and text with consistent spacing */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title {
+  display: flex !important;
+  align-items: center !important;
+  height: 48px !important;
+  margin: 4px 12px !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+}
+
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item .ant-menu-item-icon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title .ant-menu-item-icon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item .anticon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title .anticon {
+  min-width: 20px !important;
+  width: 20px !important;
+  font-size: 18px !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-title-content {
+  flex: 1 !important;
+  margin-inline-start: 0 !important;
+}
+
+/* Submenu children items - add extra left padding for hierarchy */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-sub .ant-menu-item {
+  margin-left: 24px !important;
+  padding-left: 20px !important;
+}
+
+/* Expanded sidebar hover effect */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item:hover,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Selected item styling */
+.ant-menu-dark .ant-menu-item-selected {
+  background: var(--primary-color) !important;
+  border-radius: 8px !important;
+}
