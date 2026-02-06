@@ -34,7 +34,7 @@ const MasterSplitView = ({
               </Space>
             }
             style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-            bodyStyle={{ flex: 1, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' }}
+            styles={{ body: { flex: 1, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } }}
           >
            {onSearch && (
              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>

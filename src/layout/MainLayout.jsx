@@ -175,6 +175,7 @@ const MainLayout = () => {
           top: 0,
           bottom: 0,
           zIndex: 100,
+            overflow: 'hidden',
         }}
       >
         <div
@@ -207,7 +208,7 @@ const MainLayout = () => {
           defaultOpenKeys={getOpenKeys()}
           items={menuItems}
           onClick={handleMenuClick}
-          style={{ marginTop: 8, border: "none" }}
+          style={{ marginTop: 8, border: "none", overflow: 'hidden' }}
         />
       </Sider>
       <Layout

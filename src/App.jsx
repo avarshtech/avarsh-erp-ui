@@ -83,7 +83,7 @@ function App() {
             <Route path="grn/new" element={<GRNForm />} />
             <Route path="grn/edit/:id" element={<GRNForm />} />
             {/* Admin */}
-            <Route path="admin" element={<AdminDashboard />} />
+            <Route path="admin/dashboard" element={<AdminDashboard />} />
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="admin/roles" element={<RoleAccess />} />
             {/* Master Data */}

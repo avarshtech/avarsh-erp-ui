@@ -208,16 +208,12 @@ const SubCategoryMaster = () => {
                 label="Parent Category" 
                 rules={[{ required: true, message: 'Please select a category' }]}
               >
-                <Select 
-                  placeholder="Select Category" 
+                <Select
+                  placeholder="Select Category"
                   size="large"
                   showSearch
-                  optionFilterProp="children"
-                >
-                  {categories.map(c => (
-                    <Select.Option key={c.id} value={c.id}>{c.name}</Select.Option>
-                  ))}
-                </Select>
+                  options={categories.map(c => ({ value: c.id, label: c.name }))}
+                />
               </Form.Item>
               <Form.Item 
                 name="name" 

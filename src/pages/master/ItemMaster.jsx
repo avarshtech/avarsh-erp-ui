@@ -15,6 +15,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
 import dayjs from 'dayjs';
 
+import { useStore } from '../../context/StoreContext';
 const { Text } = Typography;
 
 const MODULE_ID = 'items';
@@ -60,13 +61,13 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
   return (
     <Select
       open={open}
-      onDropdownVisibleChange={setOpen}
+      onOpenChange={setOpen}
       value={value || undefined}
       placeholder={placeholder || 'Select Color'}
       allowClear
       onClear={() => onChange('')}
       style={{ width: '100%' }}
-      dropdownRender={() => (
+      popupRender={() => (
         <div style={{ padding: 8 }}>
           <Input
             placeholder="Search colors..."
@@ -112,25 +113,22 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
           </div>
         </div>
       )}
-    >
-      {selectedColor ? (
-        <Select.Option value={selectedColor.name}>
-          <Space>
-            <span
-              style={{
-                display: 'inline-block',
-                width: 16,
-                height: 16,
-                borderRadius: 3,
-                background: selectedColor.hex,
-                border: '1px solid rgba(0,0,0,0.1)',
-              }}
-            />
-            {selectedColor.name}
-          </Space>
-        </Select.Option>
-      ) : null}
-    </Select>
+      options={selectedColor ? [{ value: selectedColor.name, label: (
+        <Space>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 16,
+              height: 16,
+              borderRadius: 3,
+              background: selectedColor.hex,
+              border: '1px solid rgba(0,0,0,0.1)',
+            }}
+          />
+          {selectedColor.name}
+        </Space>
+      ) }] : []}
+    />
   );
 };
 
@@ -149,10 +147,8 @@ const ItemMaster = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   const [sortConfig, setSortConfig] = useState({ field: 'createdAt', order: 'descend' });
 
-  // Filters
-  const [categories, setCategories] = useState([]);
-  const [allSubcategories, setAllSubcategories] = useState([]);
-  const [allItemTypes, setAllItemTypes] = useState([]);
+  // Filters (use global store for master lists)
+  const { categories: storeCategories, subCategories: storeSubCategories, itemTypes: storeItemTypes } = useStore();
   const [subcategories, setSubcategories] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -195,6 +191,25 @@ const ItemMaster = () => {
 
   const isEditMode = !!selectedItem;
 
+  // Resolve attribute value from variant/item attributes object
+  const resolveAttributeValue = (attributesObj, attr) => {
+    if (!attributesObj || typeof attributesObj !== 'object') return '';
+    const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const attrName = normalize(attr.attributeName || attr.name || '');
+    const attrCamel = normalize(toCamelCase(attr.attributeName || attr.name || ''));
+    const idStr = String(attr.id);
+
+    for (const k of Object.keys(attributesObj)) {
+      const kn = normalize(k);
+      if (kn === attrName || kn === attrCamel || kn === idStr) {
+        return attributesObj[k];
+      }
+    }
+
+    if (attributesObj[attr.id] !== undefined) return attributesObj[attr.id];
+    return '';
+  };
+
   // Fetch Items
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -211,41 +226,6 @@ const ItemMaster = () => {
 
       setAllItems(items);
       setFilteredItems(items);
-
-      // Extract unique categories, subcategories, and item types for filters
-      const categoryMap = new Map();
-      const subcategoryMap = new Map();
-      const itemTypeMap = new Map();
-
-      items.forEach((item) => {
-        if (item.categoryId && item.categoryName) {
-          if (!categoryMap.has(item.categoryId)) {
-            categoryMap.set(item.categoryId, { id: item.categoryId, name: item.categoryName });
-          }
-        }
-        if (item.subCategoryId && item.subCategoryName) {
-          if (!subcategoryMap.has(item.subCategoryId)) {
-            subcategoryMap.set(item.subCategoryId, {
-              id: item.subCategoryId,
-              name: item.subCategoryName,
-              categoryId: item.categoryId,
-            });
-          }
-        }
-        if (item.itemTypeId && item.itemTypeName) {
-          if (!itemTypeMap.has(item.itemTypeId)) {
-            itemTypeMap.set(item.itemTypeId, {
-              id: item.itemTypeId,
-              name: item.itemTypeName,
-              subCategoryId: item.subCategoryId,
-            });
-          }
-        }
-      });
-
-      setCategories(Array.from(categoryMap.values()));
-      setAllSubcategories(Array.from(subcategoryMap.values()));
-      setAllItemTypes(Array.from(itemTypeMap.values()));
     } catch (error) {
       console.error('Failed to fetch items:', error);
       message.error('Failed to load items');
@@ -336,25 +316,22 @@ const ItemMaster = () => {
 
   // Update subcategories when category filter changes
   useEffect(() => {
-    if (selectedCategory) {
-      setSubcategories(allSubcategories.filter((sc) => sc.categoryId === parseInt(selectedCategory)));
-    } else {
-      setSubcategories([]);
-    }
-    setSelectedSubcategory('');
-    setSelectedItemType('');
-    setItemTypes([]);
-  }, [selectedCategory, allSubcategories]);
+    // For filter dropdowns, always expose the full lists from the global
+    // master store so users can combine filters freely and rely on the
+    // centralized master data (populated by MasterDashboard).
+    setSubcategories(storeSubCategories || []);
+    setItemTypes(storeItemTypes || []);
+    // Intentionally do not reset `selectedSubcategory` or `selectedItemType` here
+    // so the user can apply multiple filters together.
+  }, [selectedCategory, storeSubCategories, storeItemTypes]);
 
   // Update item types when subcategory filter changes
   useEffect(() => {
-    if (selectedSubcategory) {
-      setItemTypes(allItemTypes.filter((it) => it.subCategoryId === parseInt(selectedSubcategory)));
-    } else {
-      setItemTypes([]);
-    }
-    setSelectedItemType('');
-  }, [selectedSubcategory, allItemTypes]);
+    // Keep item type dropdown populated from the global store so users can
+    // filter across types regardless of selected subcategory/category.
+    setItemTypes(storeItemTypes || []);
+    // Do not reset `selectedItemType` here to preserve user's selection.
+  }, [selectedSubcategory, storeItemTypes]);
 
   // Form Category Change Handler
   const handleFormCategoryChange = useCallback(
@@ -529,17 +506,7 @@ const ItemMaster = () => {
               // Map attributes from variant.attributes
               if (variant.attributes && typeof variant.attributes === 'object') {
                 itemType.attributes.forEach((attr) => {
-                  const attrName = attr.attributeName.toLowerCase();
-                  const matchKey = Object.keys(variant.attributes).find(
-                    (k) => k.toLowerCase() === attrName
-                  );
-                  if (matchKey) {
-                    variantObj[attr.id] = variant.attributes[matchKey];
-                  } else if (variant.attributes[attr.id] !== undefined) {
-                    variantObj[attr.id] = variant.attributes[attr.id];
-                  } else {
-                    variantObj[attr.id] = '';
-                  }
+                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
                 });
               }
 
@@ -552,19 +519,7 @@ const ItemMaster = () => {
             // No variants, create one from item attributes (legacy)
             const defaultVariant = { isActive: true };
             itemType.attributes.forEach((attr) => {
-              const attrName = attr.attributeName.toLowerCase();
-              if (item.attributes && typeof item.attributes === 'object') {
-                const matchKey = Object.keys(item.attributes).find(
-                  (k) => k.toLowerCase() === attrName
-                );
-                if (matchKey) {
-                  defaultVariant[attr.id] = item.attributes[matchKey];
-                } else {
-                  defaultVariant[attr.id] = item.attributes[attr.id] || '';
-                }
-              } else {
-                defaultVariant[attr.id] = '';
-              }
+              defaultVariant[attr.id] = resolveAttributeValue(item.attributes, attr);
             });
             setVariants([defaultVariant]);
             setActiveVariantIndex(0);
@@ -787,6 +742,7 @@ const ItemMaster = () => {
           setFormUomOptions(itemType.uoms || []);
 
           // Load variants
+          // Load variants
           if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
             const loadedVariants = item.variants.map((variant) => {
               const variantObj = {
@@ -796,15 +752,7 @@ const ItemMaster = () => {
               };
               if (variant.attributes && typeof variant.attributes === 'object') {
                 itemType.attributes.forEach((attr) => {
-                  const attrName = attr.attributeName.toLowerCase();
-                  const matchKey = Object.keys(variant.attributes).find(
-                    (k) => k.toLowerCase() === attrName
-                  );
-                  if (matchKey) {
-                    variantObj[attr.id] = variant.attributes[matchKey];
-                  } else {
-                    variantObj[attr.id] = variant.attributes[attr.id] || '';
-                  }
+                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
                 });
               }
               return variantObj;
@@ -926,7 +874,9 @@ const ItemMaster = () => {
         message.success('Item created successfully');
       }
 
-      handleModalClose();
+      // Close directly after successful save to avoid triggering the
+      // unsaved-changes confirmation (doCloseModal clears the flag).
+      doCloseModal();
       fetchItems();
     } catch (error) {
       console.error('Failed to save item:', error);
@@ -1144,13 +1094,8 @@ const ItemMaster = () => {
                 style={{ width: '100%' }}
                 value={selectedCategory || undefined}
                 onChange={(val) => setSelectedCategory(val || '')}
-              >
-                {categories.map((cat) => (
-                  <Select.Option key={cat.id} value={cat.id.toString()}>
-                    {cat.name}
-                  </Select.Option>
-                ))}
-              </Select>
+                options={(storeCategories || []).map((cat) => ({ value: cat.id.toString(), label: cat.name }))}
+              />
             </Col>
             <Col xs={24} sm={12} md={6} lg={4}>
               <Select
@@ -1159,13 +1104,8 @@ const ItemMaster = () => {
                 style={{ width: '100%' }}
                 value={selectedSubcategory || undefined}
                 onChange={(val) => setSelectedSubcategory(val || '')}
-              >
-                {subcategories.map((sc) => (
-                  <Select.Option key={sc.id} value={sc.id.toString()}>
-                    {sc.name}
-                  </Select.Option>
-                ))}
-              </Select>
+                options={(subcategories || []).map((sc) => ({ value: sc.id.toString(), label: sc.name }))}
+              />
             </Col>
             <Col xs={24} sm={12} md={6} lg={4}>
               <Select
@@ -1174,13 +1114,8 @@ const ItemMaster = () => {
                 style={{ width: '100%' }}
                 value={selectedItemType || undefined}
                 onChange={(val) => setSelectedItemType(val || '')}
-              >
-                {itemTypes.map((it) => (
-                  <Select.Option key={it.id} value={it.id.toString()}>
-                    {it.name}
-                  </Select.Option>
-                ))}
-              </Select>
+                options={(itemTypes || []).map((it) => ({ value: it.id.toString(), label: it.name }))}
+              />
             </Col>
             <Col xs={24} sm={12} md={6} lg={3}>
               <Select
@@ -1189,10 +1124,8 @@ const ItemMaster = () => {
                 style={{ width: '100%' }}
                 value={selectedStatus || undefined}
                 onChange={(val) => setSelectedStatus(val || '')}
-              >
-                <Select.Option value="active">Active</Select.Option>
-                <Select.Option value="inactive">Inactive</Select.Option>
-              </Select>
+                options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+              />
             </Col>
             <Col>
               <Button icon={<ClearOutlined />} onClick={clearFilters}>
@@ -1238,10 +1171,10 @@ const ItemMaster = () => {
         onCancel={handleModalClose}
         width={'80vw'}
         footer={null}
-        destroyOnClose
-        bodyStyle={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' }}
+        destroyOnHidden
+          styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
       >
-        <Spin spinning={metaDataLoading || submitting} tip={metaDataLoading ? 'Loading form data...' : 'Saving...'}>
+        <Spin spinning={metaDataLoading || submitting}>
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
@@ -1254,14 +1187,8 @@ const ItemMaster = () => {
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
                     showSearch
-                    optionFilterProp="children"
-                  >
-                    {formCategories.map((cat) => (
-                      <Select.Option key={cat.id} value={cat.id.toString()}>
-                        {cat.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                    options={formCategories.map((cat) => ({ value: cat.id.toString(), label: cat.name }))}
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
@@ -1274,15 +1201,9 @@ const ItemMaster = () => {
                     placeholder="Select Subcategory"
                     onChange={handleFormSubcategoryChange}
                     showSearch
-                    optionFilterProp="children"
                     disabled={!isEditMode && !form.getFieldValue('categoryId')}
-                  >
-                    {formSubcategories.map((sc) => (
-                      <Select.Option key={sc.id} value={sc.id.toString()}>
-                        {sc.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                    options={formSubcategories.map((sc) => ({ value: sc.id.toString(), label: sc.name }))}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -1298,15 +1219,9 @@ const ItemMaster = () => {
                     placeholder="Select Item Type"
                     onChange={handleFormItemTypeChange}
                     showSearch
-                    optionFilterProp="children"
                     disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
-                  >
-                    {formItemTypes.map((it) => (
-                      <Select.Option key={it.id} value={it.id.toString()}>
-                        {it.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                    options={formItemTypes.map((it) => ({ value: it.id.toString(), label: it.name }))}
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
@@ -1378,13 +1293,7 @@ const ItemMaster = () => {
                   label="Primary UOM"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
-                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')}>
-                    {formUomOptions.map((opt) => (
-                      <Select.Option key={opt.id} value={opt.id.toString()}>
-                        {opt.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: opt.id.toString(), label: opt.name }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1402,17 +1311,12 @@ const ItemMaster = () => {
                     }),
                   ]}
                 >
-                  <Select
-                    placeholder="Select Secondary UOM (optional)"
-                    allowClear
-                    disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
-                  >
-                    {formUomOptions.map((opt) => (
-                      <Select.Option key={opt.id} value={opt.id.toString()}>
-                        {opt.name}
-                      </Select.Option>
-                    ))}
-                  </Select>
+                    <Select
+                      placeholder="Select Secondary UOM (optional)"
+                      allowClear
+                      disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
+                      options={formUomOptions.map(opt => ({ value: opt.id.toString(), label: opt.name }))}
+                    />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1612,7 +1516,7 @@ const ItemMaster = () => {
           </Space>
         }
         placement="right"
-        width={720}
+        size={720}
         onClose={() => {
           setViewDrawerVisible(false);
           setViewingItem(null);
