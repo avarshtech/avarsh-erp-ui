@@ -28,7 +28,7 @@ import {
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
-import avarshLogo from "../assets/images/avarsh-logo.png";
+import avarshLogo from "../assets/images/avarsh-logo-light.png";
 
 const { Header, Sider, Content } = Layout;
 
@@ -113,7 +113,7 @@ const MainLayout = () => {
       icon: <SettingOutlined />,
       label: "Admin",
       children: [
-        { key: "/admin", label: "Dashboard" },
+        { key: "/admin/dashboard", label: "Dashboard" },
         { key: "/admin/users", label: "Users" },
         { key: "/admin/roles", label: "Role & Access" },
       ],
