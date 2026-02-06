@@ -112,9 +112,11 @@ const MasterDashboard = () => {
       );
     }
 
-    // Wait for all fetches to complete
+    // Wait for all fetches to complete (use allSettled so one failing request
+    // doesn't short-circuit other metadata fetches)
     if (fetchPromises.length > 0) {
-      await Promise.all(fetchPromises);
+      const results = await Promise.allSettled(fetchPromises);
+      console.debug('MasterDashboard: fetchAllMetaData results', results);
     }
   }, [categories, subCategories, itemTypes, attributes, uoms, isCacheValid, setData, setLoading]);
 
