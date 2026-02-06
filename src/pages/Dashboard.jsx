@@ -9,42 +9,45 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
+import { useTheme } from '../context/ThemeContext';
 
 const { Title, Text } = Typography;
 
 const Dashboard = () => {
+  const { isDarkMode } = useTheme();
+  
   const statsData = [
     {
       title: 'Total Orders',
       value: 1284,
       icon: <ShoppingCartOutlined />,
       growth: 12.5,
-      color: '#6366f1',
-      bgColor: '#e0e7ff',
+      color: isDarkMode ? '#818cf8' : '#6366f1',
+      bgColor: isDarkMode ? '#312e81' : '#e0e7ff',
     },
     {
       title: 'Active BOMs',
       value: 89,
       icon: <FileTextOutlined />,
       growth: 8.2,
-      color: '#10b981',
-      bgColor: '#d1fae5',
+      color: isDarkMode ? '#4ade80' : '#10b981',
+      bgColor: isDarkMode ? '#14532d' : '#d1fae5',
     },
     {
       title: 'Pending POs',
       value: 156,
       icon: <ShoppingOutlined />,
       growth: -3.1,
-      color: '#f59e0b',
-      bgColor: '#fef3c7',
+      color: isDarkMode ? '#fbbf24' : '#f59e0b',
+      bgColor: isDarkMode ? '#78350f' : '#fef3c7',
     },
     {
       title: 'GRN Today',
       value: 24,
       icon: <InboxOutlined />,
       growth: 18.7,
-      color: '#ef4444',
-      bgColor: '#fee2e2',
+      color: isDarkMode ? '#f87171' : '#ef4444',
+      bgColor: isDarkMode ? '#7f1d1d' : '#fee2e2',
     },
   ];
 
@@ -119,7 +122,7 @@ const Dashboard = () => {
       title: 'Order ID',
       dataIndex: 'orderId',
       key: 'orderId',
-      render: (text) => <Text strong style={{ color: '#6366f1' }}>{text}</Text>,
+      render: (text) => <Text strong style={{ color: isDarkMode ? '#818cf8' : '#6366f1' }}>{text}</Text>,
     },
     {
       title: 'Customer',
@@ -179,7 +182,7 @@ const Dashboard = () => {
       title: 'Amount',
       dataIndex: 'amount',
       key: 'amount',
-      render: (amount) => <Text strong style={{ color: '#10b981' }}>{amount}</Text>,
+      render: (amount) => <Text strong style={{ color: isDarkMode ? '#4ade80' : '#10b981' }}>{amount}</Text>,
     },
     {
       title: 'Due Date',
@@ -303,27 +306,27 @@ const Dashboard = () => {
         <Col xs={24} lg={8}>
           <Card title="Quick Stats">
             <Space orientation="vertical" style={{ width: '100%' }} size={16}>
-              <Card size="small" style={{ background: '#f0fdf4' }}>
+              <Card size="small" style={{ background: isDarkMode ? '#14532d' : '#f0fdf4' }}>
                 <Space>
-                  <CheckCircleOutlined style={{ fontSize: 24, color: '#22c55e' }} />
+                  <CheckCircleOutlined style={{ fontSize: 24, color: isDarkMode ? '#4ade80' : '#22c55e' }} />
                   <div>
                     <Text type="secondary">Completed Today</Text>
                     <Title level={4} style={{ margin: 0 }}>12 Orders</Title>
                   </div>
                 </Space>
               </Card>
-              <Card size="small" style={{ background: '#fef3c7' }}>
+              <Card size="small" style={{ background: isDarkMode ? '#78350f' : '#fef3c7' }}>
                 <Space>
-                  <ClockCircleOutlined style={{ fontSize: 24, color: '#f59e0b' }} />
+                  <ClockCircleOutlined style={{ fontSize: 24, color: isDarkMode ? '#fbbf24' : '#f59e0b' }} />
                   <div>
                     <Text type="secondary">Pending Approval</Text>
                     <Title level={4} style={{ margin: 0 }}>8 POs</Title>
                   </div>
                 </Space>
               </Card>
-              <Card size="small" style={{ background: '#e0e7ff' }}>
+              <Card size="small" style={{ background: isDarkMode ? '#312e81' : '#e0e7ff' }}>
                 <Space>
-                  <InboxOutlined style={{ fontSize: 24, color: '#6366f1' }} />
+                  <InboxOutlined style={{ fontSize: 24, color: isDarkMode ? '#818cf8' : '#6366f1' }} />
                   <div>
                     <Text type="secondary">Expected Deliveries</Text>
                     <Title level={4} style={{ margin: 0 }}>5 GRNs</Title>

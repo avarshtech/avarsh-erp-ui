@@ -9,6 +9,7 @@ import UomMaster from './UomMaster';
 import ItemMaster from './ItemMaster';
 import SupplierMaster from './SupplierMaster';
 import { useStore } from '../../context/StoreContext';
+import { useTheme } from '../../context/ThemeContext';
 import {
   getAllCategories,
   getAllSubCategories,
@@ -18,6 +19,7 @@ import {
 } from '../../services/masterDataService';
 
 const MasterDashboard = () => {
+  const { isDarkMode } = useTheme();
   const { 
     categories, subCategories, itemTypes, attributes, uoms,
     setData, setLoading, loading, isCacheValid 
@@ -186,14 +188,20 @@ const MasterDashboard = () => {
     <div className="animate-fade-in-up">
       <div className="page-header" style={{ marginBottom: 16 }}>
         <h1 style={{ marginBottom: 0 }}>Master Data Management</h1>
-        <p style={{ color: '#64748b', marginTop: 4 }}>Manage suppliers, inventory items, categories, and configurations</p>
+        <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b', marginTop: 4 }}>Manage suppliers, inventory items, categories, and configurations</p>
       </div>
       
       <Tabs 
         defaultActiveKey="supplier" 
         items={items} 
         size="large"
-        tabBarStyle={{ marginBottom: 24, background: '#fff', padding: '0 16px', borderRadius: '8px' }}
+        tabBarStyle={{ 
+          marginBottom: 24, 
+          background: isDarkMode ? '#1e293b' : '#fff', 
+          padding: '0 16px', 
+          borderRadius: '8px',
+          border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0'
+        }}
       />
     </div>
   );

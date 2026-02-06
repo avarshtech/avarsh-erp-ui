@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -20,36 +21,12 @@ import MasterDashboard from './pages/master/MasterDashboard';
 import './index.css';
 import './styles/overrides.css';
 
-const themeConfig = {
-  token: {
-    colorPrimary: '#6366f1',
-    colorSuccess: '#22c55e',
-    colorWarning: '#f59e0b',
-    colorError: '#ef4444',
-    colorInfo: '#3b82f6',
-    borderRadius: 10,
-    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-  },
-  components: {
-    Button: {
-      borderRadius: 10,
-      controlHeight: 40,
-    },
-    Input: {
-      controlHeight: 40,
-    },
-    Select: {
-      controlHeight: 40,
-    },
-    Table: {
-      borderRadius: 12,
-    },
-  },
-};
+// Inner component that uses theme context
+const ThemedApp = () => {
+  const { antThemeConfig } = useTheme();
 
-function App() {
   return (
-    <ConfigProvider theme={themeConfig}>
+    <ConfigProvider theme={antThemeConfig}>
       <StoreProvider>
         <BrowserRouter>
           <Routes>
@@ -93,6 +70,14 @@ function App() {
       </BrowserRouter>
     </StoreProvider>
   </ConfigProvider>
+  );
+};
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   );
 }
 
