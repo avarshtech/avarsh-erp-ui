@@ -1254,10 +1254,10 @@ const ItemMaster = () => {
                           left: 0,
                           right: 0,
                           zIndex: 2000,
-                          background: '#fff',
-                          border: '1px solid #d9d9d9',
+                          background: 'var(--card-bg)',
+                          border: '1px solid var(--border-color)',
                           borderRadius: 8,
-                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          boxShadow: 'var(--shadow-md)',
                           maxHeight: 200,
                           overflowY: 'auto',
                           marginTop: 4,
@@ -1269,12 +1269,12 @@ const ItemMaster = () => {
                             style={{
                               padding: '8px 12px',
                               cursor: 'pointer',
-                              borderBottom: idx < suggestions.length - 1 ? '1px solid #f0f0f0' : 'none',
+                              borderBottom: idx < suggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
                             }}
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => applySelectedItem(s)}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = '#f5f5f5')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = '#fff')}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--card-bg)')}
                           >
                             {s.itemName}
                           </div>
@@ -1338,7 +1338,7 @@ const ItemMaster = () => {
             {formAttributes.length > 0 && (
               <div
                 style={{
-                  background: '#fafafa',
+                  background: 'var(--card-bg)',
                   borderRadius: 8,
                   padding: 16,
                   marginBottom: 16,
@@ -1373,10 +1373,10 @@ const ItemMaster = () => {
                         fontSize: 14,
                         border:
                           duplicateVariantIndex === originalIndex
-                            ? '2px solid #ff4d4f'
-                            : activeVariantIndex === originalIndex
-                            ? '2px solid #1890ff'
-                            : '1px solid #d9d9d9',
+                              ? '2px solid #ff4d4f'
+                              : activeVariantIndex === originalIndex
+                              ? '2px solid #1890ff'
+                              : '1px solid var(--border-color)',
                       }}
                       onClick={() => {
                         setActiveVariantIndex(originalIndex);
@@ -1397,24 +1397,24 @@ const ItemMaster = () => {
                 {activeVariantsWithIndex.length > 0 && variants[activeVariantIndex]?.isActive !== false && (
                   <div
                     style={{
-                      background: duplicateVariantIndex === activeVariantIndex ? '#fff2f0' : '#fff',
+                      background: duplicateVariantIndex === activeVariantIndex ? 'var(--bg-elevated)' : 'var(--card-bg)',
                       borderRadius: 8,
                       padding: 16,
                       border:
                         duplicateVariantIndex === activeVariantIndex
-                          ? '1px solid #ffccc7'
-                          : '1px solid #f0f0f0',
+                          ? '1px solid rgba(255,69,58,0.12)'
+                          : '1px solid var(--border-color)',
                     }}
                   >
                     {duplicateVariantIndex === activeVariantIndex && (
                       <div
                         style={{
-                          background: '#fff2f0',
-                          border: '1px solid #ffccc7',
+                          background: 'rgba(255,69,58,0.06)',
+                          border: '1px solid rgba(255,69,58,0.18)',
                           borderRadius: 4,
                           padding: '8px 12px',
                           marginBottom: 16,
-                          color: '#ff4d4f',
+                          color: 'var(--error-color)',
                         }}
                       >
                         <ExclamationCircleOutlined style={{ marginRight: 8 }} />
@@ -1571,9 +1571,9 @@ const ItemMaster = () => {
                       style={{
                         marginBottom: 0,
                         padding: 12,
-                        border: '1px solid #f0f0f0',
+                        border: '1px solid var(--border-color)',
                         borderRadius: 6,
-                        background: '#fff',
+                        background: 'var(--card-bg)',
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1593,9 +1593,9 @@ const ItemMaster = () => {
                                   alignItems: 'center',
                                   gap: 8,
                                   padding: '6px 10px',
-                                  background: '#fafafa',
+                                  background: 'var(--bg-tertiary)',
                                   borderRadius: 6,
-                                  border: '1px solid #f0f0f0',
+                                  border: '1px solid var(--border-color)',
                                   minWidth: 120,
                                 }}
                               >

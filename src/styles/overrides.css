@@ -927,3 +927,8 @@ textarea.ant-input:active {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
   color: #ffffff !important;
 }
+
+/* Ensure Ant Design message/notification text and icons are white in dark mode */
+[data-theme="dark"] .ant-message-notice .ant-message-custom-content {
+  color: #f1f5f9 !important;
+}
