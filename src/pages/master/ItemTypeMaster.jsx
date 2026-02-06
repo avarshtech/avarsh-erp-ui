@@ -211,17 +211,13 @@ const ItemTypeMaster = () => {
                 name="subCategoryId" 
                 label="Sub Category"
               >
-                <Select 
-                  placeholder="Select Sub Category" 
+                <Select
+                  placeholder="Select Sub Category"
                   size="large"
                   showSearch
                   allowClear
-                  optionFilterProp="children"
-                >
-                  {subCategories.map(s => (
-                    <Select.Option key={s.id} value={s.id}>{s.name}</Select.Option>
-                  ))}
-                </Select>
+                  options={subCategories.map(s => ({ value: s.id, label: s.name }))}
+                />
               </Form.Item>
               <Form.Item 
                 name="name" 
@@ -237,33 +233,25 @@ const ItemTypeMaster = () => {
                 name="attributeIds" 
                 label="Attributes"
               >
-                <Select 
+                <Select
                   mode="multiple"
-                  placeholder="Select Attributes" 
+                  placeholder="Select Attributes"
                   size="large"
                   showSearch
-                  optionFilterProp="children"
-                >
-                  {attributes.map(a => (
-                    <Select.Option key={a.id} value={a.id}>{a.attributeName || a.name}</Select.Option>
-                  ))}
-                </Select>
+                  options={attributes.map(a => ({ value: a.id, label: a.attributeName || a.name }))}
+                />
               </Form.Item>
               <Form.Item 
                 name="uomIds" 
                 label="Units of Measure"
               >
-                <Select 
+                <Select
                   mode="multiple"
-                  placeholder="Select UOMs" 
+                  placeholder="Select UOMs"
                   size="large"
                   showSearch
-                  optionFilterProp="children"
-                >
-                  {uoms.map(u => (
-                    <Select.Option key={u.id} value={u.id}>{u.name}</Select.Option>
-                  ))}
-                </Select>
+                  options={uoms.map(u => ({ value: u.id, label: u.name }))}
+                />
               </Form.Item>
             </Form>
           </div>

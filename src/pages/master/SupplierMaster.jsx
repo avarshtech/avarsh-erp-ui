@@ -477,14 +477,14 @@ const SupplierMaster = () => {
             </div>
 
             <Divider orientation="left">Basic Information</Divider>
-            <Descriptions column={1} size="small" labelStyle={{ width: 120 }}>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
               <Descriptions.Item label="Supplier ID">{viewingSupplier.id}</Descriptions.Item>
               <Descriptions.Item label="Email">{viewingSupplier.email || '-'}</Descriptions.Item>
               <Descriptions.Item label="Phone">{viewingSupplier.phone || '-'}</Descriptions.Item>
             </Descriptions>
 
             <Divider orientation="left">Address</Divider>
-            <Descriptions column={1} size="small" labelStyle={{ width: 120 }}>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
               <Descriptions.Item label="Address">{viewingSupplier.address || '-'}</Descriptions.Item>
               <Descriptions.Item label="City">{viewingSupplier.city || '-'}</Descriptions.Item>
               <Descriptions.Item label="State">{viewingSupplier.state || '-'}</Descriptions.Item>
@@ -493,7 +493,7 @@ const SupplierMaster = () => {
             </Descriptions>
 
             <Divider orientation="left">Tax Information</Divider>
-            <Descriptions column={1} size="small" labelStyle={{ width: 120 }}>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
               <Descriptions.Item label="PAN">{viewingSupplier.pan || '-'}</Descriptions.Item>
               <Descriptions.Item label="GSTIN">{viewingSupplier.gstin || '-'}</Descriptions.Item>
               <Descriptions.Item label="IGST Applicable">
@@ -504,7 +504,7 @@ const SupplierMaster = () => {
             </Descriptions>
 
             <Divider orientation="left">Metadata</Divider>
-            <Descriptions column={1} size="small" labelStyle={{ width: 120 }}>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
               <Descriptions.Item label="Created">
                 {viewingSupplier.createdAt
                   ? dayjs(viewingSupplier.createdAt).format('YYYY-MM-DD HH:mm')

@@ -254,7 +254,7 @@ const Dashboard = () => {
         </Col>
         <Col xs={24} lg={8}>
           <Card title="Production Progress">
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
+            <Space orientation="vertical" style={{ width: '100%' }} size={16}>
               <div>
                 <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text>Cutting Department</Text>
@@ -302,7 +302,7 @@ const Dashboard = () => {
         </Col>
         <Col xs={24} lg={8}>
           <Card title="Quick Stats">
-            <Space direction="vertical" style={{ width: '100%' }} size={16}>
+            <Space orientation="vertical" style={{ width: '100%' }} size={16}>
               <Card size="small" style={{ background: '#f0fdf4' }}>
                 <Space>
                   <CheckCircleOutlined style={{ fontSize: 24, color: '#22c55e' }} />

@@ -423,13 +423,7 @@ const UserManagement = () => {
                 label="Role"
                 rules={[{ required: true, message: 'Please select a role' }]}
               >
-                <Select placeholder="Select role">
-                  {roles.map((role) => (
-                    <Select.Option key={role.id} value={role.id}>
-                      {role.name}
-                    </Select.Option>
-                  ))}
-                </Select>
+                <Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -437,14 +431,14 @@ const UserManagement = () => {
                 name="department"
                 label="Department"
               >
-                <Select placeholder="Select department" allowClear>
-                  <Select.Option value="Management">Management</Select.Option>
-                  <Select.Option value="Purchase">Purchase</Select.Option>
-                  <Select.Option value="Production">Production</Select.Option>
-                  <Select.Option value="Warehouse">Warehouse</Select.Option>
-                  <Select.Option value="Finance">Finance</Select.Option>
-                  <Select.Option value="HR">HR</Select.Option>
-                </Select>
+                <Select placeholder="Select department" allowClear options={[
+                  { value: 'Management', label: 'Management' },
+                  { value: 'Purchase', label: 'Purchase' },
+                  { value: 'Production', label: 'Production' },
+                  { value: 'Warehouse', label: 'Warehouse' },
+                  { value: 'Finance', label: 'Finance' },
+                  { value: 'HR', label: 'HR' },
+                ]} />
               </Form.Item>
             </Col>
           </Row>
