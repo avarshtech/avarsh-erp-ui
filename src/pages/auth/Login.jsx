@@ -3,7 +3,9 @@ import { Form, Input, Button, Card, Typography, Checkbox, message, Spin } from '
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authenticateUser, isAuthenticated } from '../../services/authService';
-import avarshLogo from '../../assets/images/avarsh-logo.png';
+import { useTheme } from '../../context/ThemeContext';
+import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
+import avarshLogoLight from '../../assets/images/avarsh-logo-light.png';
 
 const { Title, Text, Link } = Typography;
 
@@ -13,6 +15,7 @@ const Login = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const { isDarkMode } = useTheme();
 
   // Check if already logged in
   useEffect(() => {
@@ -77,7 +80,7 @@ const Login = () => {
       <Card style={styles.card} bordered={false}>
         {/* Logo and Header */}
         <div style={styles.logoContainer}>
-          <img src={avarshLogo} alt="Avarsh Logo" style={styles.logo} />
+          <img src={isDarkMode ? avarshLogoLight : avarshLogoDark} alt="Avarsh Logo" style={styles.logo} />
         </div>
 
         <div style={styles.headerContainer}>

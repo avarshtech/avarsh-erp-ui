@@ -2,12 +2,11 @@ import { useState, useEffect } from "react";
 import {
   Layout,
   Menu,
-  Badge,
   Avatar,
   Dropdown,
   Space,
   Input,
-  theme,
+  Tooltip,
   message,
 } from "antd";
 import {
@@ -18,17 +17,20 @@ import {
   InboxOutlined,
   SettingOutlined,
   UserOutlined,
-  BellOutlined,
   SearchOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
   ProfileOutlined,
   DatabaseOutlined,
+  SunOutlined,
+  MoonOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
-import avarshLogo from "../assets/images/avarsh-logo.png";
+import { useTheme } from "../context/ThemeContext";
+import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
+import avarshLogoDark from "../assets/images/avarsh-logo-dark.png";
 
 const { Header, Sider, Content } = Layout;
 
@@ -37,7 +39,7 @@ const MainLayout = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const { token } = theme.useToken();
+  const { isDarkMode, toggleTheme } = useTheme();
 
   // Load current user on mount
   useEffect(() => {
@@ -113,7 +115,7 @@ const MainLayout = () => {
       icon: <SettingOutlined />,
       label: "Admin",
       children: [
-        { key: "/admin", label: "Dashboard" },
+        { key: "/admin/dashboard", label: "Dashboard" },
         { key: "/admin/users", label: "Users" },
         { key: "/admin/roles", label: "Role & Access" },
       ],
@@ -175,7 +177,10 @@ const MainLayout = () => {
           top: 0,
           bottom: 0,
           zIndex: 100,
-            overflow: 'hidden',
+          overflow: 'hidden',
+          background: isDarkMode 
+            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' 
+            : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
         }}
       >
         <div
@@ -185,12 +190,12 @@ const MainLayout = () => {
             alignItems: "center",
             justifyContent: "center",
             padding: 0,
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            borderBottom: isDarkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.06)",
           }}
         >
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <img
-              src={avarshLogo}
+              src={isDarkMode ? avarshLogoLight : avarshLogoDark}
               alt="Avarsh Logo"
               style={{
                 height: collapsed ? 32 : 40,
@@ -202,13 +207,18 @@ const MainLayout = () => {
           </div>
         </div>
         <Menu
-          theme="dark"
+          theme={isDarkMode ? "dark" : "light"}
           mode="inline"
           selectedKeys={getSelectedKeys()}
           defaultOpenKeys={getOpenKeys()}
           items={menuItems}
           onClick={handleMenuClick}
-          style={{ marginTop: 8, border: "none", overflow: 'hidden' }}
+          style={{ 
+            marginTop: 8, 
+            border: "none", 
+            overflow: 'hidden',
+            background: 'transparent'
+          }}
         />
       </Sider>
       <Layout
@@ -217,14 +227,17 @@ const MainLayout = () => {
         <Header
           style={{
             padding: "0 24px",
-            background: "#fff",
+            background: isDarkMode ? '#1e293b' : '#fff',
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+            boxShadow: isDarkMode 
+              ? "0 1px 4px rgba(0,0,0,0.3)" 
+              : "0 1px 4px rgba(0,0,0,0.08)",
             position: "sticky",
             top: 0,
             zIndex: 99,
+            transition: "background-color 0.3s ease, box-shadow 0.3s ease",
           }}
         >
           <Space>
@@ -233,7 +246,7 @@ const MainLayout = () => {
               style={{
                 fontSize: 20,
                 cursor: "pointer",
-                color: "#64748b",
+                color: isDarkMode ? '#94a3b8' : '#64748b',
                 transition: "color 0.3s",
               }}
             >
@@ -241,34 +254,53 @@ const MainLayout = () => {
             </span>
             <Input
               placeholder="Search..."
-              prefix={<SearchOutlined style={{ color: "#94a3b8" }} />}
+              prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}
               style={{
                 width: 280,
                 borderRadius: 20,
                 marginLeft: 16,
+                background: isDarkMode ? '#334155' : '#fff',
+                borderColor: isDarkMode ? '#475569' : '#e2e8f0',
               }}
             />
           </Space>
           <Space size={20}>
-            <Badge count={5} size="small">
-              <BellOutlined
+            <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'} color={isDarkMode ? '#64748b' : '#94a3b8'} styles={{ container: { color: isDarkMode ? '#f1f5f9' : '#f7f7f7' } }}>
+              <button
+                onClick={toggleTheme}
+                className="theme-toggle-btn"
                 style={{
-                  fontSize: 20,
-                  cursor: "pointer",
-                  color: "#64748b",
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 10,
+                  background: isDarkMode ? '#334155' : '#f1f5f9',
+                  border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  color: isDarkMode ? '#fbbf24' : '#3d6091',
                 }}
-              />
-            </Badge>
+              >
+                {isDarkMode ? (
+                  <SunOutlined style={{ fontSize: 18 }} />
+                ) : (
+                  <MoonOutlined style={{ fontSize: 18 }} />
+                )}
+              </button>
+            </Tooltip>
             <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={["click"]}>
               <Space style={{ cursor: "pointer" }}>
                 <Avatar
                   style={{
-                    background:
-                      "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    background: isDarkMode
+                      ? "linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)"
+                      : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
                   }}
                   icon={<UserOutlined />}
                 />
-                <span style={{ fontWeight: 500, color: "#1e293b" }}>
+                <span style={{ fontWeight: 500, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
                   {currentUser?.name || "User"}
                 </span>
               </Space>

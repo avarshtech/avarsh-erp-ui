@@ -1,6 +1,7 @@
 import React from 'react';
 import { Row, Col, Card, Button, Table, Typography, Empty, Space, Input } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { useTheme } from '../context/ThemeContext';
 
 const { Title } = Typography;
 
@@ -18,6 +19,12 @@ const MasterSplitView = ({
   searchPlaceholder = "Search...",
   onSearch
 }) => {
+  const { isDarkMode } = useTheme();
+  const borderColor = isDarkMode ? '#334155' : '#f0f0f0';
+  const selectedBg = isDarkMode ? '#312e81' : '#e6f7ff';
+  const textMutedColor = isDarkMode ? '#94a3b8' : '#8c8c8c';
+  const searchIconColor = isDarkMode ? '#64748b' : '#bfbfbf';
+
   return (
     <div style={{ height: 'calc(100vh - 120px)' }}>
       <Row gutter={16} style={{ height: '100%' }}>
@@ -37,10 +44,10 @@ const MasterSplitView = ({
             styles={{ body: { flex: 1, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } }}
           >
            {onSearch && (
-             <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+             <div style={{ padding: '12px 16px', borderBottom: `1px solid ${borderColor}` }}>
                 <Input 
                   placeholder={searchPlaceholder} 
-                  prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                  prefix={<SearchOutlined style={{ color: searchIconColor }} />}
                   onChange={(e) => onSearch(e.target.value)}
                   allowClear
                 />
@@ -58,12 +65,12 @@ const MasterSplitView = ({
                   onClick: () => onSelectRow(record),
                   style: { 
                     cursor: 'pointer', 
-                    backgroundColor: record[rowKey] === selectedId ? '#e6f7ff' : 'transparent' // Highlight selected
+                    backgroundColor: record[rowKey] === selectedId ? selectedBg : 'transparent'
                   }
                 })}
               />
             </div>
-            <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', textAlign: 'right', color: '#8c8c8c' }}>
+            <div style={{ padding: '8px 16px', borderTop: `1px solid ${borderColor}`, textAlign: 'right', color: textMutedColor }}>
                Total: {data.length}
             </div>
           </Card>
