@@ -30,7 +30,6 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
 import { useTheme } from "../context/ThemeContext";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
-import avarshLogoDark from "../assets/images/avarsh-logo-dark.png";
 
 const { Header, Sider, Content } = Layout;
 
@@ -178,9 +177,7 @@ const MainLayout = () => {
           bottom: 0,
           zIndex: 100,
           overflow: 'hidden',
-          background: isDarkMode 
-            ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' 
-            : 'linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)',
+          background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
         }}
       >
         <div
@@ -190,12 +187,12 @@ const MainLayout = () => {
             alignItems: "center",
             justifyContent: "center",
             padding: 0,
-            borderBottom: isDarkMode ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(0,0,0,0.06)",
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
           }}
         >
           <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
             <img
-              src={isDarkMode ? avarshLogoLight : avarshLogoDark}
+              src={avarshLogoLight}
               alt="Avarsh Logo"
               style={{
                 height: collapsed ? 32 : 40,
@@ -207,7 +204,7 @@ const MainLayout = () => {
           </div>
         </div>
         <Menu
-          theme={isDarkMode ? "dark" : "light"}
+          theme="dark"
           mode="inline"
           selectedKeys={getSelectedKeys()}
           defaultOpenKeys={getOpenKeys()}

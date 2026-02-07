@@ -300,12 +300,10 @@ textarea.ant-input:active {
   text-align: center !important;
 }
 
-/* Light mode collapsed sidebar icons */
-[data-theme="light"] .ant-layout-sider-collapsed .ant-menu-item .anticon,
-[data-theme="light"] .ant-layout-sider-collapsed .ant-menu-submenu-title .anticon,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-layout-sider-collapsed .ant-menu-item .anticon,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
-  color: #475569 !important;
+/* Collapsed sidebar icons - always light for dark sidebar */
+.ant-layout-sider-collapsed .ant-menu-item .anticon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
+  color: rgba(255, 255, 255, 0.85) !important;
 }
 
 .ant-layout-sider-collapsed .ant-menu-item .ant-menu-item-icon,
@@ -368,31 +366,15 @@ textarea.ant-input:active {
   padding-left: 20px !important;
 }
 
-/* Expanded sidebar hover effect */
+/* Expanded sidebar hover effect - always dark style */
 .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item:hover,
 .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title:hover {
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Light mode expanded sidebar hover */
-[data-theme="light"] .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item:hover,
-[data-theme="light"] .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title:hover,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-item:hover,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-submenu-title:hover {
-  background: rgba(99, 102, 241, 0.1) !important;
-}
-
-/* Selected item styling */
+/* Selected item styling - always dark style */
 .ant-menu-dark .ant-menu-item-selected {
   background: var(--primary-color) !important;
-  border-radius: 8px !important;
-}
-
-/* Light mode selected item */
-[data-theme="light"] .ant-menu-light .ant-menu-item-selected,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-item-selected {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-  color: #ffffff !important;
   border-radius: 8px !important;
 }
 
@@ -841,91 +823,6 @@ textarea.ant-input:active {
 
 [data-theme="dark"] .ant-descriptions-item-content {
   color: var(--primary-color) !important;
-}
-
-/* ============================================================
-   SIDEBAR LIGHT MODE OVERRIDES
-   ============================================================ */
-
-/* Light mode sidebar menu styles */
-[data-theme="light"] .ant-layout-sider,
-:root:not([data-theme="dark"]) .ant-layout-sider {
-  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
-}
-
-[data-theme="light"] .ant-menu-light,
-:root:not([data-theme="dark"]) .ant-menu-light {
-  background: transparent !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-item,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-item {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-item:hover,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-item:hover {
-  background: rgba(99, 102, 241, 0.08) !important;
-  color: #6366f1 !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-item-selected,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-item-selected {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-  color: #ffffff !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-submenu-title,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-submenu-title {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-submenu-title:hover,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-submenu-title:hover {
-  background: rgba(99, 102, 241, 0.08) !important;
-  color: #6366f1 !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-submenu-selected > .ant-menu-submenu-title {
-  color: #6366f1 !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-sub,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-sub {
-  background: rgba(0, 0, 0, 0.02) !important;
-}
-
-[data-theme="light"] .ant-menu-light .ant-menu-submenu-arrow,
-:root:not([data-theme="dark"]) .ant-menu-light .ant-menu-submenu-arrow {
-  color: #94a3b8 !important;
-}
-
-/* Light mode popup submenu */
-[data-theme="light"] .ant-menu-submenu-popup > .ant-menu,
-:root:not([data-theme="dark"]) .ant-menu-light.ant-menu-submenu-popup > .ant-menu {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 
-              0 3px 6px -4px rgba(0, 0, 0, 0.05), 
-              0 9px 28px 8px rgba(0, 0, 0, 0.03) !important;
-}
-
-[data-theme="light"] .ant-menu-submenu-popup .ant-menu-item,
-:root:not([data-theme="dark"]) .ant-menu-light.ant-menu-submenu-popup .ant-menu-item {
-  color: #475569 !important;
-}
-
-[data-theme="light"] .ant-menu-submenu-popup .ant-menu-item:hover,
-:root:not([data-theme="dark"]) .ant-menu-light.ant-menu-submenu-popup .ant-menu-item:hover {
-  background: rgba(99, 102, 241, 0.08) !important;
-  color: #6366f1 !important;
-}
-
-[data-theme="light"] .ant-menu-submenu-popup .ant-menu-item-selected,
-:root:not([data-theme="dark"]) .ant-menu-light.ant-menu-submenu-popup .ant-menu-item-selected {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
-  color: #ffffff !important;
 }
 
 /* Ensure Ant Design message/notification text and icons are white in dark mode */
