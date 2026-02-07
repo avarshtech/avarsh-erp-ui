@@ -202,6 +202,7 @@ const SupplierMaster = () => {
 
       const supplierData = {
         ...values,
+        active: true,
         pan: values.pan?.toUpperCase(),
         gstin: values.gstin?.toUpperCase(),
       };

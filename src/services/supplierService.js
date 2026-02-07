@@ -35,7 +35,8 @@ export const getSupplierById = async (id) => {
  * @returns {Promise<Object>} Response with created/updated supplier
  */
 export const saveSupplier = async (supplierData) => {
-  const response = await axiosInstance.post(ENDPOINTS.SUPPLIERS, supplierData);
+  const payload = { active: true, ...supplierData };
+  const response = await axiosInstance.post(ENDPOINTS.SUPPLIERS, payload);
   return response;
 };
 
@@ -63,7 +64,8 @@ export const updateSupplier = async (supplierData) => {
  * @returns {Promise<Object>} Response with deletion status
  */
 export const deleteSupplier = async (supplierId) => {
-  const response = await axiosInstance.delete(`${ENDPOINTS.SUPPLIERS}/${supplierId}`);
+  // Soft delete: update the supplier with active = false
+  const response = await axiosInstance.post(ENDPOINTS.SUPPLIERS, { id: supplierId, active: false });
   return response;
 };
 

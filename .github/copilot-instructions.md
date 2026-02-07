@@ -4,6 +4,15 @@
 
 You are an expert coding agent for migrating a **Garments Industry ERP Application** from a legacy React Bootstrap UI (`erp-purchase-ui`) to a modern **Ant Design 6 + Vite** application (`avarsh-erp-ui`).
 
+### Ant Design Expertise
+
+You must be an **expert in Ant Design** and follow these guidelines:
+- **Always refer to the latest Ant Design 6.x documentation** at https://ant.design for component usage, props, and best practices
+- Use the correct component APIs and avoid deprecated patterns
+- Leverage Ant Design's built-in features (ConfigProvider, theming, form validation) instead of custom implementations
+- Follow Ant Design's recommended patterns for complex components (Table, Form, Modal, etc.)
+- Check the documentation for any component before implementing to ensure you're using the latest API
+
 ## Golden Rules
 
 1. **Preserve ALL business logic** from the source repository
@@ -379,6 +388,25 @@ const MyComponent = () => {
 
 ## Purchase Order Module Specifications
 
+> ⚠️ **CRITICAL MIGRATION COMPONENT**: The Purchase Order module is the most critical part of this migration. Pay extra attention to preserving all business logic, UI behavior, and user experience from the source repository.
+
+### Migration Rules for PO Module
+
+1. **Preserve the New PO List Page**: The target repo (`avarsh-erp-ui`) already has a `POList.jsx` page at `src/pages/po/POList.jsx`. **DO NOT replace or significantly change this page's list/table structure** - only enhance it with migrated functionality.
+
+2. **Add/Edit as Full Page (NOT Dialog)**: Unlike the old repo where Add/Edit was in a dialog, the new UI uses **separate full-page routes** for creating and editing POs:
+   - **New PO**: Separate route/page (e.g., `/purchase-orders/new` → `POForm.jsx`)
+   - **Edit PO**: Separate route/page (e.g., `/purchase-orders/edit/:id` → `POForm.jsx`)
+   - Keep the current route structure in `avarsh-erp-ui` - do not convert to dialog
+   - Migrate the form logic and business rules from the source repo's `POFormLayer.jsx` into this full-page form
+   - Support Save as Draft and Submit for Approval actions
+
+3. **Preview Dialog on Submit**: When user clicks "Submit for Approval" in the PO Form page, a **preview dialog must appear** showing a summary of the PO before final submission - **exactly matching the behavior in the old repo**. This is a critical UX requirement.
+
+4. **View Mode Uses Dialog**: PO view should open in a **Modal/Drawer dialog** (similar to old UI). This allows users to quickly view PO details without navigating away from the list. The view dialog should display all PO information and include approval action buttons.
+
+5. **Match Old Repo UX for Dialogs**: The preview dialog (on submit) and view dialog must closely match the user experience from `erp-purchase-ui`.
+
 ### PO Status Flow
 ```
 Draft → AwaitApproval → Approved → Completed
@@ -520,6 +548,49 @@ Draft → AwaitApproval → Approved → Completed
 4. **Icons**: Use `@ant-design/icons` instead of Iconify
 5. **Styling**: Use Ant Design's built-in styling + minimal custom CSS
 6. **Pagination**: API uses 0-indexed pages, Ant Design Table uses 1-indexed
+
+---
+
+## Theme Support (Light/Dark Mode)
+
+The application supports both **light and dark themes**. During migration, ensure all components are theme-aware:
+
+### Theme-Aware Styling Rules
+
+1. **Use CSS Variables** - Never hardcode colors. Use the CSS variables defined in `src/index.css`:
+   ```css
+   /* Use these instead of hardcoded colors */
+   background: var(--card-bg);        /* Instead of #ffffff */
+   color: var(--text-primary);        /* Instead of #1e293b */
+   border-color: var(--border-color); /* Instead of #e2e8f0 */
+   ```
+
+2. **Available CSS Variables**:
+   - Backgrounds: `--bg-primary`, `--bg-secondary`, `--bg-tertiary`, `--card-bg`, `--bg-elevated`
+   - Text: `--text-primary`, `--text-secondary`, `--text-muted`
+   - Borders: `--border-color`, `--border-dark`
+   - Shadows: `--shadow-sm`, `--shadow-md`, `--shadow-lg`
+   - Theme colors: `--primary-color`, `--success-color`, `--warning-color`, `--error-color`
+
+3. **Inline Styles**: When using inline styles in JSX, use CSS variables:
+   ```jsx
+   // ✓ Correct - theme-aware
+   style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
+   
+   // ✗ Wrong - hardcoded colors break in dark mode
+   style={{ background: '#ffffff', border: '1px solid #e2e8f0' }}
+   ```
+
+4. **Ant Design ConfigProvider**: The app uses `ConfigProvider` with theme tokens. Ant Design components automatically adapt to the theme.
+
+5. **Custom Components**: Any custom styled components must support both themes using the CSS variables.
+
+6. **Dark Mode Overrides**: If needed, add dark-mode specific styles in `src/styles/overrides.css` using:
+   ```css
+   [data-theme="dark"] .your-class {
+     /* dark mode styles */
+   }
+   ```
 
 ---
 
