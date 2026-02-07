@@ -86,9 +86,18 @@ const lightComponentsToken = {
     siderBg: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
     headerBg: '#ffffff',
   },
+  DatePicker: {
+    controlHeight: 40,
+  },
   Modal: {
     contentBg: '#ffffff',
     headerBg: '#ffffff',
+  },
+  Tooltip: {
+    colorBgSpotlight: '#475569',
+    colorTextLightSolid: '#f1f5f9',
+    borderRadius: 8,
+    fontSize: 13,
   },
 };
 
@@ -148,8 +157,15 @@ const darkComponentsToken = {
     colorBgElevated: '#334155',
   },
   DatePicker: {
+    controlHeight: 40,
     colorBgContainer: '#1e293b',
     colorBgElevated: '#334155',
+  },
+  Tooltip: {
+    colorBgSpotlight: '#64748b',
+    colorTextLightSolid: '#f1f5f9',
+    borderRadius: 8,
+    fontSize: 13,
   },
   Tag: {
     defaultBg: '#334155',

@@ -262,7 +262,7 @@ const MainLayout = () => {
             />
           </Space>
           <Space size={20}>
-            <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'} color={isDarkMode ? '#64748b' : '#94a3b8'} styles={{ container: { color: isDarkMode ? '#f1f5f9' : '#f7f7f7' } }}>
+            <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
               <button
                 onClick={toggleTheme}
                 className="theme-toggle-btn"

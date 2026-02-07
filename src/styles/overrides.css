@@ -443,30 +443,7 @@ textarea.ant-input:active {
   color: #cbd5e1 !important;
 }
 
-/* Tooltip fixes - light mode text color */
-.ant-tooltip-inner {
-  color: #1e293b !important;
-  background-color: #ffffff !important;
-  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 
-              0 3px 6px -4px rgba(0, 0, 0, 0.12), 
-              0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
-}
-
-.ant-tooltip-arrow::before {
-  background-color: #ffffff !important;
-}
-
-[data-theme="dark"] .ant-tooltip-inner {
-  color: #f1f5f9 !important;
-  background-color: #334155 !important;
-  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.3), 
-              0 3px 6px -4px rgba(0, 0, 0, 0.2), 
-              0 9px 28px 8px rgba(0, 0, 0, 0.15) !important;
-}
-
-[data-theme="dark"] .ant-tooltip-arrow::before {
-  background-color: #334155 !important;
-}
+/* Tooltip styles handled via Ant Design ConfigProvider component tokens in ThemeContext.jsx */
 
 /* Modal fixes - dark mode borders and background */
 [data-theme="dark"] .ant-modal-content {
@@ -683,15 +660,7 @@ textarea.ant-input:active {
   color: var(--text-primary);
 }
 
-/* Tooltip */
-[data-theme="dark"] .ant-tooltip-inner {
-  background-color: var(--bg-elevated);
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .ant-tooltip-arrow::before {
-  background-color: var(--bg-elevated);
-}
+/* Tooltip - duplicate removed, handled above */
 
 /* Spin */
 [data-theme="dark"] .ant-spin-dot-item {
@@ -828,4 +797,8 @@ textarea.ant-input:active {
 /* Ensure Ant Design message/notification text and icons are white in dark mode */
 [data-theme="dark"] .ant-message-notice .ant-message-custom-content {
   color: #f1f5f9 !important;
+}
+
+.ant-descriptions-item-container {
+  align-items: center;
 }
