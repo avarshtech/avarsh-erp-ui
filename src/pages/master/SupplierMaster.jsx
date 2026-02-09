@@ -90,7 +90,11 @@ const SupplierMaster = () => {
     setStoreLoading('suppliers', true);
     try {
       const response = await getSuppliers();
-      const data = Array.isArray(response) ? response : response?.content || response?.data || [];
+      let data = Array.isArray(response) ? response : response?.content || response?.data || [];
+      // Ensure consistent descending order by id
+      if (Array.isArray(data)) {
+        data = data.slice().sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+      }
       setSuppliers(data);
       setData('suppliers', data);
     } catch (error) {
@@ -109,7 +113,8 @@ const SupplierMaster = () => {
   // Sync local state with store
   useEffect(() => {
     if (storeSuppliers.length > 0) {
-      setSuppliers(storeSuppliers);
+      const sorted = storeSuppliers.slice().sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+      setSuppliers(sorted);
     }
   }, [storeSuppliers]);
 
@@ -212,13 +217,45 @@ const SupplierMaster = () => {
         // Update store
         const updatedSupplier = response || { ...supplierData, id: editingSupplier.id };
         updateItem('suppliers', editingSupplier.id, updatedSupplier);
+        // Update local suppliers state immediately so view reflects changes
+        setSuppliers((prev) => {
+          const arr = Array.isArray(prev) ? prev.slice() : [];
+          const exists = arr.some((s) => Number(s.id) === Number(updatedSupplier.id));
+          if (exists) {
+            return arr.map((s) => (Number(s.id) === Number(updatedSupplier.id) ? updatedSupplier : s)).sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+          }
+          arr.unshift(updatedSupplier);
+          return arr.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+        });
+        // If viewing drawer open for this supplier, update it immediately
+        if (viewingSupplier && Number(viewingSupplier.id) === Number(editingSupplier.id)) {
+          setViewingSupplier(updatedSupplier);
+        }
         message.success('Supplier updated successfully');
       } else {
         const response = await createSupplier(supplierData);
         // Add to store
         const newSupplier = response || { ...supplierData, id: Date.now() };
         addItem('suppliers', newSupplier);
+        // Update local suppliers list immediately
+        setSuppliers((prev) => {
+          const arr = Array.isArray(prev) ? prev.slice() : [];
+          arr.unshift(newSupplier);
+          return arr.sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+        });
         message.success('Supplier added successfully');
+      }
+
+      // Invalidate cache and refresh supplier list to ensure table reflects latest data
+      try {
+        invalidateCache && invalidateCache('suppliers');
+      } catch (e) {
+        // ignore
+      }
+      try {
+        await fetchSuppliers(true);
+      } catch (e) {
+        // ignore - fetchSuppliers already handles errors
       }
 
       setModalVisible(false);
@@ -467,14 +504,17 @@ const SupplierMaster = () => {
         {viewingSupplier && (
           <>
             <div style={{ marginBottom: 24 }}>
-              <Title level={4} style={{ margin: 0 }}>{viewingSupplier.name}</Title>
-              <Space style={{ marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Title level={4} style={{ margin: 0 }}>{viewingSupplier.name}</Title>
                 <Tag color={viewingSupplier.active !== false ? 'success' : 'default'}>
                   {viewingSupplier.active !== false ? 'Active' : 'Inactive'}
                 </Tag>
+              </div>
+              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Supplies:</span>
                 {viewingSupplier.suppliesFabric && <Tag color="success">Fabric</Tag>}
                 {viewingSupplier.suppliesTrims && <Tag color="processing">Trims</Tag>}
-              </Space>
+              </div>
             </div>
 
             <Divider orientation="left">Basic Information</Divider>

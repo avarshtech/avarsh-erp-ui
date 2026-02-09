@@ -151,7 +151,7 @@ const ItemMaster = () => {
   const [sortConfig, setSortConfig] = useState({ field: 'itemCode', order: 'descend' });
 
   // Filters (use global store for master lists)
-  const { categories: storeCategories, subCategories: storeSubCategories, itemTypes: storeItemTypes } = useStore();
+  const { categories: storeCategories, subCategories: storeSubCategories, itemTypes: storeItemTypes, invalidateCache } = useStore();
   const [subcategories, setSubcategories] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -638,10 +638,20 @@ const ItemMaster = () => {
       return;
     }
 
+    // Reset no-result prefix on backspace/shortening
+    const isShortening = query.length < lastQueryRef.current.length;
+    if (isShortening && noResultPrefixRef.current) {
+      if (query.length < noResultPrefixRef.current.length ||
+          !query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
+        noResultPrefixRef.current = '';
+      }
+    }
+
     if (query.length >= 3) {
       if (noResultPrefixRef.current && query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
         setSuggestions([]);
         setShowSuggestions(false);
+        lastQueryRef.current = query;
         return;
       }
 
@@ -851,7 +861,11 @@ const ItemMaster = () => {
       // Close directly after successful save to avoid triggering the
       // unsaved-changes confirmation (doCloseModal clears the flag).
       doCloseModal();
-      fetchItems();
+      // Invalidate cache and refresh items list so the table reflects latest data
+      try {
+        invalidateCache && invalidateCache('items');
+      } catch (e) {}
+      fetchItems(1, pagination.pageSize, sortConfig.field, sortConfig.order === 'ascend' ? 'asc' : 'desc');
     } catch (error) {
       console.error('Failed to save item:', error);
       message.error(error.errorMessage || 'Failed to save item');
