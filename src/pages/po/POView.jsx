@@ -93,6 +93,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   const [newNote, setNewNote] = useState('');
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editNoteText, setEditNoteText] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
 
   // Status action modal
   const [statusAction, setStatusAction] = useState(null); // { action, title, requiresReason }
@@ -114,6 +115,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       setRejectionCategory(null);
     }
   }, [open, poData?.id]);
+
+  // Activity events are handled locally by updating notes from API responses.
 
   const loadPODetails = async (poId) => {
     setLoading(true);
@@ -161,29 +164,34 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   // ========================
   const handleAddNote = async () => {
     if (!newNote.trim() || !po?.id) return;
+    setAddingNote(true);
     try {
       const res = await createActivity(po.id, {
         comment: newNote,
         status: po.status || 'InProgress',
         isSystemGenerated: false,
       });
-      const parsed = parseActivityComment(res.comment || '');
+      // Append the created activity to local notes (no global events)
+      const parsed = parseActivityComment(res.comment || res.text || '');
       setNotes((prev) => [
         ...prev,
         {
           id: res.id,
-          text: parsed.text || newNote,
-          isSystemGenerated: false,
+          text: parsed.text || res.comment || newNote,
+          isSystemGenerated: parsed.isSystemGenerated,
           status: parsed.status,
           timestamp: res.createdAt || new Date().toISOString(),
           user: res.user || 'Current User',
-          edited: false,
+          edited: res.edited || false,
         },
       ]);
+      // Clear the input and show feedback after server acknowledgement
       setNewNote('');
       message.success('Note added');
     } catch {
       message.error('Failed to add note');
+    } finally {
+      setAddingNote(false);
     }
   };
 
@@ -527,28 +535,25 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         status: newPoStatus,
         isSystemGenerated: true,
       });
-
-      // Update PO state in place — dialog stays open
+      // Append the created activity to local notes (no global events)
+      const parsed = parseActivityComment(activityRes.comment || activityRes.text || '');
+      setNotes((prev) => [
+        ...prev,
+        {
+          id: activityRes.id,
+          text: parsed.text || activityRes.comment || actComment,
+          isSystemGenerated: parsed.isSystemGenerated || true,
+          status: parsed.status,
+          timestamp: activityRes.createdAt || new Date().toISOString(),
+          user: activityRes.user || userName,
+          edited: activityRes.edited || false,
+        },
+      ]);
       setPo((prev) => ({
         ...prev,
         status: newPoStatus,
         lineItems: updatedLineItems,
       }));
-
-      // Add the new activity to the notes list
-      const parsed = parseActivityComment(activityRes.comment || actComment);
-      setNotes((prev) => [
-        ...prev,
-        {
-          id: activityRes.id,
-          text: parsed.text || actComment,
-          isSystemGenerated: true,
-          status: parsed.status,
-          timestamp: activityRes.createdAt || new Date().toISOString(),
-          user: activityRes.user || userName,
-          edited: false,
-        },
-      ]);
 
       message.success(
         allCompleted
@@ -721,6 +726,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
 
   const isInProgress =
     po?.status === PO_STATUS.IN_PROGRESS ||
+    po?.status === PO_STATUS.PENDING_APPROVAL ||
     po?.status === PO_STATUS.APPROVED ||
     po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
     po?.status === PO_STATUS.PARTIALLY_RECEIVED;
@@ -1048,21 +1054,23 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                 {/* Add Note Input */}
                 <PermissionGuard module="purchase-orders" operation="update">
                   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <TextArea
-                      rows={2}
-                      placeholder="Enter your note or comment here..."
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <Button
-                      type="primary"
-                      icon={<SendOutlined />}
-                      onClick={handleAddNote}
-                      disabled={!newNote.trim()}
-                    >
-                      Add Note
-                    </Button>
+                        <TextArea
+                          rows={2}
+                          placeholder="Enter your note or comment here..."
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          style={{ flex: 1 }}
+                          disabled={addingNote}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<SendOutlined />}
+                          onClick={handleAddNote}
+                          loading={addingNote}
+                          disabled={!newNote.trim() || addingNote}
+                        >
+                          Add Note
+                        </Button>
                   </div>
                 </PermissionGuard>
               </>
