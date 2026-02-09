@@ -151,7 +151,8 @@ export const createActivity = async (poId, payload) => {
     updatedAt: payload?.updatedAt || now,
   };
   const res = await axiosInstance.post(url, body);
-  return res.data;
+  const data = res.data;
+  return data;
 };
 
 /**
@@ -210,7 +211,8 @@ export const updateActivity = async (poId, activityId, payload) => {
     updatedAt: payload?.updatedAt || now,
   };
   const res = await axiosInstance.put(url, body);
-  return res.data;
+  const data = res.data;
+  return data;
 };
 
 export default {
