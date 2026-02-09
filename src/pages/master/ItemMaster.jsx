@@ -9,10 +9,13 @@ import {
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
   ClearOutlined, AppstoreOutlined,
 } from '@ant-design/icons';
-import { getItems, getItemMetaData, createItem, updateItem, searchItems } from '../../services/itemService';
+import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
+import PantoneColorInput from '../../components/PantoneColorInput';
+import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import { isPantoneCode } from '../../services/pantoneService';
 import dayjs from 'dayjs';
 
 import { useStore } from '../../context/StoreContext';
@@ -140,12 +143,12 @@ const ItemMaster = () => {
   const canView = hasPermission(MODULE_ID, 'view');
 
   // List State
-  const [allItems, setAllItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
-  const [sortConfig, setSortConfig] = useState({ field: 'createdAt', order: 'descend' });
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const [sortConfig, setSortConfig] = useState({ field: 'itemCode', order: 'descend' });
 
   // Filters (use global store for master lists)
   const { categories: storeCategories, subCategories: storeSubCategories, itemTypes: storeItemTypes } = useStore();
@@ -210,29 +213,42 @@ const ItemMaster = () => {
     return '';
   };
 
-  // Fetch Items
-  const fetchItems = useCallback(async () => {
+  // Fetch Items from API with server-side pagination & filters
+  const fetchItems = useCallback(async (page, pageSize, sort, direction) => {
     setLoading(true);
     try {
-      const response = await getItems();
-      let items = [];
-      if (Array.isArray(response)) {
-        items = response;
-      } else if (response?.data && Array.isArray(response.data)) {
-        items = response.data;
-      } else if (response?.content && Array.isArray(response.content)) {
-        items = response.content;
-      }
+      const params = {
+        page: (page || pagination.current) - 1, // API is 0-indexed
+        size: pageSize || pagination.pageSize,
+        sort: sort || sortConfig.field,
+        direction: direction || (sortConfig.order === 'ascend' ? 'asc' : 'desc'),
+      };
 
-      setAllItems(items);
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (selectedCategory) params.categoryId = parseInt(selectedCategory);
+      if (selectedSubcategory) params.subCategoryId = parseInt(selectedSubcategory);
+      if (selectedItemType) params.itemTypeId = parseInt(selectedItemType);
+      if (selectedStatus === 'active') params.isActive = true;
+      else if (selectedStatus === 'inactive') params.isActive = false;
+
+      const response = await searchItems(params);
+      const data = response?.data || response || {};
+      const items = Array.isArray(data) ? data : (data.content || []);
+
       setFilteredItems(items);
+      setPagination((prev) => ({
+        ...prev,
+        current: page || prev.current,
+        pageSize: pageSize || prev.pageSize,
+        total: data.totalElements || items.length,
+      }));
     } catch (error) {
       console.error('Failed to fetch items:', error);
       message.error('Failed to load items');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pagination.current, pagination.pageSize, sortConfig, debouncedSearch, selectedCategory, selectedSubcategory, selectedItemType, selectedStatus]);
 
   // Fetch Item Metadata for Form
   const fetchMetaData = useCallback(async () => {
@@ -257,62 +273,20 @@ const ItemMaster = () => {
     }
   }, []);
 
+  // Debounce search term
   useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  // Filter items when filters change
+  // Re-fetch when any filter (including debounced search) changes
   useEffect(() => {
-    let filtered = allItems;
+    fetchItems(1, pagination.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, selectedCategory, selectedSubcategory, selectedItemType, selectedStatus]);
 
-    if (searchTerm) {
-      const lower = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          (item.itemCode || '').toLowerCase().includes(lower) ||
-          (item.itemName || '').toLowerCase().includes(lower)
-      );
-    }
-
-    if (selectedCategory) {
-      filtered = filtered.filter((item) => item.categoryId === parseInt(selectedCategory));
-    }
-
-    if (selectedSubcategory) {
-      filtered = filtered.filter((item) => item.subCategoryId === parseInt(selectedSubcategory));
-    }
-
-    if (selectedItemType) {
-      filtered = filtered.filter((item) => item.itemTypeId === parseInt(selectedItemType));
-    }
-
-    if (selectedStatus) {
-      const isActive = selectedStatus === 'active';
-      filtered = filtered.filter((item) => item.isActive === isActive);
-    }
-
-    // Apply sorting
-    filtered.sort((a, b) => {
-      let aValue = a[sortConfig.field];
-      let bValue = b[sortConfig.field];
-
-      if (sortConfig.field === 'createdAt') {
-        aValue = new Date(aValue || 0);
-        bValue = new Date(bValue || 0);
-      } else if (typeof aValue === 'string') {
-        aValue = (aValue || '').toLowerCase();
-        bValue = (bValue || '').toLowerCase();
-      }
-
-      if (sortConfig.order === 'ascend') {
-        return aValue > bValue ? 1 : -1;
-      }
-      return aValue < bValue ? 1 : -1;
-    });
-
-    setFilteredItems(filtered);
-    setPagination((prev) => ({ ...prev, current: 1 }));
-  }, [searchTerm, allItems, selectedCategory, selectedSubcategory, selectedItemType, selectedStatus, sortConfig]);
+  // Filter change handler — just update state; useEffect triggers fetch
+  const handleFilterChange = (setter) => (value) => setter(value || '');
 
   // Update subcategories when category filter changes
   useEffect(() => {
@@ -675,7 +649,7 @@ const ItemMaster = () => {
       debounceRef.current = setTimeout(async () => {
         try {
           if (lastQueryRef.current === query) return;
-          const res = await searchItems(query);
+          const res = await autocompleteItems(query);
           let results = [];
           if (Array.isArray(res)) results = res;
           else if (res?.data) results = res.data;
@@ -899,7 +873,7 @@ const ItemMaster = () => {
     };
 
     if (isColorAttribute) {
-      return <ColorPicker value={value} onChange={handleChange} placeholder={`Select ${attr.attributeName}`} />;
+      return <PantoneColorInput value={value} onChange={handleChange} placeholder={`Enter ${attr.attributeName} code`} />;
     }
 
     switch (type) {
@@ -943,6 +917,7 @@ const ItemMaster = () => {
   // Clear Filters
   const clearFilters = () => {
     setSearchTerm('');
+    setDebouncedSearch('');
     setSelectedCategory('');
     setSelectedSubcategory('');
     setSelectedItemType('');
@@ -1044,13 +1019,11 @@ const ItemMaster = () => {
   ];
 
   const handleTableChange = (pag, filters, sorter) => {
-    setPagination(pag);
-    if (sorter.field) {
-      setSortConfig({
-        field: sorter.field,
-        order: sorter.order || 'ascend',
-      });
-    }
+    const newSort = sorter.field || sortConfig.field;
+    const newOrder = sorter.order || 'descend';
+    setSortConfig({ field: newSort, order: newOrder });
+    const direction = newOrder === 'ascend' ? 'asc' : 'desc';
+    fetchItems(pag.current, pag.pageSize, newSort, direction);
   };
 
   // Active variants for display
@@ -1093,7 +1066,7 @@ const ItemMaster = () => {
                 allowClear
                 style={{ width: '100%' }}
                 value={selectedCategory || undefined}
-                onChange={(val) => setSelectedCategory(val || '')}
+                onChange={handleFilterChange(setSelectedCategory)}
                 options={(storeCategories || []).map((cat) => ({ value: cat.id.toString(), label: cat.name }))}
               />
             </Col>
@@ -1103,7 +1076,7 @@ const ItemMaster = () => {
                 allowClear
                 style={{ width: '100%' }}
                 value={selectedSubcategory || undefined}
-                onChange={(val) => setSelectedSubcategory(val || '')}
+                onChange={handleFilterChange(setSelectedSubcategory)}
                 options={(subcategories || []).map((sc) => ({ value: sc.id.toString(), label: sc.name }))}
               />
             </Col>
@@ -1113,7 +1086,7 @@ const ItemMaster = () => {
                 allowClear
                 style={{ width: '100%' }}
                 value={selectedItemType || undefined}
-                onChange={(val) => setSelectedItemType(val || '')}
+                onChange={handleFilterChange(setSelectedItemType)}
                 options={(itemTypes || []).map((it) => ({ value: it.id.toString(), label: it.name }))}
               />
             </Col>
@@ -1123,7 +1096,7 @@ const ItemMaster = () => {
                 allowClear
                 style={{ width: '100%' }}
                 value={selectedStatus || undefined}
-                onChange={(val) => setSelectedStatus(val || '')}
+                onChange={handleFilterChange(setSelectedStatus)}
                 options={[{ value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
               />
             </Col>
@@ -1143,7 +1116,6 @@ const ItemMaster = () => {
           loading={loading}
           pagination={{
             ...pagination,
-            total: filteredItems.length,
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
           }}
@@ -1170,9 +1142,9 @@ const ItemMaster = () => {
         open={modalOpen}
         onCancel={handleModalClose}
         width={'80vw'}
-        footer={null}
-        destroyOnHidden
-          styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
+          footer={null}
+          destroyOnHidden
+          bodyStyle={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}
       >
         <Spin spinning={metaDataLoading || submitting}>
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
@@ -1187,6 +1159,7 @@ const ItemMaster = () => {
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
                     showSearch
+                    optionFilterProp="label"
                     options={formCategories.map((cat) => ({ value: cat.id.toString(), label: cat.name }))}
                   />
                 </Form.Item>
@@ -1201,6 +1174,7 @@ const ItemMaster = () => {
                     placeholder="Select Subcategory"
                     onChange={handleFormSubcategoryChange}
                     showSearch
+                    optionFilterProp="label"
                     disabled={!isEditMode && !form.getFieldValue('categoryId')}
                     options={formSubcategories.map((sc) => ({ value: sc.id.toString(), label: sc.name }))}
                   />
@@ -1219,6 +1193,7 @@ const ItemMaster = () => {
                     placeholder="Select Item Type"
                     onChange={handleFormItemTypeChange}
                     showSearch
+                    optionFilterProp="label"
                     disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
                     options={formItemTypes.map((it) => ({ value: it.id.toString(), label: it.name }))}
                   />
@@ -1427,7 +1402,7 @@ const ItemMaster = () => {
                           <Form.Item
                             label={
                               <span>
-                                {attr.attributeName} <span style={{ color: '#ff4d4f' }}>*</span>
+                                {attr.attributeName} <span style={{ color: 'var(--error-color, #ff4d4f)' }}>*</span>
                               </span>
                             }
                           >
@@ -1456,11 +1431,21 @@ const ItemMaster = () => {
                           width: 50,
                           render: (_, __, idx) => <Badge count={idx + 1} style={{ backgroundColor: '#1890ff' }} />,
                         },
-                        ...formAttributes.map((attr) => ({
-                          title: attr.attributeName,
-                          dataIndex: ['variant', attr.id],
-                          render: (val) => val || <Text type="secondary">—</Text>,
-                        })),
+                        ...formAttributes.map((attr) => {
+                          const attrNameLower = (attr.attributeName || '').toLowerCase();
+                          const isColorAttr = attrNameLower.includes('color') || attrNameLower.includes('colour');
+                          return {
+                            title: attr.attributeName,
+                            dataIndex: ['variant', attr.id],
+                            render: (val) => {
+                              if (!val) return <Text type="secondary">—</Text>;
+                              if (isColorAttr && isPantoneCode(val)) {
+                                return <PantoneColorSwatch value={val} size={20} showLabel />;
+                              }
+                              return val;
+                            },
+                          };
+                        }),
                         {
                           title: 'Actions',
                           width: 80,
@@ -1584,7 +1569,10 @@ const ItemMaster = () => {
                         {v.attributes && Object.keys(v.attributes).length > 0 ? (
                           Object.entries(v.attributes).map(([k, val]) => {
                             const displayVal = val ?? '-';
-                            const hex = typeof displayVal === 'string' ? getColorHex(displayVal) : null;
+                            const kLower = k.toLowerCase();
+                            const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                            const usePantone = isColorAttr && typeof displayVal === 'string' && isPantoneCode(displayVal);
+                            const hex = !usePantone && typeof displayVal === 'string' ? getColorHex(displayVal) : null;
                             return (
                               <div
                                 key={k}
@@ -1600,7 +1588,9 @@ const ItemMaster = () => {
                                 }}
                               >
                                 <Text type="secondary" style={{ fontSize: 12, minWidth: 80 }}>{k}</Text>
-                                {hex ? (
+                                {usePantone ? (
+                                  <PantoneColorSwatch value={displayVal} size={18} showLabel />
+                                ) : hex ? (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <div style={{ width: 18, height: 18, borderRadius: 4, background: hex, border: '1px solid rgba(0,0,0,0.12)' }} />
                                     <Text>{displayVal}</Text>

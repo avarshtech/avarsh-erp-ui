@@ -63,14 +63,46 @@ export const deleteItem = async (id) => {
 };
 
 /**
- * Search items by query string
+ * Autocomplete items by query string (for dropdowns/search inputs)
  * @param {string} query - Search query
- * @returns {Promise<Array>} Search results
+ * @returns {Promise<Array>} Autocomplete results (ItemDTO[])
  */
-export const searchItems = async (query) => {
-  return axiosInstance.get(`${ENDPOINTS.ITEMS}/search`, {
+export const autocompleteItems = async (query) => {
+  return axiosInstance.get(`${ENDPOINTS.ITEMS}/autocomplete`, {
     params: { q: query },
   });
+};
+
+/**
+ * Search items with pagination and filters (for Item Master table)
+ * @param {Object} params - Search parameters
+ * @param {number} params.page - Page number (0-indexed)
+ * @param {number} params.size - Page size
+ * @param {string} params.sort - Sort field
+ * @param {string} params.direction - Sort direction (asc/desc)
+ * @param {string} params.search - Free-text search keyword
+ * @param {number} params.categoryId - Filter by category
+ * @param {number} params.subCategoryId - Filter by sub-category
+ * @param {number} params.itemTypeId - Filter by item type
+ * @param {boolean} params.isActive - Filter by active status
+ * @returns {Promise<Object>} Paginated response { content, totalElements, totalPages, pageNumber, pageSize, last }
+ */
+export const searchItems = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  if (params.page !== undefined) queryParams.append('page', params.page);
+  if (params.size !== undefined) queryParams.append('size', params.size);
+  if (params.sort) queryParams.append('sort', params.sort);
+  if (params.direction) queryParams.append('direction', params.direction);
+  if (params.search) queryParams.append('search', params.search);
+  if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+  if (params.subCategoryId) queryParams.append('subCategoryId', params.subCategoryId);
+  if (params.itemTypeId) queryParams.append('itemTypeId', params.itemTypeId);
+  if (params.isActive !== undefined && params.isActive !== null && params.isActive !== '') {
+    queryParams.append('isActive', params.isActive);
+  }
+  const queryString = queryParams.toString();
+  const url = `${ENDPOINTS.ITEMS}/search?${queryString}`;
+  return axiosInstance.get(url);
 };
 
 /**
@@ -94,6 +126,7 @@ export default {
   createItem,
   updateItem,
   deleteItem,
+  autocompleteItems,
   searchItems,
   getItemsByIds,
 };

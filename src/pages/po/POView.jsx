@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Modal,
   Descriptions,
@@ -15,6 +15,7 @@ import {
   Popconfirm,
   Select,
   Avatar,
+  Tooltip,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -31,6 +32,7 @@ import {
   CloseOutlined,
   UserOutlined,
   SettingOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -41,6 +43,8 @@ import {
   parseActivityComment,
 } from '../../services/purchaseOrderService';
 import PermissionGuard from '../../components/PermissionGuard';
+import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import { isPantoneCode } from '../../services/pantoneService';
 import {
   canApprovePO,
   canRejectPO,
@@ -49,20 +53,23 @@ import {
   hasPermission,
   getCurrentUser,
 } from '../../utils/permissions';
+import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel } from '../../utils/poStatusConstants';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-// Status config for display
+// Status config for display — keys are DB enum values
 const STATUS_CONFIG = {
-  Draft: { color: 'default', icon: <FileTextOutlined /> },
-  AwaitApproval: { color: 'processing', icon: <ClockCircleOutlined /> },
-  InProgress: { color: 'warning', icon: <ClockCircleOutlined /> },
-  Approved: { color: 'success', icon: <CheckCircleOutlined /> },
-  Completed: { color: 'success', icon: <CheckCircleOutlined /> },
-  Rejected: { color: 'error', icon: <CloseCircleOutlined /> },
-  Cancelled: { color: 'default', icon: <StopOutlined /> },
-  ReferredBack: { color: 'warning', icon: <RollbackOutlined /> },
+  [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
+  [PO_STATUS.PENDING_APPROVAL]: { color: 'processing', icon: <ClockCircleOutlined /> },
+  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined /> },
+  [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined /> },
+  [PO_STATUS.COMPLETED]: { color: 'success', icon: <CheckCircleOutlined /> },
+  [PO_STATUS.REJECTED]: { color: 'error', icon: <CloseCircleOutlined /> },
+  [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined /> },
+  [PO_STATUS.REFERRED_BACK]: { color: 'warning', icon: <RollbackOutlined /> },
+  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined /> },
+  [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined /> },
 };
 
 // Rejection reason categories
@@ -79,6 +86,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [po, setPo] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [completingLineId, setCompletingLineId] = useState(null);
 
   // Activity state
   const [notes, setNotes] = useState([]);
@@ -237,8 +245,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       icon: <CheckCircleOutlined />,
       color: '#52c41a',
       type: 'primary',
-      fromStatus: ['AwaitApproval'],
-      toStatus: 'InProgress',
+      fromStatus: [PO_STATUS.PENDING_APPROVAL],
+      toStatus: PO_STATUS.SENT_TO_SUPPLIER,
+      lineItemStatus: PO_STATUS.IN_PROGRESS,
       canPerform: canApprovePO,
       requiresReason: false,
     },
@@ -249,8 +258,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       color: '#ff4d4f',
       type: 'default',
       danger: true,
-      fromStatus: ['AwaitApproval'],
-      toStatus: 'Rejected',
+      fromStatus: [PO_STATUS.PENDING_APPROVAL],
+      toStatus: PO_STATUS.REJECTED,
+      lineItemStatus: PO_STATUS.IN_PROGRESS,
       canPerform: canRejectPO,
       requiresReason: true,
     },
@@ -260,8 +270,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       icon: <StopOutlined />,
       color: undefined,
       type: 'default',
-      fromStatus: ['AwaitApproval', 'Draft'],
-      toStatus: 'Cancelled',
+      fromStatus: [PO_STATUS.PENDING_APPROVAL, PO_STATUS.DRAFT, PO_STATUS.SENT_TO_SUPPLIER],
+      toStatus: PO_STATUS.CANCELLED,
+      lineItemStatus: PO_STATUS.CANCELLED,
       canPerform: canCancelPO,
       requiresReason: true,
     },
@@ -271,8 +282,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       icon: <RollbackOutlined />,
       color: '#faad14',
       type: 'default',
-      fromStatus: ['AwaitApproval'],
-      toStatus: 'ReferredBack',
+      fromStatus: [PO_STATUS.SENT_TO_SUPPLIER],
+      toStatus: PO_STATUS.REFERRED_BACK,
+      lineItemStatus: PO_STATUS.IN_PROGRESS,
       canPerform: canReferBackPO,
       requiresReason: true,
     },
@@ -307,11 +319,17 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     if (!po) return;
     setActionLoading(true);
     try {
+      // Update line items status based on action
+      const updatedLineItems = (po.lineItems || []).map((li) => ({
+        ...li,
+        status: action.lineItemStatus || li.status,
+      }));
+
       // Update PO status via existing updatePurchaseOrder (POST with id)
       await updatePurchaseOrder(po.id, {
         ...po,
         status: action.toStatus,
-        lineItems: po.lineItems,
+        lineItems: updatedLineItems,
       });
 
       // Create system activity log
@@ -328,11 +346,19 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         activityComment = `PO rejected by ${userName}. Category: ${catLabel || rejectionCategory}. Reason: ${reason}`;
       }
 
-      await createActivity(po.id, {
+      // Include rejection category in activity payload when present
+      const activityPayload = {
         comment: activityComment,
         status: action.toStatus,
         isSystemGenerated: true,
-      });
+      };
+      if (action.key === 'reject' && rejectionCategory) {
+        activityPayload.rejectionCategory = rejectionCategory;
+        const catLabel = REJECTION_CATEGORIES.find((c) => c.value === rejectionCategory)?.label;
+        if (catLabel) activityPayload.rejectionCategoryLabel = catLabel;
+      }
+
+      await createActivity(po.id, activityPayload);
 
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
       setStatusAction(null);
@@ -356,33 +382,188 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     const config = STATUS_CONFIG[status] || { color: 'default', icon: null };
     return (
       <Tag color={config.color} icon={config.icon} style={{ fontSize: 14, padding: '4px 12px' }}>
-        {status}
+        {getStatusLabel(status)}
       </Tag>
     );
   };
 
-  // Compute totals from PO data
-  const computeTotals = () => {
+  // Determine IGST applicability from PO data
+  const isIgstApplicable = po?.isIgstApplicable || po?.igstApplicable || false;
+
+  // Compute totals from line items (not from flat PO values)
+  const totals = useMemo(() => {
     if (!po) return { subtotal: 0, sgst: 0, cgst: 0, igst: 0, grandTotal: 0 };
 
     const items = po.lineItems || [];
-    const subtotal =
-      po.subtotal ||
-      items.reduce(
-        (sum, item) => sum + (item.quantity || item.qty || 0) * (item.unitPrice || 0),
-        0
+    const subtotal = items.reduce(
+      (sum, item) => sum + (parseFloat(item.quantity || item.qty || 0)) * (parseFloat(item.unitPrice) || 0),
+      0
+    );
+
+    let sgst = 0, cgst = 0, igst = 0;
+    items.forEach((item) => {
+      const base = (parseFloat(item.quantity || item.qty || 0)) * (parseFloat(item.unitPrice) || 0);
+      let gstPercent = 0;
+      if (item.gstPercent !== undefined && item.gstPercent !== null) {
+        gstPercent = parseFloat(item.gstPercent) || 0;
+      } else if (isIgstApplicable) {
+        gstPercent = parseFloat(item.igstPercent ?? item.igst ?? 0) || 0;
+      } else {
+        gstPercent =
+          (parseFloat(item.sgstPercent ?? item.sgst ?? 0) || 0) +
+          (parseFloat(item.cgstPercent ?? item.cgst ?? 0) || 0);
+      }
+      const gstAmount = (base * gstPercent) / 100;
+      if (isIgstApplicable) {
+        igst += gstAmount;
+      } else {
+        sgst += gstAmount / 2;
+        cgst += gstAmount / 2;
+      }
+    });
+
+    const grandTotal = po.grandTotal || (subtotal + sgst + cgst + igst);
+    return {
+      subtotal: parseFloat(subtotal.toFixed(2)),
+      sgst: parseFloat(sgst.toFixed(2)),
+      cgst: parseFloat(cgst.toFixed(2)),
+      igst: parseFloat(igst.toFixed(2)),
+      grandTotal: parseFloat(grandTotal.toFixed(2)),
+    };
+  }, [po, isIgstApplicable]);
+
+  // GST Breakup by percentage
+  const gstBreakup = useMemo(() => {
+    if (!po) return [];
+    const items = po.lineItems || [];
+    const groups = {};
+
+    items.forEach((item) => {
+      const qty = parseFloat(item.quantity || item.qty) || 0;
+      const unitPrice = parseFloat(item.unitPrice) || 0;
+      const base = qty * unitPrice;
+
+      let gstPercent = 0;
+      if (item.gstPercent !== undefined && item.gstPercent !== null) {
+        gstPercent = parseFloat(item.gstPercent) || 0;
+      } else if (isIgstApplicable) {
+        gstPercent = parseFloat(item.igstPercent ?? item.igst ?? 0) || 0;
+      } else {
+        gstPercent =
+          (parseFloat(item.sgstPercent ?? item.sgst ?? 0) || 0) +
+          (parseFloat(item.cgstPercent ?? item.cgst ?? 0) || 0);
+      }
+
+      if (gstPercent === 0 || base === 0) return;
+      const gstAmount = (base * gstPercent) / 100;
+
+      if (!groups[gstPercent]) {
+        groups[gstPercent] = { igst: 0, sgst: 0, cgst: 0, taxableAmount: 0 };
+      }
+      if (isIgstApplicable) {
+        groups[gstPercent].igst += gstAmount;
+      } else {
+        groups[gstPercent].sgst += gstAmount / 2;
+        groups[gstPercent].cgst += gstAmount / 2;
+      }
+      groups[gstPercent].taxableAmount += base;
+    });
+
+    return Object.entries(groups)
+      .map(([pct, vals]) => ({ percent: parseFloat(pct), ...vals }))
+      .sort((a, b) => a.percent - b.percent);
+  }, [po, isIgstApplicable]);
+
+  const hasIgst = isIgstApplicable || totals.igst > 0;
+
+  // Can mark individual line items as completed when PO is with supplier
+  const canMarkLineCompleted =
+    po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
+    po?.status === PO_STATUS.PARTIALLY_RECEIVED;
+
+  // Show status column only after PO is sent to supplier
+  const showStatusColumn =
+    po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
+    po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
+    po?.status === PO_STATUS.COMPLETED;
+
+  // Mark a single line item as completed
+  const handleMarkLineItemCompleted = async (lineItem) => {
+    if (!po) return;
+    const lineId = lineItem.id || lineItem.itemId;
+    setCompletingLineId(lineId);
+    try {
+      const updatedLineItems = (po.lineItems || []).map((li) => {
+        if ((li.id || li.itemId) === lineId) {
+          return { ...li, status: LINE_ITEM_STATUS.COMPLETED };
+        }
+        return li;
+      });
+
+      // Check if ALL line items are now completed
+      const allCompleted = updatedLineItems.every(
+        (li) => li.status === LINE_ITEM_STATUS.COMPLETED
       );
 
-    const sgst = po.sgstValue || po.sgst || 0;
-    const cgst = po.cgstValue || po.cgst || 0;
-    const igst = po.igstValue || po.igst || 0;
-    const grandTotal = po.grandTotal || subtotal + sgst + cgst + igst;
+      const newPoStatus = allCompleted
+        ? PO_STATUS.COMPLETED
+        : PO_STATUS.PARTIALLY_RECEIVED;
 
-    return { subtotal, sgst, cgst, igst, grandTotal };
+      await updatePurchaseOrder(po.id, {
+        ...po,
+        status: newPoStatus,
+        lineItems: updatedLineItems,
+      });
+
+      const currentUser = getCurrentUser();
+      const userName = currentUser?.name || currentUser?.username || 'User';
+      const lineLabel = lineItem.itemName || lineItem.itemCode || 'Line item';
+      const actComment = allCompleted
+        ? `All line items completed. PO marked as Completed by ${userName}`
+        : `Line item "${lineLabel}" marked as completed by ${userName}`;
+
+      const activityRes = await createActivity(po.id, {
+        comment: actComment,
+        status: newPoStatus,
+        isSystemGenerated: true,
+      });
+
+      // Update PO state in place — dialog stays open
+      setPo((prev) => ({
+        ...prev,
+        status: newPoStatus,
+        lineItems: updatedLineItems,
+      }));
+
+      // Add the new activity to the notes list
+      const parsed = parseActivityComment(activityRes.comment || actComment);
+      setNotes((prev) => [
+        ...prev,
+        {
+          id: activityRes.id,
+          text: parsed.text || actComment,
+          isSystemGenerated: true,
+          status: parsed.status,
+          timestamp: activityRes.createdAt || new Date().toISOString(),
+          user: activityRes.user || userName,
+          edited: false,
+        },
+      ]);
+
+      message.success(
+        allCompleted
+          ? 'All line items completed — PO marked as Completed'
+          : `"${lineLabel}" marked as completed`
+      );
+
+      // Notify parent to refresh list (but don't close dialog)
+      if (onStatusChange) onStatusChange();
+    } catch {
+      message.error('Failed to update line item status');
+    } finally {
+      setCompletingLineId(null);
+    }
   };
-
-  const totals = po ? computeTotals() : { subtotal: 0, sgst: 0, cgst: 0, igst: 0, grandTotal: 0 };
-  const hasIgst = totals.igst > 0;
 
   // Line items columns
   const lineItemColumns = [
@@ -408,14 +589,22 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
             </>
           )}
           {record.variantAttributes && (
-            <>
-              <br />
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {typeof record.variantAttributes === 'string'
-                  ? record.variantAttributes
-                  : JSON.stringify(record.variantAttributes)}
-              </Text>
-            </>
+            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {typeof record.variantAttributes === 'object'
+                ? Object.entries(record.variantAttributes).map(([k, v]) => {
+                    const kLower = k.toLowerCase();
+                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                    const showSwatch = isColorAttr && isPantoneCode(v);
+                    return (
+                      <Tag key={k} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        {showSwatch && <PantoneColorSwatch value={v} size={14} />}
+                        {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
+                      </Tag>
+                    );
+                  })
+                : <Text type="secondary" style={{ fontSize: 11 }}>{record.variantAttributes}</Text>
+              }
+            </div>
           )}
         </div>
       ),
@@ -424,7 +613,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       title: 'Description',
       dataIndex: 'description',
       width: 180,
-      render: (v) => v || '-',
+      render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
     },
     {
       title: 'Qty',
@@ -478,13 +667,62 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       width: 110,
       align: 'right',
       render: (_, r) => (
-        <Text strong>{formatCurrency(r.totalAmount || r.amount || 0)}</Text>
+        <Text strong style={{ whiteSpace: 'nowrap' }}>{formatCurrency(r.totalAmount || r.amount || 0)}</Text>
       ),
     },
+    ...(showStatusColumn
+      ? [
+          {
+            title: 'Status',
+            key: 'lineStatus',
+            width: 120,
+            align: 'center',
+            render: (_, r) => {
+              const st = r.status || PO_STATUS.DRAFT;
+              const lineConfig = STATUS_CONFIG[st] || { color: 'default' };
+              return (
+                <Tag color={lineConfig.color} style={{ borderRadius: 12 }}>
+                  {getLineItemStatusLabel(st)}
+                </Tag>
+              );
+            },
+          },
+        ]
+      : []),
+    ...(canMarkLineCompleted
+      ? [
+          {
+            title: '',
+            key: 'lineAction',
+            width: 100,
+            render: (_, r) => {
+              if (r.status === LINE_ITEM_STATUS.COMPLETED) {
+                return <Tag color="success">Done</Tag>;
+              }
+              return (
+                <Tooltip title="Mark as complete">
+                  <Button
+                    size="small"
+                    type="link"
+                    icon={<CheckCircleOutlined />}
+                    onClick={() => handleMarkLineItemCompleted(r)}
+                    loading={completingLineId === (r.id || r.itemId)}
+                  >
+                    Complete
+                  </Button>
+                </Tooltip>
+              );
+            },
+          },
+        ]
+      : []),
   ];
 
   const isInProgress =
-    po?.status === 'InProgress' || po?.status === 'Approved';
+    po?.status === PO_STATUS.IN_PROGRESS ||
+    po?.status === PO_STATUS.APPROVED ||
+    po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
+    po?.status === PO_STATUS.PARTIALLY_RECEIVED;
 
   return (
     <>
@@ -504,28 +742,27 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         }}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              {/* Status Action Buttons */}
-              <Space>
-                {availableActions.map((action) => (
-                  <Button
-                    key={action.key}
-                    type={action.type}
-                    danger={action.danger}
-                    icon={action.icon}
-                    onClick={() => handleStatusAction(action)}
-                    loading={actionLoading}
-                    style={
-                      action.color && !action.danger
-                        ? { backgroundColor: action.color, borderColor: action.color, color: '#fff' }
+            <Space size="middle">
+              {availableActions.map((action) => (
+                <Button
+                  key={action.key}
+                  type={action.type}
+                  danger={action.danger}
+                  icon={action.icon}
+                  onClick={() => handleStatusAction(action)}
+                  loading={actionLoading}
+                  style={
+                    action.color && !action.danger
+                      ? { backgroundColor: action.color, borderColor: action.color, color: '#fff' }
+                      : action.danger
+                        ? { borderColor: '#ff4d4f' }
                         : undefined
-                    }
-                  >
-                    {action.label}
-                  </Button>
-                ))}
-              </Space>
-            </div>
+                  }
+                >
+                  {action.label}
+                </Button>
+              ))}
+            </Space>
             <Button onClick={onClose}>Close</Button>
           </div>
         }
@@ -603,19 +840,88 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                   <Text strong>{formatCurrency(totals.subtotal)}</Text>
                 </div>
 
+                {/* GST Breakup */}
+                {gstBreakup.length > 0 && (
+                  <>
+                    <Divider style={{ margin: '4px 0' }} />
+                    <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
+                      GST BREAKUP
+                    </Text>
+                    {gstBreakup.map((group) => (
+                      <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: 12, display: 'block' }}
+                        >
+                          GST @ {group.percent}%
+                        </Text>
+                        {hasIgst ? (
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              paddingLeft: 12,
+                            }}
+                          >
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              IGST ({group.percent}%)
+                            </Text>
+                            <Text style={{ fontSize: 12 }}>
+                              {formatCurrency(group.igst)}
+                            </Text>
+                          </div>
+                        ) : (
+                          <>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                SGST ({group.percent / 2}%)
+                              </Text>
+                              <Text style={{ fontSize: 12 }}>
+                                {formatCurrency(group.sgst)}
+                              </Text>
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                CGST ({group.percent / 2}%)
+                              </Text>
+                              <Text style={{ fontSize: 12 }}>
+                                {formatCurrency(group.cgst)}
+                              </Text>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                <Divider style={{ margin: '8px 0' }} />
+
                 {hasIgst ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text>IGST</Text>
+                    <Text>Total IGST</Text>
                     <Text>{formatCurrency(totals.igst)}</Text>
                   </div>
                 ) : (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text>SGST</Text>
+                      <Text>Total SGST</Text>
                       <Text>{formatCurrency(totals.sgst)}</Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text>CGST</Text>
+                      <Text>Total CGST</Text>
                       <Text>{formatCurrency(totals.cgst)}</Text>
                     </div>
                   </>
@@ -777,6 +1083,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           loading: actionLoading,
         }}
         destroyOnClose
+        bodyStyle={{ paddingBottom: 80 }}
       >
         {statusAction?.key === 'reject' && (
           <div style={{ marginBottom: 16 }}>
@@ -794,7 +1101,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         )}
         <div>
           <Text strong style={{ display: 'block', marginBottom: 8 }}>
-            {statusAction?.key === 'reject' ? 'Rejection Reason' : 'Reason'} *
+            {statusAction?.key === 'reject' ? 'Rejection Reason' : 'Reason'}{' '}
+            <span style={{ color: 'var(--error-color, #ff4d4f)' }}>*</span>
           </Text>
           <TextArea
             rows={3}

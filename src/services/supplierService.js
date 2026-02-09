@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import axios from 'axios';
 
 /**
  * Supplier API Service
@@ -70,14 +71,15 @@ export const deleteSupplier = async (supplierId) => {
 };
 
 /**
- * Get location details by pincode (using external API)
+ * Get location details by pincode (using external API via axios)
  * @param {string} pincode - 6-digit pincode
  * @returns {Promise<Object|null>} Location object with city, state, country or null
  */
 export const getLocationByPincode = async (pincode) => {
+  const baseUrl = import.meta.env.VITE_PINCODE_API_URL || 'https://api.postalpincode.in/pincode';
   try {
-    const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await response.json();
+    const response = await axios.get(`${baseUrl}/${pincode}`, { timeout: 10000 });
+    const data = response.data;
     if (data && data[0] && data[0].Status === 'Success' && data[0].PostOffice?.length > 0) {
       const postOffice = data[0].PostOffice[0];
       return {

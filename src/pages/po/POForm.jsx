@@ -41,9 +41,12 @@ import {
   createActivity,
 } from '../../services/purchaseOrderService';
 import { getSuppliers } from '../../services/supplierService';
-import { searchItems, getItemsByIds } from '../../services/itemService';
+import { autocompleteItems, getItemsByIds } from '../../services/itemService';
 import { useStore } from '../../context/StoreContext';
 import { getCurrentUser } from '../../utils/permissions';
+import { PO_STATUS, LINE_ITEM_STATUS } from '../../utils/poStatusConstants';
+import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import { isPantoneCode } from '../../services/pantoneService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -83,7 +86,7 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
       try {
-        const response = await searchItems(text);
+        const response = await autocompleteItems(text);
         // API returns: { content: [...], pageNumber, pageSize, totalElements, ... }
         // Axios interceptor returns the full response, so response.data has the payload
         const payload = response?.data || response || {};
@@ -151,22 +154,13 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
 // ============================================================
 // VariantSelectionModal - Select variant for multi-variant items
 // ============================================================
-const VariantSelectionModal = ({ open, item, onSelect, onCancel }) => {
-  const [selectedVariantId, setSelectedVariantId] = useState(null);
-
-  useEffect(() => {
-    if (open) setSelectedVariantId(null);
-  }, [open]);
-
+const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
   if (!item) return null;
 
   const variants = (item.variants || []).filter((v) => v.isActive !== false);
 
-  const handleConfirm = () => {
-    const variant = variants.find((v) => v.id === selectedVariantId);
-    if (variant) {
-      onSelect(item, variant);
-    }
+  const handleCardClick = (variant) => {
+    onSelect(item, variant);
   };
 
   return (
@@ -179,57 +173,68 @@ const VariantSelectionModal = ({ open, item, onSelect, onCancel }) => {
         </Space>
       }
       open={open}
-      onCancel={onCancel}
+      onCancel={() => onSelect(null, null)}
       width={600}
-      footer={[
-        <Button key="cancel" onClick={onCancel}>
-          Cancel
-        </Button>,
-        <Button
-          key="confirm"
-          type="primary"
-          disabled={!selectedVariantId}
-          onClick={handleConfirm}
-        >
-          Select Variant
-        </Button>,
-      ]}
+      footer={null}
+      closable={false}
+      maskClosable={false}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
         This item has {variants.length} variants. Please select one:
       </Text>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+          maxHeight: 400,
+          overflowY: 'auto',
+          paddingRight: 4,
+        }}
+      >
         {variants.map((variant) => {
-          const isSelected = selectedVariantId === variant.id;
+          const isCurrent = currentVariantId && variant.id === currentVariantId;
           const attrs = variant.attributes || {};
           return (
             <div
               key={variant.id}
-              onClick={() => setSelectedVariantId(variant.id)}
+              onClick={() => handleCardClick(variant)}
               style={{
                 padding: '12px 16px',
                 borderRadius: 8,
-                border: isSelected
+                border: isCurrent
                   ? '2px solid var(--primary-color)'
                   : '2px solid var(--border-color)',
-                background: isSelected
+                background: isCurrent
                   ? 'var(--bg-tertiary)'
                   : 'var(--card-bg)',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
+                position: 'relative',
               }}
             >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
                 {Object.entries(attrs).length > 0 ? (
-                  Object.entries(attrs).map(([key, val]) => (
-                    <Tag key={key}>
-                      <Text style={{ fontSize: 12 }}>
-                        {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
-                      </Text>
-                    </Tag>
-                  ))
+                  Object.entries(attrs).map(([key, val]) => {
+                    const kLower = key.toLowerCase();
+                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                    const showSwatch = isColorAttr && isPantoneCode(val);
+                    return (
+                      <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {showSwatch && <PantoneColorSwatch value={val} size={16} />}
+                        <Text style={{ fontSize: 12 }}>
+                          {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
+                        </Text>
+                      </Tag>
+                    );
+                  })
                 ) : (
                   <Text type="secondary">Default variant</Text>
+                )}
+                {isCurrent && (
+                  <Tag color="green" style={{ marginLeft: 'auto', fontWeight: 600 }}>
+                    Current
+                  </Tag>
                 )}
               </div>
             </div>
@@ -281,6 +286,7 @@ const POForm = () => {
     pendingItem: null,
     pendingLineKey: null,
     isChange: false,
+    currentVariantId: null,
   });
 
   // Items with their variants (keyed by itemId) - used for variant column display
@@ -360,7 +366,7 @@ const POForm = () => {
 
       // Find supplier (will be retried when suppliersList loads)
       if (data.supplierId && suppliersList.length > 0) {
-        const sup = suppliersList.find((s) => s.id === data.supplierId);
+        const sup = suppliersList.find((s) => Number(s.id) === Number(data.supplierId));
         setSelectedSupplier(sup || null);
         setIsIgstApplicable(sup?.igstApplicable || false);
       }
@@ -432,7 +438,7 @@ const POForm = () => {
     if (isEditMode && suppliersList.length > 0) {
       const supplierId = form.getFieldValue('supplierId');
       if (supplierId) {
-        const sup = suppliersList.find((s) => s.id === supplierId);
+        const sup = suppliersList.find((s) => Number(s.id) === Number(supplierId));
         setSelectedSupplier(sup || null);
         setIsIgstApplicable(sup?.igstApplicable || false);
       }
@@ -486,6 +492,7 @@ const POForm = () => {
           pendingItem: selectedItem,
           pendingLineKey: lineKey,
           isChange: false,
+          currentVariantId: null,
         });
         return;
       }
@@ -522,10 +529,12 @@ const POForm = () => {
             }
 
             const gst = item.gstPercent ?? item.gst ?? (((item.cgst || 0) + (item.sgst || 0)) || 0);
-            const unitPrice = item.unitPrice ?? item.price ?? item.rate ?? 0;
+            const rawPrice = item.unitPrice ?? item.price ?? item.rate ?? null;
+            const unitPrice = (rawPrice !== null && rawPrice !== undefined && rawPrice > 0) ? rawPrice : '';
             const qty = parseFloat(li.qty) || 0;
+            const numericPrice = parseFloat(unitPrice) || 0;
             const amount = parseFloat(
-              (qty * unitPrice * (1 + gst / 100)).toFixed(2)
+              (qty * numericPrice * (1 + gst / 100)).toFixed(2)
             );
 
             return {
@@ -557,24 +566,47 @@ const POForm = () => {
 
   // Handle variant selection from modal
   const handleVariantSelect = (item, variant) => {
-    if (variantModalState.pendingLineKey) {
+    if (item && variant && variantModalState.pendingLineKey) {
       populateLineItemWithVariant(variantModalState.pendingLineKey, item, variant);
+    }
+    // If item is null (modal dismissed without selection on new item), clear the line
+    // but only if it's a new selection (not a change)
+    if (!item && !variantModalState.isChange && variantModalState.pendingLineKey) {
+      setLineItems((prev) =>
+        prev.map((li) =>
+          li.key === variantModalState.pendingLineKey
+            ? { ...createEmptyLineItem(), key: variantModalState.pendingLineKey }
+            : li
+        )
+      );
     }
     setVariantModalState({
       show: false,
       pendingItem: null,
       pendingLineKey: null,
       isChange: false,
+      currentVariantId: null,
     });
   };
 
   // Handle variant modal cancel
   const handleVariantModalCancel = () => {
+    // If it's a new item selection (not change), clear the line item
+    if (!variantModalState.isChange && variantModalState.pendingLineKey) {
+      setLineItems((prev) =>
+        prev.map((li) =>
+          li.key === variantModalState.pendingLineKey
+            ? { ...createEmptyLineItem(), key: variantModalState.pendingLineKey }
+            : li
+        )
+      );
+    }
     setVariantModalState({
       show: false,
       pendingItem: null,
       pendingLineKey: null,
       isChange: false,
+      currentVariantId: null,
     });
   };
 
@@ -582,11 +614,14 @@ const POForm = () => {
   const handleChangeVariant = (lineKey, itemId) => {
     const item = itemsWithVariants[itemId];
     if (!item) return;
+    // Find the current variant ID for this line item
+    const lineItem = lineItems.find((li) => li.key === lineKey);
     setVariantModalState({
       show: true,
       pendingItem: item,
       pendingLineKey: lineKey,
       isChange: true,
+      currentVariantId: lineItem?.variantId || null,
     });
   };
 
@@ -690,7 +725,7 @@ const POForm = () => {
       const tomorrow = dayjs().add(1, 'day').startOf('day');
       if (deliveryDate.isBefore(tomorrow)) {
         errors.push('Expected Delivery Date must be in the future');
-      } else if (poDate && deliveryDate.isSameOrBefore(poDate)) {
+      } else if (poDate && !deliveryDate.isAfter(poDate)) {
         errors.push('Expected Delivery Date must be after PO Date');
       }
     }
@@ -713,16 +748,95 @@ const POForm = () => {
     }
 
     lineItems.forEach((item, idx) => {
-      if (!item.itemId) return; // Skip empty rows for validation
+      // If item is not selected but row exists among multiple rows, flag it
+      if (!item.itemId) {
+        // Allow a single empty row only if it's the sole row (default state)
+        if (lineItems.length > 1 || validItems.length > 0) {
+          errors.push(`Line item ${idx + 1}: Item is required`);
+        }
+        return;
+      }
+
       const qty = parseFloat(item.qty);
       const unitPrice = parseFloat(item.unitPrice);
-      if (item.qty === '' || isNaN(qty) || qty < 1)
+
+      if (item.qty === '' || isNaN(qty) || qty < 1) {
         errors.push(`Line item ${idx + 1}: Quantity must be at least 1`);
-      if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice < 0.01)
-        errors.push(`Line item ${idx + 1}: Unit Price must be at least 0.01`);
+      }
+
+      if (isSubmit) {
+        // Submit requires unit price > 0
+        if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
+          errors.push(`Line item ${idx + 1}: Unit Price must be greater than 0`);
+        }
+      } else {
+        // Draft allows unit price = 0, but not negative
+        if (item.unitPrice !== '' && !isNaN(unitPrice) && unitPrice < 0) {
+          errors.push(`Line item ${idx + 1}: Unit Price cannot be negative`);
+        }
+      }
+
+      // UOM validation
+      if (!item.uomId) {
+        errors.push(`Line item ${idx + 1}: UOM is required`);
+      }
+    });
+
+    // Duplicate line item validation (same item + variant + UOM)
+    const seen = [];
+    validItems.forEach((item, idx) => {
+      const variantKey = item.variantId
+        ? String(item.variantId)
+        : item.variantAttributes
+          ? JSON.stringify(item.variantAttributes)
+          : 'none';
+      const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
+      const existingIdx = seen.findIndex((s) => s.key === dupKey);
+      if (existingIdx >= 0) {
+        const origLineNum = seen[existingIdx].lineNum;
+        const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
+        errors.push(
+          `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
+        );
+      } else {
+        seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
+      }
     });
 
     return errors;
+  };
+
+  // Focus the first field that has an error
+  const focusFirstErrorField = (errorMsg) => {
+    const lower = errorMsg.toLowerCase();
+    // Map error messages to form field IDs
+    const fieldMap = [
+      { match: 'supplier', field: 'supplierId' },
+      { match: 'po date', field: 'poDate' },
+      { match: 'delivery date', field: 'deliveryDate' },
+      { match: 'terms', field: 'termsConditionId' },
+      { match: 'remarks', field: 'remarks' },
+    ];
+
+    for (const { match, field } of fieldMap) {
+      if (lower.includes(match)) {
+        // Scroll to and focus the AntD form field
+        form.scrollToField(field, { behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+          const el = document.getElementById(field);
+          if (el) el.focus();
+        }, 300);
+        return;
+      }
+    }
+
+    // Check for line item errors - scroll to the line items table
+    if (lower.includes('line item')) {
+      const tableEl = document.querySelector('.ant-table-wrapper');
+      if (tableEl) {
+        tableEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
   };
 
   // Build API payload
@@ -737,7 +851,12 @@ const POForm = () => {
     const isIgst = supplier?.igstApplicable || false;
 
     // Determine line item status based on PO status
-    const lineItemStatus = status === 'AwaitApproval' ? 'InProgress' : 'Draft';
+    const lineItemStatus =
+      status === PO_STATUS.PENDING_APPROVAL
+        ? LINE_ITEM_STATUS.IN_PROGRESS
+        : status === PO_STATUS.CANCELLED
+          ? LINE_ITEM_STATUS.CANCELLED
+          : LINE_ITEM_STATUS.DRAFT;
 
     return {
       supplierId: values.supplierId,
@@ -810,13 +929,14 @@ const POForm = () => {
     // For draft, validate all fields
     const errors = validateForm(false);
     if (errors.length > 0) {
-      errors.forEach((err) => message.error(err));
+      message.error(errors[0], 5);
+      focusFirstErrorField(errors[0]);
       return;
     }
 
     setSubmitting(true);
     try {
-      const payload = buildPayload('Draft');
+      const payload = buildPayload(PO_STATUS.DRAFT);
 
       const currentUser = getCurrentUser();
       const userName = currentUser?.name || currentUser?.username || 'User';
@@ -826,10 +946,10 @@ const POForm = () => {
 
         // Activity log for re-saving rejected/referred-back POs
         const previousStatus = originalPO?.status;
-        if (previousStatus === 'Rejected' || previousStatus === 'ReferredBack') {
+        if (previousStatus === PO_STATUS.REJECTED || previousStatus === PO_STATUS.REFERRED_BACK) {
           await createActivity(id, {
             comment: `PO saved as draft by ${userName}. Previous status: ${previousStatus}`,
-            status: 'Draft',
+            status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
           });
         }
@@ -842,7 +962,7 @@ const POForm = () => {
         if (createdPO?.id) {
           await createActivity(createdPO.id, {
             comment: `PO created as draft by ${userName}`,
-            status: 'Draft',
+            status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
           });
         }
@@ -862,7 +982,8 @@ const POForm = () => {
   const handleSubmitClick = async () => {
     const errors = validateForm(true);
     if (errors.length > 0) {
-      errors.forEach((err) => message.error(err));
+      message.error(errors[0], 5);
+      focusFirstErrorField(errors[0]);
       return;
     }
 
@@ -900,7 +1021,7 @@ const POForm = () => {
   const handleConfirmSubmit = async () => {
     setSubmitting(true);
     try {
-      const payload = buildPayload('AwaitApproval');
+      const payload = buildPayload(PO_STATUS.PENDING_APPROVAL);
       let result;
       if (isEditMode) {
         result = await updatePurchaseOrder(id, payload);
@@ -915,16 +1036,16 @@ const POForm = () => {
 
       if (poId) {
         const previousStatus = originalPO?.status;
-        if (isEditMode && (previousStatus === 'Rejected' || previousStatus === 'ReferredBack')) {
+        if (isEditMode && (previousStatus === PO_STATUS.REJECTED || previousStatus === PO_STATUS.REFERRED_BACK)) {
           await createActivity(poId, {
             comment: `PO re-submitted for approval by ${userName}. Previous status: ${previousStatus}`,
-            status: 'AwaitApproval',
+            status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
           });
         } else {
           await createActivity(poId, {
             comment: `PO submitted for approval by ${userName}`,
-            status: 'AwaitApproval',
+            status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
           });
         }
@@ -1054,7 +1175,7 @@ const POForm = () => {
           <div
             style={{
               display: 'flex',
-              flexWrap: 'wrap',
+              flexWrap: 'nowrap',
               gap: 4,
               alignItems: 'center',
               cursor: hasMultipleVariants ? 'pointer' : 'default',
@@ -1070,11 +1191,17 @@ const POForm = () => {
               <>
                 {Object.entries(attrs)
                   .slice(0, 2)
-                  .map(([key, val]) => (
-                    <Tag key={key} style={{ fontSize: 11, margin: 0 }}>
-                      {val}
-                    </Tag>
-                  ))}
+                  .map(([key, val]) => {
+                    const kLower = key.toLowerCase();
+                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                    const showSwatch = isColorAttr && isPantoneCode(val);
+                    return (
+                      <Tag key={key} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        {showSwatch && <PantoneColorSwatch value={val} size={14} />}
+                        {showSwatch ? (val.split('/')[0]?.trim() || val) : val}
+                      </Tag>
+                    );
+                  })}
                 {Object.entries(attrs).length > 2 && (
                   <Text type="secondary" style={{ fontSize: 10 }}>
                     +{Object.entries(attrs).length - 2}
@@ -1117,7 +1244,7 @@ const POForm = () => {
           min={0}
           step={1}
           precision={2}
-          style={{ width: '100%' }}
+          style={{ width: '100%', height: 40 }}
           value={value === '' ? null : Number(value)}
           onChange={(v) =>
             handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
@@ -1163,7 +1290,7 @@ const POForm = () => {
           min={0}
           step={0.01}
           precision={2}
-          style={{ width: '100%' }}
+          style={{ width: '100%', height: 40 }}
           value={value === '' ? null : Number(value)}
           onChange={(v) =>
             handleLineItemChange(
@@ -1273,7 +1400,7 @@ const POForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={handleGoBack} />
           <h1>{isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}</h1>
@@ -1695,14 +1822,20 @@ const POForm = () => {
                       {r.variantAttributes &&
                         Object.keys(r.variantAttributes).length > 0 && (
                           <div style={{ marginTop: 4 }}>
-                            {Object.entries(r.variantAttributes).map(([k, v]) => (
-                              <Tag
-                                key={k}
-                                style={{ fontSize: 10, margin: '0 4px 2px 0' }}
-                              >
-                                {k}: {v}
-                              </Tag>
-                            ))}
+                            {Object.entries(r.variantAttributes).map(([k, v]) => {
+                              const kLower = k.toLowerCase();
+                              const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                              const showSwatch = isColorAttr && isPantoneCode(v);
+                              return (
+                                <Tag
+                                  key={k}
+                                  style={{ fontSize: 10, margin: '0 4px 2px 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                                >
+                                  {showSwatch && <PantoneColorSwatch value={v} size={14} />}
+                                  {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
+                                </Tag>
+                              );
+                            })}
                           </div>
                         )}
                     </div>
@@ -1852,7 +1985,7 @@ const POForm = () => {
         open={variantModalState.show}
         item={variantModalState.pendingItem}
         onSelect={handleVariantSelect}
-        onCancel={handleVariantModalCancel}
+        currentVariantId={variantModalState.currentVariantId || null}
       />
     </div>
   );

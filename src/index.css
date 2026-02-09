@@ -235,6 +235,7 @@ body {
   box-shadow: var(--shadow-sm) !important;
   background: var(--card-bg) !important;
   transition: all var(--transition-normal);
+  overflow: hidden !important;
 }
 
 .ant-card:hover {
@@ -261,6 +262,7 @@ body {
   border-radius: var(--radius-lg) !important;
   overflow: hidden;
   background: var(--card-bg) !important;
+  border: 1px solid var(--table-border) !important;
 }
 
 .ant-table-wrapper {
@@ -408,6 +410,7 @@ body {
   border-radius: var(--radius-xl) !important;
   overflow: hidden;
   background: var(--card-bg) !important;
+  border: 1px solid var(--border-color) !important;
 }
 
 .ant-modal-header {
