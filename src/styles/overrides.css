@@ -859,3 +859,8 @@ textarea.ant-input:active {
 .ant-descriptions-item-container {
   align-items: center;
 }
+
+/* Center all table headers for view/preview tables */
+.centered-header-table .ant-table-thead > tr > th {
+  text-align: center !important;
+}

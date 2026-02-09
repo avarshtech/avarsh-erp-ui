@@ -132,8 +132,8 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
             gap: 8,
             padding: '4px 11px',
             border: '1px solid var(--border-color, #d9d9d9)',
-            borderRadius: 6,
-            height: 32,
+            borderRadius: 10,
+            height: 42,
             background: 'var(--card-bg, #fff)',
             cursor: 'pointer',
           }}

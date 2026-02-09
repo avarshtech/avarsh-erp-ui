@@ -59,7 +59,8 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
   const [options, setOptions] = useState([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef(null);
-  const noResultCacheRef = useRef(new Set());
+  const lastQueryRef = useRef('');
+  const noResultPrefixRef = useRef('');
 
   useEffect(() => {
     setSearchText(value || '');
@@ -72,15 +73,26 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
 
     if (!text || text.length < 2) {
       setOptions([]);
+      lastQueryRef.current = '';
+      noResultPrefixRef.current = '';
       return;
     }
 
-    // Smart no-result caching
-    for (const cached of noResultCacheRef.current) {
-      if (text.startsWith(cached)) {
-        setOptions([]);
-        return;
+    // Reset no-result prefix on backspace/shortening
+    const isShortening = text.length < lastQueryRef.current.length;
+    if (isShortening && noResultPrefixRef.current) {
+      if (text.length < noResultPrefixRef.current.length ||
+          !text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
+        noResultPrefixRef.current = '';
       }
+    }
+
+    // Skip API call if extending a no-result prefix
+    if (noResultPrefixRef.current &&
+        text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
+      setOptions([]);
+      lastQueryRef.current = text;
+      return;
     }
 
     debounceRef.current = setTimeout(async () => {
@@ -95,8 +107,11 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
           : Array.isArray(payload?.content)
             ? payload.content
             : [];
+        lastQueryRef.current = text;
         if (items.length === 0) {
-          noResultCacheRef.current.add(text);
+          noResultPrefixRef.current = text;
+        } else {
+          noResultPrefixRef.current = '';
         }
         setOptions(
           items.map((item) => ({
@@ -257,9 +272,11 @@ const TAX_OPTIONS = [
 const POForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const prevIdRef = useRef(id);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
 
   // Master data
@@ -332,6 +349,24 @@ const POForm = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // If user navigates from Edit -> New (id changed from truthy to falsy), reset form and state
+  useEffect(() => {
+    const prev = prevIdRef.current;
+    if (prev && !id) {
+      // navigated from edit to new
+      form.resetFields();
+      setLineItems([createEmptyLineItem()]);
+      setSelectedSupplier(null);
+      setOriginalPO(null);
+      setIsIgstApplicable(false);
+      setPreviewVisible(false);
+      setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
+      setItemsWithVariants({});
+      setIsDirty(false);
+    }
+    prevIdRef.current = id;
+  }, [id, form]);
+
   const loadMasterData = async () => {
     try {
       const [suppliersRes, termsRes] = await Promise.all([
@@ -344,6 +379,19 @@ const POForm = () => {
 
       setSuppliersList(Array.isArray(suppData) ? suppData : []);
       setTermsConditionsList(Array.isArray(termsData) ? termsData : []);
+
+      // If we're in edit mode and the original PO was already loaded,
+      // ensure the supplier is selected from the freshly loaded suppliers list.
+      if (isEditMode && originalPO && originalPO.supplierId) {
+        const supId = originalPO.supplierId;
+        const matched = (Array.isArray(suppData) ? suppData : []).find((s) => Number(s.id) === Number(supId));
+        if (matched) {
+          setSelectedSupplier(matched);
+          setIsIgstApplicable(matched?.igstApplicable || false);
+          // Re-set the form value to the exact supplier id/type present in suppliers list
+          form.setFieldsValue({ supplierId: matched.id });
+        }
+      }
     } catch {
       message.error('Failed to load master data');
     }
@@ -364,6 +412,17 @@ const POForm = () => {
         remarks: data.remarks || '',
       });
 
+      // If suppliers list is already loaded, set selected supplier immediately
+      const supplierIdFromPO = data.supplierId ?? data.supplier?.id ?? null;
+      if (supplierIdFromPO && suppliersList.length > 0) {
+        const sup = suppliersList.find((s) => Number(s.id) === Number(supplierIdFromPO));
+        if (sup) {
+          setSelectedSupplier(sup || null);
+          setIsIgstApplicable(sup?.igstApplicable || false);
+          // Ensure the form value matches the suppliers list id/type
+          form.setFieldsValue({ supplierId: sup.id });
+        }
+      }
       // Find supplier (will be retried when suppliersList loads)
       if (data.supplierId && suppliersList.length > 0) {
         const sup = suppliersList.find((s) => Number(s.id) === Number(data.supplierId));
@@ -436,14 +495,21 @@ const POForm = () => {
   // Reload supplier info when suppliers list loads (for edit mode)
   useEffect(() => {
     if (isEditMode && suppliersList.length > 0) {
-      const supplierId = form.getFieldValue('supplierId');
+      // Prefer explicit form value; if missing, fall back to originalPO's supplier info
+      const formSupplierId = form.getFieldValue('supplierId');
+      const supplierId =
+        formSupplierId ?? originalPO?.supplierId;
       if (supplierId) {
         const sup = suppliersList.find((s) => Number(s.id) === Number(supplierId));
-        setSelectedSupplier(sup || null);
-        setIsIgstApplicable(sup?.igstApplicable || false);
+        if (sup) {
+          setSelectedSupplier(sup);
+          setIsIgstApplicable(sup?.igstApplicable || false);
+          // Re-set form value with the exact type from suppliers list so Select matches
+          form.setFieldsValue({ supplierId: sup.id });
+        }
       }
     }
-  }, [suppliersList, isEditMode, form]);
+  }, [suppliersList, isEditMode, form, originalPO]);
 
   // Handle supplier change
   const handleSupplierChange = (value) => {
@@ -676,8 +742,8 @@ const POForm = () => {
   const gstBreakup = useMemo(() => {
     const groups = {};
     lineItems.forEach((item) => {
-      const qty = parseFloat(item.qty) || 0;
-      const unitPrice = parseFloat(item.unitPrice) || 0;
+          const qty = parseFloat(item.qty) || 0;
+          const unitPrice = parseFloat(item.unitPrice) || 0;
       const base = qty * unitPrice;
       const gstPercent = parseFloat(item.gstPercent) || 0;
       if (gstPercent === 0 || base === 0) return;
@@ -934,7 +1000,7 @@ const POForm = () => {
       return;
     }
 
-    setSubmitting(true);
+    setSavingDraft(true);
     try {
       const payload = buildPayload(PO_STATUS.DRAFT);
 
@@ -974,7 +1040,7 @@ const POForm = () => {
     } catch {
       message.error('Failed to save purchase order');
     } finally {
-      setSubmitting(false);
+      setSavingDraft(false);
     }
   };
 
@@ -995,7 +1061,10 @@ const POForm = () => {
     }
 
     // Build preview data and show preview
-    const supplier = suppliersList.find((s) => s.id === form.getFieldValue('supplierId'));
+    // Prefer supplierId from the loaded purchase order (originalPO) when editing,
+    // because the form value may occasionally be undefined while data is loading.
+    const supplierIdForPreview = (originalPO && originalPO.supplierId) ? originalPO.supplierId : form.getFieldValue('supplierId');
+    const supplier = suppliersList.find((s) => Number(s.id) === Number(supplierIdForPreview));
     const terms = termsConditionsList.find(
       (t) => t.id === form.getFieldValue('termsConditionId')
     );
@@ -1078,6 +1147,95 @@ const POForm = () => {
     }
   };
 
+  // Intercept SPA navigations (history.pushState/replaceState) while editing
+  useEffect(() => {
+    const pendingNavRef = { current: null };
+    const suppressRef = { current: false };
+
+    const confirmAndNavigate = (args, originalFn) => {
+      Modal.confirm({
+        title: 'Unsaved Changes',
+        icon: <ExclamationCircleOutlined />,
+        content: 'You have unsaved changes. Discard changes and continue?',
+        okText: 'Discard',
+        cancelText: 'Stay',
+        onOk: async () => {
+          try {
+            // Reset form and local state
+            form.resetFields();
+            setLineItems([createEmptyLineItem()]);
+            setIsDirty(false);
+            setOriginalPO(null);
+            setSelectedSupplier(null);
+            setPreviewVisible(false);
+            setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
+            suppressRef.current = true;
+            // perform the original navigation
+            originalFn.apply(window.history, args);
+            // Notify listeners about location change
+            setTimeout(() => window.dispatchEvent(new PopStateEvent('popstate')), 0);
+          } finally {
+            pendingNavRef.current = null;
+            suppressRef.current = false;
+          }
+        },
+        onCancel: () => {
+          pendingNavRef.current = null;
+        },
+      });
+    };
+
+    const originalPush = window.history.pushState;
+    const originalReplace = window.history.replaceState;
+
+    window.history.pushState = function () {
+      const args = Array.from(arguments);
+      try {
+        const to = new URL(args[2], window.location.origin).pathname;
+        const from = window.location.pathname;
+        if (isDirty && !suppressRef.current && to !== from) {
+          pendingNavRef.current = { type: 'push', args };
+          confirmAndNavigate(args, originalPush);
+          return;
+        }
+      } catch (e) {
+        // ignore URL parse errors and allow navigation
+      }
+      return originalPush.apply(window.history, args);
+    };
+
+    window.history.replaceState = function () {
+      const args = Array.from(arguments);
+      try {
+        const to = new URL(args[2], window.location.origin).pathname;
+        const from = window.location.pathname;
+        if (isDirty && !suppressRef.current && to !== from) {
+          pendingNavRef.current = { type: 'replace', args };
+          confirmAndNavigate(args, originalReplace);
+          return;
+        }
+      } catch (e) {}
+      return originalReplace.apply(window.history, args);
+    };
+
+    // Warn on full page reload/close
+    const beforeUnloadHandler = (e) => {
+      if (!isDirty) return undefined;
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+
+    return () => {
+      // restore
+      window.history.pushState = originalPush;
+      window.history.replaceState = originalReplace;
+      window.removeEventListener('beforeunload', beforeUnloadHandler);
+    };
+    // only rebind when isDirty or form/lineItems factory changes
+  }, [isDirty, form]);
+
   // Date disabled functions
   const disabledPoDate = (current) => {
     // For new POs, disable dates before today
@@ -1156,7 +1314,7 @@ const POForm = () => {
               );
             }
           }}
-          disabled={submitting}
+          disabled={submitting || savingDraft}
         />
       ),
     },
@@ -1181,7 +1339,7 @@ const POForm = () => {
               cursor: hasMultipleVariants ? 'pointer' : 'default',
             }}
             onClick={() => {
-              if (hasMultipleVariants && !submitting) {
+              if (hasMultipleVariants && !submitting && !savingDraft) {
                 handleChangeVariant(record.key, record.itemId);
               }
             }}
@@ -1231,7 +1389,7 @@ const POForm = () => {
           onChange={(e) =>
             handleLineItemChange(record.key, 'description', e.target.value)
           }
-          disabled={submitting || !record.itemId}
+          disabled={submitting || savingDraft || !record.itemId}
         />
       ),
     },
@@ -1249,7 +1407,7 @@ const POForm = () => {
           onChange={(v) =>
             handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
           }
-          disabled={submitting || !record.itemId}
+          disabled={submitting || savingDraft || !record.itemId}
           placeholder="0"
         />
       ),
@@ -1276,7 +1434,7 @@ const POForm = () => {
               handleLineItemChange(record.key, 'uom', found?.label || '');
             }}
             options={uomOpts}
-            disabled={submitting || !record.itemId}
+            disabled={submitting || savingDraft || !record.itemId}
           />
         );
       },
@@ -1299,7 +1457,7 @@ const POForm = () => {
               v !== null ? v : ''
             )
           }
-          disabled={submitting || !record.itemId}
+          disabled={submitting || savingDraft || !record.itemId}
           placeholder="0.00"
         />
       ),
@@ -1314,7 +1472,7 @@ const POForm = () => {
           value={value}
           onChange={(v) => handleLineItemChange(record.key, 'gstPercent', v)}
           options={TAX_OPTIONS}
-          disabled={submitting || !record.itemId}
+          disabled={submitting || savingDraft || !record.itemId}
         />
       ),
     },
@@ -1328,7 +1486,7 @@ const POForm = () => {
               const base =
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
               const gst = (base * (parseFloat(record.gstPercent) || 0)) / 100;
-              return <Text>₹ {gst.toFixed(2)}</Text>;
+              return <Text style={{ whiteSpace: 'nowrap' }}>₹ {gst.toFixed(2)}</Text>;
             },
           },
         ]
@@ -1342,7 +1500,7 @@ const POForm = () => {
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
               const gst =
                 (base * (parseFloat(record.gstPercent) || 0)) / 100 / 2;
-              return <Text>₹ {gst.toFixed(2)}</Text>;
+              return <Text style={{ whiteSpace: 'nowrap' }}>₹ {gst.toFixed(2)}</Text>;
             },
           },
           {
@@ -1354,7 +1512,7 @@ const POForm = () => {
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
               const gst =
                 (base * (parseFloat(record.gstPercent) || 0)) / 100 / 2;
-              return <Text>₹ {gst.toFixed(2)}</Text>;
+              return <Text style={{ whiteSpace: 'nowrap' }}>₹ {gst.toFixed(2)}</Text>;
             },
           },
         ]),
@@ -1364,7 +1522,7 @@ const POForm = () => {
       width: 120,
       align: 'right',
       render: (value) => (
-        <Text strong style={{ color: 'var(--success-color)' }}>
+        <Text strong style={{ color: 'var(--success-color)', whiteSpace: 'nowrap' }}>
           ₹ {(value || 0).toFixed(2)}
         </Text>
       ),
@@ -1383,7 +1541,7 @@ const POForm = () => {
             danger
             icon={<DeleteOutlined />}
             size="small"
-            disabled={lineItems.length === 1 || submitting}
+            disabled={lineItems.length === 1 || submitting || savingDraft}
           />
         </Popconfirm>
       ),
@@ -1400,7 +1558,7 @@ const POForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header" style={{ position: 'sticky', top: 0, zIndex: 100 }}>
+      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={handleGoBack} />
           <h1>{isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}</h1>
@@ -1409,7 +1567,8 @@ const POForm = () => {
           <Button
             icon={<SaveOutlined />}
             onClick={handleSaveDraft}
-            loading={submitting}
+            loading={savingDraft}
+            disabled={submitting}
           >
             Save as Draft
           </Button>
@@ -1418,6 +1577,7 @@ const POForm = () => {
             icon={<SendOutlined />}
             onClick={handleSubmitClick}
             loading={submitting}
+            disabled={savingDraft}
           >
             Submit for Approval
           </Button>
@@ -1592,7 +1752,7 @@ const POForm = () => {
               type="dashed"
               icon={<PlusOutlined />}
               onClick={addLineItem}
-              disabled={submitting}
+              disabled={submitting || savingDraft}
             >
               Add Item
             </Button>
@@ -1601,7 +1761,7 @@ const POForm = () => {
             columns={lineColumns}
             dataSource={lineItems}
             pagination={false}
-            scroll={{ x: 1400 }}
+            scroll={{ x: 2000 }}
             size="middle"
             rowKey="key"
           />
@@ -1804,10 +1964,12 @@ const POForm = () => {
               pagination={false}
               rowKey="key"
               scroll={{ x: 900 }}
+              className="centered-header-table"
               columns={[
                 {
                   title: '#',
                   width: 40,
+                  align: 'center',
                   render: (_, __, i) => i + 1,
                 },
                 {
@@ -1842,7 +2004,7 @@ const POForm = () => {
                   ),
                 },
                 { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
-                { title: 'UOM', dataIndex: 'uom', width: 80 },
+                { title: 'UOM', dataIndex: 'uom', width: 80, align: 'center' },
                 {
                   title: 'Unit Price',
                   dataIndex: 'unitPrice',
@@ -1877,7 +2039,17 @@ const POForm = () => {
                 justifyContent: 'flex-end',
               }}
             >
-              <div style={{ width: 350 }}>
+              <div
+                style={{
+                  width: 360,
+                  background: 'var(--bg-secondary, #f8f9fa)',
+                  borderRadius: 12,
+                  padding: 20,
+                }}
+              >
+                <Title level={5} style={{ margin: '0 0 12px' }}>
+                  Order Summary
+                </Title>
                 <div
                   style={{
                     display: 'flex',
@@ -1885,39 +2057,73 @@ const POForm = () => {
                     marginBottom: 8,
                   }}
                 >
-                  <Text>Subtotal:</Text>
+                  <Text>Subtotal</Text>
                   <Text strong>₹ {previewData.totals.subtotal.toFixed(2)}</Text>
                 </div>
 
                 {/* GST Breakup in preview */}
-                {previewData.gstBreakup?.length > 0 &&
-                  previewData.gstBreakup.map((group) => (
-                    <div key={group.percent} style={{ paddingLeft: 8, marginBottom: 4 }}>
-                      {previewData.isIgstApplicable ? (
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            IGST @ {group.percent}%
-                          </Text>
-                          <Text style={{ fontSize: 12 }}>₹ {group.igst.toFixed(2)}</Text>
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                {previewData.gstBreakup?.length > 0 && (
+                  <>
+                    <Divider style={{ margin: '4px 0' }} />
+                    <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
+                      GST BREAKUP
+                    </Text>
+                    {previewData.gstBreakup.map((group, idx) => (
+                      <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: 12, display: 'block' }}
+                        >
+                          GST @ {group.percent}%
+                        </Text>
+                        {previewData.isIgstApplicable ? (
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              paddingLeft: 12,
+                            }}
+                          >
                             <Text type="secondary" style={{ fontSize: 12 }}>
-                              SGST @ {group.percent / 2}%
+                              IGST ({group.percent}%)
                             </Text>
-                            <Text style={{ fontSize: 12 }}>₹ {group.sgst.toFixed(2)}</Text>
+                            <Text style={{ fontSize: 12 }}>₹ {group.igst.toFixed(2)}</Text>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              CGST @ {group.percent / 2}%
-                            </Text>
-                            <Text style={{ fontSize: 12 }}>₹ {group.cgst.toFixed(2)}</Text>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
+                        ) : (
+                          <>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                SGST ({group.percent / 2}%)
+                              </Text>
+                              <Text style={{ fontSize: 12 }}>₹ {group.sgst.toFixed(2)}</Text>
+                            </div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                CGST ({group.percent / 2}%)
+                              </Text>
+                              <Text style={{ fontSize: 12 }}>₹ {group.cgst.toFixed(2)}</Text>
+                            </div>
+                          </>
+                        )}
+                        {idx < previewData.gstBreakup.length - 1 && (
+                          <Divider dashed style={{ margin: '4px 0' }} />
+                        )}
+                      </div>
+                    ))}
+                  </>
+                )}
 
                 <Divider style={{ margin: '8px 0' }} />
 
@@ -1929,7 +2135,7 @@ const POForm = () => {
                       marginBottom: 8,
                     }}
                   >
-                    <Text>Total IGST:</Text>
+                    <Text>Total IGST</Text>
                     <Text>₹ {previewData.totals.igst.toFixed(2)}</Text>
                   </div>
                 ) : (
@@ -1941,7 +2147,7 @@ const POForm = () => {
                         marginBottom: 4,
                       }}
                     >
-                      <Text>Total SGST:</Text>
+                      <Text>Total SGST</Text>
                       <Text>₹ {previewData.totals.sgst.toFixed(2)}</Text>
                     </div>
                     <div
@@ -1951,7 +2157,7 @@ const POForm = () => {
                         marginBottom: 8,
                       }}
                     >
-                      <Text>Total CGST:</Text>
+                      <Text>Total CGST</Text>
                       <Text>₹ {previewData.totals.cgst.toFixed(2)}</Text>
                     </div>
                   </>

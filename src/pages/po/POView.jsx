@@ -626,6 +626,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       title: 'UOM',
       key: 'uom',
       width: 80,
+      align: 'center',
       render: (_, r) => r.uomName || r.uom || '-',
     },
     {
@@ -818,6 +819,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
               pagination={false}
               scroll={{ x: 900 }}
               size="small"
+              className="centered-header-table"
               rowKey={(record, idx) => record.id || idx}
               style={{ marginBottom: 24 }}
             />
@@ -847,7 +849,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                     <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
                       GST BREAKUP
                     </Text>
-                    {gstBreakup.map((group) => (
+                    {gstBreakup.map((group, idx) => (
                       <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
                         <Text
                           type="secondary"
@@ -901,6 +903,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                               </Text>
                             </div>
                           </>
+                        )}
+                        {idx < gstBreakup.length - 1 && (
+                          <Divider dashed style={{ margin: '4px 0' }} />
                         )}
                       </div>
                     ))}
