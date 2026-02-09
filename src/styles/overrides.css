@@ -183,6 +183,40 @@ textarea.ant-input:active {
 }
 
 /* ============================================================
+   FIX: Border lines at rounded corners
+   Ensure borders render cleanly at rounded corners globally
+   ============================================================ */
+
+/* Bordered descriptions - ensure border follows radius */
+.ant-descriptions-bordered .ant-descriptions-view {
+  border-radius: var(--radius-sm) !important;
+  overflow: hidden;
+  border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-view {
+  border-color: var(--border-color) !important;
+}
+
+/* Page header and form container corners */
+.page-header,
+.form-container,
+.stat-card {
+  overflow: hidden;
+}
+
+/* Card body allows scrolling while card clips at rounded corners */
+.ant-card-body {
+  overflow: auto;
+}
+
+/* Nested tables inside cards should not add extra border/radius */
+.ant-card .ant-table {
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* ============================================================
    PERMISSIONS MATRIX TABLE STYLES
    ============================================================ */
 
@@ -441,6 +475,29 @@ textarea.ant-input:active {
   background-color: #475569 !important;
   border-color: #64748b !important;
   color: #cbd5e1 !important;
+}
+
+/* Make the required field asterisk consistently red (AntD v5/v6 uses ::before on the label) */
+.ant-form-item-label > label.ant-form-item-required::before {
+  color: var(--error-color) !important;
+}
+
+[data-theme="dark"] .ant-tag-geekblue {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}
+
+[data-theme="dark"] .ant-tag-volcano {
+  background-color: rgba(255, 122, 69, 0.15) !important;
+  border-color: rgba(255, 122, 69, 0.3) !important;
+  color: #ff7a45 !important;
+}
+
+[data-theme="dark"] .ant-tag-lime {
+  background-color: rgba(160, 217, 17, 0.15) !important;
+  border-color: rgba(160, 217, 17, 0.3) !important;
+  color: #a0d911 !important;
 }
 
 /* Tooltip styles handled via Ant Design ConfigProvider component tokens in ThemeContext.jsx */

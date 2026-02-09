@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Card,
@@ -30,6 +30,8 @@ import {
   UndoOutlined,
   ReloadOutlined,
   StopOutlined,
+  SendOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -38,21 +40,24 @@ import {
   deletePurchaseOrder,
 } from '../../services/purchaseOrderService';
 import { hasPermission } from '../../utils/permissions';
+import { PO_STATUS, getStatusLabel } from '../../utils/poStatusConstants';
 import POView from './POView';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
-// Status config mapping
+// Status config mapping — keys are DB enum values
 const STATUS_CONFIG = {
-  Draft: { color: 'default', icon: <FileTextOutlined /> },
-  AwaitApproval: { color: 'gold', label: 'Awaiting Approval', icon: <ClockCircleOutlined /> },
-  InProgress: { color: 'blue', label: 'In Progress', icon: <CheckCircleOutlined /> },
-  Approved: { color: 'blue', icon: <CheckCircleOutlined /> },
-  Rejected: { color: 'red', icon: <CloseCircleOutlined /> },
-  Cancelled: { color: 'red', icon: <StopOutlined /> },
-  ReferredBack: { color: 'orange', label: 'Referred Back', icon: <UndoOutlined /> },
-  Completed: { color: 'green', icon: <CheckCircleOutlined /> },
+  [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
+  [PO_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: <ClockCircleOutlined /> },
+  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined /> },
+  [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined /> },
+  [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined /> },
+  [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined /> },
+  [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <UndoOutlined /> },
+  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined /> },
+  [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined /> },
+  [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined /> },
 };
 
 const POList = () => {
@@ -65,6 +70,7 @@ const POList = () => {
     total: 0,
   });
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [poDateRange, setPoDateRange] = useState(null);
   const [deliveryDateRange, setDeliveryDateRange] = useState(null);
@@ -80,9 +86,6 @@ const POList = () => {
   const canUpdate = hasPermission('purchase-orders', 'update');
   const canDelete = hasPermission('purchase-orders', 'delete');
 
-  // Debounce timer ref
-  const debounceRef = useRef(null);
-
   // Fetch data using search API
   const fetchData = useCallback(
     async (page, pageSize, sort, direction) => {
@@ -96,7 +99,7 @@ const POList = () => {
         };
 
         // Add search text
-        if (searchText) params.search = searchText;
+        if (debouncedSearch) params.search = debouncedSearch;
 
         // Add status filter
         if (statusFilter) params.status = statusFilter;
@@ -127,22 +130,20 @@ const POList = () => {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, searchText, statusFilter, poDateRange, deliveryDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poDateRange, deliveryDateRange]
   );
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  // Re-fetch when any filter (including debounced search) changes
   useEffect(() => {
     fetchData(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle search with debounce
-  const handleSearch = (value) => {
-    setSearchText(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      fetchData(1, pagination.pageSize);
-    }, 400);
-  };
+  }, [debouncedSearch, statusFilter, poDateRange, deliveryDateRange]);
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (pag, _filters, sorter) => {
@@ -153,24 +154,10 @@ const POList = () => {
     fetchData(pag.current, pag.pageSize, newSort, newDirection);
   };
 
-  // Handle status filter
-  const handleStatusFilter = (value) => {
-    setStatusFilter(value);
-    // Trigger fetch in next tick so state is updated
-    setTimeout(() => fetchData(1, pagination.pageSize), 0);
-  };
-
-  // Handle PO date range filter
-  const handlePoDateRangeChange = (dates) => {
-    setPoDateRange(dates);
-    setTimeout(() => fetchData(1, pagination.pageSize), 0);
-  };
-
-  // Handle delivery date range filter
-  const handleDeliveryDateRangeChange = (dates) => {
-    setDeliveryDateRange(dates);
-    setTimeout(() => fetchData(1, pagination.pageSize), 0);
-  };
+  // Filter change handlers — just update state; useEffect triggers fetch
+  const handleStatusFilter = (value) => setStatusFilter(value);
+  const handlePoDateRangeChange = (dates) => setPoDateRange(dates);
+  const handleDeliveryDateRangeChange = (dates) => setDeliveryDateRange(dates);
 
   // Delete PO
   const handleDelete = (record) => {
@@ -215,18 +202,13 @@ const POList = () => {
     })}`;
   };
 
-  // Get status display label
-  const getStatusLabel = (status) => {
-    return STATUS_CONFIG[status]?.label || status;
-  };
-
   // Can edit this PO?
   const canEditPO = (record) =>
-    (record.status === 'Draft' || record.status === 'ReferredBack') &&
+    (record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK) &&
     canUpdate;
 
   // Can delete this PO?
-  const canDeletePO = (record) => record.status === 'Draft' && canDelete;
+  const canDeletePO = (record) => record.status === PO_STATUS.DRAFT && canDelete;
 
   const columns = [
     {
@@ -393,7 +375,7 @@ const POList = () => {
               placeholder="Search PO number, supplier..."
               prefix={<SearchOutlined />}
               value={searchText}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchText(e.target.value)}
               allowClear
             />
           </Col>
@@ -405,7 +387,7 @@ const POList = () => {
               value={statusFilter}
               onChange={handleStatusFilter}
               options={Object.keys(STATUS_CONFIG).map((s) => ({
-                label: STATUS_CONFIG[s]?.label || s,
+                label: getStatusLabel(s),
                 value: s,
               }))}
             />
