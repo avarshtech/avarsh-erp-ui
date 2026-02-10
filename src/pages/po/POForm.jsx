@@ -43,7 +43,7 @@ import {
 import { getSuppliers } from '../../services/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/itemService';
 import { useStore } from '../../context/StoreContext';
-import { getCurrentUser } from '../../utils/permissions';
+import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS } from '../../utils/poStatusConstants';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
@@ -1564,23 +1564,27 @@ const POForm = () => {
           <h1>{isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}</h1>
         </Space>
         <div className="header-actions">
-          <Button
-            icon={<SaveOutlined />}
-            onClick={handleSaveDraft}
-            loading={savingDraft}
-            disabled={submitting}
-          >
-            Save as Draft
-          </Button>
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
-            onClick={handleSubmitClick}
-            loading={submitting}
-            disabled={savingDraft}
-          >
-            Submit for Approval
-          </Button>
+          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') && (
+            <Button
+              icon={<SaveOutlined />}
+              onClick={handleSaveDraft}
+              loading={savingDraft}
+              disabled={submitting}
+            >
+              Save as Draft
+            </Button>
+          )}
+          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') && (
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleSubmitClick}
+              loading={submitting}
+              disabled={savingDraft}
+            >
+              Submit for Approval
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1696,38 +1700,44 @@ const POForm = () => {
                 Supplier Information
               </Title>
               {selectedSupplier ? (
-                <Descriptions size="small" column={1}>
-                  <Descriptions.Item label="Name">
-                    {selectedSupplier.name}
-                  </Descriptions.Item>
-                  {selectedSupplier.gstin && (
-                    <Descriptions.Item label="GSTIN">
-                      {selectedSupplier.gstin}
-                    </Descriptions.Item>
-                  )}
-                  {selectedSupplier.email && (
-                    <Descriptions.Item label="Email">
-                      {selectedSupplier.email}
-                    </Descriptions.Item>
-                  )}
-                  {selectedSupplier.phone && (
-                    <Descriptions.Item label="Phone">
-                      {selectedSupplier.phone}
-                    </Descriptions.Item>
-                  )}
-                  {(selectedSupplier.city || selectedSupplier.state) && (
-                    <Descriptions.Item label="Location">
-                      {[selectedSupplier.city, selectedSupplier.state]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </Descriptions.Item>
-                  )}
-                  <Descriptions.Item label="IGST Applicable">
-                    <Tag color={isIgstApplicable ? 'blue' : 'default'}>
-                      {isIgstApplicable ? 'Yes' : 'No'}
-                    </Tag>
-                  </Descriptions.Item>
-                </Descriptions>
+                <Descriptions size="small" column={1} items={[
+                  {
+                    key: 'name',
+                    label: 'Name',
+                    children: selectedSupplier.name,
+                  },
+                  selectedSupplier.gstin && {
+                    key: 'gstin',
+                    label: 'GSTIN',
+                    children: selectedSupplier.gstin,
+                  },
+                  selectedSupplier.email && {
+                    key: 'email',
+                    label: 'Email',
+                    children: selectedSupplier.email,
+                  },
+                  selectedSupplier.phone && {
+                    key: 'phone',
+                    label: 'Phone',
+                    children: selectedSupplier.phone,
+                  },
+                  (selectedSupplier.city || selectedSupplier.state) && {
+                    key: 'location',
+                    label: 'Location',
+                    children: [selectedSupplier.city, selectedSupplier.state]
+                      .filter(Boolean)
+                      .join(', '),
+                  },
+                  {
+                    key: 'igst',
+                    label: 'IGST Applicable',
+                    children: (
+                      <Tag color={isIgstApplicable ? 'blue' : 'default'}>
+                        {isIgstApplicable ? 'Yes' : 'No'}
+                      </Tag>
+                    ),
+                  },
+                ].filter(Boolean)} />
               ) : (
                 <Text type="secondary">Select a supplier to view details</Text>
               )}
@@ -1917,42 +1927,55 @@ const POForm = () => {
         {previewData && (
           <div>
             {/* Supplier & Header Info */}
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
-              <Descriptions.Item label="Supplier">
-                <Text strong>{previewData.supplierDisplay}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="PO Date">
-                {previewData.poDateDisplay}
-              </Descriptions.Item>
-              {previewData.supplierGstin && (
-                <Descriptions.Item label="Supplier GSTIN">
-                  {previewData.supplierGstin}
-                </Descriptions.Item>
-              )}
-              <Descriptions.Item label="Expected Delivery Date">
-                {previewData.deliveryDateDisplay}
-              </Descriptions.Item>
-              {(previewData.supplierCity || previewData.supplierState) && (
-                <Descriptions.Item label="Supplier Location">
-                  {[previewData.supplierCity, previewData.supplierState]
-                    .filter(Boolean)
-                    .join(', ')}
-                </Descriptions.Item>
-              )}
-              <Descriptions.Item label="Terms & Conditions">
-                {previewData.termsDisplay || 'Not specified'}
-              </Descriptions.Item>
-              {previewData.remarks && (
-                <Descriptions.Item label="Remarks" span={2}>
-                  {previewData.remarks}
-                </Descriptions.Item>
-              )}
-              <Descriptions.Item label="Tax Type">
-                <Tag color={previewData.isIgstApplicable ? 'blue' : 'green'}>
-                  {previewData.isIgstApplicable ? 'IGST' : 'SGST / CGST'}
-                </Tag>
-              </Descriptions.Item>
-            </Descriptions>
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }} items={[
+              {
+                key: 'supplier',
+                label: 'Supplier',
+                children: <Text strong>{previewData.supplierDisplay}</Text>,
+              },
+              {
+                key: 'poDate',
+                label: 'PO Date',
+                children: previewData.poDateDisplay,
+              },
+              previewData.supplierGstin && {
+                key: 'supplierGstin',
+                label: 'Supplier GSTIN',
+                children: previewData.supplierGstin,
+              },
+              {
+                key: 'deliveryDate',
+                label: 'Expected Delivery Date',
+                children: previewData.deliveryDateDisplay,
+              },
+              (previewData.supplierCity || previewData.supplierState) && {
+                key: 'supplierLocation',
+                label: 'Supplier Location',
+                children: [previewData.supplierCity, previewData.supplierState]
+                  .filter(Boolean)
+                  .join(', '),
+              },
+              {
+                key: 'terms',
+                label: 'Terms & Conditions',
+                children: previewData.termsDisplay || 'Not specified',
+              },
+              previewData.remarks && {
+                key: 'remarks',
+                label: 'Remarks',
+                span: 2,
+                children: previewData.remarks,
+              },
+              {
+                key: 'taxType',
+                label: 'Tax Type',
+                children: (
+                  <Tag color={previewData.isIgstApplicable ? 'blue' : 'green'}>
+                    {previewData.isIgstApplicable ? 'IGST' : 'SGST / CGST'}
+                  </Tag>
+                ),
+              },
+            ].filter(Boolean)} />
 
             {/* Line Items */}
             <Title level={5} style={{ marginBottom: 12 }}>
@@ -2118,7 +2141,7 @@ const POForm = () => {
                           </>
                         )}
                         {idx < previewData.gstBreakup.length - 1 && (
-                          <Divider dashed style={{ margin: '4px 0' }} />
+                          <Divider variant="dashed" style={{ margin: '4px 0' }} />
                         )}
                       </div>
                     ))}

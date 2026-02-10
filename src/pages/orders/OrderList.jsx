@@ -26,6 +26,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '../../utils/permissions';
+import PermissionGuard from '../../components/PermissionGuard';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -267,22 +269,22 @@ const OrderList = () => {
       key: 'actions',
       fixed: 'right',
       width: 80,
-      render: (_, record) => (
-        <Dropdown
-          menu={{
-            items: [
-              { key: 'view', icon: <EyeOutlined />, label: 'View Details' },
-              { key: 'edit', icon: <EditOutlined />, label: 'Edit Order' },
-              { type: 'divider' },
-              { key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true },
-            ],
-            onClick: ({ key }) => handleAction(key, record),
-          }}
-          trigger={['click']}
-        >
-          <Button type="text" icon={<MoreOutlined />} />
-        </Dropdown>
-      ),
+      render: (_, record) => {
+        const items = [];
+        if (hasPermission('orders', 'view')) items.push({ key: 'view', icon: <EyeOutlined />, label: 'View Details' });
+        if (hasPermission('orders', 'update')) items.push({ key: 'edit', icon: <EditOutlined />, label: 'Edit Order' });
+        if (items.length > 0 && hasPermission('orders', 'delete')) items.push({ type: 'divider' });
+        if (hasPermission('orders', 'delete')) items.push({ key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true });
+        if (items.length === 0) return null;
+        return (
+          <Dropdown
+            menu={{ items, onClick: ({ key }) => handleAction(key, record) }}
+            trigger={['click']}
+          >
+            <Button type="text" icon={<MoreOutlined />} />
+          </Dropdown>
+        );
+      },
     },
   ];
 
@@ -321,13 +323,15 @@ const OrderList = () => {
         <h1>Order Management</h1>
         <div className="header-actions">
           <Button icon={<ExportOutlined />}>Export</Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => navigate('/orders/new')}
-          >
-            New Order
-          </Button>
+          <PermissionGuard module="orders" operation="add">
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => navigate('/orders/new')}
+            >
+              New Order
+            </Button>
+          </PermissionGuard>
         </div>
       </div>
 

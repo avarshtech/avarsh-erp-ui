@@ -231,9 +231,11 @@ const VariantMaster = () => {
                 label="Data Type" 
                 rules={[{ required: true, message: 'Please select data type' }]}
               >
-                <Select placeholder="Select data type" size="large">
-                  options={DATA_TYPES.map(d => ({ value: d.value, label: d.label }))}
-                </Select>
+                <Select
+                  placeholder="Select data type"
+                  size="large"
+                  options={DATA_TYPES}
+                />
               </Form.Item>
               {(dataType === 'select' || dataType === 'multiselect') && (
                 <Form.Item 

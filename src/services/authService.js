@@ -1,4 +1,5 @@
 import axiosInstance from './axiosInstance';
+import { getEmptyPermissions, getOperationsForModule, MODULES } from '../utils/permissions';
 
 /**
  * Decode JWT token payload
@@ -46,6 +47,13 @@ export const authenticateUser = async (username, password) => {
     // Decode JWT payload
     const payload = decodeToken(token);
 
+    // Normalize permissions from token against known module structure.
+    // This ensures that even if the token's permission object has a different
+    // shape (e.g., missing modules, extra keys), the app always has every
+    // expected module key with its correct operations.
+    const rawPermissions = payload.permissions || {};
+    const normalizedPermissions = normalizeTokenPermissions(rawPermissions);
+
     // Build user session from token payload
     const userSession = {
       id: payload.userId || payload.sub || null,
@@ -53,7 +61,7 @@ export const authenticateUser = async (username, password) => {
       name: payload.name || username,
       email: payload.email || `${username}@avarsh.com`,
       role: payload.role || '',
-      permissions: payload.permissions || {},
+      permissions: normalizedPermissions,
       token,
     };
 
@@ -116,13 +124,39 @@ export const logoutUser = () => {
 };
 
 /**
- * Check if user is authenticated
- * @returns {boolean} True if user is logged in
+ * Check if user is authenticated (token exists and is not expired)
+ * @returns {boolean} True if user is logged in with valid token
  */
 export const isAuthenticated = () => {
   const user = sessionStorage.getItem('currentUser');
   const token = sessionStorage.getItem('authToken');
-  return !!(user && token);
+  if (!(user && token)) return false;
+
+  // Check token expiry
+  const payload = decodeToken(token);
+  if (payload.exp) {
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp <= now) {
+      // Token has expired — clear session
+      logoutUser();
+      return false;
+    }
+  }
+  return true;
+};
+
+/**
+ * Get token expiry time in seconds from now.
+ * Returns null if no token or no exp claim.
+ * @returns {number|null} Seconds until token expires, or null
+ */
+export const getTokenExpirySeconds = () => {
+  const token = sessionStorage.getItem('authToken');
+  if (!token) return null;
+  const payload = decodeToken(token);
+  if (!payload.exp) return null;
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp - now;
 };
 
 /**
@@ -139,4 +173,36 @@ export const hasPermission = (module, action) => {
   if (!modulePermissions) return false;
 
   return modulePermissions[action] === true;
+};
+
+/**
+ * Normalize raw permission object from JWT token against the known module structure.
+ * Merges incoming permissions with empty template so every module key exists
+ * with its applicable operations. Unknown keys from the token are preserved.
+ *
+ * @param {object} raw - Raw permissions object from decoded JWT
+ * @returns {object} Normalized permissions object
+ */
+const normalizeTokenPermissions = (raw) => {
+  if (!raw || typeof raw !== 'object') return getEmptyPermissions();
+
+  const empty = getEmptyPermissions();
+  const merged = { ...empty };
+
+  Object.keys(raw).forEach((moduleId) => {
+    if (merged[moduleId]) {
+      merged[moduleId] = {
+        access: !!raw[moduleId]?.access,
+        operations: {
+          ...merged[moduleId].operations,
+          ...(raw[moduleId]?.operations || {}),
+        },
+      };
+    } else {
+      // Unknown module from token – carry forward
+      merged[moduleId] = raw[moduleId];
+    }
+  });
+
+  return merged;
 };

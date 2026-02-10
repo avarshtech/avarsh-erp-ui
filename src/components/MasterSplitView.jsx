@@ -35,9 +35,11 @@ const MasterSplitView = ({
             extra={
               <Space>
                 {/* Simple search input could go here */}
-                <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
-                  Add
-                </Button>
+                {onAdd && (
+                  <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
+                    Add
+                  </Button>
+                )}
               </Space>
             }
             style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
@@ -79,7 +81,10 @@ const MasterSplitView = ({
         {/* Right Side: Form */}
         {isEditing && (
           <Col span={16} style={{ height: '100%', animation: 'fadeIn 0.3s' }}>
-            <Card style={{ height: '100%', overflowY: 'auto' }}>
+            <Card 
+              style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+              styles={{ body: { flex: 1, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } }}
+            >
               {renderForm()}
             </Card>
           </Col>

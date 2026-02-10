@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
@@ -66,6 +66,9 @@ const ThemedApp = () => {
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
           </Route>
+
+          {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
     </StoreProvider>

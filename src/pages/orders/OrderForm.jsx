@@ -25,6 +25,7 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { hasPermission } from '../../utils/permissions';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -265,16 +266,20 @@ const OrderForm = () => {
           <h1>{id ? 'Edit Order' : 'Create New Order'}</h1>
         </Space>
         <div className="header-actions">
-          <Button icon={<SaveOutlined />} onClick={handleSaveAsDraft}>
-            Save as Draft
-          </Button>
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
-            onClick={() => form.submit()}
-          >
-            Submit Order
-          </Button>
+          {hasPermission('orders', id ? 'update' : 'add') && (
+            <Button icon={<SaveOutlined />} onClick={handleSaveAsDraft}>
+              Save as Draft
+            </Button>
+          )}
+          {hasPermission('orders', id ? 'update' : 'add') && (
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={() => form.submit()}
+            >
+              Submit Order
+            </Button>
+          )}
         </div>
       </div>
 

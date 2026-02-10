@@ -1,73 +1,104 @@
 /**
  * RBAC Permission System
  * Defines pages, operations, and permission utilities
+ *
+ * Permission JSON Structure (stored in DB & JWT token):
+ * {
+ *   "dashboard":        { "access": true, "operations": { "view": true } },
+ *   "orders":           { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
+ *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "master-data":      { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
+ * }
  */
 
-// Define all modules/pages in the application
+// ─── MODULE DEFINITIONS ─────────────────────────────────────────────────────────
+
 export const MODULES = {
   DASHBOARD: {
     id: 'dashboard',
     name: 'Dashboard',
     path: '/',
+    group: 'main',
   },
   ORDERS: {
     id: 'orders',
     name: 'Orders',
     path: '/orders',
+    group: 'transactions',
   },
   BOM: {
     id: 'bom',
     name: 'Bill of Materials',
     path: '/bom',
+    group: 'transactions',
   },
   PURCHASE_ORDERS: {
     id: 'purchase-orders',
     name: 'Purchase Orders',
     path: '/purchase-orders',
+    group: 'transactions',
   },
   PO_APPROVAL: {
     id: 'po-approval',
     name: 'PO Approval',
-    path: '/purchase-orders', // Actions within PO module
+    path: '/purchase-orders', // Integrated within PO module
+    group: 'transactions',
+    linkedTo: 'purchase-orders',
   },
   GRN: {
     id: 'grn',
     name: 'Goods Received',
     path: '/grn',
+    group: 'transactions',
   },
   SUPPLIERS: {
     id: 'supplier-info',
     name: 'Suppliers',
     path: '/master/suppliers',
+    group: 'master',
   },
   ITEMS: {
     id: 'items',
     name: 'Items',
     path: '/master/items',
+    group: 'master',
   },
   MASTER_DATA: {
     id: 'master-data',
     name: 'Master Data',
+    description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
     path: '/master',
+    group: 'master',
+  },
+  TERMS_CONDITIONS: {
+    id: 'terms-conditions',
+    name: 'Terms & Conditions',
+    path: '/master → Terms & Conditions tab',
+    group: 'master',
   },
   USERS: {
     id: 'users',
     name: 'Users',
     path: '/admin/users',
+    group: 'admin',
   },
   ROLES: {
     id: 'roles',
     name: 'Role & Access',
     path: '/admin/roles',
-  },
-  SETTINGS: {
-    id: 'settings',
-    name: 'Settings',
-    path: '/admin/settings',
+    group: 'admin',
   },
 };
 
-// Define operations
+// ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
+
 export const OPERATIONS = {
   VIEW: { id: 'view', name: 'View' },
   ADD: { id: 'add', name: 'Add' },
@@ -79,59 +110,103 @@ export const OPERATIONS = {
   REFER_BACK: { id: 'refer_back', name: 'Refer Back' },
 };
 
-// Get all modules as array
+// Standard CRUD operations
+export const STANDARD_OPERATIONS = ['view', 'add', 'update', 'delete'];
+
+// PO Approval operations
+export const PO_APPROVAL_OPERATIONS = ['approve', 'reject', 'cancel', 'refer_back'];
+
+// Dashboard only has view
+export const DASHBOARD_OPERATIONS = ['view'];
+
+// ─── PERMISSION MATRIX GROUPED LAYOUT ──────────────────────────────────────────
+
+export const PERMISSION_GROUPS = [
+  {
+    key: 'main',
+    label: 'General',
+    icon: 'DashboardOutlined',
+    modules: [
+      { id: 'dashboard', name: 'Dashboard', operations: DASHBOARD_OPERATIONS },
+    ],
+  },
+  {
+    key: 'transactions',
+    label: 'Transactions',
+    icon: 'ShoppingCartOutlined',
+    modules: [
+      { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
+      { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
+      { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
+      { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
+      { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
+    ],
+  },
+  {
+    key: 'master',
+    label: 'Master Data',
+    icon: 'DatabaseOutlined',
+    description: 'Individual access for Suppliers & Items; shared access for other master tabs',
+    modules: [
+      { id: 'supplier-info', name: 'Suppliers', operations: STANDARD_OPERATIONS, path: '/master → Suppliers tab' },
+      { id: 'items', name: 'Items', operations: STANDARD_OPERATIONS, path: '/master → Items tab' },
+      {
+        id: 'master-data',
+        name: 'Other Master Data',
+        description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
+        operations: STANDARD_OPERATIONS,
+        path: '/master → Other tabs',
+      },
+      { id: 'terms-conditions', name: 'Terms & Conditions', operations: STANDARD_OPERATIONS, path: '/master → T&C tab' },
+    ],
+  },
+  {
+    key: 'admin',
+    label: 'Administration',
+    icon: 'SettingOutlined',
+    modules: [
+      { id: 'users', name: 'User Management', operations: STANDARD_OPERATIONS, path: '/admin/users' },
+      { id: 'roles', name: 'Role & Access', operations: STANDARD_OPERATIONS, path: '/admin/roles' },
+    ],
+  },
+];
+
+// ─── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
+
 export const getAllModules = () => Object.values(MODULES);
-
-// Get all operations as array
 export const getAllOperations = () => Object.values(OPERATIONS);
+export const getSidebarModules = () =>
+  getAllModules().filter((m) => !['settings'].includes(m.id));
 
-// Get modules that should appear in sidebar
-export const getSidebarModules = () => 
-  getAllModules().filter(m => !['settings'].includes(m.id));
+/** Returns which operations apply to a given module ID */
+export const getOperationsForModule = (moduleId) => {
+  if (moduleId === 'po-approval') return PO_APPROVAL_OPERATIONS;
+  if (moduleId === 'dashboard') return DASHBOARD_OPERATIONS;
+  return STANDARD_OPERATIONS;
+};
 
-// Default Admin permissions (full access)
-export const getAdminPermissions = () => {
+// ─── EMPTY / ADMIN PERMISSION GENERATORS ───────────────────────────────────────
+
+const buildPermissions = (defaultValue) => {
   const permissions = {};
   Object.values(MODULES).forEach((module) => {
+    const ops = getOperationsForModule(module.id);
     permissions[module.id] = {
-      access: true,
-      operations: {
-        view: true,
-        add: true,
-        update: true,
-        delete: true,
-        approve: true,
-        reject: true,
-        cancel: true,
-        refer_back: true,
-      },
+      access: defaultValue,
+      operations: ops.reduce((acc, op) => {
+        acc[op] = defaultValue;
+        return acc;
+      }, {}),
     };
   });
   return permissions;
 };
 
-// Create empty permissions structure
-export const getEmptyPermissions = () => {
-  const permissions = {};
-  Object.values(MODULES).forEach((module) => {
-    permissions[module.id] = {
-      access: false,
-      operations: {
-        view: false,
-        add: false,
-        update: false,
-        delete: false,
-        approve: false,
-        reject: false,
-        cancel: false,
-        refer_back: false,
-      },
-    };
-  });
-  return permissions;
-};
+export const getAdminPermissions = () => buildPermissions(true);
+export const getEmptyPermissions = () => buildPermissions(false);
 
-// Helper to determine if a role is Admin
+// ─── ROLE HELPERS ──────────────────────────────────────────────────────────────
+
 export const isAdminRole = (role) => {
   if (!role) return false;
   try {
@@ -142,7 +217,8 @@ export const isAdminRole = (role) => {
   }
 };
 
-// Get current user from session storage
+// ─── SESSION HELPERS ───────────────────────────────────────────────────────────
+
 export const getCurrentUser = () => {
   const user = sessionStorage.getItem('currentUser');
   if (!user) return null;
@@ -153,32 +229,52 @@ export const getCurrentUser = () => {
   }
 };
 
-// Set current user in session storage
 export const setCurrentUser = (user) => {
   sessionStorage.setItem('currentUser', JSON.stringify(user));
 };
 
-// Get current user permissions
+/**
+ * Get current user permissions.
+ * Normalizes the token's permission object against known modules
+ * so any module added later has a safe fallback.
+ */
 export const getCurrentUserPermissions = () => {
   const user = getCurrentUser();
-  
-  // Admin-like roles have all permissions
+
   if (isAdminRole(user?.role)) {
     return getAdminPermissions();
   }
-  
-  // For other roles, get from user permissions
-  return user?.permissions || getEmptyPermissions();
+
+  const raw = user?.permissions;
+  if (!raw || typeof raw !== 'object') return getEmptyPermissions();
+
+  // Merge raw permissions with empty template so every key exists
+  const empty = getEmptyPermissions();
+  const merged = { ...empty };
+  Object.keys(raw).forEach((moduleId) => {
+    if (merged[moduleId]) {
+      merged[moduleId] = {
+        access: !!raw[moduleId]?.access,
+        operations: {
+          ...merged[moduleId].operations,
+          ...(raw[moduleId]?.operations || {}),
+        },
+      };
+    } else {
+      merged[moduleId] = raw[moduleId];
+    }
+  });
+  return merged;
 };
 
-// Check if user has access to a module
+// ─── PERMISSION CHECK FUNCTIONS ────────────────────────────────────────────────
+
 export const hasModuleAccess = (moduleId) => {
   const permissions = getCurrentUserPermissions();
   if (!permissions || !permissions[moduleId]) return false;
   return permissions[moduleId].access === true;
 };
 
-// Check if user has operation permission on a module
 export const hasPermission = (moduleId, operationId) => {
   const permissions = getCurrentUserPermissions();
   if (!permissions || !permissions[moduleId]) return false;
@@ -186,28 +282,88 @@ export const hasPermission = (moduleId, operationId) => {
   return permissions[moduleId].operations?.[operationId] === true;
 };
 
-// Alias for backward compatibility
 export const hasOperationPermission = hasPermission;
 
-// Check multiple permissions (returns true if user has ALL)
 export const hasAllPermissions = (checks) => {
   return checks.every(({ module, operation }) => hasPermission(module, operation));
 };
 
-// Check multiple permissions (returns true if user has ANY)
 export const hasAnyPermission = (checks) => {
   return checks.some(({ module, operation }) => hasPermission(module, operation));
 };
 
-/**
- * PO Approval specific permission checks
- */
-export const canApprovePO = () => hasPermission('po-approval', 'approve');
-export const canRejectPO = () => hasPermission('po-approval', 'reject');
-export const canCancelPO = () => hasPermission('po-approval', 'cancel');
-export const canReferBackPO = () => hasPermission('po-approval', 'refer_back');
+// ─── PO APPROVAL HELPERS (linked to PO access) ────────────────────────────────
 
-// Check if user can perform any approval action
-export const canPerformApprovalActions = () => {
-  return canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO();
+export const canApprovePO = () =>
+  hasModuleAccess('purchase-orders') && hasPermission('po-approval', 'approve');
+
+export const canRejectPO = () =>
+  hasModuleAccess('purchase-orders') && hasPermission('po-approval', 'reject');
+
+export const canCancelPO = () =>
+  hasModuleAccess('purchase-orders') && hasPermission('po-approval', 'cancel');
+
+export const canReferBackPO = () =>
+  hasModuleAccess('purchase-orders') && hasPermission('po-approval', 'refer_back');
+
+export const canPerformApprovalActions = () =>
+  hasModuleAccess('purchase-orders') &&
+  (canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO());
+
+// ─── PERMISSION VALIDATION ────────────────────────────────────────────────────
+
+/**
+ * Validate that at least one page permission is enabled for a role.
+ * @returns {{ valid: boolean, message?: string }}
+ */
+export const validatePermissions = (permissions) => {
+  if (!permissions || typeof permissions !== 'object') {
+    return { valid: false, message: 'Permissions are required.' };
+  }
+
+  const hasAny = Object.values(permissions).some((mod) => mod.access === true);
+
+  if (!hasAny) {
+    return {
+      valid: false,
+      message: 'At least one page permission must be enabled for a role.',
+    };
+  }
+
+  return { valid: true };
+};
+
+/**
+ * Normalize permissions before saving to API.
+ * Ensures only known modules with their applicable operations are saved.
+ * Enforces PO-approval → PO link: if PO has no access, approval is disabled.
+ */
+export const normalizePermissionsForSave = (permissions) => {
+  const normalized = {};
+
+  Object.values(MODULES).forEach((module) => {
+    const modulePerms = permissions[module.id];
+    const ops = getOperationsForModule(module.id);
+
+    const operations = {};
+    ops.forEach((op) => {
+      operations[op] = !!(modulePerms?.operations?.[op]);
+    });
+
+    const access = Object.values(operations).some(Boolean);
+    normalized[module.id] = { access, operations };
+  });
+
+  // Enforce PO-approval → PO link
+  if (!normalized['purchase-orders']?.access) {
+    normalized['po-approval'] = {
+      access: false,
+      operations: PO_APPROVAL_OPERATIONS.reduce((acc, op) => {
+        acc[op] = false;
+        return acc;
+      }, {}),
+    };
+  }
+
+  return normalized;
 };

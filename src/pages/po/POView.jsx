@@ -33,6 +33,7 @@ import {
   UserOutlined,
   SettingOutlined,
   InboxOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -54,6 +55,7 @@ import {
   getCurrentUser,
 } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel } from '../../utils/poStatusConstants';
+import { generatePOPdf } from '../../utils/poPdfGenerator';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -99,6 +101,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   const [statusAction, setStatusAction] = useState(null); // { action, title, requiresReason }
   const [actionReason, setActionReason] = useState('');
   const [rejectionCategory, setRejectionCategory] = useState(null);
+  const [printLoading, setPrintLoading] = useState(false);
 
   // Load full PO data when modal opens
   useEffect(() => {
@@ -750,6 +753,25 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Space size="middle">
+              {/* Print PO Button */}
+              {po && (
+                <Button
+                  icon={<PrinterOutlined />}
+                  onClick={async () => {
+                    setPrintLoading(true);
+                    try {
+                      await generatePOPdf(po);
+                    } catch {
+                      message.error('Failed to generate PO PDF');
+                    } finally {
+                      setPrintLoading(false);
+                    }
+                  }}
+                  loading={printLoading}
+                >
+                  Print PO
+                </Button>
+              )}
               {availableActions.map((action) => (
                 <Button
                   key={action.key}
@@ -786,34 +808,54 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
               size="small"
               column={{ xs: 1, sm: 2, md: 3 }}
               style={{ marginBottom: 24 }}
-            >
-              <Descriptions.Item label="PO Number">
-                <Text strong>{po.poNumber || po.poNo || '-'}</Text>
-              </Descriptions.Item>
-              <Descriptions.Item label="Status">{renderStatusTag(po.status)}</Descriptions.Item>
-              <Descriptions.Item label="Supplier">
-                <Space>
-                  <Avatar size="small" style={{ backgroundColor: 'var(--primary-color)' }}>
-                    {(po.supplierName || '?')[0]}
-                  </Avatar>
-                  <div>
-                    <Text strong>{po.supplierName || '-'}</Text>
-                  </div>
-                </Space>
-              </Descriptions.Item>
-              <Descriptions.Item label="PO Date">{formatDate(po.poDate)}</Descriptions.Item>
-              <Descriptions.Item label="Expected Delivery">
-                {formatDate(po.deliveryDate || po.expectedDeliveryDate)}
-              </Descriptions.Item>
-              <Descriptions.Item label="Terms & Conditions">
-                {po.termsConditionsTitle || '-'}
-              </Descriptions.Item>
-              {po.remarks && (
-                <Descriptions.Item label="Remarks" span={3}>
-                  {po.remarks}
-                </Descriptions.Item>
-              )}
-            </Descriptions>
+              items={[
+                {
+                  key: 'poNumber',
+                  label: 'PO Number',
+                  children: <Text strong>{po.poNumber || po.poNo || '-'}</Text>,
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  children: renderStatusTag(po.status),
+                },
+                {
+                  key: 'supplier',
+                  label: 'Supplier',
+                  children: (
+                    <Space>
+                      <Avatar size="small" style={{ backgroundColor: 'var(--primary-color)' }}>
+                        {(po.supplierName || '?')[0]}
+                      </Avatar>
+                      <div>
+                        <Text strong>{po.supplierName || '-'}</Text>
+                      </div>
+                    </Space>
+                  ),
+                },
+                {
+                  key: 'poDate',
+                  label: 'PO Date',
+                  children: formatDate(po.poDate),
+                },
+                {
+                  key: 'expectedDelivery',
+                  label: 'Expected Delivery',
+                  children: formatDate(po.deliveryDate || po.expectedDeliveryDate),
+                },
+                {
+                  key: 'terms',
+                  label: 'Terms & Conditions',
+                  children: po.termsConditionsTitle || '-',
+                },
+                po.remarks && {
+                  key: 'remarks',
+                  label: 'Remarks',
+                  span: 3,
+                  children: po.remarks,
+                },
+              ].filter(Boolean)}
+            />
 
             {/* Line Items */}
             <Title level={5} style={{ marginBottom: 12 }}>
@@ -911,7 +953,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                           </>
                         )}
                         {idx < gstBreakup.length - 1 && (
-                          <Divider dashed style={{ margin: '4px 0' }} />
+                          <Divider variant="dashed" style={{ margin: '4px 0' }} />
                         )}
                       </div>
                     ))}
@@ -1095,8 +1137,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           disabled: !actionReason.trim(),
           loading: actionLoading,
         }}
-        destroyOnClose
-        bodyStyle={{ paddingBottom: 80 }}
+        destroyOnHidden
+        styles={{ body: { paddingBottom: 80 } }}
       >
         {statusAction?.key === 'reject' && (
           <div style={{ marginBottom: 16 }}>

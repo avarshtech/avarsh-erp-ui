@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Table, Card, Button, Space, Input, Tag, Dropdown, DatePicker, Select, Typography, Modal, message, Row, Col, Statistic, Timeline } from 'antd';
 import { PlusOutlined, SearchOutlined, FilterOutlined, ExportOutlined, EyeOutlined, EditOutlined, MoreOutlined, PrinterOutlined, CheckCircleOutlined, InboxOutlined, TruckOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { hasPermission } from '../../utils/permissions';
+import PermissionGuard from '../../components/PermissionGuard';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -36,7 +38,7 @@ const GRNList = () => {
     { title: 'Received Qty', width: 120, align: 'center', render: (_, record) => <><Text strong style={{ color: '#22c55e' }}>{record.receivedQty.toLocaleString()}</Text>{record.rejectedQty > 0 && <><br /><Text style={{ color: '#ef4444', fontSize: 12 }}>Rej: {record.rejectedQty}</Text></>}</> },
     { title: 'Total Value', dataIndex: 'totalValue', width: 120, align: 'right', render: (v) => <Text strong style={{ color: '#10b981' }}>${v.toLocaleString()}</Text> },
     { title: 'Status', dataIndex: 'status', width: 140, fixed: 'right', render: (status) => <Tag color={statusConfig[status]?.color} icon={statusConfig[status]?.icon} style={{ borderRadius: 20 }}>{status}</Tag> },
-    { title: 'Actions', fixed: 'right', width: 80, render: (_, record) => <Dropdown menu={{ items: [{ key: 'view', icon: <EyeOutlined />, label: 'View' }, { key: 'edit', icon: <EditOutlined />, label: 'Edit' }, { key: 'print', icon: <PrinterOutlined />, label: 'Print' }], onClick: ({ key }) => key === 'view' ? setViewModal({ open: true, record }) : key === 'edit' ? navigate(`/grn/edit/${record.key}`) : message.success('Printing...') }} trigger={['click']}><Button type="text" icon={<MoreOutlined />} /></Dropdown> },
+    { title: 'Actions', fixed: 'right', width: 80, render: (_, record) => { const items = []; if (hasPermission('grn', 'view')) items.push({ key: 'view', icon: <EyeOutlined />, label: 'View' }); if (hasPermission('grn', 'update')) items.push({ key: 'edit', icon: <EditOutlined />, label: 'Edit' }); if (items.length > 0) items.push({ key: 'print', icon: <PrinterOutlined />, label: 'Print' }); if (items.length === 0) return null; return <Dropdown menu={{ items, onClick: ({ key }) => key === 'view' ? setViewModal({ open: true, record }) : key === 'edit' ? navigate(`/grn/edit/${record.key}`) : message.success('Printing...') }} trigger={['click']}><Button type="text" icon={<MoreOutlined />} /></Dropdown>; } },
   ];
 
   return (
@@ -45,7 +47,9 @@ const GRNList = () => {
         <h1>Goods Received Notes</h1>
         <div className="header-actions">
           <Button icon={<ExportOutlined />}>Export</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/grn/new')}>New GRN</Button>
+          <PermissionGuard module="grn" operation="add">
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/grn/new')}>New GRN</Button>
+          </PermissionGuard>
         </div>
       </div>
 

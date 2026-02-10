@@ -77,7 +77,7 @@ const Login = () => {
       {/* Background decoration */}
       <div style={styles.backgroundDecoration} />
       
-      <Card style={styles.card} bordered={false}>
+      <Card style={styles.card} variant="borderless">
         {/* Logo and Header */}
         <div style={styles.logoContainer}>
           <img src={isDarkMode ? avarshLogoLight : avarshLogoDark} alt="Avarsh Logo" style={styles.logo} />

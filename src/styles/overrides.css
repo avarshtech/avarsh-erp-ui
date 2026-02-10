@@ -864,3 +864,10 @@ textarea.ant-input:active {
 .centered-header-table .ant-table-thead > tr > th {
   text-align: center !important;
 }
+
+/* Form item additional / extra text — visible below editor with padding */
+.ant-form-item-extra,
+.ant-form-item .ant-form-item-extra {
+  padding: 8px 4px 4px 4px;
+  font-size: 13px;
+}
