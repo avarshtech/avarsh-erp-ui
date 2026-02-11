@@ -29,6 +29,8 @@ import {
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
 import { useTheme } from "../context/ThemeContext";
+import { hasModuleAccess } from "../utils/permissions";
+import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
 
 const { Header, Sider, Content } = Layout;
@@ -62,16 +64,19 @@ const MainLayout = () => {
     }
   };
 
-  const menuItems = [
+  // Build menu items filtered by module access
+  const allMenuItems = [
     {
       key: "/",
       icon: <DashboardOutlined />,
       label: "Dashboard",
+      moduleId: "dashboard",
     },
     {
       key: "/orders",
       icon: <ShoppingCartOutlined />,
       label: "Orders",
+      moduleId: "orders",
       children: [
         { key: "/orders/list", label: "Order List" },
         { key: "/orders/new", label: "New Order" },
@@ -81,6 +86,7 @@ const MainLayout = () => {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
+      moduleId: "bom",
       children: [
         { key: "/bom/list", label: "BOM List" },
         { key: "/bom/new", label: "Create BOM" },
@@ -90,6 +96,7 @@ const MainLayout = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
+      moduleId: "purchase-orders",
       children: [
         { key: "/purchase-orders/list", label: "PO List" },
         { key: "/purchase-orders/new", label: "New PO" },
@@ -99,6 +106,7 @@ const MainLayout = () => {
       key: "/grn",
       icon: <InboxOutlined />,
       label: "Goods Received",
+      moduleId: "grn",
       children: [
         { key: "/grn/list", label: "GRN List" },
         { key: "/grn/new", label: "New GRN" },
@@ -108,18 +116,45 @@ const MainLayout = () => {
       key: "/master",
       icon: <DatabaseOutlined />,
       label: "Master Data",
+      // Master Data is visible if user has access to any master module
+      moduleId: ["master-data", "supplier-info", "items", "terms-conditions"],
     },
     {
       key: "/admin",
       icon: <SettingOutlined />,
       label: "Admin",
+      moduleId: ["users", "roles"],
       children: [
         { key: "/admin/dashboard", label: "Dashboard" },
-        { key: "/admin/users", label: "Users" },
-        { key: "/admin/roles", label: "Role & Access" },
+        { key: "/admin/users", label: "Users", moduleId: "users" },
+        { key: "/admin/roles", label: "Role & Access", moduleId: "roles" },
       ],
     },
   ];
+
+  // Filter menu items based on module access
+  const menuItems = allMenuItems
+    .filter((item) => {
+      if (!item.moduleId) return true;
+      if (Array.isArray(item.moduleId)) {
+        return item.moduleId.some((id) => hasModuleAccess(id));
+      }
+      return hasModuleAccess(item.moduleId);
+    })
+    .map((item) => {
+      // Strip moduleId before passing to Ant Design Menu to avoid DOM warnings
+      const { moduleId, children, ...rest } = item;
+      if (children) {
+        const filteredChildren = children
+          .filter((child) => {
+            if (!child.moduleId) return true;
+            return hasModuleAccess(child.moduleId);
+          })
+          .map(({ moduleId: _mid, ...childRest }) => childRest);
+        return { ...rest, children: filteredChildren.length > 0 ? filteredChildren : undefined };
+      }
+      return rest;
+    });
 
   const userMenuItems = [
     {
@@ -163,6 +198,7 @@ const MainLayout = () => {
   };
 
   return (
+    <SessionExpiryGuard>
     <Layout style={{ minHeight: "100vh" }}>
       <Sider
         trigger={null}
@@ -314,6 +350,7 @@ const MainLayout = () => {
         </Content>
       </Layout>
     </Layout>
+    </SessionExpiryGuard>
   );
 };
 

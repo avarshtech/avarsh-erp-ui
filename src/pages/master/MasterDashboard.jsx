@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { Tabs, Spin, message } from 'antd';
-import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
 import ItemTypeMaster from './ItemTypeMaster';
@@ -8,6 +8,7 @@ import VariantMaster from './VariantMaster';
 import UomMaster from './UomMaster';
 import ItemMaster from './ItemMaster';
 import SupplierMaster from './SupplierMaster';
+import TermsConditionsMaster from './TermsConditionsMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -181,6 +182,11 @@ const MasterDashboard = () => {
           <Spin size="large" tip="Loading attributes..." />
         </div>
       ) : <VariantMaster />,
+    },
+    {
+      key: 'terms',
+      label: <span><FileProtectOutlined /> Terms & Conditions</span>,
+      children: <TermsConditionsMaster />,
     },
   ];
 

@@ -205,11 +205,18 @@ const ItemMaster = () => {
     for (const k of Object.keys(attributesObj)) {
       const kn = normalize(k);
       if (kn === attrName || kn === attrCamel || kn === idStr) {
-        return attributesObj[k];
+        const v = attributesObj[k];
+        // Ensure we always return a string, not an object
+        if (v && typeof v === 'object') return v.label || v.value || v.name || String(v);
+        return v ?? '';
       }
     }
 
-    if (attributesObj[attr.id] !== undefined) return attributesObj[attr.id];
+    if (attributesObj[attr.id] !== undefined) {
+      const v = attributesObj[attr.id];
+      if (v && typeof v === 'object') return v.label || v.value || v.name || String(v);
+      return v;
+    }
     return '';
   };
 
@@ -1158,7 +1165,7 @@ const ItemMaster = () => {
         width={'80vw'}
           footer={null}
           destroyOnHidden
-          bodyStyle={{ maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}
+          styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 } }}
       >
         <Spin spinning={metaDataLoading || submitting}>
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
@@ -1174,7 +1181,7 @@ const ItemMaster = () => {
                     onChange={handleFormCategoryChange}
                     showSearch
                     optionFilterProp="label"
-                    options={formCategories.map((cat) => ({ value: cat.id.toString(), label: cat.name }))}
+                    options={formCategories.map((cat) => ({ value: String(cat.id ?? ''), label: String(cat.name ?? '') }))}
                   />
                 </Form.Item>
               </Col>
@@ -1190,7 +1197,7 @@ const ItemMaster = () => {
                     showSearch
                     optionFilterProp="label"
                     disabled={!isEditMode && !form.getFieldValue('categoryId')}
-                    options={formSubcategories.map((sc) => ({ value: sc.id.toString(), label: sc.name }))}
+                    options={formSubcategories.map((sc) => ({ value: String(sc.id ?? ''), label: String(sc.name ?? '') }))}
                   />
                 </Form.Item>
               </Col>
@@ -1209,7 +1216,7 @@ const ItemMaster = () => {
                     showSearch
                     optionFilterProp="label"
                     disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
-                    options={formItemTypes.map((it) => ({ value: it.id.toString(), label: it.name }))}
+                    options={formItemTypes.map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
                   />
                 </Form.Item>
               </Col>
@@ -1282,7 +1289,7 @@ const ItemMaster = () => {
                   label="Primary UOM"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
-                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: opt.id.toString(), label: opt.name }))} />
+                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.name ?? opt.label ?? '') }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1304,7 +1311,7 @@ const ItemMaster = () => {
                       placeholder="Select Secondary UOM (optional)"
                       allowClear
                       disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
-                      options={formUomOptions.map(opt => ({ value: opt.id.toString(), label: opt.name }))}
+                      options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.name ?? opt.label ?? '') }))}
                     />
                 </Form.Item>
               </Col>
@@ -1453,10 +1460,15 @@ const ItemMaster = () => {
                             dataIndex: ['variant', attr.id],
                             render: (val) => {
                               if (!val) return <Text type="secondary">—</Text>;
+                              // Safety: if val is an object (e.g. {value, label}), convert to string
+                              if (typeof val === 'object' && val !== null) {
+                                const display = val.label || val.value || val.name || JSON.stringify(val);
+                                return String(display);
+                              }
                               if (isColorAttr && isPantoneCode(val)) {
                                 return <PantoneColorSwatch value={val} size={20} showLabel />;
                               }
-                              return val;
+                              return String(val);
                             },
                           };
                         }),
@@ -1515,7 +1527,7 @@ const ItemMaster = () => {
           </Space>
         }
         placement="right"
-        size={720}
+        size="large"
         onClose={() => {
           setViewDrawerVisible(false);
           setViewingItem(null);
@@ -1549,18 +1561,18 @@ const ItemMaster = () => {
               </Space>
             </div>
 
-            <Divider orientation="left">Basic Information</Divider>
-            <Descriptions column={1} size="small" labelStyle={{ width: 140 }}>
-              <Descriptions.Item label="Item ID">{viewingItem.id}</Descriptions.Item>
-              <Descriptions.Item label="Item Code">{viewingItem.itemCode || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Category">{viewingItem.categoryName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Subcategory">{viewingItem.subCategoryName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Item Type">{viewingItem.itemTypeName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="UOM">{viewingItem.uomName || '-'}</Descriptions.Item>
-              <Descriptions.Item label="HSN Code">{viewingItem.hsnCode || '-'}</Descriptions.Item>
-            </Descriptions>
+            <Divider titlePlacement="start">Basic Information</Divider>
+            <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
+              { key: 'id', label: 'Item ID', children: viewingItem.id },
+              { key: 'code', label: 'Item Code', children: viewingItem.itemCode || '-' },
+              { key: 'category', label: 'Category', children: viewingItem.categoryName || '-' },
+              { key: 'subcategory', label: 'Subcategory', children: viewingItem.subCategoryName || '-' },
+              { key: 'itemType', label: 'Item Type', children: viewingItem.itemTypeName || '-' },
+              { key: 'uom', label: 'UOM', children: viewingItem.uomName || '-' },
+              { key: 'hsn', label: 'HSN Code', children: viewingItem.hsnCode || '-' },
+            ]} />
 
-            <Divider orientation="left">Variants</Divider>
+            <Divider titlePlacement="start">Variants</Divider>
             {Array.isArray(viewingItem.variants) && viewingItem.variants.length > 0 ? (
               <div style={{ maxHeight: '50vh', overflowY: 'auto', paddingRight: 8 }}>
                 <div style={{ display: 'grid', gap: 12 }}>
@@ -1607,7 +1619,7 @@ const ItemMaster = () => {
                                 ) : hex ? (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <div style={{ width: 18, height: 18, borderRadius: 4, background: hex, border: '1px solid rgba(0,0,0,0.12)' }} />
-                                    <Text>{displayVal}</Text>
+                                    <Text>{String(displayVal)}</Text>
                                   </div>
                                 ) : (
                                   <Text>{String(displayVal)}</Text>

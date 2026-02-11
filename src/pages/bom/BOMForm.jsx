@@ -30,6 +30,7 @@ import {
   SafetyOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
+import { hasPermission } from '../../utils/permissions';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -460,10 +461,14 @@ const BOMForm = () => {
           <h1>{id ? 'Edit BOM' : 'Create Bill of Materials'}</h1>
         </Space>
         <div className="header-actions">
-          <Button icon={<SaveOutlined />}>Save as Draft</Button>
-          <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => form.submit()}>
-            Save & Approve
-          </Button>
+          {hasPermission('bom', id ? 'update' : 'add') && (
+            <Button icon={<SaveOutlined />}>Save as Draft</Button>
+          )}
+          {hasPermission('bom', id ? 'update' : 'add') && (
+            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => form.submit()}>
+              Save & Approve
+            </Button>
+          )}
         </div>
       </div>
 
@@ -531,20 +536,28 @@ const BOMForm = () => {
         {/* Cost Summary */}
         <Card>
           <Title level={5} style={{ marginBottom: 16 }}>Cost Summary</Title>
-          <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 4 }}>
-            <Descriptions.Item label="Fabric Cost">
-              ${materials.fabric.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Trims Cost">
-              ${materials.trims.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Accessories Cost">
-              ${materials.accessories.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}
-            </Descriptions.Item>
-            <Descriptions.Item label="Packing Cost">
-              ${materials.packing.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}
-            </Descriptions.Item>
-          </Descriptions>
+          <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 4 }} items={[
+            {
+              key: 'fabric',
+              label: 'Fabric Cost',
+              children: `$${materials.fabric.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}`,
+            },
+            {
+              key: 'trims',
+              label: 'Trims Cost',
+              children: `$${materials.trims.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}`,
+            },
+            {
+              key: 'accessories',
+              label: 'Accessories Cost',
+              children: `$${materials.accessories.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}`,
+            },
+            {
+              key: 'packing',
+              label: 'Packing Cost',
+              children: `$${materials.packing.reduce((sum, item) => sum + (item.amount || 0), 0).toFixed(2)}`,
+            },
+          ]} />
           <div style={{ textAlign: 'right', marginTop: 16 }}>
             <Text style={{ fontSize: 18 }}>Total Estimated Cost: </Text>
             <Text strong style={{ fontSize: 24, color: '#6366f1' }}>

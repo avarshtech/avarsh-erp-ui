@@ -18,6 +18,8 @@ import {
   Divider,
   Badge,
   Switch,
+  Alert,
+  Collapse,
 } from 'antd';
 import {
   PlusOutlined,
@@ -27,35 +29,56 @@ import {
   ReloadOutlined,
   ExclamationCircleOutlined,
   SafetyOutlined,
+  DashboardOutlined,
+  ShoppingCartOutlined,
+  DatabaseOutlined,
+  SettingOutlined,
+  LinkOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { getRoles, createRole, updateRole, deleteRole } from '../../services/roleService';
-import { MODULES, OPERATIONS, getEmptyPermissions } from '../../utils/permissions';
+import {
+  getEmptyPermissions,
+  getOperationsForModule,
+  validatePermissions,
+  normalizePermissionsForSave,
+  PERMISSION_GROUPS,
+} from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-// Modules to show in permissions matrix (excluding technical ones)
-const PERMISSION_MODULES = [
-  { id: 'dashboard', name: 'Dashboard' },
-  { id: 'orders', name: 'Orders' },
-  { id: 'bom', name: 'Bill of Materials' },
-  { id: 'purchase-orders', name: 'Purchase Orders' },
-  { id: 'po-approval', name: 'PO Approval' },
-  { id: 'grn', name: 'Goods Received' },
-  { id: 'suppliers', name: 'Suppliers' },
-  { id: 'items', name: 'Items' },
-  { id: 'master-data', name: 'Master Data' },
-  { id: 'users', name: 'Users' },
-  { id: 'roles', name: 'Roles & Access' },
-  { id: 'settings', name: 'Settings' },
-];
+// Icon map for group rendering
+const GROUP_ICONS = {
+  DashboardOutlined: <DashboardOutlined />,
+  ShoppingCartOutlined: <ShoppingCartOutlined />,
+  DatabaseOutlined: <DatabaseOutlined />,
+  SettingOutlined: <SettingOutlined />,
+};
 
-// Standard operations for most modules
-const STANDARD_OPERATIONS = ['view', 'add', 'update', 'delete'];
+// Operation label helpers
+const OP_LABELS = {
+  view: 'View',
+  add: 'Add',
+  update: 'Update',
+  delete: 'Delete',
+  approve: 'Approve',
+  reject: 'Reject',
+  cancel: 'Cancel',
+  refer_back: 'Refer Back',
+};
 
-// PO Approval has special operations
-const PO_APPROVAL_OPERATIONS = ['view', 'approve', 'reject', 'cancel', 'refer_back'];
+const OP_COLORS = {
+  view: '#6366f1',
+  add: '#22c55e',
+  update: '#f59e0b',
+  delete: '#ef4444',
+  approve: '#10b981',
+  reject: '#f43f5e',
+  cancel: '#64748b',
+  refer_back: '#8b5cf6',
+};
 
 const RoleAccess = () => {
   const [loading, setLoading] = useState(false);
@@ -65,6 +88,8 @@ const RoleAccess = () => {
   const [editingRole, setEditingRole] = useState(null);
   const [form] = Form.useForm();
   const [permissions, setPermissions] = useState(getEmptyPermissions());
+  const [formDirty, setFormDirty] = useState(false);
+  const [initialPermissions, setInitialPermissions] = useState(null);
 
   // Fetch roles
   const fetchRoles = useCallback(async () => {
@@ -101,50 +126,79 @@ const RoleAccess = () => {
         description: role.description,
         active: role.active !== false,
       });
-      setPermissions(role.permissions || getEmptyPermissions());
+      // Merge role permissions with empty template so every key exists
+      const empty = getEmptyPermissions();
+      const rolePerms = role.permissions || {};
+      const merged = { ...empty };
+      Object.keys(rolePerms).forEach((moduleId) => {
+        if (merged[moduleId]) {
+          merged[moduleId] = {
+            access: !!rolePerms[moduleId]?.access,
+            operations: {
+              ...merged[moduleId].operations,
+              ...(rolePerms[moduleId]?.operations || {}),
+            },
+          };
+        }
+      });
+      setPermissions(merged);
+      setInitialPermissions(JSON.stringify(merged));
     } else {
       form.resetFields();
       form.setFieldsValue({ active: true });
-      setPermissions(getEmptyPermissions());
+      const empty = getEmptyPermissions();
+      setPermissions(empty);
+      setInitialPermissions(JSON.stringify(empty));
     }
+    setFormDirty(false);
     setModalVisible(true);
   };
 
   // Handle permission change
   const handlePermissionChange = (moduleId, operationId, checked) => {
     setPermissions((prev) => {
-      const updated = { ...prev };
+      const updated = JSON.parse(JSON.stringify(prev));
       if (!updated[moduleId]) {
-        updated[moduleId] = { access: false, operations: {} };
-      }
-      
-      // If changing 'view' to false, disable all other operations
-      if (operationId === 'view' && !checked) {
+        const ops = getOperationsForModule(moduleId);
         updated[moduleId] = {
           access: false,
-          operations: Object.keys(updated[moduleId].operations || {}).reduce((acc, op) => {
-            acc[op] = false;
-            return acc;
-          }, {}),
+          operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
         };
+      }
+
+      // If disabling 'view' for standard modules, disable all operations
+      if (operationId === 'view' && !checked && moduleId !== 'po-approval') {
+        const ops = getOperationsForModule(moduleId);
+        ops.forEach((op) => { updated[moduleId].operations[op] = false; });
+        updated[moduleId].access = false;
       } else {
-        updated[moduleId].operations = {
-          ...updated[moduleId].operations,
-          [operationId]: checked,
-        };
-        // Set access based on whether any operation is enabled
+        updated[moduleId].operations[operationId] = checked;
+        // If enabling any operation other than view, also enable view
+        if (checked && operationId !== 'view' && moduleId !== 'po-approval') {
+          updated[moduleId].operations.view = true;
+        }
         updated[moduleId].access = Object.values(updated[moduleId].operations).some(Boolean);
       }
-      
+
+      // Enforce PO-approval → PO link
+      if (moduleId === 'purchase-orders' && !updated['purchase-orders'].access) {
+        const approvalOps = getOperationsForModule('po-approval');
+        if (updated['po-approval']) {
+          approvalOps.forEach((op) => { updated['po-approval'].operations[op] = false; });
+          updated['po-approval'].access = false;
+        }
+      }
+
       return updated;
     });
+    setFormDirty(true);
   };
 
   // Handle select all for a module
   const handleSelectAllModule = (moduleId, checked) => {
-    const operations = moduleId === 'po-approval' ? PO_APPROVAL_OPERATIONS : STANDARD_OPERATIONS;
+    const operations = getOperationsForModule(moduleId);
     setPermissions((prev) => {
-      const updated = { ...prev };
+      const updated = JSON.parse(JSON.stringify(prev));
       updated[moduleId] = {
         access: checked,
         operations: operations.reduce((acc, op) => {
@@ -152,23 +206,110 @@ const RoleAccess = () => {
           return acc;
         }, {}),
       };
+
+      // Enforce PO-approval → PO link on uncheck
+      if (moduleId === 'purchase-orders' && !checked) {
+        const approvalOps = getOperationsForModule('po-approval');
+        updated['po-approval'] = {
+          access: false,
+          operations: approvalOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+        };
+      }
+
       return updated;
     });
+    setFormDirty(true);
   };
 
-  // Check if all operations are selected for a module
+  // Handle select all for entire group
+  const handleSelectAllGroup = (group, checked) => {
+    setPermissions((prev) => {
+      const updated = JSON.parse(JSON.stringify(prev));
+      group.modules.forEach((mod) => {
+        // Skip po-approval if PO is being unchecked
+        if (mod.id === 'po-approval' && !checked) {
+          const ops = getOperationsForModule(mod.id);
+          updated[mod.id] = {
+            access: false,
+            operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+          };
+          return;
+        }
+        const ops = getOperationsForModule(mod.id);
+        updated[mod.id] = {
+          access: checked,
+          operations: ops.reduce((acc, op) => { acc[op] = checked; return acc; }, {}),
+        };
+      });
+      return updated;
+    });
+    setFormDirty(true);
+  };
+
+  // Check states
   const isAllSelectedForModule = (moduleId) => {
-    const operations = moduleId === 'po-approval' ? PO_APPROVAL_OPERATIONS : STANDARD_OPERATIONS;
+    const ops = getOperationsForModule(moduleId);
     const modulePerms = permissions[moduleId]?.operations || {};
-    return operations.every((op) => modulePerms[op] === true);
+    return ops.length > 0 && ops.every((op) => modulePerms[op] === true);
+  };
+
+  const isSomeSelectedForModule = (moduleId) => {
+    const ops = getOperationsForModule(moduleId);
+    const modulePerms = permissions[moduleId]?.operations || {};
+    const selected = ops.filter((op) => modulePerms[op] === true);
+    return selected.length > 0 && selected.length < ops.length;
+  };
+
+  const isAllSelectedForGroup = (group) => {
+    return group.modules.every((mod) => isAllSelectedForModule(mod.id));
+  };
+
+  const isSomeSelectedForGroup = (group) => {
+    const allSelected = group.modules.every((mod) => isAllSelectedForModule(mod.id));
+    const someSelected = group.modules.some((mod) =>
+      permissions[mod.id]?.access === true
+    );
+    return someSelected && !allSelected;
+  };
+
+  // Count permissions
+  const countPermissions = (role) => {
+    if (!role.permissions) return 0;
+    let count = 0;
+    Object.values(role.permissions).forEach((mod) => {
+      if (mod.operations) {
+        count += Object.values(mod.operations).filter(Boolean).length;
+      }
+    });
+    return count;
+  };
+
+  const countTotalSelectedPermissions = () => {
+    let count = 0;
+    Object.values(permissions).forEach((mod) => {
+      if (mod.operations) {
+        count += Object.values(mod.operations).filter(Boolean).length;
+      }
+    });
+    return count;
   };
 
   // Handle form submit
   const handleSubmit = async (values) => {
+    // Validate: at least one permission
+    const validation = validatePermissions(permissions);
+    if (!validation.valid) {
+      message.warning(validation.message);
+      return;
+    }
+
     try {
+      // Normalize permissions before save
+      const normalizedPermissions = normalizePermissionsForSave(permissions);
+
       const roleData = {
         ...values,
-        permissions,
+        permissions: normalizedPermissions,
       };
 
       if (editingRole) {
@@ -181,9 +322,34 @@ const RoleAccess = () => {
       setModalVisible(false);
       form.resetFields();
       setPermissions(getEmptyPermissions());
+      setFormDirty(false);
       fetchRoles();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save role');
+    }
+  };
+
+  // Close modal with unsaved changes check
+  const handleModalClose = () => {
+    if (formDirty) {
+      Modal.confirm({
+        title: 'Unsaved Changes',
+        icon: <ExclamationCircleOutlined />,
+        content: 'You have unsaved changes. Are you sure you want to discard them?',
+        okText: 'Discard',
+        okType: 'danger',
+        cancelText: 'Keep Editing',
+        onOk: () => {
+          setModalVisible(false);
+          form.resetFields();
+          setPermissions(getEmptyPermissions());
+          setFormDirty(false);
+        },
+      });
+    } else {
+      setModalVisible(false);
+      form.resetFields();
+      setPermissions(getEmptyPermissions());
     }
   };
 
@@ -196,18 +362,6 @@ const RoleAccess = () => {
     } catch (error) {
       message.error(error.errorMessage || 'Failed to delete role');
     }
-  };
-
-  // Count permissions for a role
-  const countPermissions = (role) => {
-    if (!role.permissions) return 0;
-    let count = 0;
-    Object.values(role.permissions).forEach((module) => {
-      if (module.operations) {
-        count += Object.values(module.operations).filter(Boolean).length;
-      }
-    });
-    return count;
   };
 
   // Table columns
@@ -242,10 +396,10 @@ const RoleAccess = () => {
       align: 'center',
       width: 100,
       render: (count) => (
-        <Badge 
-          count={count || 0} 
-          showZero 
-          style={{ backgroundColor: '#6366f1' }} 
+        <Badge
+          count={count || 0}
+          showZero
+          style={{ backgroundColor: '#6366f1' }}
         />
       ),
     },
@@ -270,9 +424,9 @@ const RoleAccess = () => {
       align: 'center',
       width: 100,
       render: (active) => (
-        <Badge 
-          status={active !== false ? 'success' : 'default'} 
-          text={active !== false ? 'Active' : 'Inactive'} 
+        <Badge
+          status={active !== false ? 'success' : 'default'}
+          text={active !== false ? 'Active' : 'Inactive'}
         />
       ),
     },
@@ -292,9 +446,9 @@ const RoleAccess = () => {
         <Space size="small">
           <PermissionGuard module="roles" operation="update">
             <Tooltip title="Edit">
-              <Button 
-                type="text" 
-                icon={<EditOutlined />} 
+              <Button
+                type="text"
+                icon={<EditOutlined />}
                 onClick={() => openModal(record)}
                 disabled={record.isSystem}
               />
@@ -311,10 +465,10 @@ const RoleAccess = () => {
               disabled={record.isSystem}
             >
               <Tooltip title={record.isSystem ? 'System roles cannot be deleted' : 'Delete'}>
-                <Button 
-                  type="text" 
-                  danger 
-                  icon={<DeleteOutlined />} 
+                <Button
+                  type="text"
+                  danger
+                  icon={<DeleteOutlined />}
                   disabled={record.isSystem}
                 />
               </Tooltip>
@@ -325,133 +479,172 @@ const RoleAccess = () => {
     },
   ];
 
-  // Render permissions matrix
-  const renderPermissionsMatrix = () => (
-    <div style={{ marginTop: 16 }}>
-      <Title level={5}>Permissions Matrix</Title>
-      <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-        Configure module access and operations for this role
-      </Text>
-      
-      <Table
-        className="permissions-matrix-table"
-        size="small"
-        pagination={false}
-        bordered
-        dataSource={PERMISSION_MODULES}
-        rowKey="id"
-        columns={[
-          {
-            title: 'Module',
-            dataIndex: 'name',
-            key: 'name',
-            width: 180,
-            fixed: 'left',
-            render: (name, record) => (
-              <Space>
-                <Checkbox
-                  checked={isAllSelectedForModule(record.id)}
-                  indeterminate={
-                    permissions[record.id]?.access && !isAllSelectedForModule(record.id)
-                  }
-                  onChange={(e) => handleSelectAllModule(record.id, e.target.checked)}
-                />
-                <Text strong>{name}</Text>
-              </Space>
-            ),
-          },
-          ...(STANDARD_OPERATIONS.map((op) => ({
-            title: op.charAt(0).toUpperCase() + op.slice(1),
-            key: op,
-            align: 'center',
-            width: 72,
-            render: (_, record) => {
-              // PO Approval module does not show standard operation checkboxes
-              if (record.id === 'po-approval') {
-                return <Text type="secondary">-</Text>;
-              }
-              return (
-                <Checkbox
-                  checked={permissions[record.id]?.operations?.[op] || false}
-                  onChange={(e) => handlePermissionChange(record.id, op, e.target.checked)}
-                />
-              );
-            },
-          }))),
-          // Special columns for PO Approval
-          {
-            title: 'Approve',
-            key: 'approve',
-            align: 'center',
-            width: 80,
-            render: (_, record) => {
-              if (record.id !== 'po-approval') {
-                return <Text type="secondary">-</Text>;
-              }
-              return (
-                <Checkbox
-                  checked={permissions[record.id]?.operations?.approve || false}
-                  onChange={(e) => handlePermissionChange(record.id, 'approve', e.target.checked)}
-                />
-              );
-            },
-          },
-          {
-            title: 'Reject',
-            key: 'reject',
-            align: 'center',
-            width: 80,
-            render: (_, record) => {
-              if (record.id !== 'po-approval') {
-                return <Text type="secondary">-</Text>;
-              }
-              return (
-                <Checkbox
-                  checked={permissions[record.id]?.operations?.reject || false}
-                  onChange={(e) => handlePermissionChange(record.id, 'reject', e.target.checked)}
-                />
-              );
-            },
-          },
-          {
-            title: 'Cancel',
-            key: 'cancel',
-            align: 'center',
-            width: 80,
-            render: (_, record) => {
-              if (record.id !== 'po-approval') {
-                return <Text type="secondary">-</Text>;
-              }
-              return (
-                <Checkbox
-                  checked={permissions[record.id]?.operations?.cancel || false}
-                  onChange={(e) => handlePermissionChange(record.id, 'cancel', e.target.checked)}
-                />
-              );
-            },
-          },
-          {
-            title: 'Refer Back',
-            key: 'refer_back',
-            align: 'center',
-            width: 100,
-            render: (_, record) => {
-              if (record.id !== 'po-approval') {
-                return <Text type="secondary">-</Text>;
-              }
-              return (
-                <Checkbox
-                  checked={permissions[record.id]?.operations?.refer_back || false}
-                  onChange={(e) => handlePermissionChange(record.id, 'refer_back', e.target.checked)}
-                />
-              );
-            },
-          },
-        ]}
-        scroll={{ x: 900 }}
-      />
-    </div>
-  );
+  // ─── Render Permission Group ─────────────────────────────────────────────
+
+  const renderModuleRow = (mod) => {
+    const ops = mod.operations;
+    const isPOApproval = mod.id === 'po-approval';
+    const poHasAccess = permissions['purchase-orders']?.access;
+    const isLinkedDisabled = isPOApproval && !poHasAccess;
+
+    return (
+      <div
+        key={mod.id}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '10px 16px',
+          borderBottom: '1px solid var(--border-color, #f0f0f0)',
+          background: isLinkedDisabled ? 'var(--bg-tertiary, #fafafa)' : 'transparent',
+          opacity: isLinkedDisabled ? 0.5 : 1,
+          transition: 'all 0.2s',
+        }}
+      >
+        {/* Module name + select all checkbox */}
+        <div style={{ flex: '0 0 260px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Checkbox
+            checked={isAllSelectedForModule(mod.id)}
+            indeterminate={isSomeSelectedForModule(mod.id)}
+            onChange={(e) => handleSelectAllModule(mod.id, e.target.checked)}
+            disabled={isLinkedDisabled}
+          />
+          <div>
+            <Text strong style={{ fontSize: 13 }}>{mod.name}</Text>
+            {mod.path && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                {mod.path}
+              </Text>
+            )}
+            {mod.description && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', fontStyle: 'italic' }}>
+                {mod.description}
+              </Text>
+            )}
+          </div>
+          {isPOApproval && (
+            <Tooltip title="Requires Purchase Orders access to be enabled">
+              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+            </Tooltip>
+          )}
+        </div>
+
+        {/* Operation checkboxes */}
+        <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {ops.map((op) => (
+            <div
+              key={op}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                padding: '3px 10px',
+                borderRadius: 6,
+                border: `1px solid ${permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '40' : 'var(--border-color, #e2e8f0)'}`,
+                background: permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '10' : 'transparent',
+                transition: 'all 0.2s',
+                minWidth: 90,
+              }}
+            >
+              <Checkbox
+                checked={permissions[mod.id]?.operations?.[op] || false}
+                onChange={(e) => handlePermissionChange(mod.id, op, e.target.checked)}
+                disabled={isLinkedDisabled}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] : 'var(--text-secondary, #64748b)',
+                  fontWeight: permissions[mod.id]?.operations?.[op] ? 600 : 400,
+                }}
+              >
+                {OP_LABELS[op] || op}
+              </Text>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPermissionsMatrix = () => {
+    const totalSelected = countTotalSelectedPermissions();
+
+    const collapseItems = PERMISSION_GROUPS.map((group) => ({
+      key: group.key,
+      label: (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+          <Checkbox
+            checked={isAllSelectedForGroup(group)}
+            indeterminate={isSomeSelectedForGroup(group)}
+            onChange={(e) => {
+              e.stopPropagation();
+              handleSelectAllGroup(group, e.target.checked);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {GROUP_ICONS[group.icon] || <SettingOutlined />}
+            <Text strong style={{ fontSize: 14 }}>{group.label}</Text>
+          </span>
+          {group.description && (
+            <Tooltip title={group.description}>
+              <InfoCircleOutlined style={{ color: 'var(--text-muted, #94a3b8)', fontSize: 12 }} />
+            </Tooltip>
+          )}
+          <Tag
+            style={{ marginLeft: 'auto', marginRight: 8 }}
+            color={group.modules.every((m) => isAllSelectedForModule(m.id)) ? 'green' : 'default'}
+          >
+            {group.modules.filter((m) => permissions[m.id]?.access).length}/{group.modules.length} active
+          </Tag>
+        </div>
+      ),
+      children: (
+        <div style={{ margin: -12 }}>
+          {group.modules.map((mod) => renderModuleRow(mod))}
+        </div>
+      ),
+    }));
+
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <div>
+            <Title level={5} style={{ margin: 0 }}>Permission Matrix</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Configure page access and operations for this role
+            </Text>
+          </div>
+          <Tag color={totalSelected > 0 ? 'blue' : 'default'} style={{ fontSize: 13, padding: '2px 12px' }}>
+            {totalSelected} permission{totalSelected !== 1 ? 's' : ''} selected
+          </Tag>
+        </div>
+
+        {/* PO Approval dependency notice */}
+        {permissions['purchase-orders']?.access && (
+          <Alert
+            message="PO Approval actions are linked to Purchase Orders access"
+            description="Approval, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
+            type="info"
+            showIcon
+            icon={<LinkOutlined />}
+            style={{ marginBottom: 12 }}
+            closable
+          />
+        )}
+
+        <Collapse
+          defaultActiveKey={PERMISSION_GROUPS.map((g) => g.key)}
+          items={collapseItems}
+          size="small"
+          style={{
+            background: 'var(--card-bg, #fff)',
+            borderRadius: 8,
+          }}
+        />
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -459,8 +652,12 @@ const RoleAccess = () => {
         <div style={{ marginBottom: 24 }}>
           <Row justify="space-between" align="middle">
             <Col>
-              <Title level={4} style={{ margin: 0 }}>Role & Access Management</Title>
-              <Text type="secondary">Define roles and configure permissions</Text>
+              <Title level={4} style={{ margin: 0 }}>
+                Role & Access Management
+              </Title>
+              <Text type="secondary">
+                Define roles and configure permissions
+              </Text>
             </Col>
             <Col>
               <PermissionGuard module="roles" operation="add">
@@ -481,7 +678,7 @@ const RoleAccess = () => {
           <Col xs={24} sm={12} md={8}>
             <Input
               placeholder="Search by role name or description..."
-              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               allowClear
@@ -502,69 +699,86 @@ const RoleAccess = () => {
           loading={loading}
           pagination={{
             showSizeChanger: true,
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} roles`,
+            showTotal: (total, range) =>
+              `${range[0]}-${range[1]} of ${total} roles`,
           }}
         />
       </Card>
 
       {/* Add/Edit Modal */}
       <Modal
-        title={editingRole ? 'Edit Role' : 'Add New Role'}
+        title={editingRole ? "Edit Role" : "Add New Role"}
         open={modalVisible}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-          setPermissions(getEmptyPermissions());
-        }}
+        onCancel={handleModalClose}
         footer={null}
-        width={1000}
+        width={1100}
         style={{ top: 20 }}
+        styles={{
+          body: { maxHeight: "calc(100vh - 160px)", overflowY: "auto" },
+        }}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={() => setFormDirty(true)}
+          style={{ width: "99%" }}
         >
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="name"
                 label="Role Name"
-                rules={[{ required: true, message: 'Please enter role name' }]}
+                // Note: role form dirty is tracked below via onValuesChange
+                rules={[
+                  { required: true, message: "Please enter role name" },
+                  {
+                    pattern: /^[a-zA-Z\s]+$/,
+                    message: "Role name can only contain letters and spaces",
+                  },
+                  {
+                    min: 2,
+                    message: "Role name must be at least 2 characters",
+                  },
+                  { max: 50, message: "Role name cannot exceed 50 characters" },
+                ]}
               >
-                <Input placeholder="Enter role name (e.g., Manager, Approver)" />
+                <Input
+                  placeholder="Enter role name (e.g., Manager, Approver)"
+                  onKeyDown={(e) => {
+                    // Block numbers and special characters
+                    if (
+                      /[0-9!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?`~\-]/.test(
+                        e.key,
+                      ) &&
+                      e.key.length === 1
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                name="active"
-                label="Status"
-                valuePropName="checked"
-              >
+              <Form.Item name="active" label="Status" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item
-            name="description"
-            label="Description"
-          >
-            <Input.TextArea 
-              placeholder="Enter role description" 
-              rows={2}
-            />
+          <Form.Item name="description" label="Description">
+            <Input.TextArea placeholder="Enter role description" rows={2} />
           </Form.Item>
 
-          <Divider />
+          <Divider style={{ margin: "12px 0" }} />
 
           {renderPermissionsMatrix()}
 
-          <div style={{ textAlign: 'right', marginTop: 24 }}>
+          <div style={{ textAlign: "right", marginTop: 24 }}>
             <Space>
-              <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+              <Button onClick={handleModalClose}>Cancel</Button>
               <Button type="primary" htmlType="submit">
-                {editingRole ? 'Update Role' : 'Create Role'}
+                {editingRole ? "Update Role" : "Create Role"}
               </Button>
             </Space>
           </div>

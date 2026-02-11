@@ -3,6 +3,7 @@ import { Form, Input, Select, DatePicker, InputNumber, Button, Card, Row, Col, T
 import { PlusOutlined, DeleteOutlined, SaveOutlined, ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { hasPermission } from '../../utils/permissions';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -89,8 +90,8 @@ const GRNForm = () => {
       <div className="page-header">
         <Space><Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/grn/list')} /><h1>{id ? 'Edit GRN' : 'Create Goods Received Note'}</h1></Space>
         <div className="header-actions">
-          <Button icon={<SaveOutlined />}>Save as Draft</Button>
-          <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => form.submit()}>Post GRN</Button>
+          {hasPermission('grn', id ? 'update' : 'add') && <Button icon={<SaveOutlined />}>Save as Draft</Button>}
+          {hasPermission('grn', id ? 'update' : 'add') && <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => form.submit()}>Post GRN</Button>}
         </div>
       </div>
 

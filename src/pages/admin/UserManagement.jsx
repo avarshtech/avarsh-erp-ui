@@ -51,6 +51,7 @@ const UserManagement = () => {
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [form] = Form.useForm();
+  const [formDirty, setFormDirty] = useState(false);
 
   // Fetch users from API
   const fetchUsers = useCallback(async () => {
@@ -111,6 +112,7 @@ const UserManagement = () => {
     } else {
       form.resetFields();
     }
+    setFormDirty(false);
     setModalVisible(true);
   };
 
@@ -126,9 +128,32 @@ const UserManagement = () => {
       }
       setModalVisible(false);
       form.resetFields();
+      setFormDirty(false);
       fetchUsers();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save user');
+    }
+  };
+
+  // Close modal with unsaved changes check
+  const handleModalClose = () => {
+    if (formDirty) {
+      Modal.confirm({
+        title: 'Unsaved Changes',
+        icon: <ExclamationCircleOutlined />,
+        content: 'You have unsaved changes. Are you sure you want to discard them?',
+        okText: 'Discard',
+        okType: 'danger',
+        cancelText: 'Keep Editing',
+        onOk: () => {
+          setModalVisible(false);
+          form.resetFields();
+          setFormDirty(false);
+        },
+      });
+    } else {
+      setModalVisible(false);
+      form.resetFields();
     }
   };
 
@@ -343,10 +368,7 @@ const UserManagement = () => {
       <Modal
         title={editingUser ? 'Edit User' : 'Add New User'}
         open={modalVisible}
-        onCancel={() => {
-          setModalVisible(false);
-          form.resetFields();
-        }}
+        onCancel={handleModalClose}
         footer={null}
         width={600}
       >
@@ -354,6 +376,7 @@ const UserManagement = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
+          onValuesChange={() => setFormDirty(true)}
           initialValues={{ active: true }}
         >
           <Row gutter={16}>
@@ -453,7 +476,7 @@ const UserManagement = () => {
 
           <div style={{ textAlign: 'right', marginTop: 24 }}>
             <Space>
-              <Button onClick={() => setModalVisible(false)}>Cancel</Button>
+              <Button onClick={handleModalClose}>Cancel</Button>
               <Button type="primary" htmlType="submit">
                 {editingUser ? 'Update' : 'Create'}
               </Button>
@@ -468,7 +491,7 @@ const UserManagement = () => {
         placement="right"
         onClose={() => setDrawerVisible(false)}
         open={drawerVisible}
-        width={400}
+        styles={{ wrapper: { width: 400 } }}
       >
         {selectedUser && (
           <div>

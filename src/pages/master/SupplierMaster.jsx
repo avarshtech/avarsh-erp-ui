@@ -478,7 +478,7 @@ const SupplierMaster = () => {
           </Space>
         }
         placement="right"
-        width={520}
+        styles={{ wrapper: { width: 520 } }}
         onClose={() => {
           setViewDrawerVisible(false);
           setViewingSupplier(null);
@@ -517,46 +517,54 @@ const SupplierMaster = () => {
               </div>
             </div>
 
-            <Divider orientation="left">Basic Information</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
-              <Descriptions.Item label="Supplier ID">{viewingSupplier.id}</Descriptions.Item>
-              <Descriptions.Item label="Email">{viewingSupplier.email || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Phone">{viewingSupplier.phone || '-'}</Descriptions.Item>
-            </Descriptions>
+            <Divider titlePlacement="start">Basic Information</Divider>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+              { key: 'id', label: 'Supplier ID', children: viewingSupplier.id },
+              { key: 'email', label: 'Email', children: viewingSupplier.email || '-' },
+              { key: 'phone', label: 'Phone', children: viewingSupplier.phone || '-' },
+            ]} />
 
-            <Divider orientation="left">Address</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
-              <Descriptions.Item label="Address">{viewingSupplier.address || '-'}</Descriptions.Item>
-              <Descriptions.Item label="City">{viewingSupplier.city || '-'}</Descriptions.Item>
-              <Descriptions.Item label="State">{viewingSupplier.state || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Pincode">{viewingSupplier.pincode || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Country">{viewingSupplier.country || '-'}</Descriptions.Item>
-            </Descriptions>
+            <Divider titlePlacement="start">Address</Divider>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+              { key: 'address', label: 'Address', children: viewingSupplier.address || '-' },
+              { key: 'city', label: 'City', children: viewingSupplier.city || '-' },
+              { key: 'state', label: 'State', children: viewingSupplier.state || '-' },
+              { key: 'pincode', label: 'Pincode', children: viewingSupplier.pincode || '-' },
+              { key: 'country', label: 'Country', children: viewingSupplier.country || '-' },
+            ]} />
 
-            <Divider orientation="left">Tax Information</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
-              <Descriptions.Item label="PAN">{viewingSupplier.pan || '-'}</Descriptions.Item>
-              <Descriptions.Item label="GSTIN">{viewingSupplier.gstin || '-'}</Descriptions.Item>
-              <Descriptions.Item label="IGST Applicable">
-                <Tag color={viewingSupplier.igstApplicable ? 'blue' : 'default'}>
-                  {viewingSupplier.igstApplicable ? 'Yes' : 'No'}
-                </Tag>
-              </Descriptions.Item>
-            </Descriptions>
+            <Divider titlePlacement="start">Tax Information</Divider>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+              { key: 'pan', label: 'PAN', children: viewingSupplier.pan || '-' },
+              { key: 'gstin', label: 'GSTIN', children: viewingSupplier.gstin || '-' },
+              {
+                key: 'igst',
+                label: 'IGST Applicable',
+                children: (
+                  <Tag color={viewingSupplier.igstApplicable ? 'blue' : 'default'}>
+                    {viewingSupplier.igstApplicable ? 'Yes' : 'No'}
+                  </Tag>
+                ),
+              },
+            ]} />
 
-            <Divider orientation="left">Metadata</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }}>
-              <Descriptions.Item label="Created">
-                {viewingSupplier.createdAt
+            <Divider titlePlacement="start">Metadata</Divider>
+            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+              {
+                key: 'created',
+                label: 'Created',
+                children: viewingSupplier.createdAt
                   ? dayjs(viewingSupplier.createdAt).format('YYYY-MM-DD HH:mm')
-                  : '-'}
-              </Descriptions.Item>
-              <Descriptions.Item label="Updated">
-                {viewingSupplier.updatedAt
+                  : '-',
+              },
+              {
+                key: 'updated',
+                label: 'Updated',
+                children: viewingSupplier.updatedAt
                   ? dayjs(viewingSupplier.updatedAt).format('YYYY-MM-DD HH:mm')
-                  : '-'}
-              </Descriptions.Item>
-            </Descriptions>
+                  : '-',
+              },
+            ]} />
           </>
         )}
       </Drawer>
