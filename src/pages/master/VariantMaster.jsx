@@ -105,12 +105,12 @@ const VariantMaster = () => {
     try {
       if (selectedId) {
         const response = await updateAttribute(selectedId, values);
-        const updatedItem = response || { id: selectedId, ...values };
+        const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('attributes', selectedId, updatedItem);
         message.success('Attribute updated successfully');
       } else {
         const response = await createAttribute(values);
-        const newItem = response || { id: Date.now(), ...values };
+        const newItem = response?.data || { id: Date.now(), ...values };
         addItem('attributes', newItem);
         setSelectedId(newItem.id);
         message.success('Attribute created successfully');

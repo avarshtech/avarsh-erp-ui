@@ -85,23 +85,6 @@ const TermsConditionsMaster = () => {
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
       render: (name) => <Text strong>{name}</Text>,
     },
-    {
-      title: 'Preview',
-      dataIndex: 'description',
-      key: 'description',
-      ellipsis: true,
-      width: 250,
-      render: (desc) => {
-        // Strip HTML tags for preview
-        if (!desc) return <Text type="secondary">-</Text>;
-        const text = desc.replace(/<[^>]+>/g, '').trim();
-        return (
-          <Text type="secondary" ellipsis={{ tooltip: text }}>
-            {text.length > 80 ? text.substring(0, 80) + '...' : text}
-          </Text>
-        );
-      },
-    },
   ];
 
   const handleAdd = () => {
@@ -337,8 +320,6 @@ const TermsConditionsMaster = () => {
                     value={description}
                     onChange={setDescription}
                     placeholder="Enter terms and conditions content here. Use the toolbar above for formatting like bullet points, numbered lists, bold text, alignment, etc."
-                    minHeight={200}
-                    maxHeight={350}
                     readOnly={isReadOnly}
                   />
                 </Form.Item>

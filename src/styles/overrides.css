@@ -871,3 +871,39 @@ textarea.ant-input:active {
   padding: 8px 4px 4px 4px;
   font-size: 13px;
 }
+
+/* ============================================================
+   USER DROPDOWN MENU STYLES
+   Enhanced dropdown for profile/logout menu
+   ============================================================ */
+.ant-dropdown .ant-dropdown-menu {
+  border-radius: 12px !important;
+  padding: 8px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item {
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item:hover {
+  background: var(--bg-secondary) !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item-group-title {
+  padding: 0 !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item-divider {
+  margin: 8px 0 !important;
+}
+
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu-item:hover {
+  background: #334155 !important;
+}

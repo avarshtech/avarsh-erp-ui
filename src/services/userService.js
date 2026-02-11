@@ -100,3 +100,14 @@ export const resetUserPassword = async (userId) => {
   const response = await axiosInstance.post(`${ENDPOINTS.USERS}/${userId}/reset-password`);
   return response.data;
 };
+
+/**
+ * Change user password
+ * @param {number} userId - ID of user
+ * @param {Object} passwordData - { currentPassword, newPassword }
+ * @returns {Promise<Object>} Response with confirmation
+ */
+export const changePassword = async (userId, passwordData) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.USERS}/${userId}/reset-password`, passwordData);
+  return response.data;
+};

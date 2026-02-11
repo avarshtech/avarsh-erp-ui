@@ -1,5 +1,6 @@
 import axiosInstance from './axiosInstance';
 import { getEmptyPermissions, getOperationsForModule, MODULES } from '../utils/permissions';
+import { fetchAndCacheOrganisation, clearCachedOrganisation } from './organisationService';
 
 /**
  * Decode JWT token payload
@@ -70,6 +71,11 @@ export const authenticateUser = async (username, password) => {
     sessionStorage.setItem('authToken', token);
     window.dispatchEvent(new Event('authChange'));
 
+    // Fetch and cache organisation info in background (no await - fire and forget)
+    fetchAndCacheOrganisation().catch(() => {
+      // Silently ignore errors - org info will be fetched later if needed
+    });
+
     return { success: true, user: userSession };
   } catch (error) {
     console.error('Login Error:', error);
@@ -120,6 +126,7 @@ export const getToken = () => {
 export const logoutUser = () => {
   sessionStorage.removeItem('currentUser');
   sessionStorage.removeItem('authToken');
+  clearCachedOrganisation();
   window.dispatchEvent(new Event('authChange'));
 };
 

@@ -18,6 +18,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
 import MasterDashboard from './pages/master/MasterDashboard';
+import Profile from './pages/Profile';
 import './index.css';
 import './styles/overrides.css';
 
@@ -65,6 +66,8 @@ const ThemedApp = () => {
             <Route path="admin/roles" element={<RoleAccess />} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
+            {/* Profile */}
+            <Route path="profile" element={<Profile />} />
           </Route>
 
           {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}

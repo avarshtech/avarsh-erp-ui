@@ -89,12 +89,12 @@ const SubCategoryMaster = () => {
     try {
       if (selectedId) {
         const response = await updateSubCategory(selectedId, values);
-        const updatedItem = response || { id: selectedId, ...values };
+        const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('subCategories', selectedId, updatedItem);
         message.success('Sub-category updated successfully');
       } else {
         const response = await createSubCategory(values);
-        const newItem = response || { id: Date.now(), ...values };
+        const newItem = response?.data || { id: Date.now(), ...values };
         addItem('subCategories', newItem);
         setSelectedId(newItem.id);
         message.success('Sub-category created successfully');
