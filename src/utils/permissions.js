@@ -11,7 +11,7 @@
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
  *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true } },
  *   "master-data":      { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
@@ -149,7 +149,7 @@ export const PERMISSION_GROUPS = [
     description: 'Individual access for Suppliers & Items; shared access for other master tabs',
     modules: [
       { id: 'supplier-info', name: 'Suppliers', operations: STANDARD_OPERATIONS, path: '/master → Suppliers tab' },
-      { id: 'items', name: 'Items', operations: STANDARD_OPERATIONS, path: '/master → Items tab' },
+      { id: 'items', name: 'Items', operations: ['view', 'add', 'update'], path: '/master → Items tab' },
       {
         id: 'master-data',
         name: 'Other Master Data',
@@ -182,6 +182,8 @@ export const getSidebarModules = () =>
 export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'po-approval') return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard') return DASHBOARD_OPERATIONS;
+  // Items do not support delete via UI — remove 'delete' from operations
+  if (moduleId === 'items') return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
 };
 
