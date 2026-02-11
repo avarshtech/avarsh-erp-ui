@@ -1,29 +1,17 @@
-import { useRef, useEffect, useCallback } from 'react';
-import { Button, Tooltip, Divider, Select } from 'antd';
-import {
-  BoldOutlined,
-  ItalicOutlined,
-  UnderlineOutlined,
-  StrikethroughOutlined,
-  OrderedListOutlined,
-  UnorderedListOutlined,
-  AlignLeftOutlined,
-  AlignCenterOutlined,
-  AlignRightOutlined,
-  UndoOutlined,
-  RedoOutlined,
-  MenuOutlined,
-} from '@ant-design/icons';
+import { useMemo } from 'react';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
 /**
- * RichTextEditor — a lightweight contentEditable-based rich text editor.
- * Saves and outputs HTML, supports basic formatting for T&C content.
+ * RichTextEditor — based on react-quill (recommended by Ant Design).
+ * Saves and outputs HTML, supports rich formatting for T&C content.
  *
  * Props:
  *  - value: string (HTML content)
  *  - onChange: (html: string) => void
  *  - placeholder: string
- *  - minHeight: number (default 300)
+ *  - minHeight: number (default 290)
+ *  - maxHeight: number (default 290)
  *  - readOnly: boolean
  *  - style: object
  */
@@ -36,133 +24,57 @@ const RichTextEditor = ({
   readOnly = false,
   style = {},
 }) => {
-  const editorRef = useRef(null);
-  const isInternalChange = useRef(false);
+  // Quill modules configuration
+  const modules = useMemo(
+    () => ({
+      toolbar: readOnly
+        ? false
+        : [
+            [{ size: ['small', false, 'large', 'huge'] }],
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ list: 'ordered' }, { list: 'bullet' }],
+            [{ align: [] }],
+            [{ indent: '-1' }, { indent: '+1' }],
+            ['clean'],
+          ],
+      clipboard: {
+        matchVisual: false,
+      },
+    }),
+    [readOnly]
+  );
 
-  // Initialize editor content
-  useEffect(() => {
-    if (editorRef.current && !isInternalChange.current) {
-      if (editorRef.current.innerHTML !== value) {
-        editorRef.current.innerHTML = value || '';
-      }
-    }
-    isInternalChange.current = false;
-  }, [value]);
+  // Quill formats
+  const formats = [
+    'size',
+    'bold',
+    'italic',
+    'underline',
+    'strike',
+    'list',
+    'bullet',
+    'align',
+    'indent',
+  ];
 
-  // Handle content changes
-  const handleInput = useCallback(() => {
-    if (editorRef.current && onChange) {
-      isInternalChange.current = true;
-      const html = editorRef.current.innerHTML;
-      // Normalize empty editor
-      if (html === '<br>' || html === '<div><br></div>') {
+  // Handle change
+  const handleChange = (content, delta, source, editor) => {
+    if (onChange) {
+      // Get plain text to check if empty
+      const text = editor.getText().trim();
+      if (!text) {
         onChange('');
       } else {
-        onChange(html);
+        onChange(content);
       }
     }
-  }, [onChange]);
-
-  // Execute formatting command
-  const execCommand = useCallback((command, value = null) => {
-    editorRef.current?.focus();
-    document.execCommand(command, false, value);
-    handleInput();
-  }, [handleInput]);
-
-  // Check if a command is currently active
-  const isActive = useCallback((command) => {
-    try {
-      return document.queryCommandState(command);
-    } catch {
-      return false;
-    }
-  }, []);
-
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((e) => {
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key.toLowerCase()) {
-        case 'b':
-          e.preventDefault();
-          execCommand('bold');
-          break;
-        case 'i':
-          e.preventDefault();
-          execCommand('italic');
-          break;
-        case 'u':
-          e.preventDefault();
-          execCommand('underline');
-          break;
-        case 'z':
-          if (e.shiftKey) {
-            e.preventDefault();
-            execCommand('redo');
-          } else {
-            e.preventDefault();
-            execCommand('undo');
-          }
-          break;
-        default:
-          break;
-      }
-    }
-    // Tab key for indent
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      if (e.shiftKey) {
-        execCommand('outdent');
-      } else {
-        execCommand('indent');
-      }
-    }
-  }, [execCommand]);
-
-  const handleFontSizeChange = (size) => {
-    if (!size) return;
-    // Use CSS approach for font size
-    editorRef.current?.focus();
-    document.execCommand('fontSize', false, '7');
-    // Replace the font size 7 with the actual px value
-    const fontElements = editorRef.current?.querySelectorAll('font[size="7"]');
-    if (fontElements) {
-      fontElements.forEach((el) => {
-        el.removeAttribute('size');
-        el.style.fontSize = size;
-      });
-    }
-    handleInput();
   };
 
-  const ToolbarButton = ({ command, icon, title, active }) => (
-    <Tooltip title={title} placement="top">
-      <Button
-        type="text"
-        size="small"
-        icon={icon}
-        onMouseDown={(e) => {
-          e.preventDefault(); // Prevent focus loss
-          execCommand(command);
-        }}
-        style={{
-          color: active ? 'var(--primary-color, #6366f1)' : 'var(--text-secondary, #64748b)',
-          background: active ? 'var(--primary-color, #6366f1)11' : 'transparent',
-          borderRadius: 4,
-          width: 32,
-          height: 32,
-        }}
-      />
-    </Tooltip>
-  );
-
-  const ToolbarDivider = () => (
-    <Divider orientation="vertical" style={{ height: 20, margin: '0 4px' }} />
-  );
-
+  // Read-only mode
   if (readOnly) {
     return (
       <div
+        className="rich-text-readonly"
         style={{
           padding: 16,
           minHeight,
@@ -177,139 +89,118 @@ const RichTextEditor = ({
   }
 
   return (
-    <div
-      style={{
-        border: '1px solid var(--border-color, #e2e8f0)',
-        borderRadius: 8,
-        overflow: 'hidden',
-        background: 'var(--card-bg, #fff)',
-        ...style,
-      }}
-    >
-      {/* Toolbar */}
-      <div
+    <div className="rich-text-editor-wrapper" style={style}>
+      <ReactQuill
+        theme="snow"
+        value={value}
+        onChange={handleChange}
+        modules={modules}
+        formats={formats}
+        placeholder={placeholder}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 2,
-          padding: '6px 8px',
-          borderBottom: '1px solid var(--border-color, #e2e8f0)',
-          background: 'var(--bg-secondary, #f8f9fa)',
-        }}
-      >
-        {/* Font Size */}
-        <Select
-          size="small"
-          placeholder="Size"
-          style={{ width: 90 }}
-          onMouseDown={(e) => e.preventDefault()}
-          onChange={handleFontSizeChange}
-          options={[
-            { label: 'Small', value: '12px' },
-            { label: 'Normal', value: '14px' },
-            { label: 'Medium', value: '16px' },
-            { label: 'Large', value: '18px' },
-            { label: 'X-Large', value: '22px' },
-          ]}
-          defaultValue="14px"
-        />
-
-        <ToolbarDivider />
-
-        {/* Text formatting */}
-        <ToolbarButton command="bold" icon={<BoldOutlined />} title="Bold (Ctrl+B)" />
-        <ToolbarButton command="italic" icon={<ItalicOutlined />} title="Italic (Ctrl+I)" />
-        <ToolbarButton command="underline" icon={<UnderlineOutlined />} title="Underline (Ctrl+U)" />
-        <ToolbarButton command="strikeThrough" icon={<StrikethroughOutlined />} title="Strikethrough" />
-
-        <ToolbarDivider />
-
-        {/* Lists */}
-        <ToolbarButton command="insertUnorderedList" icon={<UnorderedListOutlined />} title="Bullet List" />
-        <ToolbarButton command="insertOrderedList" icon={<OrderedListOutlined />} title="Numbered List" />
-
-        <ToolbarDivider />
-
-        {/* Alignment */}
-        <ToolbarButton command="justifyLeft" icon={<AlignLeftOutlined />} title="Align Left" />
-        <ToolbarButton command="justifyCenter" icon={<AlignCenterOutlined />} title="Align Center" />
-        <ToolbarButton command="justifyRight" icon={<AlignRightOutlined />} title="Align Right" />
-
-        <ToolbarDivider />
-
-        {/* Indent */}
-        <Tooltip title="Indent (Tab)" placement="top">
-          <Button
-            type="text"
-            size="small"
-            icon={<MenuOutlined style={{ transform: 'scaleX(-1)' }} />}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              execCommand('indent');
-            }}
-            style={{ borderRadius: 4, width: 32, height: 32, color: 'var(--text-secondary, #64748b)' }}
-          />
-        </Tooltip>
-        <Tooltip title="Outdent (Shift+Tab)" placement="top">
-          <Button
-            type="text"
-            size="small"
-            icon={<MenuOutlined />}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              execCommand('outdent');
-            }}
-            style={{ borderRadius: 4, width: 32, height: 32, color: 'var(--text-secondary, #64748b)' }}
-          />
-        </Tooltip>
-
-        <ToolbarDivider />
-
-        {/* Undo/Redo */}
-        <ToolbarButton command="undo" icon={<UndoOutlined />} title="Undo (Ctrl+Z)" />
-        <ToolbarButton command="redo" icon={<RedoOutlined />} title="Redo (Ctrl+Shift+Z)" />
-      </div>
-
-      {/* Editor Area */}
-      <div
-        ref={editorRef}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onKeyDown={handleKeyDown}
-        data-placeholder={placeholder}
-        style={{
-          minHeight,
-          maxHeight,
-          overflowY: 'auto',
-          padding: '16px 20px',
-          outline: 'none',
-          fontSize: 14,
-          lineHeight: 1.8,
-          color: 'var(--text-primary, #1e293b)',
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-          wordWrap: 'break-word',
-          whiteSpace: 'pre-wrap',
+          '--editor-min-height': `${minHeight}px`,
+          '--editor-max-height': `${maxHeight}px`,
         }}
       />
-
-      {/* CSS for placeholder */}
       <style>{`
-        [contentEditable][data-placeholder]:empty::before {
-          content: attr(data-placeholder);
-          color: var(--text-muted, #94a3b8);
-          pointer-events: none;
-          font-style: italic;
+        .rich-text-editor-wrapper .quill {
+          border: 1px solid var(--border-color, #e2e8f0);
+          border-radius: 8px;
+          overflow: hidden;
+          background: var(--card-bg, #fff);
         }
-        [contentEditable] ul, [contentEditable] ol {
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow {
+          border: none;
+          border-bottom: 1px solid var(--border-color, #e2e8f0);
+          background: var(--bg-secondary, #f8f9fa);
+          padding: 8px;
+        }
+        .rich-text-editor-wrapper .ql-container.ql-snow {
+          border: none;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          font-size: 14px;
+        }
+        .rich-text-editor-wrapper .ql-editor {
+          min-height: var(--editor-min-height, 290px);
+          max-height: var(--editor-max-height, 290px);
+          overflow-y: auto;
+          padding: 16px 20px;
+          line-height: 1.8;
+          color: var(--text-primary, #1e293b);
+        }
+        .rich-text-editor-wrapper .ql-editor.ql-blank::before {
+          color: var(--text-muted, #94a3b8);
+          font-style: italic;
+          left: 20px;
+          right: 20px;
+        }
+        .rich-text-editor-wrapper .ql-snow .ql-stroke {
+          stroke: var(--text-secondary, #64748b);
+        }
+        .rich-text-editor-wrapper .ql-snow .ql-fill,
+        .rich-text-editor-wrapper .ql-snow .ql-stroke.ql-fill {
+          fill: var(--text-secondary, #64748b);
+        }
+        .rich-text-editor-wrapper .ql-snow .ql-picker {
+          color: var(--text-secondary, #64748b);
+        }
+        .rich-text-editor-wrapper .ql-snow .ql-picker-options {
+          background: var(--card-bg, #fff);
+          border-color: var(--border-color, #e2e8f0);
+        }
+        .rich-text-editor-wrapper .ql-snow .ql-picker-item:hover,
+        .rich-text-editor-wrapper .ql-snow .ql-picker-item.ql-selected {
+          color: var(--primary-color, #6366f1);
+        }
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:hover,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:focus,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button.ql-active,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow .ql-picker-label:hover,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow .ql-picker-label.ql-active {
+          color: var(--primary-color, #6366f1);
+        }
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:hover .ql-stroke,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:focus .ql-stroke,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button.ql-active .ql-stroke,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow .ql-picker-label:hover .ql-stroke {
+          stroke: var(--primary-color, #6366f1);
+        }
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:hover .ql-fill,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button:focus .ql-fill,
+        .rich-text-editor-wrapper .ql-toolbar.ql-snow button.ql-active .ql-fill {
+          fill: var(--primary-color, #6366f1);
+        }
+        /* Dark mode support */
+        [data-theme="dark"] .rich-text-editor-wrapper .ql-editor {
+          color: var(--text-primary, #e2e8f0);
+        }
+        [data-theme="dark"] .rich-text-editor-wrapper .ql-snow .ql-stroke {
+          stroke: var(--text-secondary, #94a3b8);
+        }
+        [data-theme="dark"] .rich-text-editor-wrapper .ql-snow .ql-fill {
+          fill: var(--text-secondary, #94a3b8);
+        }
+        [data-theme="dark"] .rich-text-editor-wrapper .ql-snow .ql-picker {
+          color: var(--text-secondary, #94a3b8);
+        }
+        /* List styles */
+        .rich-text-editor-wrapper .ql-editor ul,
+        .rich-text-editor-wrapper .ql-editor ol {
+          padding-left: 24px;
+        }
+        .rich-text-editor-wrapper .ql-editor li {
+          margin-bottom: 4px;
+        }
+        /* Read-only styles */
+        .rich-text-readonly ul,
+        .rich-text-readonly ol {
           padding-left: 24px;
           margin: 8px 0;
         }
-        [contentEditable] li {
+        .rich-text-readonly li {
           margin-bottom: 4px;
         }
-        [contentEditable] p {
+        .rich-text-readonly p {
           margin: 4px 0;
         }
       `}</style>

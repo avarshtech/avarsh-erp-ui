@@ -205,17 +205,22 @@ const SupplierMaster = () => {
 
       setSubmitting(true);
 
+      // Derive state code from GSTIN first 2 characters
+      const gstin = values.gstin?.toUpperCase();
+      const stateCode = gstin && gstin.length >= 2 ? gstin.substring(0, 2) : '';
+
       const supplierData = {
         ...values,
         active: true,
         pan: values.pan?.toUpperCase(),
-        gstin: values.gstin?.toUpperCase(),
+        gstin: gstin,
+        stateCode: stateCode,
       };
 
       if (editingSupplier) {
         const response = await updateSupplier({ ...supplierData, id: editingSupplier.id });
         // Update store
-        const updatedSupplier = response || { ...supplierData, id: editingSupplier.id };
+        const updatedSupplier = response?.data || { ...supplierData, id: editingSupplier.id };
         updateItem('suppliers', editingSupplier.id, updatedSupplier);
         // Update local suppliers state immediately so view reflects changes
         setSuppliers((prev) => {
@@ -235,7 +240,7 @@ const SupplierMaster = () => {
       } else {
         const response = await createSupplier(supplierData);
         // Add to store
-        const newSupplier = response || { ...supplierData, id: Date.now() };
+        const newSupplier = response?.data || { ...supplierData, id: Date.now() };
         addItem('suppliers', newSupplier);
         // Update local suppliers list immediately
         setSuppliers((prev) => {

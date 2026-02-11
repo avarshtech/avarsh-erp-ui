@@ -94,12 +94,12 @@ const ItemTypeMaster = () => {
     try {
       if (selectedId) {
         const response = await updateItemType(selectedId, values);
-        const updatedItem = response || { id: selectedId, ...values };
+        const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('itemTypes', selectedId, updatedItem);
         message.success('Item type updated successfully');
       } else {
         const response = await createItemType(values);
-        const newItem = response || { id: Date.now(), ...values };
+        const newItem = response?.data || { id: Date.now(), ...values };
         addItem('itemTypes', newItem);
         setSelectedId(newItem.id);
         message.success('Item type created successfully');

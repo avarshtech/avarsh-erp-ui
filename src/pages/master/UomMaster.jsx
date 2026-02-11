@@ -49,7 +49,7 @@ const UomMaster = () => {
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ precision: 2 });
+    form.setFieldsValue({ decimalPrecision: 2 });
   };
 
   const handleSelect = (record) => {
@@ -88,12 +88,12 @@ const UomMaster = () => {
     try {
       if (selectedId) {
         const response = await updateUOM(selectedId, values);
-        const updatedItem = response || { id: selectedId, ...values };
+        const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('uoms', selectedId, updatedItem);
         message.success('UOM updated successfully');
       } else {
         const response = await createUOM(values);
-        const newItem = response || { id: Date.now(), ...values };
+        const newItem = response?.data || { id: Date.now(), ...values };
         addItem('uoms', newItem);
         setSelectedId(newItem.id);
         message.success('UOM created successfully');
@@ -216,7 +216,7 @@ const UomMaster = () => {
               >
                 <Input placeholder="e.g. kg" style={{ width: '50%' }} />
               </Form.Item>
-              <Form.Item name="precision" label="Decimal Precision">
+              <Form.Item name="decimalPrecision" label="Decimal Precision">
                 <InputNumber min={0} max={6} style={{ width: '50%' }} />
               </Form.Item>
             </Form>

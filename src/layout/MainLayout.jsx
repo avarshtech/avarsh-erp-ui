@@ -59,8 +59,6 @@ const MainLayout = () => {
       handleLogout();
     } else if (key === "profile") {
       navigate("/profile");
-    } else if (key === "settings") {
-      navigate("/settings");
     }
   };
 
@@ -158,23 +156,39 @@ const MainLayout = () => {
 
   const userMenuItems = [
     {
-      key: "profile",
-      icon: <ProfileOutlined />,
-      label: "Profile",
+      key: "user-header",
+      type: "group",
+      label: (
+        <div style={{ padding: '8px 4px 12px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>
+            {currentUser?.name || 'User'}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            {currentUser?.email || currentUser?.username || ''}
+          </div>
+        </div>
+      ),
     },
     {
-      key: "settings",
-      icon: <SettingOutlined />,
-      label: "Settings",
+      key: "profile",
+      icon: <ProfileOutlined style={{ fontSize: 16 }} />,
+      label: (
+        <span style={{ fontSize: 14, fontWeight: 500 }}>My Profile</span>
+      ),
+      style: { padding: '10px 16px', margin: '4px 0' },
     },
     {
       type: "divider",
+      style: { margin: '4px 0' },
     },
     {
       key: "logout",
-      icon: <LogoutOutlined />,
-      label: "Logout",
+      icon: <LogoutOutlined style={{ fontSize: 16 }} />,
+      label: (
+        <span style={{ fontSize: 14, fontWeight: 500 }}>Sign Out</span>
+      ),
       danger: true,
+      style: { padding: '10px 16px', margin: '4px 0' },
     },
   ];
 
@@ -323,19 +337,38 @@ const MainLayout = () => {
                 )}
               </button>
             </Tooltip>
-            <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenuClick }} trigger={["click"]}>
-              <Space style={{ cursor: "pointer" }}>
+            <Dropdown 
+              menu={{ 
+                items: userMenuItems, 
+                onClick: handleUserMenuClick,
+                style: { 
+                  minWidth: 220, 
+                  padding: '8px',
+                }
+              }} 
+              trigger={["click"]}
+              placement="bottomRight"
+              overlayStyle={{
+                boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+              }}
+            >
+              <Space 
+                style={{ 
+                  cursor: "pointer",
+                  padding: '6px 12px',
+                  transition: 'all 0.2s ease',
+                }}
+              >
                 <Avatar
+                  size={36}
                   style={{
                     background: isDarkMode
                       ? "linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)"
                       : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                    fontSize: 16,
                   }}
                   icon={<UserOutlined />}
                 />
-                <span style={{ fontWeight: 500, color: isDarkMode ? '#f1f5f9' : '#1e293b' }}>
-                  {currentUser?.name || "User"}
-                </span>
               </Space>
             </Dropdown>
           </Space>

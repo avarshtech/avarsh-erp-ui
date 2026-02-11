@@ -90,13 +90,13 @@ const CategoryMaster = () => {
       if (selectedId) {
         // Update existing category
         const response = await updateCategory(selectedId, values);
-        const updatedCategory = response || { id: selectedId, ...values };
+        const updatedCategory = response?.data || { id: selectedId, ...values };
         updateItem('categories', selectedId, updatedCategory);
         message.success('Category updated successfully');
       } else {
         // Create new category
         const response = await createCategory(values);
-        const newCategory = response || { id: Date.now(), ...values };
+        const newCategory = response?.data || { id: Date.now(), ...values };
         addItem('categories', newCategory);
         setSelectedId(newCategory.id);
         message.success('Category created successfully');
