@@ -479,10 +479,10 @@ const RoleAccess = () => {
     },
   ];
 
-  // ─── Render Permission Group ─────────────────────────────────────────────
+  /* Render Permission Group */
 
   const renderModuleRow = (mod) => {
-    const ops = mod.operations;
+    const ops = getOperationsForModule(mod.id);
     const isPOApproval = mod.id === 'po-approval';
     const poHasAccess = permissions['purchase-orders']?.access;
     const isLinkedDisabled = isPOApproval && !poHasAccess;
