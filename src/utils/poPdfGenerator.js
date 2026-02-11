@@ -190,8 +190,8 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
   const companyName = org?.organisationName || 'Company Name';
   const watermarkText = companyName;
 
-  // PO Type is always "Combined" as per requirement
-  const poType = 'Combined';
+  // PO Type: hard-code to "General" instead of 'Combined'
+  const poType = 'General';
 
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';

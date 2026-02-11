@@ -912,14 +912,15 @@ const ItemMaster = () => {
       case 'text':
       case 'string':
         return (
-          <Input
-            placeholder={`Enter ${attr.attributeName}`}
-            value={value}
-            onChange={(e) => {
-              const filtered = e.target.value.replace(/[^a-zA-Z\s-]/g, '');
-              handleChange(filtered);
-            }}
-          />
+                  <Input
+                    placeholder={`Enter ${attr.attributeName}`}
+                    value={value}
+                    onChange={(e) => {
+                      // Allow letters, spaces, hyphen and percent sign for text attributes
+                      const filtered = e.target.value.replace(/[^a-zA-Z\s%\-]/g, '');
+                      handleChange(filtered);
+                    }}
+                  />
         );
       default:
         return (
