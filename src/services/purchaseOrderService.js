@@ -7,7 +7,6 @@ import axiosInstance from './axiosInstance';
 
 const ENDPOINTS = {
   PURCHASE_ORDERS: '/purchase-orders',
-  TERMS_CONDITIONS: '/terms-conditions',
 };
 
 // ==================== PURCHASE ORDERS ====================
@@ -113,17 +112,6 @@ export const deletePurchaseOrder = async (id) => {
   return response.data;
 };
 
-// ==================== TERMS & CONDITIONS ====================
-
-/**
- * Get all terms and conditions
- * @returns {Promise<Array>} Terms and conditions list
- */
-export const getTermsConditions = async () => {
-  const response = await axiosInstance.get(ENDPOINTS.TERMS_CONDITIONS);
-  return response.data;
-};
-
 // ==================== ACTIVITY LOG ====================
 
 /**
@@ -138,14 +126,14 @@ export const createActivity = async (poId, payload) => {
   const now = new Date().toISOString();
 
   const rawComment = payload?.comment || payload?.text || '';
-  const isSystem = payload?.isSystemGenerated || false;
   const status = payload?.status || 'Draft';
-  const prefix = isSystem ? `[SYS:${status}]` : `[USR:${status}]`;
+  const prefix = payload?.isSystemGenerated  ? `[SYS]` : `[USR:${payload?.userName}]`;
   const formattedComment = `${prefix} ${rawComment}`;
 
   const body = {
     poId: Number(poId),
     comment: formattedComment,
+    status: status,
     edited: payload?.edited || false,
     createdAt: payload?.createdAt || now,
     updatedAt: payload?.updatedAt || now,
@@ -164,55 +152,35 @@ export const createActivity = async (poId, payload) => {
 export const parseActivityComment = (comment) => {
   if (!comment) return { text: '', isSystemGenerated: false, status: null };
 
-  const prefixPattern = /^\[(SYS|USR):([^\]]+)\]\s*/;
+  // Support prefixes:
+  // - [USR:UserName] message  (user-created with username in prefix)
+  // - [SYS] message          (system-generated)
+  const prefixPattern = /^\[(SYS|USR)(?::([^\]]+))?\]\s*/;
   const match = comment.match(prefixPattern);
 
   if (match) {
     const isSystemGenerated = match[1] === 'SYS';
-    const status = match[2];
+    const meta = match[2] || null;
+    let userName = null;
+
+    if (!isSystemGenerated && meta) {
+      // New format: [USR:UserName]
+      userName = meta;
+    }
+
     const text = comment.replace(prefixPattern, '');
-    return { text, isSystemGenerated, status };
+    return { text, isSystemGenerated, userName };
   }
 
   if (comment.startsWith('[SYSTEM]')) {
     return {
       text: comment.replace(/^\[SYSTEM\]\s*/, ''),
       isSystemGenerated: true,
-      status: null,
+      userName: null,
     };
   }
 
-  return { text: comment, isSystemGenerated: false, status: null };
-};
-
-/**
- * Update an existing activity for a Purchase Order
- * @param {number} poId - Purchase order ID
- * @param {number} activityId - Activity ID
- * @param {Object} payload - { comment, status }
- * @returns {Promise<Object>} Updated activity
- */
-export const updateActivity = async (poId, activityId, payload) => {
-  if (!poId) throw new Error('poId is required');
-  if (!activityId) throw new Error('activityId is required');
-  const url = `${ENDPOINTS.PURCHASE_ORDERS}/${poId}/activities/${activityId}`;
-  const now = new Date().toISOString();
-
-  const rawComment = payload?.comment || payload?.text || '';
-  const status = payload?.status || 'Draft';
-  const formattedComment = `[USR:${status}] ${rawComment}`;
-
-  const body = {
-    id: Number(activityId),
-    poId: Number(poId),
-    comment: formattedComment,
-    edited: payload?.edited ?? true,
-    createdAt: payload?.createdAt || now,
-    updatedAt: payload?.updatedAt || now,
-  };
-  const res = await axiosInstance.put(url, body);
-  const data = res.data;
-  return data;
+  return { text: comment, isSystemGenerated: false, userName: null };
 };
 
 export default {
@@ -222,8 +190,6 @@ export default {
   createPurchaseOrder,
   updatePurchaseOrder,
   deletePurchaseOrder,
-  getTermsConditions,
   createActivity,
   parseActivityComment,
-  updateActivity,
 };

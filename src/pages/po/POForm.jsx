@@ -37,9 +37,9 @@ import {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
-  getTermsConditions,
   createActivity,
 } from '../../services/purchaseOrderService';
+import { getAllTermsConditions } from '../../services/termsConditionsService';
 import { getSuppliers } from '../../services/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/itemService';
 import { useStore } from '../../context/StoreContext';
@@ -295,7 +295,12 @@ const POForm = () => {
   const [previewData, setPreviewData] = useState(null);
 
   // Dirty state for unsaved changes warning
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirty, setIsDirtyState] = useState(false);
+  const isDirtyRef = useRef(false);
+  const setIsDirty = (val) => {
+    isDirtyRef.current = val;
+    setIsDirtyState(val);
+  };
 
   // Variant modal state
   const [variantModalState, setVariantModalState] = useState({
@@ -371,7 +376,7 @@ const POForm = () => {
     try {
       const [suppliersRes, termsRes] = await Promise.all([
         getSuppliers(),
-        getTermsConditions(),
+        getAllTermsConditions(),
       ]);
 
       const suppData = suppliersRes?.data?.content || suppliersRes?.data || suppliersRes?.content || suppliersRes || [];
@@ -1005,7 +1010,7 @@ const POForm = () => {
       const payload = buildPayload(PO_STATUS.DRAFT);
 
       const currentUser = getCurrentUser();
-      const userName = currentUser?.name || currentUser?.username || 'User';
+      const userName = currentUser?.username || '';
 
       if (isEditMode) {
         await updatePurchaseOrder(id, payload);
@@ -1017,6 +1022,7 @@ const POForm = () => {
             comment: `PO saved as draft by ${userName}. Previous status: ${previousStatus}`,
             status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
+            userName,
           });
         }
 
@@ -1030,6 +1036,7 @@ const POForm = () => {
             comment: `PO created as draft by ${userName}`,
             status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
+            userName,
           });
         }
 
@@ -1100,7 +1107,7 @@ const POForm = () => {
 
       // Create system activity log
       const currentUser = getCurrentUser();
-      const userName = currentUser?.name || currentUser?.username || 'User';
+      const userName = currentUser?.username || '';
       const poId = result?.id || id;
 
       if (poId) {
@@ -1110,12 +1117,14 @@ const POForm = () => {
             comment: `PO re-submitted for approval by ${userName}. Previous status: ${previousStatus}`,
             status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
+            userName,
           });
         } else {
           await createActivity(poId, {
             comment: `PO submitted for approval by ${userName}`,
             status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
+            userName,
           });
         }
       }
@@ -1193,7 +1202,7 @@ const POForm = () => {
       try {
         const to = new URL(args[2], window.location.origin).pathname;
         const from = window.location.pathname;
-        if (isDirty && !suppressRef.current && to !== from) {
+        if (isDirtyRef.current && !suppressRef.current && to !== from) {
           pendingNavRef.current = { type: 'push', args };
           confirmAndNavigate(args, originalPush);
           return;
@@ -1209,7 +1218,7 @@ const POForm = () => {
       try {
         const to = new URL(args[2], window.location.origin).pathname;
         const from = window.location.pathname;
-        if (isDirty && !suppressRef.current && to !== from) {
+        if (isDirtyRef.current && !suppressRef.current && to !== from) {
           pendingNavRef.current = { type: 'replace', args };
           confirmAndNavigate(args, originalReplace);
           return;
@@ -1220,7 +1229,7 @@ const POForm = () => {
 
     // Warn on full page reload/close
     const beforeUnloadHandler = (e) => {
-      if (!isDirty) return undefined;
+      if (!isDirtyRef.current) return undefined;
       e.preventDefault();
       e.returnValue = '';
       return '';
@@ -1233,8 +1242,8 @@ const POForm = () => {
       window.history.replaceState = originalReplace;
       window.removeEventListener('beforeunload', beforeUnloadHandler);
     };
-    // only rebind when isDirty or form/lineItems factory changes
-  }, [isDirty, form]);
+    // Bind once on mount; isDirtyRef is read by reference so no need to re-bind on isDirty changes
+  }, [form]);
 
   // Date disabled functions
   const disabledPoDate = (current) => {
@@ -1569,7 +1578,7 @@ const POForm = () => {
               icon={<SaveOutlined />}
               onClick={handleSaveDraft}
               loading={savingDraft}
-              disabled={submitting}
+              disabled={submitting || (isEditMode && !isDirty)}
             >
               Save as Draft
             </Button>

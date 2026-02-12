@@ -312,6 +312,35 @@ export const canPerformApprovalActions = () =>
   hasModuleAccess('purchase-orders') &&
   (canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO());
 
+// ─── FIRST ACCESSIBLE ROUTE ──────────────────────────────────────────────────
+
+/**
+ * Returns the first accessible route for the current user.
+ * Used to redirect users who don't have dashboard permission.
+ * Order matches the sidebar menu priority.
+ */
+export const getFirstAccessibleRoute = () => {
+  const routeModuleMap = [
+    { route: '/', moduleId: 'dashboard' },
+    { route: '/orders/list', moduleId: 'orders' },
+    { route: '/bom/list', moduleId: 'bom' },
+    { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
+    { route: '/grn/list', moduleId: 'grn' },
+    { route: '/master', moduleId: ['master-data', 'supplier-info', 'items', 'terms-conditions'] },
+    { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
+  ];
+
+  for (const entry of routeModuleMap) {
+    if (Array.isArray(entry.moduleId)) {
+      if (entry.moduleId.some((id) => hasModuleAccess(id))) return entry.route;
+    } else {
+      if (hasModuleAccess(entry.moduleId)) return entry.route;
+    }
+  }
+
+  return '/'; // fallback
+};
+
 // ─── PERMISSION VALIDATION ────────────────────────────────────────────────────
 
 /**

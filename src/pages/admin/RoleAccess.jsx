@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   Table,
@@ -90,6 +90,7 @@ const RoleAccess = () => {
   const [permissions, setPermissions] = useState(getEmptyPermissions());
   const [formDirty, setFormDirty] = useState(false);
   const [initialPermissions, setInitialPermissions] = useState(null);
+  const initialFormValuesRef = useRef(null);
 
   // Fetch roles
   const fetchRoles = useCallback(async () => {
@@ -117,15 +118,29 @@ const RoleAccess = () => {
     role.description?.toLowerCase().includes(searchText.toLowerCase())
   );
 
+  // Check if form or permissions have changed from initial values
+  const checkIfDirty = (currentFormValues, currentPermissions) => {
+    if (!initialFormValuesRef.current) return false;
+    const initial = initialFormValuesRef.current;
+    const formChanged =
+      currentFormValues.name !== initial.name ||
+      (currentFormValues.description || '') !== (initial.description || '') ||
+      currentFormValues.active !== initial.active;
+    const permsChanged = JSON.stringify(currentPermissions) !== initialPermissions;
+    return formChanged || permsChanged;
+  };
+
   // Open modal for add/edit
   const openModal = (role = null) => {
     setEditingRole(role);
     if (role) {
-      form.setFieldsValue({
+      const formVals = {
         name: role.name,
         description: role.description,
         active: role.active !== false,
-      });
+      };
+      form.setFieldsValue(formVals);
+      initialFormValuesRef.current = { ...formVals };
       // Merge role permissions with empty template so every key exists
       const empty = getEmptyPermissions();
       const rolePerms = role.permissions || {};
@@ -149,6 +164,7 @@ const RoleAccess = () => {
       const empty = getEmptyPermissions();
       setPermissions(empty);
       setInitialPermissions(JSON.stringify(empty));
+      initialFormValuesRef.current = { name: '', description: '', active: true };
     }
     setFormDirty(false);
     setModalVisible(true);
@@ -191,7 +207,12 @@ const RoleAccess = () => {
 
       return updated;
     });
-    setFormDirty(true);
+    // Recalculate dirty after permission change
+    setPermissions((latest) => {
+      const vals = form.getFieldsValue();
+      setFormDirty(checkIfDirty(vals, latest));
+      return latest;
+    });
   };
 
   // Handle select all for a module
@@ -218,7 +239,11 @@ const RoleAccess = () => {
 
       return updated;
     });
-    setFormDirty(true);
+    setPermissions((latest) => {
+      const vals = form.getFieldsValue();
+      setFormDirty(checkIfDirty(vals, latest));
+      return latest;
+    });
   };
 
   // Handle select all for entire group
@@ -243,7 +268,11 @@ const RoleAccess = () => {
       });
       return updated;
     });
-    setFormDirty(true);
+    setPermissions((latest) => {
+      const vals = form.getFieldsValue();
+      setFormDirty(checkIfDirty(vals, latest));
+      return latest;
+    });
   };
 
   // Check states
@@ -721,7 +750,10 @@ const RoleAccess = () => {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          onValuesChange={() => setFormDirty(true)}
+          onValuesChange={() => {
+            const vals = form.getFieldsValue();
+            setFormDirty(checkIfDirty(vals, permissions));
+          }}
           style={{ width: "99%" }}
         >
           <Row gutter={16}>
@@ -777,7 +809,11 @@ const RoleAccess = () => {
           <div style={{ textAlign: "right", marginTop: 24 }}>
             <Space>
               <Button onClick={handleModalClose}>Cancel</Button>
-              <Button type="primary" htmlType="submit">
+              <Button
+                type="primary"
+                htmlType="submit"
+                disabled={editingRole && !formDirty}
+              >
                 {editingRole ? "Update Role" : "Create Role"}
               </Button>
             </Space>

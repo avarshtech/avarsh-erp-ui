@@ -15,6 +15,7 @@ const SubCategoryMaster = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -50,6 +51,7 @@ const SubCategoryMaster = () => {
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
+    setUnsavedChanges(false);
   };
 
   const handleSelect = (record) => {
@@ -60,6 +62,7 @@ const SubCategoryMaster = () => {
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue(record);
+    setUnsavedChanges(false);
   };
 
   const handleSave = async (values) => {
@@ -138,6 +141,7 @@ const SubCategoryMaster = () => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
+    setUnsavedChanges(false);
   };
 
   const handleSearch = (value) => {
@@ -190,6 +194,7 @@ const SubCategoryMaster = () => {
                       onClick={() => form.submit()} 
                       icon={<SaveOutlined />}
                       loading={submitting}
+                      disabled={selectedId && !unsavedChanges}
                     >
                       Save Changes
                     </Button>
@@ -202,6 +207,7 @@ const SubCategoryMaster = () => {
               layout="vertical" 
               onFinish={handleSave}
               disabled={isReadOnly}
+              onValuesChange={() => setUnsavedChanges(true)}
             >
               <Form.Item 
                 name="categoryId" 

@@ -22,9 +22,7 @@ import {
   CloseCircleOutlined,
   StopOutlined,
   RollbackOutlined,
-  EditOutlined,
   SendOutlined,
-  SaveOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
   ExclamationCircleOutlined,
@@ -40,7 +38,6 @@ import {
   getPurchaseOrderById,
   updatePurchaseOrder,
   createActivity,
-  updateActivity,
   parseActivityComment,
 } from '../../services/purchaseOrderService';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -93,8 +90,6 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   // Activity state
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
-  const [editingNoteId, setEditingNoteId] = useState(null);
-  const [editNoteText, setEditNoteText] = useState('');
   const [addingNote, setAddingNote] = useState(false);
 
   // Status action modal
@@ -112,7 +107,6 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       setPo(null);
       setNotes([]);
       setNewNote('');
-      setEditingNoteId(null);
       setStatusAction(null);
       setActionReason('');
       setRejectionCategory(null);
@@ -130,14 +124,15 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       // Map activities/notes
       const activities = data.activities || data.notes || [];
       const mappedNotes = activities.map((activity) => {
-        const parsed = parseActivityComment(activity.comment || activity.text || '');
+      const parsed = parseActivityComment(activity.comment || activity.text || '');
+       
         return {
           id: activity.id,
           text: parsed.text,
           isSystemGenerated: parsed.isSystemGenerated,
-          status: parsed.status,
+          status: activity.status ?? null,
           timestamp: activity.createdAt || activity.timestamp || '',
-          user: activity.user || activity.userName || 'User',
+          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
           edited: activity.edited || false,
         };
       });
@@ -169,10 +164,13 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     if (!newNote.trim() || !po?.id) return;
     setAddingNote(true);
     try {
+      const currentUser = getCurrentUser();
+      const userName = currentUser?.username || '';
       const res = await createActivity(po.id, {
         comment: newNote,
-        status: po.status || 'InProgress',
+        status: po.status ?? null,
         isSystemGenerated: false,
+        userName,
       });
       // Append the created activity to local notes (no global events)
       const parsed = parseActivityComment(res.comment || res.text || '');
@@ -182,9 +180,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           id: res.id,
           text: parsed.text || res.comment || newNote,
           isSystemGenerated: parsed.isSystemGenerated,
-          status: parsed.status,
+          status: res.status ?? null,
           timestamp: res.createdAt || new Date().toISOString(),
-          user: res.user || 'Current User',
+          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
           edited: res.edited || false,
         },
       ]);
@@ -196,54 +194,6 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     } finally {
       setAddingNote(false);
     }
-  };
-
-  const handleEditNote = (note) => {
-    setEditingNoteId(note.id);
-    setEditNoteText(note.text);
-  };
-
-  const handleSaveEdit = async (note) => {
-    if (!editNoteText.trim()) return;
-    // Optimistic update
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === note.id
-          ? { ...n, text: editNoteText, edited: true, timestamp: new Date().toISOString() }
-          : n
-      )
-    );
-    setEditingNoteId(null);
-    setEditNoteText('');
-
-    if (note.id && po?.id) {
-      try {
-        const res = await updateActivity(po.id, note.id, {
-          comment: editNoteText,
-          status: note.status || po.status || 'InProgress',
-        });
-        const parsed = parseActivityComment(res.comment || '');
-        setNotes((prev) =>
-          prev.map((n) =>
-            n.id === res.id
-              ? {
-                  ...n,
-                  text: parsed.text || editNoteText,
-                  timestamp: res.updatedAt || res.createdAt || n.timestamp,
-                  edited: true,
-                }
-              : n
-          )
-        );
-      } catch {
-        message.error('Failed to update note');
-      }
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingNoteId(null);
-    setEditNoteText('');
   };
 
   // ========================
@@ -345,7 +295,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
 
       // Create system activity log
       const currentUser = getCurrentUser();
-      const userName = currentUser?.name || currentUser?.username || 'User';
+      const userName = currentUser?.username || '';
       let activityComment = `PO ${action.label.toLowerCase()}d by ${userName}`;
       if (reason) {
         activityComment += `. Reason: ${reason}`;
@@ -369,6 +319,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         if (catLabel) activityPayload.rejectionCategoryLabel = catLabel;
       }
 
+      // Attach the performing user's name so backend can record the actor
+      activityPayload.userName = userName;
       await createActivity(po.id, activityPayload);
 
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
@@ -527,7 +479,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       });
 
       const currentUser = getCurrentUser();
-      const userName = currentUser?.name || currentUser?.username || 'User';
+      const userName = currentUser?.username || '';
       const lineLabel = lineItem.itemName || lineItem.itemCode || 'Line item';
       const actComment = allCompleted
         ? `All line items completed. PO marked as Completed by ${userName}`
@@ -537,8 +489,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         comment: actComment,
         status: newPoStatus,
         isSystemGenerated: true,
+        userName,
       });
-      // Append the created activity to local notes (no global events)
       const parsed = parseActivityComment(activityRes.comment || activityRes.text || '');
       setNotes((prev) => [
         ...prev,
@@ -546,9 +498,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           id: activityRes.id,
           text: parsed.text || activityRes.comment || actComment,
           isSystemGenerated: parsed.isSystemGenerated || true,
-          status: parsed.status,
+          status: activityRes.status ?? null,
           timestamp: activityRes.createdAt || new Date().toISOString(),
-          user: activityRes.user || userName,
+          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
           edited: activityRes.edited || false,
         },
       ]);
@@ -797,8 +749,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         }
       >
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
-            <Spin size="large" tip="Loading PO details..." />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 80, gap: 12 }}>
+            <Spin size="large" />
+            <Text type="secondary">Loading PO details...</Text>
           </div>
         ) : po ? (
           <>
@@ -868,7 +821,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
               scroll={{ x: 900 }}
               size="small"
               className="centered-header-table"
-              rowKey={(record, idx) => record.id || idx}
+              rowKey={(record) => record.id || record.itemId || record.itemCode || record.itemName}
               style={{ marginBottom: 24 }}
             />
 
@@ -1022,7 +975,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                       ) : (
                         <UserOutlined style={{ fontSize: 14 }} />
                       ),
-                      children: (
+                      content: (
                         <div>
                           <div style={{ marginBottom: 4 }}>
                             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -1035,58 +988,27 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                                   Edited
                                 </Tag>
                               )}
-                              {note.isSystemGenerated && (
+                              {note.isSystemGenerated ? (
                                 <Tag
                                   style={{ marginLeft: 4, fontSize: 10 }}
                                   color="blue"
                                 >
                                   System
                                 </Tag>
-                              )}
+                              ) :
+                                note.user && (
+                                  <Tag
+                                    style={{ marginLeft: 4, fontSize: 10 }}
+                                    color="green"
+                                  >
+                                    {note.user}
+                                  </Tag>
+                                )}
                             </Text>
                           </div>
-                          {editingNoteId === note.id ? (
-                            <Space direction="vertical" style={{ width: '100%' }}>
-                              <TextArea
-                                value={editNoteText}
-                                onChange={(e) => setEditNoteText(e.target.value)}
-                                rows={2}
-                                autoFocus
-                              />
-                              <Space>
-                                <Button
-                                  size="small"
-                                  type="primary"
-                                  icon={<SaveOutlined />}
-                                  onClick={() => handleSaveEdit(note)}
-                                  disabled={!editNoteText.trim()}
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  size="small"
-                                  icon={<CloseOutlined />}
-                                  onClick={handleCancelEdit}
-                                >
-                                  Cancel
-                                </Button>
-                              </Space>
-                            </Space>
-                          ) : (
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                              <Text style={{ flex: 1 }}>{note.text}</Text>
-                              {!note.isSystemGenerated && (
-                                <PermissionGuard module="purchase-orders" operation="update">
-                                  <Button
-                                    type="link"
-                                    size="small"
-                                    icon={<EditOutlined />}
-                                    onClick={() => handleEditNote(note)}
-                                  />
-                                </PermissionGuard>
-                              )}
-                            </div>
-                          )}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            <Text style={{ flex: 1 }}>{note.text}</Text>
+                          </div>
                         </div>
                       ),
                     }))}

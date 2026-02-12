@@ -21,6 +21,9 @@ const initialState = {
   // Suppliers
   suppliers: [],
   
+  // Buyers
+  buyers: [],
+  
   // Terms & Conditions
   termsConditions: [],
   
@@ -37,6 +40,7 @@ const initialState = {
     uoms: false,
     variants: false,
     suppliers: false,
+    buyers: false,
     termsConditions: false,
     users: false,
     roles: false,
@@ -51,6 +55,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    buyers: null,
     termsConditions: null,
     users: null,
     roles: null,
@@ -65,6 +70,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    buyers: null,
     termsConditions: null,
     users: null,
     roles: null,
