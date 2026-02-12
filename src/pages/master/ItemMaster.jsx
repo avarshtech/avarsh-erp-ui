@@ -1511,7 +1511,7 @@ const ItemMaster = () => {
                 Cancel
               </Button>
               {(isEditMode ? canUpdate : canAdd) && (
-                <Button type="primary" htmlType="submit" loading={submitting} icon={<SaveOutlined />}>
+                <Button type="primary" htmlType="submit" loading={submitting} disabled={isEditMode && !unsavedChanges} icon={<SaveOutlined />}>
                   {isEditMode ? 'Update' : 'Save'}
                 </Button>
               )}

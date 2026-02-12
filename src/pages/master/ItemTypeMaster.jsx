@@ -15,6 +15,7 @@ const ItemTypeMaster = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -51,6 +52,7 @@ const ItemTypeMaster = () => {
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ attributeIds: [], uomIds: [] });
+    setUnsavedChanges(false);
   };
 
   const handleSelect = (record) => {
@@ -65,6 +67,7 @@ const ItemTypeMaster = () => {
       attributeIds: record.attributeIds || record.attributes?.map(a => a.id) || [],
       uomIds: record.uomIds || record.uoms?.map(u => u.id) || [],
     });
+    setUnsavedChanges(false);
   };
 
   const handleSave = async (values) => {
@@ -143,6 +146,7 @@ const ItemTypeMaster = () => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
+    setUnsavedChanges(false);
   };
 
   const handleSearch = (value) => {
@@ -194,6 +198,7 @@ const ItemTypeMaster = () => {
                       onClick={() => form.submit()} 
                       icon={<SaveOutlined />}
                       loading={submitting}
+                      disabled={selectedId && !unsavedChanges}
                     >
                       Save Changes
                     </Button>
@@ -206,6 +211,7 @@ const ItemTypeMaster = () => {
               layout="vertical" 
               onFinish={handleSave}
               disabled={isReadOnly}
+              onValuesChange={() => setUnsavedChanges(true)}
             >
               <Form.Item 
                 name="subCategoryId" 

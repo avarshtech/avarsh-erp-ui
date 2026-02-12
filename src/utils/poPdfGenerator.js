@@ -4,6 +4,7 @@ import { getTermsConditionsById } from '../services/termsConditionsService';
 import { getSupplierById } from '../services/supplierService';
 import { getStateName } from './indianStates';
 import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/pantoneService';
+import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 /**
  * PO PDF Generator - Professional Garments Industry Format
@@ -593,7 +594,7 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
     <div class="header-section">
       <div style="display:flex; align-items:center;">
         <div class="logo-box">
-          <img src="/src/assets/images/sristi_logo.jpeg" alt="Logo" style="max-width:55px; max-height:55px; object-fit:contain;" />
+          <img src="${sristiLogo}" alt="Logo" style="max-width:55px; max-height:55px; object-fit:contain;" />
         </div>
         <div class="company-info">
           <div class="company-name">${companyName}</div>

@@ -9,12 +9,22 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
+import { Navigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
+import { hasModuleAccess, getFirstAccessibleRoute } from '../utils/permissions';
 
 const { Title, Text } = Typography;
 
 const Dashboard = () => {
   const { isDarkMode } = useTheme();
+
+  // If user doesn't have dashboard access, redirect to first accessible menu
+  if (!hasModuleAccess('dashboard')) {
+    const firstRoute = getFirstAccessibleRoute();
+    if (firstRoute !== '/') {
+      return <Navigate to={firstRoute} replace />;
+    }
+  }
   
   const statsData = [
     {

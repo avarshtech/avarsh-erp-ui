@@ -1,12 +1,13 @@
 import React, { useEffect, useCallback } from 'react';
 import { Tabs, Spin, message } from 'antd';
-import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined, ShopOutlined } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
 import ItemTypeMaster from './ItemTypeMaster';
 import VariantMaster from './VariantMaster';
 import UomMaster from './UomMaster';
 import ItemMaster from './ItemMaster';
+import BuyerMaster from './BuyerMaster';
 import SupplierMaster from './SupplierMaster';
 import TermsConditionsMaster from './TermsConditionsMaster';
 import { useStore } from '../../context/StoreContext';
@@ -129,6 +130,11 @@ const MasterDashboard = () => {
 
   const items = [
     {
+      key: 'buyer',
+      label: <span><ShopOutlined /> Buyers</span>,
+      children: <BuyerMaster />,
+    },
+    {
       key: 'supplier',
       label: <span><TeamOutlined /> Suppliers</span>,
       children: <SupplierMaster />,
@@ -198,7 +204,7 @@ const MasterDashboard = () => {
       </div>
       
       <Tabs 
-        defaultActiveKey="supplier" 
+        defaultActiveKey="buyer" 
         items={items} 
         size="large"
         tabBarStyle={{ 

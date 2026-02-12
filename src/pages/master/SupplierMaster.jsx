@@ -592,6 +592,7 @@ const SupplierMaster = () => {
             type="primary"
             loading={submitting}
             onClick={handleSubmit}
+            disabled={editingSupplier && !supplierUnsaved}
           >
             {editingSupplier ? 'Update' : 'Save'}
           </Button>,

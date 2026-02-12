@@ -213,3 +213,13 @@ const normalizeTokenPermissions = (raw) => {
 
   return merged;
 };
+
+/**
+ * Admin reset password for a user
+ * @param {Object} data - { userId, newPassword }
+ * @returns {Promise<Object>} Response
+ */
+export const adminResetPassword = async (data) => {
+  const response = await axiosInstance.post('/admin/reset-password', data);
+  return response.data ?? response;
+};

@@ -1,16 +1,18 @@
-import { useState, useRef, useCallback } from 'react';
-import { Input, Spin, Empty, Space } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
-import { searchPantoneColors, getPantoneSwatchUrl } from '../services/pantoneService';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Input, Spin, Empty, Space, Button, Tooltip } from 'antd';
+import { SearchOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { searchPantoneColors, getPantoneSwatchUrl, isPantoneCode } from '../services/pantoneService';
 import PantoneColorSwatch from './PantoneColorSwatch';
 
 /**
- * PantoneColorInput - Pantone color code search input with API-powered suggestions.
+ * PantoneColorInput - Flexible color input with Pantone API-powered suggestions.
  *
- * - Auto-inserts "-" after first 2 digits
- * - Fires API search after user enters code portion (e.g. "18-1662")
- * - Shows dropdown with color swatch + code / name
+ * - Accepts free-text input (any characters including - # etc.)
+ * - Detects Pantone-like patterns (dd-dddd) and triggers API search
+ * - Shows only the color code in suggestions (no name)
+ * - After selecting a Pantone color, allows entering a custom color name
  * - Saves "code / name" as the value (e.g. "18-1662 TCX / Flame Scarlet")
+ * - Also accepts plain text values (e.g. "Navy Blue")
  *
  * Props:
  *  - value: Current string value
@@ -22,18 +24,22 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  // After selecting a pantone code, prompt user for a custom color name
+  const [selectedCode, setSelectedCode] = useState(null);
+  const [colorName, setColorName] = useState('');
+  const [originalName, setOriginalName] = useState('');
   const debounceRef = useRef(null);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
+  const nameInputRef = useRef(null);
 
-  // Display the stored code / name or the raw input
-  const displayValue = value || inputValue;
+  // Detect pantone code pattern in input text (dd-dddd)
+  const PANTONE_PATTERN = /(\d{2}-\d{4})/;
 
-  // Format the raw input: auto-insert "-" after first 2 digits
   const handleInputChange = (e) => {
-    let raw = e.target.value;
+    const raw = e.target.value;
 
-    // If user is clearing, allow it
+    // If user is clearing
     if (!raw) {
       setInputValue('');
       setSuggestions([]);
@@ -42,61 +48,85 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
       return;
     }
 
-    // Strip anything that's not digit or dash (while typing the code portion)
-    // Format: dd-dddd
-    let digits = raw.replace(/[^0-9]/g, '');
+    setInputValue(raw);
+    onChange(''); // Clear selected value while typing
 
-    // Build formatted string
-    let formatted = '';
-    if (digits.length <= 2) {
-      formatted = digits;
-    } else {
-      formatted = digits.slice(0, 2) + '-' + digits.slice(2, 6);
-    }
-
-    setInputValue(formatted);
-    onChange(''); // Clear the selected value while typing
-
-    // Once we have the full code pattern (dd-dddd = 6 digits), trigger API search
-    if (digits.length >= 6) {
-      const searchCode = formatted; // e.g. "18-1662"
-      triggerSearch(searchCode);
+    // Check for pantone code pattern to trigger API search
+    const match = raw.match(PANTONE_PATTERN);
+    if (match) {
+      triggerSearch(match[1]);
     } else {
       setSuggestions([]);
       setDropdownOpen(false);
     }
   };
 
-  const triggerSearch = useCallback(
-    (searchCode) => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(async () => {
-        setLoading(true);
-        setDropdownOpen(true);
-        try {
-          const results = await searchPantoneColors(searchCode);
-          // Filter to only TCX and TGX suffixes
-          const filtered = results.filter((r) => {
-            const codeSuffix = (r.code || '').toUpperCase();
-            return codeSuffix.endsWith('TCX') || codeSuffix.endsWith('TGX');
-          });
-          setSuggestions(filtered);
-        } catch {
-          setSuggestions([]);
-        } finally {
-          setLoading(false);
-        }
-      }, 300);
-    },
-    []
-  );
+  const triggerSearch = useCallback((searchCode) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      setDropdownOpen(true);
+      try {
+        const results = await searchPantoneColors(searchCode);
+        setSuggestions(results);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  }, []);
 
   const handleSelect = (item) => {
-    const selectedValue = `${item.code} / ${item.name}`;
-    onChange(selectedValue);
+    setSelectedCode(item.code);
+    setOriginalName(item.name || '');
+    setColorName(item.name || '');
     setInputValue('');
     setSuggestions([]);
     setDropdownOpen(false);
+    // Focus the name input after selection
+    setTimeout(() => nameInputRef.current?.focus(), 100);
+  };
+
+  const handleConfirmName = () => {
+    const name = colorName.trim() || originalName;
+    const finalValue = `${selectedCode} / ${name}`;
+    onChange(finalValue);
+    setSelectedCode(null);
+    setColorName('');
+    setOriginalName('');
+  };
+
+  // Also allow submitting free text directly on Enter (when no pantone selected)
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !dropdownOpen && inputValue.trim() && !selectedCode) {
+      e.preventDefault();
+      onChange(inputValue.trim());
+      setInputValue('');
+    }
+  };
+
+  const handleNameKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleConfirmName();
+    }
+  };
+
+  const handleCancelSelection = () => {
+    // If we were editing an existing value, restore it; otherwise clear
+    if (value && isPantoneCode(value)) {
+      // Value is still set (handleEditExisting didn't clear it), just exit edit mode
+      setSelectedCode(null);
+      setColorName('');
+      setOriginalName('');
+      setInputValue('');
+    } else {
+      setSelectedCode(null);
+      setColorName('');
+      setOriginalName('');
+      setInputValue('');
+    }
   };
 
   const handleClear = () => {
@@ -104,6 +134,27 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
     setInputValue('');
     setSuggestions([]);
     setDropdownOpen(false);
+    setSelectedCode(null);
+    setColorName('');
+    setOriginalName('');
+  };
+
+  // Re-enter editing mode with the existing Pantone value preserved
+  const handleEditExisting = () => {
+    if (isPantoneCode(value)) {
+      // Parse "code / name" back into selectedCode + colorName
+      const parts = value.split('/');
+      const code = parts[0].trim();
+      const name = parts.length > 1 ? parts.slice(1).join('/').trim() : '';
+      setSelectedCode(code);
+      setColorName(name);
+      setOriginalName(name);
+      // Don't call onChange('') — keep value intact until user confirms or cancels
+    } else {
+      // Non-Pantone text value: put it back in the input for editing
+      setInputValue(value);
+      onChange('');
+    }
   };
 
   const handleFocus = () => {
@@ -112,19 +163,62 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
     }
   };
 
-  const handleBlur = (e) => {
-    // Delay close to allow click on dropdown items
+  const handleBlur = () => {
     setTimeout(() => {
       if (wrapperRef.current && !wrapperRef.current.contains(document.activeElement)) {
         setDropdownOpen(false);
+        // If user typed free text and blurred, save the free text value
+        if (inputValue.trim() && !value && !selectedCode) {
+          onChange(inputValue.trim());
+          setInputValue('');
+        }
       }
     }, 200);
   };
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative' }}>
-      {/* Display selected value with swatch or show input */}
-      {value ? (
+      {/* State: Pantone code selected, entering custom name */}
+      {selectedCode ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '4px 8px',
+            border: '1px solid var(--primary-color, #1677ff)',
+            borderRadius: 10,
+            minHeight: 42,
+            background: 'var(--card-bg, #fff)',
+          }}
+        >
+          <PantoneColorSwatch value={selectedCode} size={26} showPopover={false} />
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 2 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedCode}</span>
+            <Input
+              ref={nameInputRef}
+              size="small"
+              placeholder="Enter color name..."
+              value={colorName}
+              onChange={(e) => setColorName(e.target.value)}
+              onKeyDown={handleNameKeyDown}
+              variant="borderless"
+              style={{ padding: 0, fontSize: 13 }}
+            />
+          </div>
+          <Space size={4}>
+            <Tooltip title="Confirm">
+              <Button type="text" size="small" icon={<CheckOutlined />} onClick={handleConfirmName}
+                style={{ color: 'var(--success-color, #52c41a)' }} />
+            </Tooltip>
+            <Tooltip title="Cancel">
+              <Button type="text" size="small" icon={<CloseOutlined />} onClick={handleCancelSelection}
+                style={{ color: 'var(--text-muted)' }} />
+            </Tooltip>
+          </Space>
+        </div>
+      ) : value ? (
+        /* State: Has a saved value (display with swatch) */
         <div
           style={{
             display: 'flex',
@@ -137,32 +231,37 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
             background: 'var(--card-bg, #fff)',
             cursor: 'pointer',
           }}
-          onClick={handleClear}
-          title="Click to change"
+          onClick={handleEditExisting}
+          title="Click to edit"
         >
-          <PantoneColorSwatch value={value} size={18} />
+          {isPantoneCode(value) && <PantoneColorSwatch value={value} size={18} />}
           <span style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {value}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>✕</span>
+          <span
+            style={{ color: 'var(--text-muted)', fontSize: 12, padding: '0 2px' }}
+            onClick={(e) => { e.stopPropagation(); handleClear(); }}
+            title="Clear"
+          >✕</span>
         </div>
       ) : (
+        /* State: Empty - text input for typing */
         <Input
           ref={inputRef}
-          placeholder={placeholder || 'Enter code e.g. 18-1662'}
+          placeholder={placeholder || 'Type color name or Pantone code (e.g. 18-1662)'}
           value={inputValue}
           onChange={handleInputChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
           prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
           suffix={loading ? <Spin size="small" /> : null}
           allowClear
           onClear={handleClear}
-          maxLength={7} // dd-dddd
         />
       )}
 
-      {/* Dropdown suggestions */}
+      {/* Dropdown suggestions - shows only color code */}
       {dropdownOpen && (
         <div
           style={{
@@ -216,25 +315,27 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
                       border: '1px solid var(--border-color, rgba(0,0,0,0.1))',
                       flexShrink: 0,
                       background: 'var(--bg-tertiary, #f5f5f5)',
+                      position: 'relative',
                     }}
                   >
                     <img
                       src={swatchUrl}
                       alt={item.code}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        e.target.style.display = 'none';
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        transform: 'scale(1.3)',
+                        transformOrigin: 'top center',
                       }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
                     />
                   </div>
-                  {/* Code / Name */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
-                      {item.code}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary, #666)' }}>
-                      {item.name}
-                    </div>
+                  {/* Only color code - no name */}
+                  <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+                    {item.code}
                   </div>
                 </div>
               );

@@ -10,9 +10,10 @@ import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../servi
  *  - value: The stored color value like "18-1662 TCX / Flame Scarlet" or "18-1662 TCX"
  *  - size: Swatch size in px (default 20)
  *  - showLabel: Whether to show the label text next to swatch (default false)
+ *  - showPopover: Whether to show popover on hover (default true)
  *  - style: Additional style for the wrapper
  */
-const PantoneColorSwatch = ({ value, size = 20, showLabel = false, style = {} }) => {
+const PantoneColorSwatch = ({ value, size = 20, showLabel = false, showPopover = true, style = {} }) => {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -33,6 +34,7 @@ const PantoneColorSwatch = ({ value, size = 20, showLabel = false, style = {} })
     overflow: 'hidden',
     flexShrink: 0,
     background: imgError ? '#ddd' : 'var(--bg-tertiary, #f5f5f5)',
+    position: 'relative',
   };
 
   const popoverContent = (
@@ -44,35 +46,33 @@ const PantoneColorSwatch = ({ value, size = 20, showLabel = false, style = {} })
           borderRadius: 8,
           overflow: 'hidden',
           border: '1px solid var(--border-color, rgba(0,0,0,0.15))',
-          marginBottom: 8,
           background: 'var(--bg-tertiary, #f5f5f5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          position: 'relative',
         }}
       >
         {!imgError ? (
           <img
             src={swatchUrl}
             alt={code}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{
+              width: '100%',
+              height: 'auto',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              transform: 'scale(1.3)',
+              transformOrigin: 'top center',
+            }}
             onError={() => setImgError(true)}
           />
         ) : (
-          <span style={{ fontSize: 10, color: 'var(--text-muted, #999)' }}>No image</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted, #999)', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>No image</span>
         )}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{code}</div>
-      {value.includes('/') && (
-        <div style={{ fontSize: 12, color: 'var(--text-secondary, #666)' }}>
-          {value.split('/').slice(1).join('/').trim()}
-        </div>
-      )}
     </div>
   );
 
-  return (
-    <Popover content={popoverContent} trigger="hover" placement="top" arrow>
+  const swatchElement = (
       <span
         style={{
           display: 'inline-flex',
@@ -103,8 +103,12 @@ const PantoneColorSwatch = ({ value, size = 20, showLabel = false, style = {} })
                 alt={code}
                 style={{
                   width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
+                  height: 'auto',
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  transform: 'scale(1.3)',
+                  transformOrigin: 'top center',
                   display: imgLoaded ? 'block' : 'none',
                 }}
                 onLoad={() => setImgLoaded(true)}
@@ -131,6 +135,13 @@ const PantoneColorSwatch = ({ value, size = 20, showLabel = false, style = {} })
           <span style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{displayText}</span>
         )}
       </span>
+    );
+
+  if (!showPopover) return swatchElement;
+
+  return (
+    <Popover content={popoverContent} trigger="hover" placement="top" arrow>
+      {swatchElement}
     </Popover>
   );
 };

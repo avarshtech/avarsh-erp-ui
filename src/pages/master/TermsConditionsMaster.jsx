@@ -33,6 +33,7 @@ const TermsConditionsMaster = () => {
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [form] = Form.useForm();
   const [description, setDescription] = useState('');
 
@@ -96,6 +97,7 @@ const TermsConditionsMaster = () => {
     setIsEditing(true);
     form.resetFields();
     setDescription('');
+    setUnsavedChanges(false);
   };
 
   const handleSelect = (record) => {
@@ -108,6 +110,7 @@ const TermsConditionsMaster = () => {
     form.setFieldsValue({ name: record.name });
     // Set the description (HTML) as-is from the API
     setDescription(record.description || '');
+    setUnsavedChanges(false);
   };
 
   const handleSave = async (values) => {
@@ -203,6 +206,7 @@ const TermsConditionsMaster = () => {
     setSelectedId(null);
     form.resetFields();
     setDescription('');
+    setUnsavedChanges(false);
   };
 
   const handleSearch = (value) => {
@@ -271,6 +275,7 @@ const TermsConditionsMaster = () => {
                       onClick={() => form.submit()}
                       icon={<SaveOutlined />}
                       loading={submitting}
+                      disabled={selectedId && !unsavedChanges}
                     >
                       Save
                     </Button>
@@ -281,7 +286,9 @@ const TermsConditionsMaster = () => {
 
             {/* Scrollable Form Content */}
             <div style={{ flex: 1, overflow: 'auto', padding: 24, paddingBottom: 48 }}>
-              <Form form={form} layout="vertical" onFinish={handleSave} disabled={isReadOnly}>
+              <Form form={form} layout="vertical" onFinish={handleSave} disabled={isReadOnly}
+                onValuesChange={() => setUnsavedChanges(true)}
+              >
                 <Form.Item
                   name="name"
                   label="Title"
@@ -318,7 +325,7 @@ const TermsConditionsMaster = () => {
                 >
                   <RichTextEditor
                     value={description}
-                    onChange={setDescription}
+                    onChange={(val) => { setDescription(val); setUnsavedChanges(true); }}
                     placeholder="Enter terms and conditions content here. Use the toolbar above for formatting like bullet points, numbered lists, bold text, alignment, etc."
                     readOnly={isReadOnly}
                   />

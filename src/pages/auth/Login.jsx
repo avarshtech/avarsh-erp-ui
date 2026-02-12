@@ -4,6 +4,7 @@ import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@a
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authenticateUser, isAuthenticated } from '../../services/authService';
 import { useTheme } from '../../context/ThemeContext';
+import { getFirstAccessibleRoute } from '../../utils/permissions';
 import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
 import avarshLogoLight from '../../assets/images/avarsh-logo-light.png';
 
@@ -16,6 +17,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const { isDarkMode } = useTheme();
+  const [messageApi, contextHolder] = message.useMessage();
 
   // Check if already logged in
   useEffect(() => {
@@ -49,16 +51,17 @@ const Login = () => {
           localStorage.removeItem('rememberedUsername');
         }
 
-        message.success(`Welcome back, ${result.user.name}!`);
+        messageApi.success(`Welcome back, ${result.user.name}!`);
         
-        // Navigate to intended destination or dashboard
-        const from = location.state?.from?.pathname || '/';
-        navigate(from, { replace: true });
+        // Navigate to intended destination or first accessible route
+        const from = location.state?.from?.pathname;
+        const target = from || getFirstAccessibleRoute();
+        navigate(target, { replace: true });
       } else {
-        message.error(result.message || 'Login failed. Please try again.');
+        messageApi.error(result.message || 'Login failed. Please try again.');
       }
     } catch (error) {
-      message.error('An unexpected error occurred. Please try again.');
+      messageApi.error('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -74,6 +77,7 @@ const Login = () => {
 
   return (
     <div style={styles.container}>
+      {contextHolder}
       {/* Background decoration */}
       <div style={styles.backgroundDecoration} />
       
