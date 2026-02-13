@@ -272,9 +272,11 @@ const ItemMaster = () => {
       }
       setMetaData(data);
       setFormCategories(data);
+      return data;
     } catch (error) {
       console.error('Failed to fetch item metadata:', error);
       message.error('Failed to load form data');
+      return [];
     } finally {
       setMetaDataLoading(false);
     }
@@ -433,8 +435,8 @@ const ItemMaster = () => {
     lastQueryRef.current = (item.itemName || '').trim();
     setSuggestions([]);
     setShowSuggestions(false);
-    fetchMetaData().then(() => {
-      initializeEditForm(item);
+    fetchMetaData().then((metaDataList) => {
+      initializeEditForm(item, metaDataList);
     });
     setModalOpen(true);
     setUnsavedChanges(false);
@@ -447,7 +449,7 @@ const ItemMaster = () => {
   };
 
   // Initialize form for edit mode
-  const initializeEditForm = (item) => {
+  const initializeEditForm = (item, metaDataList = metaData) => {
     form.setFieldsValue({
       itemName: item.itemName || '',
       categoryId: item.categoryId?.toString(),
@@ -464,7 +466,7 @@ const ItemMaster = () => {
     const subCategoryId = parseInt(item.subCategoryId);
     const itemTypeId = parseInt(item.itemTypeId);
 
-    const category = metaData.find((c) => c.id === categoryId);
+    const category = (metaDataList || []).find((c) => c.id === categoryId);
     if (category) {
       setFormSubcategories(category.subCategories || []);
       const subcategory = category.subCategories?.find((sc) => sc.id === subCategoryId);
@@ -1180,8 +1182,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
-                    showSearch
-                    optionFilterProp="label"
+                    showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     options={formCategories.map((cat) => ({ value: String(cat.id ?? ''), label: String(cat.name ?? '') }))}
                   />
                 </Form.Item>
@@ -1195,8 +1196,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Subcategory"
                     onChange={handleFormSubcategoryChange}
-                    showSearch
-                    optionFilterProp="label"
+                    showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     disabled={!isEditMode && !form.getFieldValue('categoryId')}
                     options={formSubcategories.map((sc) => ({ value: String(sc.id ?? ''), label: String(sc.name ?? '') }))}
                   />
@@ -1214,8 +1214,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Item Type"
                     onChange={handleFormItemTypeChange}
-                    showSearch
-                    optionFilterProp="label"
+                    showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
                     options={formItemTypes.map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
                   />

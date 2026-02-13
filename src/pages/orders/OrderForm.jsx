@@ -307,10 +307,10 @@ const OrderForm = () => {
                 <Select
                   placeholder="Select customer"
                   options={customers}
-                  showSearch
-                  filterOption={(input, option) =>
-                    option.label.toLowerCase().includes(input.toLowerCase())
-                  }
+                  showSearch={{
+                    filterOption: (input, option) =>
+                      option.label.toLowerCase().includes(input.toLowerCase()),
+                  }}
                 />
               </Form.Item>
             </Col>

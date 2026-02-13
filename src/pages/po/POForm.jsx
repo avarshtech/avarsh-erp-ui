@@ -1621,12 +1621,12 @@ const POForm = () => {
                   >
                     <Select
                       placeholder="Search and select supplier"
-                      showSearch
-                      filterOption={(input, option) =>
-                        (option?.label || '')
-                          .toLowerCase()
-                          .includes(input.toLowerCase())
-                      }
+                      showSearch={{
+                        filterOption: (input, option) =>
+                          (option?.label || '')
+                            .toLowerCase()
+                            .includes(input.toLowerCase()),
+                      }}
                       onChange={handleSupplierChange}
                       options={suppliersList.map((s) => ({
                         value: s.id,
@@ -1659,13 +1659,13 @@ const POForm = () => {
                   >
                     <Select
                       placeholder="Select terms & conditions"
-                      showSearch
+                      showSearch={{
+                        filterOption: (input, option) =>
+                          (option?.label || '')
+                            .toLowerCase()
+                            .includes(input.toLowerCase()),
+                      }}
                       allowClear
-                      filterOption={(input, option) =>
-                        (option?.label || '')
-                          .toLowerCase()
-                          .includes(input.toLowerCase())
-                      }
                       options={termsConditionsList.map((t) => ({
                         value: t.id,
                         label: t.name,
