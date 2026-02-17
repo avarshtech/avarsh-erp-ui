@@ -220,20 +220,15 @@ export const isAdminRole = (role) => {
 };
 
 // ─── SESSION HELPERS ───────────────────────────────────────────────────────────
+// Delegated to sessionStore for centralized, secure session management.
+// This avoids direct sessionStorage access and ensures the token field
+// is never persisted in browser storage.
 
-export const getCurrentUser = () => {
-  const user = sessionStorage.getItem('currentUser');
-  if (!user) return null;
-  try {
-    return JSON.parse(user);
-  } catch {
-    return null;
-  }
-};
+import { getCachedUserDisplay, cacheUserDisplay } from '../services/sessionStore';
 
-export const setCurrentUser = (user) => {
-  sessionStorage.setItem('currentUser', JSON.stringify(user));
-};
+export const getCurrentUser = () => getCachedUserDisplay();
+
+export const setCurrentUser = (user) => cacheUserDisplay(user);
 
 /**
  * Get current user permissions.

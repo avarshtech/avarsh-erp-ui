@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { message } from 'antd';
+// Import directly from sessionStore (not authService) to avoid circular dependencies
+import { getAccessToken, setAccessToken, clearAll } from './sessionStore';
 
 /**
  * Axios instance configuration for API requests
@@ -11,12 +13,17 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
-// Request interceptor to add auth token
+// Track whether a token refresh is already in progress
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+// Request interceptor to add auth token from in-memory store
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem('authToken');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -25,15 +32,87 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Helper to queue failed requests while refresh is in progress
+const subscribeTokenRefresh = (callback) => {
+  refreshSubscribers.push(callback);
+};
+
+const onTokenRefreshed = (newToken) => {
+  refreshSubscribers.forEach((cb) => cb(newToken));
+  refreshSubscribers = [];
+};
+
+const onTokenRefreshFailed = () => {
+  refreshSubscribers.forEach((cb) => cb(null));
+  refreshSubscribers = [];
+};
+
 // Response interceptor for error handling
 // Return full response object so service callers can access status, headers, and data
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     let errorMessage = 'An unexpected error occurred';
+    const originalRequest = error.config;
 
     if (error.response) {
       const { status, data } = error.response;
+
+      // Attempt token refresh on 401 (except for login/refresh/logout endpoints)
+      if (
+        status === 401 &&
+        !originalRequest._retry &&
+        !originalRequest.url?.includes('/auth/login') &&
+        !originalRequest.url?.includes('/auth/refresh') &&
+        !originalRequest.url?.includes('/auth/logout') &&
+        !window.location.pathname.includes('/login')
+      ) {
+        if (isRefreshing) {
+          // Another refresh is in progress — queue this request
+          return new Promise((resolve, reject) => {
+            subscribeTokenRefresh((newToken) => {
+              if (newToken) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                resolve(axiosInstance(originalRequest));
+              } else {
+                reject(error);
+              }
+            });
+          });
+        }
+
+        originalRequest._retry = true;
+        isRefreshing = true;
+
+        try {
+          // Refresh token is sent automatically via HttpOnly cookie (withCredentials: true)
+          // No request body needed — the backend reads the cookie directly
+          const refreshResponse = await axios.post(
+            `${axiosInstance.defaults.baseURL}/auth/refresh`,
+            null,
+            { withCredentials: true }
+          );
+
+          const newToken = refreshResponse.data?.token;
+          if (newToken) {
+            // Store new token in memory (NOT in sessionStorage)
+            setAccessToken(newToken);
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            onTokenRefreshed(newToken);
+            isRefreshing = false;
+            return axiosInstance(originalRequest);
+          }
+        } catch {
+          onTokenRefreshFailed();
+          isRefreshing = false;
+        }
+
+        // Refresh failed — clear all session state
+        clearAll();
+        // Don't hard-redirect — let SessionExpiryGuard handle the expired state
+        error.errorMessage = 'Session expired. Please login again.';
+        return Promise.reject(error);
+      }
 
       // Extract message from response data
       if (data) {
@@ -71,15 +150,6 @@ axiosInstance.interceptors.response.use(
             break;
           default:
             break;
-        }
-      }
-
-      // Handle 401 redirect (except on login page)
-      if (status === 401) {
-        sessionStorage.removeItem('authToken');
-        sessionStorage.removeItem('currentUser');
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
         }
       }
     } else if (error.request) {

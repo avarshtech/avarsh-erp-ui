@@ -128,12 +128,12 @@ const AdminDashboard = () => {
     },
     {
       title: 'User',
-      dataIndex: 'username',
+      dataIndex: 'name',
       width: 180,
-      render: (username) => (
+      render: (name) => (
         <Space>
-          <Avatar size="small" style={{ background: '#6366f1' }}>{(username || '?')[0]?.toUpperCase()}</Avatar>
-          <Text strong>{username || '-'}</Text>
+          <Avatar size="small" style={{ background: '#6366f1' }}>{(name || '?')[0]?.toUpperCase()}</Avatar>
+          <Text strong>{name || '-'}</Text>
         </Space>
       ),
     },

@@ -38,7 +38,6 @@ import {
   getPurchaseOrderById,
   updatePurchaseOrder,
   createActivity,
-  parseActivityComment,
 } from '../../services/purchaseOrderService';
 import PermissionGuard from '../../components/PermissionGuard';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -123,19 +122,15 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
 
       // Map activities/notes
       const activities = data.activities || data.notes || [];
-      const mappedNotes = activities.map((activity) => {
-      const parsed = parseActivityComment(activity.comment || activity.text || '');
-       
-        return {
-          id: activity.id,
-          text: parsed.text,
-          isSystemGenerated: parsed.isSystemGenerated,
-          status: activity.status ?? null,
-          timestamp: activity.createdAt || activity.timestamp || '',
-          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
-          edited: activity.edited || false,
-        };
-      });
+      const mappedNotes = activities.map((activity) => ({
+        id: activity.id,
+        text: activity.comment || activity.text || '',
+        isSystemGenerated: activity.isSystemGenerated || false,
+        status: activity.status ?? null,
+        timestamp: activity.createdAt || activity.timestamp || '',
+        user: activity.userName || (activity.isSystemGenerated ? 'System' : 'User'),
+        edited: activity.edited || false,
+      }));
       setNotes(mappedNotes);
     } catch {
       message.error('Failed to load PO details');
@@ -165,24 +160,23 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     setAddingNote(true);
     try {
       const currentUser = getCurrentUser();
-      const userName = currentUser?.username || '';
+      const name = currentUser?.name || '';
       const res = await createActivity(po.id, {
         comment: newNote,
         status: po.status ?? null,
         isSystemGenerated: false,
-        userName,
+        name,
       });
       // Append the created activity to local notes (no global events)
-      const parsed = parseActivityComment(res.comment || res.text || '');
       setNotes((prev) => [
         ...prev,
         {
           id: res.id,
-          text: parsed.text || res.comment || newNote,
-          isSystemGenerated: parsed.isSystemGenerated,
+          text: res.comment || newNote,
+          isSystemGenerated: res.isSystemGenerated || false,
           status: res.status ?? null,
           timestamp: res.createdAt || new Date().toISOString(),
-          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
+          user: res.userName || userName,
           edited: res.edited || false,
         },
       ]);
@@ -295,8 +289,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
 
       // Create system activity log
       const currentUser = getCurrentUser();
-      const userName = currentUser?.username || '';
-      let activityComment = `PO ${action.label.toLowerCase()}d by ${userName}`;
+      const name = currentUser?.name || '';
+      let activityComment = `PO ${action.label.toLowerCase()}d by ${name}`;
       if (reason) {
         activityComment += `. Reason: ${reason}`;
       }
@@ -304,7 +298,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         const catLabel = REJECTION_CATEGORIES.find(
           (c) => c.value === rejectionCategory
         )?.label;
-        activityComment = `PO rejected by ${userName}. Category: ${catLabel || rejectionCategory}. Reason: ${reason}`;
+        activityComment = `PO rejected by ${name}. Category: ${catLabel || rejectionCategory}. Reason: ${reason}`;
       }
 
       // Include rejection category in activity payload when present
@@ -320,7 +314,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       }
 
       // Attach the performing user's name so backend can record the actor
-      activityPayload.userName = userName;
+      activityPayload.name = name;
       await createActivity(po.id, activityPayload);
 
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
@@ -479,28 +473,27 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       });
 
       const currentUser = getCurrentUser();
-      const userName = currentUser?.username || '';
+      const name = currentUser?.name || '';
       const lineLabel = lineItem.itemName || lineItem.itemCode || 'Line item';
       const actComment = allCompleted
-        ? `All line items completed. PO marked as Completed by ${userName}`
-        : `Line item "${lineLabel}" marked as completed by ${userName}`;
+        ? `All line items completed. PO marked as Completed by ${name}`
+        : `Line item "${lineLabel}" marked as completed by ${name}`;
 
       const activityRes = await createActivity(po.id, {
         comment: actComment,
         status: newPoStatus,
         isSystemGenerated: true,
-        userName,
+        name,
       });
-      const parsed = parseActivityComment(activityRes.comment || activityRes.text || '');
       setNotes((prev) => [
         ...prev,
         {
           id: activityRes.id,
-          text: parsed.text || activityRes.comment || actComment,
-          isSystemGenerated: parsed.isSystemGenerated || true,
+          text: activityRes.comment || actComment,
+          isSystemGenerated: activityRes.isSystemGenerated ?? true,
           status: activityRes.status ?? null,
           timestamp: activityRes.createdAt || new Date().toISOString(),
-          user: parsed.userName || (parsed.isSystemGenerated ? 'System' : 'User'),
+          user: activityRes.name || 'System',
           edited: activityRes.edited || false,
         },
       ]);
@@ -686,6 +679,11 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
     po?.status === PO_STATUS.PARTIALLY_RECEIVED;
 
+  const canPrintPO =
+    po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
+    po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
+    po?.status === PO_STATUS.COMPLETED;
+
   return (
     <>
       <Modal
@@ -706,7 +704,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Space size="middle">
               {/* Print PO Button */}
-              {po && (
+              {po && canPrintPO && (
                 <Button
                   icon={<PrinterOutlined />}
                   onClick={async () => {

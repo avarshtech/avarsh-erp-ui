@@ -25,31 +25,95 @@ import {
   DatabaseOutlined,
   SunOutlined,
   MoonOutlined,
+  ClockCircleOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
 import { useTheme } from "../context/ThemeContext";
+import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
 
 const { Header, Sider, Content } = Layout;
 
-const MainLayout = () => {
+const SessionTimer = () => {
+  const { showHeaderTimer, remainingSeconds } = useSession();
+  const { isDarkMode } = useTheme();
+
+  if (!showHeaderTimer || remainingSeconds === null) return null;
+
+  const formatTime = (secs) => {
+    if (secs === null || secs < 0) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const isUrgent = remainingSeconds <= 30;
+  const isWarn = remainingSeconds <= 60;
+  const color = isUrgent ? '#ff4d4f' : isWarn ? '#fa8c16' : (isDarkMode ? '#818cf8' : '#6366f1');
+  const bg = isUrgent
+    ? (isDarkMode ? 'rgba(255, 77, 79, 0.12)' : 'rgba(255, 77, 79, 0.08)')
+    : isWarn
+      ? (isDarkMode ? 'rgba(250, 140, 22, 0.12)' : 'rgba(250, 140, 22, 0.08)')
+      : (isDarkMode ? 'rgba(129, 140, 248, 0.12)' : 'rgba(99, 102, 241, 0.08)');
+
+  return (
+    <Tooltip title="Session expiring soon — click the dialog close (X) to continue working">
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '5px 10px',
+          borderRadius: 8,
+          background: bg,
+          cursor: 'default',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        <ClockCircleOutlined
+          style={{ fontSize: 13, color }}
+        />
+        <span
+          style={{
+            fontFamily: 'monospace',
+            fontWeight: 600,
+            fontSize: 12,
+            color,
+            letterSpacing: '0.5px',
+          }}
+        >
+          {formatTime(remainingSeconds)}
+        </span>
+      </div>
+    </Tooltip>
+  );
+};
+
+const MainLayoutInner = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
 
-  // Load current user on mount
+  // Load current user on mount and refresh when auth state changes
+  // (e.g., after a background token refresh updates the user session)
   useEffect(() => {
-    const user = getCurrentUser();
-    setCurrentUser(user);
+    const handleAuthChange = () => {
+      const user = getCurrentUser();
+      setCurrentUser(user);
+    };
+
+    handleAuthChange();
+    window.addEventListener('authChange', handleAuthChange);
+    return () => window.removeEventListener('authChange', handleAuthChange);
   }, []);
 
-  const handleLogout = () => {
-    logoutUser();
+  const handleLogout = async () => {
+    await logoutUser();
     message.success("Logged out successfully");
     navigate("/login", { replace: true });
   };
@@ -213,7 +277,7 @@ const MainLayout = () => {
 
   return (
     <SessionExpiryGuard>
-    <Layout style={{ minHeight: "100vh" }}>
+      <Layout style={{ minHeight: "100vh" }}>
       <Sider
         trigger={null}
         collapsible
@@ -312,6 +376,7 @@ const MainLayout = () => {
             />
           </Space>
           <Space size={20}>
+            <SessionTimer />
             <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
               <button
                 onClick={toggleTheme}
@@ -384,9 +449,15 @@ const MainLayout = () => {
           <Outlet />
         </Content>
       </Layout>
-    </Layout>
+      </Layout>
     </SessionExpiryGuard>
   );
 };
+
+const MainLayout = () => (
+  <SessionProvider>
+    <MainLayoutInner />
+  </SessionProvider>
+);
 
 export default MainLayout;
