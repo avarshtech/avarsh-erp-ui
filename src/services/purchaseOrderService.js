@@ -117,7 +117,7 @@ export const deletePurchaseOrder = async (id) => {
 /**
  * Create a new activity for a Purchase Order
  * @param {number} poId - Purchase order ID
- * @param {Object} payload - { comment, status, isSystemGenerated }
+ * @param {Object} payload - { comment, status, isSystemGenerated, name }
  * @returns {Promise<Object>} Created activity
  */
 export const createActivity = async (poId, payload) => {
@@ -125,62 +125,26 @@ export const createActivity = async (poId, payload) => {
   const url = `${ENDPOINTS.PURCHASE_ORDERS}/${poId}/activities`;
   const now = new Date().toISOString();
 
-  const rawComment = payload?.comment || payload?.text || '';
-  const status = payload?.status || 'Draft';
-  const prefix = payload?.isSystemGenerated  ? `[SYS]` : `[USR:${payload?.userName}]`;
-  const formattedComment = `${prefix} ${rawComment}`;
-
   const body = {
     poId: Number(poId),
-    comment: formattedComment,
-    status: status,
+    comment: payload?.comment || payload?.text || '',
+    status: payload?.status || 'Draft',
+    isSystemGenerated: payload?.isSystemGenerated || false,
+    name: payload?.name || '',
     edited: payload?.edited || false,
     createdAt: payload?.createdAt || now,
     updatedAt: payload?.updatedAt || now,
   };
+
+  if (payload?.rejectionCategory) {
+    body.rejectionCategory = payload.rejectionCategory;
+  }
+  if (payload?.rejectionCategoryLabel) {
+    body.rejectionCategoryLabel = payload.rejectionCategoryLabel;
+  }
+
   const res = await axiosInstance.post(url, body);
-  const data = res.data;
-  return data;
-};
-
-/**
- * Parse activity comment to extract isSystemGenerated and status
- * Format: [SYS:status] comment or [USR:status] comment
- * @param {string} comment - The raw comment from the database
- * @returns {Object} { text, isSystemGenerated, status }
- */
-export const parseActivityComment = (comment) => {
-  if (!comment) return { text: '', isSystemGenerated: false, status: null };
-
-  // Support prefixes:
-  // - [USR:UserName] message  (user-created with username in prefix)
-  // - [SYS] message          (system-generated)
-  const prefixPattern = /^\[(SYS|USR)(?::([^\]]+))?\]\s*/;
-  const match = comment.match(prefixPattern);
-
-  if (match) {
-    const isSystemGenerated = match[1] === 'SYS';
-    const meta = match[2] || null;
-    let userName = null;
-
-    if (!isSystemGenerated && meta) {
-      // New format: [USR:UserName]
-      userName = meta;
-    }
-
-    const text = comment.replace(prefixPattern, '');
-    return { text, isSystemGenerated, userName };
-  }
-
-  if (comment.startsWith('[SYSTEM]')) {
-    return {
-      text: comment.replace(/^\[SYSTEM\]\s*/, ''),
-      isSystemGenerated: true,
-      userName: null,
-    };
-  }
-
-  return { text: comment, isSystemGenerated: false, userName: null };
+  return res.data;
 };
 
 export default {
@@ -191,5 +155,4 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   createActivity,
-  parseActivityComment,
 };

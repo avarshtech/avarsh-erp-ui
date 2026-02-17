@@ -1,102 +1,45 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Modal, Typography, Button, Space, Progress } from 'antd';
+import { useCallback } from 'react';
+import { Modal, Typography, Button, Space, Progress, message } from 'antd';
 import {
   ClockCircleOutlined,
   WarningOutlined,
   LoginOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getTokenExpirySeconds, logoutUser, isAuthenticated } from '../services/authService';
+import { logoutUser } from '../services/authService';
+import { useSession } from '../context/SessionContext';
 
 const { Text, Title } = Typography;
 
-/**
- * SessionExpiryGuard
- *
- * Monitors JWT token expiry and:
- * 1. When token expires → forces re-login with a blocking modal
- * 2. 2 minutes before expiry → shows a warning banner with countdown timer
- *
- * Checks every 30 seconds. Warning threshold is 120 seconds (2 minutes).
- */
-const WARNING_THRESHOLD_SECONDS = 120; // Show warning 2 minutes before expiry
-const CHECK_INTERVAL_MS = 15000; // Check every 15 seconds
-
 const SessionExpiryGuard = ({ children }) => {
   const navigate = useNavigate();
-  const [showWarning, setShowWarning] = useState(false);
-  const [showExpired, setShowExpired] = useState(false);
-  const [remainingSeconds, setRemainingSeconds] = useState(null);
-  const timerRef = useRef(null);
-  const countdownRef = useRef(null);
+  const {
+    remainingSeconds,
+    isExpired,
+    showWarningModal,
+    refreshing,
+    dismissWarningModal,
+    handleRefreshSession,
+    resetSession,
+    WARNING_THRESHOLD_SECONDS,
+  } = useSession();
 
-  // Force logout and redirect
-  const handleForceLogout = useCallback(() => {
-    setShowWarning(false);
-    setShowExpired(false);
-    logoutUser();
+  const handleForceLogout = useCallback(async () => {
+    resetSession();
+    await logoutUser();
     navigate('/login', { replace: true });
-  }, [navigate]);
+  }, [navigate, resetSession]);
 
-  // Start the 1-second countdown when warning is active
-  const startCountdown = useCallback((seconds) => {
-    if (countdownRef.current) clearInterval(countdownRef.current);
-
-    setRemainingSeconds(seconds);
-    countdownRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(countdownRef.current);
-          countdownRef.current = null;
-          // Token has expired
-          setShowWarning(false);
-          setShowExpired(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, []);
-
-  // Periodic check for token expiry
-  const checkSession = useCallback(() => {
-    if (!isAuthenticated()) {
-      // Token already expired or removed
-      setShowWarning(false);
-      setShowExpired(true);
-      return;
+  const handleRefresh = useCallback(async () => {
+    const success = await handleRefreshSession();
+    if (success) {
+      message.success('Session renewed successfully');
+    } else {
+      message.error('Session could not be renewed. Please log in again.');
     }
+  }, [handleRefreshSession]);
 
-    const secondsLeft = getTokenExpirySeconds();
-    if (secondsLeft === null) return; // No exp claim, skip
-
-    if (secondsLeft <= 0) {
-      // Expired
-      setShowWarning(false);
-      setShowExpired(true);
-    } else if (secondsLeft <= WARNING_THRESHOLD_SECONDS) {
-      // About to expire — show warning with countdown
-      if (!showWarning && !showExpired) {
-        setShowWarning(true);
-        startCountdown(secondsLeft);
-      }
-    }
-  }, [showWarning, showExpired, startCountdown]);
-
-  // Set up the periodic check
-  useEffect(() => {
-    // Initial check
-    checkSession();
-
-    timerRef.current = setInterval(checkSession, CHECK_INTERVAL_MS);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
-    };
-  }, [checkSession]);
-
-  // Format seconds as MM:SS
   const formatTime = (secs) => {
     if (secs === null || secs < 0) return '0:00';
     const m = Math.floor(secs / 60);
@@ -104,7 +47,6 @@ const SessionExpiryGuard = ({ children }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress percentage (out of WARNING_THRESHOLD_SECONDS)
   const progressPercent = remainingSeconds !== null
     ? Math.max(0, Math.round((remainingSeconds / WARNING_THRESHOLD_SECONDS) * 100))
     : 0;
@@ -113,12 +55,13 @@ const SessionExpiryGuard = ({ children }) => {
     <>
       {children}
 
-      {/* ── Warning Modal: Session about to expire ── */}
+      {/* Warning Modal: Session about to expire */}
       <Modal
-        open={showWarning}
-        closable={false}
-        maskClosable={false}
-        keyboard={false}
+        open={showWarningModal}
+        closable={true}
+        onCancel={dismissWarningModal}
+        maskClosable={true}
+        keyboard={true}
         footer={null}
         centered
         width={440}
@@ -138,7 +81,7 @@ const SessionExpiryGuard = ({ children }) => {
             Session Expiring Soon
           </Title>
           <Text type="secondary">
-            Your session will expire shortly. Please save your work.
+            Your session will expire shortly. Please save your work or refresh your session.
           </Text>
         </div>
 
@@ -157,30 +100,40 @@ const SessionExpiryGuard = ({ children }) => {
             )}
             size={120}
             strokeColor={remainingSeconds <= 30 ? '#ff4d4f' : remainingSeconds <= 60 ? '#fa8c16' : '#1677ff'}
-            trailColor="var(--border-color, #f0f0f0)"
+            railColor="var(--border-color, #f0f0f0)"
           />
         </div>
 
         <Text type="secondary" style={{ fontSize: 13 }}>
-          You will be logged out when the timer reaches zero.
+          You can close this dialog to continue working. The timer will appear in the header.
         </Text>
 
         <div style={{ marginTop: 24 }}>
-          <Button
-            type="primary"
-            danger
-            icon={<LoginOutlined />}
-            onClick={handleForceLogout}
-            size="large"
-          >
-            Logout Now
-          </Button>
+          <Space size="middle">
+            <Button
+              type="primary"
+              icon={<ReloadOutlined />}
+              onClick={handleRefresh}
+              loading={refreshing}
+              size="large"
+            >
+              Refresh Session
+            </Button>
+            <Button
+              danger
+              icon={<LoginOutlined />}
+              onClick={handleForceLogout}
+              size="large"
+            >
+              Logout Now
+            </Button>
+          </Space>
         </div>
       </Modal>
 
-      {/* ── Expired Modal: Session has expired ── */}
+      {/* Expired Modal: Session has expired */}
       <Modal
-        open={showExpired}
+        open={isExpired}
         closable={false}
         maskClosable={false}
         keyboard={false}

@@ -119,9 +119,6 @@ const ItemSearchInput = ({ value, onSelect, onChange, disabled }) => {
             label: (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>{item.itemCode || ''} - {item.itemName || ''}</span>
-                {item.categoryName && (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{item.categoryName}</span>
-                )}
               </div>
             ),
             item,
@@ -1010,7 +1007,7 @@ const POForm = () => {
       const payload = buildPayload(PO_STATUS.DRAFT);
 
       const currentUser = getCurrentUser();
-      const userName = currentUser?.username || '';
+      const name = currentUser?.name || '';
 
       if (isEditMode) {
         await updatePurchaseOrder(id, payload);
@@ -1019,10 +1016,10 @@ const POForm = () => {
         const previousStatus = originalPO?.status;
         if (previousStatus === PO_STATUS.REJECTED || previousStatus === PO_STATUS.REFERRED_BACK) {
           await createActivity(id, {
-            comment: `PO saved as draft by ${userName}. Previous status: ${previousStatus}`,
+            comment: `PO saved as draft by ${name}. Previous status: ${previousStatus}`,
             status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
-            userName,
+            name,
           });
         }
 
@@ -1033,10 +1030,10 @@ const POForm = () => {
         // Activity log for new draft
         if (createdPO?.id) {
           await createActivity(createdPO.id, {
-            comment: `PO created as draft by ${userName}`,
+            comment: `PO created as draft by ${name}`,
             status: PO_STATUS.DRAFT,
             isSystemGenerated: true,
-            userName,
+            name,
           });
         }
 
@@ -1107,24 +1104,24 @@ const POForm = () => {
 
       // Create system activity log
       const currentUser = getCurrentUser();
-      const userName = currentUser?.username || '';
+      const name = currentUser?.name || '';
       const poId = result?.id || id;
 
       if (poId) {
         const previousStatus = originalPO?.status;
         if (isEditMode && (previousStatus === PO_STATUS.REJECTED || previousStatus === PO_STATUS.REFERRED_BACK)) {
           await createActivity(poId, {
-            comment: `PO re-submitted for approval by ${userName}. Previous status: ${previousStatus}`,
+            comment: `PO re-submitted for approval by ${name}. Previous status: ${previousStatus}`,
             status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
-            userName,
+            name,
           });
         } else {
           await createActivity(poId, {
-            comment: `PO submitted for approval by ${userName}`,
+            comment: `PO submitted for approval by ${name}`,
             status: PO_STATUS.PENDING_APPROVAL,
             isSystemGenerated: true,
-            userName,
+            name,
           });
         }
       }

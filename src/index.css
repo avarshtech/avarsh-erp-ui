@@ -507,6 +507,52 @@ body {
   background: var(--table-row-hover) !important;
 }
 
+/* DatePicker - Selected & Range styles for dark mode */
+[data-theme="dark"] .ant-picker-cell-selected .ant-picker-cell-inner,
+[data-theme="dark"] .ant-picker-cell-range-start .ant-picker-cell-inner,
+[data-theme="dark"] .ant-picker-cell-range-end .ant-picker-cell-inner {
+  background: var(--primary-color) !important;
+  color: #ffffff !important;
+  border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-picker-cell-in-range::before {
+  background: var(--primary-light) !important;
+}
+
+[data-theme="dark"] .ant-picker-cell-range-start::before,
+[data-theme="dark"] .ant-picker-cell-range-end::before {
+  background: var(--primary-light) !important;
+}
+
+[data-theme="dark"] .ant-picker-cell-in-range .ant-picker-cell-inner {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-picker-cell-range-hover::before,
+[data-theme="dark"] .ant-picker-cell-range-hover-start::before,
+[data-theme="dark"] .ant-picker-cell-range-hover-end::before,
+[data-theme="dark"] td.ant-picker-cell.ant-picker-cell-in-view.ant-picker-cell-range-hover::before {
+  background: rgba(129, 140, 248, 0.2) !important;
+}
+
+[data-theme="dark"] .ant-picker-cell-today .ant-picker-cell-inner::before {
+  border-color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-picker-footer {
+  background: var(--card-bg) !important;
+  border-top-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .ant-picker-preset > span {
+  color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-picker-header-view button:hover {
+  color: var(--primary-color) !important;
+}
+
 /* Typography */
 .ant-typography {
   color: var(--text-primary);

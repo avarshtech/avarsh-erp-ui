@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Form, Input, Button, Card, Typography, Checkbox, message, Spin } from 'antd';
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { authenticateUser, isAuthenticated } from '../../services/authService';
+import { authenticateUser, isAuthenticated, initializeSession } from '../../services/authService';
+import { hasSessionActiveFlag } from '../../services/sessionStore';
 import { useTheme } from '../../context/ThemeContext';
 import { getFirstAccessibleRoute } from '../../utils/permissions';
 import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
@@ -19,13 +20,28 @@ const Login = () => {
   const { isDarkMode } = useTheme();
   const [messageApi, contextHolder] = message.useMessage();
 
-  // Check if already logged in
+  // Check if already logged in (or if session can be restored via refresh cookie)
   useEffect(() => {
-    if (isAuthenticated()) {
-      const from = location.state?.from?.pathname || '/';
-      navigate(from, { replace: true });
-    }
-    setCheckingAuth(false);
+    const checkAuth = async () => {
+      if (isAuthenticated()) {
+        const from = location.state?.from?.pathname || '/';
+        navigate(from, { replace: true });
+        setCheckingAuth(false);
+        return;
+      }
+      // If a sessionActive flag exists, try to restore session via the HttpOnly cookie
+      if (hasSessionActiveFlag()) {
+        const success = await initializeSession();
+        if (success) {
+          const from = location.state?.from?.pathname || '/';
+          navigate(from, { replace: true });
+          setCheckingAuth(false);
+          return;
+        }
+      }
+      setCheckingAuth(false);
+    };
+    checkAuth();
   }, [navigate, location]);
 
   // Load remembered username
