@@ -183,14 +183,14 @@ const RoleAccess = () => {
       }
 
       // If disabling 'view' for standard modules, disable all operations
-      if (operationId === 'view' && !checked && moduleId !== 'po-approval') {
+      if (operationId === 'view' && !checked && moduleId !== 'po-approval' && moduleId !== 'order-actions') {
         const ops = getOperationsForModule(moduleId);
         ops.forEach((op) => { updated[moduleId].operations[op] = false; });
         updated[moduleId].access = false;
       } else {
         updated[moduleId].operations[operationId] = checked;
         // If enabling any operation other than view, also enable view
-        if (checked && operationId !== 'view' && moduleId !== 'po-approval') {
+        if (checked && operationId !== 'view' && moduleId !== 'po-approval' && moduleId !== 'order-actions') {
           updated[moduleId].operations.view = true;
         }
         updated[moduleId].access = Object.values(updated[moduleId].operations).some(Boolean);
@@ -202,6 +202,15 @@ const RoleAccess = () => {
         if (updated['po-approval']) {
           approvalOps.forEach((op) => { updated['po-approval'].operations[op] = false; });
           updated['po-approval'].access = false;
+        }
+      }
+
+      // Enforce order-actions → orders link
+      if (moduleId === 'orders' && !updated['orders'].access) {
+        const actionOps = getOperationsForModule('order-actions');
+        if (updated['order-actions']) {
+          actionOps.forEach((op) => { updated['order-actions'].operations[op] = false; });
+          updated['order-actions'].access = false;
         }
       }
 
@@ -237,6 +246,15 @@ const RoleAccess = () => {
         };
       }
 
+      // Enforce order-actions → orders link on uncheck
+      if (moduleId === 'orders' && !checked) {
+        const actionOps = getOperationsForModule('order-actions');
+        updated['order-actions'] = {
+          access: false,
+          operations: actionOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+        };
+      }
+
       return updated;
     });
     setPermissions((latest) => {
@@ -253,6 +271,15 @@ const RoleAccess = () => {
       group.modules.forEach((mod) => {
         // Skip po-approval if PO is being unchecked
         if (mod.id === 'po-approval' && !checked) {
+          const ops = getOperationsForModule(mod.id);
+          updated[mod.id] = {
+            access: false,
+            operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+          };
+          return;
+        }
+        // Skip order-actions if Orders is being unchecked
+        if (mod.id === 'order-actions' && !checked) {
           const ops = getOperationsForModule(mod.id);
           updated[mod.id] = {
             access: false,
@@ -513,8 +540,10 @@ const RoleAccess = () => {
   const renderModuleRow = (mod) => {
     const ops = getOperationsForModule(mod.id);
     const isPOApproval = mod.id === 'po-approval';
+    const isOrderActions = mod.id === 'order-actions';
     const poHasAccess = permissions['purchase-orders']?.access;
-    const isLinkedDisabled = isPOApproval && !poHasAccess;
+    const ordersHasAccess = permissions['orders']?.access;
+    const isLinkedDisabled = (isPOApproval && !poHasAccess) || (isOrderActions && !ordersHasAccess);
 
     return (
       <div
@@ -552,6 +581,11 @@ const RoleAccess = () => {
           </div>
           {isPOApproval && (
             <Tooltip title="Requires Purchase Orders access to be enabled">
+              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+            </Tooltip>
+          )}
+          {isOrderActions && (
+            <Tooltip title="Requires Orders access to be enabled">
               <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
             </Tooltip>
           )}
@@ -654,6 +688,19 @@ const RoleAccess = () => {
           <Alert
             title="PO Approval actions are linked to Purchase Orders access"
             description="Approval, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
+            type="info"
+            showIcon
+            icon={<LinkOutlined />}
+            style={{ marginBottom: 12 }}
+            closable
+          />
+        )}
+
+        {/* Order Actions dependency notice */}
+        {permissions['orders']?.access && (
+          <Alert
+            title="Order Actions are linked to Orders access"
+            description="Submit and Refer Back operations require the Orders module to be enabled."
             type="info"
             showIcon
             icon={<LinkOutlined />}

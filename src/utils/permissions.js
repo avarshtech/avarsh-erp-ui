@@ -6,6 +6,7 @@
  * {
  *   "dashboard":        { "access": true, "operations": { "view": true } },
  *   "orders":           { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "order-actions":    { "access": true, "operations": { "submit": true, "refer_back": true } },
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
@@ -44,6 +45,13 @@ export const MODULES = {
     name: 'Purchase Orders',
     path: '/purchase-orders',
     group: 'transactions',
+  },
+  ORDER_ACTIONS: {
+    id: 'order-actions',
+    name: 'Order Actions',
+    path: '/orders', // Integrated within Orders module
+    group: 'transactions',
+    linkedTo: 'orders',
   },
   PO_APPROVAL: {
     id: 'po-approval',
@@ -104,6 +112,7 @@ export const OPERATIONS = {
   ADD: { id: 'add', name: 'Add' },
   UPDATE: { id: 'update', name: 'Update' },
   DELETE: { id: 'delete', name: 'Delete' },
+  SUBMIT: { id: 'submit', name: 'Submit' },
   APPROVE: { id: 'approve', name: 'Approve' },
   REJECT: { id: 'reject', name: 'Reject' },
   CANCEL: { id: 'cancel', name: 'Cancel' },
@@ -112,6 +121,9 @@ export const OPERATIONS = {
 
 // Standard CRUD operations
 export const STANDARD_OPERATIONS = ['view', 'add', 'update', 'delete'];
+
+// Order Action operations
+export const ORDER_ACTION_OPERATIONS = ['submit', 'refer_back'];
 
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['approve', 'reject', 'cancel', 'refer_back'];
@@ -136,6 +148,7 @@ export const PERMISSION_GROUPS = [
     icon: 'ShoppingCartOutlined',
     modules: [
       { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
+      { id: 'order-actions', name: 'Order Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
@@ -180,6 +193,7 @@ export const getSidebarModules = () =>
 
 /** Returns which operations apply to a given module ID */
 export const getOperationsForModule = (moduleId) => {
+  if (moduleId === 'order-actions') return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval') return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard') return DASHBOARD_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
@@ -289,6 +303,18 @@ export const hasAnyPermission = (checks) => {
   return checks.some(({ module, operation }) => hasPermission(module, operation));
 };
 
+// ─── ORDER ACTION HELPERS (linked to Orders access) ────────────────────────────
+
+export const canSubmitOrder = () =>
+  hasModuleAccess('orders') && hasPermission('order-actions', 'submit');
+
+export const canReferBackOrder = () =>
+  hasModuleAccess('orders') && hasPermission('order-actions', 'refer_back');
+
+export const canPerformOrderActions = () =>
+  hasModuleAccess('orders') &&
+  (canSubmitOrder() || canReferBackOrder());
+
 // ─── PO APPROVAL HELPERS (linked to PO access) ────────────────────────────────
 
 export const canApprovePO = () =>
@@ -379,6 +405,17 @@ export const normalizePermissionsForSave = (permissions) => {
     const access = Object.values(operations).some(Boolean);
     normalized[module.id] = { access, operations };
   });
+
+  // Enforce order-actions → orders link
+  if (!normalized['orders']?.access) {
+    normalized['order-actions'] = {
+      access: false,
+      operations: ORDER_ACTION_OPERATIONS.reduce((acc, op) => {
+        acc[op] = false;
+        return acc;
+      }, {}),
+    };
+  }
 
   // Enforce PO-approval → PO link
   if (!normalized['purchase-orders']?.access) {
