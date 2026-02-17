@@ -827,6 +827,60 @@ body {
   transform: rotate(15deg);
 }
 
+/* Descriptions */
+.ant-descriptions {
+  background: var(--card-bg) !important;
+}
+
+.ant-descriptions-view {
+  border-color: var(--border-color) !important;
+}
+
+.ant-descriptions-item-label {
+  color: var(--text-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Only bordered descriptions get label background (uses th elements) */
+th.ant-descriptions-item-label {
+  background: var(--bg-tertiary) !important;
+}
+
+.ant-descriptions-item-content {
+  background: var(--card-bg) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+/* Collapse */
+.ant-collapse {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-collapse-item {
+  border-color: var(--border-color) !important;
+}
+
+.ant-collapse-header {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.ant-collapse-content {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-collapse-content-box {
+  color: var(--text-primary) !important;
+}
+
+/* Divider */
+.ant-divider {
+  border-color: var(--border-color) !important;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .page-header {
