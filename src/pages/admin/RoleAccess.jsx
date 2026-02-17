@@ -652,7 +652,7 @@ const RoleAccess = () => {
         {/* PO Approval dependency notice */}
         {permissions['purchase-orders']?.access && (
           <Alert
-            message="PO Approval actions are linked to Purchase Orders access"
+            title="PO Approval actions are linked to Purchase Orders access"
             description="Approval, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
             type="info"
             showIcon

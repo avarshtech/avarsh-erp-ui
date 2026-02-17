@@ -100,7 +100,7 @@ const SessionExpiryGuard = ({ children }) => {
             )}
             size={120}
             strokeColor={remainingSeconds <= 30 ? '#ff4d4f' : remainingSeconds <= 60 ? '#fa8c16' : '#1677ff'}
-            trailColor="var(--border-color, #f0f0f0)"
+            railColor="var(--border-color, #f0f0f0)"
           />
         </div>
 

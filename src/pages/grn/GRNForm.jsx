@@ -131,7 +131,7 @@ const GRNForm = () => {
         {lineItems.length > 0 && (
           <Card style={{ marginBottom: 24 }}>
             <Title level={5} style={{ marginBottom: 16 }}>Receive Items</Title>
-            {getTotalRejected() > 0 && <Alert message={`${getTotalRejected()} items marked as rejected. Please ensure quality inspection notes are added.`} type="warning" showIcon style={{ marginBottom: 16 }} />}
+            {getTotalRejected() > 0 && <Alert title={`${getTotalRejected()} items marked as rejected. Please ensure quality inspection notes are added.`} type="warning" showIcon style={{ marginBottom: 16 }} />}
             <Table columns={columns} dataSource={lineItems} pagination={false} scroll={{ x: 1000 }} size="middle" summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={{ background: '#f8fafc' }}>

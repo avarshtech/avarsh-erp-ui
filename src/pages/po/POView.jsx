@@ -968,7 +968,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                     style={{ marginBottom: 24, paddingTop: 8 }}
                     items={notes.map((note) => ({
                       color: note.isSystemGenerated ? 'blue' : 'green',
-                      dot: note.isSystemGenerated ? (
+                      icon: note.isSystemGenerated ? (
                         <SettingOutlined style={{ fontSize: 14 }} />
                       ) : (
                         <UserOutlined style={{ fontSize: 14 }} />
