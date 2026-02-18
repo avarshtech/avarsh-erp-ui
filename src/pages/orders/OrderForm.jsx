@@ -802,7 +802,7 @@ const OrderForm = () => {
   };
 
   return (
-    <div className="animate-fade-in-up" style={{ paddingBottom: 60 }}>
+    <div className="animate-fade-in-up">
       {/* Page Header */}
       <div className="page-header">
         <Space>

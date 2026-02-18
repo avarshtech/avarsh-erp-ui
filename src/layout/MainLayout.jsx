@@ -179,7 +179,7 @@ const MainLayoutInner = () => {
       icon: <DatabaseOutlined />,
       label: "Master Data",
       // Master Data is visible if user has access to any master module
-      moduleId: ["master-data", "supplier-info", "items", "terms-conditions"],
+      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions"],
     },
     {
       key: "/admin",

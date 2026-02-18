@@ -27,6 +27,7 @@ import {
   DeleteOutlined,
   EyeOutlined,
   ExclamationCircleOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -45,15 +46,16 @@ const { Text, Title } = Typography;
 const PAN_REGEX = /^[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z]$/;
 const GSTIN_REGEX = /^[0-9]{2}[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const SWIFT_REGEX = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 
 const SupplierMaster = () => {
   // Store context
-  const { 
-    suppliers: storeSuppliers, 
-    setData, 
-    isCacheValid, 
-    setLoading: setStoreLoading, 
-    loading: storeLoading,
+  const {
+    suppliers: storeSuppliers,
+    setData,
+    isCacheValid,
+    setLoading: setStoreLoading,
     addItem,
     updateItem,
     removeItem,
@@ -127,6 +129,7 @@ const SupplierMaster = () => {
         s.name?.toLowerCase().includes(search) ||
         s.email?.toLowerCase().includes(search) ||
         s.phone?.includes(search) ||
+        s.contactPerson?.toLowerCase().includes(search) ||
         s.city?.toLowerCase().includes(search) ||
         s.state?.toLowerCase().includes(search) ||
         s.pan?.toLowerCase().includes(search) ||
@@ -215,6 +218,8 @@ const SupplierMaster = () => {
         pan: values.pan?.toUpperCase(),
         gstin: gstin,
         stateCode: stateCode,
+        ifscCode: values.ifscCode?.toUpperCase() || null,
+        swiftCode: values.swiftCode?.toUpperCase() || null,
       };
 
       if (editingSupplier) {
@@ -298,7 +303,12 @@ const SupplierMaster = () => {
     doCloseSupplierModal();
   };
 
-  // Table columns - simplified for better readability
+  // Check if supplier has any bank details
+  const hasBankDetails = (supplier) =>
+    supplier?.bankName || supplier?.bankAccountNumber || supplier?.bankBranch ||
+    supplier?.swiftCode || supplier?.ifscCode;
+
+  // Table columns
   const columns = [
     {
       title: 'Supplier Name',
@@ -312,6 +322,14 @@ const SupplierMaster = () => {
           <Text strong>{name}</Text>
         </Button>
       ),
+    },
+    {
+      title: 'Contact Person',
+      dataIndex: 'contactPerson',
+      key: 'contactPerson',
+      width: 150,
+      ellipsis: true,
+      render: (val) => val || '-',
     },
     {
       title: 'Phone',
@@ -450,7 +468,7 @@ const SupplierMaster = () => {
         rowKey="id"
         loading={loading}
         size="small"
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1100 }}
         pagination={{
           showSizeChanger: true,
           showQuickJumper: true,
@@ -483,7 +501,7 @@ const SupplierMaster = () => {
           </Space>
         }
         placement="right"
-        styles={{ wrapper: { width: 520 } }}
+        styles={{ wrapper: { width: 560 } }}
         onClose={() => {
           setViewDrawerVisible(false);
           setViewingSupplier(null);
@@ -523,14 +541,15 @@ const SupplierMaster = () => {
             </div>
 
             <Divider titlePlacement="start">Basic Information</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+            <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
               { key: 'id', label: 'Supplier ID', children: viewingSupplier.id },
+              { key: 'contactPerson', label: 'Contact Person', children: viewingSupplier.contactPerson || '-' },
               { key: 'email', label: 'Email', children: viewingSupplier.email || '-' },
               { key: 'phone', label: 'Phone', children: viewingSupplier.phone || '-' },
             ]} />
 
             <Divider titlePlacement="start">Address</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+            <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
               { key: 'address', label: 'Address', children: viewingSupplier.address || '-' },
               { key: 'city', label: 'City', children: viewingSupplier.city || '-' },
               { key: 'state', label: 'State', children: viewingSupplier.state || '-' },
@@ -539,7 +558,7 @@ const SupplierMaster = () => {
             ]} />
 
             <Divider titlePlacement="start">Tax Information</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+            <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
               { key: 'pan', label: 'PAN', children: viewingSupplier.pan || '-' },
               { key: 'gstin', label: 'GSTIN', children: viewingSupplier.gstin || '-' },
               {
@@ -553,8 +572,21 @@ const SupplierMaster = () => {
               },
             ]} />
 
+            <Divider titlePlacement="start"><BankOutlined style={{ marginRight: 6 }} />Bank Details</Divider>
+            {hasBankDetails(viewingSupplier) ? (
+              <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
+                { key: 'bankName', label: 'Bank Name', children: viewingSupplier.bankName || '-' },
+                { key: 'bankAccountNumber', label: 'Account Number', children: viewingSupplier.bankAccountNumber || '-' },
+                { key: 'bankBranch', label: 'Branch', children: viewingSupplier.bankBranch || '-' },
+                { key: 'ifscCode', label: 'IFSC Code', children: viewingSupplier.ifscCode || '-' },
+                { key: 'swiftCode', label: 'SWIFT Code', children: viewingSupplier.swiftCode || '-' },
+              ]} />
+            ) : (
+              <Text type="secondary" style={{ fontSize: 13 }}>No bank details provided</Text>
+            )}
+
             <Divider titlePlacement="start">Metadata</Divider>
-            <Descriptions column={1} size="small" styles={{ label: { width: 120 } }} items={[
+            <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
               {
                 key: 'created',
                 label: 'Created',
@@ -579,7 +611,9 @@ const SupplierMaster = () => {
         title={editingSupplier ? 'Update Supplier' : 'Add Supplier'}
         open={modalVisible}
         onCancel={() => handleSupplierModalClose()}
-        width={720}
+        centered
+        width={960}
+        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: 16 } }}
         footer={[
           <Button
             key="cancel"
@@ -601,7 +635,7 @@ const SupplierMaster = () => {
         <Form
           form={form}
           layout="vertical"
-          requiredMark="optional"
+          requiredMark
           initialValues={{
             active: true,
             suppliesFabric: false,
@@ -610,8 +644,10 @@ const SupplierMaster = () => {
           }}
           onValuesChange={() => setSupplierUnsaved(true)}
         >
+          {/* --- Supplier Information --- */}
+          <Divider orientation="left" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Supplier Information</Divider>
           <Row gutter={16}>
-            <Col span={24}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="name"
                 label="Supplier Name"
@@ -628,20 +664,60 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
 
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="contactPerson"
+                label="Contact Person"
+                rules={[
+                  { required: true, message: 'Contact Person is required' },
+                  { pattern: /^[a-zA-Z\s.]+$/, message: 'Only letters, spaces and dots allowed' },
+                ]}
+              >
+                <Input placeholder="Enter Contact Person" maxLength={100} />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: 'Email is required' },
+                  { pattern: EMAIL_REGEX, message: 'Invalid email format' },
+                ]}
+              >
+                <Input placeholder="Enter Email" maxLength={100} />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="phone"
+                label="Phone Number"
+                rules={[
+                  { required: true, message: 'Phone Number is required' },
+                  { pattern: /^[0-9]{10}$/, message: 'Phone must be 10 digits' },
+                ]}
+                normalize={(value) => value?.replace(/[^0-9]/g, '').slice(0, 10)}
+              >
+                <Input placeholder="Enter Phone Number" maxLength={10} />
+              </Form.Item>
+            </Col>
+
             <Col span={24}>
               <Form.Item
                 name="address"
                 label="Address"
                 rules={[
                   { required: true, message: 'Address is required' },
-                  { pattern: /^[a-zA-Z0-9\s\-/]+$/, message: 'Only letters, numbers, spaces, - and / allowed' },
+                  { pattern: /^[a-zA-Z0-9\s\-/,.\n]+$/, message: 'Only letters, numbers, spaces, - / , . allowed' },
                 ]}
               >
                 <Input placeholder="Enter Address" maxLength={200} />
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="pincode"
                 label="Pincode"
@@ -662,7 +738,7 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="city"
                 label="City"
@@ -675,7 +751,7 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="state"
                 label="State"
@@ -688,7 +764,7 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="country"
                 label="Country"
@@ -701,7 +777,24 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Supplies" required>
+                <Space>
+                  <Form.Item name="suppliesFabric" valuePropName="checked" noStyle>
+                    <Checkbox>Fabric</Checkbox>
+                  </Form.Item>
+                  <Form.Item name="suppliesTrims" valuePropName="checked" noStyle>
+                    <Checkbox>Trims</Checkbox>
+                  </Form.Item>
+                </Space>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* --- Tax & Compliance --- */}
+          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>Tax & Compliance</Divider>
+          <Row gutter={16}>
+            <Col span={8}>
               <Form.Item
                 name="pan"
                 label="PAN"
@@ -714,11 +807,11 @@ const SupplierMaster = () => {
                 ]}
                 normalize={(value) => value?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 10)}
               >
-                <Input placeholder="Enter PAN (e.g., ABCPD1234E)" maxLength={10} />
+                <Input placeholder="e.g., ABCPD1234E" maxLength={10} />
               </Form.Item>
             </Col>
 
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="gstin"
                 label="GSTIN"
@@ -731,55 +824,88 @@ const SupplierMaster = () => {
                 ]}
                 normalize={(value) => value?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 15)}
               >
-                <Input placeholder="Enter GSTIN (e.g., 22ABCPD1234E1Z5)" maxLength={15} />
+                <Input placeholder="e.g., 22ABCPD1234E1Z5" maxLength={15} />
               </Form.Item>
             </Col>
 
-            <Col span={12}>
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: 'Email is required' },
-                  { pattern: EMAIL_REGEX, message: 'Invalid email format' },
-                ]}
-              >
-                <Input placeholder="Enter Email" maxLength={100} />
-              </Form.Item>
-            </Col>
-
-            <Col span={12}>
-              <Form.Item
-                name="phone"
-                label="Phone Number"
-                rules={[
-                  { required: true, message: 'Phone Number is required' },
-                  { pattern: /^[0-9]{10}$/, message: 'Phone must be 10 digits' },
-                ]}
-                normalize={(value) => value?.replace(/[^0-9]/g, '').slice(0, 10)}
-              >
-                <Input placeholder="Enter Phone Number" maxLength={10} />
-              </Form.Item>
-            </Col>
-
-            <Col span={12}>
-              <Form.Item label="Supplies" required>
-                <Space>
-                  <Form.Item name="suppliesFabric" valuePropName="checked" noStyle>
-                    <Checkbox>Fabric</Checkbox>
-                  </Form.Item>
-                  <Form.Item name="suppliesTrims" valuePropName="checked" noStyle>
-                    <Checkbox>Trims</Checkbox>
-                  </Form.Item>
-                </Space>
-              </Form.Item>
-            </Col>
-
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item label="Tax Settings">
                 <Form.Item name="igstApplicable" valuePropName="checked" noStyle>
                   <Checkbox>IGST Applicable</Checkbox>
                 </Form.Item>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* --- Bank Details --- */}
+          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
+            <BankOutlined style={{ marginRight: 6 }} />Bank Details
+          </Divider>
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="bankName"
+                label="Bank Name"
+                rules={[{ required: true, message: 'Bank Name is required' }]}
+              >
+                <Input placeholder="Enter Bank Name" maxLength={100} />
+              </Form.Item>
+            </Col>
+
+            <Col span={8}>
+              <Form.Item
+                name="bankAccountNumber"
+                label="Account Number"
+                rules={[
+                  { required: true, message: 'Account Number is required' },
+                  { pattern: /^[0-9]+$/, message: 'Only digits allowed' },
+                ]}
+                normalize={(value) => value?.replace(/[^0-9]/g, '').slice(0, 20)}
+              >
+                <Input placeholder="Enter Account Number" maxLength={20} />
+              </Form.Item>
+            </Col>
+
+            <Col span={8}>
+              <Form.Item
+                name="bankBranch"
+                label="Branch"
+                rules={[{ required: true, message: 'Branch is required' }]}
+              >
+                <Input placeholder="Enter Branch" maxLength={100} />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="ifscCode"
+                label="IFSC Code"
+                rules={[
+                  { required: true, message: 'IFSC Code is required' },
+                  {
+                    pattern: IFSC_REGEX,
+                    message: 'Invalid IFSC format (e.g., SBIN0001234)',
+                  },
+                ]}
+                normalize={(value) => value?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11)}
+              >
+                <Input placeholder="e.g., SBIN0001234" maxLength={11} />
+              </Form.Item>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="swiftCode"
+                label="SWIFT Code"
+                rules={[
+                  {
+                    pattern: SWIFT_REGEX,
+                    message: 'Invalid SWIFT format (e.g., SBININBB)',
+                  },
+                ]}
+                normalize={(value) => value?.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 11)}
+              >
+                <Input placeholder="e.g., SBININBB" maxLength={11} />
               </Form.Item>
             </Col>
           </Row>

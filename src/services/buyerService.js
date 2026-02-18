@@ -45,24 +45,3 @@ export const deleteBuyer = async (id) => {
   const response = await axiosInstance.post(ENDPOINTS.BUYERS, { id, active: false });
   return response.data ?? response;
 };
-
-/**
- * Get location details by pincode (Indian postal code)
- */
-export const getLocationByPincode = async (pincode) => {
-  try {
-    const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await response.json();
-    if (data?.[0]?.Status === 'Success' && data[0].PostOffice?.length > 0) {
-      const po = data[0].PostOffice[0];
-      return {
-        city: po.District || po.Division,
-        state: po.State,
-        country: po.Country || 'India',
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
-};
