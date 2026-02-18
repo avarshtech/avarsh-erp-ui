@@ -11,6 +11,7 @@
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
  *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true } },
  *   "master-data":      { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
@@ -65,6 +66,12 @@ export const MODULES = {
     name: 'Goods Received',
     path: '/grn',
     group: 'transactions',
+  },
+  BUYERS: {
+    id: 'buyer-info',
+    name: 'Buyers',
+    path: '/master/buyers',
+    group: 'master',
   },
   SUPPLIERS: {
     id: 'supplier-info',
@@ -161,6 +168,7 @@ export const PERMISSION_GROUPS = [
     icon: 'DatabaseOutlined',
     description: 'Individual access for Suppliers & Items; shared access for other master tabs',
     modules: [
+      { id: 'buyer-info', name: 'Buyers', operations: STANDARD_OPERATIONS, path: '/master → Buyers tab' },
       { id: 'supplier-info', name: 'Suppliers', operations: STANDARD_OPERATIONS, path: '/master → Suppliers tab' },
       { id: 'items', name: 'Items', operations: ['view', 'add', 'update'], path: '/master → Items tab' },
       {
@@ -347,7 +355,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/bom/list', moduleId: 'bom' },
     { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
     { route: '/grn/list', moduleId: 'grn' },
-    { route: '/master', moduleId: ['master-data', 'supplier-info', 'items', 'terms-conditions'] },
+    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions'] },
     { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
   ];
 
