@@ -11,6 +11,8 @@
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
  *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "costing":          { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "costing-approval": { "access": true, "operations": { "approve": true } },
  *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true } },
@@ -66,6 +68,19 @@ export const MODULES = {
     name: 'Goods Received',
     path: '/grn',
     group: 'transactions',
+  },
+  COSTING: {
+    id: 'costing',
+    name: 'Costing',
+    path: '/costing',
+    group: 'transactions',
+  },
+  COSTING_APPROVAL: {
+    id: 'costing-approval',
+    name: 'Costing Approval',
+    path: '/costing',
+    group: 'transactions',
+    linkedTo: 'costing',
   },
   BUYERS: {
     id: 'buyer-info',
@@ -135,6 +150,9 @@ export const ORDER_ACTION_OPERATIONS = ['submit', 'refer_back'];
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['approve', 'reject', 'cancel', 'refer_back'];
 
+// Costing Approval operations
+export const COSTING_APPROVAL_OPERATIONS = ['approve'];
+
 // Dashboard only has view
 export const DASHBOARD_OPERATIONS = ['view'];
 
@@ -160,6 +178,8 @@ export const PERMISSION_GROUPS = [
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
       { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
+      { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
+      { id: 'costing-approval', name: 'Costing Approval', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
     ],
   },
   {
@@ -203,6 +223,7 @@ export const getSidebarModules = () =>
 export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions') return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval') return PO_APPROVAL_OPERATIONS;
+  if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard') return DASHBOARD_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items') return ['view', 'add', 'update'];
@@ -341,6 +362,11 @@ export const canPerformApprovalActions = () =>
   hasModuleAccess('purchase-orders') &&
   (canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO());
 
+// ─── COSTING APPROVAL HELPERS (linked to Costing access) ────────────────────
+
+export const canApproveCostSheet = () =>
+  hasModuleAccess('costing') && hasPermission('costing-approval', 'approve');
+
 // ─── FIRST ACCESSIBLE ROUTE ──────────────────────────────────────────────────
 
 /**
@@ -355,6 +381,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/bom/list', moduleId: 'bom' },
     { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
     { route: '/grn/list', moduleId: 'grn' },
+    { route: '/costing/list', moduleId: 'costing' },
     { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions'] },
     { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
   ];
@@ -430,6 +457,17 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized['po-approval'] = {
       access: false,
       operations: PO_APPROVAL_OPERATIONS.reduce((acc, op) => {
+        acc[op] = false;
+        return acc;
+      }, {}),
+    };
+  }
+
+  // Enforce costing-approval → costing link
+  if (!normalized['costing']?.access) {
+    normalized['costing-approval'] = {
+      access: false,
+      operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => {
         acc[op] = false;
         return acc;
       }, {}),

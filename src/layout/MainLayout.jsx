@@ -15,6 +15,7 @@ import {
   FileTextOutlined,
   ShoppingOutlined,
   InboxOutlined,
+  DollarOutlined,
   SettingOutlined,
   UserOutlined,
   SearchOutlined,
@@ -175,6 +176,17 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/costing",
+      icon: <DollarOutlined />,
+      label: "Costing",
+      moduleId: "costing",
+      children: [
+        { key: "/costing/list", label: "Cost Sheet List" },
+        { key: "/costing/new", label: "New Cost Sheet" },
+        { key: "/costing/compare", label: "Compare" },
+      ],
+    },
+    {
       key: "/master",
       icon: <DatabaseOutlined />,
       label: "Master Data",
@@ -271,6 +283,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
     if (path.startsWith("/grn")) return ["/grn"];
+    if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/admin")) return ["/admin"];
     return [];
   };

@@ -1,0 +1,1447 @@
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Form,
+  Input,
+  InputNumber,
+  Select,
+  DatePicker,
+  Button,
+  Card,
+  Row,
+  Col,
+  Space,
+  Table,
+  Typography,
+  Upload,
+  Collapse,
+  Popconfirm,
+  Tooltip,
+  Tag,
+  Divider,
+  message,
+  Statistic,
+} from 'antd';
+import {
+  PlusOutlined,
+  DeleteOutlined,
+  SaveOutlined,
+  SendOutlined,
+  ArrowLeftOutlined,
+  CalculatorOutlined,
+  InboxOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
+import dayjs from 'dayjs';
+import {
+  getCostSheetById,
+  createCostSheet,
+  updateCostSheet,
+  getPastPOSuggestions,
+  getTodaysRate,
+} from '../../services/costingService';
+import {
+  COSTING_STATUS,
+  SEASONS,
+  FABRIC_CLASSIFICATIONS,
+  FABRIC_TYPES,
+  LOCAL_TRIM_ITEMS,
+  IMPORTED_TRIM_ITEMS,
+  MANUFACTURING_PROCESSES,
+  OVERHEAD_CATEGORIES,
+  CURRENCIES,
+  ALLOWED_FILE_TYPES,
+  MAX_FILE_SIZE_MB,
+  generateCostingId,
+  calcFabricNetCost,
+  calcTrimPrice,
+  calcTotalMakingPrice,
+  calcTotalOverheadCharges,
+  calcFinalPrice,
+  calcAutoProfit,
+  formatCurrency,
+} from '../../utils/costingConstants';
+import { BUYERS } from '../../utils/orderConstants';
+import { getCurrencySymbol } from '../../utils/orderConstants';
+import { useTheme } from '../../context/ThemeContext';
+import KnitsConsumptionModal from './KnitsConsumptionModal';
+
+const { Text } = Typography;
+const { Dragger } = Upload;
+
+const CostingForm = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [form] = Form.useForm();
+  const { isDarkMode } = useTheme();
+  const isEdit = Boolean(id);
+
+  // State
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [costingId, setCostingId] = useState('');
+  const [currency, setCurrency] = useState('INR');
+  const [quoteCurrency, setQuoteCurrency] = useState('USD');
+  const [actualRate, setActualRate] = useState(83.80);
+  const [todaysRate, setTodaysRate] = useState(83.80);
+  const [fileList, setFileList] = useState([]);
+
+  // Section data
+  const [fabricRows, setFabricRows] = useState([]);
+  const [localTrims, setLocalTrims] = useState([]);
+  const [importedTrims, setImportedTrims] = useState([]);
+  const [manufacturingRows, setManufacturingRows] = useState([]);
+  const [overheadRows, setOverheadRows] = useState([]);
+
+  // Summary editable fields
+  const [agentCommissionPct, setAgentCommissionPct] = useState(0);
+  const [profitPct, setProfitPct] = useState(0);
+  const [targetPrice, setTargetPrice] = useState('');
+
+  // Knits modal
+  const [knitsModalOpen, setKnitsModalOpen] = useState(false);
+  const [knitsRowKey, setKnitsRowKey] = useState(null);
+  const [knitsParts, setKnitsParts] = useState([]);
+
+  // Past PO suggestions
+  const [poSuggestions, setPOSuggestions] = useState([]);
+  const [suggestionVisible, setSuggestionVisible] = useState(false);
+
+  // Load existing cost sheet for edit
+  useEffect(() => {
+    if (isEdit) {
+      loadCostSheet();
+    } else {
+      setCostingId(generateCostingId());
+      // Pre-populate manufacturing rows with common processes
+      setManufacturingRows([
+        { key: `m_${Date.now()}_1`, process: 'CMT', cost: '', comments: '' },
+      ]);
+    }
+  }, [id]);
+
+  // Update today's rate when currencies change
+  useEffect(() => {
+    if (quoteCurrency && quoteCurrency !== currency) {
+      getTodaysRate(quoteCurrency, currency).then((rate) => {
+        setTodaysRate(rate);
+      });
+    } else {
+      setTodaysRate(1);
+    }
+  }, [currency, quoteCurrency]);
+
+  const loadCostSheet = async () => {
+    setLoading(true);
+    try {
+      const cs = await getCostSheetById(id);
+      setCostingId(cs.costingId);
+      setCurrency(cs.currency);
+      setQuoteCurrency(cs.quoteCurrency);
+      setActualRate(cs.actualRate);
+      setFabricRows(cs.fabricRows || []);
+      setLocalTrims(cs.localTrims || []);
+      setImportedTrims(cs.importedTrims || []);
+      setManufacturingRows(cs.manufacturingRows || []);
+      setOverheadRows(cs.overheadRows || []);
+      setAgentCommissionPct(cs.agentCommissionPct || 0);
+      setProfitPct(cs.profitPct || 0);
+      setTargetPrice(cs.targetPrice || '');
+      setFileList(cs.attachments || []);
+
+      form.setFieldsValue({
+        date: cs.date ? dayjs(cs.date) : null,
+        buyerId: cs.buyerId,
+        styleNo: cs.styleNo,
+        garmentName: cs.garmentName,
+        season: cs.season,
+        currency: cs.currency,
+        quoteCurrency: cs.quoteCurrency,
+        actualRate: cs.actualRate,
+        sizes: cs.sizes,
+      });
+    } catch {
+      message.error('Failed to load cost sheet');
+      navigate('/costing/list');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==================== AUTO CALCULATIONS ====================
+
+  const totalFabricCost = useMemo(() => {
+    return fabricRows.reduce((sum, r) => sum + (Number(r.netCost) || 0), 0);
+  }, [fabricRows]);
+
+  const totalLocalTrimsCost = useMemo(() => {
+    return localTrims.reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+  }, [localTrims]);
+
+  const totalImportedTrimsCostUsd = useMemo(() => {
+    return importedTrims.reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
+  }, [importedTrims]);
+
+  const totalAccessoriesCost = useMemo(() => {
+    return totalLocalTrimsCost + totalImportedTrimsCostUsd * actualRate;
+  }, [totalLocalTrimsCost, totalImportedTrimsCostUsd, actualRate]);
+
+  const totalManufacturingCost = useMemo(() => {
+    return manufacturingRows.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+  }, [manufacturingRows]);
+
+  const totalMarkupCost = useMemo(() => {
+    return overheadRows.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+  }, [overheadRows]);
+
+  const totalMakingPrice = useMemo(() => {
+    return calcTotalMakingPrice(totalFabricCost, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost);
+  }, [totalFabricCost, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost]);
+
+  const totalOverheadCharges = useMemo(() => {
+    return calcTotalOverheadCharges(agentCommissionPct, profitPct, totalMakingPrice);
+  }, [agentCommissionPct, profitPct, totalMakingPrice]);
+
+  const totalPrice = useMemo(() => {
+    return totalMakingPrice + totalOverheadCharges;
+  }, [totalMakingPrice, totalOverheadCharges]);
+
+  const finalPrice = useMemo(() => {
+    return calcFinalPrice(totalPrice, actualRate);
+  }, [totalPrice, actualRate]);
+
+  // Auto-calculate profit when target price changes
+  useEffect(() => {
+    if (targetPrice && Number(targetPrice) > 0 && totalMakingPrice > 0) {
+      const autoProfit = calcAutoProfit(Number(targetPrice), totalMakingPrice, agentCommissionPct);
+      setProfitPct(Math.round(autoProfit * 100) / 100);
+    }
+  }, [targetPrice, totalMakingPrice, agentCommissionPct]);
+
+  // ==================== ROW HANDLERS ====================
+
+  const updateFabricRow = (key, field, value) => {
+    setFabricRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const updated = { ...r, [field]: value };
+        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+        return updated;
+      })
+    );
+  };
+
+  const addFabricRow = () => {
+    setFabricRows((prev) => [
+      ...prev,
+      {
+        key: `f_${Date.now()}`,
+        fabricType: '',
+        classification: 'Woven',
+        description: '',
+        consumption: '',
+        fabricPrice: '',
+        fabricWidthStd: '',
+        fabricWidthVendor: '',
+        vendorId: null,
+        vendorName: '',
+        allowancePct: 0,
+        netCost: 0,
+      },
+    ]);
+  };
+
+  const deleteFabricRow = (key) => {
+    setFabricRows((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const updateLocalTrim = (key, field, value) => {
+    setLocalTrims((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const updated = { ...r, [field]: value };
+        updated.price = calcTrimPrice(updated.consumption, updated.cost);
+        return updated;
+      })
+    );
+  };
+
+  const addLocalTrim = () => {
+    setLocalTrims((prev) => [
+      ...prev,
+      { key: `lt_${Date.now()}`, item: '', code: '', size: '', consumption: '', cost: '', price: 0 },
+    ]);
+  };
+
+  const deleteLocalTrim = (key) => {
+    setLocalTrims((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const updateImportedTrim = (key, field, value) => {
+    setImportedTrims((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const updated = { ...r, [field]: value };
+        updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd);
+        return updated;
+      })
+    );
+  };
+
+  const addImportedTrim = () => {
+    setImportedTrims((prev) => [
+      ...prev,
+      { key: `it_${Date.now()}`, item: '', code: '', size: '', consumption: '', costUsd: '', priceUsd: 0 },
+    ]);
+  };
+
+  const deleteImportedTrim = (key) => {
+    setImportedTrims((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const updateManufacturingRow = (key, field, value) => {
+    setManufacturingRows((prev) =>
+      prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
+    );
+  };
+
+  const addManufacturingRow = () => {
+    setManufacturingRows((prev) => [
+      ...prev,
+      { key: `m_${Date.now()}`, process: '', cost: '', comments: '' },
+    ]);
+  };
+
+  const deleteManufacturingRow = (key) => {
+    setManufacturingRows((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const updateOverheadRow = (key, field, value) => {
+    setOverheadRows((prev) =>
+      prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
+    );
+  };
+
+  const addOverheadRow = () => {
+    setOverheadRows((prev) => [
+      ...prev,
+      { key: `o_${Date.now()}`, description: '', cost: '', comments: '' },
+    ]);
+  };
+
+  const deleteOverheadRow = (key) => {
+    setOverheadRows((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  // Knits modal handlers
+  const openKnitsModal = (rowKey) => {
+    setKnitsRowKey(rowKey);
+    const row = fabricRows.find((r) => r.key === rowKey);
+    setKnitsParts(row?.knitsParts || []);
+    setKnitsModalOpen(true);
+  };
+
+  const handleKnitsApply = (totalConsumption, parts) => {
+    setFabricRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== knitsRowKey) return r;
+        const updated = { ...r, consumption: Math.round(totalConsumption * 10000) / 10000, knitsParts: parts };
+        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+        return updated;
+      })
+    );
+    setKnitsModalOpen(false);
+  };
+
+  // Past PO suggestions
+  const loadSuggestions = async (type, itemName) => {
+    if (!itemName) return;
+    const suggestions = await getPastPOSuggestions(type, itemName);
+    setPOSuggestions(suggestions);
+    setSuggestionVisible(suggestions.length > 0);
+  };
+
+  // ==================== SAVE / SUBMIT ====================
+
+  const buildPayload = (formValues, status) => {
+    const buyer = BUYERS.find((b) => b.value === formValues.buyerId);
+    return {
+      costingId,
+      status,
+      date: formValues.date?.format('YYYY-MM-DD'),
+      buyerId: formValues.buyerId,
+      buyerName: buyer?.label || '',
+      styleNo: formValues.styleNo,
+      garmentName: formValues.garmentName,
+      season: formValues.season,
+      currency,
+      quoteCurrency,
+      actualRate,
+      todaysRate,
+      sizes: formValues.sizes || [],
+      attachments: fileList,
+      fabricRows,
+      localTrims,
+      importedTrims,
+      manufacturingRows,
+      overheadRows,
+      agentCommissionPct,
+      profitPct,
+      targetPrice,
+      totalFabricCost,
+      totalLocalTrimsCost,
+      totalImportedTrimsCostUsd,
+      totalAccessoriesCost,
+      totalManufacturingCost,
+      totalMarkupCost,
+      totalMakingPrice,
+      totalOverheadCharges,
+      totalPrice,
+      finalPrice,
+    };
+  };
+
+  const handleSaveDraft = async () => {
+    try {
+      const values = await form.validateFields().catch(() => form.getFieldsValue());
+      setSaving(true);
+      const payload = buildPayload(values, COSTING_STATUS.DRAFT);
+      if (isEdit) {
+        await updateCostSheet(id, payload);
+        message.success('Cost sheet saved as draft');
+      } else {
+        await createCostSheet(payload);
+        message.success('Cost sheet created as draft');
+      }
+      navigate('/costing/list');
+    } catch {
+      message.error('Failed to save cost sheet');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+      setSaving(true);
+      const payload = buildPayload(values, COSTING_STATUS.FINAL);
+      if (isEdit) {
+        await updateCostSheet(id, payload);
+        message.success('Cost sheet submitted successfully');
+      } else {
+        await createCostSheet(payload);
+        message.success('Cost sheet created and submitted');
+      }
+      navigate('/costing/list');
+    } catch {
+      message.error('Please fill all required fields');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ==================== FILE UPLOAD ====================
+
+  const uploadProps = {
+    onRemove: (file) => {
+      setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
+    },
+    beforeUpload: (file) => {
+      const isAllowed = ALLOWED_FILE_TYPES.includes(file.type);
+      if (!isAllowed) {
+        message.error('File type not allowed. Use JPG, PNG, PDF, DOC, or XLS.');
+        return Upload.LIST_IGNORE;
+      }
+      const isLt5M = file.size / 1024 / 1024 < MAX_FILE_SIZE_MB;
+      if (!isLt5M) {
+        message.error(`File must be smaller than ${MAX_FILE_SIZE_MB}MB`);
+        return Upload.LIST_IGNORE;
+      }
+      setFileList((prev) => [...prev, file]);
+      return false; // Prevent auto-upload
+    },
+    fileList,
+  };
+
+  // ==================== SECTION STYLES ====================
+
+  const sectionHeaderStyle = (color) => ({
+    background: isDarkMode
+      ? `linear-gradient(135deg, ${color}22 0%, ${color}11 100%)`
+      : `linear-gradient(135deg, ${color}15 0%, ${color}08 100%)`,
+    borderRadius: 8,
+    border: `1px solid ${isDarkMode ? `${color}33` : `${color}22`}`,
+  });
+
+  const summaryRowStyle = {
+    background: isDarkMode ? 'rgba(99, 102, 241, 0.08)' : 'rgba(99, 102, 241, 0.04)',
+    fontWeight: 600,
+  };
+
+  // ==================== COLUMN DEFINITIONS ====================
+
+  const fabricColumns = [
+    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Fabric Type',
+      dataIndex: 'fabricType',
+      width: 150,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={FABRIC_TYPES}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Select"
+          onChange={(v) => updateFabricRow(record.key, 'fabricType', v)}
+          onFocus={() => loadSuggestions('fabric', val)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Classification',
+      dataIndex: 'classification',
+      width: 110,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={FABRIC_CLASSIFICATIONS}
+          onChange={(v) => updateFabricRow(record.key, 'classification', v)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      width: 160,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="Fabric desc"
+          onChange={(e) => updateFabricRow(record.key, 'description', e.target.value)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Consumption',
+      dataIndex: 'consumption',
+      width: 120,
+      render: (val, record) => (
+        <Space.Compact style={{ width: '100%' }}>
+          <InputNumber
+            value={val}
+            min={0}
+            step={0.01}
+            placeholder="Qty"
+            onChange={(v) => updateFabricRow(record.key, 'consumption', v)}
+            size="small"
+            style={{ width: record.classification === 'Knits' ? '70%' : '100%' }}
+          />
+          {record.classification === 'Knits' && (
+            <Tooltip title="Calculate Knits Consumption">
+              <Button
+                icon={<CalculatorOutlined />}
+                onClick={() => openKnitsModal(record.key)}
+                size="small"
+                type="primary"
+                ghost
+              />
+            </Tooltip>
+          )}
+        </Space.Compact>
+      ),
+    },
+    {
+      title: `Price (${getCurrencySymbol(currency)})`,
+      dataIndex: 'fabricPrice',
+      width: 110,
+      render: (val, record) => (
+        <InputNumber
+          value={val}
+          min={0}
+          step={0.01}
+          placeholder="Price"
+          onChange={(v) => updateFabricRow(record.key, 'fabricPrice', v)}
+          size="small"
+          style={{ width: '100%' }}
+        />
+      ),
+    },
+    {
+      title: 'Width (Std)',
+      dataIndex: 'fabricWidthStd',
+      width: 90,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder='e.g. 58"'
+          onChange={(e) => updateFabricRow(record.key, 'fabricWidthStd', e.target.value)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Width (Vendor)',
+      dataIndex: 'fabricWidthVendor',
+      width: 95,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder='e.g. 58"'
+          onChange={(e) => updateFabricRow(record.key, 'fabricWidthVendor', e.target.value)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Allowance %',
+      dataIndex: 'allowancePct',
+      width: 95,
+      render: (val, record) => (
+        <InputNumber
+          value={val}
+          min={0}
+          max={100}
+          placeholder="%"
+          onChange={(v) => updateFabricRow(record.key, 'allowancePct', v)}
+          size="small"
+          style={{ width: '100%' }}
+        />
+      ),
+    },
+    {
+      title: `Net Cost (${getCurrencySymbol(currency)})`,
+      dataIndex: 'netCost',
+      width: 120,
+      render: (val) => (
+        <Text strong style={{ color: 'var(--success-color)' }}>
+          {formatCurrency(val, currency)}
+        </Text>
+      ),
+    },
+    {
+      title: '',
+      width: 45,
+      render: (_, record) => (
+        <Popconfirm title="Remove this fabric row?" onConfirm={() => deleteFabricRow(record.key)}>
+          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  const localTrimColumns = [
+    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Item',
+      dataIndex: 'item',
+      width: 160,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={LOCAL_TRIM_ITEMS}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Select item"
+          onChange={(v) => updateLocalTrim(record.key, 'item', v)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Code',
+      dataIndex: 'code',
+      width: 130,
+      render: (val, record) => (
+        <Input value={val} placeholder="Item code" onChange={(e) => updateLocalTrim(record.key, 'code', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: 'Size',
+      dataIndex: 'size',
+      width: 90,
+      render: (val, record) => (
+        <Input value={val} placeholder="Size" onChange={(e) => updateLocalTrim(record.key, 'size', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: 'Consumption',
+      dataIndex: 'consumption',
+      width: 100,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: `Cost (${getCurrencySymbol(currency)})`,
+      dataIndex: 'cost',
+      width: 110,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateLocalTrim(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: `Price (${getCurrencySymbol(currency)})`,
+      dataIndex: 'price',
+      width: 110,
+      render: (val) => (
+        <Text strong>{formatCurrency(val, currency)}</Text>
+      ),
+    },
+    {
+      title: '',
+      width: 45,
+      render: (_, record) => (
+        <Popconfirm title="Remove this item?" onConfirm={() => deleteLocalTrim(record.key)}>
+          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  const importedTrimColumns = [
+    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Item',
+      dataIndex: 'item',
+      width: 160,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={IMPORTED_TRIM_ITEMS}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Select item"
+          onChange={(v) => updateImportedTrim(record.key, 'item', v)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: 'Code',
+      dataIndex: 'code',
+      width: 130,
+      render: (val, record) => (
+        <Input value={val} placeholder="Item code" onChange={(e) => updateImportedTrim(record.key, 'code', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: 'Size',
+      dataIndex: 'size',
+      width: 90,
+      render: (val, record) => (
+        <Input value={val} placeholder="Size" onChange={(e) => updateImportedTrim(record.key, 'size', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: 'Consumption',
+      dataIndex: 'consumption',
+      width: 100,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: 'Cost ($ USD)',
+      dataIndex: 'costUsd',
+      width: 110,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateImportedTrim(record.key, 'costUsd', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: 'Price ($ USD)',
+      dataIndex: 'priceUsd',
+      width: 110,
+      render: (val) => (
+        <Text strong>{formatCurrency(val, 'USD')}</Text>
+      ),
+    },
+    {
+      title: '',
+      width: 45,
+      render: (_, record) => (
+        <Popconfirm title="Remove this item?" onConfirm={() => deleteImportedTrim(record.key)}>
+          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  const manufacturingColumns = [
+    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Process',
+      dataIndex: 'process',
+      width: 200,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={MANUFACTURING_PROCESSES}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Select process"
+          onChange={(v) => updateManufacturingRow(record.key, 'process', v)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: `Cost (${getCurrencySymbol(currency)})`,
+      dataIndex: 'cost',
+      width: 130,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateManufacturingRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: 'Comments',
+      dataIndex: 'comments',
+      render: (val, record) => (
+        <Input value={val} placeholder="Notes" onChange={(e) => updateManufacturingRow(record.key, 'comments', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: '',
+      width: 45,
+      render: (_, record) => (
+        <Popconfirm title="Remove this process?" onConfirm={() => deleteManufacturingRow(record.key)}>
+          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  const overheadColumns = [
+    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      width: 200,
+      render: (val, record) => (
+        <Select
+          value={val}
+          style={{ width: '100%' }}
+          options={OVERHEAD_CATEGORIES}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Select category"
+          onChange={(v) => updateOverheadRow(record.key, 'description', v)}
+          size="small"
+        />
+      ),
+    },
+    {
+      title: `Cost (${getCurrencySymbol(currency)})`,
+      dataIndex: 'cost',
+      width: 130,
+      render: (val, record) => (
+        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateOverheadRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: 'Comments',
+      dataIndex: 'comments',
+      render: (val, record) => (
+        <Input value={val} placeholder="Notes" onChange={(e) => updateOverheadRow(record.key, 'comments', e.target.value)} size="small" />
+      ),
+    },
+    {
+      title: '',
+      width: 45,
+      render: (_, record) => (
+        <Popconfirm title="Remove this item?" onConfirm={() => deleteOverheadRow(record.key)}>
+          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+        </Popconfirm>
+      ),
+    },
+  ];
+
+  // ==================== COLLAPSE ITEMS ====================
+
+  const collapseItems = [
+    {
+      key: 'general',
+      label: (
+        <Text strong style={{ fontSize: 15, color: '#6366f1' }}>
+          Section A — General Details
+        </Text>
+      ),
+      style: sectionHeaderStyle('#6366f1'),
+      children: (
+        <Row gutter={24}>
+          <Col xs={24} lg={16}>
+            <Row gutter={16}>
+              <Col xs={12} md={8}>
+                <Form.Item label="Costing ID">
+                  <Input value={costingId} disabled />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={8}>
+                <Form.Item label="Date" name="date" rules={[{ required: true, message: 'Date is required' }]}>
+                  <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item label="Buyer" name="buyerId" rules={[{ required: true, message: 'Buyer is required' }]}>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select buyer"
+                    options={BUYERS}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={8}>
+                <Form.Item label="Style #" name="styleNo" rules={[{ required: true, message: 'Style # is required' }]}>
+                  <Input placeholder="e.g. N58070-1LU" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={8}>
+                <Form.Item label="Garment Name" name="garmentName" rules={[{ required: true, message: 'Required' }]}>
+                  <Input placeholder="e.g. Blouse SS Ladies" />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={8}>
+                <Form.Item label="Season" name="season">
+                  <Select placeholder="Select season" options={SEASONS} allowClear />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item label="Costing Currency" name="currency" rules={[{ required: true }]}>
+                  <Select
+                    options={CURRENCIES}
+                    onChange={(v) => setCurrency(v)}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item label="Quote Currency" name="quoteCurrency" rules={[{ required: true }]}>
+                  <Select
+                    options={CURRENCIES}
+                    onChange={(v) => setQuoteCurrency(v)}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item label="Actual Rate" rules={[{ required: true }]}>
+                  <InputNumber
+                    value={actualRate}
+                    min={0}
+                    step={0.01}
+                    style={{ width: '100%' }}
+                    onChange={setActualRate}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item label={<Space>Today's Rate <Tooltip title="Auto-fetched exchange rate"><InfoCircleOutlined /></Tooltip></Space>}>
+                  <InputNumber value={todaysRate} disabled style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col xs={24}>
+                <Form.Item label="Sizes" name="sizes">
+                  <Select
+                    mode="tags"
+                    placeholder="Enter sizes (e.g. S, M, L, XL)"
+                    style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Form.Item label="Attachments">
+              <Dragger {...uploadProps} style={{ padding: '16px 0' }}>
+                <p className="ant-upload-drag-icon" style={{ marginBottom: 8 }}>
+                  <InboxOutlined style={{ color: '#6366f1', fontSize: 36 }} />
+                </p>
+                <p className="ant-upload-text" style={{ fontSize: 13 }}>
+                  Click or drag files to upload
+                </p>
+                <p className="ant-upload-hint" style={{ fontSize: 12 }}>
+                  JPG, PNG, PDF, DOC, XLS (max {MAX_FILE_SIZE_MB}MB)
+                </p>
+              </Dragger>
+            </Form.Item>
+          </Col>
+        </Row>
+      ),
+    },
+    {
+      key: 'fabric',
+      label: (
+        <Space>
+          <Text strong style={{ fontSize: 15, color: '#0ea5e9' }}>
+            Section B — Fabric Cost Breakup
+          </Text>
+          <Tag color="blue">{formatCurrency(totalFabricCost, currency)}</Tag>
+        </Space>
+      ),
+      style: sectionHeaderStyle('#0ea5e9'),
+      children: (
+        <>
+          <Table
+            dataSource={fabricRows}
+            columns={fabricColumns}
+            pagination={false}
+            size="small"
+            rowKey="key"
+            scroll={{ x: 1300 }}
+            locale={{ emptyText: 'No fabrics added. Click + Add Fabric to begin.' }}
+            summary={() =>
+              fabricRows.length > 0 ? (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={summaryRowStyle}>
+                    <Table.Summary.Cell index={0} colSpan={9}>
+                      <Text strong>Total Fabric Cost</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={9}>
+                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
+                        {formatCurrency(totalFabricCost, currency)}
+                      </Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={10} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              ) : null
+            }
+          />
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            onClick={addFabricRow}
+            style={{ width: '100%', marginTop: 12 }}
+          >
+            Add Fabric
+          </Button>
+        </>
+      ),
+    },
+    {
+      key: 'trims',
+      label: (
+        <Space>
+          <Text strong style={{ fontSize: 15, color: '#8b5cf6' }}>
+            Section C — Trims / Accessories Cost Breakup
+          </Text>
+          <Tag color="purple">{formatCurrency(totalAccessoriesCost, currency)}</Tag>
+        </Space>
+      ),
+      style: sectionHeaderStyle('#8b5cf6'),
+      children: (
+        <>
+          <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>
+            C.1 — Local Accessories
+          </Text>
+          <Table
+            dataSource={localTrims}
+            columns={localTrimColumns}
+            pagination={false}
+            size="small"
+            rowKey="key"
+            scroll={{ x: 900 }}
+            locale={{ emptyText: 'No local accessories added.' }}
+            summary={() =>
+              localTrims.length > 0 ? (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={summaryRowStyle}>
+                    <Table.Summary.Cell index={0} colSpan={6}>
+                      <Text strong>Local Accessories Total</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={6}>
+                      <Text strong>{formatCurrency(totalLocalTrimsCost, currency)}</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              ) : null
+            }
+          />
+          <Button type="dashed" icon={<PlusOutlined />} onClick={addLocalTrim} style={{ width: '100%', marginTop: 8 }}>
+            Add Local Item
+          </Button>
+
+          <Divider style={{ margin: '16px 0' }} />
+
+          <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>
+            C.2 — Imported Accessories
+          </Text>
+          <Table
+            dataSource={importedTrims}
+            columns={importedTrimColumns}
+            pagination={false}
+            size="small"
+            rowKey="key"
+            scroll={{ x: 900 }}
+            locale={{ emptyText: 'No imported accessories added.' }}
+            summary={() =>
+              importedTrims.length > 0 ? (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={summaryRowStyle}>
+                    <Table.Summary.Cell index={0} colSpan={6}>
+                      <Text strong>Imported Accessories Total (USD)</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={6}>
+                      <Text strong>{formatCurrency(totalImportedTrimsCostUsd, 'USD')}</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={7} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              ) : null
+            }
+          />
+          <Button type="dashed" icon={<PlusOutlined />} onClick={addImportedTrim} style={{ width: '100%', marginTop: 8 }}>
+            Add Imported Item
+          </Button>
+
+          <Card
+            size="small"
+            style={{ marginTop: 16, background: isDarkMode ? 'rgba(139, 92, 246, 0.08)' : 'rgba(139, 92, 246, 0.04)' }}
+          >
+            <Text strong style={{ fontSize: 14 }}>
+              Total Accessories Cost: {formatCurrency(totalAccessoriesCost, currency)}
+            </Text>
+            <Text type="secondary" style={{ marginLeft: 16, fontSize: 12 }}>
+              (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {actualRate} rate)
+            </Text>
+          </Card>
+        </>
+      ),
+    },
+    {
+      key: 'manufacturing',
+      label: (
+        <Space>
+          <Text strong style={{ fontSize: 15, color: '#f59e0b' }}>
+            Section D — Manufacturing Cost
+          </Text>
+          <Tag color="orange">{formatCurrency(totalManufacturingCost, currency)}</Tag>
+        </Space>
+      ),
+      style: sectionHeaderStyle('#f59e0b'),
+      children: (
+        <>
+          <Table
+            dataSource={manufacturingRows}
+            columns={manufacturingColumns}
+            pagination={false}
+            size="small"
+            rowKey="key"
+            locale={{ emptyText: 'No manufacturing costs added.' }}
+            summary={() =>
+              manufacturingRows.length > 0 ? (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={summaryRowStyle}>
+                    <Table.Summary.Cell index={0} colSpan={2}>
+                      <Text strong>Total Manufacturing Cost</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={2}>
+                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
+                        {formatCurrency(totalManufacturingCost, currency)}
+                      </Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={3} colSpan={2} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              ) : null
+            }
+          />
+          <Button type="dashed" icon={<PlusOutlined />} onClick={addManufacturingRow} style={{ width: '100%', marginTop: 12 }}>
+            Add Process
+          </Button>
+        </>
+      ),
+    },
+    {
+      key: 'overhead',
+      label: (
+        <Space>
+          <Text strong style={{ fontSize: 15, color: '#ef4444' }}>
+            Section E — Overhead / Markup Costs
+          </Text>
+          <Tag color="red">{formatCurrency(totalMarkupCost, currency)}</Tag>
+        </Space>
+      ),
+      style: sectionHeaderStyle('#ef4444'),
+      children: (
+        <>
+          <Table
+            dataSource={overheadRows}
+            columns={overheadColumns}
+            pagination={false}
+            size="small"
+            rowKey="key"
+            locale={{ emptyText: 'No overhead costs added.' }}
+            summary={() =>
+              overheadRows.length > 0 ? (
+                <Table.Summary fixed>
+                  <Table.Summary.Row style={summaryRowStyle}>
+                    <Table.Summary.Cell index={0} colSpan={2}>
+                      <Text strong>Total Markup Cost</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={2}>
+                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
+                        {formatCurrency(totalMarkupCost, currency)}
+                      </Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={3} colSpan={2} />
+                  </Table.Summary.Row>
+                </Table.Summary>
+              ) : null
+            }
+          />
+          <Button type="dashed" icon={<PlusOutlined />} onClick={addOverheadRow} style={{ width: '100%', marginTop: 12 }}>
+            Add Overhead
+          </Button>
+        </>
+      ),
+    },
+    {
+      key: 'summary',
+      label: (
+        <Text strong style={{ fontSize: 15, color: '#10b981' }}>
+          Section F — Cost Summary
+        </Text>
+      ),
+      style: sectionHeaderStyle('#10b981'),
+      children: (
+        <Card
+          style={{
+            background: isDarkMode
+              ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%)'
+              : 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(99, 102, 241, 0.03) 100%)',
+            border: `1px solid ${isDarkMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.15)'}`,
+          }}
+        >
+          <Row gutter={[24, 16]}>
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Fabric Cost"
+                value={totalFabricCost}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 16, color: '#0ea5e9' }}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Trims / Accessories"
+                value={totalAccessoriesCost}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 16, color: '#8b5cf6' }}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Manufacturing Cost"
+                value={totalManufacturingCost}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 16, color: '#f59e0b' }}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Markup / Overhead"
+                value={totalMarkupCost}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 16, color: '#ef4444' }}
+              />
+            </Col>
+          </Row>
+
+          <Divider style={{ margin: '16px 0' }} />
+
+          <Row gutter={[24, 16]} align="middle">
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Total Making Price"
+                value={totalMakingPrice}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 18, fontWeight: 700 }}
+              />
+            </Col>
+            <Col xs={12} md={4}>
+              <div style={{ marginBottom: 4 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Agent Commission %</Text>
+              </div>
+              <InputNumber
+                value={agentCommissionPct}
+                min={0}
+                max={100}
+                step={0.5}
+                onChange={setAgentCommissionPct}
+                style={{ width: '100%' }}
+                addonAfter="%"
+              />
+            </Col>
+            <Col xs={12} md={4}>
+              <div style={{ marginBottom: 4 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Profit %</Text>
+              </div>
+              <InputNumber
+                value={profitPct}
+                min={0}
+                max={100}
+                step={0.5}
+                onChange={(v) => { setProfitPct(v); setTargetPrice(''); }}
+                style={{ width: '100%' }}
+                addonAfter="%"
+              />
+            </Col>
+            <Col xs={12} md={4}>
+              <div style={{ marginBottom: 4 }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>Target Price ({getCurrencySymbol(currency)})</Text>
+              </div>
+              <InputNumber
+                value={targetPrice}
+                min={0}
+                step={0.01}
+                placeholder="Auto-calc profit"
+                onChange={setTargetPrice}
+                style={{ width: '100%' }}
+              />
+            </Col>
+            <Col xs={12} md={6}>
+              <Statistic
+                title="Overhead Charges"
+                value={totalOverheadCharges}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 16, color: '#64748b' }}
+              />
+            </Col>
+          </Row>
+
+          <Divider style={{ margin: '16px 0' }} />
+
+          <Row gutter={[24, 16]} align="middle">
+            <Col xs={12} md={8}>
+              <Statistic
+                title={`Total Price (${currency})`}
+                value={totalPrice}
+                precision={2}
+                prefix={getCurrencySymbol(currency)}
+                valueStyle={{ fontSize: 20, fontWeight: 700, color: 'var(--primary-color)' }}
+              />
+            </Col>
+            <Col xs={12} md={8}>
+              <Card
+                style={{
+                  background: isDarkMode
+                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  textAlign: 'center',
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 12, display: 'block' }}>
+                  Final Price ({quoteCurrency})
+                </Text>
+                <Text style={{ color: '#fff', fontSize: 28, fontWeight: 800, display: 'block' }}>
+                  {getCurrencySymbol(quoteCurrency)} {finalPrice.toFixed(2)}
+                </Text>
+              </Card>
+            </Col>
+          </Row>
+        </Card>
+      ),
+    },
+  ];
+
+  return (
+    <div className="animate-fade-in-up">
+      <div className="page-header">
+        <Space>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/costing/list')}
+            type="text"
+          />
+          <h1>{isEdit ? 'Edit Cost Sheet' : 'Create Cost Sheet'}</h1>
+          {costingId && (
+            <Tag color="blue" style={{ fontSize: 13, padding: '2px 10px' }}>
+              {costingId}
+            </Tag>
+          )}
+        </Space>
+      </div>
+
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          currency: 'INR',
+          quoteCurrency: 'USD',
+          date: dayjs(),
+        }}
+      >
+        <Collapse
+          defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
+          items={collapseItems}
+          style={{ marginBottom: 80 }}
+        />
+      </Form>
+
+      {/* Sticky Footer */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '12px 24px',
+          background: isDarkMode ? '#1e293b' : '#fff',
+          borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
+          boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
+          zIndex: 100,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 12,
+        }}
+      >
+        <Button onClick={() => navigate('/costing/list')} disabled={saving}>
+          Cancel
+        </Button>
+        <Button
+          icon={<SaveOutlined />}
+          onClick={handleSaveDraft}
+          loading={saving}
+        >
+          Save as Draft
+        </Button>
+        <Button
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={handleSubmit}
+          loading={saving}
+        >
+          Submit
+        </Button>
+      </div>
+
+      {/* Knits Consumption Modal */}
+      <KnitsConsumptionModal
+        open={knitsModalOpen}
+        onApply={handleKnitsApply}
+        onCancel={() => setKnitsModalOpen(false)}
+        initialParts={knitsParts}
+      />
+    </div>
+  );
+};
+
+export default CostingForm;

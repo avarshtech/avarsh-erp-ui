@@ -14,6 +14,10 @@ import POList from './pages/po/POList';
 import POForm from './pages/po/POForm';
 import GRNList from './pages/grn/GRNList';
 import GRNForm from './pages/grn/GRNForm';
+import CostingList from './pages/costing/CostingList';
+import CostingForm from './pages/costing/CostingForm';
+import CostingView from './pages/costing/CostingView';
+import CostComparison from './pages/costing/CostComparison';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
@@ -60,6 +64,12 @@ const ThemedApp = () => {
             <Route path="grn/list" element={<GRNList />} />
             <Route path="grn/new" element={<GRNForm />} />
             <Route path="grn/edit/:id" element={<GRNForm />} />
+            {/* Costing */}
+            <Route path="costing/list" element={<CostingList />} />
+            <Route path="costing/new" element={<CostingForm />} />
+            <Route path="costing/edit/:id" element={<CostingForm />} />
+            <Route path="costing/compare" element={<CostComparison />} />
+            <Route path="costing/:id" element={<CostingView />} />
             {/* Admin */}
             <Route path="admin/dashboard" element={<AdminDashboard />} />
             <Route path="admin/users" element={<UserManagement />} />
