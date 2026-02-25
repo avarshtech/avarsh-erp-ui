@@ -846,7 +846,6 @@ const SupplierMaster = () => {
               <Form.Item
                 name="bankName"
                 label="Bank Name"
-                rules={[{ required: true, message: 'Bank Name is required' }]}
               >
                 <Input placeholder="Enter Bank Name" maxLength={100} />
               </Form.Item>
@@ -857,7 +856,6 @@ const SupplierMaster = () => {
                 name="bankAccountNumber"
                 label="Account Number"
                 rules={[
-                  { required: true, message: 'Account Number is required' },
                   { pattern: /^[0-9]+$/, message: 'Only digits allowed' },
                 ]}
                 normalize={(value) => value?.replace(/[^0-9]/g, '').slice(0, 20)}
@@ -870,7 +868,6 @@ const SupplierMaster = () => {
               <Form.Item
                 name="bankBranch"
                 label="Branch"
-                rules={[{ required: true, message: 'Branch is required' }]}
               >
                 <Input placeholder="Enter Branch" maxLength={100} />
               </Form.Item>
@@ -881,7 +878,6 @@ const SupplierMaster = () => {
                 name="ifscCode"
                 label="IFSC Code"
                 rules={[
-                  { required: true, message: 'IFSC Code is required' },
                   {
                     pattern: IFSC_REGEX,
                     message: 'Invalid IFSC format (e.g., SBIN0001234)',
