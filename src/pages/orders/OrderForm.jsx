@@ -788,8 +788,7 @@ const OrderForm = () => {
     return (
       <Space wrap>
         <Tag color="blue">#{idx + 1}</Tag>
-        <Text strong>{line.description || line.styleNo || 'New Assortment'}</Text>
-        {line.styleNo && <Text type="secondary">({line.styleNo})</Text>}
+        <Text strong>{line.buyerPoNo || line.styleNo ? [line.buyerPoNo, line.styleNo].filter(Boolean).join(' / ') : 'New Assortment'}</Text>
         <Text type="secondary">|</Text>
         <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
         <Text type="secondary">|</Text>
