@@ -766,7 +766,6 @@ const BuyerMaster = () => {
                 <Form.Item
                   name="bankName"
                   label="Bank Name"
-                  rules={[{ required: true, message: 'Bank Name is required' }]}
                   normalize={nameWithSpecial}
                 >
                   <Input placeholder="Enter Bank Name" maxLength={100} />
