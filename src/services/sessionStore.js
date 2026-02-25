@@ -135,6 +135,35 @@ export const getCachedUserDisplay = () => {
   }
 };
 
+// ── Shared Refresh Lock (prevents concurrent refresh calls) ─────────────
+
+let _refreshPromise = null;
+
+/**
+ * Execute a token refresh with deduplication.
+ * If a refresh is already in progress, returns the existing promise
+ * instead of starting a new one. This prevents race conditions between
+ * the axios interceptor and SessionContext proactive refresh.
+ *
+ * @param {() => Promise<string|null>} refreshFn - Function that performs the refresh API call and returns the new token or null
+ * @returns {Promise<string|null>} The new access token, or null on failure
+ */
+export const executeTokenRefresh = (refreshFn) => {
+  if (_refreshPromise) return _refreshPromise;
+
+  _refreshPromise = refreshFn().catch(() => null).finally(() => {
+    _refreshPromise = null;
+  });
+
+  return _refreshPromise;
+};
+
+/** @returns {boolean} True if a refresh is currently in progress */
+export const isRefreshInProgress = () => _refreshPromise !== null;
+
+/** @returns {Promise<string|null>|null} The current refresh promise, if any */
+export const getRefreshPromise = () => _refreshPromise;
+
 // ── Full Clear (logout / session expiry) ────────────────────────────────────
 
 /**

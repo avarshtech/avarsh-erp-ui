@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { message } from 'antd';
 // Import directly from sessionStore (not authService) to avoid circular dependencies
-import { getAccessToken, setAccessToken, clearAll } from './sessionStore';
+import { getAccessToken, setAccessToken, clearAll, executeTokenRefresh } from './sessionStore';
 
 /**
  * Axios instance configuration for API requests
@@ -85,17 +85,19 @@ axiosInstance.interceptors.response.use(
         isRefreshing = true;
 
         try {
-          // Refresh token is sent automatically via HttpOnly cookie (withCredentials: true)
-          // No request body needed — the backend reads the cookie directly
-          const refreshResponse = await axios.post(
-            `${axiosInstance.defaults.baseURL}/auth/refresh`,
-            null,
-            { withCredentials: true }
+          // Use the shared lock to prevent concurrent refresh calls
+          // (e.g., if SessionContext proactive refresh is already in-flight).
+          // Uses raw `axios` (NOT axiosInstance) so we don't add the
+          // Authorization header — the JWT filter would reject an expired token.
+          const newToken = await executeTokenRefresh(() =>
+            axios.post(
+              `${axiosInstance.defaults.baseURL}/auth/refresh`,
+              null,
+              { withCredentials: true }
+            ).then((r) => r.data?.token || null)
           );
 
-          const newToken = refreshResponse.data?.token;
           if (newToken) {
-            // Store new token in memory (NOT in sessionStorage)
             setAccessToken(newToken);
             originalRequest.headers.Authorization = `Bearer ${newToken}`;
             onTokenRefreshed(newToken);
