@@ -42,27 +42,26 @@ import {
 } from '../../services/costingService';
 import {
   COSTING_STATUS,
-  SEASONS,
   FABRIC_CLASSIFICATIONS,
-  FABRIC_TYPES,
-  LOCAL_TRIM_ITEMS,
-  IMPORTED_TRIM_ITEMS,
-  MANUFACTURING_PROCESSES,
-  OVERHEAD_CATEGORIES,
   CURRENCIES,
+  FABRIC_UOMS,
+  TRIM_UOMS,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE_MB,
-  generateCostingId,
   calcFabricNetCost,
   calcTrimPrice,
   calcTotalMakingPrice,
   calcTotalOverheadCharges,
   calcFinalPrice,
+  calcFinalPriceUsd,
   calcAutoProfit,
   formatCurrency,
 } from '../../utils/costingConstants';
-import { BUYERS } from '../../utils/orderConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
+import { getBuyers } from '../../services/buyerService';
+import { getStylesByBuyerId } from '../../services/styleService';
+import { searchItems } from '../../services/itemService';
+import { getAllCategories } from '../../services/masterDataService';
 import { useTheme } from '../../context/ThemeContext';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
 
@@ -85,6 +84,20 @@ const CostingForm = () => {
   const [actualRate, setActualRate] = useState(83.80);
   const [todaysRate, setTodaysRate] = useState(83.80);
   const [fileList, setFileList] = useState([]);
+  const [usdToInrRate, setUsdToInrRate] = useState(83.80);
+  const [styleId, setStyleId] = useState(null);
+
+  // API-fetched dropdown options
+  const [buyerOptions, setBuyerOptions] = useState([]);
+  const [styleOptions, setStyleOptions] = useState([]);
+  const [fabricItemOptions, setFabricItemOptions] = useState([]);
+  const [fabricItemsRaw, setFabricItemsRaw] = useState([]);
+  const [localTrimOptions, setLocalTrimOptions] = useState([]);
+  const [importedTrimOptions, setImportedTrimOptions] = useState([]);
+  const [manufacturingOptions, setManufacturingOptions] = useState([]);
+  const [overheadOptions, setOverheadOptions] = useState([]);
+  const [stylesLoading, setStylesLoading] = useState(false);
+  const [optionsLoading, setOptionsLoading] = useState(false);
 
   // Section data
   const [fabricRows, setFabricRows] = useState([]);
@@ -107,16 +120,82 @@ const CostingForm = () => {
   const [poSuggestions, setPOSuggestions] = useState([]);
   const [suggestionVisible, setSuggestionVisible] = useState(false);
 
+  // Fetch dropdown options from API on mount
+  useEffect(() => {
+    const fetchOptions = async () => {
+      setOptionsLoading(true);
+      try {
+        // Fetch buyers
+        const buyers = await getBuyers();
+        setBuyerOptions((buyers || []).map((b) => ({ value: b.id, label: b.name })));
+
+        // Fetch categories to find Fabric, Local Trims, Imported Trims
+        const catRes = await getAllCategories();
+        const categories = catRes.data || catRes || [];
+
+        const fabricCat = categories.find((c) => c.name === 'Fabric');
+        const localTrimCat = categories.find((c) => c.name?.toLowerCase().includes('local trim'));
+        const importedTrimCat = categories.find((c) => c.name?.toLowerCase().includes('imported trim'));
+        // Fallback: use a general "Trims" category for both if specific ones aren't found
+        const generalTrimCat = (!localTrimCat || !importedTrimCat)
+          ? categories.find((c) => {
+              const n = c.name?.toLowerCase() || '';
+              return n.includes('trim') && !n.includes('local') && !n.includes('imported');
+            })
+          : null;
+
+        // Fetch items for each category
+        if (fabricCat) {
+          const fabRes = await searchItems({ categoryId: fabricCat.id, size: 200 });
+          const fabItems = fabRes.data?.content || fabRes.data || [];
+          setFabricItemsRaw(fabItems);
+          setFabricItemOptions(fabItems.map((item) => ({ value: item.id, label: item.itemName })));
+        }
+        const effectiveLocalTrimCat = localTrimCat || generalTrimCat;
+        if (effectiveLocalTrimCat) {
+          const ltRes = await searchItems({ categoryId: effectiveLocalTrimCat.id, size: 200 });
+          const ltItems = ltRes.data?.content || ltRes.data || [];
+          setLocalTrimOptions(ltItems.map((item) => ({ value: item.id, label: item.itemName })));
+        }
+        const effectiveImportedTrimCat = importedTrimCat || generalTrimCat;
+        if (effectiveImportedTrimCat) {
+          const itRes = await searchItems({ categoryId: effectiveImportedTrimCat.id, size: 200 });
+          const itItems = itRes.data?.content || itRes.data || [];
+          setImportedTrimOptions(itItems.map((item) => ({ value: item.id, label: item.itemName })));
+        }
+
+        // Fetch Manufacturing items
+        const mfgCat = categories.find((c) => c.name?.toLowerCase().includes('manufactur'));
+        if (mfgCat) {
+          const mfgRes = await searchItems({ categoryId: mfgCat.id, size: 200 });
+          const mfgItems = mfgRes.data?.content || mfgRes.data || [];
+          setManufacturingOptions(mfgItems.map((item) => ({ value: item.id, label: item.itemName })));
+        }
+
+        // Fetch Overhead items
+        const ovhCat = categories.find((c) => c.name?.toLowerCase().includes('overhead'));
+        if (ovhCat) {
+          const ovhRes = await searchItems({ categoryId: ovhCat.id, size: 200 });
+          const ovhItems = ovhRes.data?.content || ovhRes.data || [];
+          setOverheadOptions(ovhItems.map((item) => ({ value: item.id, label: item.itemName })));
+        }
+      } catch {
+        // Fallback to empty arrays — dropdowns will be empty
+      } finally {
+        setOptionsLoading(false);
+      }
+    };
+    fetchOptions();
+  }, []);
+
   // Load existing cost sheet for edit
   useEffect(() => {
     if (isEdit) {
       loadCostSheet();
     } else {
-      setCostingId(generateCostingId());
+      setCostingId('Auto-generated');
       // Pre-populate manufacturing rows with common processes
-      setManufacturingRows([
-        { key: `m_${Date.now()}_1`, process: 'CMT', cost: '', comments: '' },
-      ]);
+      setManufacturingRows([]);
     }
   }, [id]);
 
@@ -131,30 +210,63 @@ const CostingForm = () => {
     }
   }, [currency, quoteCurrency]);
 
+  // Fetch USD-INR rate for USD Final Price display
+  useEffect(() => {
+    getTodaysRate('USD', 'INR').then((rate) => {
+      setUsdToInrRate(rate);
+    });
+  }, []);
+
   const loadCostSheet = async () => {
     setLoading(true);
     try {
       const cs = await getCostSheetById(id);
       setCostingId(cs.costingId);
+      setStyleId(cs.styleId || null);
       setCurrency(cs.currency);
       setQuoteCurrency(cs.quoteCurrency);
       setActualRate(cs.actualRate);
-      setFabricRows(cs.fabricRows || []);
-      setLocalTrims(cs.localTrims || []);
-      setImportedTrims(cs.importedTrims || []);
-      setManufacturingRows(cs.manufacturingRows || []);
-      setOverheadRows(cs.overheadRows || []);
+      // Ensure every loaded row has a unique `key` — the API strips keys on save,
+      // and the Table + update/delete functions depend on `key` for row identity.
+      const withKeys = (rows, prefix) =>
+        (rows || []).map((r, i) => ({ ...r, key: r.key || `${prefix}_${Date.now()}_${i}` }));
+      setFabricRows(withKeys(cs.fabricRows, 'f'));
+      setLocalTrims(withKeys(cs.localTrims, 'lt'));
+      setImportedTrims(withKeys(cs.importedTrims, 'it'));
+      setManufacturingRows(withKeys(cs.manufacturingRows, 'm'));
+      setOverheadRows(withKeys(cs.overheadRows, 'o'));
       setAgentCommissionPct(cs.agentCommissionPct || 0);
       setProfitPct(cs.profitPct || 0);
       setTargetPrice(cs.targetPrice || '');
       setFileList(cs.attachments || []);
 
+      // Parse season: "SS26" → seasonCode="SS", seasonYear="2026"
+      let seasonCode = '';
+      let seasonYear = '';
+      if (cs.season && cs.season.length >= 4) {
+        seasonCode = cs.season.substring(0, 2);
+        seasonYear = '20' + cs.season.substring(2);
+      }
+
+      // Fetch styles for the loaded buyer so the Select can show the correct label
+      if (cs.buyerId) {
+        try {
+          const styles = await getStylesByBuyerId(cs.buyerId);
+          setStyleOptions(
+            (styles || []).map((s) => ({ value: s.id, label: s.styleNo, style: s }))
+          );
+        } catch {
+          // Style options may not load — dropdown will be empty
+        }
+      }
+
       form.setFieldsValue({
         date: cs.date ? dayjs(cs.date) : null,
         buyerId: cs.buyerId,
-        styleNo: cs.styleNo,
+        styleNo: cs.styleId || null,
         garmentName: cs.garmentName,
-        season: cs.season,
+        seasonCode,
+        seasonYear,
         currency: cs.currency,
         quoteCurrency: cs.quoteCurrency,
         actualRate: cs.actualRate,
@@ -210,6 +322,11 @@ const CostingForm = () => {
     return calcFinalPrice(totalPrice, actualRate);
   }, [totalPrice, actualRate]);
 
+  const finalPriceUsd = useMemo(() => {
+    if (quoteCurrency === 'USD') return finalPrice;
+    return calcFinalPriceUsd(finalPrice, quoteCurrency, actualRate, usdToInrRate);
+  }, [finalPrice, quoteCurrency, actualRate, usdToInrRate]);
+
   // Auto-calculate profit when target price changes
   useEffect(() => {
     if (targetPrice && Number(targetPrice) > 0 && totalMakingPrice > 0) {
@@ -217,6 +334,36 @@ const CostingForm = () => {
       setProfitPct(Math.round(autoProfit * 100) / 100);
     }
   }, [targetPrice, totalMakingPrice, agentCommissionPct]);
+
+  // ==================== BUYER & STYLE HANDLERS ====================
+
+  const handleBuyerChange = async (buyerId) => {
+    // Clear style fields when buyer changes
+    form.setFieldsValue({ styleNo: undefined, garmentName: '' });
+    setStyleId(null);
+    setStyleOptions([]);
+
+    if (!buyerId) return;
+
+    setStylesLoading(true);
+    try {
+      const styles = await getStylesByBuyerId(buyerId);
+      setStyleOptions(
+        (styles || []).map((s) => ({ value: s.id, label: s.styleNo, style: s }))
+      );
+    } catch {
+      setStyleOptions([]);
+    } finally {
+      setStylesLoading(false);
+    }
+  };
+
+  const handleStyleChange = (selectedStyleId, option) => {
+    setStyleId(selectedStyleId);
+    if (option?.style) {
+      form.setFieldsValue({ garmentName: option.style.garmentName || '' });
+    }
+  };
 
   // ==================== ROW HANDLERS ====================
 
@@ -236,10 +383,12 @@ const CostingForm = () => {
       ...prev,
       {
         key: `f_${Date.now()}`,
+        itemId: null,
         fabricType: '',
         classification: 'Woven',
         description: '',
         consumption: '',
+        uom: 'meters',
         fabricPrice: '',
         fabricWidthStd: '',
         fabricWidthVendor: '',
@@ -249,6 +398,24 @@ const CostingForm = () => {
         netCost: 0,
       },
     ]);
+  };
+
+  const handleFabricItemSelect = (key, itemId, option) => {
+    // Set itemId and fabricType from the selected item
+    const rawItem = fabricItemsRaw.find((item) => item.id === itemId);
+    setFabricRows((prev) =>
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        const updated = { ...r, itemId, fabricType: option.label };
+        // Auto-set classification from subcategory
+        if (rawItem?.subCategoryName) {
+          const subName = rawItem.subCategoryName.toLowerCase();
+          if (subName.includes('knit')) updated.classification = 'Knits';
+          else if (subName.includes('woven')) updated.classification = 'Woven';
+        }
+        return updated;
+      })
+    );
   };
 
   const deleteFabricRow = (key) => {
@@ -269,7 +436,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, item: '', code: '', size: '', consumption: '', cost: '', price: 0 },
+      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', cost: '', price: 0 },
     ]);
   };
 
@@ -291,7 +458,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, item: '', code: '', size: '', consumption: '', costUsd: '', priceUsd: 0 },
+      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', costUsd: '', priceUsd: 0 },
     ]);
   };
 
@@ -308,7 +475,7 @@ const CostingForm = () => {
   const addManufacturingRow = () => {
     setManufacturingRows((prev) => [
       ...prev,
-      { key: `m_${Date.now()}`, process: '', cost: '', comments: '' },
+      { key: `m_${Date.now()}`, itemId: null, process: '', cost: '', comments: '' },
     ]);
   };
 
@@ -325,7 +492,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, description: '', cost: '', comments: '' },
+      { key: `o_${Date.now()}`, itemId: null, description: '', cost: '', comments: '' },
     ]);
   };
 
@@ -364,27 +531,39 @@ const CostingForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (formValues, status) => {
-    const buyer = BUYERS.find((b) => b.value === formValues.buyerId);
+    // Combine season code + year → e.g. "SS26"
+    const season =
+      formValues.seasonCode && formValues.seasonYear
+        ? formValues.seasonCode + formValues.seasonYear.slice(-2)
+        : '';
+
+    // Resolve styleNo label from styleOptions
+    const selectedStyle = styleOptions.find((s) => s.value === formValues.styleNo);
+    const resolvedStyleNo = selectedStyle ? selectedStyle.label : formValues.styleNo;
+
+    // Strip `key` from row arrays and ensure itemId is included
+    const cleanRows = (rows) => rows.map(({ key, ...rest }) => rest);
+
     return {
       costingId,
       status,
       date: formValues.date?.format('YYYY-MM-DD'),
       buyerId: formValues.buyerId,
-      buyerName: buyer?.label || '',
-      styleNo: formValues.styleNo,
+      styleId,
+      styleNo: resolvedStyleNo,
       garmentName: formValues.garmentName,
-      season: formValues.season,
+      season,
       currency,
       quoteCurrency,
       actualRate,
       todaysRate,
       sizes: formValues.sizes || [],
       attachments: fileList,
-      fabricRows,
-      localTrims,
-      importedTrims,
-      manufacturingRows,
-      overheadRows,
+      fabricRows: cleanRows(fabricRows),
+      localTrims: cleanRows(localTrims),
+      importedTrims: cleanRows(importedTrims),
+      manufacturingRows: cleanRows(manufacturingRows),
+      overheadRows: cleanRows(overheadRows),
       agentCommissionPct,
       profitPct,
       targetPrice,
@@ -398,6 +577,7 @@ const CostingForm = () => {
       totalOverheadCharges,
       totalPrice,
       finalPrice,
+      finalPriceUsd: quoteCurrency === 'USD' ? finalPrice : finalPriceUsd,
     };
   };
 
@@ -485,18 +665,18 @@ const CostingForm = () => {
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
       title: 'Fabric Type',
-      dataIndex: 'fabricType',
+      dataIndex: 'itemId',
       width: 150,
       render: (val, record) => (
         <Select
-          value={val}
+          value={record.itemId || undefined}
           style={{ width: '100%' }}
-          options={FABRIC_TYPES}
+          options={fabricItemOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select"
-          onChange={(v) => updateFabricRow(record.key, 'fabricType', v)}
-          onFocus={() => loadSuggestions('fabric', val)}
+          onChange={(v, opt) => handleFabricItemSelect(record.key, v, opt)}
+          onFocus={() => loadSuggestions('fabric', record.fabricType)}
           size="small"
         />
       ),
@@ -555,6 +735,20 @@ const CostingForm = () => {
             </Tooltip>
           )}
         </Space.Compact>
+      ),
+    },
+    {
+      title: 'UOM',
+      dataIndex: 'uom',
+      width: 100,
+      render: (val, record) => (
+        <Select
+          value={val || 'meters'}
+          style={{ width: '100%' }}
+          options={FABRIC_UOMS}
+          onChange={(v) => updateFabricRow(record.key, 'uom', v)}
+          size="small"
+        />
       ),
     },
     {
@@ -640,17 +834,20 @@ const CostingForm = () => {
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
       title: 'Item',
-      dataIndex: 'item',
+      dataIndex: 'itemId',
       width: 160,
-      render: (val, record) => (
+      render: (_, record) => (
         <Select
-          value={val}
+          value={record.itemId || undefined}
           style={{ width: '100%' }}
-          options={LOCAL_TRIM_ITEMS}
+          options={localTrimOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select item"
-          onChange={(v) => updateLocalTrim(record.key, 'item', v)}
+          onChange={(v, opt) => {
+            updateLocalTrim(record.key, 'itemId', v);
+            updateLocalTrim(record.key, 'item', opt.label);
+          }}
           size="small"
         />
       ),
@@ -677,6 +874,20 @@ const CostingForm = () => {
       width: 100,
       render: (val, record) => (
         <InputNumber value={val} min={0} step={0.01} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} />
+      ),
+    },
+    {
+      title: 'UOM',
+      dataIndex: 'uom',
+      width: 100,
+      render: (val, record) => (
+        <Select
+          value={val || 'pcs'}
+          style={{ width: '100%' }}
+          options={TRIM_UOMS}
+          onChange={(v) => updateLocalTrim(record.key, 'uom', v)}
+          size="small"
+        />
       ),
     },
     {
@@ -710,17 +921,20 @@ const CostingForm = () => {
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
       title: 'Item',
-      dataIndex: 'item',
+      dataIndex: 'itemId',
       width: 160,
-      render: (val, record) => (
+      render: (_, record) => (
         <Select
-          value={val}
+          value={record.itemId || undefined}
           style={{ width: '100%' }}
-          options={IMPORTED_TRIM_ITEMS}
+          options={importedTrimOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select item"
-          onChange={(v) => updateImportedTrim(record.key, 'item', v)}
+          onChange={(v, opt) => {
+            updateImportedTrim(record.key, 'itemId', v);
+            updateImportedTrim(record.key, 'item', opt.label);
+          }}
           size="small"
         />
       ),
@@ -750,6 +964,20 @@ const CostingForm = () => {
       ),
     },
     {
+      title: 'UOM',
+      dataIndex: 'uom',
+      width: 100,
+      render: (val, record) => (
+        <Select
+          value={val || 'pcs'}
+          style={{ width: '100%' }}
+          options={TRIM_UOMS}
+          onChange={(v) => updateImportedTrim(record.key, 'uom', v)}
+          size="small"
+        />
+      ),
+    },
+    {
       title: 'Cost ($ USD)',
       dataIndex: 'costUsd',
       width: 110,
@@ -776,21 +1004,41 @@ const CostingForm = () => {
     },
   ];
 
+  // Merge saved row values into API options so existing values always display
+  const effectiveMfgOptions = useMemo(() => {
+    const apiIds = new Set(manufacturingOptions.map((o) => o.value));
+    const extras = manufacturingRows
+      .filter((r) => r.itemId && !apiIds.has(r.itemId))
+      .map((r) => ({ value: r.itemId, label: r.process || `Item #${r.itemId}` }));
+    return [...manufacturingOptions, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
+  }, [manufacturingOptions, manufacturingRows]);
+
+  const effectiveOvhOptions = useMemo(() => {
+    const apiIds = new Set(overheadOptions.map((o) => o.value));
+    const extras = overheadRows
+      .filter((r) => r.itemId && !apiIds.has(r.itemId))
+      .map((r) => ({ value: r.itemId, label: r.description || `Item #${r.itemId}` }));
+    return [...overheadOptions, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
+  }, [overheadOptions, overheadRows]);
+
   const manufacturingColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
       title: 'Process',
-      dataIndex: 'process',
+      dataIndex: 'itemId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={val}
+          value={record.itemId || undefined}
           style={{ width: '100%' }}
-          options={MANUFACTURING_PROCESSES}
+          options={effectiveMfgOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select process"
-          onChange={(v) => updateManufacturingRow(record.key, 'process', v)}
+          onChange={(v, opt) => {
+            updateManufacturingRow(record.key, 'itemId', v);
+            updateManufacturingRow(record.key, 'process', opt.label);
+          }}
           size="small"
         />
       ),
@@ -825,17 +1073,20 @@ const CostingForm = () => {
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
       title: 'Description',
-      dataIndex: 'description',
+      dataIndex: 'itemId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={val}
+          value={record.itemId || undefined}
           style={{ width: '100%' }}
-          options={OVERHEAD_CATEGORIES}
+          options={effectiveOvhOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select category"
-          onChange={(v) => updateOverheadRow(record.key, 'description', v)}
+          onChange={(v, opt) => {
+            updateOverheadRow(record.key, 'itemId', v);
+            updateOverheadRow(record.key, 'description', opt.label);
+          }}
           size="small"
         />
       ),
@@ -897,23 +1148,52 @@ const CostingForm = () => {
                     showSearch
                     optionFilterProp="label"
                     placeholder="Select buyer"
-                    options={BUYERS}
+                    options={buyerOptions}
+                    loading={optionsLoading}
+                    onChange={handleBuyerChange}
                   />
                 </Form.Item>
               </Col>
               <Col xs={12} md={8}>
                 <Form.Item label="Style #" name="styleNo" rules={[{ required: true, message: 'Style # is required' }]}>
-                  <Input placeholder="e.g. N58070-1LU" />
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select style"
+                    options={styleOptions}
+                    loading={stylesLoading}
+                    disabled={!form.getFieldValue('buyerId')}
+                    onChange={handleStyleChange}
+                  />
                 </Form.Item>
               </Col>
               <Col xs={12} md={8}>
                 <Form.Item label="Garment Name" name="garmentName" rules={[{ required: true, message: 'Required' }]}>
-                  <Input placeholder="e.g. Blouse SS Ladies" />
+                  <Input placeholder="Auto-filled from style" readOnly />
                 </Form.Item>
               </Col>
-              <Col xs={12} md={8}>
-                <Form.Item label="Season" name="season">
-                  <Select placeholder="Select season" options={SEASONS} allowClear />
+              <Col xs={12} md={4}>
+                <Form.Item label="Season" name="seasonCode">
+                  <Select
+                    placeholder="Season"
+                    allowClear
+                    options={[
+                      { value: 'SS', label: 'Spring/Summer' },
+                      { value: 'AW', label: 'Autumn/Winter' },
+                    ]}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={4}>
+                <Form.Item label="Year" name="seasonYear">
+                  <Select
+                    placeholder="Year"
+                    allowClear
+                    options={Array.from({ length: 7 }, (_, i) => {
+                      const yr = new Date().getFullYear() - 1 + i;
+                      return { value: String(yr), label: String(yr) };
+                    })}
+                  />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6}>
@@ -996,21 +1276,21 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 1300 }}
+            scroll={{ x: 1400 }}
             locale={{ emptyText: 'No fabrics added. Click + Add Fabric to begin.' }}
             summary={() =>
               fabricRows.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={9}>
+                    <Table.Summary.Cell index={0} colSpan={10}>
                       <Text strong>Total Fabric Cost</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={9}>
+                    <Table.Summary.Cell index={10}>
                       <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
                         {formatCurrency(totalFabricCost, currency)}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={10} />
+                    <Table.Summary.Cell index={11} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1055,13 +1335,13 @@ const CostingForm = () => {
               localTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={6}>
+                    <Table.Summary.Cell index={0} colSpan={7}>
                       <Text strong>Local Accessories Total</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={6}>
+                    <Table.Summary.Cell index={7}>
                       <Text strong>{formatCurrency(totalLocalTrimsCost, currency)}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={7} />
+                    <Table.Summary.Cell index={8} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1088,13 +1368,13 @@ const CostingForm = () => {
               importedTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={6}>
+                    <Table.Summary.Cell index={0} colSpan={7}>
                       <Text strong>Imported Accessories Total (USD)</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={6}>
+                    <Table.Summary.Cell index={7}>
                       <Text strong>{formatCurrency(totalImportedTrimsCostUsd, 'USD')}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={7} />
+                    <Table.Summary.Cell index={8} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1328,31 +1608,36 @@ const CostingForm = () => {
 
           <Divider style={{ margin: '16px 0' }} />
 
-          <Row gutter={[24, 16]} align="middle">
-            <Col xs={12} md={8}>
-              <Statistic
-                title={`Total Price (${currency})`}
-                value={totalPrice}
-                precision={2}
-                prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 20, fontWeight: 700, color: 'var(--primary-color)' }}
-              />
-            </Col>
-            <Col xs={12} md={8}>
-              <Card
-                style={{
-                  background: isDarkMode
-                    ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  border: 'none',
-                  textAlign: 'center',
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 12, display: 'block' }}>
-                  Final Price ({quoteCurrency})
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={12} md={6}>
+              <Card size="small" style={{ textAlign: 'center', borderColor: '#6366f1' }}>
+                <Text style={{ color: '#6366f1', fontSize: 12, display: 'block' }}>
+                  Total Price (INR)
                 </Text>
-                <Text style={{ color: '#fff', fontSize: 28, fontWeight: 800, display: 'block' }}>
-                  {getCurrencySymbol(quoteCurrency)} {finalPrice.toFixed(2)}
+                <Text style={{ color: '#6366f1', fontSize: 24, fontWeight: 800, display: 'block' }}>
+                  {getCurrencySymbol('INR')} {totalPrice.toFixed(2)}
+                </Text>
+              </Card>
+            </Col>
+            {quoteCurrency !== 'INR' && quoteCurrency !== 'USD' && (
+              <Col xs={12} md={6}>
+                <Card size="small" style={{ textAlign: 'center', borderColor: '#10b981' }}>
+                  <Text style={{ color: '#10b981', fontSize: 12, display: 'block' }}>
+                    Final Price ({quoteCurrency})
+                  </Text>
+                  <Text style={{ color: '#10b981', fontSize: 24, fontWeight: 800, display: 'block' }}>
+                    {getCurrencySymbol(quoteCurrency)} {finalPrice.toFixed(2)}
+                  </Text>
+                </Card>
+              </Col>
+            )}
+            <Col xs={12} md={quoteCurrency !== 'INR' && quoteCurrency !== 'USD' ? 6 : 9}>
+              <Card size="small" style={{ textAlign: 'center', borderColor: '#3b82f6' }}>
+                <Text style={{ color: '#3b82f6', fontSize: 12, display: 'block' }}>
+                  Final Price (USD)
+                </Text>
+                <Text style={{ color: '#3b82f6', fontSize: 24, fontWeight: 800, display: 'block' }}>
+                  $ {finalPriceUsd.toFixed(2)}
                 </Text>
               </Card>
             </Col>

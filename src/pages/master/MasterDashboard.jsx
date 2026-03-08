@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { Tabs, Spin, message } from 'antd';
-import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined, ShopOutlined } from '@ant-design/icons';
+import { DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined, GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined, ShopOutlined, HighlightOutlined } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
 import ItemTypeMaster from './ItemTypeMaster';
@@ -10,6 +10,7 @@ import ItemMaster from './ItemMaster';
 import BuyerMaster from './BuyerMaster';
 import SupplierMaster from './SupplierMaster';
 import TermsConditionsMaster from './TermsConditionsMaster';
+import StyleMaster from './StyleMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import {
@@ -19,12 +20,13 @@ import {
   getAllAttributes,
   getAllUOMs,
 } from '../../services/masterDataService';
+import { getStyles } from '../../services/styleService';
 
 const MasterDashboard = () => {
   const { isDarkMode } = useTheme();
-  const { 
-    categories, subCategories, itemTypes, attributes, uoms,
-    setData, setLoading, loading, isCacheValid 
+  const {
+    categories, subCategories, itemTypes, attributes, uoms, styles,
+    setData, setLoading, loading, isCacheValid
   } = useStore();
 
   // Fetch all metadata when component mounts
@@ -116,13 +118,30 @@ const MasterDashboard = () => {
       );
     }
 
+    // Fetch styles
+    if (!isCacheValid('styles') || styles.length === 0) {
+      setLoading('styles', true);
+      fetchPromises.push(
+        getStyles()
+          .then((data) => {
+            setData('styles', data);
+            console.debug('MasterDashboard: styles fetched, count=', data?.length);
+          })
+          .catch(error => {
+            console.error('Failed to fetch styles:', error);
+            message.error('Failed to load styles');
+          })
+          .finally(() => setLoading('styles', false))
+      );
+    }
+
     // Wait for all fetches to complete (use allSettled so one failing request
     // doesn't short-circuit other metadata fetches)
     if (fetchPromises.length > 0) {
       const results = await Promise.allSettled(fetchPromises);
       console.debug('MasterDashboard: fetchAllMetaData results', results);
     }
-  }, [categories, subCategories, itemTypes, attributes, uoms, isCacheValid, setData, setLoading]);
+  }, [categories, subCategories, itemTypes, attributes, uoms, styles, isCacheValid, setData, setLoading]);
 
   useEffect(() => {
     fetchAllMetaData();
@@ -138,6 +157,15 @@ const MasterDashboard = () => {
       key: 'supplier',
       label: <span><TeamOutlined /> Suppliers</span>,
       children: <SupplierMaster />,
+    },
+    {
+      key: 'style',
+      label: <span><HighlightOutlined /> Styles</span>,
+      children: loading.styles ? (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+          <Spin size="large" tip="Loading styles..." />
+        </div>
+      ) : <StyleMaster />,
     },
     {
       key: 'item',

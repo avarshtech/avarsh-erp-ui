@@ -23,7 +23,10 @@ const initialState = {
   
   // Buyers
   buyers: [],
-  
+
+  // Styles
+  styles: [],
+
   // Terms & Conditions
   termsConditions: [],
   
@@ -41,6 +44,7 @@ const initialState = {
     variants: false,
     suppliers: false,
     buyers: false,
+    styles: false,
     termsConditions: false,
     users: false,
     roles: false,
@@ -56,11 +60,12 @@ const initialState = {
     variants: null,
     suppliers: null,
     buyers: null,
+    styles: null,
     termsConditions: null,
     users: null,
     roles: null,
   },
-  
+
   // Last fetched timestamps (for cache invalidation)
   lastFetched: {
     categories: null,
@@ -71,6 +76,7 @@ const initialState = {
     variants: null,
     suppliers: null,
     buyers: null,
+    styles: null,
     termsConditions: null,
     users: null,
     roles: null,

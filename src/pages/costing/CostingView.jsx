@@ -36,6 +36,7 @@ import {
   EDITABLE_STATUSES,
   getStatusLabel,
   formatCurrency,
+  calcFinalPriceUsd,
 } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { hasPermission } from '../../utils/permissions';
@@ -88,7 +89,7 @@ const CostingView = () => {
 
   const handleApprove = async () => {
     try {
-      await updateCostSheet(id, { status: COSTING_STATUS.APPROVED });
+      await updateCostSheet(id, { ...data, status: COSTING_STATUS.APPROVED });
       message.success('Cost sheet approved');
       loadData();
     } catch {
@@ -111,6 +112,13 @@ const CostingView = () => {
   const statusConfig = STATUS_CONFIG[data.status] || {};
   const isEditable = EDITABLE_STATUSES.includes(data.status);
 
+  const finalPriceUsd = (() => {
+    if (!data) return 0;
+    if (data.quoteCurrency === 'USD') return data.finalPrice;
+    if (data.finalPriceUsd) return data.finalPriceUsd;
+    return calcFinalPriceUsd(data.finalPrice, data.quoteCurrency, data.actualRate);
+  })();
+
   const sectionHeaderStyle = (color) => ({
     background: isDarkMode
       ? `linear-gradient(135deg, ${color}22 0%, ${color}11 100%)`
@@ -125,6 +133,7 @@ const CostingView = () => {
     { title: 'Classification', dataIndex: 'classification', width: 100 },
     { title: 'Description', dataIndex: 'description', width: 160 },
     { title: 'Consumption', dataIndex: 'consumption', width: 100, render: (v) => v?.toFixed(4) || '-' },
+    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
     { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 100, render: (v) => formatCurrency(v, data.currency) },
     { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 90 },
     { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 95 },
@@ -139,6 +148,7 @@ const CostingView = () => {
     { title: 'Code', dataIndex: 'code', width: 130 },
     { title: 'Size', dataIndex: 'size', width: 90 },
     { title: 'Consumption', dataIndex: 'consumption', width: 100 },
+    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 110, render: (v) => formatCurrency(v, data.currency) },
     { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'price', width: 110, render: (v) => <Text strong>{formatCurrency(v, data.currency)}</Text> },
   ];
@@ -149,6 +159,7 @@ const CostingView = () => {
     { title: 'Code', dataIndex: 'code', width: 130 },
     { title: 'Size', dataIndex: 'size', width: 90 },
     { title: 'Consumption', dataIndex: 'consumption', width: 100 },
+    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
     { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 110, render: (v) => formatCurrency(v, 'USD') },
     { title: 'Price ($ USD)', dataIndex: 'priceUsd', width: 110, render: (v) => <Text strong>{formatCurrency(v, 'USD')}</Text> },
   ];
@@ -218,8 +229,8 @@ const CostingView = () => {
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
-                <Table.Summary.Cell index={0} colSpan={10}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={10}>
+                <Table.Summary.Cell index={0} colSpan={11}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={11}>
                   <Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalFabricCost, data.currency)}</Text>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
@@ -244,8 +255,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={6}><Text strong>Local Total</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={6}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Local Total</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -256,8 +267,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={6}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={6}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -357,21 +368,30 @@ const CostingView = () => {
             </Col>
           </Row>
           <Divider style={{ margin: '16px 0' }} />
-          <Row gutter={[24, 16]} align="middle">
-            <Col xs={12} md={8}>
-              <Statistic title={`Total Price (${data.currency})`} value={data.totalPrice} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }} />
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={12} md={6}>
+              <Card size="small" style={{ textAlign: 'center', borderColor: '#6366f1' }}>
+                <Text style={{ color: '#6366f1', fontSize: 12, display: 'block' }}>Total Price (INR)</Text>
+                <Text style={{ color: '#6366f1', fontSize: 26, fontWeight: 800, display: 'block' }}>
+                  {getCurrencySymbol('INR')} {data.totalPrice?.toFixed(2)}
+                </Text>
+              </Card>
             </Col>
-            <Col xs={12} md={8}>
-              <Card
-                style={{
-                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                  border: 'none',
-                  textAlign: 'center',
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 12, display: 'block' }}>Final Price ({data.quoteCurrency})</Text>
-                <Text style={{ color: '#fff', fontSize: 30, fontWeight: 800, display: 'block' }}>
-                  {getCurrencySymbol(data.quoteCurrency)} {data.finalPrice?.toFixed(2)}
+            {data.quoteCurrency !== 'INR' && data.quoteCurrency !== 'USD' && (
+              <Col xs={12} md={6}>
+                <Card size="small" style={{ textAlign: 'center', borderColor: '#10b981' }}>
+                  <Text style={{ color: '#10b981', fontSize: 12, display: 'block' }}>Final Price ({data.quoteCurrency})</Text>
+                  <Text style={{ color: '#10b981', fontSize: 26, fontWeight: 800, display: 'block' }}>
+                    {getCurrencySymbol(data.quoteCurrency)} {data.finalPrice?.toFixed(2)}
+                  </Text>
+                </Card>
+              </Col>
+            )}
+            <Col xs={12} md={data.quoteCurrency !== 'INR' && data.quoteCurrency !== 'USD' ? 6 : 9}>
+              <Card size="small" style={{ textAlign: 'center', borderColor: '#3b82f6' }}>
+                <Text style={{ color: '#3b82f6', fontSize: 12, display: 'block' }}>Final Price (USD)</Text>
+                <Text style={{ color: '#3b82f6', fontSize: 26, fontWeight: 800, display: 'block' }}>
+                  $ {finalPriceUsd?.toFixed(2)}
                 </Text>
               </Card>
             </Col>

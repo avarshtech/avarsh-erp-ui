@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(npx vite build:*)",
+      "Bash(timeout 15 npx vite:*)",
+      "Bash(node -e:*)",
+      "Bash(node --experimental-vm-modules -e:*)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(npx playwright install chromium)",
+      "Bash(npx playwright test --project=setup --headed)",
+      "Bash(npx playwright test:*)",
+      "Bash(npm run build:*)"
+    ]
+  }
+}

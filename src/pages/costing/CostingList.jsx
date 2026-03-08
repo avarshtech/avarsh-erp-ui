@@ -27,6 +27,7 @@ import {
   SendOutlined,
   ReloadOutlined,
   ExclamationCircleOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -46,6 +47,7 @@ import {
   formatCurrency,
 } from '../../utils/costingConstants';
 import { BUYERS } from '../../utils/orderConstants';
+import CostingHistoryModal from './CostingHistoryModal';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -73,6 +75,8 @@ const CostingList = () => {
   const [dateRange, setDateRange] = useState(null);
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('desc');
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [historyRecord, setHistoryRecord] = useState(null);
 
   // Permissions
   const canAdd = hasPermission('costing', 'add');
@@ -166,6 +170,11 @@ const CostingList = () => {
     setDateRange(null);
   };
 
+  const handleViewHistory = (record) => {
+    setHistoryRecord(record);
+    setHistoryModalOpen(true);
+  };
+
   const canEditSheet = (record) =>
     EDITABLE_STATUSES.includes(record.status) && canUpdate;
 
@@ -244,12 +253,19 @@ const CostingList = () => {
       title: 'Final Price',
       dataIndex: 'finalPrice',
       key: 'finalPrice',
-      width: 120,
+      width: 140,
       align: 'right',
       render: (amount, record) => (
-        <Text strong style={{ color: 'var(--primary-color)' }}>
-          {formatCurrency(amount, record.quoteCurrency)}
-        </Text>
+        <div>
+          <Text strong style={{ color: 'var(--primary-color)' }}>
+            {formatCurrency(amount, record.quoteCurrency)}
+          </Text>
+          <div>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              {formatCurrency(record.finalPriceUsd || amount, 'USD')}
+            </Text>
+          </div>
+        </div>
       ),
     },
     {
@@ -274,7 +290,7 @@ const CostingList = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 150,
+      width: 180,
       render: (_, record) => (
         <Space size="small">
           {canView && (
@@ -308,6 +324,17 @@ const CostingList = () => {
               style={{ color: '#722ed1' }}
             />
           </Tooltip>
+          {(record.status === COSTING_STATUS.APPROVED || record.status === COSTING_STATUS.FINAL) && (
+            <Tooltip title="History">
+              <Button
+                type="text"
+                size="small"
+                icon={<HistoryOutlined />}
+                onClick={() => handleViewHistory(record)}
+                style={{ color: '#faad14' }}
+              />
+            </Tooltip>
+          )}
           {canDeleteSheet(record) && (
             <Popconfirm
               title="Delete Cost Sheet"
@@ -437,6 +464,13 @@ const CostingList = () => {
           }}
         />
       </Card>
+
+      <CostingHistoryModal
+        open={historyModalOpen}
+        onClose={() => setHistoryModalOpen(false)}
+        costingId={historyRecord?.costingId}
+        recordId={historyRecord?.id}
+      />
     </div>
   );
 };

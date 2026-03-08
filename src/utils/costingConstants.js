@@ -78,6 +78,25 @@ export const FABRIC_TYPES = [
   { value: 'Denim', label: 'Denim' },
 ];
 
+// ==================== UNIT OF MEASUREMENT ====================
+
+export const FABRIC_UOMS = [
+  { value: 'meters', label: 'Meters' },
+  { value: 'yards', label: 'Yards' },
+  { value: 'kgs', label: 'Kgs' },
+];
+
+export const TRIM_UOMS = [
+  { value: 'pcs', label: 'Pieces' },
+  { value: 'sets', label: 'Sets' },
+  { value: 'pairs', label: 'Pairs' },
+  { value: 'meters', label: 'Meters' },
+  { value: 'yards', label: 'Yards' },
+  { value: 'cones', label: 'Cones' },
+  { value: 'rolls', label: 'Rolls' },
+  { value: 'dozen', label: 'Dozen' },
+];
+
 // ==================== TRIMS / ACCESSORIES ====================
 
 export const LOCAL_TRIM_ITEMS = [
@@ -274,4 +293,19 @@ export const formatCurrency = (amount, currency = 'INR') => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+};
+
+/**
+ * Convert final price to USD equivalent
+ * Uses INR as the cross-currency bridge:
+ *   totalPrice (INR) = finalPrice × actualRate
+ *   finalPriceUsd = totalPrice / usdToInrRate
+ */
+export const calcFinalPriceUsd = (finalPrice, quoteCurrency, actualRate, usdToInrRate = 83.80) => {
+  if (quoteCurrency === 'USD') return Number(finalPrice) || 0;
+  const fp = Number(finalPrice) || 0;
+  const ar = Number(actualRate) || 1;
+  const usdRate = Number(usdToInrRate) || 1;
+  if (usdRate === 0) return 0;
+  return (fp * ar) / usdRate;
 };
