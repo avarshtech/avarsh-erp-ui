@@ -803,7 +803,7 @@ const OrderForm = () => {
   return (
     <div className="animate-fade-in-up">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <Space>
           <Button
             icon={<ArrowLeftOutlined />}

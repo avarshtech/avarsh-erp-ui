@@ -447,6 +447,7 @@ const POList = () => {
           setViewingPO(null);
         }}
         onStatusChange={handleStatusActionComplete}
+        onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
       />
     </div>
   );
