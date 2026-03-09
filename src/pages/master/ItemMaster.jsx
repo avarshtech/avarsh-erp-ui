@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Card, Table, Button, Input, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, message, Tooltip, Divider, Badge, Checkbox, Typography, Empty,
-  Drawer, Descriptions,
+  Drawer, Descriptions, Alert,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined,
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
-  ClearOutlined, AppstoreOutlined,
+  ClearOutlined, AppstoreOutlined, FileImageOutlined,
 } from '@ant-design/icons';
 import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/itemService';
 import { hasPermission } from '../../utils/permissions';
@@ -16,6 +16,8 @@ import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
 import PantoneColorInput from '../../components/PantoneColorInput';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
+import FileUpload from '../../components/FileUpload';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import dayjs from 'dayjs';
 
 import { useStore } from '../../context/StoreContext';
@@ -167,6 +169,8 @@ const ItemMaster = () => {
   // View Drawer State
   const [viewDrawerVisible, setViewDrawerVisible] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
+  // Per-variant image state for drawer: { variantId: 'loading' | blobUrl }
+  const [drawerVariantImages, setDrawerVariantImages] = useState({});
 
   // Form State
   const [form] = Form.useForm();
@@ -182,6 +186,7 @@ const ItemMaster = () => {
   const [variants, setVariants] = useState([]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [duplicateVariantIndex, setDuplicateVariantIndex] = useState(null);
+  const [variantImagesLoading, setVariantImagesLoading] = useState(false);
 
   // Suggestion State (for item name autocomplete)
   const [suggestions, setSuggestions] = useState([]);
@@ -218,6 +223,293 @@ const ItemMaster = () => {
       return v;
     }
     return '';
+  };
+
+  // ──────────────────────────────────────────────────────
+  // Variant Image Helpers
+  // Image state is stored directly on variant objects using underscore-prefixed keys:
+  //   _imageFile        : File | null       – pending upload
+  //   _imagePreviewUrl  : string | null     – blob URL for preview
+  //   _existingImage    : FileStorageDTO    – server-side file metadata
+  //   _imageRemoved     : boolean           – mark existing image for deletion
+  // These fields are never sent to the API (the payload builder skips them).
+  // ──────────────────────────────────────────────────────
+
+  const getVariantPreviewUrl = (variantIndex) => {
+    const variant = variants[variantIndex];
+    if (!variant || variant._imageRemoved) return null;
+    return variant._imagePreviewUrl || null;
+  };
+
+  const getVariantFileName = (variantIndex) => {
+    const variant = variants[variantIndex];
+    if (!variant || variant._imageRemoved) return null;
+    if (variant._imageFile) return variant._imageFile.name;
+    if (variant._existingImage) return variant._existingImage.originalFilename;
+    return null;
+  };
+
+  const getVariantFileType = (variantIndex) => {
+    const variant = variants[variantIndex];
+    if (!variant) return null;
+    if (variant._imageFile) return variant._imageFile.type;
+    if (variant._existingImage) return variant._existingImage.fileType;
+    return null;
+  };
+
+  const getVariantFileSize = (variantIndex) => {
+    const variant = variants[variantIndex];
+    if (!variant) return null;
+    if (variant._imageFile) return variant._imageFile.size;
+    if (variant._existingImage) return variant._existingImage.fileSizeBytes;
+    return null;
+  };
+
+  const handleVariantImageSelect = async (variantIndex, file) => {
+    // Revoke the old preview URL if it was from a locally-selected File
+    const old = variants[variantIndex];
+    if (old?._imagePreviewUrl && old._imageFile) {
+      URL.revokeObjectURL(old._imagePreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+
+    const variantId = old?.id;
+
+    if (variantId) {
+      // Existing variant — upload immediately
+      setVariants((prev) => {
+        const updated = [...prev];
+        updated[variantIndex] = {
+          ...updated[variantIndex],
+          _imageFile: null,
+          _imagePreviewUrl: previewUrl,
+          _imageRemoved: false,
+          _imageUploading: true,
+        };
+        return updated;
+      });
+
+      try {
+        // Delete old image first if replacing
+        if (old._existingImage?.fileId) {
+          await deleteFile(old._existingImage.fileId).catch((err) =>
+            console.error('Failed to delete old image:', err),
+          );
+        }
+
+        const result = await uploadFile(file, {
+          module: 'ITEM_VARIANT',
+          entity: 'ITEM_VARIANT',
+          entityId: variantId,
+          fileCategory: 'IMAGE',
+        });
+
+        const uploaded = result?.data || result;
+        setVariants((prev) => {
+          const updated = [...prev];
+          updated[variantIndex] = {
+            ...updated[variantIndex],
+            _existingImage: uploaded,
+            _imageFile: null,
+            _imagePreviewUrl: previewUrl,
+            _imageRemoved: false,
+            _imageUploading: false,
+          };
+          return updated;
+        });
+        message.success('Image uploaded successfully');
+      } catch (err) {
+        console.error('Failed to upload variant image:', err);
+        message.error('Image upload failed. Please try again.');
+        // Revert the preview
+        URL.revokeObjectURL(previewUrl);
+        setVariants((prev) => {
+          const updated = [...prev];
+          updated[variantIndex] = {
+            ...updated[variantIndex],
+            _imageFile: null,
+            _imagePreviewUrl: old._existingImage ? old._imagePreviewUrl : null,
+            _imageRemoved: false,
+            _imageUploading: false,
+          };
+          return updated;
+        });
+      }
+    } else {
+      // New variant — stage locally, will upload after save
+      setVariants((prev) => {
+        const updated = [...prev];
+        updated[variantIndex] = {
+          ...updated[variantIndex],
+          _imageFile: file,
+          _imagePreviewUrl: previewUrl,
+          _imageRemoved: false,
+        };
+        return updated;
+      });
+      setUnsavedChanges(true);
+    }
+  };
+
+  const handleVariantImageRemove = async (variantIndex) => {
+    const variant = variants[variantIndex];
+    // Revoke blob URL to free memory
+    if (variant?._imagePreviewUrl) {
+      URL.revokeObjectURL(variant._imagePreviewUrl);
+    }
+
+    const hasExistingImage = !!variant?._existingImage?.fileId;
+    const variantId = variant?.id;
+
+    if (hasExistingImage && variantId) {
+      // Existing variant with server image — delete immediately
+      setVariants((prev) => {
+        const updated = [...prev];
+        updated[variantIndex] = {
+          ...updated[variantIndex],
+          _imageFile: null,
+          _imagePreviewUrl: null,
+          _imageRemoved: false,
+          _existingImage: null,
+          _imageUploading: true,
+        };
+        return updated;
+      });
+
+      try {
+        await deleteFile(variant._existingImage.fileId);
+        setVariants((prev) => {
+          const updated = [...prev];
+          updated[variantIndex] = {
+            ...updated[variantIndex],
+            _imageUploading: false,
+          };
+          return updated;
+        });
+        message.success('Image removed successfully');
+      } catch (err) {
+        console.error('Failed to delete variant image:', err);
+        message.error('Failed to remove image. Please try again.');
+        // Revert — re-download will be needed but at least restore the metadata
+        setVariants((prev) => {
+          const updated = [...prev];
+          updated[variantIndex] = {
+            ...updated[variantIndex],
+            _existingImage: variant._existingImage,
+            _imageUploading: false,
+          };
+          return updated;
+        });
+      }
+    } else {
+      // New variant or locally staged file — just clear locally
+      setVariants((prev) => {
+        const updated = [...prev];
+        updated[variantIndex] = {
+          ...updated[variantIndex],
+          _imageFile: null,
+          _imagePreviewUrl: null,
+          _imageRemoved: !!updated[variantIndex]._existingImage,
+        };
+        return updated;
+      });
+      setUnsavedChanges(true);
+    }
+  };
+
+  /**
+   * Load existing images for variants that have server-side IDs.
+   * Runs in the background after the form is rendered.
+   */
+  const loadVariantImages = async (rawVariants) => {
+    const variantsWithIds = (rawVariants || []).filter((v) => v.id);
+    if (variantsWithIds.length === 0) return;
+
+    setVariantImagesLoading(true);
+
+    const results = await Promise.all(
+      variantsWithIds.map(async (v) => {
+        try {
+          const files = await getFilesByEntity('ITEM_VARIANT', v.id);
+          const imageFile = (files || []).find((f) =>
+            ['IMAGE', 'PHOTO'].includes(f.fileCategory),
+          );
+          if (!imageFile) return null;
+
+          const blob = await downloadFileAsBlob(imageFile.fileId);
+          const previewUrl = URL.createObjectURL(blob);
+          return { variantId: v.id, imageFile, previewUrl };
+        } catch (err) {
+          console.error(`Failed to load image for variant ${v.id}:`, err);
+          return null;
+        }
+      }),
+    );
+
+    setVariants((prev) =>
+      prev.map((v) => {
+        const result = results.find((r) => r?.variantId === v.id);
+        if (result) {
+          return {
+            ...v,
+            _existingImage: result.imageFile,
+            _imagePreviewUrl: result.previewUrl,
+          };
+        }
+        return v;
+      }),
+    );
+    setVariantImagesLoading(false);
+  };
+
+  /**
+   * After item save, upload new images and delete removed images.
+   * savedVariants is the array returned by the API (same order as local variants).
+   */
+  /**
+   * After item save, upload images for NEW variants only.
+   * Existing variants already had their uploads/deletes handled immediately.
+   * savedVariants is the array returned by the API (same order as local variants).
+   */
+  const processVariantImages = async (savedVariants) => {
+    if (!savedVariants || savedVariants.length === 0) return;
+
+    const fileOps = [];
+    let uploadFailures = 0;
+
+    for (let i = 0; i < variants.length; i++) {
+      const local = variants[i];
+      const saved = savedVariants[i];
+      if (!saved || local.isActive === false) continue;
+
+      // Skip variants that already had an ID before save —
+      // their images were uploaded/deleted immediately on selection/removal.
+      if (local.id) continue;
+
+      // Upload staged image for newly created variants
+      if (local._imageFile) {
+        fileOps.push(
+          uploadFile(local._imageFile, {
+            module: 'ITEM_VARIANT',
+            entity: 'ITEM_VARIANT',
+            entityId: saved.id,
+            fileCategory: 'IMAGE',
+          }).catch(() => {
+            uploadFailures++;
+          }),
+        );
+      }
+    }
+
+    if (fileOps.length > 0) {
+      await Promise.allSettled(fileOps);
+    }
+
+    if (uploadFailures > 0) {
+      message.warning(
+        `Item saved successfully, but ${uploadFailures} image upload${uploadFailures > 1 ? 's' : ''} failed. You can re-upload by editing the item.`,
+      );
+    }
   };
 
   // Fetch Items from API with server-side pagination & filters
@@ -437,6 +729,10 @@ const ItemMaster = () => {
     setShowSuggestions(false);
     fetchMetaData().then((metaDataList) => {
       initializeEditForm(item, metaDataList);
+      // Load variant images in background after form is rendered
+      if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
+        loadVariantImages(item.variants);
+      }
     });
     setModalOpen(true);
     setUnsavedChanges(false);
@@ -445,7 +741,38 @@ const ItemMaster = () => {
   // Open View Drawer
   const handleView = (item) => {
     setViewingItem(item);
+    setDrawerVariantImages({});
     setViewDrawerVisible(true);
+
+    // Load variant images in background for the drawer (per-variant state)
+    // Two-phase: first check which variants have images (metadata), then download blobs
+    if (item.variants && Array.isArray(item.variants)) {
+      const variantsWithIds = item.variants.filter((v) => v.id);
+      if (variantsWithIds.length > 0) {
+        // Phase 1: Fetch metadata for all variants to discover which have images
+        variantsWithIds.forEach(async (v) => {
+          try {
+            const files = await getFilesByEntity('ITEM_VARIANT', v.id);
+            const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+            if (!img) return; // No image — no spinner, no entry
+
+            // Phase 2: Only now mark this variant as loading (it has an image)
+            setDrawerVariantImages((prev) => ({ ...prev, [v.id]: 'loading' }));
+
+            const blob = await downloadFileAsBlob(img.fileId);
+            const url = URL.createObjectURL(blob);
+            setDrawerVariantImages((prev) => ({ ...prev, [v.id]: url }));
+          } catch {
+            // Failed — remove loading state if it was set
+            setDrawerVariantImages((prev) => {
+              const next = { ...prev };
+              delete next[v.id];
+              return next;
+            });
+          }
+        });
+      }
+    }
   };
 
   // Initialize form for edit mode
@@ -514,6 +841,10 @@ const ItemMaster = () => {
 
   // Close Modal
   const doCloseModal = () => {
+    // Clean up blob URLs to prevent memory leaks
+    variants.forEach((v) => {
+      if (v._imagePreviewUrl) URL.revokeObjectURL(v._imagePreviewUrl);
+    });
     setModalOpen(false);
     setSelectedItem(null);
     setSelectedItemId(null);
@@ -523,6 +854,7 @@ const ItemMaster = () => {
     setShowSuggestions(false);
     setDuplicateVariantIndex(null);
     setUnsavedChanges(false);
+    setVariantImagesLoading(false);
   };
 
   const handleModalClose = () => {
@@ -584,6 +916,12 @@ const ItemMaster = () => {
     }
 
     const variantToDelete = variants[indexToDelete];
+
+    // Clean up blob URL for hard-deleted variants
+    if (!variantToDelete.id && variantToDelete._imagePreviewUrl) {
+      URL.revokeObjectURL(variantToDelete._imagePreviewUrl);
+    }
+
     if (variantToDelete.id) {
       // Soft delete
       setVariants((prev) => {
@@ -854,8 +1192,9 @@ const ItemMaster = () => {
         variants: variantsPayload,
       };
 
+      let response;
       if (isUpdateOperation) {
-        await updateItem({ id: parseInt(selectedItemId || selectedItem?.id), ...payload });
+        response = await updateItem({ id: parseInt(selectedItemId || selectedItem?.id), ...payload });
         message.success('Item updated successfully');
       } else {
         // Remove itemCode/itemId from variants for new items
@@ -863,8 +1202,23 @@ const ItemMaster = () => {
           const { itemCode, itemId, ...rest } = v;
           return rest;
         });
-        await createItem(payload);
+        response = await createItem(payload);
         message.success('Item created successfully');
+      }
+
+      // Process variant image uploads/deletions.
+      // The API returns saved variants (with IDs) in the same order as submitted.
+      // Only new variants (without IDs) may have pending staged images
+      const hasPendingImages = variants.some((v) => !v.id && v._imageFile);
+      if (hasPendingImages) {
+        const savedItem = response?.data || response;
+        const savedVariants = savedItem?.variants || [];
+        try {
+          await processVariantImages(savedVariants);
+        } catch (imgErr) {
+          console.error('Some image operations failed:', imgErr);
+          message.warning('Item saved, but some image operations failed.');
+        }
       }
 
       // Close directly after successful save to avoid triggering the
@@ -1289,7 +1643,7 @@ const ItemMaster = () => {
                   label="Primary UOM"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
-                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.name ?? opt.label ?? '') }))} />
+                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.symbol ?? opt.name ?? opt.label ?? '') }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1311,7 +1665,7 @@ const ItemMaster = () => {
                       placeholder="Select Secondary UOM (optional)"
                       allowClear
                       disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
-                      options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.name ?? opt.label ?? '') }))}
+                      options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.symbol ?? opt.name ?? opt.label ?? '') }))}
                     />
                 </Form.Item>
               </Col>
@@ -1432,6 +1786,39 @@ const ItemMaster = () => {
                         </Col>
                       ))}
                     </Row>
+
+                    {/* Variant Image Upload */}
+                    <div style={{ marginTop: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                        Variant Image (Optional)
+                      </Text>
+                      <FileUpload
+                        accept="image/png,image/jpeg,image/jpg"
+                        maxSizeMB={10}
+                        previewUrl={getVariantPreviewUrl(activeVariantIndex)}
+                        fileName={getVariantFileName(activeVariantIndex)}
+                        fileType={getVariantFileType(activeVariantIndex)}
+                        fileSize={getVariantFileSize(activeVariantIndex)}
+                        onSelect={(file) => handleVariantImageSelect(activeVariantIndex, file)}
+                        onRemove={() => handleVariantImageRemove(activeVariantIndex)}
+                        disabled={(isEditMode && !canUpdate) || variants[activeVariantIndex]?._imageUploading}
+                        loading={
+                          variants[activeVariantIndex]?._imageUploading ||
+                          (variantImagesLoading && !getVariantPreviewUrl(activeVariantIndex))
+                        }
+                        compact
+                        placeholder="Click or drag to upload variant image"
+                      />
+                      {/* Info message for new variants (no ID yet) */}
+                      {!variants[activeVariantIndex]?.id && variants[activeVariantIndex]?._imageFile && (
+                        <Alert
+                          type="info"
+                          showIcon
+                          style={{ marginTop: 8, fontSize: 12 }}
+                          message="Image will be uploaded automatically after saving the item."
+                        />
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1472,6 +1859,22 @@ const ItemMaster = () => {
                             },
                           };
                         }),
+                        {
+                          title: 'Image',
+                          width: 50,
+                          render: (_, record) => {
+                            const v = variants[record.originalIndex];
+                            const hasImage = v && !v._imageRemoved && (v._imagePreviewUrl || v._imageFile);
+                            if (!hasImage) return <Text type="secondary">—</Text>;
+                            return v._imagePreviewUrl ? (
+                              <div style={{ width: 28, height: 28, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                                <img src={v._imagePreviewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              </div>
+                            ) : (
+                              <FileImageOutlined style={{ color: 'var(--primary-color)' }} />
+                            );
+                          },
+                        },
                         {
                           title: 'Actions',
                           width: 80,
@@ -1529,6 +1932,11 @@ const ItemMaster = () => {
         placement="right"
         size="large"
         onClose={() => {
+          // Clean up drawer image blob URLs
+          Object.values(drawerVariantImages).forEach((url) => {
+            if (url && url !== 'loading') URL.revokeObjectURL(url);
+          });
+          setDrawerVariantImages({});
           setViewDrawerVisible(false);
           setViewingItem(null);
         }}
@@ -1631,6 +2039,53 @@ const ItemMaster = () => {
                           <Text type="secondary">-</Text>
                         )}
                       </div>
+
+                      {/* Variant Image in Drawer */}
+                      {v.id && drawerVariantImages[v.id] === 'loading' ? (
+                        <div style={{ marginTop: 10 }}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                            Image
+                          </Text>
+                          <div
+                            style={{
+                              width: 72,
+                              height: 72,
+                              borderRadius: 6,
+                              border: '1px dashed var(--border-color)',
+                              background: 'var(--bg-secondary, #f8fafc)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <Spin size="small" />
+                          </div>
+                        </div>
+                      ) : v.id && drawerVariantImages[v.id] ? (
+                        <div style={{ marginTop: 10 }}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                            Image
+                          </Text>
+                          <div
+                            style={{
+                              width: 72,
+                              height: 72,
+                              borderRadius: 6,
+                              overflow: 'hidden',
+                              border: '1px solid var(--border-color)',
+                              background: 'var(--bg-secondary, #f8fafc)',
+                              cursor: 'pointer',
+                            }}
+                            onClick={() => window.open(drawerVariantImages[v.id], '_blank')}
+                          >
+                            <img
+                              src={drawerVariantImages[v.id]}
+                              alt={`Variant ${idx + 1}`}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
