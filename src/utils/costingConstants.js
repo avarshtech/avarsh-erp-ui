@@ -47,14 +47,23 @@ export const STATUS_COLORS = {
 
 // ==================== SEASONS ====================
 
-export const SEASONS = [
-  { value: 'SS25', label: 'Spring/Summer 2025' },
-  { value: 'AW25', label: 'Autumn/Winter 2025' },
-  { value: 'SS26', label: 'Spring/Summer 2026' },
-  { value: 'AW26', label: 'Autumn/Winter 2026' },
-  { value: 'SS27', label: 'Spring/Summer 2027' },
-  { value: 'AW27', label: 'Autumn/Winter 2027' },
+export const SEASON_CODES = [
+  { value: 'SS', label: 'Spring/Summer' },
+  { value: 'AW', label: 'Autumn/Winter' },
 ];
+
+export const SEASON_YEARS = Array.from({ length: 7 }, (_, i) => {
+  const yr = new Date().getFullYear() - 1 + i;
+  return { value: String(yr), label: String(yr) };
+});
+
+// Combined seasons list (used by CostingList filter on CostSheet's combined season field)
+export const SEASONS = SEASON_CODES.flatMap((code) =>
+  SEASON_YEARS.map((year) => ({
+    value: code.value + year.value.slice(-2),
+    label: `${code.label} ${year.label}`,
+  })),
+);
 
 // ==================== FABRIC ====================
 

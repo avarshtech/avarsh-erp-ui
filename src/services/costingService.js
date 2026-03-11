@@ -151,17 +151,38 @@ export const getAllCostSheetSummaries = async () => {
 
 /**
  * Get today's exchange rate between two currencies.
- * GET /api/v1/exchange-rates/today?from=USD&to=INR
+ * Tries the backend first, then falls back to the free open ExchangeRate-API.
  * @param {string} fromCurrency - Source currency code (e.g. 'USD')
  * @param {string} toCurrency - Target currency code (e.g. 'INR')
- * @returns {Promise<number>} Exchange rate value (unwrapped from ExchangeRateDTO)
+ * @returns {Promise<number>} Exchange rate value
  */
 export const getTodaysRate = async (fromCurrency, toCurrency) => {
   if (!fromCurrency || !toCurrency || fromCurrency === toCurrency) return 1;
-  const response = await axiosInstance.get(`${ENDPOINTS.EXCHANGE_RATES}/today`, {
-    params: { from: fromCurrency, to: toCurrency },
-  });
-  return response.data?.rate ?? 1;
+
+  // Try live open exchange rate API first for up-to-date rates
+  try {
+    const res = await fetch(
+      `https://open.er-api.com/v6/latest/${fromCurrency}`
+    );
+    const data = await res.json();
+    if (data?.result === 'success' && data.rates?.[toCurrency]) {
+      return data.rates[toCurrency];
+    }
+  } catch {
+    // Open API unavailable — fall through to backend
+  }
+
+  // Fallback: backend exchange rate
+  try {
+    const response = await axiosInstance.get(`${ENDPOINTS.EXCHANGE_RATES}/today`, {
+      params: { from: fromCurrency, to: toCurrency },
+    });
+    if (response.data?.rate) return response.data.rate;
+  } catch {
+    // Backend also unavailable
+  }
+
+  return 1;
 };
 
 // ==================== ATTACHMENTS ====================

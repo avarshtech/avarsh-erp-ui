@@ -6,7 +6,7 @@ import { useStore } from '../../context/StoreContext';
 import { saveStyle, deleteStyle } from '../../services/styleService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
-import { SEASONS } from '../../utils/costingConstants';
+import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 
 const MODULE_ID = 'master-data';
 
@@ -52,11 +52,12 @@ const StyleMaster = () => {
     },
     {
       title: 'Season',
-      dataIndex: 'season',
-      width: 100,
-      render: (val) => {
-        const found = SEASONS.find(s => s.value === val);
-        return found ? <Tag>{found.label}</Tag> : (val || '-');
+      dataIndex: 'seasonCode',
+      width: 130,
+      render: (val, record) => {
+        if (!val) return '-';
+        const codeLabel = SEASON_CODES.find((s) => s.value === val)?.label || val;
+        return <Tag>{codeLabel} {record.seasonYear || ''}</Tag>;
       },
     },
     {
@@ -275,12 +276,21 @@ const StyleMaster = () => {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
-                  <Form.Item name="season" label="Season">
+                <Col span={6}>
+                  <Form.Item name="seasonCode" label="Season">
                     <Select
-                      placeholder="Select Season"
+                      placeholder="Season"
                       allowClear
-                      options={SEASONS}
+                      options={SEASON_CODES}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item name="seasonYear" label="Year">
+                    <Select
+                      placeholder="Year"
+                      allowClear
+                      options={SEASON_YEARS}
                     />
                   </Form.Item>
                 </Col>

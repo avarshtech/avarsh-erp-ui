@@ -8,12 +8,13 @@
  */
 
 import { test as setup, expect } from '@playwright/test';
+import process from 'process';
 
 const authFile = './e2e/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
-  const username = process.env.E2E_USERNAME || 's';
-  const password = process.env.E2E_PASSWORD || 'a';
+  const username = process.env['E2E_USERNAME'] || 's';
+  const password = process.env['E2E_PASSWORD'] || 'a';
 
   // Navigate to login page
   await page.goto('/login');

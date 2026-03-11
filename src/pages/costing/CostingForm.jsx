@@ -76,6 +76,13 @@ const CostingForm = () => {
   const { isDarkMode } = useTheme();
   const isEdit = Boolean(id);
 
+  // Watch Section A sizes to use as options in other sections
+  const formSizes = Form.useWatch('sizes', form) || [];
+  const sizeOptions = useMemo(
+    () => formSizes.map((s) => ({ label: s, value: s })),
+    [formSizes],
+  );
+
   // State
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -209,6 +216,10 @@ const CostingForm = () => {
     if (quoteCurrency && quoteCurrency !== currency) {
       getTodaysRate(quoteCurrency, currency).then((rate) => {
         setTodaysRate(rate);
+        // Auto-set actual rate from live rate on new sheets (not edit)
+        if (!isEdit && rate > 1) {
+          setActualRate(Math.round(rate * 100) / 100);
+        }
       });
     } else {
       setTodaysRate(1);
@@ -413,7 +424,7 @@ const CostingForm = () => {
 
   const handleBuyerChange = async (buyerId) => {
     // Clear style fields when buyer changes
-    form.setFieldsValue({ styleNo: undefined, garmentName: '' });
+    form.setFieldsValue({ styleNo: undefined, garmentName: '', seasonCode: undefined, seasonYear: undefined });
     setStyleId(null);
     setStyleOptions([]);
 
@@ -435,7 +446,12 @@ const CostingForm = () => {
   const handleStyleChange = (selectedStyleId, option) => {
     setStyleId(selectedStyleId);
     if (option?.style) {
-      form.setFieldsValue({ garmentName: option.style.garmentName || '' });
+      const style = option.style;
+      form.setFieldsValue({
+        garmentName: style.garmentName || '',
+        seasonCode: style.seasonCode || undefined,
+        seasonYear: style.seasonYear || undefined,
+      });
     }
   };
 
@@ -749,13 +765,17 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 100,
+      width: 120,
       render: (val, record) => (
-        <Input
-          value={val}
-          placeholder="e.g. M, L"
-          onChange={(e) => updateFabricRow(record.key, 'sizes', e.target.value)}
+        <Select
+          mode="multiple"
+          value={val ? val.split(',').map((s) => s.trim()).filter(Boolean) : []}
+          placeholder="Sizes"
+          options={sizeOptions}
+          onChange={(arr) => updateFabricRow(record.key, 'sizes', arr.join(', '))}
           size="small"
+          style={{ width: '100%' }}
+          maxTagCount="responsive"
         />
       ),
     },
@@ -931,13 +951,17 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 100,
+      width: 120,
       render: (val, record) => (
-        <Input
-          value={val}
-          placeholder="e.g. M, L"
-          onChange={(e) => updateLocalTrim(record.key, 'sizes', e.target.value)}
+        <Select
+          mode="multiple"
+          value={val ? val.split(',').map((s) => s.trim()).filter(Boolean) : []}
+          placeholder="Sizes"
+          options={sizeOptions}
+          onChange={(arr) => updateLocalTrim(record.key, 'sizes', arr.join(', '))}
           size="small"
+          style={{ width: '100%' }}
+          maxTagCount="responsive"
         />
       ),
     },
@@ -1031,13 +1055,17 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 100,
+      width: 120,
       render: (val, record) => (
-        <Input
-          value={val}
-          placeholder="e.g. M, L"
-          onChange={(e) => updateImportedTrim(record.key, 'sizes', e.target.value)}
+        <Select
+          mode="multiple"
+          value={val ? val.split(',').map((s) => s.trim()).filter(Boolean) : []}
+          placeholder="Sizes"
+          options={sizeOptions}
+          onChange={(arr) => updateImportedTrim(record.key, 'sizes', arr.join(', '))}
           size="small"
+          style={{ width: '100%' }}
+          maxTagCount="responsive"
         />
       ),
     },
@@ -1148,13 +1176,17 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 100,
+      width: 120,
       render: (val, record) => (
-        <Input
-          value={val}
-          placeholder="e.g. M, L"
-          onChange={(e) => updateManufacturingRow(record.key, 'sizes', e.target.value)}
+        <Select
+          mode="multiple"
+          value={val ? val.split(',').map((s) => s.trim()).filter(Boolean) : []}
+          placeholder="Sizes"
+          options={sizeOptions}
+          onChange={(arr) => updateManufacturingRow(record.key, 'sizes', arr.join(', '))}
           size="small"
+          style={{ width: '100%' }}
+          maxTagCount="responsive"
         />
       ),
     },
@@ -1209,13 +1241,17 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 100,
+      width: 120,
       render: (val, record) => (
-        <Input
-          value={val}
-          placeholder="e.g. M, L"
-          onChange={(e) => updateOverheadRow(record.key, 'sizes', e.target.value)}
+        <Select
+          mode="multiple"
+          value={val ? val.split(',').map((s) => s.trim()).filter(Boolean) : []}
+          placeholder="Sizes"
+          options={sizeOptions}
+          onChange={(arr) => updateOverheadRow(record.key, 'sizes', arr.join(', '))}
           size="small"
+          style={{ width: '100%' }}
+          maxTagCount="responsive"
         />
       ),
     },
