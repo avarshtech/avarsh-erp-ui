@@ -18,6 +18,7 @@ import {
   Tooltip,
   Tag,
   Divider,
+  Checkbox,
   message,
   Statistic,
 } from 'antd';
@@ -110,6 +111,10 @@ const CostingForm = () => {
   const [agentCommissionPct, setAgentCommissionPct] = useState(0);
   const [profitPct, setProfitPct] = useState(0);
   const [targetPrice, setTargetPrice] = useState('');
+
+  // Multi-size overrides
+  const [perSizeOverrides, setPerSizeOverrides] = useState({});
+  const [syncPercentages, setSyncPercentages] = useState(true);
 
   // Knits modal
   const [knitsModalOpen, setKnitsModalOpen] = useState(false);
@@ -240,6 +245,26 @@ const CostingForm = () => {
       setTargetPrice(cs.targetPrice || '');
       setFileList(cs.attachments || []);
 
+      // Load per-size overrides from API response
+      if (cs.sizeSummaries && cs.sizeSummaries.length > 0) {
+        const overrides = {};
+        let allSameAgent = true;
+        let allSameProfit = true;
+        const firstAgent = cs.sizeSummaries[0].agentCommissionPct;
+        const firstProfit = cs.sizeSummaries[0].profitPct;
+        cs.sizeSummaries.forEach((ss) => {
+          overrides[ss.sizes] = {
+            agentCommissionPct: ss.agentCommissionPct,
+            profitPct: ss.profitPct,
+            targetPrice: ss.targetPrice,
+          };
+          if (ss.agentCommissionPct !== firstAgent) allSameAgent = false;
+          if (ss.profitPct !== firstProfit) allSameProfit = false;
+        });
+        setPerSizeOverrides(overrides);
+        setSyncPercentages(allSameAgent && allSameProfit);
+      }
+
       // Parse season: "SS26" → seasonCode="SS", seasonYear="2026"
       let seasonCode = '';
       let seasonYear = '';
@@ -327,6 +352,55 @@ const CostingForm = () => {
     return calcFinalPriceUsd(finalPrice, quoteCurrency, actualRate, usdToInrRate);
   }, [finalPrice, quoteCurrency, actualRate, usdToInrRate]);
 
+  // Extract unique size keys from ALL tables
+  const uniqueSizeKeys = useMemo(() => {
+    const allRows = [...fabricRows, ...localTrims, ...importedTrims, ...manufacturingRows, ...overheadRows];
+    const sizeSet = new Set();
+    allRows.forEach((r) => {
+      if (r.sizes && r.sizes.trim()) {
+        r.sizes.split(',').map((s) => s.trim()).filter(Boolean).forEach((s) => sizeSet.add(s));
+      }
+    });
+    return [...sizeSet].sort();
+  }, [fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows]);
+
+  // Per-size cost summaries
+  const perSizeSummaries = useMemo(() => {
+    if (uniqueSizeKeys.length <= 1) return [];
+
+    const matchesSize = (row, sizeKey) => {
+      if (!row.sizes || !row.sizes.trim()) return true; // blank = all sizes
+      return row.sizes.split(',').map((s) => s.trim()).includes(sizeKey);
+    };
+
+    return uniqueSizeKeys.map((sizeKey) => {
+      const fabCost = fabricRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.netCost) || 0), 0);
+      const localCost = localTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+      const importCostUsd = importedTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
+      const accCost = localCost + importCostUsd * (parseFloat(actualRate) || 1);
+      const mfgCost = manufacturingRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+      const ovhCost = overheadRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
+      const makingPrice = calcTotalMakingPrice(fabCost, accCost, mfgCost, ovhCost);
+
+      const sizeAgent = syncPercentages ? agentCommissionPct : (perSizeOverrides[sizeKey]?.agentCommissionPct ?? agentCommissionPct);
+      const sizeProfit = syncPercentages ? profitPct : (perSizeOverrides[sizeKey]?.profitPct ?? profitPct);
+      const sizeTarget = perSizeOverrides[sizeKey]?.targetPrice ?? '';
+
+      const overheadCharges = calcTotalOverheadCharges(sizeAgent, sizeProfit, makingPrice);
+      const sizeTotalPrice = makingPrice + overheadCharges;
+      const sizeFinalPrice = calcFinalPrice(sizeTotalPrice, actualRate);
+      const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
+
+      return {
+        sizeKey, fabCost, localCost, importCostUsd, accCost, mfgCost, ovhCost,
+        makingPrice, agentCommissionPct: sizeAgent, profitPct: sizeProfit,
+        targetPrice: sizeTarget, overheadCharges, totalPrice: sizeTotalPrice,
+        finalPrice: sizeFinalPrice, finalPriceUsd: sizeFinalPriceUsd,
+      };
+    });
+  }, [uniqueSizeKeys, fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows,
+      actualRate, agentCommissionPct, profitPct, syncPercentages, perSizeOverrides, quoteCurrency, usdToInrRate]);
+
   // Auto-calculate profit when target price changes
   useEffect(() => {
     if (targetPrice && Number(targetPrice) > 0 && totalMakingPrice > 0) {
@@ -396,6 +470,7 @@ const CostingForm = () => {
         vendorName: '',
         allowancePct: 0,
         netCost: 0,
+        sizes: '',
       },
     ]);
   };
@@ -436,7 +511,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', cost: '', price: 0 },
+      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', cost: '', price: 0, sizes: '' },
     ]);
   };
 
@@ -458,7 +533,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', costUsd: '', priceUsd: 0 },
+      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', costUsd: '', priceUsd: 0, sizes: '' },
     ]);
   };
 
@@ -475,7 +550,7 @@ const CostingForm = () => {
   const addManufacturingRow = () => {
     setManufacturingRows((prev) => [
       ...prev,
-      { key: `m_${Date.now()}`, itemId: null, process: '', cost: '', comments: '' },
+      { key: `m_${Date.now()}`, itemId: null, process: '', cost: '', comments: '', sizes: '' },
     ]);
   };
 
@@ -492,7 +567,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, itemId: null, description: '', cost: '', comments: '' },
+      { key: `o_${Date.now()}`, itemId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
   };
 
@@ -578,6 +653,14 @@ const CostingForm = () => {
       totalPrice,
       finalPrice,
       finalPriceUsd: quoteCurrency === 'USD' ? finalPrice : finalPriceUsd,
+      sizeSummaries: uniqueSizeKeys.length > 1
+        ? uniqueSizeKeys.map((sk) => ({
+            sizes: sk,
+            agentCommissionPct: syncPercentages ? agentCommissionPct : (perSizeOverrides[sk]?.agentCommissionPct ?? agentCommissionPct),
+            profitPct: syncPercentages ? profitPct : (perSizeOverrides[sk]?.profitPct ?? profitPct),
+            targetPrice: perSizeOverrides[sk]?.targetPrice ?? null,
+          }))
+        : [],
     };
   };
 
@@ -663,6 +746,19 @@ const CostingForm = () => {
 
   const fabricColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      width: 100,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="e.g. M, L"
+          onChange={(e) => updateFabricRow(record.key, 'sizes', e.target.value)}
+          size="small"
+        />
+      ),
+    },
     {
       title: 'Fabric Type',
       dataIndex: 'itemId',
@@ -833,6 +929,19 @@ const CostingForm = () => {
   const localTrimColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      width: 100,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="e.g. M, L"
+          onChange={(e) => updateLocalTrim(record.key, 'sizes', e.target.value)}
+          size="small"
+        />
+      ),
+    },
+    {
       title: 'Item',
       dataIndex: 'itemId',
       width: 160,
@@ -919,6 +1028,19 @@ const CostingForm = () => {
 
   const importedTrimColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      width: 100,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="e.g. M, L"
+          onChange={(e) => updateImportedTrim(record.key, 'sizes', e.target.value)}
+          size="small"
+        />
+      ),
+    },
     {
       title: 'Item',
       dataIndex: 'itemId',
@@ -1024,6 +1146,19 @@ const CostingForm = () => {
   const manufacturingColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
     {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      width: 100,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="e.g. M, L"
+          onChange={(e) => updateManufacturingRow(record.key, 'sizes', e.target.value)}
+          size="small"
+        />
+      ),
+    },
+    {
       title: 'Process',
       dataIndex: 'itemId',
       width: 200,
@@ -1071,6 +1206,19 @@ const CostingForm = () => {
 
   const overheadColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    {
+      title: 'Sizes',
+      dataIndex: 'sizes',
+      width: 100,
+      render: (val, record) => (
+        <Input
+          value={val}
+          placeholder="e.g. M, L"
+          onChange={(e) => updateOverheadRow(record.key, 'sizes', e.target.value)}
+          size="small"
+        />
+      ),
+    },
     {
       title: 'Description',
       dataIndex: 'itemId',
@@ -1282,15 +1430,15 @@ const CostingForm = () => {
               fabricRows.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={10}>
+                    <Table.Summary.Cell index={0} colSpan={11}>
                       <Text strong>Total Fabric Cost</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={10}>
+                    <Table.Summary.Cell index={11}>
                       <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
                         {formatCurrency(totalFabricCost, currency)}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={11} />
+                    <Table.Summary.Cell index={12} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1335,13 +1483,13 @@ const CostingForm = () => {
               localTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={7}>
+                    <Table.Summary.Cell index={0} colSpan={8}>
                       <Text strong>Local Accessories Total</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={7}>
+                    <Table.Summary.Cell index={8}>
                       <Text strong>{formatCurrency(totalLocalTrimsCost, currency)}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8} />
+                    <Table.Summary.Cell index={9} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1368,13 +1516,13 @@ const CostingForm = () => {
               importedTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={7}>
+                    <Table.Summary.Cell index={0} colSpan={8}>
                       <Text strong>Imported Accessories Total (USD)</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={7}>
+                    <Table.Summary.Cell index={8}>
                       <Text strong>{formatCurrency(totalImportedTrimsCostUsd, 'USD')}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8} />
+                    <Table.Summary.Cell index={9} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1422,15 +1570,15 @@ const CostingForm = () => {
               manufacturingRows.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={2}>
+                    <Table.Summary.Cell index={0} colSpan={3}>
                       <Text strong>Total Manufacturing Cost</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={2}>
+                    <Table.Summary.Cell index={3}>
                       <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
                         {formatCurrency(totalManufacturingCost, currency)}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={3} colSpan={2} />
+                    <Table.Summary.Cell index={4} colSpan={2} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1466,15 +1614,15 @@ const CostingForm = () => {
               overheadRows.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={2}>
+                    <Table.Summary.Cell index={0} colSpan={3}>
                       <Text strong>Total Markup Cost</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={2}>
+                    <Table.Summary.Cell index={3}>
                       <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
                         {formatCurrency(totalMarkupCost, currency)}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={3} colSpan={2} />
+                    <Table.Summary.Cell index={4} colSpan={2} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
@@ -1612,14 +1760,14 @@ const CostingForm = () => {
             <Col xs={12} md={6}>
               <Card size="small" style={{ textAlign: 'center', borderColor: '#6366f1' }}>
                 <Text style={{ color: '#6366f1', fontSize: 12, display: 'block' }}>
-                  Total Price (INR)
+                  Total Price ({currency})
                 </Text>
                 <Text style={{ color: '#6366f1', fontSize: 24, fontWeight: 800, display: 'block' }}>
-                  {getCurrencySymbol('INR')} {totalPrice.toFixed(2)}
+                  {getCurrencySymbol(currency)} {totalPrice.toFixed(2)}
                 </Text>
               </Card>
             </Col>
-            {quoteCurrency !== 'INR' && quoteCurrency !== 'USD' && (
+            {quoteCurrency !== currency && quoteCurrency !== 'USD' && (
               <Col xs={12} md={6}>
                 <Card size="small" style={{ textAlign: 'center', borderColor: '#10b981' }}>
                   <Text style={{ color: '#10b981', fontSize: 12, display: 'block' }}>
@@ -1631,7 +1779,7 @@ const CostingForm = () => {
                 </Card>
               </Col>
             )}
-            <Col xs={12} md={quoteCurrency !== 'INR' && quoteCurrency !== 'USD' ? 6 : 9}>
+            <Col xs={12} md={quoteCurrency !== currency && quoteCurrency !== 'USD' ? 6 : 9}>
               <Card size="small" style={{ textAlign: 'center', borderColor: '#3b82f6' }}>
                 <Text style={{ color: '#3b82f6', fontSize: 12, display: 'block' }}>
                   Final Price (USD)
@@ -1642,6 +1790,92 @@ const CostingForm = () => {
               </Card>
             </Col>
           </Row>
+
+          {/* Per-Size Breakdown */}
+          {perSizeSummaries.length > 0 && (
+            <>
+              <Divider style={{ margin: '16px 0' }} />
+              <div style={{ marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 15, marginRight: 16 }}>Per-Size Breakdown</Text>
+                <Checkbox
+                  checked={syncPercentages}
+                  onChange={(e) => setSyncPercentages(e.target.checked)}
+                >
+                  Apply same % to all sizes
+                </Checkbox>
+              </div>
+              <Row gutter={[16, 16]}>
+                {perSizeSummaries.map((ps) => (
+                  <Col xs={24} sm={12} md={Math.max(6, Math.floor(24 / perSizeSummaries.length))} key={ps.sizeKey}>
+                    <Card
+                      size="small"
+                      title={<Tag color="blue">{ps.sizeKey}</Tag>}
+                      style={{ borderColor: '#10b981' }}
+                    >
+                      <div style={{ fontSize: 12, lineHeight: '22px' }}>
+                        <div>Fabric: {formatCurrency(ps.fabCost, currency)}</div>
+                        <div>Accessories: {formatCurrency(ps.accCost, currency)}</div>
+                        <div>Manufacturing: {formatCurrency(ps.mfgCost, currency)}</div>
+                        <div>Markup: {formatCurrency(ps.ovhCost, currency)}</div>
+                        <Divider style={{ margin: '6px 0' }} />
+                        <div><Text strong>Making: {formatCurrency(ps.makingPrice, currency)}</Text></div>
+                      </div>
+                      {!syncPercentages && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ marginBottom: 4 }}>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Agent %</Text>
+                            <InputNumber
+                              value={perSizeOverrides[ps.sizeKey]?.agentCommissionPct ?? agentCommissionPct}
+                              min={0} max={100} step={0.5} size="small"
+                              style={{ width: '100%' }}
+                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                                ...prev,
+                                [ps.sizeKey]: { ...prev[ps.sizeKey], agentCommissionPct: v },
+                              }))}
+                            />
+                          </div>
+                          <div style={{ marginBottom: 4 }}>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Profit %</Text>
+                            <InputNumber
+                              value={perSizeOverrides[ps.sizeKey]?.profitPct ?? profitPct}
+                              min={0} max={100} step={0.5} size="small"
+                              style={{ width: '100%' }}
+                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                                ...prev,
+                                [ps.sizeKey]: { ...prev[ps.sizeKey], profitPct: v },
+                              }))}
+                            />
+                          </div>
+                          <div>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Target Price</Text>
+                            <InputNumber
+                              value={perSizeOverrides[ps.sizeKey]?.targetPrice ?? ''}
+                              min={0} step={0.01} size="small"
+                              style={{ width: '100%' }}
+                              placeholder="Target"
+                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                                ...prev,
+                                [ps.sizeKey]: { ...prev[ps.sizeKey], targetPrice: v },
+                              }))}
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <Divider style={{ margin: '6px 0' }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <Text style={{ color: '#3b82f6', fontSize: 18, fontWeight: 700 }}>
+                          $ {ps.finalPriceUsd.toFixed(2)}
+                        </Text>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                          {getCurrencySymbol(currency)} {ps.totalPrice.toFixed(2)}
+                        </div>
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </>
+          )}
         </Card>
       ),
     },

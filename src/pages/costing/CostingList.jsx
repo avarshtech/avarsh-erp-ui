@@ -255,18 +255,35 @@ const CostingList = () => {
       key: 'finalPrice',
       width: 140,
       align: 'right',
-      render: (amount, record) => (
-        <div>
-          <Text strong style={{ color: 'var(--primary-color)' }}>
-            {formatCurrency(amount, record.quoteCurrency)}
-          </Text>
+      render: (amount, record) => {
+        const hasSizes = record.sizeSummaries && record.sizeSummaries.length > 0;
+        const content = (
           <div>
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {formatCurrency(record.finalPriceUsd || amount, 'USD')}
+            <Text strong style={{ color: 'var(--primary-color)' }}>
+              {formatCurrency(amount, record.quoteCurrency)}
             </Text>
+            <div>
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                {formatCurrency(record.finalPriceUsd || amount, 'USD')}
+              </Text>
+            </div>
           </div>
-        </div>
-      ),
+        );
+        if (!hasSizes) return content;
+        return (
+          <Tooltip
+            title={
+              <div>
+                {record.sizeSummaries.map((ss) => (
+                  <div key={ss.sizes}>{ss.sizes}: $ {ss.finalPriceUsd?.toFixed(2)}</div>
+                ))}
+              </div>
+            }
+          >
+            {content}
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Status',

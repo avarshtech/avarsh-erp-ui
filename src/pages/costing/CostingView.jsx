@@ -129,6 +129,7 @@ const CostingView = () => {
 
   const fabricColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
     { title: 'Fabric Type', dataIndex: 'fabricType', width: 150 },
     { title: 'Classification', dataIndex: 'classification', width: 100 },
     { title: 'Description', dataIndex: 'description', width: 160 },
@@ -144,6 +145,7 @@ const CostingView = () => {
 
   const localTrimColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
     { title: 'Item', dataIndex: 'item', width: 160 },
     { title: 'Code', dataIndex: 'code', width: 130 },
     { title: 'Size', dataIndex: 'size', width: 90 },
@@ -155,6 +157,7 @@ const CostingView = () => {
 
   const importedTrimColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
     { title: 'Item', dataIndex: 'item', width: 160 },
     { title: 'Code', dataIndex: 'code', width: 130 },
     { title: 'Size', dataIndex: 'size', width: 90 },
@@ -166,6 +169,7 @@ const CostingView = () => {
 
   const mfgColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
     { title: 'Process', dataIndex: 'process', width: 200 },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, render: (v) => formatCurrency(v, data.currency) },
     { title: 'Comments', dataIndex: 'comments' },
@@ -173,6 +177,7 @@ const CostingView = () => {
 
   const overheadColumns = [
     { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
     { title: 'Description', dataIndex: 'description', width: 200 },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, render: (v) => formatCurrency(v, data.currency) },
     { title: 'Comments', dataIndex: 'comments' },
@@ -229,8 +234,8 @@ const CostingView = () => {
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
-                <Table.Summary.Cell index={0} colSpan={11}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={11}>
+                <Table.Summary.Cell index={0} colSpan={12}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={12}>
                   <Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalFabricCost, data.currency)}</Text>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
@@ -255,8 +260,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Local Total</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={8}><Text strong>Local Total</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={8}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -267,8 +272,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={8}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={8}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -293,9 +298,9 @@ const CostingView = () => {
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
-                <Table.Summary.Cell index={0} colSpan={2}><Text strong>Total Manufacturing Cost</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={2}><Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalManufacturingCost, data.currency)}</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={3} />
+                <Table.Summary.Cell index={0} colSpan={3}><Text strong>Total Manufacturing Cost</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={3}><Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalManufacturingCost, data.currency)}</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={4} />
               </Table.Summary.Row>
             </Table.Summary>
           )}
@@ -316,9 +321,9 @@ const CostingView = () => {
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
-                <Table.Summary.Cell index={0} colSpan={2}><Text strong>Total Markup Cost</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={2}><Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalMarkupCost, data.currency)}</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={3} />
+                <Table.Summary.Cell index={0} colSpan={3}><Text strong>Total Markup Cost</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={3}><Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalMarkupCost, data.currency)}</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={4} />
               </Table.Summary.Row>
             </Table.Summary>
           )}
@@ -396,6 +401,40 @@ const CostingView = () => {
               </Card>
             </Col>
           </Row>
+
+          {/* Per-Size Breakdown (read-only) */}
+          {data.sizeSummaries && data.sizeSummaries.length > 0 && (
+            <>
+              <Divider style={{ margin: '16px 0' }} />
+              <Text strong style={{ fontSize: 15, marginBottom: 12, display: 'block' }}>Per-Size Breakdown</Text>
+              <Row gutter={[16, 16]}>
+                {data.sizeSummaries.map((ss) => (
+                  <Col xs={24} sm={12} md={Math.max(6, Math.floor(24 / data.sizeSummaries.length))} key={ss.sizes}>
+                    <Card size="small" title={<Tag color="blue">{ss.sizes}</Tag>} style={{ borderColor: '#10b981' }}>
+                      <div style={{ fontSize: 12, lineHeight: '22px' }}>
+                        <div>Fabric: {formatCurrency(ss.totalFabricCost, data.currency)}</div>
+                        <div>Accessories: {formatCurrency(ss.totalAccessoriesCost, data.currency)}</div>
+                        <div>Manufacturing: {formatCurrency(ss.totalManufacturingCost, data.currency)}</div>
+                        <div>Markup: {formatCurrency(ss.totalMarkupCost, data.currency)}</div>
+                        <Divider style={{ margin: '6px 0' }} />
+                        <div><Text strong>Making: {formatCurrency(ss.totalMakingPrice, data.currency)}</Text></div>
+                        <div>Agent: {ss.agentCommissionPct}% | Profit: {ss.profitPct}%</div>
+                      </div>
+                      <Divider style={{ margin: '6px 0' }} />
+                      <div style={{ textAlign: 'center' }}>
+                        <Text style={{ color: '#3b82f6', fontSize: 18, fontWeight: 700 }}>
+                          $ {ss.finalPriceUsd?.toFixed(2)}
+                        </Text>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>
+                          {getCurrencySymbol(data.currency)} {ss.totalPrice?.toFixed(2)}
+                        </div>
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </>
+          )}
         </Card>
       ),
     },
