@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntdApp } from 'antd';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
@@ -32,6 +32,7 @@ const ThemedApp = () => {
 
   return (
     <ConfigProvider theme={antThemeConfig}>
+      <AntdApp>
       <StoreProvider>
         <BrowserRouter>
           <Routes>
@@ -85,6 +86,7 @@ const ThemedApp = () => {
         </Routes>
       </BrowserRouter>
     </StoreProvider>
+      </AntdApp>
   </ConfigProvider>
   );
 };

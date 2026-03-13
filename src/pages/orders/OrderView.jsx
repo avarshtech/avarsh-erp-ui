@@ -256,7 +256,7 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
       onCancel={onClose}
       width={1100}
       centered
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 8 } }}
       footer={
         <Space>
           {/* Edit button for editable statuses */}

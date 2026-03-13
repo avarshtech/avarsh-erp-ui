@@ -47,6 +47,7 @@ import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS } from '../../utils/poStatusConstants';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -311,6 +312,11 @@ const POForm = () => {
   // Items with their variants (keyed by itemId) - used for variant column display
   const [itemsWithVariants, setItemsWithVariants] = useState({});
 
+  // Variant images for line items { [variantId]: 'loading' | blobUrl }
+  const [lineItemImages, setLineItemImages] = useState({});
+  const loadedVariantIdsRef = useRef(new Set());
+  const lineItemImagesRef = useRef({});
+
   // Original PO data for edit mode (to know previous status)
   const [originalPO, setOriginalPO] = useState(null);
 
@@ -365,9 +371,51 @@ const POForm = () => {
       setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
       setItemsWithVariants({});
       setIsDirty(false);
+      // Clean up variant images
+      Object.values(lineItemImagesRef.current).forEach((url) => {
+        if (url && url !== 'loading') URL.revokeObjectURL(url);
+      });
+      setLineItemImages({});
+      loadedVariantIdsRef.current.clear();
     }
     prevIdRef.current = id;
   }, [id, form]);
+
+  // Keep lineItemImagesRef in sync with state for cleanup
+  useEffect(() => {
+    lineItemImagesRef.current = lineItemImages;
+  }, [lineItemImages]);
+
+  // Revoke blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(lineItemImagesRef.current).forEach((url) => {
+        if (url && url !== 'loading') URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
+
+  // Auto-load variant images whenever lineItems gains a new variantId
+  useEffect(() => {
+    lineItems.forEach((li) => {
+      const vid = li.variantId;
+      if (!vid || loadedVariantIdsRef.current.has(vid)) return;
+      loadedVariantIdsRef.current.add(vid);
+      (async () => {
+        try {
+          const files = await getFilesByEntity('ITEM_VARIANT', vid);
+          const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+          if (!img) return;
+          setLineItemImages((prev) => ({ ...prev, [vid]: 'loading' }));
+          const blob = await downloadFileAsBlob(img.fileId);
+          const url = URL.createObjectURL(blob);
+          setLineItemImages((prev) => ({ ...prev, [vid]: url }));
+        } catch {
+          loadedVariantIdsRef.current.delete(vid);
+        }
+      })();
+    });
+  }, [lineItems]);
 
   const loadMasterData = async () => {
     try {
@@ -467,11 +515,11 @@ const POForm = () => {
         itemName: item.itemName || '',
         description: item.description || '',
         qty: String(item.quantity || item.qty || ''),
-        uom: item.uomName || item.uom || '',
+        uom: item.uomSymbol || item.uom || '',
         uomId: item.uomId || null,
-        primaryUom: item.uomName || '',
+        primaryUom: item.uomSymbol || '',
         primaryUomId: item.uomId || null,
-        secondaryUom: item.secondaryUomName || '',
+        secondaryUom: item.secondaryUomSymbol || '',
         secondaryUomId: item.secondaryUomId || null,
         unitPrice: item.unitPrice || 0,
         gstPercent:
@@ -611,11 +659,11 @@ const POForm = () => {
               itemCode: item.itemCode || '',
               itemName: item.itemName || '',
               description: descParts.join(' '),
-              uom: item.uomName || '',
+              uom: item.uomSymbol || '',
               uomId: item.uomId || null,
-              primaryUom: item.uomName || '',
+              primaryUom: item.uomSymbol || '',
               primaryUomId: item.uomId || null,
-              secondaryUom: item.secondaryUomName || '',
+              secondaryUom: item.secondaryUomSymbol || '',
               secondaryUomId: item.secondaryUomId || null,
               unitPrice,
               gstPercent: gst,
@@ -1334,13 +1382,14 @@ const POForm = () => {
         const attrs = record.variantAttributes || {};
         const hasMultipleVariants =
           itemsWithVariants[record.itemId]?.variants?.length > 1;
+        const imgUrl = lineItemImages[record.variantId];
 
         return (
           <div
             style={{
               display: 'flex',
               flexWrap: 'nowrap',
-              gap: 4,
+              gap: 6,
               alignItems: 'center',
               cursor: hasMultipleVariants ? 'pointer' : 'default',
             }}
@@ -1351,35 +1400,50 @@ const POForm = () => {
             }}
             title={hasMultipleVariants ? 'Click to change variant' : ''}
           >
-            {Object.entries(attrs).length > 0 ? (
-              <>
-                {Object.entries(attrs)
-                  .slice(0, 2)
-                  .map(([key, val]) => {
-                    const kLower = key.toLowerCase();
-                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                    const showSwatch = isColorAttr && isPantoneCode(val);
-                    return (
-                      <Tag key={key} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                        {showSwatch && <PantoneColorSwatch value={val} size={14} />}
-                        {showSwatch ? (val.split('/')[0]?.trim() || val) : val}
-                      </Tag>
-                    );
-                  })}
-                {Object.entries(attrs).length > 2 && (
-                  <Text type="secondary" style={{ fontSize: 10 }}>
-                    +{Object.entries(attrs).length - 2}
-                  </Text>
-                )}
-                {hasMultipleVariants && (
-                  <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)' }} />
-                )}
-              </>
-            ) : (
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                Default
-              </Text>
+            {/* Variant image thumbnail */}
+            {imgUrl === 'loading' && (
+              <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Spin size="small" />
+              </div>
             )}
+            {imgUrl && imgUrl !== 'loading' && (
+              <img
+                src={imgUrl}
+                alt="variant"
+                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }}
+              />
+            )}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+              {Object.entries(attrs).length > 0 ? (
+                <>
+                  {Object.entries(attrs)
+                    .slice(0, 2)
+                    .map(([key, val]) => {
+                      const kLower = key.toLowerCase();
+                      const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                      const showSwatch = isColorAttr && isPantoneCode(val);
+                      return (
+                        <Tag key={key} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                          {showSwatch && <PantoneColorSwatch value={val} size={14} />}
+                          {showSwatch ? (val.split('/')[0]?.trim() || val) : val}
+                        </Tag>
+                      );
+                    })}
+                  {Object.entries(attrs).length > 2 && (
+                    <Text type="secondary" style={{ fontSize: 10 }}>
+                      +{Object.entries(attrs).length - 2}
+                    </Text>
+                  )}
+                  {hasMultipleVariants && (
+                    <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)' }} />
+                  )}
+                </>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  Default
+                </Text>
+              )}
+            </div>
           </div>
         );
       },
@@ -1914,7 +1978,9 @@ const POForm = () => {
         title="Purchase Order Preview"
         open={previewVisible}
         onCancel={() => setPreviewVisible(false)}
-        width={900}
+        width={1100}
+        style={{ top: 20 }}
+        styles={{ body: { maxHeight: 'calc(90vh - 160px)', overflowY: 'auto', padding: '24px' } }}
         footer={[
           <Button key="back" onClick={() => setPreviewVisible(false)}>
             Go Back & Edit
@@ -1992,7 +2058,6 @@ const POForm = () => {
               size="small"
               pagination={false}
               rowKey="key"
-              scroll={{ x: 900 }}
               className="centered-header-table"
               columns={[
                 {
@@ -2003,34 +2068,47 @@ const POForm = () => {
                 },
                 {
                   title: 'Item',
-                  render: (_, r) => (
-                    <div>
-                      <Text strong>{r.itemName}</Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {r.itemCode}
-                      </Text>
-                      {r.variantAttributes &&
-                        Object.keys(r.variantAttributes).length > 0 && (
-                          <div style={{ marginTop: 4 }}>
-                            {Object.entries(r.variantAttributes).map(([k, v]) => {
-                              const kLower = k.toLowerCase();
-                              const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                              const showSwatch = isColorAttr && isPantoneCode(v);
-                              return (
-                                <Tag
-                                  key={k}
-                                  style={{ fontSize: 10, margin: '0 4px 2px 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
-                                >
-                                  {showSwatch && <PantoneColorSwatch value={v} size={14} />}
-                                  {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
-                                </Tag>
-                              );
-                            })}
+                  render: (_, r) => {
+                    const imgUrl = r.variantId ? lineItemImages[r.variantId] : null;
+                    return (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        {imgUrl === 'loading' && (
+                          <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Spin size="small" />
                           </div>
                         )}
-                    </div>
-                  ),
+                        {imgUrl && imgUrl !== 'loading' && (
+                          <img src={imgUrl} alt="variant" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }} />
+                        )}
+                        <div>
+                          <Text strong>{r.itemName}</Text>
+                          <br />
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {r.itemCode}
+                          </Text>
+                          {r.variantAttributes &&
+                            Object.keys(r.variantAttributes).length > 0 && (
+                              <div style={{ marginTop: 4 }}>
+                                {Object.entries(r.variantAttributes).map(([k, v]) => {
+                                  const kLower = k.toLowerCase();
+                                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                                  const showSwatch = isColorAttr && isPantoneCode(v);
+                                  return (
+                                    <Tag
+                                      key={k}
+                                      style={{ fontSize: 10, margin: '0 4px 2px 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                                    >
+                                      {showSwatch && <PantoneColorSwatch value={v} size={14} />}
+                                      {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
+                                    </Tag>
+                                  );
+                                })}
+                              </div>
+                            )}
+                        </div>
+                      </div>
+                    );
+                  },
                 },
                 { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
                 { title: 'UOM', dataIndex: 'uom', width: 80, align: 'center' },

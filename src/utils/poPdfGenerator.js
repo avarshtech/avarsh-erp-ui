@@ -182,7 +182,7 @@ const extractColorSwatches = (item) => {
 
 // ─── Build HTML Document ───────────────────────────────────────────────────────
 
-const buildPOHtml = (po, org, termsContent, supplier) => {
+const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const gst = computeGSTDetails(po);
   const items = po.lineItems || [];
   const amountInWords = numberToIndianWords(gst.grandTotal);
@@ -204,7 +204,7 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
   const uomTotals = {};
   let totalQty = 0;
   items.forEach((item) => {
-    const uom = item.uomName || item.uom || 'Units';
+    const uom = item.uomSymbol || item.uomName || item.uom || 'Units';
     const qty = parseFloat(item.quantity || item.qty || 0);
     uomTotals[uom] = (uomTotals[uom] || 0) + qty;
     totalQty += qty;
@@ -216,7 +216,7 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
     const qty = parseFloat(item.quantity || item.qty || 0);
     const price = parseFloat(item.unitPrice || 0);
     const base = qty * price;
-    const uom = item.uomName || item.uom || 'Units';
+    const uom = item.uomSymbol || item.uomName || item.uom || 'Units';
 
     let gstPercent = 0;
     if (item.gstPercent !== undefined && item.gstPercent !== null) {
@@ -261,6 +261,12 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
       `).join('');
     }
 
+    // Variant image (base64 data URL from item master)
+    const variantImgSrc = item.variantId ? variantImages[item.variantId] : null;
+    const variantImageHtml = variantImgSrc
+      ? `<img src="${variantImgSrc}" class="variant-img" alt="variant" onerror="this.style.display='none'" />`
+      : '';
+
     // GST columns based on type - only show relevant columns
     // Order: SGST%, CGST%, SGST, CGST (percentages first, then values)
     let gstColumnsHtml = '';
@@ -277,8 +283,13 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
       <tr>
         <td class="center">${idx + 1}</td>
         <td class="desc-cell">
-          <div class="desc-content">${descParts.join('<br>')}</div>
-          ${swatchHtml ? `<div class="swatches-row">${swatchHtml}</div>` : ''}
+          <div style="display:flex;gap:6px;align-items:flex-start;">
+            ${variantImageHtml ? `<div style="flex-shrink:0;">${variantImageHtml}</div>` : ''}
+            <div>
+              <div class="desc-content">${descParts.join('<br>')}</div>
+              ${swatchHtml ? `<div class="swatches-row">${swatchHtml}</div>` : ''}
+            </div>
+          </div>
         </td>
         <td class="num">${formatCurrency(price)}</td>
         <td class="center nowrap">${qty}&nbsp;${uom}</td>
@@ -429,6 +440,7 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
     .items-table .desc-content { line-height: 1.35; }
     .items-table .item-code { color: #6366f1; font-size: 7px; }
     .items-table .attr { color: #64748b; font-size: 7px; }
+    .variant-img { width: 48px; height: 48px; object-fit: cover; border-radius: 3px; border: 1px solid #e2e8f0; display: block; }
     .swatches-row { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
     .color-swatch-container { display: flex; align-items: center; }
     .color-swatch-wrapper {
@@ -787,6 +799,7 @@ const buildPOHtml = (po, org, termsContent, supplier) => {
  * @param {Object} [options.organisation] - Pre-fetched org info (skips session lookup)
  * @param {string} [options.termsContent] - Pre-fetched T&C HTML content (skips API call)
  * @param {Object} [options.supplier] - Pre-fetched supplier info (skips API call)
+ * @param {Object} [options.variantImages] - Map of { [variantId]: base64DataUrl } for line item images
  */
 export const generatePOPdf = async (poData, options = {}) => {
   if (!poData) {
@@ -828,7 +841,8 @@ export const generatePOPdf = async (poData, options = {}) => {
     }
 
     // Build the HTML document
-    const html = buildPOHtml(poData, org, termsContent, supplier);
+    const variantImages = options.variantImages || {};
+    const html = buildPOHtml(poData, org, termsContent, supplier, variantImages);
 
     // Open print window
     const printWindow = window.open('', '_blank');

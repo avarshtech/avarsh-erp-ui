@@ -23,12 +23,11 @@ export const getBuyerById = async (id) => {
 /**
  * Create a new buyer (POST)
  */
-export const saveBuyer = async (data) => {
+export const createBuyer = async (data) => {
   const response = await axiosInstance.post(ENDPOINTS.BUYERS, { ...data, active: true });
   return response.data ?? response;
 };
 
-export const createBuyer = saveBuyer;
 
 /**
  * Update an existing buyer (POST with id in body)

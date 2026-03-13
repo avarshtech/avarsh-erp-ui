@@ -11,11 +11,13 @@ import {
   Input,
   Timeline,
   Spin,
-  message,
+  App,
   Popconfirm,
   Select,
   Avatar,
   Tooltip,
+  Upload,
+  Progress,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -32,6 +34,9 @@ import {
   SettingOutlined,
   InboxOutlined,
   PrinterOutlined,
+  PaperClipOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -52,20 +57,22 @@ import {
 } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 // Status config for display — keys are DB enum values
+// Colors kept in sync with POList.jsx STATUS_CONFIG
 const STATUS_CONFIG = {
   [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [PO_STATUS.PENDING_APPROVAL]: { color: 'processing', icon: <ClockCircleOutlined /> },
+  [PO_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: <ClockCircleOutlined /> },
   [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined /> },
   [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined /> },
-  [PO_STATUS.COMPLETED]: { color: 'success', icon: <CheckCircleOutlined /> },
-  [PO_STATUS.REJECTED]: { color: 'error', icon: <CloseCircleOutlined /> },
+  [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined /> },
+  [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined /> },
   [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined /> },
-  [PO_STATUS.REFERRED_BACK]: { color: 'warning', icon: <RollbackOutlined /> },
+  [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <RollbackOutlined /> },
   [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined /> },
   [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined /> },
 };
@@ -80,7 +87,8 @@ const REJECTION_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
-const POView = ({ open, onClose, poData, onStatusChange }) => {
+const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [po, setPo] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -90,6 +98,14 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+
+  // Attachments state
+  const [poFiles, setPoFiles] = useState([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Variant images for line items { [variantId]: 'loading' | blobUrl }
+  const [lineItemImages, setLineItemImages] = useState({});
 
   // Status action modal
   const [statusAction, setStatusAction] = useState(null); // { action, title, requiresReason }
@@ -109,16 +125,47 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       setStatusAction(null);
       setActionReason('');
       setRejectionCategory(null);
+      setPoFiles([]);
+      setUploadProgress(0);
+      setLineItemImages((prev) => {
+        Object.values(prev).forEach((url) => {
+          if (url && url !== 'loading') URL.revokeObjectURL(url);
+        });
+        return {};
+      });
     }
   }, [open, poData?.id]);
 
   // Activity events are handled locally by updating notes from API responses.
+
+  // Two-phase variant image loader for line items
+  const loadLineItemImages = useCallback(async (lineItems) => {
+    const variantIds = [...new Set(
+      (lineItems || []).map((li) => li.variantId).filter(Boolean)
+    )];
+    variantIds.forEach(async (variantId) => {
+      try {
+        const files = await getFilesByEntity('ITEM_VARIANT', variantId);
+        const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+        if (!img) return;
+        setLineItemImages((prev) => ({ ...prev, [variantId]: 'loading' }));
+        const blob = await downloadFileAsBlob(img.fileId);
+        const url = URL.createObjectURL(blob);
+        setLineItemImages((prev) => ({ ...prev, [variantId]: url }));
+      } catch {
+        // Non-critical — just no image shown
+      }
+    });
+  }, []);
 
   const loadPODetails = async (poId) => {
     setLoading(true);
     try {
       const data = await getPurchaseOrderById(poId);
       setPo(data);
+
+      // Load variant images for line items (non-blocking)
+      loadLineItemImages(data.lineItems || []);
 
       // Map activities/notes
       const activities = data.activities || data.notes || [];
@@ -128,10 +175,18 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         isSystemGenerated: activity.isSystemGenerated || false,
         status: activity.status ?? null,
         timestamp: activity.createdAt || activity.timestamp || '',
-        user: activity.userName || (activity.isSystemGenerated ? 'System' : 'User'),
+        user: activity.userName || activity.name || (activity.isSystemGenerated ? 'System' : 'User'),
         edited: activity.edited || false,
       }));
       setNotes(mappedNotes);
+
+      // Load attachments
+      try {
+        const files = await getFilesByEntity('PO', poId);
+        setPoFiles(files || []);
+      } catch {
+        setPoFiles([]);
+      }
     } catch {
       message.error('Failed to load PO details');
     } finally {
@@ -176,7 +231,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           isSystemGenerated: res.isSystemGenerated || false,
           status: res.status ?? null,
           timestamp: res.createdAt || new Date().toISOString(),
-          user: res.userName || userName,
+          user: res.userName || res.name || name,
           edited: res.edited || false,
         },
       ]);
@@ -187,6 +242,155 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       message.error('Failed to add note');
     } finally {
       setAddingNote(false);
+    }
+  };
+
+  // ========================
+  // File Attachment Helpers & Handlers
+  // ========================
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getExtColor = (fileName) => {
+    const ext = (fileName || '').split('.').pop().toLowerCase();
+    if (ext === 'pdf') return { bg: '#fff1f0', color: '#cf1322', label: 'PDF' };
+    if (['doc', 'docx'].includes(ext)) return { bg: '#e6f4ff', color: '#0958d9', label: 'DOC' };
+    if (['xls', 'xlsx'].includes(ext)) return { bg: '#f6ffed', color: '#389e0d', label: 'XLS' };
+    if (ext === 'csv') return { bg: '#f6ffed', color: '#389e0d', label: 'CSV' };
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return { bg: '#f9f0ff', color: '#531dab', label: ext.toUpperCase() };
+    if (['zip', 'rar', '7z'].includes(ext)) return { bg: '#fff7e6', color: '#d46b08', label: ext.toUpperCase() };
+    if (['txt', 'md'].includes(ext)) return { bg: '#f0f0f0', color: '#595959', label: ext.toUpperCase() };
+    return { bg: '#f0f0f0', color: '#595959', label: ext.toUpperCase() || 'FILE' };
+  };
+
+  // Windows Explorer–style renaming: "report.pdf" → "report (1).pdf"
+  const getUniqueFileName = (name, existingFiles) => {
+    const lastDot = name.lastIndexOf('.');
+    const ext = lastDot >= 0 ? name.slice(lastDot) : '';
+    const base = lastDot >= 0 ? name.slice(0, lastDot) : name;
+    let counter = 1;
+    let newName = `${base} (${counter})${ext}`;
+    while (existingFiles.some((f) => f.originalFilename === newName)) {
+      counter++;
+      newName = `${base} (${counter})${ext}`;
+    }
+    return newName;
+  };
+
+  const doUpload = async (file) => {
+    setUploadingFile(true);
+    setUploadProgress(0);
+    try {
+      const currentUser = getCurrentUser();
+      const userName = currentUser?.name || '';
+      const result = await uploadFile(
+        file,
+        { module: 'PURCHASE_ORDER', entity: 'PO', entityId: po.id, fileCategory: 'DOCUMENT' },
+        (percent) => setUploadProgress(percent)
+      );
+      setPoFiles((prev) => [...prev, result]);
+
+      const actComment = JSON.stringify({
+        type: 'file_upload',
+        fileName: result.originalFilename || file.name,
+        fileId: result.fileId,
+        by: userName,
+      });
+      const actRes = await createActivity(po.id, {
+        comment: actComment,
+        status: po.status ?? null,
+        isSystemGenerated: false,
+        name: userName,
+      });
+      setNotes((prev) => [...prev, {
+        id: actRes.id,
+        text: actRes.comment || actComment,
+        isSystemGenerated: false,
+        status: actRes.status ?? null,
+        timestamp: actRes.createdAt || new Date().toISOString(),
+        user: actRes.userName || actRes.name || userName,
+        edited: false,
+      }]);
+      message.success(`"${result.originalFilename || file.name}" uploaded`);
+    } catch {
+      message.error('Failed to upload file');
+    } finally {
+      setUploadingFile(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleFileUpload = async (file) => {
+    if (!po?.id) return false;
+
+    // Check for duplicate filename
+    const duplicate = poFiles.some((f) => f.originalFilename === file.name);
+    if (duplicate) {
+      modal.confirm({
+        title: 'File already attached',
+        content: `"${file.name}" is already attached. Upload as a new copy?`,
+        okText: 'Upload as Copy',
+        cancelText: 'Cancel',
+        onOk: async () => {
+          const newName = getUniqueFileName(file.name, poFiles);
+          const renamed = new File([file], newName, { type: file.type });
+          await doUpload(renamed);
+        },
+      });
+      return false;
+    }
+
+    await doUpload(file);
+    return false; // prevent antd default upload
+  };
+
+  const handleFileDownload = async (fileRecord) => {
+    try {
+      const fileName = fileRecord.originalFilename || 'download';
+      const blob = await downloadFileAsBlob(fileRecord.fileId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error('Failed to download file');
+    }
+  };
+
+  const handleFileDelete = async (fileRecord) => {
+    if (!po?.id) return;
+    try {
+      const currentUser = getCurrentUser();
+      const userName = currentUser?.name || '';
+      const fileName = fileRecord.originalFilename || 'file';
+      await deleteFile(fileRecord.fileId);
+      setPoFiles((prev) => prev.filter((f) => f.fileId !== fileRecord.fileId));
+
+      const actComment = JSON.stringify({ type: 'file_delete', fileName, by: userName });
+      const actRes = await createActivity(po.id, {
+        comment: actComment,
+        status: po.status ?? null,
+        isSystemGenerated: false,
+        name: userName,
+      });
+      setNotes((prev) => [...prev, {
+        id: actRes.id,
+        text: actRes.comment || actComment,
+        isSystemGenerated: false,
+        status: actRes.status ?? null,
+        timestamp: actRes.createdAt || new Date().toISOString(),
+        user: actRes.userName || actRes.name || userName,
+        edited: false,
+      }]);
+      message.success(`"${fileName}" removed`);
+    } catch {
+      message.error('Failed to delete file');
     }
   };
 
@@ -290,31 +494,29 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       // Create system activity log
       const currentUser = getCurrentUser();
       const name = currentUser?.name || '';
-      let activityComment = `PO ${action.label.toLowerCase()}d by ${name}`;
-      if (reason) {
-        activityComment += `. Reason: ${reason}`;
-      }
+      const commentData = {
+        type: 'status_change',
+        action: action.key,
+        actionLabel: action.label,
+        from: po.status,
+        to: action.toStatus,
+        by: name,
+        ...(reason ? { reason } : {}),
+      };
       if (action.key === 'reject' && rejectionCategory) {
-        const catLabel = REJECTION_CATEGORIES.find(
-          (c) => c.value === rejectionCategory
-        )?.label;
-        activityComment = `PO rejected by ${name}. Category: ${catLabel || rejectionCategory}. Reason: ${reason}`;
+        const catLabel = REJECTION_CATEGORIES.find((c) => c.value === rejectionCategory)?.label;
+        commentData.rejectionCategory = rejectionCategory;
+        commentData.rejectionCategoryLabel = catLabel || rejectionCategory;
       }
+      const activityComment = JSON.stringify(commentData);
 
-      // Include rejection category in activity payload when present
       const activityPayload = {
         comment: activityComment,
         status: action.toStatus,
         isSystemGenerated: true,
+        name,
       };
-      if (action.key === 'reject' && rejectionCategory) {
-        activityPayload.rejectionCategory = rejectionCategory;
-        const catLabel = REJECTION_CATEGORIES.find((c) => c.value === rejectionCategory)?.label;
-        if (catLabel) activityPayload.rejectionCategoryLabel = catLabel;
-      }
 
-      // Attach the performing user's name so backend can record the actor
-      activityPayload.name = name;
       await createActivity(po.id, activityPayload);
 
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
@@ -475,9 +677,11 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       const currentUser = getCurrentUser();
       const name = currentUser?.name || '';
       const lineLabel = lineItem.itemName || lineItem.itemCode || 'Line item';
-      const actComment = allCompleted
-        ? `All line items completed. PO marked as Completed by ${name}`
-        : `Line item "${lineLabel}" marked as completed by ${name}`;
+      const actComment = JSON.stringify(
+        allCompleted
+          ? { type: 'all_complete', by: name }
+          : { type: 'line_complete', item: lineLabel, by: name }
+      );
 
       const activityRes = await createActivity(po.id, {
         comment: actComment,
@@ -509,8 +713,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           : `"${lineLabel}" marked as completed`
       );
 
-      // Notify parent to refresh list (but don't close dialog)
-      if (onStatusChange) onStatusChange();
+      // Notify parent to refresh list but keep dialog open
+      if (onRefresh) onRefresh();
     } catch {
       message.error('Failed to update line item status');
     } finally {
@@ -529,38 +733,55 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     {
       title: 'Item',
       key: 'item',
-      width: 200,
-      render: (_, record) => (
-        <div>
-          <Text strong>{record.itemName || 'Unknown Item'}</Text>
-          {record.itemCode && (
-            <>
-              <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                {record.itemCode}
-              </Text>
-            </>
-          )}
-          {record.variantAttributes && (
-            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              {typeof record.variantAttributes === 'object'
-                ? Object.entries(record.variantAttributes).map(([k, v]) => {
-                    const kLower = k.toLowerCase();
-                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                    const showSwatch = isColorAttr && isPantoneCode(v);
-                    return (
-                      <Tag key={k} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                        {showSwatch && <PantoneColorSwatch value={v} size={14} />}
-                        {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
-                      </Tag>
-                    );
-                  })
-                : <Text type="secondary" style={{ fontSize: 11 }}>{record.variantAttributes}</Text>
-              }
+      width: 220,
+      render: (_, record) => {
+        const imgUrl = record.variantId ? lineItemImages[record.variantId] : null;
+        return (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            {imgUrl === 'loading' && (
+              <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Spin size="small" />
+              </div>
+            )}
+            {imgUrl && imgUrl !== 'loading' && (
+              <img
+                src={imgUrl}
+                alt="variant"
+                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }}
+              />
+            )}
+            <div>
+              <Text strong>{record.itemName || 'Unknown Item'}</Text>
+              {record.itemCode && (
+                <>
+                  <br />
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {record.itemCode}
+                  </Text>
+                </>
+              )}
+              {record.variantAttributes && (
+                <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {typeof record.variantAttributes === 'object'
+                    ? Object.entries(record.variantAttributes).map(([k, v]) => {
+                        const kLower = k.toLowerCase();
+                        const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                        const showSwatch = isColorAttr && isPantoneCode(v);
+                        return (
+                          <Tag key={k} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                            {showSwatch && <PantoneColorSwatch value={v} size={14} />}
+                            {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
+                          </Tag>
+                        );
+                      })
+                    : <Text type="secondary" style={{ fontSize: 11 }}>{record.variantAttributes}</Text>
+                  }
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      ),
+          </div>
+        );
+      },
     },
     {
       title: 'Description',
@@ -580,7 +801,7 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
       key: 'uom',
       width: 80,
       align: 'center',
-      render: (_, r) => r.uomName || r.uom || '-',
+      render: (_, r) => r.uomSymbol || r.uomName || r.uom || '-',
     },
     {
       title: 'Unit Price',
@@ -684,6 +905,92 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
     po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
     po?.status === PO_STATUS.COMPLETED;
 
+  // ========================
+  // Activity comment renderer
+  // ========================
+  const renderActivityComment = (note) => {
+    // Always try JSON parsing — system events AND user file actions both use JSON
+    try {
+      const data = JSON.parse(note.text);
+      if (data && data.type) {
+        if (data.type === 'status_change') {
+          const fromCfg = STATUS_CONFIG[data.from] || { color: 'default', icon: null };
+          const toCfg = STATUS_CONFIG[data.to] || { color: 'default', icon: null };
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Tag color={fromCfg.color} icon={fromCfg.icon} style={{ margin: 0 }}>
+                  {getStatusLabel(data.from)}
+                </Tag>
+                <span style={{ fontSize: 18, color: 'var(--text-secondary, #888)', lineHeight: 1 }}>→</span>
+                <Tag color={toCfg.color} icon={toCfg.icon} style={{ margin: 0 }}>
+                  {getStatusLabel(data.to)}
+                </Tag>
+                <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+              </div>
+              {data.rejectionCategoryLabel && (
+                <div style={{ paddingLeft: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Category:</Text>
+                  <Tag color="error" style={{ fontSize: 11, margin: 0 }}>{data.rejectionCategoryLabel}</Tag>
+                </div>
+              )}
+              {data.reason && (
+                <div style={{ paddingLeft: 4, fontSize: 12 }}>
+                  <Text type="secondary">Reason: </Text>
+                  <Text style={{ fontSize: 12 }}>{data.reason}</Text>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        if (data.type === 'line_complete') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              <Text>Line item <Text strong>"{data.item}"</Text> marked as completed</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+            </div>
+          );
+        }
+
+        if (data.type === 'all_complete') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <CheckCircleOutlined style={{ color: '#52c41a' }} />
+              <Text>All line items received —</Text>
+              <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0 }}>PO Completed</Tag>
+              <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+            </div>
+          );
+        }
+
+        if (data.type === 'file_upload') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <PaperClipOutlined style={{ color: '#1677ff' }} />
+              <Text>Attached: <Text strong>{data.fileName}</Text></Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+            </div>
+          );
+        }
+
+        if (data.type === 'file_delete') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <DeleteOutlined style={{ color: '#ff4d4f' }} />
+              <Text>Removed: <Text strong style={{ textDecoration: 'line-through', opacity: 0.7 }}>{data.fileName}</Text></Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+            </div>
+          );
+        }
+      }
+    } catch {
+      // not JSON — fall through to plain text
+    }
+    return <Text style={{ flex: 1 }}>{note.text}</Text>;
+  };
+
   return (
     <>
       <Modal
@@ -697,8 +1004,9 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
         open={open}
         onCancel={onClose}
         width={1200}
+        style={{ top: 20 }}
         styles={{
-          body: { maxHeight: '75vh', overflowY: 'auto', padding: '24px' },
+          body: { height: 'calc(90vh - 160px)', overflowY: 'auto', padding: '24px' },
         }}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -710,7 +1018,26 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                   onClick={async () => {
                     setPrintLoading(true);
                     try {
-                      await generatePOPdf(po);
+                      // Convert blob URLs → base64 data URLs for PDF embedding
+                      const variantImages = {};
+                      await Promise.all(
+                        (po.lineItems || [])
+                          .filter((li) => li.variantId && lineItemImages[li.variantId] && lineItemImages[li.variantId] !== 'loading')
+                          .map(async (li) => {
+                            try {
+                              const res = await fetch(lineItemImages[li.variantId]);
+                              const blob = await res.blob();
+                              const base64 = await new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(blob);
+                              });
+                              variantImages[li.variantId] = base64;
+                            } catch { /* skip if conversion fails */ }
+                          })
+                      );
+                      await generatePOPdf(po, { variantImages });
                     } catch {
                       message.error('Failed to generate PO PDF');
                     } finally {
@@ -951,8 +1278,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
               </div>
             </div>
 
-            {/* Activity Log & Notes */}
-            {isInProgress && (
+            {/* Activity Log & Notes — shown when entries exist or PO is not a draft */}
+            {(notes.length > 0 || po?.status !== PO_STATUS.DRAFT) && (
               <>
                 <Divider />
                 <Title level={5} style={{ marginBottom: 16 }}>
@@ -975,66 +1302,182 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
                       ),
                       content: (
                         <div>
-                          <div style={{ marginBottom: 4 }}>
+                          <div style={{ marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <Text type="secondary" style={{ fontSize: 12 }}>
-                              {dayjs(note.timestamp).format('YYYY-MMM-DD HH:mm:ss')}
-                              {note.edited && (
-                                <Tag
-                                  style={{ marginLeft: 8, fontSize: 10 }}
-                                  color="default"
-                                >
-                                  Edited
-                                </Tag>
-                              )}
-                              {note.isSystemGenerated ? (
-                                <Tag
-                                  style={{ marginLeft: 4, fontSize: 10 }}
-                                  color="blue"
-                                >
-                                  System
-                                </Tag>
-                              ) :
-                                note.user && (
-                                  <Tag
-                                    style={{ marginLeft: 4, fontSize: 10 }}
-                                    color="green"
-                                  >
-                                    {note.user}
-                                  </Tag>
-                                )}
+                              {dayjs(note.timestamp).format('DD-MMM-YYYY HH:mm')}
                             </Text>
+                            {!note.isSystemGenerated && note.user && note.user !== 'User' && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                · <UserOutlined style={{ fontSize: 10, marginRight: 3 }} />{note.user}
+                              </Text>
+                            )}
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                            <Text style={{ flex: 1 }}>{note.text}</Text>
-                          </div>
+                          <div>{renderActivityComment(note)}</div>
                         </div>
                       ),
                     }))}
                   />
                 )}
 
-                {/* Add Note Input */}
-                <PermissionGuard module="purchase-orders" operation="update">
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                        <TextArea
-                          rows={2}
-                          placeholder="Enter your note or comment here..."
-                          value={newNote}
-                          onChange={(e) => setNewNote(e.target.value)}
-                          style={{ flex: 1 }}
-                          disabled={addingNote}
-                        />
-                        <Button
-                          type="primary"
-                          icon={<SendOutlined />}
-                          onClick={handleAddNote}
-                          loading={addingNote}
-                          disabled={!newNote.trim() || addingNote}
-                        >
-                          Add Note
-                        </Button>
+                {/* Attachments card grid — always visible when files exist or non-draft */}
+                {(poFiles.length > 0 || po?.status !== PO_STATUS.DRAFT) && (
+                  <div style={{ marginBottom: 16 }}>
+                    {/* Section header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <Text strong style={{ fontSize: 13 }}>
+                        <PaperClipOutlined style={{ marginRight: 6, color: 'var(--primary-color)' }} />
+                        Attachments {poFiles.length > 0 && <Text type="secondary" style={{ fontWeight: 400, fontSize: 12 }}>({poFiles.length})</Text>}
+                      </Text>
+                      {po?.status !== PO_STATUS.DRAFT && (
+                        <PermissionGuard module="purchase-orders" operation="update">
+                          <Upload showUploadList={false} beforeUpload={handleFileUpload} disabled={uploadingFile}>
+                            <Button
+                              icon={<PaperClipOutlined />}
+                              loading={uploadingFile}
+                              disabled={uploadingFile}
+                              style={{
+                                borderStyle: 'dashed',
+                                color: 'var(--primary-color)',
+                                borderColor: 'var(--primary-color)',
+                                background: 'transparent',
+                                padding: '4px 14px',
+                                height: 32,
+                              }}
+                            >
+                              Attach File
+                            </Button>
+                          </Upload>
+                        </PermissionGuard>
+                      )}
+                    </div>
+
+                    {/* Upload progress */}
+                    {uploadingFile && (
+                      <Progress percent={uploadProgress} size="small" status="active" style={{ marginBottom: 10 }} />
+                    )}
+
+                    {/* File cards grid */}
+                    {poFiles.length === 0 ? (
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', textAlign: 'center', padding: '12px 0', color: 'var(--text-secondary)' }}>
+                        No attachments yet
+                      </Text>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                        {poFiles.map((f) => {
+                          const fileName = f.originalFilename || 'file';
+                          const ext = getExtColor(fileName);
+                          return (
+                            <div
+                              key={f.fileId}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
+                                padding: '10px 12px',
+                                borderRadius: 8,
+                                border: '1px solid var(--border-color, #e8e8e8)',
+                                background: 'var(--card-bg, #fff)',
+                                minWidth: 0,
+                              }}
+                            >
+                              {/* Extension badge */}
+                              <div
+                                style={{
+                                  flexShrink: 0,
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 6,
+                                  background: ext.bg,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  color: ext.color,
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
+                                {ext.label}
+                              </div>
+
+                              {/* File info */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <Tooltip title={fileName}>
+                                  <Text
+                                    style={{
+                                      fontSize: 13,
+                                      display: 'block',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {fileName}
+                                  </Text>
+                                </Tooltip>
+                                {f.fileSizeBytes && (
+                                  <Text type="secondary" style={{ fontSize: 11 }}>
+                                    {formatFileSize(f.fileSizeBytes)}
+                                  </Text>
+                                )}
+                              </div>
+
+                              {/* Actions */}
+                              <div style={{ display: 'flex', flexShrink: 0, gap: 2 }}>
+                                <Tooltip title="Download">
+                                  <Button
+                                    type="text"
+                                    size="small"
+                                    icon={<DownloadOutlined style={{ fontSize: 13 }} />}
+                                    onClick={() => handleFileDownload(f)}
+                                  />
+                                </Tooltip>
+                                <PermissionGuard module="purchase-orders" operation="update">
+                                  <Popconfirm
+                                    title={`Remove "${fileName}"?`}
+                                    description="This will permanently delete the attachment."
+                                    onConfirm={() => handleFileDelete(f)}
+                                    okText="Remove"
+                                    cancelText="Cancel"
+                                    okButtonProps={{ danger: true }}
+                                  >
+                                    <Tooltip title="Remove">
+                                      <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: 13 }} />} />
+                                    </Tooltip>
+                                  </Popconfirm>
+                                </PermissionGuard>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </PermissionGuard>
+                )}
+
+                {/* Add Note input — available for all non-draft statuses */}
+                {po?.status !== PO_STATUS.DRAFT && (
+                  <PermissionGuard module="purchase-orders" operation="update">
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      <TextArea
+                        placeholder="Enter your note or comment here..."
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        style={{ flex: 1, minHeight: 72, resize: 'none' }}
+                        disabled={addingNote}
+                      />
+                      <Button
+                        type="primary"
+                        icon={<SendOutlined />}
+                        onClick={handleAddNote}
+                        loading={addingNote}
+                        disabled={!newNote.trim() || addingNote}
+                      >
+                        Add Note
+                      </Button>
+                    </div>
+                  </PermissionGuard>
+                )}
               </>
             )}
           </>
@@ -1051,7 +1494,8 @@ const POView = ({ open, onClose, poData, onStatusChange }) => {
           setRejectionCategory(null);
         }}
         onOk={() => executeStatusChange(statusAction, actionReason)}
-        okText={statusAction?.label || 'Confirm'}
+        okText={statusAction?.key === 'cancel' ? 'Cancel PO' : statusAction?.label || 'Confirm'}
+        cancelText="Close"
         okButtonProps={{
           danger: statusAction?.danger,
           disabled: !actionReason.trim(),

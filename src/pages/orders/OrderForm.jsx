@@ -18,8 +18,8 @@ import {
   Modal,
   Table,
   Popconfirm,
-  Tooltip,
   FloatButton,
+  Popover,
 } from 'antd';
 import {
   PlusOutlined,
@@ -28,23 +28,19 @@ import {
   ArrowLeftOutlined,
   SendOutlined,
   CaretRightOutlined,
+  PictureOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
 import { createOrder, updateOrder, getOrderById } from '../../services/orderService';
+import { getBuyers } from '../../services/buyerService';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,
-  BUYERS,
-  ITEM_GROUPS,
-  CURRENCIES,
-  SHIPMENT_MODES,
-  DELIVERY_TERMS,
   PAYMENT_TERMS,
-  PAYMENT_DAYS_OPTIONS,
-  FABRIC_TYPES,
-  MATERIAL_TYPES,
+  COMPONENT_OPTIONS,
   SIZE_PRESETS,
   generateOrderNumber,
   getCurrencySymbol,
@@ -53,6 +49,142 @@ import {
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+// ==================== COMPONENT DETAILS DIALOG ====================
+
+const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
+  const [rows, setRows] = useState(() =>
+    components && components.length > 0
+      ? components
+      : [
+          { key: 'c1', name: '', description: '', qtyPerSet: 1 },
+          { key: 'c2', name: '', description: '', qtyPerSet: 1 },
+        ]
+  );
+
+  // Sync when components prop changes (e.g. reopening)
+  useEffect(() => {
+    if (visible) {
+      setRows(
+        components && components.length > 0
+          ? components
+          : [
+              { key: 'c1', name: '', description: '', qtyPerSet: 1 },
+              { key: 'c2', name: '', description: '', qtyPerSet: 1 },
+            ]
+      );
+    }
+  }, [visible, components]);
+
+  const handleChange = (key, field, value) => {
+    setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
+  };
+
+  const handleAdd = () => {
+    setRows((prev) => [
+      ...prev,
+      { key: `c_${Date.now()}`, name: '', description: '', qtyPerSet: 1 },
+    ]);
+  };
+
+  const handleRemove = (key) => {
+    if (rows.length <= 2) {
+      message.warning('At least 2 components are required for Multiple');
+      return;
+    }
+    setRows((prev) => prev.filter((r) => r.key !== key));
+  };
+
+  const handleOk = () => {
+    const allNamed = rows.every((r) => r.name.trim());
+    if (!allNamed) {
+      message.error('Component name is required for all rows');
+      return;
+    }
+    onSave(rows);
+  };
+
+  const columns = [
+    {
+      title: 'Component Name *',
+      dataIndex: 'name',
+      render: (v, r) => (
+        <Input
+          size="small"
+          value={v}
+          placeholder="e.g. Top, Bottom, Jacket"
+          onChange={(e) => handleChange(r.key, 'name', e.target.value)}
+        />
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      render: (v, r) => (
+        <Input
+          size="small"
+          value={v}
+          placeholder="Optional"
+          onChange={(e) => handleChange(r.key, 'description', e.target.value)}
+        />
+      ),
+    },
+    {
+      title: 'Qty / Set',
+      dataIndex: 'qtyPerSet',
+      width: 90,
+      render: (v, r) => (
+        <InputNumber
+          size="small"
+          min={1}
+          controls={false}
+          value={v}
+          onChange={(val) => handleChange(r.key, 'qtyPerSet', val || 1)}
+          style={{ width: '100%' }}
+        />
+      ),
+    },
+    {
+      title: '',
+      width: 40,
+      render: (_, r) => (
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => handleRemove(r.key)}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <Modal
+      title="Component Details"
+      open={visible}
+      onOk={handleOk}
+      onCancel={onCancel}
+      okText="Save Components"
+      width={640}
+    >
+      <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+        Define the individual parts of this multi-component garment (e.g. Top + Bottom for a 2-piece set, Jacket + Trousers for a suit).
+      </Text>
+      <Table
+        dataSource={rows}
+        rowKey="key"
+        columns={columns}
+        pagination={false}
+        size="small"
+        style={{ marginBottom: 8 }}
+      />
+      <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAdd}>
+        Add Component
+      </Button>
+    </Modal>
+  );
+};
 
 // ==================== SIZE BREAKDOWN TABLE ====================
 
@@ -133,7 +265,6 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
   // Handle size price change
   const handleSizePriceChange = (size, price) => {
     const newPrices = { ...sizePrices, [size]: price || 0 };
-    // Recompute all color row values
     const newColorRows = colorRows.map((row) => {
       const rowValue = sizes.reduce((sum, s) => sum + (row.quantities?.[s] || 0) * (newPrices[s] || 0), 0);
       return { ...row, rowValue };
@@ -202,7 +333,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
       <Row gutter={16} style={{ marginBottom: 12 }} align="middle">
         <Col>
           <Space>
-            <Text strong style={{ fontSize: 13 }}>Size Preset:</Text>
+            <Text strong style={{ fontSize: 13 }}>Size Preset: <span style={{ color: '#ff4d4f' }}>*</span></Text>
             <Select
               style={{ width: 180 }}
               value={sizePreset || undefined}
@@ -231,18 +362,16 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
         {!readOnly && sizes.length > 0 && (
           <Col>
             <Space size={4}>
-              <Tooltip title="Set same price for all sizes">
-                <InputNumber
-                  size="small"
-                  min={0}
-                  step={0.01}
-                  precision={2}
-                  value={bulkPrice}
-                  onChange={(v) => setBulkPrice(v || 0)}
-                  style={{ width: 80 }}
-                  placeholder="Price"
-                />
-              </Tooltip>
+              <InputNumber
+                size="small"
+                min={0}
+                step={0.01}
+                precision={2}
+                value={bulkPrice}
+                onChange={(v) => setBulkPrice(v || 0)}
+                style={{ width: 80 }}
+                placeholder="Price"
+              />
               <Button
                 size="small"
                 type="primary"
@@ -273,7 +402,9 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-secondary, #f8fafc)' }}>
-                <th style={{ ...thStyle, minWidth: 180 }}>Color/Print</th>
+                <th style={{ ...thStyle, minWidth: 180 }}>
+                  Color/Print <span style={{ color: '#ff4d4f' }}>*</span>
+                </th>
                 {sizes.map((s) => (
                   <th key={s} style={{ ...thStyle, textAlign: 'center', minWidth: 80 }}>{s}</th>
                 ))}
@@ -321,7 +452,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
                     ) : (
                       <Input
                         size="small"
-                        placeholder="Color/Print name"
+                        placeholder="Color/Print name *"
                         value={row.colorName}
                         onChange={(e) => handleColorNameChange(row.key, e.target.value)}
                         style={{ width: '100%' }}
@@ -435,18 +566,8 @@ const tdStyle = {
 const createEmptyLine = () => ({
   key: `line_${Date.now()}`,
   buyerPoNo: '',
-  styleNo: '',
-  description: '',
-  itemGroup: undefined,
   destination: '',
-  basePrice: 0,
   dispatchDate: null,
-  fabric: undefined,
-  material: undefined,
-  gsm: null,
-  season: '',
-  brand: '',
-  collection: '',
   sizePreset: undefined,
   customSizes: [],
   sizes: [],
@@ -464,10 +585,23 @@ const OrderForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [form] = Form.useForm();
+
+  // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
   const [loading, setLoading] = useState(false);
   const [existingOrder, setExistingOrder] = useState(null);
   const [activeKeys, setActiveKeys] = useState([]);
+
+  // Buyer data
+  const [buyers, setBuyers] = useState([]);
+  const [buyersLoading, setBuyersLoading] = useState(false);
+
+  // Component dialog
+  const [componentModalVisible, setComponentModalVisible] = useState(false);
+  const [formComponents, setFormComponents] = useState([]);
+
+  // Generated order number for add mode
+  const [generatedOrderNo] = useState(() => generateOrderNumber());
 
   const isEdit = !!id;
   const orderStatus = existingOrder?.status;
@@ -477,6 +611,39 @@ const OrderForm = () => {
     : hasPermission('orders', 'add');
   const canSubmit = canSubmitOrder();
 
+  // Watch form values
+  const formCurrency = Form.useWatch('currency', form);
+  const watchedBuyerId = Form.useWatch('buyerId', form);
+
+  // Buyer destinations derived from selected buyer
+  const buyerDestinations = useMemo(() => {
+    const buyer = buyers.find((b) => b.id === watchedBuyerId);
+    return (buyer?.shippingLocations || [])
+      .filter((l) => l.active !== false)
+      .map((loc) => ({
+        value: loc.label || [loc.city, loc.country].filter(Boolean).join(', '),
+        label: loc.label || [loc.city, loc.country].filter(Boolean).join(', '),
+      }));
+  }, [buyers, watchedBuyerId]);
+
+  // Load buyers from API
+  useEffect(() => {
+    const loadBuyers = async () => {
+      setBuyersLoading(true);
+      try {
+        const data = await getBuyers();
+        const list = Array.isArray(data) ? data : (data?.content || []);
+        setBuyers(list.filter((b) => b.active !== false));
+      } catch {
+        message.warning('Could not load buyers from server');
+        setBuyers([]);
+      } finally {
+        setBuyersLoading(false);
+      }
+    };
+    loadBuyers();
+  }, []);
+
   // Load existing order for edit
   useEffect(() => {
     if (!id) return;
@@ -484,27 +651,28 @@ const OrderForm = () => {
       setLoading(true);
       try {
         const order = await getOrderById(id);
-        // Check if editable
         if (!EDITABLE_STATUSES.includes(order.status)) {
           message.warning('This order cannot be edited in its current status');
           navigate('/orders/list');
           return;
         }
         setExistingOrder(order);
-        // Populate form
+
         form.setFieldsValue({
+          costingId: order.costingId,
           buyerId: order.buyerId,
-          orderDate: order.orderDate ? dayjs(order.orderDate) : null,
-          shipDate: order.shipDate ? dayjs(order.shipDate) : null,
+          styleNo: order.styleNo,
+          garmentType: order.garmentType,
+          season: order.season,
+          component: order.component,
           currency: order.currency,
-          shipmentMode: order.shipmentMode,
-          deliveryTerms: order.deliveryTerms,
-          allowance: order.allowance,
           paymentTerms: order.paymentTerms,
           paymentDays: order.paymentDays,
           remarks: order.remarks,
         });
-        // Populate order lines (convert date strings to dayjs)
+
+        if (order.components?.length > 0) setFormComponents(order.components);
+
         const lines = (order.orderLines || []).map((l) => ({
           ...l,
           dispatchDate: l.dispatchDate ? dayjs(l.dispatchDate) : null,
@@ -521,10 +689,7 @@ const OrderForm = () => {
     loadOrder();
   }, [id, form, navigate]);
 
-  // Watched form values for lead time calculation
-  const formCurrency = Form.useWatch('currency', form);
-
-  // Auto-calculate line totals when colorRows or sizePrices change
+  // Recalculate line totals
   const recalcLine = useCallback((line) => {
     const lineQty = (line.colorRows || []).reduce((sum, r) => sum + (r.total || 0), 0);
     const lineTotal = (line.colorRows || []).reduce((sum, r) => sum + (r.rowValue || 0), 0);
@@ -536,31 +701,7 @@ const OrderForm = () => {
     setOrderLines((prev) =>
       prev.map((line) => {
         if (line.key !== lineKey) return line;
-        const updated = { ...line, ...changes };
-
-        // If basePrice changed and sizePrices haven't been manually overridden per-size,
-        // update all sizePrices to the new basePrice
-        if ('basePrice' in changes && changes.basePrice !== undefined) {
-          const newPrices = { ...updated.sizePrices };
-          const oldBase = line.basePrice || 0;
-          updated.sizes.forEach((s) => {
-            // Only update sizes that still had the old base price
-            if (newPrices[s] === oldBase || newPrices[s] === undefined || newPrices[s] === 0) {
-              newPrices[s] = changes.basePrice;
-            }
-          });
-          updated.sizePrices = newPrices;
-          // Recompute color row values
-          updated.colorRows = (updated.colorRows || []).map((row) => {
-            const rowValue = updated.sizes.reduce(
-              (sum, s) => sum + (row.quantities?.[s] || 0) * (newPrices[s] || 0),
-              0
-            );
-            return { ...row, rowValue };
-          });
-        }
-
-        return recalcLine(updated);
+        return recalcLine({ ...line, ...changes });
       })
     );
   }, [recalcLine]);
@@ -593,26 +734,18 @@ const OrderForm = () => {
     [orderLines]
   );
 
-  const leadTime = useMemo(() => {
-    const orderDate = form.getFieldValue('orderDate');
-    const shipDate = form.getFieldValue('shipDate');
-    if (orderDate && shipDate) {
-      return dayjs(shipDate).diff(dayjs(orderDate), 'day');
-    }
-    return null;
-  }, [form]);
-
-  // Assortment summary
+  // Assortment summary grouped by Buyer PO + Destination
   const assortmentSummary = useMemo(() => {
     const groups = {};
     orderLines.forEach((line) => {
+      const po = line.buyerPoNo || 'Unspecified';
       const dest = line.destination || 'Unspecified';
-      if (!groups[dest]) {
-        groups[dest] = { destination: dest, lineCount: 0, totalQty: 0, totalValue: 0 };
+      const key = `${po}::${dest}`;
+      if (!groups[key]) {
+        groups[key] = { key, buyerPoNo: po, destination: dest, totalQty: 0, totalValue: 0 };
       }
-      groups[dest].lineCount++;
-      groups[dest].totalQty += line.lineQty || 0;
-      groups[dest].totalValue += line.lineTotal || 0;
+      groups[key].totalQty += line.lineQty || 0;
+      groups[key].totalValue += line.lineTotal || 0;
     });
     return Object.values(groups).map((g) => ({
       ...g,
@@ -620,92 +753,110 @@ const OrderForm = () => {
     }));
   }, [orderLines]);
 
-  // Validation
+  // ==================== VALIDATION ====================
+
   const validateForm = (isSubmit) => {
     const errors = [];
     const values = form.getFieldsValue();
 
+    // Always required
+    if (!values.costingId?.trim()) errors.push('Costing ID is required');
     if (!values.buyerId) errors.push('Buyer is required');
-    if (!values.orderDate) errors.push('Order Date is required');
-    if (!values.shipDate) errors.push('Ship Date is required');
-    if (values.orderDate && values.shipDate && dayjs(values.shipDate).isBefore(dayjs(values.orderDate))) {
-      errors.push('Ship Date must be on or after Order Date');
-    }
 
     if (isSubmit) {
-      if (!values.currency) errors.push('Currency is required');
-      if (!values.shipmentMode) errors.push('Shipment Mode is required');
-      if (!values.deliveryTerms) errors.push('Delivery Terms is required');
-      if (!values.paymentDays) errors.push('Payment Days is required');
+      if (!values.component) errors.push('Component is required');
+      if (values.component === 'Multiple' && formComponents.length < 2) {
+        errors.push('Please define at least 2 components for Multiple component type');
+      }
+      if (!values.paymentTerms) errors.push('Payment Terms is required');
+      if (!values.paymentDays || values.paymentDays <= 0) {
+        errors.push('Payment Days is required and must be greater than 0');
+      }
     }
 
-    if (orderLines.length === 0) {
-      errors.push('At least one Order Line is required');
-    }
+    if (orderLines.length === 0) errors.push('At least one Order Line is required');
 
-    // Validate each line
+    // Check for duplicate Buyer PO + Destination
+    const seen = new Set();
+    orderLines.forEach((line, idx) => {
+      if (line.buyerPoNo && line.destination) {
+        const key = `${line.buyerPoNo}::${line.destination}`;
+        if (seen.has(key)) {
+          errors.push(
+            `Lines #${idx + 1}: Buyer PO '${line.buyerPoNo}' + Destination '${line.destination}' is duplicated — combine into a single line`
+          );
+        }
+        seen.add(key);
+      }
+    });
+
+    // Per-line validation
     orderLines.forEach((line, idx) => {
       const lineNum = idx + 1;
-      if (isSubmit && !line.styleNo) {
-        errors.push(`Line #${lineNum}: Style No is required`);
-      }
-      if (isSubmit && line.sizes.length === 0) {
-        errors.push(`Line #${lineNum}: Select a size preset and configure sizes`);
-      }
-      if (isSubmit && line.sizes.length > 0) {
-        const hasZeroPrice = line.sizes.some((s) => !line.sizePrices[s] || line.sizePrices[s] <= 0);
-        if (hasZeroPrice) {
-          errors.push(`Line #${lineNum}: All size prices must be greater than 0`);
-        }
-      }
-      if (isSubmit && (line.lineQty || 0) <= 0) {
-        errors.push(`Line #${lineNum}: Size breakdown total must be greater than 0`);
-      }
-      if (isSubmit && line.colorRows?.length > 0) {
-        const emptyColors = line.colorRows.filter((r) => !r.colorName?.trim());
-        if (emptyColors.length > 0) {
-          errors.push(`Line #${lineNum}: All color/print names are required`);
+
+      if (!line.buyerPoNo?.trim()) errors.push(`Line #${lineNum}: Buyer PO No is required`);
+      if (!line.destination) errors.push(`Line #${lineNum}: Destination is required`);
+      if (!line.dispatchDate) errors.push(`Line #${lineNum}: Dispatch Date is required`);
+
+      if (isSubmit) {
+        if (!line.sizePreset) {
+          errors.push(`Line #${lineNum}: Size preset is required`);
+        } else if (line.sizes.length === 0) {
+          errors.push(`Line #${lineNum}: Configure sizes for the selected preset`);
+        } else {
+          // Must have at least one qty entered
+          const hasAnyQty = (line.colorRows || []).some((row) =>
+            line.sizes.some((s) => (row.quantities?.[s] || 0) > 0)
+          );
+          if (!hasAnyQty) {
+            errors.push(`Line #${lineNum}: Enter at least one size quantity`);
+          } else {
+            // For every size with qty, price must be set; for every size with price, qty must be set
+            line.sizes.forEach((s) => {
+              const sizeHasQty = (line.colorRows || []).some((row) => (row.quantities?.[s] || 0) > 0);
+              const sizePrice = line.sizePrices[s] || 0;
+              if (sizeHasQty && sizePrice <= 0) {
+                errors.push(`Line #${lineNum}: Price is missing for size "${s}" which has quantity entered`);
+              }
+              if (!sizeHasQty && sizePrice > 0) {
+                errors.push(`Line #${lineNum}: Quantity is missing for size "${s}" which has a price entered`);
+              }
+            });
+          }
+
+          // Color names must be filled
+          const emptyColors = (line.colorRows || []).filter((r) => !r.colorName?.trim());
+          if (emptyColors.length > 0) {
+            errors.push(`Line #${lineNum}: Color/Print name is required for all color rows`);
+          }
         }
       }
     });
 
-    // Check for duplicate Buyer PO + Style No
-    if (isSubmit) {
-      const seen = new Set();
-      orderLines.forEach((line, idx) => {
-        if (line.buyerPoNo && line.styleNo) {
-          const key = `${line.buyerPoNo}::${line.styleNo}`;
-          if (seen.has(key)) {
-            errors.push(`Line #${idx + 1}: Duplicate Buyer PO + Style No (${line.buyerPoNo} / ${line.styleNo})`);
-          }
-          seen.add(key);
-        }
-      });
-    }
-
     return errors;
   };
 
-  // Build order data for save
+  // ==================== BUILD ORDER DATA ====================
+
   const buildOrderData = (status) => {
     const values = form.getFieldsValue();
-    const buyer = BUYERS.find((b) => b.value === values.buyerId);
+    const buyer = buyers.find((b) => b.id === values.buyerId);
+    const orderDate = dayjs();
 
     return {
-      orderNo: existingOrder?.orderNo || generateOrderNumber(),
+      orderNo: existingOrder?.orderNo || generatedOrderNo,
       status,
+      costingId: values.costingId,
       buyerId: values.buyerId,
-      buyerName: buyer?.label || '',
-      entryDate: existingOrder?.entryDate || dayjs().format('YYYY-MM-DD'),
-      orderDate: values.orderDate ? dayjs(values.orderDate).format('YYYY-MM-DD') : null,
-      shipDate: values.shipDate ? dayjs(values.shipDate).format('YYYY-MM-DD') : null,
-      leadTime: values.orderDate && values.shipDate
-        ? dayjs(values.shipDate).diff(dayjs(values.orderDate), 'day')
-        : null,
+      buyerName: buyer?.name || '',
+      entryDate: existingOrder?.entryDate || orderDate.format('YYYY-MM-DD'),
+      orderDate: orderDate.format('YYYY-MM-DD'),
+      styleNo: values.styleNo,
+      garmentType: values.garmentType,
+      season: values.season,
+      component: values.component,
+      components: values.component === 'Multiple' ? formComponents : [],
       currency: values.currency,
-      shipmentMode: values.shipmentMode,
-      deliveryTerms: values.deliveryTerms,
-      allowance: values.allowance,
       paymentTerms: values.paymentTerms,
       paymentDays: values.paymentDays,
       remarks: values.remarks,
@@ -718,7 +869,8 @@ const OrderForm = () => {
     };
   };
 
-  // Save as draft
+  // ==================== SAVE / SUBMIT ====================
+
   const handleSaveDraft = async () => {
     const errors = validateForm(false);
     if (errors.length > 0) {
@@ -743,7 +895,6 @@ const OrderForm = () => {
     }
   };
 
-  // Submit / Resubmit
   const handleSubmitOrder = () => {
     const errors = validateForm(true);
     if (errors.length > 0) {
@@ -780,53 +931,56 @@ const OrderForm = () => {
 
   // Panel header for each line
   const getLineHeader = (line, idx) => {
-    const destShort = line.destination
-      ? line.destination.length > 30
-        ? `${line.destination.substring(0, 30)}...`
-        : line.destination
-      : 'No destination';
+    const hasIdentity = line.buyerPoNo || line.destination;
+    const label = hasIdentity
+      ? [line.buyerPoNo, line.destination].filter(Boolean).join(' → ')
+      : 'New Assortment';
+    const destShort =
+      label.length > 60 ? `${label.substring(0, 60)}...` : label;
     return (
       <Space wrap>
         <Tag color="blue">#{idx + 1}</Tag>
-        <Text strong>{line.description || line.styleNo || 'New Assortment'}</Text>
-        {line.styleNo && <Text type="secondary">({line.styleNo})</Text>}
+        <Text strong>{destShort}</Text>
         <Text type="secondary">|</Text>
         <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
         <Text type="secondary">|</Text>
         <Text style={{ color: 'var(--success-color, #10b981)' }}>
-          {getCurrencySymbol(formCurrency)} {(line.lineTotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {getCurrencySymbol(formCurrency)}{' '}
+          {(line.lineTotal || 0).toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}
         </Text>
-        <Text type="secondary">→ {destShort}</Text>
       </Space>
     );
   };
 
+  // ==================== RENDER ====================
+
   return (
     <div className="animate-fade-in-up">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <Space>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/orders/list')}
-          />
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/orders/list')} />
           <h1>{isEdit ? 'Edit Order' : 'Create New Order'}</h1>
           {existingOrder && (
-            <Tag color={
-              orderStatus === ORDER_STATUS.DRAFT ? 'default' :
-              orderStatus === ORDER_STATUS.REFERRED_BACK ? 'orange' : 'green'
-            }>
+            <Tag
+              color={
+                orderStatus === ORDER_STATUS.DRAFT
+                  ? 'default'
+                  : orderStatus === ORDER_STATUS.REFERRED_BACK
+                  ? 'orange'
+                  : 'green'
+              }
+            >
               {getStatusLabel(orderStatus)}
             </Tag>
           )}
         </Space>
         <div className="header-actions">
           {canSaveAsDraft && !isReferredBack && (
-            <Button
-              icon={<SaveOutlined />}
-              onClick={handleSaveDraft}
-              loading={loading}
-            >
+            <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={loading}>
               Save as Draft
             </Button>
           )}
@@ -864,120 +1018,179 @@ const OrderForm = () => {
         </Card>
       )}
 
+      {/* Component Details Dialog */}
+      <ComponentDialog
+        visible={componentModalVisible}
+        components={formComponents}
+        onSave={(saved) => {
+          setFormComponents(saved);
+          setComponentModalVisible(false);
+        }}
+        onCancel={() => {
+          setComponentModalVisible(false);
+          // Revert to Single if nothing was saved
+          if (formComponents.length === 0) {
+            form.setFieldValue('component', 'Single');
+          }
+        }}
+      />
+
       <Form
         form={form}
         layout="vertical"
         initialValues={{
           orderDate: dayjs(),
-          currency: 'USD',
         }}
       >
-        {/* Order Header */}
+        {/* ==================== ORDER DETAILS ==================== */}
         <Card style={{ marginBottom: 16 }}>
           <Title level={5} style={{ marginBottom: 16 }}>Order Details</Title>
-          <Row gutter={24}>
-            <Col xs={24} md={8} lg={6}>
+
+          {/* Row 1: Costing ID, Order No, Buyer, Style No, Garment Type, Season, Component */}
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item
-                name="buyerId"
-                label="Buyer"
-                rules={[{ required: true, message: 'Select buyer' }]}
+                name="costingId"
+                label="Costing ID"
+                rules={[{ required: true, message: 'Enter costing ID' }]}
               >
-                <Select
-                  placeholder="Select buyer"
-                  showSearch
-                  filterOption={(input, option) =>
-                    option.label.toLowerCase().includes(input.toLowerCase())
-                  }
-                  options={BUYERS}
-                />
+                <Input placeholder="Enter costing ID" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8} lg={6}>
+            <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item label="Order No">
                 <Input
-                  value={existingOrder?.orderNo || 'Auto-generated'}
+                  value={existingOrder?.orderNo || generatedOrderNo}
                   disabled
                   style={{ backgroundColor: 'var(--bg-tertiary)' }}
                 />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item label="Entry Date">
-                <DatePicker
-                  value={existingOrder ? dayjs(existingOrder.entryDate) : dayjs()}
+            {/* buyerId hidden — used for destination lookup; value set from costing */}
+            <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item label="Buyer">
+                <Input
+                  value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
+                  placeholder="Populated from costing"
                   disabled
-                  style={{ width: '100%' }}
+                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
                 />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item
-                name="orderDate"
-                label="Order Date"
-                rules={[{ required: true, message: 'Select order date' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item
-                name="shipDate"
-                label="Ship Date"
-                rules={[{ required: true, message: 'Select ship date' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item label="Lead Time">
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item name="styleNo" label="Style No">
                 <Input
-                  value={leadTime !== null ? `${leadTime} days` : '-'}
+                  placeholder="Populated from costing"
+                  disabled
+                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item name="garmentType" label="Garment Type">
+                <Input
+                  placeholder="Populated from costing"
+                  disabled
+                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item name="season" label="Season">
+                <Input
+                  placeholder="Populated from costing"
                   disabled
                   style={{ backgroundColor: 'var(--bg-tertiary)' }}
                 />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={24}>
-            <Col xs={12} md={4} lg={3}>
+
+          {/* Row 1b: Component + Currency + Order Date + Payment Terms + Payment Days */}
+          <Row gutter={16}>
+
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
+                name="component"
+                label="Component"
+                rules={[{ required: true, message: 'Select component type' }]}
+              >
+                <Select
+                  placeholder="Select"
+                  options={COMPONENT_OPTIONS}
+                  onChange={(val) => {
+                    if (val === 'Multiple') {
+                      setComponentModalVisible(true);
+                    } else {
+                      setFormComponents([]);
+                    }
+                  }}
+                />
+              </Form.Item>
+              {formComponents.length > 0 && (
+                <div style={{ marginTop: -16, marginBottom: 8 }}>
+                  <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, fontSize: 12 }}
+                    onClick={() => setComponentModalVisible(true)}
+                  >
+                    {formComponents.length} components · Edit
+                  </Button>
+                </div>
+              )}
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="currency" label="Currency">
-                <Select options={CURRENCIES} />
+                <Input
+                  placeholder="Populated from costing"
+                  disabled
+                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item name="shipmentMode" label="Shipment Mode">
-                <Select placeholder="Select" options={SHIPMENT_MODES} />
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item label="Order Date">
+                <DatePicker
+                  value={dayjs()}
+                  disabled
+                  style={{ width: '100%', backgroundColor: 'var(--bg-tertiary)' }}
+                />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item name="deliveryTerms" label="Delivery Terms">
-                <Select placeholder="Select" options={DELIVERY_TERMS} />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item name="allowance" label="Allowance">
-                <Input placeholder="e.g. 2%" />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item name="paymentTerms" label="Payment Terms">
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
+                name="paymentTerms"
+                label="Payment Terms"
+                rules={[{ required: true, message: 'Select payment terms' }]}
+              >
                 <Select placeholder="Select" options={PAYMENT_TERMS} />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4} lg={3}>
-              <Form.Item name="paymentDays" label="Payment Days">
-                <Select placeholder="Select" options={PAYMENT_DAYS_OPTIONS} />
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
+                name="paymentDays"
+                label="Payment Days"
+                rules={[
+                  { required: true, message: 'Enter payment days' },
+                  { type: 'number', min: 1, message: 'Must be at least 1 day' },
+                ]}
+              >
+                <InputNumber
+                  style={{ width: '100%', height: 40, lineHeight: '30px' }}
+                  min={1}
+                  controls={false}
+                  placeholder="e.g. 60"
+                />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={24}>
-            <Col xs={24} md={16}>
-              <Form.Item name="remarks" label="Remarks">
-                <TextArea rows={2} placeholder="Notes or special instructions" />
-              </Form.Item>
-            </Col>
-            <Col xs={12} md={4}>
-              <Form.Item label="Total Order Qty">
+
+          {/* Row 3: Order Qty, Total Value, Remarks, Image */}
+          <Row gutter={16} align="bottom">
+            <Col xs={12} sm={6} md={4} lg={3}>
+              <Form.Item label="Order Qty">
                 <Input
                   value={totalOrderQty.toLocaleString()}
                   disabled
@@ -985,29 +1198,76 @@ const OrderForm = () => {
                 />
               </Form.Item>
             </Col>
-            <Col xs={12} md={4}>
+            <Col xs={12} sm={6} md={5} lg={4}>
               <Form.Item label="Total Order Value">
                 <Input
-                  value={`${getCurrencySymbol(formCurrency)} ${totalOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  value={`${getCurrencySymbol(formCurrency)} ${totalOrderValue.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}`}
                   disabled
-                  style={{ backgroundColor: 'var(--secondary-light)', fontWeight: 600, color: 'var(--success-color, #10b981)' }}
+                  style={{
+                    backgroundColor: 'var(--secondary-light)',
+                    fontWeight: 600,
+                    color: 'var(--success-color, #10b981)',
+                  }}
                 />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={24} md={11} lg={13}>
+              <Form.Item name="remarks" label="Remarks">
+                <TextArea rows={1} placeholder="Notes or special instructions" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={6} md={4} lg={4}>
+              <Form.Item label="Garment Image">
+                <Popover
+                  content={
+                    <div style={{ padding: 8, color: '#999', fontSize: 12, textAlign: 'center' }}>
+                      Garment image pulled from Costing module
+                    </div>
+                  }
+                  trigger="hover"
+                  placement="left"
+                >
+                  <div
+                    style={{
+                      width: 64,
+                      height: 64,
+                      border: '1px dashed #d9d9d9',
+                      borderRadius: 4,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#bbb',
+                      fontSize: 10,
+                      cursor: 'default',
+                      userSelect: 'none',
+                    }}
+                  >
+                    <PictureOutlined style={{ fontSize: 22 }} />
+                  </div>
+                </Popover>
               </Form.Item>
             </Col>
           </Row>
         </Card>
 
-        {/* Order Lines */}
+        {/* ==================== ORDER LINES ==================== */}
         <Card style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
             <Title level={5} style={{ margin: 0 }}>
               Order Lines ({orderLines.length})
             </Title>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={handleAddLine}
-            >
+            <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddLine}>
               Add Order Line
             </Button>
           </div>
@@ -1041,151 +1301,138 @@ const OrderForm = () => {
               ),
               children: (
                 <div>
-                  {/* Line Info Row 1 */}
+                  {/* Line Fields */}
                   <Row gutter={16}>
-                    <Col xs={12} md={6}>
-                      <Form.Item label="Buyer PO No" style={{ marginBottom: 12 }}>
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label={
+                          <span>
+                            Buyer PO No <span style={{ color: '#ff4d4f' }}>*</span>
+                          </span>
+                        }
+                        style={{ marginBottom: 12 }}
+                      >
                         <Input
-                          placeholder="Buyer PO No"
+                          placeholder="Buyer PO Number"
                           value={line.buyerPoNo}
-                          onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={6}>
-                      <Form.Item label="Style No" required style={{ marginBottom: 12 }}>
-                        <Input
-                          placeholder="Style reference"
-                          value={line.styleNo}
-                          onChange={(e) => handleLineChange(line.key, { styleNo: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={6}>
-                      <Form.Item label="Description" style={{ marginBottom: 12 }}>
-                        <Input
-                          placeholder="Garment description"
-                          value={line.description}
-                          onChange={(e) => handleLineChange(line.key, { description: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={6}>
-                      <Form.Item label="Item Group" style={{ marginBottom: 12 }}>
-                        <Select
-                          placeholder="Select"
-                          value={line.itemGroup}
-                          onChange={(v) => handleLineChange(line.key, { itemGroup: v })}
-                          options={ITEM_GROUPS}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  {/* Line Info Row 2 */}
-                  <Row gutter={16}>
-                    <Col xs={24} md={12}>
-                      <Form.Item label="Destination" style={{ marginBottom: 12 }}>
-                        <Input
-                          placeholder="Shipping destination for this line"
-                          value={line.destination}
-                          onChange={(e) => handleLineChange(line.key, { destination: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={4}>
-                      <Form.Item label="Base Price" style={{ marginBottom: 12 }}>
-                        <InputNumber
-                          min={0}
-                          step={0.01}
-                          precision={2}
-                          style={{ width: '100%' }}
-                          placeholder="0.00"
-                          value={line.basePrice}
-                          onChange={(v) => handleLineChange(line.key, { basePrice: v || 0 })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={12} md={4}>
-                      <Form.Item label="Dispatch Date" style={{ marginBottom: 12 }}>
-                        <DatePicker
-                          style={{ width: '100%' }}
-                          value={line.dispatchDate}
-                          onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-
-                  {/* Line Info Row 3 — Material details */}
-                  <Row gutter={16}>
-                    <Col xs={12} md={4}>
-                      <Form.Item label="Fabric" style={{ marginBottom: 12 }}>
-                        <Select
-                          placeholder="Select"
-                          value={line.fabric}
-                          onChange={(v) => handleLineChange(line.key, { fabric: v })}
-                          options={FABRIC_TYPES}
-                          showSearch
-                          filterOption={(input, option) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
+                          onChange={(e) =>
+                            handleLineChange(line.key, { buyerPoNo: e.target.value })
                           }
                         />
                       </Form.Item>
                     </Col>
-                    <Col xs={12} md={3}>
-                      <Form.Item label="Material" style={{ marginBottom: 12 }}>
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label={
+                          <span>
+                            Destination <span style={{ color: '#ff4d4f' }}>*</span>
+                          </span>
+                        }
+                        style={{ marginBottom: 12 }}
+                      >
                         <Select
-                          placeholder="Select"
-                          value={line.material}
-                          onChange={(v) => handleLineChange(line.key, { material: v })}
-                          options={MATERIAL_TYPES}
+                          placeholder={
+                            buyerDestinations.length > 0
+                              ? 'Select destination'
+                              : 'Select a buyer first'
+                          }
+                          showSearch
+                          value={line.destination || undefined}
+                          options={buyerDestinations}
+                          disabled={buyerDestinations.length === 0}
+                          filterOption={(input, option) =>
+                            option.label.toLowerCase().includes(input.toLowerCase())
+                          }
+                          onChange={(v) => handleLineChange(line.key, { destination: v })}
                         />
                       </Form.Item>
                     </Col>
-                    <Col xs={8} md={3}>
-                      <Form.Item label="GSM" style={{ marginBottom: 12 }}>
-                        <InputNumber
-                          min={0}
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item
+                        label={
+                          <span>
+                            Dispatch Date <span style={{ color: '#ff4d4f' }}>*</span>
+                          </span>
+                        }
+                        style={{ marginBottom: 12 }}
+                      >
+                        <DatePicker
                           style={{ width: '100%' }}
-                          placeholder="GSM"
-                          value={line.gsm}
-                          onChange={(v) => handleLineChange(line.key, { gsm: v })}
+                          value={line.dispatchDate}
+                          disabledDate={(current) =>
+                            current && current <= dayjs().endOf('day')
+                          }
+                          onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
                         />
                       </Form.Item>
                     </Col>
-                    <Col xs={8} md={4}>
-                      <Form.Item label="Season" style={{ marginBottom: 12 }}>
+                    <Col xs={24} sm={12} md={8}>
+                      <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
                         <Input
-                          placeholder="e.g. SS/26"
-                          value={line.season}
-                          onChange={(e) => handleLineChange(line.key, { season: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={8} md={4}>
-                      <Form.Item label="Brand" style={{ marginBottom: 12 }}>
-                        <Input
-                          placeholder="Brand"
-                          value={line.brand}
-                          onChange={(e) => handleLineChange(line.key, { brand: e.target.value })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={8} md={4}>
-                      <Form.Item label="Collection" style={{ marginBottom: 12 }}>
-                        <Input
-                          placeholder="Collection"
-                          value={line.collection}
-                          onChange={(e) => handleLineChange(line.key, { collection: e.target.value })}
+                          disabled
+                          style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
+                          prefix={<ClockCircleOutlined />}
+                          value={
+                            line.dispatchDate
+                              ? `${dayjs(line.dispatchDate).diff(dayjs(), 'day')} days`
+                              : ''
+                          }
+                          placeholder="—"
                         />
                       </Form.Item>
                     </Col>
                   </Row>
 
+                  {/* Components — shown when Multiple component is selected */}
+                  {formComponents.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                          Components
+                        </Text>
+                        <Button
+                          type="link"
+                          size="small"
+                          style={{ padding: 0, fontSize: 11, height: 'auto' }}
+                          onClick={() => setComponentModalVisible(true)}
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {formComponents.map((comp) => (
+                          <div
+                            key={comp.key}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '5px 10px',
+                              border: '1px solid var(--border-color, #e5e7eb)',
+                              borderRadius: 8,
+                              background: 'var(--bg-secondary, #f8fafc)',
+                            }}
+                          >
+                            <Text strong style={{ fontSize: 12 }}>{comp.name}</Text>
+                            <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 5px' }}>
+                              ×{comp.qtyPerSet || 1}
+                            </Tag>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <Divider style={{ margin: '8px 0 16px' }} />
 
-                  {/* Size Breakdown Table */}
+                  {/* Size Breakdown */}
                   <SizeBreakdownTable
                     line={line}
                     currency={formCurrency || 'USD'}
@@ -1197,86 +1444,107 @@ const OrderForm = () => {
           />
         </Card>
 
-        {/* Order Summary */}
+        {/* ==================== ORDER SUMMARY ==================== */}
         <Card>
           <Title level={5} style={{ marginBottom: 16 }}>Order Summary</Title>
 
-          {/* Assortment Summary */}
-          {assortmentSummary.length > 0 && (
-            <>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>Assortment by Destination</Text>
-              <Table
-                dataSource={assortmentSummary}
-                rowKey="destination"
-                pagination={false}
-                size="small"
-                style={{ marginBottom: 16 }}
-                columns={[
-                  {
-                    title: 'Destination',
-                    dataIndex: 'destination',
-                    key: 'destination',
-                    ellipsis: true,
-                  },
-                  { title: 'Lines', dataIndex: 'lineCount', key: 'lineCount', width: 70, align: 'center' },
-                  {
-                    title: 'Total Qty',
-                    dataIndex: 'totalQty',
-                    key: 'totalQty',
-                    width: 100,
-                    align: 'right',
-                    render: (v) => <Text strong>{v.toLocaleString()}</Text>,
-                  },
-                  {
-                    title: 'Avg Price',
-                    dataIndex: 'avgPrice',
-                    key: 'avgPrice',
-                    width: 100,
-                    align: 'right',
-                    render: (v) => `${getCurrencySymbol(formCurrency)} ${v.toFixed(2)}`,
-                  },
-                  {
-                    title: 'Total Value',
-                    dataIndex: 'totalValue',
-                    key: 'totalValue',
-                    width: 130,
-                    align: 'right',
-                    render: (v) => (
-                      <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
-                        {`${getCurrencySymbol(formCurrency)} ${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          {assortmentSummary.length > 0 ? (
+            <Table
+              dataSource={assortmentSummary}
+              rowKey="key"
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: 'Buyer PO No',
+                  dataIndex: 'buyerPoNo',
+                  key: 'buyerPoNo',
+                  width: 140,
+                  render: (v) => <Text strong>{v}</Text>,
+                },
+                {
+                  title: 'Destination',
+                  dataIndex: 'destination',
+                  key: 'destination',
+                  ellipsis: true,
+                },
+                {
+                  title: 'Total Qty',
+                  dataIndex: 'totalQty',
+                  key: 'totalQty',
+                  width: 100,
+                  align: 'right',
+                  render: (v) => <Text strong>{v.toLocaleString()}</Text>,
+                },
+                {
+                  title: 'Avg Price',
+                  dataIndex: 'avgPrice',
+                  key: 'avgPrice',
+                  width: 110,
+                  align: 'right',
+                  render: (v) =>
+                    `${getCurrencySymbol(formCurrency)} ${v.toFixed(2)}`,
+                },
+                {
+                  title: 'Line Value',
+                  dataIndex: 'totalValue',
+                  key: 'totalValue',
+                  width: 140,
+                  align: 'right',
+                  render: (v) => (
+                    <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
+                      {`${getCurrencySymbol(formCurrency)} ${v.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}`}
+                    </Text>
+                  ),
+                },
+              ]}
+              summary={() => (
+                <Table.Summary fixed>
+                  <Table.Summary.Row
+                    style={{ background: 'var(--bg-secondary, #f8fafc)', fontWeight: 600 }}
+                  >
+                    <Table.Summary.Cell index={0} colSpan={2}>
+                      <Text strong>Grand Total</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={2} align="right">
+                      <Text strong style={{ fontSize: 15 }}>
+                        {totalOrderQty.toLocaleString()}
                       </Text>
-                    ),
-                  },
-                ]}
-              />
-            </>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={3} align="right">
+                      <Text type="secondary">—</Text>
+                    </Table.Summary.Cell>
+                    <Table.Summary.Cell index={4} align="right">
+                      <Text
+                        strong
+                        style={{ color: 'var(--success-color, #10b981)', fontSize: 15 }}
+                      >
+                        {getCurrencySymbol(formCurrency)}{' '}
+                        {totalOrderValue.toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </Text>
+                    </Table.Summary.Cell>
+                  </Table.Summary.Row>
+                </Table.Summary>
+              )}
+            />
+          ) : (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '32px 0',
+                color: '#bbb',
+                fontSize: 13,
+              }}
+            >
+              Add order lines to see summary
+            </div>
           )}
-
-          {/* Grand Total */}
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              gap: 32,
-              padding: '16px 0',
-              borderTop: '2px solid var(--border-color, #e5e7eb)',
-            }}
-          >
-            <div style={{ textAlign: 'right' }}>
-              <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>Total Lines</Text>
-              <Text strong style={{ fontSize: 18 }}>{orderLines.length}</Text>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>Total Quantity</Text>
-              <Text strong style={{ fontSize: 18 }}>{totalOrderQty.toLocaleString()}</Text>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>Total Value</Text>
-              <Text strong style={{ fontSize: 18, color: 'var(--success-color, #10b981)' }}>
-                {getCurrencySymbol(formCurrency)} {totalOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Text>
-            </div>
-          </div>
         </Card>
       </Form>
 

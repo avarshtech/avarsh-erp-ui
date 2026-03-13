@@ -1,3 +1,4 @@
+import axios from 'axios';
 import axiosInstance from './axiosInstance';
 import { getEmptyPermissions } from '../utils/permissions';
 import { fetchAndCacheOrganisation } from './organisationService';
@@ -12,6 +13,7 @@ import {
   setSessionActiveFlag,
   hasSessionActiveFlag,
   clearAll,
+  executeTokenRefresh,
 } from './sessionStore';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -208,10 +210,18 @@ export const hasPermission = (module, action) => {
  */
 export const refreshSession = async () => {
   try {
-    // No request body needed — the refresh token is sent as an HttpOnly cookie
-    const response = await axiosInstance.post('/auth/refresh');
-    const { data } = response;
-    const newToken = data?.token;
+    // Use the shared lock to prevent concurrent refresh calls
+    // (e.g., SessionContext proactive refresh vs. axios interceptor refresh).
+    // Uses raw `axios` (NOT axiosInstance) so the request interceptor does NOT
+    // add the Authorization header — the JWT filter would reject an expired
+    // access token before the refresh endpoint is reached.
+    const newToken = await executeTokenRefresh(() =>
+      axios.post(
+        `${axiosInstance.defaults.baseURL}/auth/refresh`,
+        null,
+        { withCredentials: true }
+      ).then((r) => r.data?.token || null)
+    );
 
     if (!newToken) return false;
 
