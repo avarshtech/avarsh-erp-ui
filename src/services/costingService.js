@@ -1,0 +1,226 @@
+/**
+ * Costing Service — Real API Integration
+ * All endpoints follow the backend Swagger spec (CostSheetController).
+ * Uses the same exported function names so frontend components work without import changes.
+ */
+
+import axiosInstance, { upload } from './axiosInstance';
+
+const ENDPOINTS = {
+  COST_SHEETS: '/cost-sheets',
+  EXCHANGE_RATES: '/exchange-rates',
+};
+
+// ==================== CRUD OPERATIONS ====================
+
+/**
+ * Search cost sheets with filters and pagination.
+ * GET /api/v1/cost-sheets/search?search=&status=&buyerId=&season=&dateFrom=&dateTo=&page=&size=&sort=&direction=
+ * @param {Object} params - CostSheetSearchRequest query parameters
+ * @returns {Promise<Object>} PaginatedResponseCostSheetResponse { content, totalElements, totalPages, pageNumber, pageSize, last }
+ */
+export const searchCostSheets = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  if (params.search) queryParams.append('search', params.search);
+  if (params.status) queryParams.append('status', params.status);
+  if (params.buyerId) queryParams.append('buyerId', params.buyerId);
+  if (params.season) queryParams.append('season', params.season);
+  if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+  if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+  if (params.page !== undefined) queryParams.append('page', params.page);
+  if (params.size !== undefined) queryParams.append('size', params.size);
+  if (params.sort) queryParams.append('sort', params.sort);
+  if (params.direction) queryParams.append('direction', params.direction);
+
+  const queryString = queryParams.toString();
+  const url = `${ENDPOINTS.COST_SHEETS}/search${queryString ? `?${queryString}` : ''}`;
+  const response = await axiosInstance.get(url);
+  const data = response.data;
+
+  // Normalize pagination fields for frontend compatibility
+  return {
+    content: data.content || [],
+    totalElements: data.totalElements || 0,
+    totalPages: data.totalPages || 0,
+    size: data.pageSize ?? data.size ?? 25,
+    number: data.pageNumber ?? data.number ?? 0,
+    last: data.last,
+  };
+};
+
+/**
+ * Get a cost sheet by ID (includes full detail with history).
+ * GET /api/v1/cost-sheets/{id}
+ * @param {number|string} id - Cost sheet ID
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const getCostSheetById = async (id) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/${id}`);
+  return response.data;
+};
+
+/**
+ * Create a new cost sheet.
+ * POST /api/v1/cost-sheets (no id in body)
+ * @param {Object} data - CostSheetRequest payload
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const createCostSheet = async (data) => {
+  const { id, costingId, createdAt, updatedAt, history, ...payload } = data;
+  const response = await axiosInstance.post(ENDPOINTS.COST_SHEETS, payload);
+  return response.data;
+};
+
+/**
+ * Update an existing cost sheet.
+ * POST /api/v1/cost-sheets (id in body = update)
+ * @param {number|string} id - Cost sheet ID
+ * @param {Object} data - CostSheetRequest payload (partial or full)
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const updateCostSheet = async (id, data) => {
+  const payload = { id: Number(id), ...data };
+  const response = await axiosInstance.post(ENDPOINTS.COST_SHEETS, payload);
+  return response.data;
+};
+
+/**
+ * Delete a cost sheet (Draft status only).
+ * DELETE /api/v1/cost-sheets/{id}
+ * @param {number|string} id - Cost sheet ID
+ * @returns {Promise<void>}
+ */
+export const deleteCostSheet = async (id) => {
+  await axiosInstance.delete(`${ENDPOINTS.COST_SHEETS}/${id}`);
+};
+
+/**
+ * Duplicate a cost sheet as a new Draft.
+ * POST /api/v1/cost-sheets/{id}/duplicate
+ * @param {number|string} id - Source cost sheet ID
+ * @returns {Promise<Object>} CostSheetResponse (the new duplicate)
+ */
+export const duplicateCostSheet = async (id) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/${id}/duplicate`);
+  return response.data;
+};
+
+// ==================== HISTORY ====================
+
+/**
+ * Get revision history for a cost sheet.
+ * GET /api/v1/cost-sheets/{id}/history
+ * @param {number|string} id - Cost sheet ID
+ * @returns {Promise<Array>} HistoryEntryDTO[]
+ */
+export const getCostSheetHistory = async (id) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/${id}/history`);
+  return response.data ?? [];
+};
+
+// ==================== PAST PRICES ====================
+
+/**
+ * Get past PO price suggestions for a given item.
+ * GET /api/v1/cost-sheets/past-prices?type=fabric&itemId=42
+ * @param {string} type - Item category ('fabric', 'trim', 'manufacturing', 'overhead')
+ * @param {number} itemId - Item ID from items table
+ * @returns {Promise<Array>} PastPriceSuggestionDTO[]
+ */
+export const getPastPOSuggestions = async (type, itemId) => {
+  if (!itemId) return [];
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/past-prices`, {
+    params: { type, itemId },
+  });
+  return response.data ?? [];
+};
+
+// ==================== SUMMARIES ====================
+
+/**
+ * Get all cost sheet summaries for comparison dropdown (minimal data).
+ * GET /api/v1/cost-sheets/summaries
+ * @returns {Promise<Array>} CostSheetSummaryDTO[]
+ */
+export const getAllCostSheetSummaries = async () => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/summaries`);
+  return response.data ?? [];
+};
+
+// ==================== EXCHANGE RATES ====================
+
+/**
+ * Get today's exchange rate between two currencies.
+ * Tries the backend first, then falls back to the free open ExchangeRate-API.
+ * @param {string} fromCurrency - Source currency code (e.g. 'USD')
+ * @param {string} toCurrency - Target currency code (e.g. 'INR')
+ * @returns {Promise<number>} Exchange rate value
+ */
+export const getTodaysRate = async (fromCurrency, toCurrency) => {
+  if (!fromCurrency || !toCurrency || fromCurrency === toCurrency) return 1;
+
+  // Try live open exchange rate API first for up-to-date rates
+  try {
+    const res = await fetch(
+      `https://open.er-api.com/v6/latest/${fromCurrency}`
+    );
+    const data = await res.json();
+    if (data?.result === 'success' && data.rates?.[toCurrency]) {
+      return data.rates[toCurrency];
+    }
+  } catch {
+    // Open API unavailable — fall through to backend
+  }
+
+  // Fallback: backend exchange rate
+  try {
+    const response = await axiosInstance.get(`${ENDPOINTS.EXCHANGE_RATES}/today`, {
+      params: { from: fromCurrency, to: toCurrency },
+    });
+    if (response.data?.rate) return response.data.rate;
+  } catch {
+    // Backend also unavailable
+  }
+
+  return 1;
+};
+
+// ==================== ATTACHMENTS ====================
+
+/**
+ * Upload a file attachment to a cost sheet.
+ * POST /api/v1/cost-sheets/{id}/attachments (multipart/form-data)
+ * @param {number|string} costSheetId - Cost sheet ID
+ * @param {File} file - File to upload
+ * @param {Function} [onProgress] - Optional upload progress callback
+ * @returns {Promise<Object>} AttachmentDTO
+ */
+export const uploadAttachment = async (costSheetId, file, onProgress) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return upload(`${ENDPOINTS.COST_SHEETS}/${costSheetId}/attachments`, formData, onProgress);
+};
+
+/**
+ * Download an attachment file.
+ * GET /api/v1/cost-sheets/attachments/{attachmentId}
+ * @param {number|string} attachmentId - Attachment ID
+ * @returns {Promise<Blob>} File binary data
+ */
+export const downloadAttachment = async (attachmentId) => {
+  const response = await axiosInstance.get(
+    `${ENDPOINTS.COST_SHEETS}/attachments/${attachmentId}`,
+    { responseType: 'blob' }
+  );
+  return response.data;
+};
+
+/**
+ * Delete an attachment.
+ * DELETE /api/v1/cost-sheets/attachments/{attachmentId}
+ * @param {number|string} attachmentId - Attachment ID
+ * @returns {Promise<void>}
+ */
+export const deleteAttachment = async (attachmentId) => {
+  await axiosInstance.delete(`${ENDPOINTS.COST_SHEETS}/attachments/${attachmentId}`);
+};

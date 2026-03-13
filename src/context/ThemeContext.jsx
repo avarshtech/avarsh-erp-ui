@@ -179,10 +179,7 @@ export const ThemeProvider = ({ children }) => {
     if (storedTheme && Object.values(THEMES).includes(storedTheme)) {
       return storedTheme;
     }
-    // Check system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return THEMES.DARK;
-    }
+    // Default to light theme for new users
     return THEMES.LIGHT;
   };
 
