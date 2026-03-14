@@ -46,7 +46,7 @@ import {
   SEASONS,
   formatCurrency,
 } from '../../utils/costingConstants';
-import { BUYERS } from '../../utils/orderConstants';
+import { getBuyers } from '../../services/buyerService';
 import CostingHistoryModal from './CostingHistoryModal';
 
 const { Text } = Typography;
@@ -77,6 +77,7 @@ const CostingList = () => {
   const [sortDirection, setSortDirection] = useState('desc');
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState(null);
+  const [buyerOptions, setBuyerOptions] = useState([]);
 
   // Permissions
   const canAdd = hasPermission('costing', 'add');
@@ -126,6 +127,15 @@ const CostingList = () => {
     const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
     return () => clearTimeout(timer);
   }, [searchText]);
+
+  // Fetch buyer options on mount
+  useEffect(() => {
+    getBuyers()
+      .then((buyers) =>
+        setBuyerOptions((buyers || []).map((b) => ({ value: b.id, label: b.name })))
+      )
+      .catch(() => {});
+  }, []);
 
   // Re-fetch when filters change
   useEffect(() => {
@@ -414,7 +424,7 @@ const CostingList = () => {
               optionFilterProp="label"
               value={buyerFilter}
               onChange={setBuyerFilter}
-              options={BUYERS}
+              options={buyerOptions}
             />
           </Col>
           <Col xs={12} sm={8} md={3} lg={3}>
