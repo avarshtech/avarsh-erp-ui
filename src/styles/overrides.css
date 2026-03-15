@@ -686,6 +686,39 @@ textarea.ant-input:active {
   background: var(--primary-color);
 }
 
+/* ============================================================
+   SIDEBAR SMOOTH TRANSITION OVERRIDES
+   Override AntD's default 0.2s sider transition with a slower,
+   GPU-accelerated ease for a fluid expand / collapse feel.
+   ============================================================ */
+
+.ant-layout-sider {
+  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              flex 0.32s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: width;
+}
+
+/* Fade menu item labels in/out during collapse animation */
+.ant-menu-inline-collapsed .ant-menu-title-content {
+  opacity: 0;
+  transition: opacity 0.18s ease !important;
+}
+.ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-title-content {
+  opacity: 1;
+  transition: opacity 0.22s ease 0.12s !important;
+}
+
+/* Smooth the sub-menu expand/collapse arrow */
+.ant-menu-submenu-arrow {
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ============================================================
+   COLLAPSE / ACCORDION
+   ============================================================ */
+
 /* Collapse / Accordion */
 [data-theme="dark"] .ant-collapse {
   background-color: var(--card-bg);

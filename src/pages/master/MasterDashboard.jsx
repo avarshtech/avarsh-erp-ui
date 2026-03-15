@@ -385,7 +385,8 @@ const MasterDashboard = () => {
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'width 0.2s ease',
+          transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'width',
         }}>
           {/* Panel header — pinned */}
           <div style={{

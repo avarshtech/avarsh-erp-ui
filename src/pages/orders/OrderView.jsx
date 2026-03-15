@@ -309,61 +309,60 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 16px 16px 24px' } }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          {/* Left — print */}
-          <Button
-            icon={<PrinterOutlined />}
-            loading={printLoading}
-            onClick={handlePrint}
-          >
-            Print
-          </Button>
-          {/* Right — action buttons */}
+          {/* Left — print, refer back, cancel */}
           <Space>
-          {canEdit && (
             <Button
-              icon={<EditOutlined />}
-              onClick={() => { onClose(); navigate(`/orders/edit/${orderData.id}`, { state: { orderData } }); }}
+              icon={<PrinterOutlined />}
+              loading={printLoading}
+              onClick={handlePrint}
             >
-              Edit Order
+              Print
             </Button>
-          )}
-          {canSubmitOrder() && (status === ORDER_STATUS.DRAFT || status === ORDER_STATUS.REFERRED_BACK) && (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              loading={actionLoading}
-              onClick={handleSubmit}
-            >
-              {status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
-            </Button>
-          )}
-          {canReferBackOrder() && status === ORDER_STATUS.CONFIRMED && !showReferBackInput && (
-            <Button
-              icon={<RollbackOutlined />}
-              onClick={() => setShowReferBackInput(true)}
-              style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
-            >
-              Refer Back
-            </Button>
-          )}
-          {canCancelOrder() && status === ORDER_STATUS.CONFIRMED && (
-            <Popconfirm
-              title="Cancel Order"
-              description={`Are you sure you want to cancel order "${orderNo}"? This action cannot be undone.`}
-              onConfirm={handleCancel}
-              okText="Cancel Order"
-              cancelText="No"
-              okButtonProps={{ danger: true, loading: actionLoading }}
-            >
+            {canReferBackOrder() && status === ORDER_STATUS.CONFIRMED && !showReferBackInput && (
               <Button
-                icon={<StopOutlined />}
-                danger
+                icon={<RollbackOutlined />}
+                onClick={() => setShowReferBackInput(true)}
+                style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
               >
-                Cancel Order
+                Refer Back
               </Button>
-            </Popconfirm>
-          )}
-          <Button onClick={onClose}>Close</Button>
+            )}
+            {canCancelOrder() && status === ORDER_STATUS.CONFIRMED && (
+              <Popconfirm
+                title="Cancel Order"
+                description={`Are you sure you want to cancel order "${orderNo}"? This action cannot be undone.`}
+                onConfirm={handleCancel}
+                okText="Cancel Order"
+                cancelText="No"
+                okButtonProps={{ danger: true, loading: actionLoading }}
+              >
+                <Button icon={<StopOutlined />} danger>
+                  Cancel Order
+                </Button>
+              </Popconfirm>
+            )}
+          </Space>
+          {/* Right — edit, submit, close */}
+          <Space>
+            {canEdit && (
+              <Button
+                icon={<EditOutlined />}
+                onClick={() => { onClose(); navigate(`/orders/edit/${orderData.id}`, { state: { orderData } }); }}
+              >
+                Edit Order
+              </Button>
+            )}
+            {canSubmitOrder() && (status === ORDER_STATUS.DRAFT || status === ORDER_STATUS.REFERRED_BACK) && (
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                loading={actionLoading}
+                onClick={handleSubmit}
+              >
+                {status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
+              </Button>
+            )}
+            <Button onClick={onClose}>Close</Button>
           </Space>
         </div>
       }

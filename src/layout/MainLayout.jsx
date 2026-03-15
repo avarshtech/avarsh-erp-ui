@@ -306,7 +306,8 @@ const MainLayoutInner = () => {
           zIndex: 100,
           overflow: 'hidden',
           background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-          transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'width',
         }}
       >
         <div
@@ -368,17 +369,19 @@ const MainLayoutInner = () => {
           }}
         >
           <Space>
-            <span
-              onClick={() => setCollapsed(!collapsed)}
-              style={{
-                fontSize: 20,
-                cursor: "pointer",
-                color: isDarkMode ? '#94a3b8' : '#64748b',
-                transition: "color 0.3s",
-              }}
-            >
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </span>
+            <Tooltip title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
+              <span
+                onClick={() => setCollapsed(!collapsed)}
+                style={{
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  transition: "color 0.3s",
+                }}
+              >
+                {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              </span>
+            </Tooltip>
             <Input
               placeholder="Search..."
               prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}
