@@ -85,7 +85,8 @@ const CostingForm = () => {
 
   // State
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [costingId, setCostingId] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [quoteCurrency, setQuoteCurrency] = useState('USD');
@@ -683,7 +684,7 @@ const CostingForm = () => {
   const handleSaveDraft = async () => {
     try {
       const values = await form.validateFields().catch(() => form.getFieldsValue());
-      setSaving(true);
+      setSavingDraft(true);
       const payload = buildPayload(values, COSTING_STATUS.DRAFT);
       if (isEdit) {
         await updateCostSheet(id, payload);
@@ -696,14 +697,14 @@ const CostingForm = () => {
     } catch {
       message.error('Failed to save cost sheet');
     } finally {
-      setSaving(false);
+      setSavingDraft(false);
     }
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      setSaving(true);
+      setSubmitting(true);
       const payload = buildPayload(values, COSTING_STATUS.FINAL);
       if (isEdit) {
         await updateCostSheet(id, payload);
@@ -716,7 +717,7 @@ const CostingForm = () => {
     } catch {
       message.error('Please fill all required fields');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -1968,13 +1969,14 @@ const CostingForm = () => {
           gap: 12,
         }}
       >
-        <Button onClick={() => navigate('/costing/list')} disabled={saving}>
+        <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
           Cancel
         </Button>
         <Button
           icon={<SaveOutlined />}
           onClick={handleSaveDraft}
-          loading={saving}
+          loading={savingDraft}
+          disabled={submitting}
         >
           Save as Draft
         </Button>
@@ -1982,7 +1984,8 @@ const CostingForm = () => {
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSubmit}
-          loading={saving}
+          loading={submitting}
+          disabled={savingDraft}
         >
           Submit
         </Button>

@@ -60,6 +60,19 @@ export const getCostSheetById = async (id) => {
 };
 
 /**
+ * Get a cost sheet by its human-readable costing ID (e.g. CST/25-26/1001).
+ * GET /api/v1/cost-sheets/costing-id/{costingId}
+ * @param {string} costingId - Costing ID string
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const getCostSheetByCostingId = async (costingId) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/by-costing-id`, {
+    params: { costingId },
+  });
+  return response.data;
+};
+
+/**
  * Create a new cost sheet.
  * POST /api/v1/cost-sheets (no id in body)
  * @param {Object} data - CostSheetRequest payload

@@ -190,9 +190,9 @@ const OrderList = () => {
       ),
     },
     {
-      title: 'Entry Date',
-      dataIndex: 'entryDate',
-      key: 'entryDate',
+      title: 'Order Date',
+      dataIndex: 'orderDate',
+      key: 'orderDate',
       width: 120,
       sorter: true,
       render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
@@ -204,14 +204,6 @@ const OrderList = () => {
       width: 200,
       ellipsis: true,
       render: (text) => <Text strong>{text || '-'}</Text>,
-    },
-    {
-      title: 'Ship Date',
-      dataIndex: 'shipDate',
-      key: 'shipDate',
-      width: 120,
-      sorter: true,
-      render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
     },
     {
       title: 'Lines',
@@ -284,7 +276,7 @@ const OrderList = () => {
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
-                onClick={() => navigate(`/orders/edit/${record.id}`)}
+                onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
                 style={{ color: '#52c41a' }}
               />
             </Tooltip>

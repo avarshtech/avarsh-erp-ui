@@ -10,13 +10,14 @@ import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 
 const MODULE_ID = 'master-data';
 
-const StyleMaster = () => {
+const StyleMaster = ({ onDirtyChange }) => {
   const { styles, buyers, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -188,6 +189,8 @@ const StyleMaster = () => {
   return (
     <MasterSplitView
       title="Styles"
+      subtitle="Order Entry, Costing"
+      addLabel="Add Style"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

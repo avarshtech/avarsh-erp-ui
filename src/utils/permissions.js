@@ -6,7 +6,7 @@
  * {
  *   "dashboard":        { "access": true, "operations": { "view": true } },
  *   "orders":           { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "order-actions":    { "access": true, "operations": { "submit": true, "refer_back": true } },
+ *   "order-actions":    { "access": true, "operations": { "refer_back": true, "cancel": true } },
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
@@ -145,7 +145,7 @@ export const OPERATIONS = {
 export const STANDARD_OPERATIONS = ['view', 'add', 'update', 'delete'];
 
 // Order Action operations
-export const ORDER_ACTION_OPERATIONS = ['submit', 'refer_back'];
+export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel'];
 
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['approve', 'reject', 'cancel', 'refer_back'];
@@ -334,15 +334,19 @@ export const hasAnyPermission = (checks) => {
 
 // ─── ORDER ACTION HELPERS (linked to Orders access) ────────────────────────────
 
+// Submit = user has add OR update access on orders (no separate permission needed)
 export const canSubmitOrder = () =>
-  hasModuleAccess('orders') && hasPermission('order-actions', 'submit');
+  hasPermission('orders', 'add') || hasPermission('orders', 'update');
 
 export const canReferBackOrder = () =>
   hasModuleAccess('orders') && hasPermission('order-actions', 'refer_back');
 
+export const canCancelOrder = () =>
+  hasModuleAccess('orders') && hasPermission('order-actions', 'cancel');
+
 export const canPerformOrderActions = () =>
   hasModuleAccess('orders') &&
-  (canSubmitOrder() || canReferBackOrder());
+  (canReferBackOrder() || canCancelOrder());
 
 // ─── PO APPROVAL HELPERS (linked to PO access) ────────────────────────────────
 

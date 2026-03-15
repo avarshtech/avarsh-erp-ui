@@ -203,6 +203,12 @@ textarea.ant-input:active {
   outline: none !important;
 }
 
+/* Dark mode: remove box-shadow on default/danger buttons that shows as a white line at the bottom */
+[data-theme="dark"] .ant-btn-default,
+[data-theme="dark"] .ant-btn-dangerous {
+  box-shadow: none !important;
+}
+
 /* ============================================================
    FIX: Border lines at rounded corners
    Ensure borders render cleanly at rounded corners globally
@@ -213,6 +219,12 @@ textarea.ant-input:active {
   border-radius: var(--radius-sm) !important;
   overflow: hidden;
   border: 1px solid var(--border-color) !important;
+}
+
+/* Remove cell-level border-radius so the parent overflow:hidden handles all rounding cleanly */
+.ant-descriptions-bordered .ant-descriptions-view table th,
+.ant-descriptions-bordered .ant-descriptions-view table td {
+  border-radius: 0 !important;
 }
 
 [data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-view {
@@ -687,6 +699,12 @@ textarea.ant-input:active {
 [data-theme="dark"] .ant-collapse-content {
   background-color: var(--bg-secondary);
   border-top-color: var(--border-color);
+}
+
+/* Remove bottom border-radius from header when panel is expanded — prevents triangle gap */
+.ant-collapse-item-active > .ant-collapse-header {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
 }
 
 /* Divider */

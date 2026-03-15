@@ -513,7 +513,7 @@ const BuyerMaster = () => {
       title={
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Buyers</div>
-          <div style={{ fontSize: 12, color: '#888' }}>Manage buyer master data</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Order Entry</div>
         </div>
       }
     >

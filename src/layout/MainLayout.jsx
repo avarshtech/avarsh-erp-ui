@@ -295,6 +295,7 @@ const MainLayoutInner = () => {
         trigger={null}
         collapsible
         collapsed={collapsed}
+        collapsedWidth={80}
         width={260}
         style={{
           position: "fixed",
@@ -305,6 +306,7 @@ const MainLayoutInner = () => {
           zIndex: 100,
           overflow: 'hidden',
           background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+          transition: 'width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
         }}
       >
         <div
@@ -325,7 +327,8 @@ const MainLayoutInner = () => {
                 height: collapsed ? 32 : 40,
                 width: collapsed ? 32 : 'auto',
                 objectFit: 'contain',
-                display: 'block'
+                display: 'block',
+                transition: 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             />
           </div>
@@ -346,7 +349,7 @@ const MainLayoutInner = () => {
         />
       </Sider>
       <Layout
-        style={{ marginLeft: collapsed ? 80 : 260, transition: "all 0.2s" }}
+        style={{ marginLeft: collapsed ? 80 : 260, transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}
       >
         <Header
           style={{

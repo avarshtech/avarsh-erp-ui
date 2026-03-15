@@ -439,7 +439,7 @@ const SupplierMaster = () => {
       title={
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Suppliers</div>
-          <div style={{ fontSize: 12, color: '#888' }}>Manage supplier master data</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Purchase Order</div>
         </div>
       }
     >

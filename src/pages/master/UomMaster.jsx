@@ -9,13 +9,14 @@ import PermissionGuard from '../../components/PermissionGuard';
 
 const MODULE_ID = 'master-data';
 
-const UomMaster = () => {
+const UomMaster = ({ onDirtyChange }) => {
   const { uoms, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -155,7 +156,9 @@ const UomMaster = () => {
 
   return (
     <MasterSplitView
-      title="Unit of Measure"
+      title="Unit of Measurement"
+      subtitle="Item"
+      addLabel="Add UOM"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

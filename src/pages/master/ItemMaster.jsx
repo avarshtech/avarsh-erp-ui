@@ -1413,10 +1413,13 @@ const ItemMaster = () => {
     <div className="animate-fade-in-up">
       <Card
         title={
-          <Space>
-            <AppstoreOutlined />
-            <span>Item Master</span>
-          </Space>
+          <div>
+            <Space>
+              <AppstoreOutlined />
+              <span style={{ fontSize: 16, fontWeight: 600 }}>Item Master</span>
+            </Space>
+            <div style={{ fontSize: 12, color: '#888' }}>Purchase Order</div>
+          </div>
         }
         extra={
           <PermissionGuard module={MODULE_ID} operation="add">
@@ -1833,6 +1836,7 @@ const ItemMaster = () => {
                       rowKey={(item) => item.originalIndex}
                       size="small"
                       pagination={false}
+                      scroll={{ x: 'max-content' }}
                       columns={[
                         {
                           title: '#',

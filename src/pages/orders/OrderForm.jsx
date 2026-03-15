@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Form,
   Input,
@@ -19,7 +19,7 @@ import {
   Table,
   Popconfirm,
   FloatButton,
-  Popover,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
@@ -28,27 +28,112 @@ import {
   ArrowLeftOutlined,
   SendOutlined,
   CaretRightOutlined,
-  PictureOutlined,
   ClockCircleOutlined,
+  LoadingOutlined,
+  FilePdfOutlined,
+  FileImageOutlined,
+  FileOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
-import { createOrder, updateOrder, getOrderById } from '../../services/orderService';
-import { getBuyers } from '../../services/buyerService';
+import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orderService';
+import { getBuyers, getBuyerById } from '../../services/buyerService';
+import { getAllPaymentTerms } from '../../services/paymentTermsService';
+import { getCostSheetByCostingId, downloadAttachment } from '../../services/costingService';
+import { getAllSizePresets } from '../../services/sizePresetService';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,
-  PAYMENT_TERMS,
   COMPONENT_OPTIONS,
-  SIZE_PRESETS,
-  generateOrderNumber,
   getCurrencySymbol,
   getStatusLabel,
 } from '../../utils/orderConstants';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+// ==================== COSTING ATTACHMENTS PREVIEW ====================
+
+const formatBytes = (bytes) => {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const getFileIcon = (fileType) => {
+  if (!fileType) return <FileOutlined style={{ fontSize: 28, color: '#8c8c8c' }} />;
+  if (fileType === 'application/pdf') return <FilePdfOutlined style={{ fontSize: 28, color: '#f5222d' }} />;
+  if (fileType.startsWith('image/')) return <FileImageOutlined style={{ fontSize: 28, color: '#fa8c16' }} />;
+  return <FileOutlined style={{ fontSize: 28, color: '#1890ff' }} />;
+};
+
+const CostingAttachmentCard = ({ attachment }) => {
+  const [blobUrl, setBlobUrl] = useState(null);
+  const isImage = attachment.fileType?.startsWith('image/');
+
+  useEffect(() => {
+    if (!isImage) return;
+    let objectUrl;
+    downloadAttachment(attachment.id)
+      .then((blob) => { objectUrl = URL.createObjectURL(blob); setBlobUrl(objectUrl); })
+      .catch(() => {});
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [attachment.id, isImage]);
+
+  const handleDownload = async () => {
+    try {
+      const blob = await downloadAttachment(attachment.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = attachment.fileName; a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error('Download failed');
+    }
+  };
+
+  return (
+    <Tooltip title={attachment.fileName}>
+      <div style={{
+        width: 140, border: '1px solid var(--border-color, #e5e7eb)',
+        borderRadius: 8, overflow: 'hidden', background: 'var(--card-bg, #fff)', flexShrink: 0,
+      }}>
+        <div
+          onClick={handleDownload}
+          style={{
+            height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--bg-secondary, #f8fafc)', borderBottom: '1px solid var(--border-color, #e5e7eb)',
+            cursor: 'pointer', overflow: 'hidden', position: 'relative',
+          }}
+        >
+          {isImage && blobUrl
+            ? <img src={blobUrl} alt={attachment.fileName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : getFileIcon(attachment.fileType)
+          }
+          <div style={{
+            position: 'absolute', bottom: 4, right: 4,
+            background: 'rgba(0,0,0,0.45)', borderRadius: 4, padding: '2px 5px',
+            color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', gap: 3,
+          }}>
+            <DownloadOutlined style={{ fontSize: 10 }} /> Download
+          </div>
+        </div>
+        <div style={{ padding: '6px 8px' }}>
+          <Text style={{
+            fontSize: 11, display: 'block', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {attachment.fileName}
+          </Text>
+          <Text type="secondary" style={{ fontSize: 10 }}>{formatBytes(attachment.fileSize)}</Text>
+        </div>
+      </div>
+    </Tooltip>
+  );
+};
 
 // ==================== COMPONENT DETAILS DIALOG ====================
 
@@ -188,7 +273,7 @@ const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
 
 // ==================== SIZE BREAKDOWN TABLE ====================
 
-const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
+const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePresets = [] }) => {
   const {
     sizes = [],
     sizePrices = {},
@@ -215,7 +300,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
 
   // Handle size preset change
   const handlePresetChange = (preset) => {
-    const presetData = SIZE_PRESETS[preset];
+    const presetData = sizePresets.find((p) => p.id === preset);
     const newSizes = preset === 'CUSTOM' ? customSizes : (presetData?.sizes || []);
     const newSizePrices = {};
     newSizes.forEach((s) => {
@@ -330,71 +415,62 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
   return (
     <div>
       {/* Size preset selector */}
-      <Row gutter={16} style={{ marginBottom: 12 }} align="middle">
-        <Col>
-          <Space>
-            <Text strong style={{ fontSize: 13 }}>Size Preset: <span style={{ color: '#ff4d4f' }}>*</span></Text>
-            <Select
-              style={{ width: 180 }}
-              value={sizePreset || undefined}
-              placeholder="Select size preset"
-              onChange={handlePresetChange}
-              disabled={readOnly}
-              options={Object.entries(SIZE_PRESETS).map(([key, val]) => ({
-                value: key,
-                label: val.label,
-              }))}
-            />
-          </Space>
-        </Col>
-        {sizePreset === 'CUSTOM' && (
-          <Col flex="auto">
-            <Select
-              mode="tags"
-              style={{ width: '100%' }}
-              placeholder="Enter custom sizes (press Enter)"
-              value={customSizes}
-              onChange={handleCustomSizesChange}
-              disabled={readOnly}
-            />
-          </Col>
-        )}
-        {!readOnly && sizes.length > 0 && (
-          <Col>
-            <Space size={4}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+        <Space>
+          <Text strong style={{ fontSize: 13 }}>Size Preset: <span style={{ color: '#ff4d4f' }}>*</span></Text>
+          <Select
+            style={{ width: 180 }}
+            value={sizePreset || undefined}
+            placeholder="Select size preset"
+            onChange={handlePresetChange}
+            disabled={readOnly}
+            options={sizePresets.map((p) => ({
+              value: p.id,
+              label: p.name,
+            }))}
+          />
+        </Space>
+
+        <Space size={12} align="center">
+          {!readOnly && sizes.length > 0 && (
+            <Space
+              size={8}
+              align="center"
+              style={{
+                background: 'var(--bg-secondary, #f8fafc)',
+                border: '1px solid var(--border-color, #e5e7eb)',
+                borderRadius: 8,
+                padding: '6px 10px',
+              }}
+            >
+              <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                Set price for all sizes:
+              </Text>
               <InputNumber
-                size="small"
                 min={0}
                 step={0.01}
                 precision={2}
                 value={bulkPrice}
                 onChange={(v) => setBulkPrice(v || 0)}
-                style={{ width: 80 }}
-                placeholder="Price"
+                style={{ width: 100, height: 32 }}
+                placeholder="0.00"
               />
-              <Button
-                size="small"
-                type="primary"
-                onClick={handleApplyBulkPrice}
-              >
+              <Button type="primary" style={{ height: 32 }} onClick={handleApplyBulkPrice}>
                 Apply All
               </Button>
             </Space>
-          </Col>
-        )}
-        {!readOnly && sizes.length > 0 && (
-          <Col>
+          )}
+          {!readOnly && sizes.length > 0 && (
             <Button
-              type="dashed"
-              size="small"
+              type="link"
               icon={<PlusOutlined />}
               onClick={handleAddColor}
             >
               Add Color
             </Button>
-          </Col>
-        )}
-      </Row>
+          )}
+        </Space>
+      </div>
 
       {/* Matrix table */}
       {sizes.length > 0 && (
@@ -418,7 +494,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly }) => {
               <tr style={{ backgroundColor: 'var(--primary-light)' }}>
                 <td style={tdStyle}>
                   <Text strong style={{ fontSize: 12, color: '#1890ff' }}>
-                    Price ({currency || 'USD'})
+                    Price{currency ? ` (${currency})` : ''}
                   </Text>
                 </td>
                 {sizes.map((s) => (
@@ -583,25 +659,37 @@ const createEmptyLine = () => ({
 
 const OrderForm = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const [form] = Form.useForm();
+  const dataInitRef = useRef(false);
 
   // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
   const [loading, setLoading] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [existingOrder, setExistingOrder] = useState(null);
   const [activeKeys, setActiveKeys] = useState([]);
+
+  // Costing lookup
+  const [costingLoading, setCostingLoading] = useState(false);
+  const [costingAttachments, setCostingAttachments] = useState([]);
 
   // Buyer data
   const [buyers, setBuyers] = useState([]);
   const [buyersLoading, setBuyersLoading] = useState(false);
 
+  // Payment terms data
+  const [paymentTermsList, setPaymentTermsList] = useState([]);
+  const [paymentTermsLoading, setPaymentTermsLoading] = useState(false);
+
+  // Size presets data
+  const [sizePresetsList, setSizePresetsList] = useState([]);
+
   // Component dialog
   const [componentModalVisible, setComponentModalVisible] = useState(false);
   const [formComponents, setFormComponents] = useState([]);
-
-  // Generated order number for add mode
-  const [generatedOrderNo] = useState(() => generateOrderNumber());
 
   const isEdit = !!id;
   const orderStatus = existingOrder?.status;
@@ -626,27 +714,89 @@ const OrderForm = () => {
       }));
   }, [buyers, watchedBuyerId]);
 
-  // Load buyers from API
+  // Load dropdown data (buyers, payment terms, size presets) — merged to avoid double calls in StrictMode
   useEffect(() => {
-    const loadBuyers = async () => {
-      setBuyersLoading(true);
-      try {
-        const data = await getBuyers();
+    if (dataInitRef.current) return;
+    dataInitRef.current = true;
+
+    setBuyersLoading(true);
+    getBuyers()
+      .then((data) => {
         const list = Array.isArray(data) ? data : (data?.content || []);
         setBuyers(list.filter((b) => b.active !== false));
-      } catch {
-        message.warning('Could not load buyers from server');
-        setBuyers([]);
-      } finally {
-        setBuyersLoading(false);
-      }
-    };
-    loadBuyers();
+      })
+      .catch(() => { message.warning('Could not load buyers from server'); setBuyers([]); })
+      .finally(() => setBuyersLoading(false));
+
+    setPaymentTermsLoading(true);
+    getAllPaymentTerms()
+      .then((response) => {
+        const list = Array.isArray(response?.data) ? response.data : [];
+        setPaymentTermsList(list.filter((pt) => pt.active !== false));
+      })
+      .catch(() => message.warning('Could not load payment terms'))
+      .finally(() => setPaymentTermsLoading(false));
+
+    getAllSizePresets()
+      .then((response) => {
+        const list = Array.isArray(response?.data) ? response.data : [];
+        setSizePresetsList(list.filter((p) => p.active !== false));
+      })
+      .catch(() => message.warning('Could not load size presets'));
   }, []);
 
-  // Load existing order for edit
+  // Populate form fields from an order object
+  const populateForm = useCallback((order) => {
+    setExistingOrder(order);
+    form.setFieldsValue({
+      costingId: order.costingId,
+      buyerId: order.buyerId,
+      styleNo: order.styleNo,
+      garmentType: order.garmentType,
+      season: order.season,
+      component: order.component,
+      currency: order.currency,
+      paymentTerms: order.paymentTermsId,
+      paymentDays: order.paymentDays,
+      remarks: order.remarks,
+    });
+    if (order.components?.length > 0) setFormComponents(order.components);
+    const lines = (order.orderLines || []).map((l) => ({
+      key: `line_${l.id || Date.now() + Math.random()}`,
+      buyerPoNo: l.buyerPoNo || '',
+      destination: l.destination || '',
+      dispatchDate: l.dispatchDate ? dayjs(l.dispatchDate) : null,
+      sizePreset: l.sizePresetId,
+      customSizes: [],
+      sizes: Object.keys(l.sizePrices || {}),
+      sizePrices: l.sizePrices || {},
+      colorRows: (l.colorRows || []).map((c) => ({
+        key: `c_${c.id || Date.now() + Math.random()}`,
+        colorName: c.colorName || '',
+        quantities: c.quantities || {},
+        total: c.total || 0,
+        rowValue: c.rowValue || 0,
+      })),
+      lineQty: l.lineQty || 0,
+      lineTotal: l.lineTotal || 0,
+    }));
+    setOrderLines(lines.length > 0 ? lines : [createEmptyLine()]);
+    setActiveKeys(lines.map((l) => l.key));
+  }, [form]);
+
+  // Load existing order for edit — use passed location state first, fall back to API
   useEffect(() => {
     if (!id) return;
+    const passed = location.state?.orderData;
+    if (passed && String(passed.id) === String(id)) {
+      if (!EDITABLE_STATUSES.includes(passed.status)) {
+        message.warning('This order cannot be edited in its current status');
+        navigate('/orders/list');
+        return;
+      }
+      populateForm(passed);
+      return;
+    }
     const loadOrder = async () => {
       setLoading(true);
       try {
@@ -656,29 +806,7 @@ const OrderForm = () => {
           navigate('/orders/list');
           return;
         }
-        setExistingOrder(order);
-
-        form.setFieldsValue({
-          costingId: order.costingId,
-          buyerId: order.buyerId,
-          styleNo: order.styleNo,
-          garmentType: order.garmentType,
-          season: order.season,
-          component: order.component,
-          currency: order.currency,
-          paymentTerms: order.paymentTerms,
-          paymentDays: order.paymentDays,
-          remarks: order.remarks,
-        });
-
-        if (order.components?.length > 0) setFormComponents(order.components);
-
-        const lines = (order.orderLines || []).map((l) => ({
-          ...l,
-          dispatchDate: l.dispatchDate ? dayjs(l.dispatchDate) : null,
-        }));
-        setOrderLines(lines.length > 0 ? lines : [createEmptyLine()]);
-        setActiveKeys(lines.map((l) => l.key));
+        populateForm(order);
       } catch {
         message.error('Failed to load order');
         navigate('/orders/list');
@@ -687,7 +815,7 @@ const OrderForm = () => {
       }
     };
     loadOrder();
-  }, [id, form, navigate]);
+  }, [id, populateForm, navigate, location.state]);
 
   // Recalculate line totals
   const recalcLine = useCallback((line) => {
@@ -752,6 +880,54 @@ const OrderForm = () => {
       avgPrice: g.totalQty > 0 ? g.totalValue / g.totalQty : 0,
     }));
   }, [orderLines]);
+
+  // ==================== COSTING ID LOOKUP ====================
+
+  const handleCostingIdBlur = async (e) => {
+    const val = e.target.value?.trim();
+    if (!val) return;
+    setCostingLoading(true);
+    try {
+      const costing = await getCostSheetByCostingId(val);
+      form.setFieldsValue({
+        buyerId: costing.buyerId,
+        styleNo: costing.styleNo || '',
+        garmentType: costing.garmentName || '',
+        season: costing.season || '',
+        currency: costing.quoteCurrency || costing.currency || '',
+      });
+      setCostingAttachments(Array.isArray(costing.attachments) ? costing.attachments : []);
+      // Fetch buyer by ID to ensure shippingLocations are loaded for destination dropdown
+      if (costing.buyerId) {
+        try {
+          const buyer = await getBuyerById(costing.buyerId);
+          setBuyers((prev) => {
+            const idx = prev.findIndex((b) => b.id === buyer.id);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx] = buyer;
+              return updated;
+            }
+            return [...prev, buyer];
+          });
+        } catch {
+          // Buyers already loaded from initial fetch; destinations may still work
+        }
+      }
+    } catch {
+      message.error('Costing ID not found. Please enter a valid costing ID.');
+      form.setFieldsValue({
+        buyerId: null,
+        styleNo: '',
+        garmentType: '',
+        season: '',
+        currency: '',
+      });
+      setCostingAttachments([]);
+    } finally {
+      setCostingLoading(false);
+    }
+  };
 
   // ==================== VALIDATION ====================
 
@@ -844,12 +1020,9 @@ const OrderForm = () => {
     const orderDate = dayjs();
 
     return {
-      orderNo: existingOrder?.orderNo || generatedOrderNo,
-      status,
       costingId: values.costingId,
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
-      entryDate: existingOrder?.entryDate || orderDate.format('YYYY-MM-DD'),
       orderDate: orderDate.format('YYYY-MM-DD'),
       styleNo: values.styleNo,
       garmentType: values.garmentType,
@@ -857,14 +1030,29 @@ const OrderForm = () => {
       component: values.component,
       components: values.component === 'Multiple' ? formComponents : [],
       currency: values.currency,
-      paymentTerms: values.paymentTerms,
+      paymentTermsId: typeof values.paymentTerms === 'number' ? values.paymentTerms : null,
+      paymentTermsName: paymentTermsList.find((pt) => pt.id === values.paymentTerms)?.name || '',
       paymentDays: values.paymentDays,
       remarks: values.remarks,
       totalOrderQty,
       totalOrderValue,
-      orderLines: orderLines.map((l) => ({
-        ...l,
+      orderLines: orderLines.map((l, idx) => ({
+        lineNo: idx + 1,
+        buyerPoNo: l.buyerPoNo,
+        destination: l.destination,
         dispatchDate: l.dispatchDate ? dayjs(l.dispatchDate).format('YYYY-MM-DD') : null,
+        leadTime: l.dispatchDate && values.orderDate
+          ? dayjs(l.dispatchDate).diff(dayjs(values.orderDate), 'day')
+          : l.dispatchDate
+          ? dayjs(l.dispatchDate).diff(dayjs(), 'day')
+          : null,
+        sizePresetId: l.sizePreset,
+        sizePrices: l.sizePrices,
+        colorRows: (l.colorRows || []).map((c, ci) => ({
+          sortOrder: ci,
+          colorName: c.colorName,
+          quantities: c.quantities,
+        })),
       })),
     };
   };
@@ -877,7 +1065,7 @@ const OrderForm = () => {
       errors.forEach((e) => message.error(e));
       return;
     }
-    setLoading(true);
+    setSavingDraft(true);
     try {
       const data = buildOrderData(ORDER_STATUS.DRAFT);
       if (isEdit) {
@@ -891,7 +1079,7 @@ const OrderForm = () => {
     } catch {
       message.error('Failed to save order');
     } finally {
-      setLoading(false);
+      setSavingDraft(false);
     }
   };
 
@@ -910,20 +1098,23 @@ const OrderForm = () => {
       okType: 'primary',
       cancelText: 'Cancel',
       onOk: async () => {
-        setLoading(true);
+        setSubmitting(true);
         try {
-          const data = buildOrderData(ORDER_STATUS.CONFIRMED);
+          const data = buildOrderData(ORDER_STATUS.DRAFT); // always save as draft first
+          let savedOrder;
           if (isEdit) {
-            await updateOrder(id, data);
+            savedOrder = await updateOrder(id, data);
           } else {
-            await createOrder(data);
+            savedOrder = await createOrder(data);
           }
+          // Then confirm it
+          await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           navigate('/orders/list');
         } catch {
           message.error('Failed to submit order');
         } finally {
-          setLoading(false);
+          setSubmitting(false);
         }
       },
     });
@@ -980,7 +1171,7 @@ const OrderForm = () => {
         </Space>
         <div className="header-actions">
           {canSaveAsDraft && !isReferredBack && (
-            <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={loading}>
+            <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={savingDraft} disabled={submitting}>
               Save as Draft
             </Button>
           )}
@@ -989,7 +1180,8 @@ const OrderForm = () => {
               type="primary"
               icon={<SendOutlined />}
               onClick={handleSubmitOrder}
-              loading={loading}
+              loading={submitting}
+              disabled={savingDraft}
             >
               Submit Order
             </Button>
@@ -999,7 +1191,8 @@ const OrderForm = () => {
               type="primary"
               icon={<SendOutlined />}
               onClick={handleSubmitOrder}
-              loading={loading}
+              loading={submitting}
+              disabled={savingDraft}
             >
               Resubmit Order
             </Button>
@@ -1054,18 +1247,24 @@ const OrderForm = () => {
                 label="Costing ID"
                 rules={[{ required: true, message: 'Enter costing ID' }]}
               >
-                <Input placeholder="Enter costing ID" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={8} lg={4}>
-              <Form.Item label="Order No">
                 <Input
-                  value={existingOrder?.orderNo || generatedOrderNo}
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder="Enter costing ID"
+                  onBlur={handleCostingIdBlur}
+                  suffix={costingLoading ? <LoadingOutlined spin /> : null}
                 />
               </Form.Item>
             </Col>
+            {isEdit && (
+              <Col xs={24} sm={12} md={8} lg={4}>
+                <Form.Item label="Order No">
+                  <Input
+                    value={existingOrder?.orderNo || ''}
+                    disabled
+                    style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  />
+                </Form.Item>
+              </Col>
+            )}
             {/* buyerId hidden — used for destination lookup; value set from costing */}
             <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>
             <Col xs={24} sm={12} md={8} lg={4}>
@@ -1165,7 +1364,17 @@ const OrderForm = () => {
                 label="Payment Terms"
                 rules={[{ required: true, message: 'Select payment terms' }]}
               >
-                <Select placeholder="Select" options={PAYMENT_TERMS} />
+                <Select
+                  placeholder="Select"
+                  loading={paymentTermsLoading}
+                  options={paymentTermsList.map((pt) => ({ value: pt.id, label: pt.name }))}
+                  onChange={(value) => {
+                    const selected = paymentTermsList.find((pt) => pt.id === value);
+                    if (selected?.paymentDays != null) {
+                      form.setFieldValue('paymentDays', selected.paymentDays);
+                    }
+                  }}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
@@ -1219,39 +1428,21 @@ const OrderForm = () => {
                 <TextArea rows={1} placeholder="Notes or special instructions" />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={6} md={4} lg={4}>
-              <Form.Item label="Garment Image">
-                <Popover
-                  content={
-                    <div style={{ padding: 8, color: '#999', fontSize: 12, textAlign: 'center' }}>
-                      Garment image pulled from Costing module
-                    </div>
-                  }
-                  trigger="hover"
-                  placement="left"
-                >
-                  <div
-                    style={{
-                      width: 64,
-                      height: 64,
-                      border: '1px dashed #d9d9d9',
-                      borderRadius: 4,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#bbb',
-                      fontSize: 10,
-                      cursor: 'default',
-                      userSelect: 'none',
-                    }}
-                  >
-                    <PictureOutlined style={{ fontSize: 22 }} />
-                  </div>
-                </Popover>
-              </Form.Item>
-            </Col>
           </Row>
+
+          {/* Documents from Costing */}
+          {costingAttachments.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                Documents from Costing ({costingAttachments.length})
+              </Text>
+              <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 4 }}>
+                {costingAttachments.map((att) => (
+                  <CostingAttachmentCard key={att.id} attachment={att} />
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* ==================== ORDER LINES ==================== */}
@@ -1276,6 +1467,7 @@ const OrderForm = () => {
             activeKey={activeKeys}
             onChange={setActiveKeys}
             expandIcon={({ isActive }) => <CaretRightOutlined rotate={isActive ? 90 : 0} />}
+            style={{ overflow: 'hidden' }}
             items={orderLines.map((line, idx) => ({
               key: line.key,
               label: getLineHeader(line, idx),
@@ -1372,11 +1564,12 @@ const OrderForm = () => {
                           disabled
                           style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
                           prefix={<ClockCircleOutlined />}
-                          value={
-                            line.dispatchDate
-                              ? `${dayjs(line.dispatchDate).diff(dayjs(), 'day')} days`
-                              : ''
-                          }
+                          value={(() => {
+                            if (!line.dispatchDate) return '';
+                            const orderDate = form.getFieldValue('orderDate');
+                            const base = orderDate ? dayjs(orderDate) : dayjs();
+                            return `${dayjs(line.dispatchDate).diff(base, 'day')} days`;
+                          })()}
                           placeholder="—"
                         />
                       </Form.Item>
@@ -1435,8 +1628,9 @@ const OrderForm = () => {
                   {/* Size Breakdown */}
                   <SizeBreakdownTable
                     line={line}
-                    currency={formCurrency || 'USD'}
+                    currency={formCurrency}
                     onLineChange={(changes) => handleLineChange(line.key, changes)}
+                    sizePresets={sizePresetsList}
                   />
                 </div>
               ),
