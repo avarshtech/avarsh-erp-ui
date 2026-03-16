@@ -2,6 +2,7 @@ import axios from 'axios';
 import { message } from 'antd';
 // Import directly from sessionStore (not authService) to avoid circular dependencies
 import { getAccessToken, setAccessToken, clearAll, executeTokenRefresh } from './sessionStore';
+import { emitConflict } from '../components/ConflictDialog';
 
 /**
  * Axios instance configuration for API requests
@@ -57,6 +58,14 @@ axiosInstance.interceptors.response.use(
 
     if (error.response) {
       const { status, data } = error.response;
+
+      // Optimistic locking conflict — show global dialog, skip default toast
+      if (status === 409 && data?.error === 'OPTIMISTIC_LOCK_CONFLICT') {
+        emitConflict();
+        error.isOptimisticLockConflict = true;
+        error.errorMessage = data.message || 'This record was modified by another user.';
+        return Promise.reject(error);
+      }
 
       // Attempt token refresh on 401 (except for login/refresh/logout endpoints)
       if (

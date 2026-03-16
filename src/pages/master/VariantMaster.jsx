@@ -106,7 +106,8 @@ const VariantMaster = ({ onDirtyChange }) => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateAttribute(selectedId, values);
+        const selectedRecord = attributes.find(a => a.id === selectedId);
+        const response = await updateAttribute(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('attributes', selectedId, updatedItem);
         message.success('Attribute updated successfully');

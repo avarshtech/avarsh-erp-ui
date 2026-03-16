@@ -715,6 +715,36 @@ textarea.ant-input:active {
   transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
+/* Sidebar: make ant-layout-sider-children a flex column so the menu area can scroll */
+.ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar menu scroll area — thin dark-themed scrollbar */
+.ant-layout-sider-children > div:last-child {
+  flex: 1;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar {
+  width: 4px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
 /* ============================================================
    COLLAPSE / ACCORDION
    ============================================================ */
@@ -738,6 +768,12 @@ textarea.ant-input:active {
 .ant-collapse-item-active > .ant-collapse-header {
   border-bottom-left-radius: 0 !important;
   border-bottom-right-radius: 0 !important;
+}
+
+/* Fix top border-radius gap on the first accordion panel header */
+.ant-collapse > .ant-collapse-item:first-child > .ant-collapse-header {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
 }
 
 /* Divider */

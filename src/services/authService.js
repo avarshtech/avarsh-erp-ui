@@ -68,6 +68,8 @@ const buildUserSession = (token, fallbackUser = null) => {
     email: payload.email || fallbackUser?.email || '',
     role: payload.role || fallbackUser?.role || '',
     permissions: normalizedPermissions,
+    idleTimeoutMinutes: payload.idleTimeoutMinutes || 30,
+    idleWarningSeconds: payload.idleWarningSeconds || 120,
     token, // included in the in-memory object; stripped by cacheUserDisplay before sessionStorage
   };
 };

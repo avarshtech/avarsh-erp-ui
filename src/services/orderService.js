@@ -58,8 +58,8 @@ export const updateOrder = async (id, data) => {
  * @param {string} status - target status (CONFIRMED, REFERRED_BACK, CANCELLED, IN_PRODUCTION)
  * @param {string} [reason] - referBackReason (optional)
  */
-export const changeOrderStatus = async (id, status, reason) => {
-  const response = await axiosInstance.put(`${BASE}/${id}/status`, { status, reason });
+export const changeOrderStatus = async (id, status, reason, version) => {
+  const response = await axiosInstance.put(`${BASE}/${id}/status`, { status, reason, version });
   return response.data;
 };
 

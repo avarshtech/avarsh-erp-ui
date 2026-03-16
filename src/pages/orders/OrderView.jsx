@@ -13,6 +13,7 @@ import {
   Divider,
   Row,
   Col,
+  Alert,
   Popconfirm,
 } from 'antd';
 import {
@@ -24,12 +25,22 @@ import {
   UndoOutlined,
   StopOutlined,
   PrinterOutlined,
+  ClockCircleOutlined,
+  CheckOutlined,
+  CloseOutlined,
 } from '@ant-design/icons';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { changeOrderStatus } from '../../services/orderService';
-import { hasPermission, canSubmitOrder, canReferBackOrder, canCancelOrder } from '../../utils/permissions';
+import {
+  hasPermission,
+  canSubmitOrder,
+  canReferBackOrder,
+  canCancelOrder,
+  canApproveOrderAction,
+  canRejectOrderAction,
+} from '../../utils/permissions';
 import {
   ORDER_STATUS,
   getStatusLabel,
@@ -40,12 +51,16 @@ import {
 const { Text, Title } = Typography;
 
 const STATUS_CONFIG = {
-  [ORDER_STATUS.DRAFT]:        { color: 'default', icon: <FileTextOutlined /> },
-  [ORDER_STATUS.CONFIRMED]:    { color: 'green',   icon: <CheckCircleOutlined /> },
-  [ORDER_STATUS.REFERRED_BACK]:{ color: 'orange',  icon: <UndoOutlined /> },
+  [ORDER_STATUS.DRAFT]:                { color: 'default', icon: <FileTextOutlined /> },
+  [ORDER_STATUS.CONFIRMED]:            { color: 'green',   icon: <CheckCircleOutlined /> },
+  [ORDER_STATUS.REFER_BACK_REQUESTED]: { color: 'orange',  icon: <ClockCircleOutlined /> },
+  [ORDER_STATUS.REFERRED_BACK]:        { color: 'orange',  icon: <UndoOutlined /> },
+  [ORDER_STATUS.CANCEL_REQUESTED]:     { color: 'red',     icon: <ClockCircleOutlined /> },
+  [ORDER_STATUS.CANCELLED]:            { color: 'red',     icon: <StopOutlined /> },
+  [ORDER_STATUS.IN_PRODUCTION]:        { color: 'blue',    icon: <CheckCircleOutlined /> },
+  [ORDER_STATUS.COMPLETED]:            { color: 'green',   icon: <CheckCircleOutlined /> },
 };
 
-// Table cell styles (shared between header and size breakdown)
 const thStyle = {
   padding: '8px 10px',
   borderBottom: '2px solid var(--border-color, #e5e7eb)',
@@ -62,11 +77,20 @@ const tdStyle = {
 
 const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
   const navigate = useNavigate();
-  const [referBackReason, setReferBackReason] = useState('');
+
+  // Refer-back request state
   const [showReferBackInput, setShowReferBackInput] = useState(false);
+  const [referBackReason, setReferBackReason] = useState('');
+
+  // Cancel request state
+  const [showCancelInput, setShowCancelInput] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+
   const [actionLoading, setActionLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
+
   const referBackTextareaRef = useRef(null);
+  const cancelTextareaRef = useRef(null);
 
   useEffect(() => {
     if (showReferBackInput) {
@@ -75,9 +99,18 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
   }, [showReferBackInput]);
 
   useEffect(() => {
+    if (showCancelInput) {
+      setTimeout(() => cancelTextareaRef.current?.focus(), 50);
+    }
+  }, [showCancelInput]);
+
+  // Reset all transient state when dialog closes/reopens
+  useEffect(() => {
     if (!open) {
       setShowReferBackInput(false);
       setReferBackReason('');
+      setShowCancelInput(false);
+      setCancelReason('');
     }
   }, [open]);
 
@@ -102,12 +135,19 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
     totalOrderValue,
     orderLines = [],
     referBackReason: existingReferBackReason,
+    cancelReason: existingCancelReason,
   } = orderData;
 
   const currSymbol = getCurrencySymbol(currency);
   const statusConfig = STATUS_CONFIG[status] || {};
-  const isEditable = EDITABLE_STATUSES.includes(status);
-  const canEdit = isEditable && hasPermission('orders', 'update');
+
+  // Edit is only available once refer back is APPROVED (status = REFERRED_BACK), not while pending
+  const canEdit = status === ORDER_STATUS.REFERRED_BACK && hasPermission('orders', 'update');
+
+  // Pending-approval statuses
+  const isReferBackPending = status === ORDER_STATUS.REFER_BACK_REQUESTED;
+  const isCancelPending    = status === ORDER_STATUS.CANCEL_REQUESTED;
+  const isPendingApproval  = isReferBackPending || isCancelPending;
 
   const fmtCurrency = (amount) => {
     if (amount === null || amount === undefined) return `${currSymbol} 0.00`;
@@ -117,55 +157,59 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
     })}`;
   };
 
-  // Assortment summary grouped by destination
-  const assortmentSummary = (() => {
-    const groups = {};
-    orderLines.forEach((line) => {
-      const dest = line.destination || 'Unspecified';
-      if (!groups[dest]) {
-        groups[dest] = { destination: dest, lineCount: 0, totalQty: 0, totalValue: 0 };
-      }
-      groups[dest].lineCount++;
-      groups[dest].totalQty += line.lineQty || 0;
-      groups[dest].totalValue += line.lineTotal || 0;
-    });
-    return Object.values(groups).map((g) => ({
-      ...g,
-      avgPrice: g.totalQty > 0 ? g.totalValue / g.totalQty : 0,
-    }));
-  })();
+  // ── Assortment summary — one row per order line ───────────────────────────────
+  const assortmentSummary = orderLines.map((line, idx) => ({
+    key: line.key || line.id || idx,
+    buyerPoNo: line.buyerPoNo || '—',
+    destination: line.destination || 'Unspecified',
+    colorRows: line.colorRows || [],
+    lineQty: line.lineQty || 0,
+    lineTotal: line.lineTotal || 0,
+  }));
 
-  // Submit (Draft/Referred Back → Confirmed)
-  const handleSubmit = async () => {
+  // ── Action handlers ──────────────────────────────────────────────────────────
+
+  const doStatusChange = async (targetStatus, reason, successMsg, errorMsg) => {
     setActionLoading(true);
     try {
-      await changeOrderStatus(orderData.id, ORDER_STATUS.CONFIRMED);
-      message.success(`${orderNo} submitted and confirmed`);
+      await changeOrderStatus(orderData.id, targetStatus, reason || undefined, orderData.version);
+      message.success(successMsg);
       onStatusChange?.();
     } catch {
-      message.error('Failed to submit order');
+      message.error(errorMsg);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Refer back (Confirmed → Referred Back)
-  const handleReferBack = async () => {
-    setActionLoading(true);
-    try {
-      await changeOrderStatus(orderData.id, ORDER_STATUS.REFERRED_BACK, referBackReason || undefined);
-      message.success(`${orderNo} referred back`);
-      setShowReferBackInput(false);
-      setReferBackReason('');
-      onStatusChange?.();
-    } catch {
-      message.error('Failed to refer back order');
-    } finally {
-      setActionLoading(false);
+  const handleSubmit = () =>
+    doStatusChange(ORDER_STATUS.CONFIRMED, undefined,
+      `${orderNo} submitted and confirmed`, 'Failed to submit order');
+
+  const handleRequestReferBack = () =>
+    doStatusChange(ORDER_STATUS.REFER_BACK_REQUESTED, referBackReason,
+      `Refer back requested for ${orderNo}`, 'Failed to request refer back');
+
+  const handleRequestCancel = () =>
+    doStatusChange(ORDER_STATUS.CANCEL_REQUESTED, cancelReason,
+      `Cancel requested for ${orderNo}`, 'Failed to request cancellation');
+
+
+
+  const handleApprove = () => {
+    if (isReferBackPending) {
+      return doStatusChange(ORDER_STATUS.REFERRED_BACK, undefined,
+        `${orderNo} refer back approved`, 'Failed to approve');
+    } else if (isCancelPending) {
+      return doStatusChange(ORDER_STATUS.CANCELLED, undefined,
+        `${orderNo} cancellation approved`, 'Failed to approve');
     }
   };
 
-  // Print
+  const handleReject = () =>
+    doStatusChange(ORDER_STATUS.CONFIRMED, undefined,
+      `${orderNo} request rejected — restored to Confirmed`, 'Failed to reject');
+
   const handlePrint = async () => {
     setPrintLoading(true);
     try {
@@ -177,21 +221,7 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
     }
   };
 
-  // Cancel (Confirmed → Cancelled)
-  const handleCancel = async () => {
-    setActionLoading(true);
-    try {
-      await changeOrderStatus(orderData.id, ORDER_STATUS.CANCELLED);
-      message.success(`${orderNo} cancelled`);
-      onStatusChange?.();
-    } catch {
-      message.error('Failed to cancel order');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Size breakdown table for a single order line
+  // ── Size breakdown table ─────────────────────────────────────────────────────
   const renderSizeBreakdown = (line) => {
     const { sizePrices = {}, colorRows = [] } = line;
     const sizes = line.sizes?.length > 0 ? line.sizes : Object.keys(sizePrices);
@@ -207,7 +237,7 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
         colValues[s] += qty * (sizePrices[s] || 0);
       });
     });
-    const grandQty = Object.values(colTotals).reduce((a, b) => a + b, 0);
+    const grandQty   = Object.values(colTotals).reduce((a, b) => a + b, 0);
     const grandValue = Object.values(colValues).reduce((a, b) => a + b, 0);
 
     return (
@@ -224,7 +254,6 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
             </tr>
           </thead>
           <tbody>
-            {/* Price row */}
             <tr style={{ backgroundColor: 'var(--primary-light)' }}>
               <td style={tdStyle}>
                 <Text strong style={{ fontSize: 12, color: '#1890ff' }}>
@@ -239,7 +268,6 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
               <td style={tdStyle} />
               <td style={tdStyle} />
             </tr>
-            {/* Color rows */}
             {colorRows.map((row) => (
               <tr key={row.key}>
                 <td style={tdStyle}><Text>{row.colorName || '—'}</Text></td>
@@ -256,7 +284,6 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
                 </td>
               </tr>
             ))}
-            {/* Total qty */}
             <tr style={{ backgroundColor: 'var(--bg-secondary, #f8fafc)', fontWeight: 600 }}>
               <td style={tdStyle}><Text strong>Total Qty</Text></td>
               {sizes.map((s) => (
@@ -271,7 +298,6 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
               </td>
               <td style={tdStyle} />
             </tr>
-            {/* Total value */}
             <tr style={{ backgroundColor: 'var(--secondary-light)' }}>
               <td style={tdStyle}><Text strong>Total Value</Text></td>
               {sizes.map((s) => (
@@ -292,6 +318,99 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
     );
   };
 
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  const renderFooter = () => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+      {/* Left */}
+      <Space>
+        <Button icon={<PrinterOutlined />} loading={printLoading} onClick={handlePrint}>
+          Print
+        </Button>
+
+        {/* Approve — shown when a request is pending and user has approve permission */}
+        {isPendingApproval && canApproveOrderAction() && (
+          <Popconfirm
+            title={isReferBackPending ? 'Approve Refer Back' : 'Approve Cancellation'}
+            description={
+              isReferBackPending
+                ? 'Approve this refer back request? The order will be returned to the creator for editing.'
+                : 'Approve this cancellation? The order will be permanently cancelled.'
+            }
+            onConfirm={handleApprove}
+            okText="Approve"
+            cancelText="No"
+            okButtonProps={{ loading: actionLoading, type: 'primary' }}
+          >
+            <Button icon={<CheckOutlined />} style={{ color: '#52c41a', borderColor: '#52c41a' }}>
+              Approve
+            </Button>
+          </Popconfirm>
+        )}
+
+        {/* Reject — separate permission check; restores order to Confirmed */}
+        {isPendingApproval && canRejectOrderAction() && (
+          <Popconfirm
+            title="Reject Request"
+            description="Reject this request? The order will be restored to Confirmed status."
+            onConfirm={handleReject}
+            okText="Reject"
+            cancelText="No"
+            okButtonProps={{ danger: true, loading: actionLoading }}
+          >
+            <Button icon={<CloseOutlined />} danger>
+              Reject
+            </Button>
+          </Popconfirm>
+        )}
+
+        {/* Refer Back request — only for CONFIRMED, hide when pending approval */}
+        {canReferBackOrder() && status === ORDER_STATUS.CONFIRMED && !showReferBackInput && (
+          <Button
+            icon={<RollbackOutlined />}
+            onClick={() => { setShowReferBackInput(true); setShowCancelInput(false); setCancelReason(''); }}
+            style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
+          >
+            Refer Back
+          </Button>
+        )}
+
+        {/* Cancel request — only for CONFIRMED, hide when pending approval */}
+        {canCancelOrder() && status === ORDER_STATUS.CONFIRMED && !showCancelInput && (
+          <Button
+            icon={<StopOutlined />}
+            danger
+            onClick={() => { setShowCancelInput(true); setShowReferBackInput(false); setReferBackReason(''); }}
+          >
+            Cancel Order
+          </Button>
+        )}
+      </Space>
+
+      {/* Right */}
+      <Space>
+        {canEdit && (
+          <Button
+            icon={<EditOutlined />}
+            onClick={() => { onClose(); navigate(`/orders/edit/${orderData.id}`, { state: { orderData } }); }}
+          >
+            Edit Order
+          </Button>
+        )}
+        {canSubmitOrder() && (status === ORDER_STATUS.DRAFT || status === ORDER_STATUS.REFERRED_BACK) && (
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            loading={actionLoading}
+            onClick={handleSubmit}
+          >
+            {status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
+          </Button>
+        )}
+        <Button onClick={onClose}>Close</Button>
+      </Space>
+    </div>
+  );
+
   return (
     <Modal
       title={
@@ -307,67 +426,9 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
       width={1100}
       centered
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 16px 16px 24px' } }}
-      footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-          {/* Left — print, refer back, cancel */}
-          <Space>
-            <Button
-              icon={<PrinterOutlined />}
-              loading={printLoading}
-              onClick={handlePrint}
-            >
-              Print
-            </Button>
-            {canReferBackOrder() && status === ORDER_STATUS.CONFIRMED && !showReferBackInput && (
-              <Button
-                icon={<RollbackOutlined />}
-                onClick={() => setShowReferBackInput(true)}
-                style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
-              >
-                Refer Back
-              </Button>
-            )}
-            {canCancelOrder() && status === ORDER_STATUS.CONFIRMED && (
-              <Popconfirm
-                title="Cancel Order"
-                description={`Are you sure you want to cancel order "${orderNo}"? This action cannot be undone.`}
-                onConfirm={handleCancel}
-                okText="Cancel Order"
-                cancelText="No"
-                okButtonProps={{ danger: true, loading: actionLoading }}
-              >
-                <Button icon={<StopOutlined />} danger>
-                  Cancel Order
-                </Button>
-              </Popconfirm>
-            )}
-          </Space>
-          {/* Right — edit, submit, close */}
-          <Space>
-            {canEdit && (
-              <Button
-                icon={<EditOutlined />}
-                onClick={() => { onClose(); navigate(`/orders/edit/${orderData.id}`, { state: { orderData } }); }}
-              >
-                Edit Order
-              </Button>
-            )}
-            {canSubmitOrder() && (status === ORDER_STATUS.DRAFT || status === ORDER_STATUS.REFERRED_BACK) && (
-              <Button
-                type="primary"
-                icon={<SendOutlined />}
-                loading={actionLoading}
-                onClick={handleSubmit}
-              >
-                {status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
-              </Button>
-            )}
-            <Button onClick={onClose}>Close</Button>
-          </Space>
-        </div>
-      }
+      footer={renderFooter()}
     >
-      {/* Refer-back input */}
+      {/* ── Refer-back request input ── */}
       {showReferBackInput && (
         <Card size="small" style={{ marginBottom: 16, borderColor: '#fa8c16' }}>
           <Space direction="vertical" style={{ width: '100%' }}>
@@ -392,10 +453,14 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
                 size="small"
                 loading={actionLoading}
                 disabled={referBackReason.trim().length < 50}
-                onClick={handleReferBack}
+                onClick={async () => {
+                  await handleRequestReferBack();
+                  setShowReferBackInput(false);
+                  setReferBackReason('');
+                }}
                 style={referBackReason.trim().length >= 50 ? { backgroundColor: '#fa8c16', borderColor: '#fa8c16' } : {}}
               >
-                Confirm Refer Back
+                Submit Request
               </Button>
               <Button size="small" onClick={() => { setShowReferBackInput(false); setReferBackReason(''); }}>
                 Cancel
@@ -405,11 +470,83 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
         </Card>
       )}
 
-      {/* Existing refer-back reason banner */}
-      {existingReferBackReason && status === ORDER_STATUS.REFERRED_BACK && (
+      {/* ── Cancel request input ── */}
+      {showCancelInput && (
+        <Card size="small" style={{ marginBottom: 16, borderColor: '#ff4d4f' }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text strong style={{ color: '#ff4d4f' }}>Reason for Cancellation:</Text>
+            <Input.TextArea
+              ref={cancelTextareaRef}
+              rows={3}
+              placeholder="Enter reason (minimum 50 characters)..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              showCount
+              maxLength={500}
+            />
+            {cancelReason.length > 0 && cancelReason.length < 50 && (
+              <Text type="danger" style={{ fontSize: 12 }}>
+                Minimum 50 characters required ({50 - cancelReason.length} more needed)
+              </Text>
+            )}
+            <Space>
+              <Button
+                type="primary"
+                danger
+                size="small"
+                loading={actionLoading}
+                disabled={cancelReason.trim().length < 50}
+                onClick={async () => {
+                  await handleRequestCancel();
+                  setShowCancelInput(false);
+                  setCancelReason('');
+                }}
+              >
+                Submit Request
+              </Button>
+              <Button size="small" onClick={() => { setShowCancelInput(false); setCancelReason(''); }}>
+                Cancel
+              </Button>
+            </Space>
+          </Space>
+        </Card>
+      )}
+
+      {/* ── Pending refer-back approval banner ── */}
+      {isReferBackPending && existingReferBackReason && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Refer Back Requested — Pending Approval"
+          description={existingReferBackReason}
+        />
+      )}
+
+      {/* ── Pending cancel approval banner ── */}
+      {isCancelPending && existingCancelReason && (
+        <Alert
+          type="error"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Cancellation Requested — Pending Approval"
+          description={existingCancelReason}
+        />
+      )}
+
+      {/* ── Approved refer-back reason (order is now REFERRED_BACK) ── */}
+      {status === ORDER_STATUS.REFERRED_BACK && existingReferBackReason && (
         <Card size="small" style={{ marginBottom: 16, borderColor: '#fa8c16', backgroundColor: 'var(--accent-light)' }}>
           <Text strong style={{ color: '#fa8c16' }}>Refer Back Reason: </Text>
           <Text>{existingReferBackReason}</Text>
+        </Card>
+      )}
+
+      {/* ── Cancelled order reason ── */}
+      {status === ORDER_STATUS.CANCELLED && existingCancelReason && (
+        <Card size="small" style={{ marginBottom: 16, borderColor: '#ff4d4f', backgroundColor: 'var(--accent-light)' }}>
+          <Text strong style={{ color: '#ff4d4f' }}>Cancellation Reason: </Text>
+          <Text>{existingCancelReason}</Text>
         </Card>
       )}
 
@@ -463,10 +600,17 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
         <Card size="small" title="Assortment Summary" style={{ marginBottom: 16 }}>
           <Table
             dataSource={assortmentSummary}
-            rowKey="destination"
+            rowKey="key"
             pagination={false}
             size="small"
             columns={[
+              {
+                title: 'Buyer PO No',
+                dataIndex: 'buyerPoNo',
+                key: 'buyerPoNo',
+                width: 130,
+                render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
+              },
               {
                 title: 'Destination',
                 dataIndex: 'destination',
@@ -474,27 +618,43 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
                 ellipsis: true,
                 render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
               },
-              { title: 'Lines', dataIndex: 'lineCount', key: 'lineCount', width: 60, align: 'center' },
+              {
+                title: 'Color / Print',
+                dataIndex: 'colorRows',
+                key: 'colorRows',
+                render: (rows) =>
+                  rows.length === 0 ? (
+                    <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                      {rows.map((c, i) => (
+                        <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                          {c.colorName || '—'}
+                          <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
+                        </Text>
+                      ))}
+                    </div>
+                  ),
+              },
               {
                 title: 'Total Qty',
-                dataIndex: 'totalQty',
-                key: 'totalQty',
-                width: 100,
+                dataIndex: 'lineQty',
+                key: 'lineQty',
+                width: 90,
                 align: 'right',
                 render: (v) => <Text strong>{v.toLocaleString()}</Text>,
               },
               {
                 title: 'Avg Price',
-                dataIndex: 'avgPrice',
                 key: 'avgPrice',
                 width: 100,
                 align: 'right',
-                render: (v) => `${currSymbol} ${v.toFixed(2)}`,
+                render: (_, r) => `${currSymbol} ${(r.lineQty > 0 ? r.lineTotal / r.lineQty : 0).toFixed(2)}`,
               },
               {
                 title: 'Total Value',
-                dataIndex: 'totalValue',
-                key: 'totalValue',
+                dataIndex: 'lineTotal',
+                key: 'lineTotal',
                 width: 120,
                 align: 'right',
                 render: (v) => (
@@ -512,54 +672,51 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
       <Title level={5} style={{ marginBottom: 12 }}>
         Order Lines ({orderLines.length})
       </Title>
-      {orderLines.map((line, idx) => {
-        const leadTimeDays = line.leadTime != null ? line.leadTime : null;
-        return (
-          <Card
-            key={line.key || idx}
-            size="small"
-            style={{ marginBottom: 12 }}
-            title={
-              <Space wrap>
-                <Tag color="blue">#{idx + 1}</Tag>
-                {line.buyerPoNo && <Text strong>PO: {line.buyerPoNo}</Text>}
-                {line.destination && <Text type="secondary">{line.destination}</Text>}
-                <Text type="secondary">|</Text>
-                <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
-                <Text type="secondary">|</Text>
-                <Text style={{ color: 'var(--success-color, #10b981)' }}>
-                  {fmtCurrency(line.lineTotal)}
-                </Text>
-              </Space>
-            }
-          >
-            <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
-              <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Buyer PO No</Text>
-                <Text strong>{line.buyerPoNo || '—'}</Text>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Destination</Text>
-                <Text strong>{line.destination || '—'}</Text>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Dispatch Date</Text>
-                <Text strong>
-                  {line.dispatchDate ? dayjs(line.dispatchDate).format('DD-MMM-YYYY') : '—'}
-                </Text>
-              </Col>
-              <Col xs={12} sm={6}>
-                <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Lead Time</Text>
-                <Text strong>
-                  {leadTimeDays != null ? `${leadTimeDays} days` : '—'}
-                </Text>
-              </Col>
-            </Row>
-            <Divider style={{ margin: '8px 0' }} />
-            {renderSizeBreakdown(line)}
-          </Card>
-        );
-      })}
+      {orderLines.map((line, idx) => (
+        <Card
+          key={line.key || idx}
+          size="small"
+          style={{ marginBottom: 12 }}
+          title={
+            <Space wrap>
+              <Tag color="blue">#{idx + 1}</Tag>
+              {line.buyerPoNo && <Text strong>PO: {line.buyerPoNo}</Text>}
+              {line.destination && <Text type="secondary">{line.destination}</Text>}
+              <Text type="secondary">|</Text>
+              <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
+              <Text type="secondary">|</Text>
+              <Text style={{ color: 'var(--success-color, #10b981)' }}>
+                {fmtCurrency(line.lineTotal)}
+              </Text>
+            </Space>
+          }
+        >
+          <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
+            <Col xs={12} sm={6}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Buyer PO No</Text>
+              <Text strong>{line.buyerPoNo || '—'}</Text>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Destination</Text>
+              <Text strong>{line.destination || '—'}</Text>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Dispatch Date</Text>
+              <Text strong>
+                {line.dispatchDate ? dayjs(line.dispatchDate).format('DD-MMM-YYYY') : '—'}
+              </Text>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Lead Time</Text>
+              <Text strong>
+                {line.leadTime != null ? `${line.leadTime} days` : '—'}
+              </Text>
+            </Col>
+          </Row>
+          <Divider style={{ margin: '8px 0' }} />
+          {renderSizeBreakdown(line)}
+        </Card>
+      ))}
     </Modal>
   );
 };

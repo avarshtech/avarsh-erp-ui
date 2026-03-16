@@ -7,7 +7,7 @@ import { createPaymentTerms, updatePaymentTerms, deletePaymentTerms } from '../.
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 
-const MODULE_ID = 'master-data';
+const MODULE_ID = 'payment-terms';
 
 const PaymentTermsMaster = ({ onDirtyChange }) => {
   const { paymentTerms, addItem, updateItem, removeItem } = useStore();
@@ -107,7 +107,8 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updatePaymentTerms(selectedId, values);
+        const selectedRecord = paymentTerms.find(pt => pt.id === selectedId);
+        const response = await updatePaymentTerms(selectedId, { ...values, version: selectedRecord?.version });
         const updated = response?.data || { id: selectedId, ...values };
         updateItem('paymentTerms', selectedId, updated);
         message.success('Payment terms updated successfully');

@@ -1,12 +1,11 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { Menu, Breadcrumb, Spin, Button, Tooltip, message, ConfigProvider } from 'antd';
+import { Menu, Breadcrumb, Spin, Button, Tooltip, message, ConfigProvider, Modal } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
-import UnsavedChangesModal from '../../components/UnsavedChangesModal';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
   GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined,
   ShopOutlined, HighlightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
-  CreditCardOutlined, ColumnWidthOutlined,
+  CreditCardOutlined, ColumnWidthOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -22,6 +21,7 @@ import PaymentTermsMaster from './PaymentTermsMaster';
 import SizePresetMaster from './SizePresetMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
+import { hasModuleAccess } from '../../utils/permissions';
 import {
   getAllCategories,
   getAllSubCategories,
@@ -43,7 +43,7 @@ const NAV_GROUPS = [
         key: 'buyer',
         label: 'Buyers',
         icon: <ShopOutlined />,
-        modules: ['Orders'],
+        moduleId: 'buyer-info',
         Component: BuyerMaster,
         loadingKey: null,
         description: 'Brands and customers who place orders',
@@ -52,7 +52,7 @@ const NAV_GROUPS = [
         key: 'supplier',
         label: 'Suppliers',
         icon: <TeamOutlined />,
-        modules: ['Purchase'],
+        moduleId: 'supplier-info',
         Component: SupplierMaster,
         loadingKey: null,
         description: 'Fabric, trim and accessories vendors',
@@ -67,7 +67,7 @@ const NAV_GROUPS = [
         key: 'category',
         label: 'Categories',
         icon: <AppstoreOutlined />,
-        modules: ['Inventory'],
+        moduleId: 'master-data',
         Component: CategoryMaster,
         loadingKey: 'categories',
         description: 'Top-level item classification',
@@ -76,7 +76,7 @@ const NAV_GROUPS = [
         key: 'subcategory',
         label: 'Sub Categories',
         icon: <TagsOutlined />,
-        modules: ['Inventory'],
+        moduleId: 'master-data',
         Component: SubCategoryMaster,
         loadingKey: 'subCategories',
         description: 'Second-level classification under categories',
@@ -85,7 +85,7 @@ const NAV_GROUPS = [
         key: 'type',
         label: 'Item Types',
         icon: <ExperimentOutlined />,
-        modules: ['Inventory', 'Purchase'],
+        moduleId: 'master-data',
         Component: ItemTypeMaster,
         loadingKey: 'itemTypes',
         description: 'Specific types with linked attributes and UOMs',
@@ -94,7 +94,7 @@ const NAV_GROUPS = [
         key: 'variant',
         label: 'Attributes',
         icon: <GoldOutlined />,
-        modules: ['Orders'],
+        moduleId: 'master-data',
         Component: VariantMaster,
         loadingKey: 'attributes',
         description: 'Size, colour, finish and other variants',
@@ -103,7 +103,7 @@ const NAV_GROUPS = [
         key: 'uom',
         label: 'Unit of Measurement',
         icon: <DatabaseOutlined />,
-        modules: ['Inventory'],
+        moduleId: 'master-data',
         Component: UomMaster,
         loadingKey: 'uoms',
         description: 'Units of measurement with decimal precision',
@@ -112,7 +112,7 @@ const NAV_GROUPS = [
         key: 'item',
         label: 'Items',
         icon: <SkinOutlined />,
-        modules: ['Inventory', 'Purchase'],
+        moduleId: 'items',
         Component: ItemMaster,
         loadingKey: null,
         description: 'Fabric, trims and accessories master list',
@@ -127,7 +127,7 @@ const NAV_GROUPS = [
         key: 'style',
         label: 'Styles',
         icon: <HighlightOutlined />,
-        modules: ['Orders', 'Production'],
+        moduleId: 'style-master',
         Component: StyleMaster,
         loadingKey: 'styles',
         description: 'Garment style references by buyer and season',
@@ -136,7 +136,7 @@ const NAV_GROUPS = [
         key: 'size-presets',
         label: 'Size Presets',
         icon: <ColumnWidthOutlined />,
-        modules: ['Orders', 'Costing'],
+        moduleId: 'size-presets',
         Component: SizePresetMaster,
         loadingKey: null,
         description: 'Size run templates by garment category and regional standard',
@@ -151,7 +151,7 @@ const NAV_GROUPS = [
         key: 'payment-terms',
         label: 'Payment Terms',
         icon: <CreditCardOutlined />,
-        modules: ['Orders', 'Purchase'],
+        moduleId: 'payment-terms',
         Component: PaymentTermsMaster,
         loadingKey: 'paymentTerms',
         description: 'Payment term templates for order entry',
@@ -160,7 +160,7 @@ const NAV_GROUPS = [
         key: 'terms',
         label: 'Terms & Conditions',
         icon: <FileProtectOutlined />,
-        modules: ['Orders', 'Purchase'],
+        moduleId: 'terms-conditions',
         Component: TermsConditionsMaster,
         loadingKey: null,
         description: 'Contract and terms templates for purchase orders',
@@ -169,8 +169,17 @@ const NAV_GROUPS = [
   },
 ];
 
-// Flatten all items for quick lookup
+// Flatten all items for quick lookup (unfiltered — used after permission filtering)
 const ALL_ITEMS = NAV_GROUPS.flatMap(g => g.items.map(item => ({ ...item, groupLabel: g.label })));
+
+// Permission-filtered nav groups — computed once per render (permissions are stable per session)
+const getAccessibleGroups = () =>
+  NAV_GROUPS
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => hasModuleAccess(item.moduleId)),
+    }))
+    .filter(group => group.items.length > 0);
 
 const MasterDashboard = () => {
   const { isDarkMode } = useTheme();
@@ -179,10 +188,15 @@ const MasterDashboard = () => {
     setData, setLoading, loading, isCacheValid,
   } = useStore();
 
-  const [selectedKey, setSelectedKey] = useState('buyer');
+  const accessibleGroups = useMemo(getAccessibleGroups, []);
+  const accessibleItems  = useMemo(
+    () => accessibleGroups.flatMap(g => g.items.map(item => ({ ...item, groupLabel: g.label }))),
+    [accessibleGroups],
+  );
+
+  const [selectedKey, setSelectedKey] = useState(() => accessibleItems[0]?.key ?? 'buyer');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [childIsDirty, setChildIsDirty] = useState(false);
-  const [pendingKey, setPendingKey] = useState(null);
 
   // Warn on browser tab close/refresh when a child form is dirty
   useUnsavedChanges(childIsDirty);
@@ -196,20 +210,21 @@ const MasterDashboard = () => {
   const handleMenuSelect = (key) => {
     if (key === selectedKey) return;
     if (childIsDirty) {
-      setPendingKey(key);
+      Modal.confirm({
+        title: 'Unsaved Changes',
+        icon: <ExclamationCircleOutlined />,
+        content: 'You have unsaved changes that will be lost if you leave this page. Do you want to continue?',
+        okText: 'Leave',
+        okType: 'danger',
+        cancelText: 'Stay',
+        onOk: () => {
+          setSelectedKey(key);
+          setChildIsDirty(false);
+        },
+      });
     } else {
       setSelectedKey(key);
     }
-  };
-
-  const handleLeftNavDiscard = () => {
-    setSelectedKey(pendingKey);
-    setPendingKey(null);
-    setChildIsDirty(false);
-  };
-
-  const handleLeftNavKeepEditing = () => {
-    setPendingKey(null);
   };
 
   // Fetch all metadata on mount
@@ -305,9 +320,9 @@ const MasterDashboard = () => {
     fetchAllMetaData();
   }, []);
 
-  // Build Ant Design Menu items from NAV_GROUPS config
+  // Build Ant Design Menu items from accessible groups only
   const menuItems = useMemo(() =>
-    NAV_GROUPS.map(group => ({
+    accessibleGroups.map(group => ({
       type: 'group',
       label: (
         <span style={{
@@ -326,12 +341,12 @@ const MasterDashboard = () => {
         label: <span style={{ fontSize: 13 }}>{item.label}</span>,
       })),
     }))
-  , [isDarkMode]);
+  , [accessibleGroups, isDarkMode]);
 
-  // Active item lookup
+  // Active item lookup (from accessible items only)
   const activeItem = useMemo(() =>
-    ALL_ITEMS.find(item => item.key === selectedKey) ?? ALL_ITEMS[0]
-  , [selectedKey]);
+    accessibleItems.find(item => item.key === selectedKey) ?? accessibleItems[0]
+  , [accessibleItems, selectedKey]);
 
   // Breadcrumb
   const breadcrumbItems = useMemo(() => [
@@ -423,7 +438,7 @@ const MasterDashboard = () => {
           {navCollapsed ? (
             /* Collapsed: icon-only list with tooltips */
             <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-              {NAV_GROUPS.map((group, gi) => (
+              {accessibleGroups.map((group, gi) => (
                 <div key={group.groupKey}>
                   {gi > 0 && (
                     <div style={{ margin: '4px 6px', borderTop: `1px solid ${borderColor}` }} />
@@ -514,12 +529,6 @@ const MasterDashboard = () => {
         </div>
       </div>
 
-      {/* Unsaved changes — left-nav switch */}
-      <UnsavedChangesModal
-        open={!!pendingKey}
-        onDiscard={handleLeftNavDiscard}
-        onKeepEditing={handleLeftNavKeepEditing}
-      />
     </div>
   );
 };

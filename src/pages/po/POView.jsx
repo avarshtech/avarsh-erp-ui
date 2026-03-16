@@ -103,6 +103,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   const [poFiles, setPoFiles] = useState([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [downloadingFileId, setDownloadingFileId] = useState(null);
+  const [deletingFileId, setDeletingFileId] = useState(null);
 
   // Variant images for line items { [variantId]: 'loading' | blobUrl }
   const [lineItemImages, setLineItemImages] = useState({});
@@ -349,6 +351,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   };
 
   const handleFileDownload = async (fileRecord) => {
+    setDownloadingFileId(fileRecord.fileId);
     try {
       const fileName = fileRecord.originalFilename || 'download';
       const blob = await downloadFileAsBlob(fileRecord.fileId);
@@ -360,11 +363,14 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       URL.revokeObjectURL(url);
     } catch {
       message.error('Failed to download file');
+    } finally {
+      setDownloadingFileId(null);
     }
   };
 
   const handleFileDelete = async (fileRecord) => {
     if (!po?.id) return;
+    setDeletingFileId(fileRecord.fileId);
     try {
       const currentUser = getCurrentUser();
       const userName = currentUser?.name || '';
@@ -391,6 +397,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       message.success(`"${fileName}" removed`);
     } catch {
       message.error('Failed to delete file');
+    } finally {
+      setDeletingFileId(null);
     }
   };
 
@@ -489,6 +497,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
         ...po,
         status: action.toStatus,
         lineItems: updatedLineItems,
+        version: po.version,
       });
 
       // Create system activity log
@@ -672,6 +681,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
         ...po,
         status: newPoStatus,
         lineItems: updatedLineItems,
+        version: po.version,
       });
 
       const currentUser = getCurrentUser();
@@ -1429,6 +1439,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                                     type="text"
                                     size="small"
                                     icon={<DownloadOutlined style={{ fontSize: 13 }} />}
+                                    loading={downloadingFileId === f.fileId}
                                     onClick={() => handleFileDownload(f)}
                                   />
                                 </Tooltip>
@@ -1439,7 +1450,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                                     onConfirm={() => handleFileDelete(f)}
                                     okText="Remove"
                                     cancelText="Cancel"
-                                    okButtonProps={{ danger: true }}
+                                    okButtonProps={{ danger: true, loading: deletingFileId === f.fileId }}
                                   >
                                     <Tooltip title="Remove">
                                       <Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: 13 }} />} />

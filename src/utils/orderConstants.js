@@ -5,21 +5,25 @@
 // ==================== ORDER STATUS ====================
 
 export const ORDER_STATUS = {
-  DRAFT:         'DRAFT',
-  CONFIRMED:     'CONFIRMED',
-  REFERRED_BACK: 'REFERRED_BACK',
-  IN_PRODUCTION: 'IN_PRODUCTION',
-  COMPLETED:     'COMPLETED',
-  CANCELLED:     'CANCELLED',
+  DRAFT:                 'DRAFT',
+  CONFIRMED:             'CONFIRMED',
+  REFER_BACK_REQUESTED:  'REFER_BACK_REQUESTED',
+  REFERRED_BACK:         'REFERRED_BACK',
+  CANCEL_REQUESTED:      'CANCEL_REQUESTED',
+  IN_PRODUCTION:         'IN_PRODUCTION',
+  COMPLETED:             'COMPLETED',
+  CANCELLED:             'CANCELLED',
 };
 
 const STATUS_LABELS = {
-  [ORDER_STATUS.DRAFT]:         'Draft',
-  [ORDER_STATUS.CONFIRMED]:     'Confirmed',
-  [ORDER_STATUS.REFERRED_BACK]: 'Referred Back',
-  [ORDER_STATUS.IN_PRODUCTION]: 'In Production',
-  [ORDER_STATUS.COMPLETED]:     'Completed',
-  [ORDER_STATUS.CANCELLED]:     'Cancelled',
+  [ORDER_STATUS.DRAFT]:                 'Draft',
+  [ORDER_STATUS.CONFIRMED]:             'Confirmed',
+  [ORDER_STATUS.REFER_BACK_REQUESTED]:  'Refer Back Requested',
+  [ORDER_STATUS.REFERRED_BACK]:         'Referred Back',
+  [ORDER_STATUS.CANCEL_REQUESTED]:      'Cancel Requested',
+  [ORDER_STATUS.IN_PRODUCTION]:         'In Production',
+  [ORDER_STATUS.COMPLETED]:             'Completed',
+  [ORDER_STATUS.CANCELLED]:             'Cancelled',
 };
 
 export const getStatusLabel = (status) => {

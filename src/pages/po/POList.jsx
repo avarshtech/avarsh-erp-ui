@@ -77,6 +77,9 @@ const POList = () => {
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('desc');
 
+  // Delete loading state
+  const [deletingId, setDeletingId] = useState(null);
+
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingPO, setViewingPO] = useState(null);
@@ -324,16 +327,18 @@ const POList = () => {
               title="Delete Purchase Order"
               description={`Are you sure you want to delete "${record.poNumber}"?`}
               onConfirm={() => {
-                deletePurchaseOrder(record.id)
+                setDeletingId(record.id);
+                return deletePurchaseOrder(record.id)
                   .then(() => {
                     message.success(`${record.poNumber} deleted successfully`);
                     fetchData(pagination.current, pagination.pageSize);
                   })
-                  .catch(() => message.error('Failed to delete purchase order'));
+                  .catch(() => message.error('Failed to delete purchase order'))
+                  .finally(() => setDeletingId(null));
               }}
               okText="Delete"
               cancelText="Cancel"
-              okButtonProps={{ danger: true }}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
             >
               <Tooltip title="Delete">

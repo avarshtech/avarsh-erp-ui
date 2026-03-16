@@ -92,7 +92,8 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateSubCategory(selectedId, values);
+        const selectedRecord = subCategories.find(sc => sc.id === selectedId);
+        const response = await updateSubCategory(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('subCategories', selectedId, updatedItem);
         message.success('Sub-category updated successfully');

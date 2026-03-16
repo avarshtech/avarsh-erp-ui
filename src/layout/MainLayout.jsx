@@ -334,20 +334,21 @@ const MainLayoutInner = () => {
             />
           </div>
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={getSelectedKeys()}
-          defaultOpenKeys={getOpenKeys()}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ 
-            marginTop: 8, 
-            border: "none", 
-            overflow: 'hidden',
-            background: 'transparent'
-          }}
-        />
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={getSelectedKeys()}
+            defaultOpenKeys={getOpenKeys()}
+            items={menuItems}
+            onClick={handleMenuClick}
+            style={{
+              marginTop: 8,
+              border: 'none',
+              background: 'transparent',
+            }}
+          />
+        </div>
       </Sider>
       <Layout
         style={{ marginLeft: collapsed ? 80 : 260, transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}

@@ -97,7 +97,8 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateItemType(selectedId, values);
+        const selectedRecord = itemTypes.find(it => it.id === selectedId);
+        const response = await updateItemType(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('itemTypes', selectedId, updatedItem);
         message.success('Item type updated successfully');

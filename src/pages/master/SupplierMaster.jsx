@@ -72,6 +72,7 @@ const SupplierMaster = () => {
   const [supplierUnsaved, setSupplierUnsaved] = useState(false);
   const [viewDrawerVisible, setViewDrawerVisible] = useState(false);
   const [viewingSupplier, setViewingSupplier] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [form] = Form.useForm();
 
   // Permissions
@@ -170,6 +171,7 @@ const SupplierMaster = () => {
 
   // Handle Delete
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       await deleteSupplier(id);
       // Update store
@@ -177,6 +179,8 @@ const SupplierMaster = () => {
       message.success('Supplier deleted successfully');
     } catch (error) {
       message.error(error?.errorMessage || 'Failed to delete supplier');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -223,7 +227,7 @@ const SupplierMaster = () => {
       };
 
       if (editingSupplier) {
-        const response = await updateSupplier({ ...supplierData, id: editingSupplier.id });
+        const response = await updateSupplier({ ...supplierData, id: editingSupplier.id, version: editingSupplier.version });
         // Update store
         const updatedSupplier = response?.data || { ...supplierData, id: editingSupplier.id };
         updateItem('suppliers', editingSupplier.id, updatedSupplier);
@@ -416,7 +420,7 @@ const SupplierMaster = () => {
               onConfirm={() => handleDelete(record.id)}
               okText="Delete"
               cancelText="Cancel"
-              okButtonProps={{ danger: true }}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
             >
               <Tooltip title="Delete">

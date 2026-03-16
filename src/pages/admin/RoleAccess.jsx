@@ -90,6 +90,8 @@ const RoleAccess = () => {
   const [permissions, setPermissions] = useState(getEmptyPermissions());
   const [formDirty, setFormDirty] = useState(false);
   const [initialPermissions, setInitialPermissions] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const initialFormValuesRef = useRef(null);
 
   // Fetch roles
@@ -182,15 +184,18 @@ const RoleAccess = () => {
         };
       }
 
+      // Approval/action modules have no 'view' — skip the view-cascade logic for them
+      const isApprovalModule = ['po-approval', 'order-actions', 'costing-approval'].includes(moduleId);
+
       // If disabling 'view' for standard modules, disable all operations
-      if (operationId === 'view' && !checked && moduleId !== 'po-approval' && moduleId !== 'order-actions') {
+      if (operationId === 'view' && !checked && !isApprovalModule) {
         const ops = getOperationsForModule(moduleId);
         ops.forEach((op) => { updated[moduleId].operations[op] = false; });
         updated[moduleId].access = false;
       } else {
         updated[moduleId].operations[operationId] = checked;
         // If enabling any operation other than view, also enable view
-        if (checked && operationId !== 'view' && moduleId !== 'po-approval' && moduleId !== 'order-actions') {
+        if (checked && operationId !== 'view' && !isApprovalModule) {
           updated[moduleId].operations.view = true;
         }
         updated[moduleId].access = Object.values(updated[moduleId].operations).some(Boolean);
@@ -211,6 +216,15 @@ const RoleAccess = () => {
         if (updated['order-actions']) {
           actionOps.forEach((op) => { updated['order-actions'].operations[op] = false; });
           updated['order-actions'].access = false;
+        }
+      }
+
+      // Enforce costing-approval → costing link
+      if (moduleId === 'costing' && !updated['costing'].access) {
+        const approvalOps = getOperationsForModule('costing-approval');
+        if (updated['costing-approval']) {
+          approvalOps.forEach((op) => { updated['costing-approval'].operations[op] = false; });
+          updated['costing-approval'].access = false;
         }
       }
 
@@ -255,6 +269,15 @@ const RoleAccess = () => {
         };
       }
 
+      // Enforce costing-approval → costing link on uncheck
+      if (moduleId === 'costing' && !checked) {
+        const approvalOps = getOperationsForModule('costing-approval');
+        updated['costing-approval'] = {
+          access: false,
+          operations: approvalOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+        };
+      }
+
       return updated;
     });
     setPermissions((latest) => {
@@ -269,17 +292,9 @@ const RoleAccess = () => {
     setPermissions((prev) => {
       const updated = JSON.parse(JSON.stringify(prev));
       group.modules.forEach((mod) => {
-        // Skip po-approval if PO is being unchecked
-        if (mod.id === 'po-approval' && !checked) {
-          const ops = getOperationsForModule(mod.id);
-          updated[mod.id] = {
-            access: false,
-            operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-          };
-          return;
-        }
-        // Skip order-actions if Orders is being unchecked
-        if (mod.id === 'order-actions' && !checked) {
+        // For linked approval modules, enforce parent access when unchecking the group
+        const linkedParent = { 'po-approval': 'purchase-orders', 'order-actions': 'orders', 'costing-approval': 'costing' };
+        if (!checked && linkedParent[mod.id] && !updated[linkedParent[mod.id]]?.access) {
           const ops = getOperationsForModule(mod.id);
           updated[mod.id] = {
             access: false,
@@ -359,6 +374,7 @@ const RoleAccess = () => {
       return;
     }
 
+    setSaving(true);
     try {
       // Normalize permissions before save
       const normalizedPermissions = normalizePermissionsForSave(permissions);
@@ -369,8 +385,14 @@ const RoleAccess = () => {
       };
 
       if (editingRole) {
-        await updateRole(editingRole.id, roleData);
+        await updateRole(editingRole.id, { ...roleData, version: editingRole.version });
         message.success('Role updated successfully');
+        // Refresh the current user's session permissions immediately
+        // so UI guards reflect the change without requiring a re-login.
+        const currentUser = getCurrentUser();
+        if (currentUser && currentUser.role?.toLowerCase() === editingRole.name?.toLowerCase()) {
+          setCurrentUser({ ...currentUser, permissions: normalizedPermissions });
+        }
       } else {
         await createRole(roleData);
         message.success('Role created successfully');
@@ -382,6 +404,8 @@ const RoleAccess = () => {
       fetchRoles();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save role');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -411,12 +435,15 @@ const RoleAccess = () => {
 
   // Handle delete
   const handleDelete = async (roleId) => {
+    setDeletingId(roleId);
     try {
       await deleteRole(roleId);
       message.success('Role deleted successfully');
       fetchRoles();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to delete role');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -519,6 +546,7 @@ const RoleAccess = () => {
               cancelText="No"
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
               disabled={record.isSystem}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
             >
               <Tooltip title={record.isSystem ? 'System roles cannot be deleted' : 'Delete'}>
                 <Button
@@ -539,11 +567,16 @@ const RoleAccess = () => {
 
   const renderModuleRow = (mod) => {
     const ops = getOperationsForModule(mod.id);
-    const isPOApproval = mod.id === 'po-approval';
-    const isOrderActions = mod.id === 'order-actions';
-    const poHasAccess = permissions['purchase-orders']?.access;
-    const ordersHasAccess = permissions['orders']?.access;
-    const isLinkedDisabled = (isPOApproval && !poHasAccess) || (isOrderActions && !ordersHasAccess);
+    const isPOApproval      = mod.id === 'po-approval';
+    const isOrderActions    = mod.id === 'order-actions';
+    const isCostingApproval = mod.id === 'costing-approval';
+    const poHasAccess      = permissions['purchase-orders']?.access;
+    const ordersHasAccess  = permissions['orders']?.access;
+    const costingHasAccess = permissions['costing']?.access;
+    const isLinkedDisabled =
+      (isPOApproval      && !poHasAccess)      ||
+      (isOrderActions    && !ordersHasAccess)  ||
+      (isCostingApproval && !costingHasAccess);
 
     return (
       <div
@@ -586,6 +619,11 @@ const RoleAccess = () => {
           )}
           {isOrderActions && (
             <Tooltip title="Requires Orders access to be enabled">
+              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+            </Tooltip>
+          )}
+          {isCostingApproval && (
+            <Tooltip title="Requires Costing access to be enabled">
               <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
             </Tooltip>
           )}
@@ -686,8 +724,8 @@ const RoleAccess = () => {
         {/* PO Approval dependency notice */}
         {permissions['purchase-orders']?.access && (
           <Alert
-            title="PO Approval actions are linked to Purchase Orders access"
-            description="Approval, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
+            message="PO Approval Actions are linked to Purchase Orders access"
+            description="Approve, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
             type="info"
             showIcon
             icon={<LinkOutlined />}
@@ -696,11 +734,24 @@ const RoleAccess = () => {
           />
         )}
 
-        {/* Order Actions dependency notice */}
+        {/* Order Approval Actions dependency notice */}
         {permissions['orders']?.access && (
           <Alert
-            title="Order Actions are linked to Orders access"
-            description="Submit and Refer Back operations require the Orders module to be enabled."
+            message="Order Approval Actions are linked to Orders access"
+            description="Refer Back, Cancel, Approve, and Reject operations require the Orders module to be enabled."
+            type="info"
+            showIcon
+            icon={<LinkOutlined />}
+            style={{ marginBottom: 12 }}
+            closable
+          />
+        )}
+
+        {/* Costing Approval Actions dependency notice */}
+        {permissions['costing']?.access && (
+          <Alert
+            message="Costing Approval Actions are linked to Costing access"
+            description="Approve operation requires the Costing module to be enabled."
             type="info"
             showIcon
             icon={<LinkOutlined />}
@@ -860,6 +911,7 @@ const RoleAccess = () => {
                 type="primary"
                 htmlType="submit"
                 disabled={editingRole && !formDirty}
+                loading={saving}
               >
                 {editingRole ? "Update Role" : "Create Role"}
               </Button>

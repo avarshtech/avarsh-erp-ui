@@ -20,6 +20,7 @@ import {
   Popconfirm,
   FloatButton,
   Tooltip,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -50,6 +51,7 @@ import {
   getCurrencySymbol,
   getStatusLabel,
 } from '../../utils/orderConstants';
+import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -663,13 +665,17 @@ const OrderForm = () => {
   const { id } = useParams();
   const [form] = Form.useForm();
   const dataInitRef = useRef(false);
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedChanges(isDirty);
 
   // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
+  const [pageLoading, setPageLoading] = useState(!!id);
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [existingOrder, setExistingOrder] = useState(null);
+  const [entityVersion, setEntityVersion] = useState(null);
   const [activeKeys, setActiveKeys] = useState([]);
 
   // Costing lookup
@@ -748,6 +754,7 @@ const OrderForm = () => {
   // Populate form fields from an order object
   const populateForm = useCallback((order) => {
     setExistingOrder(order);
+    setEntityVersion(order.version);
     form.setFieldsValue({
       costingId: order.costingId,
       buyerId: order.buyerId,
@@ -795,6 +802,7 @@ const OrderForm = () => {
         return;
       }
       populateForm(passed);
+      setPageLoading(false);
       return;
     }
     const loadOrder = async () => {
@@ -812,6 +820,7 @@ const OrderForm = () => {
         navigate('/orders/list');
       } finally {
         setLoading(false);
+        setPageLoading(false);
       }
     };
     loadOrder();
@@ -832,6 +841,7 @@ const OrderForm = () => {
         return recalcLine({ ...line, ...changes });
       })
     );
+    setIsDirty(true);
   }, [recalcLine]);
 
   // Add order line
@@ -839,6 +849,7 @@ const OrderForm = () => {
     const newLine = createEmptyLine();
     setOrderLines((prev) => [...prev, newLine]);
     setActiveKeys((prev) => [...prev, newLine.key]);
+    setIsDirty(true);
   };
 
   // Remove order line
@@ -849,6 +860,7 @@ const OrderForm = () => {
     }
     setOrderLines((prev) => prev.filter((l) => l.key !== lineKey));
     setActiveKeys((prev) => prev.filter((k) => k !== lineKey));
+    setIsDirty(true);
   };
 
   // Computed totals
@@ -862,24 +874,18 @@ const OrderForm = () => {
     [orderLines]
   );
 
-  // Assortment summary grouped by Buyer PO + Destination
-  const assortmentSummary = useMemo(() => {
-    const groups = {};
-    orderLines.forEach((line) => {
-      const po = line.buyerPoNo || 'Unspecified';
-      const dest = line.destination || 'Unspecified';
-      const key = `${po}::${dest}`;
-      if (!groups[key]) {
-        groups[key] = { key, buyerPoNo: po, destination: dest, totalQty: 0, totalValue: 0 };
-      }
-      groups[key].totalQty += line.lineQty || 0;
-      groups[key].totalValue += line.lineTotal || 0;
-    });
-    return Object.values(groups).map((g) => ({
-      ...g,
-      avgPrice: g.totalQty > 0 ? g.totalValue / g.totalQty : 0,
-    }));
-  }, [orderLines]);
+  // Assortment summary — one row per order line
+  const assortmentSummary = useMemo(() =>
+    orderLines.map((line) => ({
+      key: line.key,
+      buyerPoNo: line.buyerPoNo || 'Unspecified',
+      destination: line.destination || 'Unspecified',
+      colorRows: line.colorRows || [],
+      totalQty: line.lineQty || 0,
+      totalValue: line.lineTotal || 0,
+      avgPrice: (line.lineQty || 0) > 0 ? (line.lineTotal || 0) / (line.lineQty || 0) : 0,
+    }))
+  , [orderLines]);
 
   // ==================== COSTING ID LOOKUP ====================
 
@@ -1020,6 +1026,7 @@ const OrderForm = () => {
     const orderDate = dayjs();
 
     return {
+      version: entityVersion,
       costingId: values.costingId,
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
@@ -1068,13 +1075,16 @@ const OrderForm = () => {
     setSavingDraft(true);
     try {
       const data = buildOrderData(ORDER_STATUS.DRAFT);
+      let saved;
       if (isEdit) {
-        await updateOrder(id, data);
+        saved = await updateOrder(id, data);
         message.success('Order updated as draft');
       } else {
-        await createOrder(data);
+        saved = await createOrder(data);
         message.success('Order saved as draft');
       }
+      if (saved?.version != null) setEntityVersion(saved.version);
+      setIsDirty(false);
       navigate('/orders/list');
     } catch {
       message.error('Failed to save order');
@@ -1100,16 +1110,17 @@ const OrderForm = () => {
       onOk: async () => {
         setSubmitting(true);
         try {
-          const data = buildOrderData(ORDER_STATUS.DRAFT); // always save as draft first
+          const data = buildOrderData(ORDER_STATUS.DRAFT);
           let savedOrder;
           if (isEdit) {
             savedOrder = await updateOrder(id, data);
           } else {
             savedOrder = await createOrder(data);
           }
-          // Then confirm it
+          if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
+          setIsDirty(false);
           navigate('/orders/list');
         } catch {
           message.error('Failed to submit order');
@@ -1147,6 +1158,14 @@ const OrderForm = () => {
   };
 
   // ==================== RENDER ====================
+
+  if (pageLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in-up">
@@ -1234,6 +1253,7 @@ const OrderForm = () => {
         initialValues={{
           orderDate: dayjs(),
         }}
+        onValuesChange={() => setIsDirty(true)}
       >
         {/* ==================== ORDER DETAILS ==================== */}
         <Card style={{ marginBottom: 16 }}>
@@ -1663,6 +1683,24 @@ const OrderForm = () => {
                   ellipsis: true,
                 },
                 {
+                  title: 'Color / Print',
+                  dataIndex: 'colorRows',
+                  key: 'colorRows',
+                  render: (rows) =>
+                    !rows || rows.length === 0 ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                        {rows.map((c, i) => (
+                          <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {c.colorName || '—'}
+                            <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
+                          </Text>
+                        ))}
+                      </div>
+                    ),
+                },
+                {
                   title: 'Total Qty',
                   dataIndex: 'totalQty',
                   key: 'totalQty',
@@ -1700,18 +1738,18 @@ const OrderForm = () => {
                   <Table.Summary.Row
                     style={{ background: 'var(--bg-secondary, #f8fafc)', fontWeight: 600 }}
                   >
-                    <Table.Summary.Cell index={0} colSpan={2}>
+                    <Table.Summary.Cell index={0} colSpan={3}>
                       <Text strong>Grand Total</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={2} align="right">
+                    <Table.Summary.Cell index={3} align="right">
                       <Text strong style={{ fontSize: 15 }}>
                         {totalOrderQty.toLocaleString()}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={3} align="right">
+                    <Table.Summary.Cell index={4} align="right">
                       <Text type="secondary">—</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right">
+                    <Table.Summary.Cell index={5} align="right">
                       <Text
                         strong
                         style={{ color: 'var(--success-color, #10b981)', fontSize: 15 }}

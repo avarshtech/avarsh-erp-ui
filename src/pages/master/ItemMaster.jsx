@@ -1194,7 +1194,7 @@ const ItemMaster = () => {
 
       let response;
       if (isUpdateOperation) {
-        response = await updateItem({ id: parseInt(selectedItemId || selectedItem?.id), ...payload });
+        response = await updateItem({ id: parseInt(selectedItemId || selectedItem?.id), ...payload, version: selectedItem?.version });
         message.success('Item updated successfully');
       } else {
         // Remove itemCode/itemId from variants for new items

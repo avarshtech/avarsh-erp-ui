@@ -16,7 +16,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 
 const { Text } = Typography;
 
-const MODULE_ID = 'master-data';
+const MODULE_ID = 'size-presets';
 
 const CATEGORY_OPTIONS = [
   'Tops',
@@ -371,7 +371,8 @@ const SizePresetMaster = ({ onDirtyChange }) => {
     try {
       const payload = { ...values, name };
       if (selectedId) {
-        const res = await updateSizePreset(selectedId, payload);
+        const selectedRecord = (sizePresets || []).find(p => p.id === selectedId);
+        const res = await updateSizePreset(selectedId, { ...payload, version: selectedRecord?.version });
         const updated = res?.data || { id: selectedId, ...payload };
         updateItem('sizePresets', selectedId, updated);
         message.success('Size preset updated');

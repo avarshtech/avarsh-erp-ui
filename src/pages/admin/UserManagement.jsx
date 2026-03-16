@@ -29,6 +29,8 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [form] = Form.useForm();
   const [formDirty, setFormDirty] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [saving, setSaving] = useState(false);
   const initialFormValuesRef = useRef(null);
 
   // Admin password reset modal state
@@ -126,6 +128,7 @@ const UserManagement = () => {
   };
 
   const handleSubmit = async (values) => {
+    setSaving(true);
     try {
       // Build clean payload (no department field)
       const payload = {
@@ -141,7 +144,7 @@ const UserManagement = () => {
       }
 
       if (editingUser) {
-        await updateUser(editingUser.id, payload);
+        await updateUser(editingUser.id, { ...payload, version: editingUser.version });
         message.success('User updated successfully');
       } else {
         await createUser(payload);
@@ -154,6 +157,8 @@ const UserManagement = () => {
       fetchUsers();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save user');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -181,12 +186,15 @@ const UserManagement = () => {
   };
 
   const handleDelete = async (userId) => {
+    setDeletingId(userId);
     try {
       await deleteUser(userId);
       message.success('User deleted successfully');
       fetchUsers();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to delete user');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -267,7 +275,7 @@ const UserManagement = () => {
             </Tooltip>
           )}
           <PermissionGuard module="users" operation="delete">
-            <Popconfirm title="Delete User" description="Are you sure you want to delete this user?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No" icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}>
+            <Popconfirm title="Delete User" description="Are you sure you want to delete this user?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No" icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />} okButtonProps={{ danger: true, loading: deletingId === record.id }}>
               <Tooltip title="Delete"><Button type="text" danger icon={<DeleteOutlined />} /></Tooltip>
             </Popconfirm>
           </PermissionGuard>
@@ -312,7 +320,7 @@ const UserManagement = () => {
           <div style={{ textAlign: 'right', marginTop: 24 }}>
             <Space>
               <Button onClick={handleModalClose}>Cancel</Button>
-              <Button type="primary" htmlType="submit" disabled={editingUser && !formDirty}>{editingUser ? 'Update' : 'Create'}</Button>
+              <Button type="primary" htmlType="submit" disabled={editingUser && !formDirty} loading={saving}>{editingUser ? 'Update' : 'Create'}</Button>
             </Space>
           </div>
         </Form>

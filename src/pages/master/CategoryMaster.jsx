@@ -93,7 +93,8 @@ const CategoryMaster = ({ onDirtyChange }) => {
     try {
       if (selectedId) {
         // Update existing category
-        const response = await updateCategory(selectedId, values);
+        const selectedRecord = categories.find(c => c.id === selectedId);
+        const response = await updateCategory(selectedId, { ...values, version: selectedRecord?.version });
         const updatedCategory = response?.data || { id: selectedId, ...values };
         updateItem('categories', selectedId, updatedCategory);
         message.success('Category updated successfully');

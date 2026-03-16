@@ -8,7 +8,7 @@ import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 
-const MODULE_ID = 'master-data';
+const MODULE_ID = 'style-master';
 
 const StyleMaster = ({ onDirtyChange }) => {
   const { styles, buyers, addItem, updateItem, removeItem } = useStore();
@@ -119,9 +119,10 @@ const StyleMaster = ({ onDirtyChange }) => {
 
     setSubmitting(true);
     try {
+      const selectedRecord = selectedId ? styles.find(s => s.id === selectedId) : null;
       const payload = {
         ...values,
-        ...(selectedId ? { id: selectedId } : {}),
+        ...(selectedId ? { id: selectedId, version: selectedRecord?.version } : {}),
       };
       const saved = await saveStyle(payload);
       if (selectedId) {

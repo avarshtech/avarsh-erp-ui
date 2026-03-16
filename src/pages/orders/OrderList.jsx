@@ -52,6 +52,8 @@ const STATUS_CONFIG = {
 const OrderList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [navigatingId, setNavigatingId] = useState(null);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -133,12 +135,15 @@ const OrderList = () => {
 
   // Delete
   const handleDelete = async (record) => {
+    setDeletingId(record.id);
     try {
       await deleteOrder(record.id);
       message.success(`${record.orderNo} deleted successfully`);
       fetchData(pagination.current, pagination.pageSize);
     } catch {
       message.error('Failed to delete order');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -276,7 +281,11 @@ const OrderList = () => {
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
-                onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
+                loading={navigatingId === record.id}
+                onClick={() => {
+                  setNavigatingId(record.id);
+                  navigate(`/orders/edit/${record.id}`, { state: { orderData: record } });
+                }}
                 style={{ color: '#52c41a' }}
               />
             </Tooltip>
@@ -288,7 +297,7 @@ const OrderList = () => {
               onConfirm={() => handleDelete(record)}
               okText="Delete"
               cancelText="Cancel"
-              okButtonProps={{ danger: true }}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
             >
               <Tooltip title="Delete">

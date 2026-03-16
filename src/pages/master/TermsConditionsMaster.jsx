@@ -155,7 +155,8 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
       };
 
       if (selectedId) {
-        const response = await updateTermsConditions(selectedId, payload);
+        const selectedRecord = (termsConditions || []).find(tc => tc.id === selectedId);
+        const response = await updateTermsConditions(selectedId, { ...payload, version: selectedRecord?.version });
         const updated = response?.data || response || { id: selectedId, ...payload };
         updateItem('termsConditions', selectedId, updated);
         message.success('Terms & Conditions updated successfully');

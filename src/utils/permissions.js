@@ -6,7 +6,7 @@
  * {
  *   "dashboard":        { "access": true, "operations": { "view": true } },
  *   "orders":           { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "order-actions":    { "access": true, "operations": { "refer_back": true, "cancel": true } },
+ *   "order-actions":    { "access": true, "operations": { "refer_back": true, "cancel": true, "approve": true, "reject": true } },
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
@@ -15,8 +15,11 @@
  *   "costing-approval": { "access": true, "operations": { "approve": true } },
  *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true } },
  *   "master-data":      { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "items":            { "access": true, "operations": { "view": true, "add": true, "update": true } },
+ *   "style-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "size-presets":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "payment-terms":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
  * }
@@ -77,7 +80,7 @@ export const MODULES = {
   },
   COSTING_APPROVAL: {
     id: 'costing-approval',
-    name: 'Costing Approval',
+    name: 'Costing Approval Actions',
     path: '/costing',
     group: 'transactions',
     linkedTo: 'costing',
@@ -105,6 +108,24 @@ export const MODULES = {
     name: 'Master Data',
     description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
     path: '/master',
+    group: 'master',
+  },
+  STYLE_MASTER: {
+    id: 'style-master',
+    name: 'Style Master',
+    path: '/master → Styles tab',
+    group: 'master',
+  },
+  SIZE_PRESETS: {
+    id: 'size-presets',
+    name: 'Size Presets',
+    path: '/master → Size Presets tab',
+    group: 'master',
+  },
+  PAYMENT_TERMS_MASTER: {
+    id: 'payment-terms',
+    name: 'Payment Terms',
+    path: '/master → Payment Terms tab',
     group: 'master',
   },
   TERMS_CONDITIONS: {
@@ -145,10 +166,10 @@ export const OPERATIONS = {
 export const STANDARD_OPERATIONS = ['view', 'add', 'update', 'delete'];
 
 // Order Action operations
-export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel'];
+export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
 // PO Approval operations
-export const PO_APPROVAL_OPERATIONS = ['approve', 'reject', 'cancel', 'refer_back'];
+export const PO_APPROVAL_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
 // Costing Approval operations
 export const COSTING_APPROVAL_OPERATIONS = ['approve'];
@@ -173,13 +194,13 @@ export const PERMISSION_GROUPS = [
     icon: 'ShoppingCartOutlined',
     modules: [
       { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
-      { id: 'order-actions', name: 'Order Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
+      { id: 'order-actions', name: 'Order Approval Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
       { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
-      { id: 'costing-approval', name: 'Costing Approval', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
+      { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
     ],
   },
   {
@@ -188,17 +209,19 @@ export const PERMISSION_GROUPS = [
     icon: 'DatabaseOutlined',
     description: 'Individual access for Suppliers & Items; shared access for other master tabs',
     modules: [
-      { id: 'buyer-info', name: 'Buyers', operations: STANDARD_OPERATIONS, path: '/master → Buyers tab' },
-      { id: 'supplier-info', name: 'Suppliers', operations: STANDARD_OPERATIONS, path: '/master → Suppliers tab' },
-      { id: 'items', name: 'Items', operations: ['view', 'add', 'update'], path: '/master → Items tab' },
+      { id: 'buyer-info',      name: 'Buyers',                    description: 'Order Entry',          operations: STANDARD_OPERATIONS },
+      { id: 'supplier-info',   name: 'Suppliers',                 description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
       {
         id: 'master-data',
-        name: 'Other Master Data',
-        description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
+        name: 'Product Catalog',
+        description: 'Item — Categories, Sub-Categories, Item Types, UOM, Attributes',
         operations: STANDARD_OPERATIONS,
-        path: '/master → Other tabs',
       },
-      { id: 'terms-conditions', name: 'Terms & Conditions', operations: STANDARD_OPERATIONS, path: '/master → T&C tab' },
+      { id: 'items',           name: 'Items',                     description: 'Purchase Order',        operations: ['view', 'add', 'update'] },
+      { id: 'style-master',    name: 'Style Master',              description: 'Order Entry, Costing',  operations: STANDARD_OPERATIONS },
+      { id: 'size-presets',    name: 'Size Presets',              description: 'Order Entry, Costing',  operations: STANDARD_OPERATIONS },
+      { id: 'payment-terms',   name: 'Payment Terms',             description: 'Order Entry',           operations: STANDARD_OPERATIONS },
+      { id: 'terms-conditions',name: 'Terms & Conditions',        description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
     ],
   },
   {
@@ -221,12 +244,12 @@ export const getSidebarModules = () =>
 
 /** Returns which operations apply to a given module ID */
 export const getOperationsForModule = (moduleId) => {
-  if (moduleId === 'order-actions') return ORDER_ACTION_OPERATIONS;
-  if (moduleId === 'po-approval') return PO_APPROVAL_OPERATIONS;
+  if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
+  if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
-  if (moduleId === 'dashboard') return DASHBOARD_OPERATIONS;
+  if (moduleId === 'dashboard')       return DASHBOARD_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
-  if (moduleId === 'items') return ['view', 'add', 'update'];
+  if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
 };
 
@@ -255,8 +278,8 @@ export const getEmptyPermissions = () => buildPermissions(false);
 export const isAdminRole = (role) => {
   if (!role) return false;
   try {
-    const normalized = String(role).toLowerCase().replace(/\s+/g, '');
-    return normalized === 'admin' || normalized === 'superadmin' || normalized.includes('admin');
+    const normalized = String(role).toLowerCase().replace(/[\s_-]+/g, '');
+    return normalized === 'admin' || normalized === 'superadmin';
   } catch {
     return false;
   }
@@ -343,6 +366,12 @@ export const canReferBackOrder = () =>
 
 export const canCancelOrder = () =>
   hasModuleAccess('orders') && hasPermission('order-actions', 'cancel');
+
+export const canApproveOrderAction = () =>
+  hasModuleAccess('orders') && hasPermission('order-actions', 'approve');
+
+export const canRejectOrderAction = () =>
+  hasModuleAccess('orders') && hasPermission('order-actions', 'reject');
 
 export const canPerformOrderActions = () =>
   hasModuleAccess('orders') &&
@@ -449,10 +478,7 @@ export const normalizePermissionsForSave = (permissions) => {
   if (!normalized['orders']?.access) {
     normalized['order-actions'] = {
       access: false,
-      operations: ORDER_ACTION_OPERATIONS.reduce((acc, op) => {
-        acc[op] = false;
-        return acc;
-      }, {}),
+      operations: ORDER_ACTION_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
     };
   }
 
@@ -467,14 +493,11 @@ export const normalizePermissionsForSave = (permissions) => {
     };
   }
 
-  // Enforce costing-approval → costing link
+  // Enforce costing-approval → costing link (mirrors order-actions and po-approval pattern)
   if (!normalized['costing']?.access) {
     normalized['costing-approval'] = {
       access: false,
-      operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => {
-        acc[op] = false;
-        return acc;
-      }, {}),
+      operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
     };
   }
 

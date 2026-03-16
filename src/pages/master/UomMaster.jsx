@@ -91,7 +91,8 @@ const UomMaster = ({ onDirtyChange }) => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateUOM(selectedId, values);
+        const selectedRecord = uoms.find(u => u.id === selectedId);
+        const response = await updateUOM(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('uoms', selectedId, updatedItem);
         message.success('UOM updated successfully');
