@@ -1433,14 +1433,14 @@ const CostingForm = () => {
                     value={actualRate}
                     min={0}
                     step={0.01}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', height: 40 }}
                     onChange={setActualRate}
                   />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6}>
                 <Form.Item label={<Space>Today's Rate <Tooltip title="Auto-fetched exchange rate"><InfoCircleOutlined /></Tooltip></Space>}>
-                  <InputNumber value={todaysRate} disabled style={{ width: '100%' }} />
+                  <InputNumber value={todaysRate} disabled style={{ width: '100%', height: 40 }} />
                 </Form.Item>
               </Col>
               <Col xs={24}>

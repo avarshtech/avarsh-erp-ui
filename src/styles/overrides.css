@@ -745,6 +745,37 @@ textarea.ant-input:active {
   background: rgba(255, 255, 255, 0.28);
 }
 
+/* Ant Design table scrollbar — dark mode fix
+   AntD Table renders a custom sticky scrollbar <div> (not a native scrollbar).
+   Its color is driven by --ant-table-sticky-scroll-bar-bg which defaults to
+   rgba(0,0,0,0.25) — nearly invisible on dark backgrounds.
+   Override to semi-transparent white for dark mode. */
+[data-theme='dark'] .ant-table-sticky-scroll-bar {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-sticky-scroll-bar:hover,
+[data-theme='dark'] .ant-table-sticky-scroll-bar:active {
+  background: #7d95b7 !important;
+}
+
+/* Native scrollbar (table body overflow) — dark mode fix */
+[data-theme='dark'] .ant-table-body,
+[data-theme='dark'] .ant-table-content {
+  scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255, 255, 255, 0.05);
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb:hover,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb:hover {
+  background: #7d95b7 !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-track,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
 /* ============================================================
    COLLAPSE / ACCORDION
    ============================================================ */
