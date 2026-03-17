@@ -33,6 +33,7 @@ import {
   InboxOutlined,
   InfoCircleOutlined,
   WhatsAppOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
@@ -67,6 +68,7 @@ import { getStylesByBuyerId } from '../../services/styleService';
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
 import { useTheme } from '../../context/ThemeContext';
+import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
 import useIsTablet from '../../hooks/useIsTablet';
 import CostingFormTablet from './CostingFormTablet';
@@ -97,6 +99,7 @@ const CostingForm = () => {
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
   const [costingId, setCostingId] = useState('');
   const [currency, setCurrency] = useState('INR');
@@ -807,6 +810,86 @@ const CostingForm = () => {
       message.error('Please fill all required fields');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ==================== PRINT ====================
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      const values = form.getFieldsValue();
+      const selectedBuyer = buyerOptions.find((b) => b.value === values.buyerId);
+      const selectedStyle = styleOptions.find((s) => s.value === values.styleNo);
+      const season =
+        values.seasonCode && values.seasonYear
+          ? values.seasonCode + values.seasonYear.slice(-2)
+          : '';
+      const cleanRows = (rows) => rows.map(({ key, ...rest }) => rest);
+
+      const printData = {
+        costingId,
+        status: isEdit ? 'Draft' : 'Draft',
+        date: values.date?.format('YYYY-MM-DD'),
+        buyerName: selectedBuyer?.label || '',
+        styleNo: selectedStyle?.label || values.styleNo || '',
+        garmentName: values.garmentName,
+        season,
+        currency,
+        quoteCurrency,
+        actualRate,
+        todaysRate,
+        usdToInrRate,
+        sizes: values.sizes || [],
+        fabricRows: cleanRows(fabricRows),
+        localTrims: cleanRows(localTrims),
+        importedTrims: cleanRows(importedTrims),
+        manufacturingRows: cleanRows(manufacturingRows),
+        overheadRows: cleanRows(overheadRows),
+        agentCommissionPct,
+        profitPct,
+        targetPrice,
+        totalFabricCost,
+        totalLocalTrimsCost,
+        totalImportedTrimsCostUsd,
+        totalAccessoriesCost,
+        totalManufacturingCost,
+        totalMarkupCost,
+        totalMakingPrice,
+        totalOverheadCharges,
+        totalPrice,
+        finalPrice,
+        finalPriceUsd: quoteCurrency === 'USD' ? finalPrice : finalPriceUsd,
+        sizeSummaries: uniqueSizeKeys.length > 1
+          ? uniqueSizeKeys.map((sk) => {
+              const sizeFabric = fabricRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.netCost) || 0), 0);
+              const sizeLocalTrims = localTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.price) || 0), 0);
+              const sizeImportedTrims = importedTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.priceUsd) || 0), 0);
+              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * actualRate;
+              const sizeMfg = manufacturingRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
+              const sizeMarkup = overheadRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
+              const sizeMaking = sizeFabric + sizeAccessories + sizeMfg + sizeMarkup;
+              const sizeAgent = syncPercentages ? agentCommissionPct : (perSizeOverrides[sk]?.agentCommissionPct ?? agentCommissionPct);
+              const sizeProfit = syncPercentages ? profitPct : (perSizeOverrides[sk]?.profitPct ?? profitPct);
+              const sizeOverhead = ((sizeAgent + sizeProfit) / 100) * sizeMaking;
+              const sizeTotalPrice = sizeMaking + sizeOverhead;
+              const sizeFinalPrice = actualRate ? sizeTotalPrice / actualRate : 0;
+              const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
+              return {
+                sizes: sk, agentCommissionPct: sizeAgent, profitPct: sizeProfit,
+                totalFabricCost: sizeFabric, totalAccessoriesCost: sizeAccessories,
+                totalManufacturingCost: sizeMfg, totalMarkupCost: sizeMarkup,
+                totalMakingPrice: sizeMaking, totalPrice: sizeTotalPrice,
+                finalPriceUsd: sizeFinalPriceUsd,
+              };
+            })
+          : [],
+      };
+      await generateCostingPdf(printData);
+    } catch {
+      message.error('Failed to generate print document');
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -2119,6 +2202,8 @@ const CostingForm = () => {
             uploadProps={uploadProps}
             handleSaveDraft={handleSaveDraft}
             handleSubmit={handleSubmit}
+            handlePrint={handlePrint}
+            printing={printing}
           />
         </Form>
         <KnitsConsumptionModal
@@ -2186,6 +2271,14 @@ const CostingForm = () => {
       >
         <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
           Cancel
+        </Button>
+        <Button
+          icon={<PrinterOutlined />}
+          onClick={handlePrint}
+          loading={printing}
+          disabled={savingDraft || submitting}
+        >
+          Print / PDF
         </Button>
         <Button
           icon={<SaveOutlined />}

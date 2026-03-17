@@ -41,6 +41,7 @@ import {
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
+import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 
 const { Text, Title } = Typography;
 
@@ -58,6 +59,7 @@ const CostingView = () => {
   const [data, setData] = useState(null);
   const [duplicating, setDuplicating] = useState(false);
   const [approving, setApproving] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
@@ -106,8 +108,15 @@ const CostingView = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      await generateCostingPdf(data);
+    } catch {
+      message.error('Failed to generate print document');
+    } finally {
+      setPrinting(false);
+    }
   };
 
   if (loading || !data) {
@@ -471,7 +480,7 @@ const CostingView = () => {
                 Duplicate
               </Button>
             )}
-            <Button icon={<PrinterOutlined />} onClick={handlePrint}>
+            <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printing}>
               Print / PDF
             </Button>
             {data.status === COSTING_STATUS.FINAL && canApprove && (

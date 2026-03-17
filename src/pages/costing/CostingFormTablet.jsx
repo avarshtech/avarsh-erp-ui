@@ -38,6 +38,7 @@ import {
   ToolOutlined,
   DollarOutlined,
   PieChartOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import {
   FABRIC_CLASSIFICATIONS,
@@ -147,6 +148,8 @@ const CostingFormTablet = ({
   // Actions
   handleSaveDraft,
   handleSubmit,
+  handlePrint,
+  printing,
 }) => {
   const { isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState('general');
@@ -1051,6 +1054,9 @@ const CostingFormTablet = ({
         </div>
         <Button onClick={() => navigate('/costing/list')} disabled={saving}>
           Cancel
+        </Button>
+        <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printing} disabled={saving}>
+          Print
         </Button>
         <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={saving}>
           Draft
