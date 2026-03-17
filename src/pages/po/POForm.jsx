@@ -48,6 +48,7 @@ import { PO_STATUS, LINE_ITEM_STATUS } from '../../utils/poStatusConstants';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -300,6 +301,8 @@ const POForm = () => {
     setIsDirtyState(val);
   };
 
+  useUnsavedChanges(isDirty);
+
   // Variant modal state
   const [variantModalState, setVariantModalState] = useState({
     show: false,
@@ -319,6 +322,7 @@ const POForm = () => {
 
   // Original PO data for edit mode (to know previous status)
   const [originalPO, setOriginalPO] = useState(null);
+  const [entityVersion, setEntityVersion] = useState(null);
 
   // Store context
   const { suppliers, uoms, setData, isCacheValid, setLoading: setStoreLoading } = useStore();
@@ -452,6 +456,7 @@ const POForm = () => {
     try {
       const data = await getPurchaseOrderById(id);
       setOriginalPO(data);
+      setEntityVersion(data.version);
 
       // Set form fields
       form.setFieldsValue({
@@ -975,6 +980,7 @@ const POForm = () => {
           : LINE_ITEM_STATUS.DRAFT;
 
     return {
+      version: entityVersion,
       supplierId: values.supplierId,
       supplierName: supplier?.name || '',
       poDate: values.poDate?.format('YYYY-MM-DD'),
@@ -1058,7 +1064,8 @@ const POForm = () => {
       const name = currentUser?.name || '';
 
       if (isEditMode) {
-        await updatePurchaseOrder(id, payload);
+        const saved = await updatePurchaseOrder(id, payload);
+        if (saved?.version != null) setEntityVersion(saved.version);
 
         // Activity log for re-saving rejected/referred-back POs
         const previousStatus = originalPO?.status;
@@ -1074,6 +1081,7 @@ const POForm = () => {
         message.success('Purchase order saved as draft');
       } else {
         const createdPO = await createPurchaseOrder(payload);
+        if (createdPO?.version != null) setEntityVersion(createdPO.version);
 
         // Activity log for new draft
         if (createdPO?.id) {
@@ -1149,6 +1157,7 @@ const POForm = () => {
       } else {
         result = await createPurchaseOrder(payload);
       }
+      if (result?.version != null) setEntityVersion(result.version);
 
       // Create system activity log
       const currentUser = getCurrentUser();
@@ -1200,95 +1209,6 @@ const POForm = () => {
       navigate('/purchase-orders/list');
     }
   };
-
-  // Intercept SPA navigations (history.pushState/replaceState) while editing
-  useEffect(() => {
-    const pendingNavRef = { current: null };
-    const suppressRef = { current: false };
-
-    const confirmAndNavigate = (args, originalFn) => {
-      Modal.confirm({
-        title: 'Unsaved Changes',
-        icon: <ExclamationCircleOutlined />,
-        content: 'You have unsaved changes. Discard changes and continue?',
-        okText: 'Discard',
-        cancelText: 'Stay',
-        onOk: async () => {
-          try {
-            // Reset form and local state
-            form.resetFields();
-            setLineItems([createEmptyLineItem()]);
-            setIsDirty(false);
-            setOriginalPO(null);
-            setSelectedSupplier(null);
-            setPreviewVisible(false);
-            setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
-            suppressRef.current = true;
-            // perform the original navigation
-            originalFn.apply(window.history, args);
-            // Notify listeners about location change
-            setTimeout(() => window.dispatchEvent(new PopStateEvent('popstate')), 0);
-          } finally {
-            pendingNavRef.current = null;
-            suppressRef.current = false;
-          }
-        },
-        onCancel: () => {
-          pendingNavRef.current = null;
-        },
-      });
-    };
-
-    const originalPush = window.history.pushState;
-    const originalReplace = window.history.replaceState;
-
-    window.history.pushState = function () {
-      const args = Array.from(arguments);
-      try {
-        const to = new URL(args[2], window.location.origin).pathname;
-        const from = window.location.pathname;
-        if (isDirtyRef.current && !suppressRef.current && to !== from) {
-          pendingNavRef.current = { type: 'push', args };
-          confirmAndNavigate(args, originalPush);
-          return;
-        }
-      } catch (e) {
-        // ignore URL parse errors and allow navigation
-      }
-      return originalPush.apply(window.history, args);
-    };
-
-    window.history.replaceState = function () {
-      const args = Array.from(arguments);
-      try {
-        const to = new URL(args[2], window.location.origin).pathname;
-        const from = window.location.pathname;
-        if (isDirtyRef.current && !suppressRef.current && to !== from) {
-          pendingNavRef.current = { type: 'replace', args };
-          confirmAndNavigate(args, originalReplace);
-          return;
-        }
-      } catch (e) {}
-      return originalReplace.apply(window.history, args);
-    };
-
-    // Warn on full page reload/close
-    const beforeUnloadHandler = (e) => {
-      if (!isDirtyRef.current) return undefined;
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    };
-    window.addEventListener('beforeunload', beforeUnloadHandler);
-
-    return () => {
-      // restore
-      window.history.pushState = originalPush;
-      window.history.replaceState = originalReplace;
-      window.removeEventListener('beforeunload', beforeUnloadHandler);
-    };
-    // Bind once on mount; isDirtyRef is read by reference so no need to re-bind on isDirty changes
-  }, [form]);
 
   // Date disabled functions
   const disabledPoDate = (current) => {

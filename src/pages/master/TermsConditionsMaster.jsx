@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Input, Button, Space, message, Modal, Spin, Tag, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
@@ -17,7 +17,7 @@ const { Text } = Typography;
 
 const MODULE_ID = 'terms-conditions';
 
-const TermsConditionsMaster = () => {
+const TermsConditionsMaster = ({ onDirtyChange }) => {
   const {
     termsConditions,
     setData,
@@ -34,8 +34,10 @@ const TermsConditionsMaster = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
   const [description, setDescription] = useState('');
+  const skipDirty = useRef(false);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -93,11 +95,13 @@ const TermsConditionsMaster = () => {
       message.warning('You do not have permission to add terms & conditions');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
     setDescription('');
     setUnsavedChanges(false);
+    setTimeout(() => { skipDirty.current = false; }, 100);
   };
 
   const handleSelect = (record) => {
@@ -151,7 +155,8 @@ const TermsConditionsMaster = () => {
       };
 
       if (selectedId) {
-        const response = await updateTermsConditions(selectedId, payload);
+        const selectedRecord = (termsConditions || []).find(tc => tc.id === selectedId);
+        const response = await updateTermsConditions(selectedId, { ...payload, version: selectedRecord?.version });
         const updated = response?.data || response || { id: selectedId, ...payload };
         updateItem('termsConditions', selectedId, updated);
         message.success('Terms & Conditions updated successfully');
@@ -225,6 +230,8 @@ const TermsConditionsMaster = () => {
   return (
     <MasterSplitView
       title="Terms & Conditions"
+      subtitle="Purchase Order"
+      addLabel="Add Terms"
       data={filteredData}
       columns={columns}
       loading={storeLoading.termsConditions}
@@ -235,59 +242,58 @@ const TermsConditionsMaster = () => {
       onSearch={handleSearch}
       searchPlaceholder="Search terms & conditions..."
       renderForm={() => (
-        <Spin spinning={submitting}>
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Sticky Header */}
-            <div
-              style={{
-                position: 'sticky',
-                top: 0,
-                zIndex: 10,
-                background: 'var(--card-bg, #fff)',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '16px 24px',
-                borderBottom: '1px solid var(--border-color, #f0f0f0)',
-              }}
-            >
-              <div>
-                <h2 style={{ margin: 0 }}>
-                  {selectedId ? (isReadOnly ? 'View Terms & Conditions' : 'Edit Terms & Conditions') : 'New Terms & Conditions'}
-                </h2>
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  {selectedId ? 'Modify the title and content below' : 'Create a new terms & conditions template for purchase orders'}
-                </Text>
-              </div>
-              <Space>
-                {selectedId && canDelete && (
-                  <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
-                    Delete
-                  </Button>
-                )}
-                <Button onClick={handleCancel} icon={<CloseOutlined />}>
-                  {isReadOnly ? 'Close' : 'Cancel'}
-                </Button>
-                {!isReadOnly && (
-                  <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
-                    <Button
-                      type="primary"
-                      onClick={() => form.submit()}
-                      icon={<SaveOutlined />}
-                      loading={submitting}
-                      disabled={selectedId && !unsavedChanges}
-                    >
-                      Save
-                    </Button>
-                  </PermissionGuard>
-                )}
-              </Space>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Sticky header */}
+          <div style={{
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: 'var(--card-bg, #fff)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 24px',
+            borderBottom: '1px solid var(--border-color, #f0f0f0)',
+          }}>
+            <div>
+              <h2 style={{ margin: 0 }}>
+                {selectedId ? (isReadOnly ? 'View Terms & Conditions' : 'Edit Terms & Conditions') : 'New Terms & Conditions'}
+              </h2>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {selectedId ? 'Modify the title and content below' : 'Create a new terms & conditions template for purchase orders'}
+              </Text>
             </div>
+            <Space>
+              {selectedId && canDelete && (
+                <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              )}
+              <Button onClick={handleCancel} icon={<CloseOutlined />}>
+                {isReadOnly ? 'Close' : 'Cancel'}
+              </Button>
+              {!isReadOnly && (
+                <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
+                  <Button
+                    type="primary"
+                    onClick={() => form.submit()}
+                    icon={<SaveOutlined />}
+                    loading={submitting}
+                    disabled={selectedId && !unsavedChanges}
+                  >
+                    Save
+                  </Button>
+                </PermissionGuard>
+              )}
+            </Space>
+          </div>
 
-            {/* Scrollable Form Content */}
-            <div style={{ flex: 1, overflow: 'auto', padding: 24, paddingBottom: 48 }}>
+          {/* Scrollable form content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 24px' }}>
+            <Spin spinning={submitting}>
               <Form form={form} layout="vertical" onFinish={handleSave} disabled={isReadOnly}
-                onValuesChange={() => setUnsavedChanges(true)}
+                onValuesChange={() => { if (!skipDirty.current) setUnsavedChanges(true); }}
               >
                 <Form.Item
                   name="name"
@@ -316,19 +322,24 @@ const TermsConditionsMaster = () => {
 
                 <Form.Item
                   label={
-                    <Space>
+                    <Space size={6}>
                       <span>Description / Content</span>
-                      <Tag color="blue" style={{ fontSize: 11 }}>Rich Text</Tag>
+                      <Tag color="blue" style={{ fontSize: 11, marginBottom: 0 }}>Rich Text</Tag>
                     </Space>
                   }
                   required
+                  style={{ marginBottom: 0 }}
                 >
-                  <RichTextEditor
-                    value={description}
-                    onChange={(val) => { setDescription(val); setUnsavedChanges(true); }}
-                    placeholder="Enter terms and conditions content here. Use the toolbar above for formatting like bullet points, numbered lists, bold text, alignment, etc."
-                    readOnly={isReadOnly}
-                  />
+                  <div style={{ marginTop: 6 }}>
+                    <RichTextEditor
+                      value={description}
+                      onChange={(val) => { setDescription(val); if (!skipDirty.current) setUnsavedChanges(true); }}
+                      placeholder="Enter terms and conditions content here. Use the toolbar above for formatting like bullet points, numbered lists, bold text, alignment, etc."
+                      readOnly={isReadOnly}
+                      minHeight={380}
+                      maxHeight={380}
+                    />
+                  </div>
                 </Form.Item>
                 <div
                   style={{
@@ -340,9 +351,9 @@ const TermsConditionsMaster = () => {
                   This content will be appended to the PO document during PDF generation. Use formatting tools for clean presentation.
                 </div>
               </Form>
-            </div>
+            </Spin>
           </div>
-        </Spin>
+        </div>
       )}
     />
   );

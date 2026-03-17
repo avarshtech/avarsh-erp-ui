@@ -9,13 +9,14 @@ import PermissionGuard from '../../components/PermissionGuard';
 
 const MODULE_ID = 'master-data';
 
-const ItemTypeMaster = () => {
+const ItemTypeMaster = ({ onDirtyChange }) => {
   const { itemTypes, subCategories, attributes, uoms, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -96,7 +97,8 @@ const ItemTypeMaster = () => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateItemType(selectedId, values);
+        const selectedRecord = itemTypes.find(it => it.id === selectedId);
+        const response = await updateItemType(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('itemTypes', selectedId, updatedItem);
         message.success('Item type updated successfully');
@@ -161,6 +163,8 @@ const ItemTypeMaster = () => {
   return (
     <MasterSplitView
       title="Item Types"
+      subtitle="Item"
+      addLabel="Add Item Type"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

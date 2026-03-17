@@ -35,6 +35,7 @@ import {
   WhatsAppOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
+import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import dayjs from 'dayjs';
 import {
   getCostSheetById,
@@ -88,9 +89,15 @@ const CostingForm = () => {
     [formSizes],
   );
 
+  // Unsaved changes guard
+  const [isDirty, setIsDirty] = useState(false);
+  useUnsavedChanges(isDirty);
+
   // State
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [entityVersion, setEntityVersion] = useState(null);
   const [costingId, setCostingId] = useState('');
   const [currency, setCurrency] = useState('INR');
   const [quoteCurrency, setQuoteCurrency] = useState('USD');
@@ -242,6 +249,7 @@ const CostingForm = () => {
     setLoading(true);
     try {
       const cs = await getCostSheetById(id);
+      setEntityVersion(cs.version);
       setCostingId(cs.costingId);
       setStyleId(cs.styleId || null);
       setCurrency(cs.currency);
@@ -471,6 +479,7 @@ const CostingForm = () => {
         return updated;
       })
     );
+    setIsDirty(true);
   };
 
   const addFabricRow = () => {
@@ -494,6 +503,7 @@ const CostingForm = () => {
         sizes: '',
       },
     ]);
+    setIsDirty(true);
   };
 
   const handleFabricItemSelect = (key, itemId, option) => {
@@ -512,10 +522,12 @@ const CostingForm = () => {
         return updated;
       })
     );
+    setIsDirty(true);
   };
 
   const deleteFabricRow = (key) => {
     setFabricRows((prev) => prev.filter((r) => r.key !== key));
+    setIsDirty(true);
   };
 
   const duplicateFabricRow = (key) => {
@@ -538,6 +550,7 @@ const CostingForm = () => {
         return updated;
       })
     );
+    setIsDirty(true);
   };
 
   const addLocalTrim = () => {
@@ -545,10 +558,12 @@ const CostingForm = () => {
       ...prev,
       { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', cost: '', price: 0, sizes: '' },
     ]);
+    setIsDirty(true);
   };
 
   const deleteLocalTrim = (key) => {
     setLocalTrims((prev) => prev.filter((r) => r.key !== key));
+    setIsDirty(true);
   };
 
   const duplicateLocalTrim = (key) => {
@@ -571,6 +586,7 @@ const CostingForm = () => {
         return updated;
       })
     );
+    setIsDirty(true);
   };
 
   const addImportedTrim = () => {
@@ -578,10 +594,12 @@ const CostingForm = () => {
       ...prev,
       { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', costUsd: '', priceUsd: 0, sizes: '' },
     ]);
+    setIsDirty(true);
   };
 
   const deleteImportedTrim = (key) => {
     setImportedTrims((prev) => prev.filter((r) => r.key !== key));
+    setIsDirty(true);
   };
 
   const duplicateImportedTrim = (key) => {
@@ -599,6 +617,7 @@ const CostingForm = () => {
     setManufacturingRows((prev) =>
       prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
     );
+    setIsDirty(true);
   };
 
   const addManufacturingRow = () => {
@@ -606,27 +625,20 @@ const CostingForm = () => {
       ...prev,
       { key: `m_${Date.now()}`, itemId: null, process: '', cost: '', comments: '', sizes: '' },
     ]);
+    setIsDirty(true);
   };
 
   const deleteManufacturingRow = (key) => {
     setManufacturingRows((prev) => prev.filter((r) => r.key !== key));
+    setIsDirty(true);
   };
 
-  const duplicateManufacturingRow = (key) => {
-    setManufacturingRows((prev) => {
-      const idx = prev.findIndex((r) => r.key === key);
-      if (idx === -1) return prev;
-      const clone = { ...prev[idx], key: `m_${Date.now()}` };
-      const next = [...prev];
-      next.splice(idx + 1, 0, clone);
-      return next;
-    });
-  };
 
   const updateOverheadRow = (key, field, value) => {
     setOverheadRows((prev) =>
       prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
     );
+    setIsDirty(true);
   };
 
   const addOverheadRow = () => {
@@ -634,10 +646,12 @@ const CostingForm = () => {
       ...prev,
       { key: `o_${Date.now()}`, itemId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
+    setIsDirty(true);
   };
 
   const deleteOverheadRow = (key) => {
     setOverheadRows((prev) => prev.filter((r) => r.key !== key));
+    setIsDirty(true);
   };
 
   const duplicateOverheadRow = (key) => {
@@ -650,6 +664,7 @@ const CostingForm = () => {
       return next;
     });
   };
+
 
   // Knits modal handlers
   const openKnitsModal = (rowKey) => {
@@ -696,6 +711,7 @@ const CostingForm = () => {
     const cleanRows = (rows) => rows.map(({ key, ...rest }) => rest);
 
     return {
+      version: entityVersion,
       costingId,
       status,
       date: formValues.date?.format('YYYY-MM-DD'),
@@ -743,48 +759,54 @@ const CostingForm = () => {
   const handleSaveDraft = async () => {
     try {
       const values = await form.validateFields().catch(() => form.getFieldsValue());
-      setSaving(true);
+      setSavingDraft(true);
       const payload = buildPayload(values, COSTING_STATUS.DRAFT);
+      let saved;
       if (isEdit) {
-        await updateCostSheet(id, payload);
+        saved = await updateCostSheet(id, payload);
         message.success('Cost sheet saved as draft');
       } else {
-        await createCostSheet(payload);
+        saved = await createCostSheet(payload);
         message.success('Cost sheet created as draft');
       }
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
       });
+      if (saved?.version != null) setEntityVersion(saved.version);
+      setIsDirty(false);
       navigate('/costing/list');
     } catch {
       message.error('Failed to save cost sheet');
     } finally {
-      setSaving(false);
+      setSavingDraft(false);
     }
   };
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-      setSaving(true);
+      setSubmitting(true);
       const payload = buildPayload(values, COSTING_STATUS.FINAL);
+      let saved;
       if (isEdit) {
-        await updateCostSheet(id, payload);
+        saved = await updateCostSheet(id, payload);
         message.success('Cost sheet submitted successfully');
       } else {
-        await createCostSheet(payload);
+        saved = await createCostSheet(payload);
         message.success('Cost sheet created and submitted');
       }
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
       });
+      if (saved?.version != null) setEntityVersion(saved.version);
+      setIsDirty(false);
       navigate('/costing/list');
     } catch {
       message.error('Please fill all required fields');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -1495,14 +1517,14 @@ const CostingForm = () => {
                     value={actualRate}
                     min={0}
                     step={0.01}
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', height: 40 }}
                     onChange={setActualRate}
                   />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6}>
                 <Form.Item label={<Space>Today's Rate <Tooltip title="Auto-fetched exchange rate"><InfoCircleOutlined /></Tooltip></Space>}>
-                  <InputNumber value={todaysRate} disabled style={{ width: '100%' }} />
+                  <InputNumber value={todaysRate} disabled style={{ width: '100%', height: 40 }} />
                 </Form.Item>
               </Col>
               <Col xs={24}>
@@ -1840,7 +1862,7 @@ const CostingForm = () => {
                 min={0}
                 max={100}
                 step={0.5}
-                onChange={setAgentCommissionPct}
+                onChange={(v) => { setAgentCommissionPct(v); setIsDirty(true); }}
                 style={{ width: '100%' }}
                 addonAfter="%"
               />
@@ -1854,7 +1876,7 @@ const CostingForm = () => {
                 min={0}
                 max={100}
                 step={0.5}
-                onChange={(v) => { setProfitPct(v); setTargetPrice(''); }}
+                onChange={(v) => { setProfitPct(v); setTargetPrice(''); setIsDirty(true); }}
                 style={{ width: '100%' }}
                 addonAfter="%"
               />
@@ -1868,7 +1890,7 @@ const CostingForm = () => {
                 min={0}
                 step={0.01}
                 placeholder="Auto-calc profit"
-                onChange={setTargetPrice}
+                onChange={(v) => { setTargetPrice(v); setIsDirty(true); }}
                 style={{ width: '100%' }}
               />
             </Col>
@@ -1928,7 +1950,7 @@ const CostingForm = () => {
                 <Text strong style={{ fontSize: 15, marginRight: 16 }}>Per-Size Breakdown</Text>
                 <Checkbox
                   checked={syncPercentages}
-                  onChange={(e) => setSyncPercentages(e.target.checked)}
+                  onChange={(e) => { setSyncPercentages(e.target.checked); setIsDirty(true); }}
                 >
                   Apply same % to all sizes
                 </Checkbox>
@@ -1957,10 +1979,10 @@ const CostingForm = () => {
                               value={perSizeOverrides[ps.sizeKey]?.agentCommissionPct ?? agentCommissionPct}
                               min={0} max={100} step={0.5} size="small"
                               style={{ width: '100%' }}
-                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                              onChange={(v) => { setPerSizeOverrides((prev) => ({
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], agentCommissionPct: v },
-                              }))}
+                              })); setIsDirty(true); }}
                             />
                           </div>
                           <div style={{ marginBottom: 4 }}>
@@ -1969,10 +1991,10 @@ const CostingForm = () => {
                               value={perSizeOverrides[ps.sizeKey]?.profitPct ?? profitPct}
                               min={0} max={100} step={0.5} size="small"
                               style={{ width: '100%' }}
-                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                              onChange={(v) => { setPerSizeOverrides((prev) => ({
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], profitPct: v },
-                              }))}
+                              })); setIsDirty(true); }}
                             />
                           </div>
                           <div>
@@ -1982,10 +2004,10 @@ const CostingForm = () => {
                               min={0} step={0.01} size="small"
                               style={{ width: '100%' }}
                               placeholder="Target"
-                              onChange={(v) => setPerSizeOverrides((prev) => ({
+                              onChange={(v) => { setPerSizeOverrides((prev) => ({
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], targetPrice: v },
-                              }))}
+                              })); setIsDirty(true); }}
                             />
                           </div>
                         </div>
@@ -2136,6 +2158,7 @@ const CostingForm = () => {
           quoteCurrency: 'USD',
           date: dayjs(),
         }}
+        onValuesChange={() => setIsDirty(true)}
       >
         <Collapse
           defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
@@ -2161,13 +2184,14 @@ const CostingForm = () => {
           gap: 12,
         }}
       >
-        <Button onClick={() => navigate('/costing/list')} disabled={saving}>
+        <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
           Cancel
         </Button>
         <Button
           icon={<SaveOutlined />}
           onClick={handleSaveDraft}
-          loading={saving}
+          loading={savingDraft}
+          disabled={submitting}
         >
           Save as Draft
         </Button>
@@ -2175,7 +2199,8 @@ const CostingForm = () => {
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSubmit}
-          loading={saving}
+          loading={submitting}
+          disabled={savingDraft}
         >
           Submit
         </Button>

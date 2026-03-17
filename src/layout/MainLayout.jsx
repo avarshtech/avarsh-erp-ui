@@ -295,6 +295,7 @@ const MainLayoutInner = () => {
         trigger={null}
         collapsible
         collapsed={collapsed}
+        collapsedWidth={80}
         width={260}
         style={{
           position: "fixed",
@@ -305,6 +306,8 @@ const MainLayoutInner = () => {
           zIndex: 100,
           overflow: 'hidden',
           background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+          transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'width',
         }}
       >
         <div
@@ -325,28 +328,30 @@ const MainLayoutInner = () => {
                 height: collapsed ? 32 : 40,
                 width: collapsed ? 32 : 'auto',
                 objectFit: 'contain',
-                display: 'block'
+                display: 'block',
+                transition: 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               }}
             />
           </div>
         </div>
-        <Menu
-          theme="dark"
-          mode="inline"
-          selectedKeys={getSelectedKeys()}
-          defaultOpenKeys={getOpenKeys()}
-          items={menuItems}
-          onClick={handleMenuClick}
-          style={{ 
-            marginTop: 8, 
-            border: "none", 
-            overflow: 'hidden',
-            background: 'transparent'
-          }}
-        />
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+          <Menu
+            theme="dark"
+            mode="inline"
+            selectedKeys={getSelectedKeys()}
+            defaultOpenKeys={getOpenKeys()}
+            items={menuItems}
+            onClick={handleMenuClick}
+            style={{
+              marginTop: 8,
+              border: 'none',
+              background: 'transparent',
+            }}
+          />
+        </div>
       </Sider>
       <Layout
-        style={{ marginLeft: collapsed ? 80 : 260, transition: "all 0.2s" }}
+        style={{ marginLeft: collapsed ? 80 : 260, transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}
       >
         <Header
           style={{
@@ -365,17 +370,19 @@ const MainLayoutInner = () => {
           }}
         >
           <Space>
-            <span
-              onClick={() => setCollapsed(!collapsed)}
-              style={{
-                fontSize: 20,
-                cursor: "pointer",
-                color: isDarkMode ? '#94a3b8' : '#64748b',
-                transition: "color 0.3s",
-              }}
-            >
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            </span>
+            <Tooltip title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
+              <span
+                onClick={() => setCollapsed(!collapsed)}
+                style={{
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  transition: "color 0.3s",
+                }}
+              >
+                {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              </span>
+            </Tooltip>
             <Input
               placeholder="Search..."
               prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}

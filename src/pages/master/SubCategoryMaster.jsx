@@ -9,13 +9,14 @@ import PermissionGuard from '../../components/PermissionGuard';
 
 const MODULE_ID = 'master-data';
 
-const SubCategoryMaster = () => {
+const SubCategoryMaster = ({ onDirtyChange }) => {
   const { categories, subCategories, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -91,7 +92,8 @@ const SubCategoryMaster = () => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateSubCategory(selectedId, values);
+        const selectedRecord = subCategories.find(sc => sc.id === selectedId);
+        const response = await updateSubCategory(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('subCategories', selectedId, updatedItem);
         message.success('Sub-category updated successfully');
@@ -157,6 +159,8 @@ const SubCategoryMaster = () => {
   return (
     <MasterSplitView
       title="Sub Categories"
+      subtitle="Item"
+      addLabel="Add Sub Category"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

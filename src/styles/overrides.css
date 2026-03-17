@@ -203,6 +203,12 @@ textarea.ant-input:active {
   outline: none !important;
 }
 
+/* Dark mode: remove box-shadow on default/danger buttons that shows as a white line at the bottom */
+[data-theme="dark"] .ant-btn-default,
+[data-theme="dark"] .ant-btn-dangerous {
+  box-shadow: none !important;
+}
+
 /* ============================================================
    FIX: Border lines at rounded corners
    Ensure borders render cleanly at rounded corners globally
@@ -213,6 +219,12 @@ textarea.ant-input:active {
   border-radius: var(--radius-sm) !important;
   overflow: hidden;
   border: 1px solid var(--border-color) !important;
+}
+
+/* Remove cell-level border-radius so the parent overflow:hidden handles all rounding cleanly */
+.ant-descriptions-bordered .ant-descriptions-view table th,
+.ant-descriptions-bordered .ant-descriptions-view table td {
+  border-radius: 0 !important;
 }
 
 [data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-view {
@@ -674,6 +686,100 @@ textarea.ant-input:active {
   background: var(--primary-color);
 }
 
+/* ============================================================
+   SIDEBAR SMOOTH TRANSITION OVERRIDES
+   Override AntD's default 0.2s sider transition with a slower,
+   GPU-accelerated ease for a fluid expand / collapse feel.
+   ============================================================ */
+
+.ant-layout-sider {
+  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              min-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              flex 0.32s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: width;
+}
+
+/* Fade menu item labels in/out during collapse animation */
+.ant-menu-inline-collapsed .ant-menu-title-content {
+  opacity: 0;
+  transition: opacity 0.18s ease !important;
+}
+.ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-title-content {
+  opacity: 1;
+  transition: opacity 0.22s ease 0.12s !important;
+}
+
+/* Smooth the sub-menu expand/collapse arrow */
+.ant-menu-submenu-arrow {
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Sidebar: make ant-layout-sider-children a flex column so the menu area can scroll */
+.ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar menu scroll area — thin dark-themed scrollbar */
+.ant-layout-sider-children > div:last-child {
+  flex: 1;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar {
+  width: 4px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* Ant Design table scrollbar — dark mode fix
+   AntD Table renders a custom sticky scrollbar <div> (not a native scrollbar).
+   Its color is driven by --ant-table-sticky-scroll-bar-bg which defaults to
+   rgba(0,0,0,0.25) — nearly invisible on dark backgrounds.
+   Override to semi-transparent white for dark mode. */
+[data-theme='dark'] .ant-table-sticky-scroll-bar {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-sticky-scroll-bar:hover,
+[data-theme='dark'] .ant-table-sticky-scroll-bar:active {
+  background: #7d95b7 !important;
+}
+
+/* Native scrollbar (table body overflow) — dark mode fix */
+[data-theme='dark'] .ant-table-body,
+[data-theme='dark'] .ant-table-content {
+  scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255, 255, 255, 0.05);
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb:hover,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb:hover {
+  background: #7d95b7 !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-track,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* ============================================================
+   COLLAPSE / ACCORDION
+   ============================================================ */
+
 /* Collapse / Accordion */
 [data-theme="dark"] .ant-collapse {
   background-color: var(--card-bg);
@@ -687,6 +793,18 @@ textarea.ant-input:active {
 [data-theme="dark"] .ant-collapse-content {
   background-color: var(--bg-secondary);
   border-top-color: var(--border-color);
+}
+
+/* Remove bottom border-radius from header when panel is expanded — prevents triangle gap */
+.ant-collapse-item-active > .ant-collapse-header {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Fix top border-radius gap on the first accordion panel header */
+.ant-collapse > .ant-collapse-item:first-child > .ant-collapse-header {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
 }
 
 /* Divider */

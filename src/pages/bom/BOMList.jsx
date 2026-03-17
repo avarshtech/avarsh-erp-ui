@@ -273,7 +273,9 @@ const BOMList = () => {
       <div className="page-header">
         <h1>Bill of Materials</h1>
         <div className="header-actions">
-          <Button icon={<ExportOutlined />}>Export</Button>
+          {hasPermission('bom', 'view') && (
+            <Button icon={<ExportOutlined />}>Export</Button>
+          )}
           <PermissionGuard module="bom" operation="add">
             <Button
               type="primary"

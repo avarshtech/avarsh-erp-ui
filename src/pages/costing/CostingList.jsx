@@ -78,6 +78,8 @@ const CostingList = () => {
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyRecord, setHistoryRecord] = useState(null);
   const [buyerOptions, setBuyerOptions] = useState([]);
+  const [duplicatingId, setDuplicatingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Permissions
   const canAdd = hasPermission('costing', 'add');
@@ -152,22 +154,28 @@ const CostingList = () => {
   };
 
   const handleDelete = async (record) => {
+    setDeletingId(record.id);
     try {
       await deleteCostSheet(record.id);
       message.success(`${record.costingId} deleted successfully`);
       fetchData(pagination.current, pagination.pageSize);
     } catch {
       message.error('Failed to delete cost sheet');
+    } finally {
+      setDeletingId(null);
     }
   };
 
   const handleDuplicate = async (record) => {
+    setDuplicatingId(record.id);
     try {
       const dup = await duplicateCostSheet(record.id);
       message.success(`Duplicated as ${dup.costingId}`);
       fetchData(1, pagination.pageSize);
     } catch {
       message.error('Failed to duplicate cost sheet');
+    } finally {
+      setDuplicatingId(null);
     }
   };
 
@@ -348,6 +356,7 @@ const CostingList = () => {
               size="small"
               icon={<CopyOutlined />}
               onClick={() => handleDuplicate(record)}
+              loading={duplicatingId === record.id}
               style={{ color: '#722ed1' }}
             />
           </Tooltip>
@@ -369,7 +378,7 @@ const CostingList = () => {
               onConfirm={() => handleDelete(record)}
               okText="Delete"
               cancelText="Cancel"
-              okButtonProps={{ danger: true }}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
             >
               <Tooltip title="Delete">

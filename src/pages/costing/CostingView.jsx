@@ -56,7 +56,10 @@ const CostingView = () => {
   const { isDarkMode } = useTheme();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
+  const [duplicating, setDuplicating] = useState(false);
+  const [approving, setApproving] = useState(false);
 
+  const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
   const canApprove = hasPermission('costing-approval', 'approve');
 
@@ -78,22 +81,28 @@ const CostingView = () => {
   };
 
   const handleDuplicate = async () => {
+    setDuplicating(true);
     try {
       const dup = await duplicateCostSheet(id);
       message.success(`Duplicated as ${dup.costingId}`);
       navigate(`/costing/edit/${dup.id}`);
     } catch {
       message.error('Failed to duplicate cost sheet');
+    } finally {
+      setDuplicating(false);
     }
   };
 
   const handleApprove = async () => {
+    setApproving(true);
     try {
-      await updateCostSheet(id, { ...data, status: COSTING_STATUS.APPROVED });
+      await updateCostSheet(id, { ...data, status: COSTING_STATUS.APPROVED, version: data.version });
       message.success('Cost sheet approved');
       loadData();
     } catch {
       message.error('Failed to approve cost sheet');
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -457,14 +466,16 @@ const CostingView = () => {
                 Edit
               </Button>
             )}
-            <Button icon={<CopyOutlined />} onClick={handleDuplicate}>
-              Duplicate
-            </Button>
+            {canAdd && (
+              <Button icon={<CopyOutlined />} onClick={handleDuplicate} loading={duplicating}>
+                Duplicate
+              </Button>
+            )}
             <Button icon={<PrinterOutlined />} onClick={handlePrint}>
               Print / PDF
             </Button>
             {data.status === COSTING_STATUS.FINAL && canApprove && (
-              <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove}>
+              <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove} loading={approving}>
                 Approve
               </Button>
             )}

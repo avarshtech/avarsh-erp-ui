@@ -1,8 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp } from 'antd';
+import { useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
+import ConflictDialog from './components/ConflictDialog';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/auth/Login';
 import Dashboard from './pages/Dashboard';
@@ -26,13 +28,43 @@ import Profile from './pages/Profile';
 import './index.css';
 import './styles/overrides.css';
 
+// Scrolls every visible modal body back to the top whenever a modal opens.
+// Watches only `style` attribute changes on `.ant-modal-wrap` elements —
+// Ant Design toggles `display: none` on that wrapper when a modal opens/closes.
+const useModalScrollReset = () => {
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type !== 'attributes') continue;
+        const el = mutation.target;
+        if (!el.classList?.contains('ant-modal-wrap')) continue;
+        // Modal just became visible (display removed or set to non-none)
+        if (el.style.display !== 'none') {
+          const body = el.querySelector('.ant-modal-body');
+          if (body) body.scrollTop = 0;
+        }
+      }
+    });
+
+    observer.observe(document.body, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+};
+
 // Inner component that uses theme context
 const ThemedApp = () => {
   const { antThemeConfig } = useTheme();
+  useModalScrollReset();
 
   return (
     <ConfigProvider theme={antThemeConfig}>
       <AntdApp>
+      <ConflictDialog />
       <StoreProvider>
         <BrowserRouter>
           <Routes>

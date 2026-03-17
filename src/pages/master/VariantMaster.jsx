@@ -19,12 +19,14 @@ const DATA_TYPES = [
   { value: 'multiselect', label: 'Multi-Select' },
 ];
 
-const VariantMaster = () => {
+const VariantMaster = ({ onDirtyChange }) => {
   const { attributes, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -104,7 +106,8 @@ const VariantMaster = () => {
     setSubmitting(true);
     try {
       if (selectedId) {
-        const response = await updateAttribute(selectedId, values);
+        const selectedRecord = attributes.find(a => a.id === selectedId);
+        const response = await updateAttribute(selectedId, { ...values, version: selectedRecord?.version });
         const updatedItem = response?.data || { id: selectedId, ...values };
         updateItem('attributes', selectedId, updatedItem);
         message.success('Attribute updated successfully');
@@ -154,6 +157,7 @@ const VariantMaster = () => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
+    setUnsavedChanges(false);
   };
 
   const handleSearch = (value) => {
@@ -169,6 +173,8 @@ const VariantMaster = () => {
   return (
     <MasterSplitView
       title="Variants / Attributes"
+      subtitle="Item"
+      addLabel="Add Attribute"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}
@@ -213,11 +219,12 @@ const VariantMaster = () => {
                 )}
               </Space>
             </div>
-            <Form 
-              form={form} 
-              layout="vertical" 
+            <Form
+              form={form}
+              layout="vertical"
               onFinish={handleSave}
               disabled={isReadOnly}
+              onValuesChange={() => setUnsavedChanges(true)}
             >
               <Form.Item 
                 name="attributeName" 

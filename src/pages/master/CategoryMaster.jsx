@@ -9,13 +9,14 @@ import PermissionGuard from '../../components/PermissionGuard';
 
 const MODULE_ID = 'master-data';
 
-const CategoryMaster = () => {
+const CategoryMaster = ({ onDirtyChange }) => {
   const { categories, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   // Check permissions
@@ -92,7 +93,8 @@ const CategoryMaster = () => {
     try {
       if (selectedId) {
         // Update existing category
-        const response = await updateCategory(selectedId, values);
+        const selectedRecord = categories.find(c => c.id === selectedId);
+        const response = await updateCategory(selectedId, { ...values, version: selectedRecord?.version });
         const updatedCategory = response?.data || { id: selectedId, ...values };
         updateItem('categories', selectedId, updatedCategory);
         message.success('Category updated successfully');
@@ -160,6 +162,8 @@ const CategoryMaster = () => {
   return (
     <MasterSplitView
       title="Categories"
+      subtitle="Item"
+      addLabel="Add Category"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

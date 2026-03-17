@@ -8,15 +8,16 @@ import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 
-const MODULE_ID = 'master-data';
+const MODULE_ID = 'style-master';
 
-const StyleMaster = () => {
+const StyleMaster = ({ onDirtyChange }) => {
   const { styles, buyers, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -118,9 +119,10 @@ const StyleMaster = () => {
 
     setSubmitting(true);
     try {
+      const selectedRecord = selectedId ? styles.find(s => s.id === selectedId) : null;
       const payload = {
         ...values,
-        ...(selectedId ? { id: selectedId } : {}),
+        ...(selectedId ? { id: selectedId, version: selectedRecord?.version } : {}),
       };
       const saved = await saveStyle(payload);
       if (selectedId) {
@@ -188,6 +190,8 @@ const StyleMaster = () => {
   return (
     <MasterSplitView
       title="Styles"
+      subtitle="Order Entry, Costing"
+      addLabel="Add Style"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}

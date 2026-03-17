@@ -29,7 +29,13 @@ const initialState = {
 
   // Terms & Conditions
   termsConditions: [],
-  
+
+  // Payment Terms
+  paymentTerms: [],
+
+  // Size Presets
+  sizePresets: [],
+
   // Users & Roles
   users: [],
   roles: [],
@@ -46,10 +52,12 @@ const initialState = {
     buyers: false,
     styles: false,
     termsConditions: false,
+    paymentTerms: false,
+    sizePresets: false,
     users: false,
     roles: false,
   },
-  
+
   // Error states per data type
   errors: {
     categories: null,
@@ -62,6 +70,8 @@ const initialState = {
     buyers: null,
     styles: null,
     termsConditions: null,
+    paymentTerms: null,
+    sizePresets: null,
     users: null,
     roles: null,
   },
@@ -78,6 +88,8 @@ const initialState = {
     buyers: null,
     styles: null,
     termsConditions: null,
+    paymentTerms: null,
+    sizePresets: null,
     users: null,
     roles: null,
   },

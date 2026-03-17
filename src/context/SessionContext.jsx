@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/authService';
+import { getCurrentUser } from '../utils/permissions';
+import useIdleTimeout from '../hooks/useIdleTimeout';
 
 const SessionContext = createContext(null);
 
@@ -7,6 +9,17 @@ const WARNING_THRESHOLD_SECONDS = 120;
 const CHECK_INTERVAL_MS = 15000;
 
 export const SessionProvider = ({ children }) => {
+  // ── Idle timeout (reads config from JWT claims cached in currentUser) ──
+  const user = getCurrentUser();
+  const idleTimeoutMs = (user?.idleTimeoutMinutes || 30) * 60 * 1000;
+  const idleWarningSeconds = user?.idleWarningSeconds || 120;
+  const {
+    isIdle: isIdleExpired,
+    isWarning: isIdleWarning,
+    remainingSeconds: idleRemainingSeconds,
+    resetIdle,
+  } = useIdleTimeout(idleTimeoutMs, idleWarningSeconds);
+
   const [remainingSeconds, setRemainingSeconds] = useState(null);
   const [isWarning, setIsWarning] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
@@ -156,6 +169,11 @@ export const SessionProvider = ({ children }) => {
     handleRefreshSession,
     resetSession,
     WARNING_THRESHOLD_SECONDS,
+    // Idle timeout state
+    isIdleWarning,
+    isIdleExpired,
+    idleRemainingSeconds,
+    resetIdle,
   }), [
     remainingSeconds,
     isWarning,
@@ -166,6 +184,10 @@ export const SessionProvider = ({ children }) => {
     dismissWarningModal,
     handleRefreshSession,
     resetSession,
+    isIdleWarning,
+    isIdleExpired,
+    idleRemainingSeconds,
+    resetIdle,
   ]);
 
   return (

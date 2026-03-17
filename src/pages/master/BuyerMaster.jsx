@@ -78,6 +78,7 @@ const BuyerMaster = () => {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   const [viewDrawerVisible, setViewDrawerVisible] = useState(false);
   const [viewingBuyer, setViewingBuyer] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [form] = Form.useForm();
 
   // Shipping locations state (managed outside Form)
@@ -175,12 +176,15 @@ const BuyerMaster = () => {
 
   // Handle Delete
   const handleDelete = async (id) => {
+    setDeletingId(id);
     try {
       await deleteBuyer(id);
       removeItem('buyers', id);
       message.success('Buyer deleted successfully');
     } catch (error) {
       message.error(error?.errorMessage || 'Failed to delete buyer');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -208,7 +212,7 @@ const BuyerMaster = () => {
       };
 
       if (editingBuyer) {
-        const response = await updateBuyer({ ...buyerData, id: editingBuyer.id });
+        const response = await updateBuyer({ ...buyerData, id: editingBuyer.id, version: editingBuyer.version });
         const updatedBuyer = response?.data || response || { ...buyerData, id: editingBuyer.id };
         updateItem('buyers', editingBuyer.id, updatedBuyer);
         setBuyers((prev) => {
@@ -435,7 +439,7 @@ const BuyerMaster = () => {
               onConfirm={() => handleDelete(record.id)}
               okText="Delete"
               cancelText="Cancel"
-              okButtonProps={{ danger: true }}
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
               icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
             >
               <Tooltip title="Delete">
@@ -513,7 +517,7 @@ const BuyerMaster = () => {
       title={
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Buyers</div>
-          <div style={{ fontSize: 12, color: '#888' }}>Manage buyer master data</div>
+          <div style={{ fontSize: 12, color: '#888' }}>Order Entry</div>
         </div>
       }
     >
