@@ -25,12 +25,15 @@ import {
 import {
   PlusOutlined,
   DeleteOutlined,
+  CopyOutlined,
   SaveOutlined,
   SendOutlined,
   ArrowLeftOutlined,
   CalculatorOutlined,
   InboxOutlined,
   InfoCircleOutlined,
+  WhatsAppOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
@@ -65,7 +68,10 @@ import { getStylesByBuyerId } from '../../services/styleService';
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
 import { useTheme } from '../../context/ThemeContext';
+import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
+import useIsTablet from '../../hooks/useIsTablet';
+import CostingFormTablet from './CostingFormTablet';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
@@ -76,6 +82,7 @@ const CostingForm = () => {
   const [form] = Form.useForm();
   const { isDarkMode } = useTheme();
   const isEdit = Boolean(id);
+  const isTablet = useIsTablet();
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -92,6 +99,7 @@ const CostingForm = () => {
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
   const [costingId, setCostingId] = useState('');
   const [currency, setCurrency] = useState('INR');
@@ -525,6 +533,17 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+  const duplicateFabricRow = (key) => {
+    setFabricRows((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `f_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  };
+
   const updateLocalTrim = (key, field, value) => {
     setLocalTrims((prev) =>
       prev.map((r) => {
@@ -548,6 +567,17 @@ const CostingForm = () => {
   const deleteLocalTrim = (key) => {
     setLocalTrims((prev) => prev.filter((r) => r.key !== key));
     setIsDirty(true);
+  };
+
+  const duplicateLocalTrim = (key) => {
+    setLocalTrims((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `lt_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
   };
 
   const updateImportedTrim = (key, field, value) => {
@@ -575,6 +605,17 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+  const duplicateImportedTrim = (key) => {
+    setImportedTrims((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `it_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  };
+
   const updateManufacturingRow = (key, field, value) => {
     setManufacturingRows((prev) =>
       prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
@@ -595,6 +636,7 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+
   const updateOverheadRow = (key, field, value) => {
     setOverheadRows((prev) =>
       prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
@@ -614,6 +656,18 @@ const CostingForm = () => {
     setOverheadRows((prev) => prev.filter((r) => r.key !== key));
     setIsDirty(true);
   };
+
+  const duplicateOverheadRow = (key) => {
+    setOverheadRows((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `o_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+  };
+
 
   // Knits modal handlers
   const openKnitsModal = (rowKey) => {
@@ -652,7 +706,8 @@ const CostingForm = () => {
         ? formValues.seasonCode + formValues.seasonYear.slice(-2)
         : '';
 
-    // Resolve styleNo label from styleOptions
+    // Resolve buyer name and styleNo label from options
+    const selectedBuyer = buyerOptions.find((b) => b.value === formValues.buyerId);
     const selectedStyle = styleOptions.find((s) => s.value === formValues.styleNo);
     const resolvedStyleNo = selectedStyle ? selectedStyle.label : formValues.styleNo;
 
@@ -665,6 +720,7 @@ const CostingForm = () => {
       status,
       date: formValues.date?.format('YYYY-MM-DD'),
       buyerId: formValues.buyerId,
+      buyerName: selectedBuyer?.label || '',
       styleId,
       styleNo: resolvedStyleNo,
       garmentName: formValues.garmentName,
@@ -718,6 +774,10 @@ const CostingForm = () => {
         saved = await createCostSheet(payload);
         message.success('Cost sheet created as draft');
       }
+      message.success({
+        content: 'WhatsApp notification sent',
+        icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
+      });
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       navigate('/costing/list');
@@ -741,6 +801,10 @@ const CostingForm = () => {
         saved = await createCostSheet(payload);
         message.success('Cost sheet created and submitted');
       }
+      message.success({
+        content: 'WhatsApp notification sent',
+        icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
+      });
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       navigate('/costing/list');
@@ -748,6 +812,86 @@ const CostingForm = () => {
       message.error('Please fill all required fields');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ==================== PRINT ====================
+
+  const handlePrint = async () => {
+    setPrinting(true);
+    try {
+      const values = form.getFieldsValue();
+      const selectedBuyer = buyerOptions.find((b) => b.value === values.buyerId);
+      const selectedStyle = styleOptions.find((s) => s.value === values.styleNo);
+      const season =
+        values.seasonCode && values.seasonYear
+          ? values.seasonCode + values.seasonYear.slice(-2)
+          : '';
+      const cleanRows = (rows) => rows.map(({ key, ...rest }) => rest);
+
+      const printData = {
+        costingId,
+        status: isEdit ? 'Draft' : 'Draft',
+        date: values.date?.format('YYYY-MM-DD'),
+        buyerName: selectedBuyer?.label || '',
+        styleNo: selectedStyle?.label || values.styleNo || '',
+        garmentName: values.garmentName,
+        season,
+        currency,
+        quoteCurrency,
+        actualRate,
+        todaysRate,
+        usdToInrRate,
+        sizes: values.sizes || [],
+        fabricRows: cleanRows(fabricRows),
+        localTrims: cleanRows(localTrims),
+        importedTrims: cleanRows(importedTrims),
+        manufacturingRows: cleanRows(manufacturingRows),
+        overheadRows: cleanRows(overheadRows),
+        agentCommissionPct,
+        profitPct,
+        targetPrice,
+        totalFabricCost,
+        totalLocalTrimsCost,
+        totalImportedTrimsCostUsd,
+        totalAccessoriesCost,
+        totalManufacturingCost,
+        totalMarkupCost,
+        totalMakingPrice,
+        totalOverheadCharges,
+        totalPrice,
+        finalPrice,
+        finalPriceUsd: quoteCurrency === 'USD' ? finalPrice : finalPriceUsd,
+        sizeSummaries: uniqueSizeKeys.length > 1
+          ? uniqueSizeKeys.map((sk) => {
+              const sizeFabric = fabricRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.netCost) || 0), 0);
+              const sizeLocalTrims = localTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.price) || 0), 0);
+              const sizeImportedTrims = importedTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.priceUsd) || 0), 0);
+              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * actualRate;
+              const sizeMfg = manufacturingRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
+              const sizeMarkup = overheadRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
+              const sizeMaking = sizeFabric + sizeAccessories + sizeMfg + sizeMarkup;
+              const sizeAgent = syncPercentages ? agentCommissionPct : (perSizeOverrides[sk]?.agentCommissionPct ?? agentCommissionPct);
+              const sizeProfit = syncPercentages ? profitPct : (perSizeOverrides[sk]?.profitPct ?? profitPct);
+              const sizeOverhead = ((sizeAgent + sizeProfit) / 100) * sizeMaking;
+              const sizeTotalPrice = sizeMaking + sizeOverhead;
+              const sizeFinalPrice = actualRate ? sizeTotalPrice / actualRate : 0;
+              const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
+              return {
+                sizes: sk, agentCommissionPct: sizeAgent, profitPct: sizeProfit,
+                totalFabricCost: sizeFabric, totalAccessoriesCost: sizeAccessories,
+                totalManufacturingCost: sizeMfg, totalMarkupCost: sizeMarkup,
+                totalMakingPrice: sizeMaking, totalPrice: sizeTotalPrice,
+                finalPriceUsd: sizeFinalPriceUsd,
+              };
+            })
+          : [],
+      };
+      await generateCostingPdf(printData);
+    } catch {
+      message.error('Failed to generate print document');
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -968,11 +1112,16 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 45,
+      width: 80,
       render: (_, record) => (
-        <Popconfirm title="Remove this fabric row?" onConfirm={() => deleteFabricRow(record.key)}>
-          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-        </Popconfirm>
+        <Space size={0}>
+          <Tooltip title="Duplicate row">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateFabricRow(record.key)} />
+          </Tooltip>
+          <Popconfirm title="Remove this fabric row?" onConfirm={() => deleteFabricRow(record.key)}>
+            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -1072,11 +1221,16 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 45,
+      width: 80,
       render: (_, record) => (
-        <Popconfirm title="Remove this item?" onConfirm={() => deleteLocalTrim(record.key)}>
-          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-        </Popconfirm>
+        <Space size={0}>
+          <Tooltip title="Duplicate row">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateLocalTrim(record.key)} />
+          </Tooltip>
+          <Popconfirm title="Remove this item?" onConfirm={() => deleteLocalTrim(record.key)}>
+            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -1176,11 +1330,16 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 45,
+      width: 80,
       render: (_, record) => (
-        <Popconfirm title="Remove this item?" onConfirm={() => deleteImportedTrim(record.key)}>
-          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-        </Popconfirm>
+        <Space size={0}>
+          <Tooltip title="Duplicate row">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateImportedTrim(record.key)} />
+          </Tooltip>
+          <Popconfirm title="Remove this item?" onConfirm={() => deleteImportedTrim(record.key)}>
+            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -1258,11 +1417,16 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 45,
+      width: 80,
       render: (_, record) => (
-        <Popconfirm title="Remove this process?" onConfirm={() => deleteManufacturingRow(record.key)}>
-          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-        </Popconfirm>
+        <Space size={0}>
+          <Tooltip title="Duplicate row">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateManufacturingRow(record.key)} />
+          </Tooltip>
+          <Popconfirm title="Remove this process?" onConfirm={() => deleteManufacturingRow(record.key)}>
+            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -1323,11 +1487,16 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 45,
+      width: 80,
       render: (_, record) => (
-        <Popconfirm title="Remove this item?" onConfirm={() => deleteOverheadRow(record.key)}>
-          <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-        </Popconfirm>
+        <Space size={0}>
+          <Tooltip title="Duplicate row">
+            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateOverheadRow(record.key)} />
+          </Tooltip>
+          <Popconfirm title="Remove this item?" onConfirm={() => deleteOverheadRow(record.key)}>
+            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -1948,6 +2117,108 @@ const CostingForm = () => {
     },
   ];
 
+  // ==================== TABLET LAYOUT ====================
+  if (isTablet) {
+    return (
+      <>
+        <Form
+          form={form}
+          layout="vertical"
+          initialValues={{ currency: 'INR', quoteCurrency: 'USD', date: dayjs() }}
+        >
+          <CostingFormTablet
+            form={form}
+            navigate={navigate}
+            isEdit={isEdit}
+            loading={loading}
+            saving={saving}
+            costingId={costingId}
+            currency={currency}
+            setCurrency={setCurrency}
+            quoteCurrency={quoteCurrency}
+            setQuoteCurrency={setQuoteCurrency}
+            actualRate={actualRate}
+            setActualRate={setActualRate}
+            todaysRate={todaysRate}
+            buyerOptions={buyerOptions}
+            styleOptions={styleOptions}
+            sizeOptions={sizeOptions}
+            fabricItemOptions={fabricItemOptions}
+            localTrimOptions={localTrimOptions}
+            importedTrimOptions={importedTrimOptions}
+            effectiveMfgOptions={effectiveMfgOptions}
+            effectiveOvhOptions={effectiveOvhOptions}
+            optionsLoading={optionsLoading}
+            stylesLoading={stylesLoading}
+            fabricRows={fabricRows}
+            localTrims={localTrims}
+            importedTrims={importedTrims}
+            manufacturingRows={manufacturingRows}
+            overheadRows={overheadRows}
+            addFabricRow={addFabricRow}
+            updateFabricRow={updateFabricRow}
+            deleteFabricRow={deleteFabricRow}
+            duplicateFabricRow={duplicateFabricRow}
+            handleFabricItemSelect={handleFabricItemSelect}
+            openKnitsModal={openKnitsModal}
+            addLocalTrim={addLocalTrim}
+            updateLocalTrim={updateLocalTrim}
+            deleteLocalTrim={deleteLocalTrim}
+            duplicateLocalTrim={duplicateLocalTrim}
+            addImportedTrim={addImportedTrim}
+            updateImportedTrim={updateImportedTrim}
+            deleteImportedTrim={deleteImportedTrim}
+            duplicateImportedTrim={duplicateImportedTrim}
+            addManufacturingRow={addManufacturingRow}
+            updateManufacturingRow={updateManufacturingRow}
+            deleteManufacturingRow={deleteManufacturingRow}
+            duplicateManufacturingRow={duplicateManufacturingRow}
+            addOverheadRow={addOverheadRow}
+            updateOverheadRow={updateOverheadRow}
+            deleteOverheadRow={deleteOverheadRow}
+            duplicateOverheadRow={duplicateOverheadRow}
+            handleBuyerChange={handleBuyerChange}
+            handleStyleChange={handleStyleChange}
+            totalFabricCost={totalFabricCost}
+            totalLocalTrimsCost={totalLocalTrimsCost}
+            totalImportedTrimsCostUsd={totalImportedTrimsCostUsd}
+            totalAccessoriesCost={totalAccessoriesCost}
+            totalManufacturingCost={totalManufacturingCost}
+            totalMarkupCost={totalMarkupCost}
+            totalMakingPrice={totalMakingPrice}
+            totalOverheadCharges={totalOverheadCharges}
+            totalPrice={totalPrice}
+            finalPrice={finalPrice}
+            finalPriceUsd={finalPriceUsd}
+            agentCommissionPct={agentCommissionPct}
+            setAgentCommissionPct={setAgentCommissionPct}
+            profitPct={profitPct}
+            setProfitPct={setProfitPct}
+            targetPrice={targetPrice}
+            setTargetPrice={setTargetPrice}
+            perSizeSummaries={perSizeSummaries}
+            perSizeOverrides={perSizeOverrides}
+            setPerSizeOverrides={setPerSizeOverrides}
+            syncPercentages={syncPercentages}
+            setSyncPercentages={setSyncPercentages}
+            uploadProps={uploadProps}
+            handleSaveDraft={handleSaveDraft}
+            handleSubmit={handleSubmit}
+            handlePrint={handlePrint}
+            printing={printing}
+          />
+        </Form>
+        <KnitsConsumptionModal
+          open={knitsModalOpen}
+          onApply={handleKnitsApply}
+          onCancel={() => setKnitsModalOpen(false)}
+          initialParts={knitsParts}
+        />
+      </>
+    );
+  }
+
+  // ==================== DESKTOP LAYOUT ====================
   return (
     <div className="animate-fade-in-up">
       <div className="page-header">
@@ -2002,6 +2273,14 @@ const CostingForm = () => {
       >
         <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
           Cancel
+        </Button>
+        <Button
+          icon={<PrinterOutlined />}
+          onClick={handlePrint}
+          loading={printing}
+          disabled={savingDraft || submitting}
+        >
+          Print / PDF
         </Button>
         <Button
           icon={<SaveOutlined />}

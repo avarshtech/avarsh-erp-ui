@@ -237,3 +237,22 @@ export const downloadAttachment = async (attachmentId) => {
 export const deleteAttachment = async (attachmentId) => {
   await axiosInstance.delete(`${ENDPOINTS.COST_SHEETS}/attachments/${attachmentId}`);
 };
+
+// ==================== WHATSAPP NOTIFICATIONS ====================
+
+/**
+ * Send a WhatsApp notification for a cost sheet.
+ * POST /api/v1/whatsapp/test/send
+ * @param {string} phoneNumber - Recipient phone number (with country code)
+ * @param {string} templateName - WhatsApp template name
+ * @param {string} [languageCode='en_US'] - Language code
+ * @returns {Promise<Object>} Response with success status
+ */
+export const sendWhatsAppNotification = async (phoneNumber, templateName, languageCode = 'en_US') => {
+  const response = await axiosInstance.post('/whatsapp/test/send', {
+    phoneNumber,
+    templateName,
+    languageCode,
+  });
+  return response.data;
+};

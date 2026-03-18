@@ -28,6 +28,7 @@ import {
   ReloadOutlined,
   ExclamationCircleOutlined,
   HistoryOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -35,6 +36,7 @@ import {
   searchCostSheets,
   deleteCostSheet,
   duplicateCostSheet,
+  getCostSheetById,
 } from '../../services/costingService';
 import { hasPermission } from '../../utils/permissions';
 import {
@@ -47,6 +49,7 @@ import {
   formatCurrency,
 } from '../../utils/costingConstants';
 import { getBuyers } from '../../services/buyerService';
+import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import CostingHistoryModal from './CostingHistoryModal';
 
 const { Text } = Typography;
@@ -80,6 +83,7 @@ const CostingList = () => {
   const [buyerOptions, setBuyerOptions] = useState([]);
   const [duplicatingId, setDuplicatingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
 
   // Permissions
   const canAdd = hasPermission('costing', 'add');
@@ -191,6 +195,18 @@ const CostingList = () => {
   const handleViewHistory = (record) => {
     setHistoryRecord(record);
     setHistoryModalOpen(true);
+  };
+
+  const handlePrint = async (record) => {
+    setPrintingId(record.id);
+    try {
+      const fullData = await getCostSheetById(record.id);
+      await generateCostingPdf(fullData);
+    } catch {
+      message.error('Failed to generate print document');
+    } finally {
+      setPrintingId(null);
+    }
   };
 
   const canEditSheet = (record) =>
@@ -358,6 +374,16 @@ const CostingList = () => {
               onClick={() => handleDuplicate(record)}
               loading={duplicatingId === record.id}
               style={{ color: '#722ed1' }}
+            />
+          </Tooltip>
+          <Tooltip title="Print">
+            <Button
+              type="text"
+              size="small"
+              icon={<PrinterOutlined />}
+              onClick={() => handlePrint(record)}
+              loading={printingId === record.id}
+              style={{ color: '#0ea5e9' }}
             />
           </Tooltip>
           {(record.status === COSTING_STATUS.APPROVED || record.status === COSTING_STATUS.FINAL) && (
