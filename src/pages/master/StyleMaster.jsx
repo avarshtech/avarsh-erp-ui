@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Switch, Modal, Spin, Row, Col } from 'antd';
+import { Form, Input, Button, Space, message, Tag, Select, Switch, Modal, Row, Col, Typography } from 'antd';
+const { Text } = Typography;
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { saveStyle, deleteStyle } from '../../services/styleService';
@@ -17,8 +18,9 @@ const StyleMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -76,11 +78,13 @@ const StyleMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add styles');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ isActive: true });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -88,13 +92,15 @@ const StyleMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view style details');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({
       ...record,
       isActive: record.isActive !== false,
     });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -133,7 +139,9 @@ const StyleMaster = ({ onDirtyChange }) => {
         setSelectedId(saved.id);
         message.success('Style created successfully');
       }
-      setUnsavedChanges(false);
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save style:', error);
       message.error(selectedId ? 'Failed to update style' : 'Failed to create style');
@@ -173,7 +181,7 @@ const StyleMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -201,19 +209,26 @@ const StyleMaster = ({ onDirtyChange }) => {
       onSearch={handleSearch}
       searchPlaceholder="Search by style no, garment or buyer..."
       renderForm={() => (
-        <Spin spinning={submitting}>
-          <div style={{ padding: 24 }}>
+          <div style={{ height: '100%', overflowY: 'auto' }}>
             <div style={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
+              background: 'var(--card-bg, #fff)',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: 24,
-              borderBottom: '1px solid #f0f0f0',
-              paddingBottom: 16,
+              padding: '16px 24px',
+              borderBottom: '1px solid var(--border-color, #f0f0f0)',
             }}>
-              <h2 style={{ margin: 0 }}>
-                {selectedId ? (isReadOnly ? 'View Style' : 'Edit Style') : 'New Style'}
-              </h2>
+              <div>
+                <h2 style={{ margin: 0 }}>
+                  {selectedId ? (isReadOnly ? 'View Style' : 'Edit Style') : 'New Style'}
+                </h2>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {selectedId ? 'Modify the style details below' : 'Define a new garment style reference by buyer and season'}
+                </Text>
+              </div>
               <Space>
                 {selectedId && canDelete && (
                   <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
@@ -238,12 +253,13 @@ const StyleMaster = ({ onDirtyChange }) => {
                 )}
               </Space>
             </div>
+            <div style={{ padding: 24 }}>
             <Form
               form={form}
               layout="vertical"
               onFinish={handleSave}
               disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
+              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
               <Row gutter={16}>
                 <Col span={12}>
@@ -299,15 +315,15 @@ const StyleMaster = ({ onDirtyChange }) => {
                   </Form.Item>
                 </Col>
               </Row>
-              <Form.Item name="description" label="Description">
-                <Input.TextArea rows={3} placeholder="Style description (optional)" maxLength={500} />
+              <Form.Item name="description" label="Fabric Description">
+                <Input.TextArea rows={3} placeholder="Fabric description (optional)" maxLength={500} />
               </Form.Item>
               <Form.Item name="isActive" label="Active" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
               </Form.Item>
             </Form>
+            </div>
           </div>
-        </Spin>
       )}
     />
   );

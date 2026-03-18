@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Modal, Spin } from 'antd';
+import { Form, Input, Button, Space, message, Tag, Select, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createAttribute, updateAttribute, deleteAttribute } from '../../services/masterDataService';
@@ -26,8 +26,9 @@ const VariantMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   // Check permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -61,10 +62,13 @@ const VariantMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add attributes');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ dataType: 'string', values: [] });
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -72,6 +76,7 @@ const VariantMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view attribute details');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({
@@ -79,6 +84,8 @@ const VariantMaster = ({ onDirtyChange }) => {
       attributeName: record.attributeName || record.name,
       values: record.values || [],
     });
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -118,6 +125,9 @@ const VariantMaster = ({ onDirtyChange }) => {
         setSelectedId(newItem.id);
         message.success('Attribute created successfully');
       }
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save attribute:', error);
       message.error(selectedId ? 'Failed to update attribute' : 'Failed to create attribute');
@@ -157,7 +167,7 @@ const VariantMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -183,7 +193,6 @@ const VariantMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       renderForm={() => (
-        <Spin spinning={submitting}>
           <div style={{ padding: 24 }}>
             <div style={{ 
               display: 'flex', 
@@ -224,7 +233,7 @@ const VariantMaster = ({ onDirtyChange }) => {
               layout="vertical"
               onFinish={handleSave}
               disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
+              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
               <Form.Item 
                 name="attributeName" 
@@ -260,7 +269,6 @@ const VariantMaster = ({ onDirtyChange }) => {
               )}
             </Form>
           </div>
-        </Spin>
       )}
     />
   );

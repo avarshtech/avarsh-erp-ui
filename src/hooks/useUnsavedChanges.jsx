@@ -17,11 +17,15 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
  */
 const useUnsavedChanges = (isDirty) => {
   const isDirtyRef = useRef(false);
+  const clearDirtyRef = useRef(() => {});
 
   // Keep ref in sync — ref is read synchronously by event handlers
   useEffect(() => {
     isDirtyRef.current = isDirty;
   }, [isDirty]);
+
+  // Imperative clear — call before navigate to avoid race with useEffect sync
+  clearDirtyRef.current = () => { isDirtyRef.current = false; };
 
   useEffect(() => {
     const suppressRef = { current: false };
@@ -56,12 +60,15 @@ const useUnsavedChanges = (isDirty) => {
     const originalPush = window.history.pushState;
     const originalReplace = window.history.replaceState;
 
+    // Navigation to /login (session expiry) should never be blocked
+    const isAuthRedirect = (pathname) => pathname === '/login';
+
     window.history.pushState = function () {
       const args = Array.from(arguments);
       try {
         const to = new URL(args[2], window.location.origin).pathname;
         const from = window.location.pathname;
-        if (isDirtyRef.current && !suppressRef.current && to !== from) {
+        if (isDirtyRef.current && !suppressRef.current && to !== from && !isAuthRedirect(to)) {
           confirmAndNavigate(args, originalPush);
           return;
         }
@@ -76,7 +83,7 @@ const useUnsavedChanges = (isDirty) => {
       try {
         const to = new URL(args[2], window.location.origin).pathname;
         const from = window.location.pathname;
-        if (isDirtyRef.current && !suppressRef.current && to !== from) {
+        if (isDirtyRef.current && !suppressRef.current && to !== from && !isAuthRedirect(to)) {
           confirmAndNavigate(args, originalReplace);
           return;
         }
@@ -102,6 +109,9 @@ const useUnsavedChanges = (isDirty) => {
     };
     // Mount once — isDirtyRef is read by reference so no re-bind needed
   }, []);
+
+  /** Call before programmatic navigation to bypass the guard synchronously */
+  return { clearDirty: () => clearDirtyRef.current() };
 };
 
 export default useUnsavedChanges;

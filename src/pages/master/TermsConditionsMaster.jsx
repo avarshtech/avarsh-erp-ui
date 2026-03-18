@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Form, Input, Button, Space, message, Modal, Spin, Tag, Typography } from 'antd';
+import { Form, Input, Button, Space, message, Modal, Tag, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import {
@@ -34,7 +34,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
   const [description, setDescription] = useState('');
   const skipDirty = useRef(false);
@@ -100,7 +100,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
     setIsEditing(true);
     form.resetFields();
     setDescription('');
-    setUnsavedChanges(false);
+    markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 100);
   };
 
@@ -109,12 +109,14 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view terms & conditions');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({ name: record.name });
     // Set the description (HTML) as-is from the API
     setDescription(record.description || '');
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -168,6 +170,9 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
         message.success('Terms & Conditions created successfully');
       }
 
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
       // Refresh from server to ensure consistency
       await fetchData(true);
     } catch (error) {
@@ -211,7 +216,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
     setSelectedId(null);
     form.resetFields();
     setDescription('');
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -291,9 +296,8 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
 
           {/* Scrollable form content */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 24px' }}>
-            <Spin spinning={submitting}>
               <Form form={form} layout="vertical" onFinish={handleSave} disabled={isReadOnly}
-                onValuesChange={() => { if (!skipDirty.current) setUnsavedChanges(true); }}
+                onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
               >
                 <Form.Item
                   name="name"
@@ -333,7 +337,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
                   <div style={{ marginTop: 6 }}>
                     <RichTextEditor
                       value={description}
-                      onChange={(val) => { setDescription(val); if (!skipDirty.current) setUnsavedChanges(true); }}
+                      onChange={(val) => { setDescription(val); if (!skipDirty.current) markDirty(true); }}
                       placeholder="Enter terms and conditions content here. Use the toolbar above for formatting like bullet points, numbered lists, bold text, alignment, etc."
                       readOnly={isReadOnly}
                       minHeight={380}
@@ -351,7 +355,6 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
                   This content will be appended to the PO document during PDF generation. Use formatting tools for clean presentation.
                 </div>
               </Form>
-            </Spin>
           </div>
         </div>
       )}

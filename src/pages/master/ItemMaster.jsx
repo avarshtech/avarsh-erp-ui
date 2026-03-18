@@ -1527,7 +1527,7 @@ const ItemMaster = () => {
           destroyOnHidden
           styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 } }}
       >
-        <Spin spinning={metaDataLoading || submitting}>
+        <Spin spinning={metaDataLoading}>
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
@@ -1646,7 +1646,7 @@ const ItemMaster = () => {
                   label="Primary UOM"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
-                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.symbol ?? opt.name ?? opt.label ?? '') }))} />
+                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))} />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1668,7 +1668,7 @@ const ItemMaster = () => {
                       placeholder="Select Secondary UOM (optional)"
                       allowClear
                       disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
-                      options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: String(opt.symbol ?? opt.name ?? opt.label ?? '') }))}
+                      options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                     />
                 </Form.Item>
               </Col>

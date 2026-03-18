@@ -130,6 +130,8 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
     currency,
     paymentTermsName,
     paymentDays,
+    fabricDescription,
+    material,
     remarks,
     totalOrderQty,
     totalOrderValue,
@@ -567,6 +569,7 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
         <Descriptions.Item label="Garment Type">{garmentType || '—'}</Descriptions.Item>
 
         <Descriptions.Item label="Season">{season || '—'}</Descriptions.Item>
+        <Descriptions.Item label="Material">{material || '—'}</Descriptions.Item>
         <Descriptions.Item label="Component">
           {component || '—'}
           {component === 'Multiple' && components.length > 0 && (
@@ -590,8 +593,9 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
             {fmtCurrency(totalOrderValue)}
           </Text>
         </Descriptions.Item>
+        <Descriptions.Item label="Fabric Description" span={2}>{fabricDescription || '—'}</Descriptions.Item>
         {remarks && (
-          <Descriptions.Item label="Remarks" span={2}>{remarks}</Descriptions.Item>
+          <Descriptions.Item label="Remarks" span={3}>{remarks}</Descriptions.Item>
         )}
       </Descriptions>
 

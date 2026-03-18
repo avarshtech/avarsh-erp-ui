@@ -6,6 +6,8 @@ import {
   GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined,
   ShopOutlined, HighlightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   CreditCardOutlined, ColumnWidthOutlined, ExclamationCircleOutlined,
+  ToolOutlined,
+  ScissorOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -19,6 +21,8 @@ import TermsConditionsMaster from './TermsConditionsMaster';
 import StyleMaster from './StyleMaster';
 import PaymentTermsMaster from './PaymentTermsMaster';
 import SizePresetMaster from './SizePresetMaster';
+import ProcessMaster from './ProcessMaster';
+import PartsMaster from './PartsMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
@@ -164,6 +168,30 @@ const NAV_GROUPS = [
         Component: TermsConditionsMaster,
         loadingKey: null,
         description: 'Contract and terms templates for purchase orders',
+      },
+    ],
+  },
+  {
+    groupKey: 'manufacturing',
+    label: 'Manufacturing',
+    items: [
+      {
+        key: 'process',
+        label: 'Processes',
+        icon: <ToolOutlined />,
+        moduleId: 'process-master',
+        Component: ProcessMaster,
+        loadingKey: null,
+        description: 'Manufacturing processes and allowance defaults for BOM',
+      },
+      {
+        key: 'parts',
+        label: 'Parts',
+        icon: <ScissorOutlined />,
+        moduleId: 'parts-master',
+        Component: PartsMaster,
+        loadingKey: null,
+        description: 'Garment part names for BOM line items',
       },
     ],
   },

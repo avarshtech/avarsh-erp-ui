@@ -11,6 +11,7 @@ import {
   Col,
   Space,
   Typography,
+  Statistic,
   message,
   Collapse,
   Tag,
@@ -44,6 +45,7 @@ import { getBuyers, getBuyerById } from '../../services/buyerService';
 import { getAllPaymentTerms } from '../../services/paymentTermsService';
 import { getCostSheetByCostingId, downloadAttachment } from '../../services/costingService';
 import { getAllSizePresets } from '../../services/sizePresetService';
+import { getStyleById } from '../../services/styleService';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,
@@ -55,6 +57,27 @@ import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+/** Auto-format costing ID: user types after "CST/" prefix, auto-inserts - and / */
+const formatCostingId = (raw, prev = '') => {
+  const prefix = 'CST/';
+  if (!raw || raw.length < prefix.length) return prefix;
+  const isDeleting = raw.length < prev.length;
+  if (isDeleting && raw.length <= prefix.length) return prefix;
+  const after = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  let result = prefix;
+  for (let i = 0; i < after.length; i++) {
+    if (i === 2) result += '-';
+    if (i === 4) result += '/';
+    result += after[i];
+  }
+  // Append separator immediately when segment is complete (not deleting)
+  if (!isDeleting) {
+    if (after.length === 2 && !result.endsWith('-')) result += '-';
+    if (after.length === 4 && !result.endsWith('/')) result += '/';
+  }
+  return result;
+};
 
 // ==================== COSTING ATTACHMENTS PREVIEW ====================
 
@@ -666,7 +689,7 @@ const OrderForm = () => {
   const [form] = Form.useForm();
   const dataInitRef = useRef(false);
   const [isDirty, setIsDirty] = useState(false);
-  useUnsavedChanges(isDirty);
+  const { clearDirty } = useUnsavedChanges(isDirty);
 
   // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
@@ -761,6 +784,8 @@ const OrderForm = () => {
       styleNo: order.styleNo,
       garmentType: order.garmentType,
       season: order.season,
+      fabricDescription: order.fabricDescription || '',
+      material: order.material || undefined,
       component: order.component,
       currency: order.currency,
       paymentTerms: order.paymentTermsId,
@@ -790,6 +815,21 @@ const OrderForm = () => {
     setOrderLines(lines.length > 0 ? lines : [createEmptyLine()]);
     setActiveKeys(lines.map((l) => l.key));
   }, [form]);
+
+  // Reset form state when switching from edit to new order
+  useEffect(() => {
+    if (!id) {
+      form.resetFields();
+      setExistingOrder(null);
+      setEntityVersion(null);
+      setOrderLines([createEmptyLine()]);
+      setActiveKeys([]);
+      setCostingAttachments([]);
+      setFormComponents([]);
+      setIsDirty(false);
+      setPageLoading(false);
+    }
+  }, [id, form]);
 
   // Load existing order for edit — use passed location state first, fall back to API
   useEffect(() => {
@@ -889,19 +929,37 @@ const OrderForm = () => {
 
   // ==================== COSTING ID LOOKUP ====================
 
+  const COSTING_ID_PATTERN = /^CST\/\d{2}-\d{2}\/\d{4,}$/;
+
   const handleCostingIdBlur = async (e) => {
     const val = e.target.value?.trim();
     if (!val) return;
+    if (!COSTING_ID_PATTERN.test(val)) return; // incomplete pattern — don't call API
     setCostingLoading(true);
     try {
       const costing = await getCostSheetByCostingId(val);
-      form.setFieldsValue({
+      if (costing.status?.toUpperCase() !== 'APPROVED') {
+        message.error('Costing is not approved. Only approved costings can be used for order creation.');
+        setCostingLoading(false);
+        return;
+      }
+      const formValues = {
         buyerId: costing.buyerId,
         styleNo: costing.styleNo || '',
         garmentType: costing.garmentName || '',
         season: costing.season || '',
         currency: costing.quoteCurrency || costing.currency || '',
-      });
+      };
+      // Fetch fabric description from style master
+      if (costing.styleId) {
+        try {
+          const style = await getStyleById(costing.styleId);
+          formValues.fabricDescription = style.description || '';
+        } catch {
+          // Style not found — leave fabric description empty for manual entry
+        }
+      }
+      form.setFieldsValue(formValues);
       setCostingAttachments(Array.isArray(costing.attachments) ? costing.attachments : []);
       // Fetch buyer by ID to ensure shippingLocations are loaded for destination dropdown
       if (costing.buyerId) {
@@ -921,13 +979,14 @@ const OrderForm = () => {
         }
       }
     } catch {
-      message.error('Costing ID not found. Please enter a valid costing ID.');
+      // Error toast is shown by the global interceptor with backend message
       form.setFieldsValue({
         buyerId: null,
         styleNo: '',
         garmentType: '',
         season: '',
         currency: '',
+        fabricDescription: '',
       });
       setCostingAttachments([]);
     } finally {
@@ -1034,6 +1093,8 @@ const OrderForm = () => {
       styleNo: values.styleNo,
       garmentType: values.garmentType,
       season: values.season,
+      fabricDescription: values.fabricDescription,
+      material: values.material,
       component: values.component,
       components: values.component === 'Multiple' ? formComponents : [],
       currency: values.currency,
@@ -1085,6 +1146,7 @@ const OrderForm = () => {
       }
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
+      clearDirty();
       navigate('/orders/list');
     } catch {
       message.error('Failed to save order');
@@ -1121,6 +1183,7 @@ const OrderForm = () => {
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
+          clearDirty();
           navigate('/orders/list');
         } catch {
           message.error('Failed to submit order');
@@ -1252,6 +1315,7 @@ const OrderForm = () => {
         layout="vertical"
         initialValues={{
           orderDate: dayjs(),
+          costingId: 'CST/',
         }}
         onValuesChange={() => setIsDirty(true)}
       >
@@ -1266,9 +1330,10 @@ const OrderForm = () => {
                 name="costingId"
                 label="Costing ID"
                 rules={[{ required: true, message: 'Enter costing ID' }]}
+                normalize={(val) => formatCostingId(val || '', '')}
               >
                 <Input
-                  placeholder="Enter costing ID"
+                  placeholder="CST/25-26/1001"
                   onBlur={handleCostingIdBlur}
                   suffix={costingLoading ? <LoadingOutlined spin /> : null}
                 />
@@ -1326,9 +1391,23 @@ const OrderForm = () => {
             </Col>
           </Row>
 
-          {/* Row 1b: Component + Currency + Order Date + Payment Terms + Payment Days */}
+          {/* Row 2: Material + Component + Currency + Order Date + Payment Terms + Payment Days */}
           <Row gutter={16}>
-
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
+                name="material"
+                label="Material"
+                rules={[{ required: true, message: 'Select material type' }]}
+              >
+                <Select
+                  placeholder="Select"
+                  options={[
+                    { value: 'Knit', label: 'Knit' },
+                    { value: 'Woven', label: 'Woven' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item
                 name="component"
@@ -1416,37 +1495,47 @@ const OrderForm = () => {
             </Col>
           </Row>
 
-          {/* Row 3: Order Qty, Total Value, Remarks, Image */}
-          <Row gutter={16} align="bottom">
-            <Col xs={12} sm={6} md={4} lg={3}>
-              <Form.Item label="Order Qty">
-                <Input
-                  value={totalOrderQty.toLocaleString()}
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)', fontWeight: 600 }}
-                />
+          {/* Row 3: Fabric Description + Remarks */}
+          <Row gutter={16}>
+            <Col xs={24} sm={24} md={12} lg={12}>
+              <Form.Item
+                name="fabricDescription"
+                label="Fabric Description"
+                rules={[{ required: true, message: 'Enter fabric description' }]}
+              >
+                <TextArea rows={1} placeholder="e.g. 100% Cotton Single Jersey" />
               </Form.Item>
             </Col>
-            <Col xs={12} sm={6} md={5} lg={4}>
-              <Form.Item label="Total Order Value">
-                <Input
-                  value={`${getCurrencySymbol(formCurrency)} ${totalOrderValue.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}`}
-                  disabled
-                  style={{
-                    backgroundColor: 'var(--secondary-light)',
-                    fontWeight: 600,
-                    color: 'var(--success-color, #10b981)',
-                  }}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={24} md={11} lg={13}>
+            <Col xs={24} sm={24} md={12} lg={12}>
               <Form.Item name="remarks" label="Remarks">
                 <TextArea rows={1} placeholder="Notes or special instructions" />
               </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Order Summary */}
+          <Row gutter={16} style={{ marginTop: 4 }}>
+            <Col xs={12} sm={8} md={6} lg={4}>
+              <Card
+                size="small"
+                style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid #1677ff' }}
+                styles={{ body: { padding: '12px 16px' } }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--text-secondary, #8c8c8c)', marginBottom: 4 }}>Order Qty</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#1677ff' }}>{totalOrderQty.toLocaleString()}</div>
+              </Card>
+            </Col>
+            <Col xs={12} sm={8} md={6} lg={4}>
+              <Card
+                size="small"
+                style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid #10b981' }}
+                styles={{ body: { padding: '12px 16px' } }}
+              >
+                <div style={{ fontSize: 12, color: 'var(--text-secondary, #8c8c8c)', marginBottom: 4 }}>Total Order Value</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>
+                  {getCurrencySymbol(formCurrency)} {totalOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </Card>
             </Col>
           </Row>
 

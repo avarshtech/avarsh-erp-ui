@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Table,
   Card,
@@ -6,276 +6,272 @@ import {
   Space,
   Input,
   Tag,
-  Dropdown,
-  Typography,
-  Tooltip,
-  Modal,
-  message,
   Select,
-  Progress,
+  Typography,
+  message,
+  Row,
+  Col,
+  Tooltip,
+  Popconfirm,
 } from 'antd';
 import {
   PlusOutlined,
   SearchOutlined,
-  FilterOutlined,
-  ExportOutlined,
   EyeOutlined,
   EditOutlined,
   DeleteOutlined,
-  MoreOutlined,
-  CopyOutlined,
-  FileTextOutlined,
+  ReloadOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { searchBoms, deleteBom } from '../../services/bomService';
+import { BOM_STATUS, getStatusLabel, EDITABLE_STATUSES } from '../../utils/bomConstants';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
+import BOMView from './BOMView';
 
 const { Text } = Typography;
+
+const STATUS_COLORS = {
+  DRAFT: 'default',
+  CREATED: 'green',
+};
 
 const BOMList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [navigatingId, setNavigatingId] = useState(null);
+  const [data, setData] = useState([]);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState(undefined);
+  const [sortField, setSortField] = useState('id');
+  const [sortDirection, setSortDirection] = useState('desc');
 
-  const boms = [
-    {
-      key: '1',
-      bomId: 'BOM-2024-0001',
-      styleName: 'Men\'s Casual Shirts',
-      styleCode: 'MCS-001',
-      version: '1.2',
-      category: 'Shirts',
-      totalMaterials: 12,
-      estimatedCost: 8.50,
-      status: 'Active',
-      createdDate: '2024-01-15',
-      lastModified: '2024-01-28',
-      completeness: 100,
-    },
-    {
-      key: '2',
-      bomId: 'BOM-2024-0002',
-      styleName: 'Women\'s Summer Dresses',
-      styleCode: 'WSD-002',
-      version: '1.0',
-      category: 'Dresses',
-      totalMaterials: 18,
-      estimatedCost: 12.75,
-      status: 'Active',
-      createdDate: '2024-01-20',
-      lastModified: '2024-01-27',
-      completeness: 95,
-    },
-    {
-      key: '3',
-      bomId: 'BOM-2024-0003',
-      styleName: 'Children\'s T-Shirts',
-      styleCode: 'CTS-003',
-      version: '2.0',
-      category: 'Kids Wear',
-      totalMaterials: 8,
-      estimatedCost: 4.25,
-      status: 'Draft',
-      createdDate: '2024-01-22',
-      lastModified: '2024-01-26',
-      completeness: 60,
-    },
-    {
-      key: '4',
-      bomId: 'BOM-2024-0004',
-      styleName: 'Premium Polo Shirts',
-      styleCode: 'PPS-004',
-      version: '1.1',
-      category: 'Shirts',
-      totalMaterials: 15,
-      estimatedCost: 14.00,
-      status: 'Active',
-      createdDate: '2024-01-10',
-      lastModified: '2024-01-25',
-      completeness: 100,
-    },
-    {
-      key: '5',
-      bomId: 'BOM-2024-0005',
-      styleName: 'Slim Fit Jeans',
-      styleCode: 'SFJ-005',
-      version: '1.0',
-      category: 'Denim',
-      totalMaterials: 20,
-      estimatedCost: 18.50,
-      status: 'Pending Approval',
-      createdDate: '2024-01-24',
-      lastModified: '2024-01-28',
-      completeness: 85,
-    },
-  ];
+  // View modal state
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [viewingBom, setViewingBom] = useState(null);
 
-  const statusColors = {
-    'Active': 'green',
-    'Draft': 'default',
-    'Pending Approval': 'gold',
-    'Archived': 'red',
+  // Permissions
+  const canView = hasPermission('bom', 'view');
+  const canAdd = hasPermission('bom', 'add');
+  const canUpdate = hasPermission('bom', 'update');
+  const canDelete = hasPermission('bom', 'delete');
+
+  const fetchData = useCallback(async (page, size, sort, direction) => {
+    setLoading(true);
+    try {
+      const params = {
+        page: (page || pagination.current) - 1,
+        size: size || pagination.pageSize,
+        sort: sort || sortField,
+        direction: direction || sortDirection,
+      };
+      if (debouncedSearch) params.search = debouncedSearch;
+      if (statusFilter) params.status = statusFilter;
+
+      const res = await searchBoms(params);
+      setData(res.content || []);
+      setPagination((prev) => ({
+        ...prev,
+        current: (res.page ?? 0) + 1,
+        pageSize: res.size || prev.pageSize,
+        total: res.totalElements || 0,
+      }));
+    } catch {
+      message.error('Failed to load BOMs');
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearch, statusFilter, pagination.current, pagination.pageSize, sortField, sortDirection]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Table change (pagination, sorting)
+  const handleTableChange = (pag, _filters, sorter) => {
+    const newSort = sorter.field || sortField;
+    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
+    setSortField(newSort);
+    setSortDirection(newDirection);
+    fetchData(pag.current, pag.pageSize, newSort, newDirection);
   };
+
+  // Delete
+  const handleDelete = async (record) => {
+    setDeletingId(record.id);
+    try {
+      await deleteBom(record.id);
+      message.success(`${record.orderNo} deleted successfully`);
+      fetchData(pagination.current, pagination.pageSize);
+    } catch {
+      message.error('Failed to delete BOM');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // View
+  const handleView = (record) => {
+    setViewingBom(record);
+    setViewModalVisible(true);
+  };
+
+  // Can edit?
+  const canEditBom = (record) =>
+    EDITABLE_STATUSES.includes(record.status) && canUpdate;
+
+  // Can delete? (only DRAFT)
+  const canDeleteBom = (record) =>
+    record.status === BOM_STATUS.DRAFT && canDelete;
 
   const columns = [
     {
-      title: 'BOM ID',
-      dataIndex: 'bomId',
-      key: 'bomId',
+      title: 'Order No',
+      dataIndex: 'orderNo',
+      key: 'orderNo',
       fixed: 'left',
-      width: 140,
-      render: (text) => (
-        <Text strong style={{ color: '#6366f1', cursor: 'pointer' }}>
+      width: 160,
+      sorter: true,
+      render: (text, record) => (
+        <Text
+          strong
+          style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
+          onClick={() => handleView(record)}
+        >
           {text}
         </Text>
       ),
     },
     {
-      title: 'Style',
-      key: 'style',
-      width: 220,
-      render: (_, record) => (
-        <div>
-          <Text strong>{record.styleName}</Text>
-          <br />
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {record.styleCode}
-          </Text>
-        </div>
-      ),
+      title: 'Style No',
+      dataIndex: 'styleName',
+      key: 'styleName',
+      width: 140,
+      sorter: true,
+      render: (text) => <Text strong>{text || '-'}</Text>,
     },
     {
-      title: 'Version',
-      dataIndex: 'version',
-      key: 'version',
-      width: 80,
-      align: 'center',
-      render: (v) => <Tag color="blue">v{v}</Tag>,
+      title: 'Buyer',
+      dataIndex: 'buyerName',
+      key: 'buyerName',
+      width: 200,
+      ellipsis: true,
+      render: (text) => text || '-',
     },
     {
-      title: 'Category',
-      dataIndex: 'category',
-      key: 'category',
+      title: 'Season',
+      dataIndex: 'season',
+      key: 'season',
       width: 120,
+      render: (text) => text || '-',
     },
     {
-      title: 'Materials',
-      dataIndex: 'totalMaterials',
-      key: 'totalMaterials',
-      width: 100,
+      title: 'Lines',
+      dataIndex: 'lineCount',
+      key: 'lineCount',
+      width: 70,
       align: 'center',
-      render: (count) => (
-        <Space>
-          <FileTextOutlined />
-          <Text>{count}</Text>
-        </Space>
-      ),
+      render: (count) => <Tag>{count || 0}</Tag>,
     },
     {
-      title: 'Est. Cost/Unit',
-      dataIndex: 'estimatedCost',
-      key: 'estimatedCost',
+      title: 'Purchase Qty',
+      dataIndex: 'totalPurchaseQty',
+      key: 'totalPurchaseQty',
       width: 130,
       align: 'right',
-      render: (cost) => (
-        <Text strong style={{ color: '#10b981' }}>
-          ${cost.toFixed(2)}
-        </Text>
-      ),
-      sorter: (a, b) => a.estimatedCost - b.estimatedCost,
-    },
-    {
-      title: 'Completeness',
-      dataIndex: 'completeness',
-      key: 'completeness',
-      width: 140,
-      render: (percent) => (
-        <Progress
-          percent={percent}
-          size="small"
-          strokeColor={percent === 100 ? '#22c55e' : percent >= 80 ? '#f59e0b' : '#ef4444'}
-        />
-      ),
-    },
-    {
-      title: 'Last Modified',
-      dataIndex: 'lastModified',
-      key: 'lastModified',
-      width: 120,
-      sorter: (a, b) => new Date(a.lastModified) - new Date(b.lastModified),
+      sorter: true,
+      render: (qty) => qty ? <Text strong>{Number(qty).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text> : '-',
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 140,
-      fixed: 'right',
+      width: 110,
       render: (status) => (
-        <Tag color={statusColors[status]} style={{ borderRadius: 20 }}>
-          {status}
+        <Tag
+          color={STATUS_COLORS[status] || 'default'}
+          style={{ borderRadius: 20 }}
+        >
+          {getStatusLabel(status)}
         </Tag>
       ),
-      filters: Object.keys(statusColors).map((s) => ({ text: s, value: s })),
-      onFilter: (value, record) => record.status === value,
     },
     {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 80,
-      render: (_, record) => {
-        const items = [];
-        if (hasPermission('bom', 'view')) items.push({ key: 'view', icon: <EyeOutlined />, label: 'View BOM' });
-        if (hasPermission('bom', 'update')) items.push({ key: 'edit', icon: <EditOutlined />, label: 'Edit' });
-        if (hasPermission('bom', 'add')) items.push({ key: 'duplicate', icon: <CopyOutlined />, label: 'Duplicate' });
-        if (items.length > 0 && hasPermission('bom', 'delete')) items.push({ type: 'divider' });
-        if (hasPermission('bom', 'delete')) items.push({ key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true });
-        if (items.length === 0) return null;
-        return (
-          <Dropdown
-            menu={{ items, onClick: ({ key }) => handleAction(key, record) }}
-            trigger={['click']}
-          >
-            <Button type="text" icon={<MoreOutlined />} />
-          </Dropdown>
-        );
-      },
+      width: 120,
+      render: (_, record) => (
+        <Space size="small">
+          {canView && (
+            <Tooltip title="View">
+              <Button
+                type="text"
+                size="small"
+                icon={<EyeOutlined />}
+                onClick={() => handleView(record)}
+                style={{ color: '#1890ff' }}
+              />
+            </Tooltip>
+          )}
+          {canEditBom(record) && (
+            <Tooltip title="Edit">
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                loading={navigatingId === record.id}
+                onClick={() => {
+                  setNavigatingId(record.id);
+                  navigate(`/bom/edit/${record.id}`, { state: { bomData: record } });
+                }}
+                style={{ color: '#52c41a' }}
+              />
+            </Tooltip>
+          )}
+          {canDeleteBom(record) && (
+            <Popconfirm
+              title="Delete BOM"
+              description={`Are you sure you want to delete "${record.orderNo}"?`}
+              onConfirm={() => handleDelete(record)}
+              okText="Delete"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true, loading: deletingId === record.id }}
+              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+            >
+              <Tooltip title="Delete">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  danger
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
+        </Space>
+      ),
     },
   ];
-
-  const handleAction = (key, record) => {
-    switch (key) {
-      case 'view':
-        message.info(`Viewing BOM: ${record.bomId}`);
-        break;
-      case 'edit':
-        navigate(`/bom/edit/${record.key}`);
-        break;
-      case 'duplicate':
-        message.success(`BOM ${record.bomId} duplicated`);
-        break;
-      case 'delete':
-        Modal.confirm({
-          title: 'Delete BOM',
-          content: `Are you sure you want to delete ${record.bomId}?`,
-          okText: 'Delete',
-          okType: 'danger',
-          onOk: () => message.success('BOM deleted successfully'),
-        });
-        break;
-      default:
-        break;
-    }
-  };
 
   return (
     <div className="animate-fade-in-up">
       <div className="page-header">
         <h1>Bill of Materials</h1>
         <div className="header-actions">
-          {hasPermission('bom', 'view') && (
-            <Button icon={<ExportOutlined />}>Export</Button>
-          )}
           <PermissionGuard module="bom" operation="add">
             <Button
               type="primary"
@@ -289,52 +285,70 @@ const BOMList = () => {
       </div>
 
       <Card>
-        <Space wrap style={{ marginBottom: 16, width: '100%' }}>
-          <Input
-            placeholder="Search BOM..."
-            prefix={<SearchOutlined />}
-            style={{ width: 250 }}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            allowClear
-          />
-          <Select
-            placeholder="Category"
-            style={{ width: 150 }}
-            allowClear
-            options={[
-              { label: 'Shirts', value: 'Shirts' },
-              { label: 'Dresses', value: 'Dresses' },
-              { label: 'Kids Wear', value: 'Kids Wear' },
-              { label: 'Denim', value: 'Denim' },
-            ]}
-          />
-          <Select
-            placeholder="Status"
-            style={{ width: 150 }}
-            allowClear
-            options={Object.keys(statusColors).map((s) => ({ label: s, value: s }))}
-          />
-          <Button icon={<FilterOutlined />}>More Filters</Button>
-        </Space>
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
+          <Col xs={24} sm={12} md={6} lg={5}>
+            <Input
+              placeholder="Search order no, style, buyer..."
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              allowClear
+            />
+          </Col>
+          <Col xs={12} sm={8} md={4} lg={3}>
+            <Select
+              placeholder="Status"
+              style={{ width: '100%' }}
+              allowClear
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={Object.keys(STATUS_COLORS).map((s) => ({
+                label: getStatusLabel(s),
+                value: s,
+              }))}
+            />
+          </Col>
+          <Col>
+            <Tooltip title="Refresh">
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => fetchData(pagination.current, pagination.pageSize)}
+              />
+            </Tooltip>
+          </Col>
+        </Row>
 
         <Table
           columns={columns}
-          dataSource={boms}
+          dataSource={data}
           loading={loading}
-          scroll={{ x: 1400 }}
+          rowKey="id"
+          scroll={{ x: 1000 }}
+          onChange={handleTableChange}
           pagination={{
-            total: boms.length,
-            pageSize: 10,
+            ...pagination,
             showSizeChanger: true,
+            showQuickJumper: true,
             showTotal: (total, range) =>
               `${range[0]}-${range[1]} of ${total} BOMs`,
           }}
-          rowSelection={{
-            type: 'checkbox',
-          }}
         />
       </Card>
+
+      {/* ── BOM View Modal ── */}
+      <BOMView
+        open={viewModalVisible}
+        bomData={viewingBom}
+        onClose={() => {
+          setViewModalVisible(false);
+          setViewingBom(null);
+        }}
+        onStatusChange={() => {
+          setViewModalVisible(false);
+          setViewingBom(null);
+          fetchData(pagination.current, pagination.pageSize);
+        }}
+      />
     </div>
   );
 };

@@ -6,6 +6,7 @@ import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
 import ProtectedRoute from './components/ProtectedRoute';
+import PermissionRoute from './components/PermissionRoute';
 import Login from './pages/auth/Login';
 import Dashboard from './pages/Dashboard';
 import OrderList from './pages/orders/OrderList';
@@ -82,28 +83,28 @@ const ThemedApp = () => {
           >
             <Route index element={<Dashboard />} />
             {/* Orders */}
-            <Route path="orders/list" element={<OrderList />} />
-            <Route path="orders/new" element={<OrderForm />} />
-            <Route path="orders/edit/:id" element={<OrderForm />} />
+            <Route path="orders/list" element={<PermissionRoute module="orders"><OrderList /></PermissionRoute>} />
+            <Route path="orders/new" element={<PermissionRoute module="orders" operation="add"><OrderForm /></PermissionRoute>} />
+            <Route path="orders/edit/:id" element={<PermissionRoute module="orders" operation="update"><OrderForm /></PermissionRoute>} />
             {/* BOM */}
-            <Route path="bom/list" element={<BOMList />} />
-            <Route path="bom/new" element={<BOMForm />} />
-            <Route path="bom/edit/:id" element={<BOMForm />} />
+            <Route path="bom/list" element={<PermissionRoute module="bom"><BOMList /></PermissionRoute>} />
+            <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
+            <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
             {/* Purchase Orders */}
-            <Route path="purchase-orders/list" element={<POList />} />
-            <Route path="purchase-orders/new" element={<POForm />} />
-            <Route path="purchase-orders/edit/:id" element={<POForm />} />
+            <Route path="purchase-orders/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
+            <Route path="purchase-orders/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
+            <Route path="purchase-orders/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><POForm /></PermissionRoute>} />
             {/* GRN */}
-            <Route path="grn/list" element={<GRNList />} />
-            <Route path="grn/new" element={<GRNForm />} />
-            <Route path="grn/edit/:id" element={<GRNForm />} />
+            <Route path="grn/list" element={<PermissionRoute module="grn"><GRNList /></PermissionRoute>} />
+            <Route path="grn/new" element={<PermissionRoute module="grn" operation="add"><GRNForm /></PermissionRoute>} />
+            <Route path="grn/edit/:id" element={<PermissionRoute module="grn" operation="update"><GRNForm /></PermissionRoute>} />
             {/* Costing */}
-            <Route path="costing/list" element={<CostingList />} />
-            <Route path="costing/new" element={<CostingForm />} />
-            <Route path="costing/edit/:id" element={<CostingForm />} />
-            <Route path="costing/compare" element={<CostComparison />} />
-            <Route path="costing/:id" element={<CostingView />} />
-            {/* Admin */}
+            <Route path="costing/list" element={<PermissionRoute module="costing"><CostingList /></PermissionRoute>} />
+            <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingForm /></PermissionRoute>} />
+            <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><CostingForm /></PermissionRoute>} />
+            <Route path="costing/compare" element={<PermissionRoute module="costing"><CostComparison /></PermissionRoute>} />
+            <Route path="costing/:id" element={<PermissionRoute module="costing"><CostingView /></PermissionRoute>} />
+            {/* Admin — access controlled by role, not module permissions */}
             <Route path="admin/dashboard" element={<AdminDashboard />} />
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="admin/roles" element={<RoleAccess />} />

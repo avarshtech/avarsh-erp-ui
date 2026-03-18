@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, InputNumber, Switch, Modal, Spin } from 'antd';
+import { Form, Input, Button, Space, message, Tag, InputNumber, Switch, Modal, Typography, Row, Col } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+
+const { Text } = Typography;
 import { useStore } from '../../context/StoreContext';
 import { createPaymentTerms, updatePaymentTerms, deletePaymentTerms } from '../../services/paymentTermsService';
 import { hasPermission } from '../../utils/permissions';
@@ -16,8 +18,9 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -64,11 +67,13 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add payment terms');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ active: true });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -76,13 +81,15 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view payment terms');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({
       ...record,
       active: record.active !== false,
     });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -119,7 +126,9 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
         setSelectedId(newItem.id);
         message.success('Payment terms created successfully');
       }
-      setUnsavedChanges(false);
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save payment terms:', error);
       message.error(selectedId ? 'Failed to update payment terms' : 'Failed to create payment terms');
@@ -159,7 +168,7 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -188,76 +197,96 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
       onSearch={handleSearch}
       searchPlaceholder="Search payment terms..."
       renderForm={() => (
-        <Spin spinning={submitting}>
-          <div style={{ padding: 24 }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 24,
-              borderBottom: '1px solid #f0f0f0',
-              paddingBottom: 16,
-            }}>
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Sticky header */}
+          <div style={{
+            flexShrink: 0,
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            background: 'var(--card-bg, #fff)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 24px',
+            borderBottom: '1px solid var(--border-color, #f0f0f0)',
+          }}>
+            <div>
               <h2 style={{ margin: 0 }}>
                 {selectedId ? (isReadOnly ? 'View Payment Terms' : 'Edit Payment Terms') : 'New Payment Terms'}
               </h2>
-              <Space>
-                {selectedId && canDelete && (
-                  <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
-                    Delete
-                  </Button>
-                )}
-                <Button onClick={handleCancel} icon={<CloseOutlined />}>
-                  {isReadOnly ? 'Close' : 'Cancel'}
-                </Button>
-                {!isReadOnly && (
-                  <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
-                    <Button
-                      type="primary"
-                      onClick={() => form.submit()}
-                      icon={<SaveOutlined />}
-                      loading={submitting}
-                      disabled={selectedId && !unsavedChanges}
-                    >
-                      Save Changes
-                    </Button>
-                  </PermissionGuard>
-                )}
-              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {selectedId ? 'Modify the payment terms details below' : 'Create a new payment terms template for order entry'}
+              </Text>
             </div>
-            <Form
-              form={form}
-              layout="vertical"
-              onFinish={handleSave}
-              disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
-            >
-              <Form.Item
-                name="name"
-                label="Name"
-                rules={[{ required: true, message: 'Please enter a name' }]}
-              >
-                <Input placeholder="e.g. Net 30, 50/50 T/T, LC at Sight" size="large" maxLength={100} />
-              </Form.Item>
-              <Form.Item name="description" label="Description">
-                <Input.TextArea rows={3} placeholder="Additional details (optional)" maxLength={500} />
-              </Form.Item>
-              <Form.Item
-                name="paymentDays"
-                label="Payment Days"
-                rules={[{ required: true, message: 'Please enter payment days' }]}
-              >
-                <InputNumber min={0} max={365} placeholder="e.g. 30" style={{ width: '50%' }} />
-              </Form.Item>
-              <Form.Item name="advancePercentage" label="Advance Percentage (%)">
-                <InputNumber min={0} max={100} precision={2} placeholder="e.g. 50" style={{ width: '50%' }} />
-              </Form.Item>
-              <Form.Item name="active" label="Active" valuePropName="checked">
-                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-              </Form.Item>
-            </Form>
+            <Space>
+              {selectedId && canDelete && (
+                <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>
+                  Delete
+                </Button>
+              )}
+              <Button onClick={handleCancel} icon={<CloseOutlined />}>
+                {isReadOnly ? 'Close' : 'Cancel'}
+              </Button>
+              {!isReadOnly && (
+                <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
+                  <Button
+                    type="primary"
+                    onClick={() => form.submit()}
+                    icon={<SaveOutlined />}
+                    loading={submitting}
+                    disabled={selectedId && !unsavedChanges}
+                  >
+                    Save
+                  </Button>
+                </PermissionGuard>
+              )}
+            </Space>
           </div>
-        </Spin>
+
+          {/* Scrollable form content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 24px' }}>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSave}
+                disabled={isReadOnly}
+                onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
+              >
+                <Form.Item
+                  name="name"
+                  label="Name"
+                  rules={[{ required: true, message: 'Please enter a name' }]}
+                >
+                  <Input placeholder="e.g. Net 30, 50/50 T/T, LC at Sight" size="large" maxLength={100} />
+                </Form.Item>
+                <Form.Item name="description" label="Description">
+                  <Input.TextArea rows={3} placeholder="Additional details (optional)" maxLength={500} />
+                </Form.Item>
+                <Row gutter={16}>
+                  <Col span={8}>
+                    <Form.Item
+                      name="paymentDays"
+                      label="Payment Days"
+                      rules={[{ required: true, message: 'Please enter payment days' }]}
+                    >
+                      <InputNumber min={0} max={365} controls={false} placeholder="e.g. 30" addonAfter="days" style={{ width: 100 }} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item name="advancePercentage" label="Advance Percentage">
+                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 50" addonAfter="%" style={{ width: 100 }} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={8}>
+                    <Form.Item name="active" label="Active" valuePropName="checked">
+                      <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Form>
+          </div>
+        </div>
       )}
     />
   );

@@ -20,6 +20,8 @@
  *   "style-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "size-presets":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "payment-terms":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "process-master":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "parts-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
  * }
@@ -134,6 +136,18 @@ export const MODULES = {
     path: '/master → Terms & Conditions tab',
     group: 'master',
   },
+  PROCESS_MASTER: {
+    id: 'process-master',
+    name: 'Processes',
+    path: '/master → Processes tab',
+    group: 'master',
+  },
+  PARTS_MASTER: {
+    id: 'parts-master',
+    name: 'Parts Master',
+    path: '/master → Parts tab',
+    group: 'master',
+  },
   USERS: {
     id: 'users',
     name: 'Users',
@@ -222,6 +236,8 @@ export const PERMISSION_GROUPS = [
       { id: 'size-presets',    name: 'Size Presets',              description: 'Order Entry, Costing',  operations: STANDARD_OPERATIONS },
       { id: 'payment-terms',   name: 'Payment Terms',             description: 'Order Entry',           operations: STANDARD_OPERATIONS },
       { id: 'terms-conditions',name: 'Terms & Conditions',        description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
+      { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
+      { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
     ],
   },
   {

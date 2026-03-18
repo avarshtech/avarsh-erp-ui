@@ -84,9 +84,9 @@ const MasterSplitView = ({
         {/* Right Side: Form */}
         {isEditing && (
           <Col span={16} style={{ height: '100%', animation: 'fadeIn 0.3s' }}>
-            <Card 
+            <Card
               style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
-              styles={{ body: { flex: 1, overflow: 'hidden', padding: 0, display: 'flex', flexDirection: 'column' } }}
+              styles={{ body: { flex: 1, minHeight: 0, overflow: 'hidden', padding: 0 } }}
             >
               {renderForm()}
             </Card>

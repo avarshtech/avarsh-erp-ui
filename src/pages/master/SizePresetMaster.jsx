@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Button, Input, Select, Switch, Form, Space, Tag, Modal, Spin,
+  Button, Input, Select, Switch, Form, Space, Tag, Modal,
   Typography, message, Tooltip, Alert,
 } from 'antd';
 import {
@@ -222,7 +222,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
   const skipDirty  = useRef(false);
   const fetchingRef = useRef(false);
 
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
 
   const canAdd    = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -326,7 +326,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ active: true, sizes: [] });
-    setUnsavedChanges(false);
+    markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 100);
   };
 
@@ -345,7 +345,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
       sizes:    record.sizes || [],
       active:   record.active !== false,
     });
-    setUnsavedChanges(false);
+    markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 100);
   };
 
@@ -383,7 +383,9 @@ const SizePresetMaster = ({ onDirtyChange }) => {
         setSelectedId(newItem.id);
         message.success('Size preset created');
       }
-      setUnsavedChanges(false);
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
       await fetchData(true);
     } catch {
       message.error(selectedId ? 'Failed to update' : 'Failed to create');
@@ -419,7 +421,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -506,14 +508,13 @@ const SizePresetMaster = ({ onDirtyChange }) => {
 
           {/* Scrollable form body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
-            <Spin spinning={submitting}>
               <Form
                 form={form}
                 layout="vertical"
                 onFinish={handleSave}
                 disabled={isReadOnly}
                 onValuesChange={(changedValues, allValues) => {
-                  if (!skipDirty.current) setUnsavedChanges(true);
+                  if (!skipDirty.current) markDirty(true);
                   if (changedValues.category !== undefined || changedValues.region !== undefined) {
                     const { category, region } = allValues;
                     if (category && region) {
@@ -586,7 +587,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
                           style={{ padding: 0, height: 'auto', fontSize: 12 }}
                           onClick={() => {
                             form.setFieldsValue({ sizes: [] });
-                            setUnsavedChanges(true);
+                            markDirty(true);
                           }}
                         >
                           Clear All
@@ -611,7 +612,6 @@ const SizePresetMaster = ({ onDirtyChange }) => {
                   <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
                 </Form.Item>
               </Form>
-            </Spin>
           </div>
         </div>
       )}

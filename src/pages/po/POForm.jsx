@@ -301,7 +301,7 @@ const POForm = () => {
     setIsDirtyState(val);
   };
 
-  useUnsavedChanges(isDirty);
+  const { clearDirty } = useUnsavedChanges(isDirty);
 
   // Variant modal state
   const [variantModalState, setVariantModalState] = useState({
@@ -1096,6 +1096,7 @@ const POForm = () => {
         message.success('Purchase order created as draft');
       }
       setIsDirty(false);
+      clearDirty();
       navigate('/purchase-orders/list');
     } catch {
       message.error('Failed to save purchase order');
@@ -1185,6 +1186,7 @@ const POForm = () => {
 
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
+      clearDirty();
       setPreviewVisible(false);
       navigate('/purchase-orders/list');
     } catch {

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Modal, Spin } from 'antd';
+import { Form, Input, Button, Space, message, Tag, Select, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createItemType, updateItemType, deleteItemType } from '../../services/masterDataService';
@@ -16,8 +16,9 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   // Check permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -49,11 +50,13 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add item types');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
     form.setFieldsValue({ attributeIds: [], uomIds: [] });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -61,6 +64,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view item type details');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({
@@ -68,7 +72,8 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       attributeIds: record.attributeIds || record.attributes?.map(a => a.id) || [],
       uomIds: record.uomIds || record.uoms?.map(u => u.id) || [],
     });
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -109,6 +114,9 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
         setSelectedId(newItem.id);
         message.success('Item type created successfully');
       }
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save item type:', error);
       message.error(selectedId ? 'Failed to update item type' : 'Failed to create item type');
@@ -148,7 +156,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -173,7 +181,6 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       renderForm={() => (
-        <Spin spinning={submitting}>
           <div style={{ padding: 24 }}>
             <div style={{ 
               display: 'flex', 
@@ -215,7 +222,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
               layout="vertical" 
               onFinish={handleSave}
               disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
+              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
               <Form.Item 
                 name="subCategoryId" 
@@ -265,7 +272,6 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
               </Form.Item>
             </Form>
           </div>
-        </Spin>
       )}
     />
   );

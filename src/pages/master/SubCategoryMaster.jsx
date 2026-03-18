@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Modal, Spin } from 'antd';
+import { Form, Input, Button, Space, message, Tag, Select, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createSubCategory, updateSubCategory, deleteSubCategory } from '../../services/masterDataService';
@@ -16,8 +16,9 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   // Check permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -49,10 +50,12 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add sub-categories');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -60,10 +63,12 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view sub-category details');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue(record);
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -104,6 +109,9 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
         setSelectedId(newItem.id);
         message.success('Sub-category created successfully');
       }
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save sub-category:', error);
       message.error(selectedId ? 'Failed to update sub-category' : 'Failed to create sub-category');
@@ -143,7 +151,7 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -169,7 +177,6 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       renderForm={() => (
-        <Spin spinning={submitting}>
           <div style={{ padding: 24 }}>
             <div style={{ 
               display: 'flex', 
@@ -211,7 +218,7 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
               layout="vertical" 
               onFinish={handleSave}
               disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
+              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
               <Form.Item 
                 name="categoryId" 
@@ -237,7 +244,6 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
               </Form.Item>
             </Form>
           </div>
-        </Spin>
       )}
     />
   );

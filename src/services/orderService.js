@@ -37,6 +37,14 @@ export const getOrderById = async (id) => {
 };
 
 /**
+ * Get order by order number. GET /api/v1/orders/by-order-no/{orderNo}
+ */
+export const getOrderByOrderNo = async (orderNo) => {
+  const response = await axiosInstance.get(`${BASE}/by-order-no`, { params: { orderNo } });
+  return response.data;
+};
+
+/**
  * Create a new order. POST /api/v1/orders
  */
 export const createOrder = async (data) => {

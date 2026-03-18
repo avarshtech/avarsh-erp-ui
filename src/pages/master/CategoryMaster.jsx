@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Modal, Spin } from 'antd';
+import { Form, Input, Button, Space, message, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createCategory, updateCategory, deleteCategory } from '../../services/masterDataService';
@@ -16,8 +16,9 @@ const CategoryMaster = ({ onDirtyChange }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  useEffect(() => { onDirtyChange?.(unsavedChanges); }, [unsavedChanges]);
+  const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
+  const skipDirty = useRef(false);
 
   // Check permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -49,10 +50,12 @@ const CategoryMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to add categories');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSelect = (record) => {
@@ -60,10 +63,12 @@ const CategoryMaster = ({ onDirtyChange }) => {
       message.warning('You do not have permission to view category details');
       return;
     }
+    skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue(record);
-    setUnsavedChanges(false);
+    markDirty(false);
+    setTimeout(() => { skipDirty.current = false; }, 0);
   };
 
   const handleSave = async (values) => {
@@ -106,6 +111,9 @@ const CategoryMaster = ({ onDirtyChange }) => {
         setSelectedId(newCategory.id);
         message.success('Category created successfully');
       }
+      markDirty(false);
+      setIsEditing(false);
+      setSelectedId(null);
     } catch (error) {
       console.error('Failed to save category:', error);
       message.error(selectedId ? 'Failed to update category' : 'Failed to create category');
@@ -145,7 +153,7 @@ const CategoryMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
-    setUnsavedChanges(false);
+    markDirty(false);
   };
 
   const handleSearch = (value) => {
@@ -172,7 +180,6 @@ const CategoryMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       renderForm={() => (
-        <Spin spinning={submitting}>
           <div style={{ padding: 24 }}>
             <div style={{ 
               display: 'flex', 
@@ -218,7 +225,7 @@ const CategoryMaster = ({ onDirtyChange }) => {
               layout="vertical" 
               onFinish={handleSave}
               disabled={isReadOnly}
-              onValuesChange={() => setUnsavedChanges(true)}
+              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
               <Form.Item 
                 name="name" 
@@ -232,7 +239,6 @@ const CategoryMaster = ({ onDirtyChange }) => {
               </Form.Item>
             </Form>
           </div>
-        </Spin>
       )}
     />
   );

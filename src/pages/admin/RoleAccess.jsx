@@ -837,12 +837,26 @@ const RoleAccess = () => {
         title={editingRole ? "Edit Role" : "Add New Role"}
         open={modalVisible}
         onCancel={handleModalClose}
-        footer={null}
         width={1100}
         style={{ top: 20 }}
         styles={{
-          body: { maxHeight: "calc(100vh - 160px)", overflowY: "auto" },
+          body: { maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingBottom: 0 },
         }}
+        footer={
+          <div style={{ textAlign: "right" }}>
+            <Space>
+              <Button onClick={handleModalClose}>Cancel</Button>
+              <Button
+                type="primary"
+                onClick={() => form.submit()}
+                disabled={editingRole && !formDirty}
+                loading={saving}
+              >
+                {editingRole ? "Update Role" : "Create Role"}
+              </Button>
+            </Space>
+          </div>
+        }
       >
         <Form
           form={form}
@@ -859,7 +873,6 @@ const RoleAccess = () => {
               <Form.Item
                 name="name"
                 label="Role Name"
-                // Note: role form dirty is tracked below via onValuesChange
                 rules={[
                   { required: true, message: "Please enter role name" },
                   {
@@ -876,7 +889,6 @@ const RoleAccess = () => {
                 <Input
                   placeholder="Enter role name (e.g., Manager, Approver)"
                   onKeyDown={(e) => {
-                    // Block numbers and special characters
                     if (
                       /[0-9!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?`~\-]/.test(
                         e.key,
@@ -903,20 +915,6 @@ const RoleAccess = () => {
           <Divider style={{ margin: "12px 0" }} />
 
           {renderPermissionsMatrix()}
-
-          <div style={{ textAlign: "right", marginTop: 24 }}>
-            <Space>
-              <Button onClick={handleModalClose}>Cancel</Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                disabled={editingRole && !formDirty}
-                loading={saving}
-              >
-                {editingRole ? "Update Role" : "Create Role"}
-              </Button>
-            </Space>
-          </div>
         </Form>
       </Modal>
     </div>

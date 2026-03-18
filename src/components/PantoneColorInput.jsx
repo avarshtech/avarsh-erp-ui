@@ -49,13 +49,15 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
     }
 
     setInputValue(raw);
-    onChange(''); // Clear selected value while typing
 
     // Check for pantone code pattern to trigger API search
     const match = raw.match(PANTONE_PATTERN);
     if (match) {
+      onChange(''); // Clear value while searching pantone
       triggerSearch(match[1]);
     } else {
+      // Free-text: commit value immediately so parent state is always in sync
+      onChange(raw.trim());
       setSuggestions([]);
       setDropdownOpen(false);
     }
