@@ -706,7 +706,8 @@ const CostingForm = () => {
         ? formValues.seasonCode + formValues.seasonYear.slice(-2)
         : '';
 
-    // Resolve styleNo label from styleOptions
+    // Resolve buyer name and styleNo label from options
+    const selectedBuyer = buyerOptions.find((b) => b.value === formValues.buyerId);
     const selectedStyle = styleOptions.find((s) => s.value === formValues.styleNo);
     const resolvedStyleNo = selectedStyle ? selectedStyle.label : formValues.styleNo;
 
@@ -719,6 +720,7 @@ const CostingForm = () => {
       status,
       date: formValues.date?.format('YYYY-MM-DD'),
       buyerId: formValues.buyerId,
+      buyerName: selectedBuyer?.label || '',
       styleId,
       styleNo: resolvedStyleNo,
       garmentName: formValues.garmentName,
