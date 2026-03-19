@@ -74,8 +74,6 @@ import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
 import TechpackImportModal from './TechpackImportModal';
 import ConsumptionCalcModal from './ConsumptionCalcModal';
-import useIsTablet from '../../hooks/useIsTablet';
-import CostingFormTablet from './CostingFormTablet';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
@@ -86,7 +84,7 @@ const CostingForm = () => {
   const [form] = Form.useForm();
   const { isDarkMode } = useTheme();
   const isEdit = Boolean(id);
-  const isTablet = useIsTablet();
+
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -2332,109 +2330,6 @@ const CostingForm = () => {
     },
   ];
 
-  // ==================== TABLET LAYOUT ====================
-  if (isTablet) {
-    return (
-      <>
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ currency: 'INR', quoteCurrency: 'USD', date: dayjs() }}
-        >
-          <CostingFormTablet
-            form={form}
-            navigate={navigate}
-            isEdit={isEdit}
-            loading={loading}
-            savingDraft={savingDraft}
-            submitting={submitting}
-            costingId={costingId}
-            currency={currency}
-            setCurrency={setCurrency}
-            quoteCurrency={quoteCurrency}
-            setQuoteCurrency={setQuoteCurrency}
-            actualRate={actualRate}
-            setActualRate={setActualRate}
-            todaysRate={todaysRate}
-            buyerOptions={buyerOptions}
-            styleOptions={styleOptions}
-            sizeOptions={sizeOptions}
-            fabricItemOptions={fabricItemOptions}
-            localTrimOptions={localTrimOptions}
-            importedTrimOptions={importedTrimOptions}
-            effectiveMfgOptions={effectiveMfgOptions}
-            effectiveOvhOptions={effectiveOvhOptions}
-            optionsLoading={optionsLoading}
-            stylesLoading={stylesLoading}
-            fabricRows={fabricRows}
-            localTrims={localTrims}
-            importedTrims={importedTrims}
-            manufacturingRows={manufacturingRows}
-            overheadRows={overheadRows}
-            addFabricRow={addFabricRow}
-            updateFabricRow={updateFabricRow}
-            deleteFabricRow={deleteFabricRow}
-            duplicateFabricRow={duplicateFabricRow}
-            handleFabricItemSelect={handleFabricItemSelect}
-            openKnitsModal={openKnitsModal}
-            addLocalTrim={addLocalTrim}
-            updateLocalTrim={updateLocalTrim}
-            deleteLocalTrim={deleteLocalTrim}
-            duplicateLocalTrim={duplicateLocalTrim}
-            addImportedTrim={addImportedTrim}
-            updateImportedTrim={updateImportedTrim}
-            deleteImportedTrim={deleteImportedTrim}
-            duplicateImportedTrim={duplicateImportedTrim}
-            addManufacturingRow={addManufacturingRow}
-            updateManufacturingRow={updateManufacturingRow}
-            deleteManufacturingRow={deleteManufacturingRow}
-            duplicateManufacturingRow={duplicateManufacturingRow}
-            addOverheadRow={addOverheadRow}
-            updateOverheadRow={updateOverheadRow}
-            deleteOverheadRow={deleteOverheadRow}
-            duplicateOverheadRow={duplicateOverheadRow}
-            handleBuyerChange={handleBuyerChange}
-            handleStyleChange={handleStyleChange}
-            totalFabricCost={totalFabricCost}
-            totalLocalTrimsCost={totalLocalTrimsCost}
-            totalImportedTrimsCostUsd={totalImportedTrimsCostUsd}
-            totalAccessoriesCost={totalAccessoriesCost}
-            totalManufacturingCost={totalManufacturingCost}
-            totalMarkupCost={totalMarkupCost}
-            totalMakingPrice={totalMakingPrice}
-            totalOverheadCharges={totalOverheadCharges}
-            totalPrice={totalPrice}
-            finalPrice={finalPrice}
-            finalPriceUsd={finalPriceUsd}
-            agentCommissionPct={agentCommissionPct}
-            setAgentCommissionPct={setAgentCommissionPct}
-            profitPct={profitPct}
-            setProfitPct={setProfitPct}
-            targetPrice={targetPrice}
-            setTargetPrice={setTargetPrice}
-            perSizeSummaries={perSizeSummaries}
-            perSizeOverrides={perSizeOverrides}
-            setPerSizeOverrides={setPerSizeOverrides}
-            syncPercentages={syncPercentages}
-            setSyncPercentages={setSyncPercentages}
-            uploadProps={uploadProps}
-            handleSaveDraft={handleSaveDraft}
-            handleSubmit={handleSubmit}
-            handlePrint={handlePrint}
-            printing={printing}
-          />
-        </Form>
-        <KnitsConsumptionModal
-          open={knitsModalOpen}
-          onApply={handleKnitsApply}
-          onCancel={() => setKnitsModalOpen(false)}
-          initialParts={knitsParts}
-        />
-      </>
-    );
-  }
-
-  // ==================== DESKTOP LAYOUT ====================
   return (
     <div className="animate-fade-in-up">
       <div className="page-header">
