@@ -181,14 +181,13 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       renderForm={() => (
-          <div style={{ padding: 24 }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: 24, 
-              borderBottom: '1px solid #f0f0f0', 
-              paddingBottom: 16 
+          <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 24px',
+              borderBottom: '1px solid #f0f0f0',
             }}>
               <h2 style={{ margin: 0 }}>
                 {selectedId ? (isReadOnly ? 'View Item Type' : 'Edit Item Type') : 'New Item Type'}
@@ -204,9 +203,9 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                 </Button>
                 {!isReadOnly && (
                   <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
-                    <Button 
-                      type="primary" 
-                      onClick={() => form.submit()} 
+                    <Button
+                      type="primary"
+                      onClick={() => form.submit()}
                       icon={<SaveOutlined />}
                       loading={submitting}
                       disabled={selectedId && !unsavedChanges}
@@ -217,60 +216,64 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                 )}
               </Space>
             </div>
-            <Form 
-              form={form} 
-              layout="vertical" 
-              onFinish={handleSave}
-              disabled={isReadOnly}
-              onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
-            >
-              <Form.Item 
-                name="subCategoryId" 
-                label="Sub Category"
+
+            {/* Scrollable form content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSave}
+                disabled={isReadOnly}
+                onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
               >
-                <Select
-                  placeholder="Select Sub Category"
-                  size="large"
-                  showSearch
-                  allowClear
-                  options={subCategories.map(s => ({ value: s.id, label: s.name }))}
-                />
-              </Form.Item>
-              <Form.Item 
-                name="name" 
-                label="Item Type Name" 
-                rules={[{ required: true, message: 'Please enter item type name' }]}
-              >
-                <Input placeholder="e.g. Raw Material" size="large"/>
-              </Form.Item>
-              <Form.Item name="description" label="Description">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-              <Form.Item 
-                name="attributeIds" 
-                label="Attributes"
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="Select Attributes"
-                  size="large"
-                  showSearch
-                  options={attributes.map(a => ({ value: a.id, label: a.attributeName || a.name }))}
-                />
-              </Form.Item>
-              <Form.Item 
-                name="uomIds" 
-                label="Units of Measure"
-              >
-                <Select
-                  mode="multiple"
-                  placeholder="Select UOMs"
-                  size="large"
-                  showSearch
-                  options={uoms.map(u => ({ value: u.id, label: u.name }))}
-                />
-              </Form.Item>
-            </Form>
+                <Form.Item
+                  name="subCategoryId"
+                  label="Sub Category"
+                >
+                  <Select
+                    placeholder="Select Sub Category"
+                    size="large"
+                    showSearch
+                    allowClear
+                    options={subCategories.map(s => ({ value: s.id, label: s.name }))}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="name"
+                  label="Item Type Name"
+                  rules={[{ required: true, message: 'Please enter item type name' }]}
+                >
+                  <Input placeholder="e.g. Raw Material" size="large"/>
+                </Form.Item>
+                <Form.Item name="description" label="Description">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+                <Form.Item
+                  name="attributeIds"
+                  label="Attributes"
+                >
+                  <Select
+                    mode="multiple"
+                    placeholder="Select Attributes"
+                    size="large"
+                    showSearch
+                    options={attributes.map(a => ({ value: a.id, label: a.attributeName || a.name }))}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="uomIds"
+                  label="Units of Measure"
+                >
+                  <Select
+                    mode="multiple"
+                    placeholder="Select UOMs"
+                    size="large"
+                    showSearch
+                    options={uoms.map(u => ({ value: u.id, label: u.name }))}
+                  />
+                </Form.Item>
+              </Form>
+            </div>
           </div>
       )}
     />
