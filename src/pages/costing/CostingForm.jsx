@@ -767,6 +767,17 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+  const duplicateManufacturingRow = (key) => {
+    setManufacturingRows((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `m_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+    setIsDirty(true);
+  };
 
   const updateOverheadRow = (key, field, value) => {
     setOverheadRows((prev) =>
@@ -2335,7 +2346,8 @@ const CostingForm = () => {
             navigate={navigate}
             isEdit={isEdit}
             loading={loading}
-            saving={saving}
+            savingDraft={savingDraft}
+            submitting={submitting}
             costingId={costingId}
             currency={currency}
             setCurrency={setCurrency}

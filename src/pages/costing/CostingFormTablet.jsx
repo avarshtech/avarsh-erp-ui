@@ -18,7 +18,6 @@ import {
   Tag,
   Divider,
   Checkbox,
-  Drawer,
   Badge,
   Statistic,
 } from 'antd';
@@ -66,7 +65,8 @@ const CostingFormTablet = ({
   navigate,
   isEdit,
   loading,
-  saving,
+  savingDraft,
+  submitting,
   costingId,
   // Currency & rates
   currency,
@@ -1052,16 +1052,16 @@ const CostingFormTablet = ({
         <div className="footer-price" style={{ color: '#3b82f6' }}>
           $ {finalPriceUsd.toFixed(2)}
         </div>
-        <Button onClick={() => navigate('/costing/list')} disabled={saving}>
+        <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
           Cancel
         </Button>
-        <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printing} disabled={saving}>
+        <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printing} disabled={savingDraft || submitting}>
           Print
         </Button>
-        <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={saving}>
+        <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={savingDraft} disabled={submitting}>
           Draft
         </Button>
-        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit} loading={saving}>
+        <Button type="primary" icon={<SendOutlined />} onClick={handleSubmit} loading={submitting} disabled={savingDraft}>
           Submit
         </Button>
       </div>
