@@ -34,6 +34,8 @@ import {
   InfoCircleOutlined,
   WhatsAppOutlined,
   PrinterOutlined,
+  ImportOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
@@ -70,6 +72,8 @@ import { getAllCategories } from '../../services/masterDataService';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
+import TechpackImportModal from './TechpackImportModal';
+import ConsumptionCalcModal from './ConsumptionCalcModal';
 import useIsTablet from '../../hooks/useIsTablet';
 import CostingFormTablet from './CostingFormTablet';
 
@@ -142,6 +146,14 @@ const CostingForm = () => {
   const [knitsModalOpen, setKnitsModalOpen] = useState(false);
   const [knitsRowKey, setKnitsRowKey] = useState(null);
   const [knitsParts, setKnitsParts] = useState([]);
+
+  // Techpack import modal
+  const [techpackModalOpen, setTechpackModalOpen] = useState(false);
+
+  // AI consumption calculator modal
+  const [consumptionModalOpen, setConsumptionModalOpen] = useState(false);
+  const [consumptionRowKey, setConsumptionRowKey]       = useState(null);
+  const [consumptionFabricRow, setConsumptionFabricRow] = useState(null);
 
   // Past PO suggestions
   const [poSuggestions, setPOSuggestions] = useState([]);
@@ -220,9 +232,27 @@ const CostingForm = () => {
     if (isEdit) {
       loadCostSheet();
     } else {
+      // Reset all state for a blank new cost sheet
+      form.resetFields();
       setCostingId('Auto-generated');
-      // Pre-populate manufacturing rows with common processes
+      setEntityVersion(null);
+      setCurrency('INR');
+      setQuoteCurrency('USD');
+      setActualRate(83.80);
+      setFileList([]);
+      setStyleId(null);
+      setStyleOptions([]);
+      setFabricRows([]);
+      setLocalTrims([]);
+      setImportedTrims([]);
       setManufacturingRows([]);
+      setOverheadRows([]);
+      setAgentCommissionPct(0);
+      setProfitPct(0);
+      setTargetPrice('');
+      setPerSizeOverrides({});
+      setSyncPercentages(true);
+      setIsDirty(false);
     }
   }, [id]);
 
@@ -471,6 +501,107 @@ const CostingForm = () => {
     }
   };
 
+  // ==================== TECHPACK IMPORT HANDLER ====================
+
+  const handleTechpackApply = async (result) => {
+    // 1. Load buyer styles if buyer matched, then set buyer + style fields
+    if (result.matchedBuyerId) {
+      form.setFieldValue('buyerId', result.matchedBuyerId);
+      try {
+        const styles = await import('../../services/styleService').then((m) =>
+          m.getStylesByBuyerId(result.matchedBuyerId)
+        );
+        setStyleOptions((styles || []).map((s) => ({ value: s.id, label: s.styleNo, style: s })));
+      } catch { /* style options unavailable */ }
+    }
+
+    // 2. Set style + header form fields
+    form.setFieldsValue({
+      garmentName:  result.garmentName  || '',
+      seasonCode:   result.seasonCode   || undefined,
+      seasonYear:   result.seasonYear   || undefined,
+      sizes:        result.sizes?.length ? result.sizes : undefined,
+      ...(result.matchedStyleId && { styleNo: result.matchedStyleId }),
+    });
+    if (result.matchedStyleId) setStyleId(result.matchedStyleId);
+
+    // 3. Map fabric rows
+    if (result.fabricRows?.length) {
+      setFabricRows(
+        result.fabricRows.map((r, i) => ({
+          key:              `f_import_${Date.now()}_${i}`,
+          itemId:           r.matchedItemId   || null,
+          fabricType:       r.matchedItemName || r.extractedName || '',
+          classification:   r.classification  || 'Woven',
+          description:      r.notes           || '',
+          consumption:      '',
+          uom:              r.uom || 'meters',
+          fabricPrice:      '',
+          fabricWidthStd:   '',
+          fabricWidthVendor: '',
+          vendorId:         null,
+          vendorName:       '',
+          allowancePct:     0,
+          netCost:          0,
+          sizes:            '',
+        }))
+      );
+    }
+
+    // 4. Map local trim rows
+    if (result.localTrimRows?.length) {
+      setLocalTrims(
+        result.localTrimRows.map((r, i) => ({
+          key:         `lt_import_${Date.now()}_${i}`,
+          itemId:      r.matchedItemId   || null,
+          item:        r.matchedItemName || r.extractedName || '',
+          code:        '',
+          size:        '',
+          consumption: r.quantity || '',
+          uom:         r.uom || 'pcs',
+          cost:        '',
+          price:       0,
+          sizes:       '',
+        }))
+      );
+    }
+
+    // 5. Map imported trim rows
+    if (result.importedTrimRows?.length) {
+      setImportedTrims(
+        result.importedTrimRows.map((r, i) => ({
+          key:         `it_import_${Date.now()}_${i}`,
+          itemId:      r.matchedItemId   || null,
+          item:        r.matchedItemName || r.extractedName || '',
+          code:        '',
+          size:        '',
+          consumption: r.quantity || '',
+          uom:         r.uom || 'pcs',
+          costUsd:     '',
+          priceUsd:    0,
+          sizes:       '',
+        }))
+      );
+    }
+
+    // 6. Map manufacturing rows (only add if explicitly extracted)
+    if (result.manufacturingRows?.length) {
+      setManufacturingRows(
+        result.manufacturingRows.map((r, i) => ({
+          key:      `m_import_${Date.now()}_${i}`,
+          itemId:   r.matchedItemId   || null,
+          process:  r.matchedItemName || r.extractedName || '',
+          cost:     '',
+          comments: r.notes || '',
+          sizes:    '',
+        }))
+      );
+    }
+
+    setIsDirty(true);
+    message.success('Techpack data applied. Please fill in prices and consumption.');
+  };
+
   // ==================== ROW HANDLERS ====================
 
   const updateFabricRow = (key, field, value) => {
@@ -687,6 +818,71 @@ const CostingForm = () => {
       })
     );
     setKnitsModalOpen(false);
+  };
+
+  // AI Consumption modal handlers
+  const openConsumptionModal = (rowKey, row) => {
+    setConsumptionRowKey(rowKey);
+    setConsumptionFabricRow(row);
+    setConsumptionModalOpen(true);
+  };
+
+  const handleConsumptionApply = (result) => {
+    if (result.splitBySizes) {
+      // Replace the source row with one row per size, each with its specific consumption
+      setFabricRows((prev) => {
+        const source = prev.find((r) => r.key === consumptionRowKey);
+        if (!source) return prev;
+        const newRows = (result.sizes || []).map((size, i) => {
+          const c = result.consumptionPerSize?.[size] || 0;
+          return {
+            ...source,
+            key:         `${consumptionRowKey}_sz_${i}_${Date.now()}`,
+            sizes:       size,
+            consumption: c,
+            uom:         result.uom || source.uom,
+            netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct),
+          };
+        });
+        return [...prev.filter((r) => r.key !== consumptionRowKey), ...newRows];
+      });
+    } else {
+      setFabricRows((prev) =>
+        prev.map((r) => {
+          if (r.key !== consumptionRowKey) return r;
+          const updated = { ...r, consumption: result.consumption, uom: result.uom || r.uom };
+          updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+          return updated;
+        })
+      );
+    }
+    setConsumptionModalOpen(false);
+    setIsDirty(true);
+    message.success('Consumption updated from AI calculation.');
+  };
+
+  /**
+   * Open the Knits Parts Calculator pre-filled with AI-extracted panel data.
+   * contributionPerSize values are in kg → multiply by 1000 to get grams (what the modal expects).
+   * Called from ConsumptionCalcModal's "Verify in Calculator" button.
+   */
+  const handleOpenKnitsCalcFromAI = (aiParts, gsm, size) => {
+    const preparedParts = (aiParts || []).map((p, i) => ({
+      key:          `kp_ai_${i}`,
+      partName:     p.partName || `Part ${i + 1}`,
+      length:       '',
+      width:        '',
+      nop:          p.numberOfPieces || 1,
+      gsm:          gsm || '',
+      // contributionPerSize is raw panel contribution in kg → convert to grams
+      gramsPerPart: p.contributionPerSize?.[size] != null
+        ? Math.round(p.contributionPerSize[size] * 100000) / 100
+        : '',
+    }));
+    setConsumptionModalOpen(false);
+    setKnitsRowKey(consumptionRowKey);
+    setKnitsParts(preparedParts);
+    setKnitsModalOpen(true);
   };
 
   // Past PO suggestions
@@ -1002,7 +1198,7 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 120,
+      width: 145,
       render: (val, record) => (
         <Space.Compact style={{ width: '100%' }}>
           <InputNumber
@@ -1012,10 +1208,10 @@ const CostingForm = () => {
             placeholder="Qty"
             onChange={(v) => updateFabricRow(record.key, 'consumption', v)}
             size="small"
-            style={{ width: record.classification === 'Knits' ? '70%' : '100%' }}
+            style={{ width: record.classification === 'Knits' ? '58%' : '78%' }}
           />
           {record.classification === 'Knits' && (
-            <Tooltip title="Calculate Knits Consumption">
+            <Tooltip title="Knits Consumption Calculator (manual parts)">
               <Button
                 icon={<CalculatorOutlined />}
                 onClick={() => openKnitsModal(record.key)}
@@ -1025,6 +1221,14 @@ const CostingForm = () => {
               />
             </Tooltip>
           )}
+          <Tooltip title="Calculate from Measurement Chart (AI)">
+            <Button
+              icon={<ThunderboltOutlined />}
+              onClick={() => openConsumptionModal(record.key, record)}
+              size="small"
+              style={{ color: '#faad14', borderColor: '#faad14' }}
+            />
+          </Tooltip>
         </Space.Compact>
       ),
     },
@@ -2235,6 +2439,14 @@ const CostingForm = () => {
             </Tag>
           )}
         </Space>
+        <div className="header-actions">
+          <Button
+            icon={<ImportOutlined />}
+            onClick={() => setTechpackModalOpen(true)}
+          >
+            Import from Techpack
+          </Button>
+        </div>
       </div>
 
       <Form
@@ -2307,6 +2519,22 @@ const CostingForm = () => {
         onApply={handleKnitsApply}
         onCancel={() => setKnitsModalOpen(false)}
         initialParts={knitsParts}
+      />
+
+      {/* Techpack AI Import Modal */}
+      <TechpackImportModal
+        open={techpackModalOpen}
+        onClose={() => setTechpackModalOpen(false)}
+        onApply={handleTechpackApply}
+      />
+
+      {/* AI Consumption Calculator Modal */}
+      <ConsumptionCalcModal
+        open={consumptionModalOpen}
+        onClose={() => setConsumptionModalOpen(false)}
+        onApply={handleConsumptionApply}
+        onOpenKnitsCalc={handleOpenKnitsCalcFromAI}
+        fabricRow={consumptionFabricRow}
       />
     </div>
   );

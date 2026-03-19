@@ -198,6 +198,41 @@ export const getTodaysRate = async (fromCurrency, toCurrency) => {
   return 1;
 };
 
+// ==================== TECHPACK AI IMPORT ====================
+
+/**
+ * Upload a Buyer Techpack PDF and extract costing data using AI.
+ * The backend runs Gemini extraction + master data matching.
+ * Returns TechpackCostingDTO with match info for the frontend review modal.
+ * POST /api/v1/cost-sheets/extract-techpack (multipart/form-data)
+ * @param {File} file - PDF techpack file
+ * @returns {Promise<Object>} TechpackCostingDTO
+ */
+export const extractTechpackForCosting = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return upload(`${ENDPOINTS.COST_SHEETS}/extract-techpack`, formData);
+};
+
+// ==================== CONSUMPTION CALCULATION ====================
+
+/**
+ * Calculate fabric consumption per size from a measurement chart + optional techpack.
+ * AI uses industry-standard formulas:
+ *   Knits → L × W × NOP × GSM / 10000 per panel → kg
+ *   Woven → panel area / fabric width / marker efficiency → meters
+ * POST /api/v1/cost-sheets/calculate-consumption (multipart/form-data)
+ * @param {File} measurementChart - Size spec image (PNG/JPG) or PDF
+ * @param {File|null} [techpack] - Optional techpack PDF (improves GSM/classification accuracy)
+ * @returns {Promise<Object>} ConsumptionExtractionDTO
+ */
+export const calculateConsumption = async (measurementChart, techpack = null) => {
+  const formData = new FormData();
+  formData.append('measurementChart', measurementChart);
+  if (techpack) formData.append('techpack', techpack);
+  return upload(`${ENDPOINTS.COST_SHEETS}/calculate-consumption`, formData);
+};
+
 // ==================== ATTACHMENTS ====================
 
 /**
