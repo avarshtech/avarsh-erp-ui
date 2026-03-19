@@ -1046,3 +1046,60 @@ textarea.ant-input:active {
 [data-theme="dark"] .ant-dropdown .ant-dropdown-menu-item:hover {
   background: #334155 !important;
 }
+
+/* ============================================================
+   BOM CONSUMPTION MODE TOGGLE
+   Segmented control in BOM variant column for trims
+   ============================================================ */
+.bom-consumption-mode-toggle {
+  font-size: 11px !important;
+  padding: 2px !important;
+  width: auto !important;
+  display: inline-flex !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item {
+  padding: 0 6px !important;
+  min-height: 24px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-label {
+  font-size: 11px !important;
+  line-height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 2px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-thumb {
+  background: var(--primary-color) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+
+/* BOM variant attribute tags — purple in light, geekblue in dark */
+.bom-variant-tag {
+  background-color: rgba(114, 46, 209, 0.08) !important;
+  border-color: rgba(114, 46, 209, 0.25) !important;
+  color: #722ed1 !important;
+}
+
+[data-theme="dark"] .bom-variant-tag {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}

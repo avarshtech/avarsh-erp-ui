@@ -49,8 +49,8 @@ export const createItem = async (data) => {
  * @param {Object} data - Updated item data (must include id)
  * @returns {Promise<Object>} Updated item
  */
-export const updateItem = async (data) => {
-  return axiosInstance.post(ENDPOINTS.ITEMS, data);
+export const updateItem = async (id, data) => {
+  return axiosInstance.put(`${ENDPOINTS.ITEMS}/${id}`, data);
 };
 
 /**
