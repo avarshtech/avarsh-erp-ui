@@ -227,7 +227,7 @@ const SupplierMaster = () => {
       };
 
       if (editingSupplier) {
-        const response = await updateSupplier({ ...supplierData, id: editingSupplier.id, version: editingSupplier.version });
+        const response = await updateSupplier(editingSupplier.id, { ...supplierData, version: editingSupplier.version });
         // Update store
         const updatedSupplier = response?.data || { ...supplierData, id: editingSupplier.id };
         updateItem('suppliers', editingSupplier.id, updatedSupplier);

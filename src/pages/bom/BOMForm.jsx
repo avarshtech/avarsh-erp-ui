@@ -21,6 +21,7 @@ import {
   Radio,
   Popover,
   ConfigProvider,
+  Segmented,
 } from 'antd';
 import {
   PlusOutlined,
@@ -33,6 +34,7 @@ import {
   EditOutlined,
   CheckCircleOutlined,
   WarningOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
@@ -48,10 +50,15 @@ import { uploadFile, deleteFile, downloadFileAsBlob, getFilesByEntity } from '..
 import {
   BOM_STATUS,
   QTY_CALC_BASIS,
+  CONSUMPTION_MODE,
+  CONSUMPTION_MODE_OPTIONS,
   calcPurchaseQty,
   calcTrimsTotal,
+  buildOrderQtyGrid,
+  calcMatrixTotal,
 } from '../../utils/bomConstants';
 import ProcessAllowanceModal from './ProcessAllowanceModal';
+import ConsumptionMatrixDialog from './ConsumptionMatrixDialog';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -78,10 +85,11 @@ const createEmptyLine = () => ({
   uom: '',
   partsName: '',
   consumptionPerGarment: null,
-  selectedBuyerPoNo: null, // set when Buyer PO basis + color in multiple lines
   colorInvalid: false, // true when variant color not found in order lines
-  qtyCalcBasis: 'TOTAL', // per-line calc basis (only editable for trims)
-  baseQtyMatchAttr: null, // which variant attr to match for trims base qty: 'color', 'size', or 'color+size'
+  qtyCalcBasis: 'TOTAL', // per-line calc basis
+  consumptionMode: 'SIMPLE', // 'SIMPLE', 'SIZE_WISE', 'VARIANT_PER_SIZE'
+  consumptionMatrix: null, // { color: { size: consumption } }
+  variantMapping: null, // { size: variantId } for VARIANT_PER_SIZE
   processes: [],
   processAllowances: [],
   totalQty: null,
@@ -259,6 +267,23 @@ const BOMForm = () => {
   const [colors, setColors] = useState([]);
   const [orderLineSummary, setOrderLineSummary] = useState([]); // [{ buyerPoNo, colors: [{ name, qty }], lineQty }]
   const [orderQty, setOrderQty] = useState(null);
+
+  // Derive union of all sizes from order line summary
+  const allSizes = useMemo(() => {
+    const sizeSet = new Set();
+    const sizeOrder = [];
+    orderLineSummary.forEach((ol) => {
+      (ol.colors || []).forEach((cr) => {
+        Object.keys(cr.quantities || {}).forEach((s) => {
+          if (s && !sizeSet.has(s.trim().toLowerCase())) {
+            sizeSet.add(s.trim().toLowerCase());
+            sizeOrder.push(s.trim());
+          }
+        });
+      });
+    });
+    return sizeOrder;
+  }, [orderLineSummary]);
   const [remarks, setRemarks] = useState('');
 
   // ── Section B: BOM Lines ─────────────────────────────────────────
@@ -280,6 +305,7 @@ const BOMForm = () => {
   // ── Trims Match By Modal ────────────────────────────────────────
   const [matchByModalOpen, setMatchByModalOpen] = useState(false);
   const [matchByLineKey, setMatchByLineKey] = useState(null);
+  const [matrixDialogLineKey, setMatrixDialogLineKey] = useState(null);
 
   // ── Auto-focus variant dropdown after edit button click ─────────
   const [variantEditLineKey, setVariantEditLineKey] = useState(null);
@@ -374,8 +400,9 @@ const BOMForm = () => {
               processes: Array.isArray(l.processes) ? l.processes.map((p) => (typeof p === 'object' ? p.id : p)) : [],
               processAllowances: l.processAllowances || [],
               qtyCalcBasis: l.qtyCalcBasis || 'TOTAL',
-              baseQtyMatchAttr: l.baseQtyMatchAttr || null,
-              selectedBuyerPoNo: l.selectedBuyerPoNo || null,
+              consumptionMode: l.consumptionMode || 'SIMPLE',
+              consumptionMatrix: l.consumptionMatrix || null,
+              variantMapping: l.variantMapping || null,
               totalQty: l.totalQty,
               cadPreviewUrl: null,
               _cadFileId: null,
@@ -409,11 +436,9 @@ const BOMForm = () => {
               .catch(() => { /* item details unavailable — variant editing won't work */ });
           }
 
-          // Load CAD files for fabric lines (async, non-blocking)
-          const fabricLinesWithId = (bom.lines || []).filter((l) =>
-            l.id && (l.categoryName || '').toLowerCase().includes('fabric'),
-          );
-          for (const l of fabricLinesWithId) {
+          // Load CAD files for fabric lines only (async, non-blocking)
+          const linesWithId = mappedLines.filter((l) => l.id && isFabricCategory(l));
+          for (const l of linesWithId) {
             getFilesByEntity('BOM_LINE', l.id)
               .then((files) => {
                 const cadFile = (files?.data || files || []).find((f) => f.fileCategory === 'CAD_MARKER');
@@ -421,7 +446,7 @@ const BOMForm = () => {
                 return downloadFileAsBlob(cadFile.fileId).then((blob) => {
                   const url = URL.createObjectURL(blob);
                   setLines((prev) => prev.map((line) =>
-                    line.id === l.id ? { ...line, cadPreviewUrl: url, _cadFileId: cadFile.fileId } : line,
+                    line.id === l.id ? { ...line, cadPreviewUrl: url, _cadFileId: cadFile.fileId, _cadFileName: cadFile.originalFilename } : line,
                   ));
                 });
               })
@@ -627,7 +652,7 @@ const BOMForm = () => {
     primaryUom: '', secondaryUom: '', uom: '',
     consumptionPerGarment: null, colorInvalid: false,
     partsName: '', processes: [], processAllowances: [],
-    baseQtyMatchAttr: null, selectedBuyerPoNo: null,
+    consumptionMode: 'SIMPLE', consumptionMatrix: null, variantMapping: null,
   };
 
   const handleCategoryChange = useCallback(
@@ -780,8 +805,6 @@ const BOMForm = () => {
           partsName: '',
           processes: [],
           processAllowances: [],
-          baseQtyMatchAttr: null,
-          selectedBuyerPoNo: null,
         });
         if (!valid) message.error({ content: errorMsg, key: 'variant-validation' });
       };
@@ -794,14 +817,14 @@ const BOMForm = () => {
   const handleVariantSelect = useCallback(
     (lineKey, variantId) => {
       if (variantId === null) {
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, baseQtyMatchAttr: null, selectedBuyerPoNo: null });
+        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, consumptionMatrix: null, variantMapping: null });
         return;
       }
       // Check duplicate
       if (isVariantDuplicate(variantId, lineKey)) {
         message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
         // Clear selection and keep dropdown open
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, baseQtyMatchAttr: null, selectedBuyerPoNo: null });
+        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, consumptionMatrix: null, variantMapping: null });
         setVariantEditLineKey(lineKey);
         return;
       }
@@ -813,7 +836,7 @@ const BOMForm = () => {
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
         if (!valid) message.error({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
-          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, baseQtyMatchAttr: null, selectedBuyerPoNo: null } : l,
+          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, consumptionMatrix: null, variantMapping: null } : l,
         );
       });
       setIsDirty(true);
@@ -839,7 +862,7 @@ const BOMForm = () => {
    *
    * TRIMS:  Uses per-line qtyCalcBasis (Total / Buyer PO).
    *         Matches by the user-selected attribute(s): color, size, or color+size.
-   *         If no baseQtyMatchAttr selected yet → returns qty: 0 (pending config).
+   *         SIMPLE mode: returns total order qty.
    *
    * Returns { qty, needsPoPick, matchingLines }.
    */
@@ -860,79 +883,37 @@ const BOMForm = () => {
         return { qty: totalColorQty, needsPoPick: false, matchingLines: [] };
       }
 
-      // ── TRIMS: per-line calc basis + attribute matching ──
-      const calcBasis = line.qtyCalcBasis || 'TOTAL';
-      const matchAttr = line.baseQtyMatchAttr; // 'color' | 'size' | 'color+size' | null
-
-      // No attribute configured yet → qty not resolved
-      if (!matchAttr) {
-        return { qty: orderQty || 0, needsPoPick: false, matchingLines: [] };
-      }
-
-      const varColor = getVariantAttr(line, 'color');
-      const varSize = getVariantAttr(line, 'size');
-
-      // Build matching lines based on the chosen attribute(s)
-      const matchingLines = [];
-      orderLineSummary.forEach((ol) => {
-        ol.colors.forEach((cr) => {
-          if (matchAttr === 'color') {
-            if (varColor && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase()) {
-              matchingLines.push({ buyerPoNo: ol.buyerPoNo, qty: cr.qty });
-            }
-          } else if (matchAttr === 'size') {
-            // Sum the given size across all colors in this order line
-            if (varSize && cr.quantities) {
-              const sizeKey = Object.keys(cr.quantities).find((s) => s.trim().toLowerCase() === varSize.toLowerCase());
-              if (sizeKey && cr.quantities[sizeKey]) {
-                matchingLines.push({ buyerPoNo: ol.buyerPoNo, qty: cr.quantities[sizeKey] });
-              }
-            }
-          } else if (matchAttr === 'color+size') {
-            if (varColor && varSize && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase() && cr.quantities) {
-              const sizeKey = Object.keys(cr.quantities).find((s) => s.trim().toLowerCase() === varSize.toLowerCase());
-              if (sizeKey && cr.quantities[sizeKey]) {
-                matchingLines.push({ buyerPoNo: ol.buyerPoNo, qty: cr.quantities[sizeKey] });
-              }
-            }
-          }
-        });
-      });
-
-      // Deduplicate by buyerPoNo (sum if same PO matched multiple color rows for 'size' attr)
-      const poMap = {};
-      matchingLines.forEach((m) => {
-        poMap[m.buyerPoNo] = (poMap[m.buyerPoNo] || 0) + m.qty;
-      });
-      const deduped = Object.entries(poMap).map(([buyerPoNo, qty]) => ({ buyerPoNo, qty }));
-
-      if (calcBasis === QTY_CALC_BASIS.TOTAL) {
-        const total = deduped.reduce((sum, m) => sum + (m.qty || 0), 0);
-        return { qty: total, needsPoPick: false, matchingLines: deduped };
-      }
-
-      // Buyer PO basis
-      if (line.selectedBuyerPoNo) {
-        const match = deduped.find((m) => m.buyerPoNo === line.selectedBuyerPoNo);
-        return { qty: match?.qty || 0, needsPoPick: false, matchingLines: deduped };
-      }
-      if (deduped.length === 1) {
-        return { qty: deduped[0].qty, needsPoPick: false, matchingLines: deduped };
-      }
-      if (deduped.length > 1) {
-        return { qty: 0, needsPoPick: true, matchingLines: deduped };
-      }
-      return { qty: 0, needsPoPick: false, matchingLines: [] };
+      // ── TRIMS (SIMPLE mode): use total order qty ──
+      // Matrix modes are handled by computeMatrixTotalQty, not this function.
+      return { qty: orderQty || 0, needsPoPick: false, matchingLines: [] };
     },
     [orderLineSummary, orderQty, getVariantAttr],
+  );
+
+  // Compute total qty for matrix modes (SIZE_WISE / VARIANT_PER_SIZE)
+  const computeMatrixTotalQty = useCallback(
+    (line) => {
+      if (!line.consumptionMatrix) return 0;
+      const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
+      return calcMatrixTotal(line.consumptionMatrix, orderQtyGrid);
+    },
+    [orderLineSummary],
   );
 
   // ── Process selection & allowance popup ────────────────────────
   const openAllowanceDialog = useCallback(
     (lineKey, line, allSelectedProcesses) => {
-      const consumption = line?.consumptionPerGarment || 0;
-      const { qty: colorQty } = getColorQty(line);
-      const base = consumption * colorQty;
+      const cMode = line?.consumptionMode || 'SIMPLE';
+      const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+
+      let base;
+      if (isMatrixMode) {
+        base = computeMatrixTotalQty(line);
+      } else {
+        const consumption = line?.consumptionPerGarment || 0;
+        const { qty: colorQty } = getColorQty(line);
+        base = consumption * colorQty;
+      }
       const wVariant = line?.variants?.W || line?.variants?.Width || line?.variants?.width || 0;
       const finWidth = Number(String(wVariant).replace(/[^0-9.]/g, '')) || 0;
 
@@ -952,39 +933,71 @@ const BOMForm = () => {
       setAllowanceBaseQty(base);
       setAllowanceModalOpen(true);
     },
-    [getColorQty],
+    [getColorQty, computeMatrixTotalQty],
   );
 
   /** Re-open allowance dialog with previously saved values for editing */
   const editAllowanceDialog = useCallback(
     (lineKey) => {
       const line = lines.find((l) => l.key === lineKey);
-      if (!line || !line.processAllowances?.length) return;
+      if (!line) return;
 
-      const consumption = line.consumptionPerGarment || 0;
-      const { qty: colorQty } = getColorQty(line);
-      const base = consumption * colorQty;
+      const cMode = line.consumptionMode || 'SIMPLE';
+      const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+
+      let base;
+      if (isMatrixMode) {
+        base = computeMatrixTotalQty(line);
+      } else {
+        const consumption = line.consumptionPerGarment || 0;
+        const { qty: colorQty } = getColorQty(line);
+        base = consumption * colorQty;
+      }
       const wVariant = line.variants?.W || line.variants?.Width || line.variants?.width || 0;
       const finWidth = Number(String(wVariant).replace(/[^0-9.]/g, '')) || 0;
 
       setAllowanceLineKey(lineKey);
       setAllowanceIsFabric(isFabricCategory(line));
-      // Load saved allowance values as defaults so the dialog shows existing data
+
+      // Build process list from ALL currently selected processes,
+      // merging saved allowance values where available
+      const savedAllowanceMap = {};
+      (line.processAllowances || []).forEach((a) => { savedAllowanceMap[a.processId] = a; });
+
+      const allSelectedProcesses = (line.processes || [])
+        .map((pid) => processesList.find((p) => p.id === pid))
+        .filter(Boolean);
+
       setAllowanceProcesses(
-        line.processAllowances.map((a) => ({
-          id: a.processId,
-          processName: a.processName,
-          defaultShrinkageInches: a.shrinkageInches ?? 0,
-          defaultProcessLossPercent: a.processLossPercent ?? 0,
-          defaultRejectionPercent: a.rejectionPercent ?? 0,
-          defaultShipmentAllowancePercent: a.shipmentAllowancePercent ?? 0,
-        })),
+        allSelectedProcesses.map((p) => {
+          const saved = savedAllowanceMap[p.id];
+          if (saved) {
+            return {
+              id: p.id,
+              processName: p.processName,
+              defaultShrinkageInches: saved.shrinkageInches ?? p.defaultShrinkageInches ?? 0,
+              defaultProcessLossPercent: saved.processLossPercent ?? p.defaultProcessLossPercent ?? 0,
+              defaultRejectionPercent: saved.rejectionPercent ?? p.defaultRejectionPercent ?? 0,
+              defaultShipmentAllowancePercent: saved.shipmentAllowancePercent ?? p.defaultShipmentAllowancePercent ?? 0,
+              sizeAllowances: saved.sizeAllowances || {},
+            };
+          }
+          return {
+            id: p.id,
+            processName: p.processName,
+            defaultShrinkageInches: p.defaultShrinkageInches ?? 0,
+            defaultProcessLossPercent: p.defaultProcessLossPercent ?? 0,
+            defaultRejectionPercent: p.defaultRejectionPercent ?? 0,
+            defaultShipmentAllowancePercent: p.defaultShipmentAllowancePercent ?? 0,
+            sizeAllowances: {},
+          };
+        }),
       );
       setAllowanceFinishedWidth(finWidth);
       setAllowanceBaseQty(base);
       setAllowanceModalOpen(true);
     },
-    [lines, getColorQty],
+    [lines, getColorQty, computeMatrixTotalQty, processesList],
   );
 
   const handleProcessChange = useCallback(
@@ -1084,18 +1097,17 @@ const BOMForm = () => {
 
   const computeTotalQty = useCallback(
     (line) => {
+      // Matrix modes for trims
+      if (!isFabricCategory(line) && (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE)) {
+        return computeMatrixTotalQty(line);
+      }
+      // SIMPLE mode (trims and fabric)
       const consumption = Number(line.consumptionPerGarment) || 0;
       if (!consumption) return 0;
-      if (!isFabricCategory(line)) {
-        // Trims: don't calculate until match-by is selected
-        if (!line.baseQtyMatchAttr) return 0;
-        // Trims + Buyer PO basis: don't calculate until a PO is selected
-        if ((line.qtyCalcBasis || 'TOTAL') === QTY_CALC_BASIS.BUYER_PO && !line.selectedBuyerPoNo) return 0;
-      }
       const { qty: colorQty } = getColorQty(line);
       return calcTrimsTotal(consumption, colorQty);
     },
-    [getColorQty],
+    [getColorQty, computeMatrixTotalQty],
   );
 
   // ==================== PROCESS OPTIONS ====================
@@ -1118,8 +1130,14 @@ const BOMForm = () => {
     const fabricLines = linesWithCategory.filter((l) => isFabricCategory(l)).length;
     const trimLines = total - fabricLines;
     const completedLines = lines.filter((l) => {
-      if (!l.categoryId || !l.itemId || !l.consumptionPerGarment || !l.processes?.length) return false;
-      if (!isFabricCategory(l) && !l.baseQtyMatchAttr) return false;
+      if (!l.categoryId || !l.itemId || !l.processes?.length) return false;
+      const cMode = l.consumptionMode || 'SIMPLE';
+      const isMatrix = !isFabricCategory(l) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      if (isMatrix) {
+        if (!l.consumptionMatrix || Object.keys(l.consumptionMatrix).length === 0) return false;
+      } else {
+        if (!l.consumptionPerGarment) return false;
+      }
       return true;
     }).length;
     const totalPurchaseQty = lines.reduce((sum, l) => {
@@ -1127,6 +1145,26 @@ const BOMForm = () => {
       if (!tq) return sum;
       const allowances = l.processAllowances || [];
       if (!allowances.length) return sum + tq;
+      const cMode = l.consumptionMode || 'SIMPLE';
+      const isMatrixMode = !isFabricCategory(l) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      if (isMatrixMode && l.consumptionMatrix) {
+        const oqg = buildOrderQtyGrid(orderLineSummary);
+        let total = 0;
+        allSizes.forEach((size) => {
+          let sizeReq = 0;
+          Object.entries(l.consumptionMatrix).forEach(([color, szMap]) => {
+            sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
+          });
+          let rejTotal = 0, shipTotal = 0;
+          allowances.forEach((a) => {
+            const sa = a.sizeAllowances?.[size];
+            rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
+            shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
+          });
+          total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
+        });
+        return sum + total;
+      }
       const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
       const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
       const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
@@ -1138,18 +1176,45 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
       ...rest,
+      // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
+      variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
       baseQty: (() => {
-        const { qty } = getColorQty(lines[idx]);
+        const line = lines[idx];
+        if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+          return computeMatrixTotalQty(line);
+        }
+        const { qty } = getColorQty(line);
         return qty || 0;
       })(),
       totalQty: computeTotalQty(lines[idx]),
       purchaseQty: (() => {
-        const tq = computeTotalQty(lines[idx]);
+        const line = lines[idx];
+        const tq = computeTotalQty(line);
         if (!tq) return 0;
         const allowances = rest.processAllowances || [];
         if (!allowances.length) return tq;
+        const cMode = line.consumptionMode || 'SIMPLE';
+        const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+        if (isMatrixMode && line.consumptionMatrix) {
+          const oqg = buildOrderQtyGrid(orderLineSummary);
+          let total = 0;
+          allSizes.forEach((size) => {
+            let sizeReq = 0;
+            Object.entries(line.consumptionMatrix).forEach(([color, szMap]) => {
+              sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
+            });
+            let rejTotal = 0, shipTotal = 0;
+            allowances.forEach((a) => {
+              const sa = a.sizeAllowances?.[size];
+              rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
+              shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
+            });
+            total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
+          });
+          return total;
+        }
         const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
         const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
         const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
@@ -1191,29 +1256,121 @@ const BOMForm = () => {
       return { valid: false, errors };
     }
 
+    // Build order qty grid once for matrix validation
+    const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
+
     lines.forEach((l, idx) => {
       const n = idx + 1;
       const fabric = isFabricCategory(l);
+      const cMode = l.consumptionMode || 'SIMPLE';
+      const isMatrixMode = !fabric && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+
+      // ── Basic fields (draft + submit) ──
       if (!l.categoryId) errors.push(`Line ${n}: Category is required.`);
       if (!l.subCategoryId) errors.push(`Line ${n}: Sub Category is required.`);
       if (!l.itemTypeId) errors.push(`Line ${n}: Item Type is required.`);
       if (!l.itemId) errors.push(`Line ${n}: Item is required.`);
-      if (!l.variantId && (l.availableVariants || []).length > 1) errors.push(`Line ${n}: Variant selection is required.`);
-      if (!l.consumptionPerGarment || Number(l.consumptionPerGarment) <= 0) errors.push(`Line ${n}: Consumption is required.`);
       if (!l.uom) errors.push(`Line ${n}: UOM is required.`);
-      if (!l.partsName) errors.push(`Line ${n}: Parts Name is required.`);
-      if (!l.processes?.length) errors.push(`Line ${n}: At least one process is required.`);
-      if (!fabric) {
-        // Trims: calc basis match-by is required
-        if (!l.baseQtyMatchAttr) errors.push(`Line ${n}: Base quantity match-by is required. Open Calc Basis dialog.`);
-        if ((l.qtyCalcBasis || 'TOTAL') === 'BUYER_PO' && !l.selectedBuyerPoNo) errors.push(`Line ${n}: Buyer PO selection is required.`);
+      if (!l.partsName || (Array.isArray(l.partsName) && l.partsName.length === 0)) errors.push(`Line ${n}: Parts Name is required.`);
+
+      // ── Variant selection ──
+      // Required for: fabric (always), SIMPLE trims, SIZE_WISE trims
+      // Not required for: VARIANT_PER_SIZE trims (variants mapped per size in matrix)
+      if (cMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+        if (!l.variantId && (l.availableVariants || []).length > 1) {
+          errors.push(`Line ${n}: Variant selection is required.`);
+        }
       }
-      if (mode === 'submit' && fabric && !l._cadFileId && !l.cadPreviewUrl) {
+
+      // ── Consumption ──
+      if (isMatrixMode) {
+        // Matrix must exist and have at least one non-zero consumption value
+        if (!l.consumptionMatrix || Object.keys(l.consumptionMatrix).length === 0) {
+          errors.push(`Line ${n}: Consumption matrix is required. Click the edit icon to set it.`);
+        } else {
+          // Check that at least one cell with order qty has consumption entered
+          let hasAnyConsumption = false;
+          Object.entries(l.consumptionMatrix).forEach(([color, sizes]) => {
+            Object.entries(sizes || {}).forEach(([size, val]) => {
+              if ((Number(val) || 0) > 0 && (orderQtyGrid[color]?.[size] || 0) > 0) {
+                hasAnyConsumption = true;
+              }
+            });
+          });
+          if (!hasAnyConsumption) {
+            errors.push(`Line ${n}: At least one consumption value is required in the matrix.`);
+          }
+        }
+
+        // VARIANT_PER_SIZE: every size that has order qty must have a variant mapped
+        if (cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+          if (!l.variantMapping || Object.keys(l.variantMapping).length === 0) {
+            errors.push(`Line ${n}: Variant mapping is required. Map variants per size in the consumption matrix.`);
+          } else {
+            // Only check sizes that actually have order qty
+            const sizesWithQty = allSizes.filter((s) => {
+              return Object.keys(orderQtyGrid).some((color) => (orderQtyGrid[color]?.[s] || 0) > 0);
+            });
+            const unmapped = sizesWithQty.filter((s) => !l.variantMapping[s]);
+            if (unmapped.length > 0) {
+              errors.push(`Line ${n}: Variant mapping missing for sizes: ${unmapped.join(', ')}.`);
+            }
+          }
+        }
+      } else {
+        // SIMPLE mode
+        if (!l.consumptionPerGarment || Number(l.consumptionPerGarment) <= 0) {
+          errors.push(`Line ${n}: Consumption is required.`);
+        }
+      }
+
+      // ── Process ──
+      if (!l.processes?.length) errors.push(`Line ${n}: At least one process is required.`);
+
+      // ── Process Allowances (submit only) ──
+      if (mode === 'submit') {
+        if (!l.processAllowances?.length) {
+          errors.push(`Line ${n}: Process allowances are required for submission.`);
+        }
+      }
+
+      // ── CAD Marker (submit only, fabric only) ──
+      if (mode === 'submit' && fabric && !l._cadFileId && !l.cadPreviewUrl && !l._cadStagedFile) {
         errors.push(`Line ${n}: CAD marker file is required for submission.`);
+      }
+
+      // ── Total Qty check (submit only) ──
+      if (mode === 'submit') {
+        const totalQty = computeTotalQty(l);
+        if (!totalQty || totalQty <= 0) {
+          errors.push(`Line ${n}: Total quantity must be greater than zero.`);
+        }
       }
     });
 
     return { valid: errors.length === 0, errors };
+  };
+
+  // Upload any staged CAD files after BOM save (for new lines that didn't have an ID at upload time)
+  const uploadStagedCadFiles = async (savedBom) => {
+    if (!savedBom?.lines?.length) return;
+    for (const savedLine of savedBom.lines) {
+      // Match saved line back to local line by itemId + variantId (or index)
+      const localLine = lines.find((l) =>
+        !l.id && l._cadStagedFile && l.itemId === savedLine.itemId && l.variantId === savedLine.variantId,
+      );
+      if (!localLine || !localLine._cadStagedFile) continue;
+      try {
+        await uploadFile(localLine._cadStagedFile, {
+          module: 'BOM',
+          entity: 'BOM_LINE',
+          entityId: savedLine.id,
+          fileCategory: 'CAD_MARKER',
+        });
+      } catch {
+        message.warning(`Failed to upload CAD marker for line ${savedLine.itemCode || savedLine.itemId}`);
+      }
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -1234,6 +1391,7 @@ const BOMForm = () => {
         saved = await createBom(payload);
         message.success('BOM created as draft');
       }
+      await uploadStagedCadFiles(saved);
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       clearDirty();
@@ -1263,6 +1421,7 @@ const BOMForm = () => {
         saved = await createBom(payload);
         message.success('BOM created successfully');
       }
+      await uploadStagedCadFiles(saved);
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       clearDirty();
@@ -1409,7 +1568,88 @@ const BOMForm = () => {
         ),
         width: variantColWidth,
         render: (_, record) => {
+          const fabric = isFabricCategory(record);
           const variants = record.availableVariants || [];
+
+          // ── TRIMS: show consumption mode toggle + optional variant dropdown ──
+          if (!fabric && record.itemId) {
+            const cMode = record.consumptionMode || 'SIMPLE';
+            const showVariantDropdown = cMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE;
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                <Tooltip
+                  title={
+                    cMode === CONSUMPTION_MODE.SIMPLE
+                      ? 'Single consumption value for all sizes. Select a variant to specify the SKU.'
+                      : cMode === CONSUMPTION_MODE.SIZE_WISE
+                      ? 'Consumption varies by garment size (e.g., more thread for larger sizes). Same variant, different quantities per size.'
+                      : 'Different trim variant for each garment size (e.g., shorter zipper for S, longer for XL). Map variants per size in the matrix.'
+                  }
+                  placement="bottom"
+                >
+                  <Segmented
+                    size="small"
+                    value={cMode}
+                    options={CONSUMPTION_MODE_OPTIONS}
+                    className="bom-consumption-mode-toggle"
+                    block={false}
+                    onChange={(v) => {
+                      const updates = { consumptionMode: v };
+                      if (v === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+                        updates.variantId = null;
+                        updates.variants = {};
+                        updates.consumptionPerGarment = null;
+                        updates.consumptionMatrix = updates.consumptionMatrix || null;
+                        updates.variantMapping = updates.variantMapping || {};
+                      } else if (v === CONSUMPTION_MODE.SIZE_WISE) {
+                        updates.consumptionPerGarment = null;
+                        updates.consumptionMatrix = record.consumptionMatrix || null;
+                      } else {
+                        updates.consumptionMatrix = null;
+                        updates.variantMapping = null;
+                      }
+                      updateLineMulti(record.key, updates);
+                    }}
+                  />
+                </Tooltip>
+                {showVariantDropdown && variants.length > 1 && !record.variantId && (
+                  <Select
+                    placeholder="Select variant"
+                    style={{ width: '100%' }}
+                    size="small"
+                    value={record.variantId || undefined}
+                    onChange={(v) => handleVariantSelect(record.key, v)}
+                    showSearch={{ optionFilterProp: 'label' }}
+                    options={variants.map((v) => {
+                      const entries = Object.entries(v.attributes || {});
+                      entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
+                      return { value: v.id, label: entries.map(([k, val]) => `${k}: ${val}`).join(' | ') };
+                    })}
+                  />
+                )}
+                {showVariantDropdown && record.variantId && (() => {
+                  const tags = variantsToTags(record.variants);
+                  return tags.length > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {variants.length > 1 && (
+                        <Tooltip title="Change variant">
+                          <EditOutlined
+                            style={{ fontSize: 11, color: '#1677ff', cursor: 'pointer' }}
+                            onClick={() => { setVariantEditLineKey(record.key); handleVariantSelect(record.key, null); }}
+                          />
+                        </Tooltip>
+                      )}
+                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                        {tags.map((t) => <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 10 }}>{t}</Tag>)}
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+              </div>
+            );
+          }
+
+          // ── FABRIC: variant selection (unchanged) ──
           if (variants.length > 1 && !record.variantId) {
             const shouldAutoOpen = variantEditLineKey === record.key;
             return (
@@ -1426,7 +1666,7 @@ const BOMForm = () => {
                     setTimeout(() => { node.focus(); }, 50);
                   }
                 }}
-                onDropdownVisibleChange={(open) => { if (!open) setVariantEditLineKey(null); }}
+                onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                 options={variants.map((v) => {
                   const entries = Object.entries(v.attributes || {});
                   entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
@@ -1444,27 +1684,15 @@ const BOMForm = () => {
                   <EditOutlined
                     style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer', flexShrink: 0 }}
                     onClick={() => {
-                      const line = lines.find((l) => l.key === record.key);
-                      if (line?.baseQtyMatchAttr || line?.selectedBuyerPoNo) {
-                        Modal.confirm({
-                          title: 'Change variant?',
-                          content: 'Calculation basis and match-by selection for this line will be reset. Continue?',
-                          okText: 'Yes, change',
-                          okType: 'danger',
-                          cancelText: 'Cancel',
-                          onOk: () => { setVariantEditLineKey(record.key); handleVariantSelect(record.key, null); },
-                        });
-                      } else {
-                        setVariantEditLineKey(record.key);
-                        handleVariantSelect(record.key, null);
-                      }
+                      setVariantEditLineKey(record.key);
+                      handleVariantSelect(record.key, null);
                     }}
                   />
                 </Tooltip>
               )}
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 {tags.map((t) => (
-                  <Tag key={t} color="geekblue" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
+                  <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
                 ))}
               </div>
             </div>
@@ -1475,21 +1703,64 @@ const BOMForm = () => {
       {
         title: 'Consumption',
         dataIndex: 'consumptionPerGarment',
-        width: 110,
-        render: (value, record) => (
-          <InputNumber
-            min={0}
-            step={0.001}
-            precision={4}
-            size="small"
-            style={{ width: '100%' }}
-            placeholder={record.colorInvalid ? 'Invalid color' : !record.itemId ? 'Select item first' : !record.variantId && (record.availableVariants || []).length > 1 ? 'Select variant first' : '0.0000'}
-            value={value}
-            onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
-            controls={false}
-            disabled={record.colorInvalid || !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
-          />
-        ),
+        width: 130,
+        align: 'center',
+        render: (value, record) => {
+          const fabric = isFabricCategory(record);
+          const cMode = record.consumptionMode || 'SIMPLE';
+          const isMatrix = !fabric && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+
+          if (isMatrix) {
+            // Matrix mode: show total req (read-only) + edit icon
+            const total = computeTotalQty(record);
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 12 }}>{total ? total.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}</Text>
+                <Tooltip title="Edit consumption matrix">
+                  <EditOutlined
+                    style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer' }}
+                    onClick={() => setMatrixDialogLineKey(record.key)}
+                  />
+                </Tooltip>
+              </div>
+            );
+          }
+
+          // Fabric: InputNumber + base qty below
+          // SIMPLE trims: InputNumber only
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <InputNumber
+                min={0}
+                step={0.001}
+                precision={4}
+                size="small"
+                style={{ width: '100%' }}
+                placeholder={record.colorInvalid ? 'Invalid color' : !record.itemId ? 'Select item first' : !record.variantId && (record.availableVariants || []).length > 1 ? 'Select variant first' : '0.0000'}
+                value={value}
+                onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
+                controls={false}
+                disabled={record.colorInvalid || !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
+              />
+              {fabric && record.variantId && !record.colorInvalid && (() => {
+                const color = getVariantAttr(record, 'color');
+                const { qty } = getColorQty(record);
+                if (!qty) return null;
+                return (
+                  <Tag
+                    style={{
+                      fontSize: 10, margin: 0, padding: '1px 8px',
+                      textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    color="processing"
+                  >
+                    {color || 'All'}: {qty.toLocaleString()}
+                  </Tag>
+                );
+              })()}
+            </div>
+          );
+        },
       },
       // 10. UOM
       {
@@ -1548,14 +1819,24 @@ const BOMForm = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <Select
               mode="multiple"
-              placeholder={!record.consumptionPerGarment ? 'Enter consumption first' : 'Processes'}
+              placeholder={(() => {
+                const cMode = record.consumptionMode || 'SIMPLE';
+                const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
+                if (isMatrixMode) return record.consumptionMatrix ? 'Processes' : 'Set matrix first';
+                return !record.consumptionPerGarment ? 'Enter consumption first' : 'Processes';
+              })()}
               style={{ flex: 1 }}
               size="small"
               value={value || []}
               onChange={(v) => handleProcessChange(record.key, v)}
               options={processOptions}
               showSearch={{ optionFilterProp: 'label' }}
-              disabled={!record.consumptionPerGarment}
+              disabled={(() => {
+                const cMode = record.consumptionMode || 'SIMPLE';
+                const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
+                if (isMatrixMode) return !record.consumptionMatrix;
+                return !record.consumptionPerGarment;
+              })()}
             />
             {(record.processAllowances?.length > 0) && (
               <Tooltip title="Edit allowances">
@@ -1568,77 +1849,7 @@ const BOMForm = () => {
           </div>
         ),
       },
-      // 13. Calc Basis (fabric: read-only total, trims: radio buttons + match-by edit)
-      {
-        title: 'Calc Basis',
-        width: 180,
-        align: 'center',
-        render: (_, record) => {
-          const fabric = isFabricCategory(record);
-          const color = getVariantAttr(record, 'color');
-
-          if (fabric) {
-            // Show only after variant is selected and color is valid
-            if (!record.variantId || record.colorInvalid) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>;
-            const { qty } = getColorQty(record);
-            return (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '3px 10px', borderRadius: 12,
-                  background: 'var(--oq-color-row-strong)',
-                  border: '1px solid var(--oq-total-cell)',
-                }}>
-                  <Text style={{ fontSize: 11, color: 'var(--primary-color, #1677ff)' }}>{color || 'All'}</Text>
-                  <Text strong style={{ fontSize: 13, color: 'var(--primary-color, #1677ff)' }}>{qty.toLocaleString()}</Text>
-                </div>
-                <Text type="secondary" style={{ fontSize: 10 }}>Total across all order lines</Text>
-              </div>
-            );
-          }
-
-          // Trims — show after variant is selected and valid
-          if (!record.variantId || record.colorInvalid) return <Text type="secondary" style={{ fontSize: 11 }}>—</Text>;
-
-          const matchLabel = record.baseQtyMatchAttr === 'color' ? 'Color'
-            : record.baseQtyMatchAttr === 'size' ? 'Size'
-            : record.baseQtyMatchAttr === 'color+size' ? 'Color+Size' : null;
-          const { qty } = getColorQty(record);
-
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-              <Radio.Group
-                size="small"
-                value={record.qtyCalcBasis || 'TOTAL'}
-                onChange={(e) => updateLineMulti(record.key, {
-                  qtyCalcBasis: e.target.value,
-                  selectedBuyerPoNo: null,
-                  baseQtyMatchAttr: null,
-                })}
-                optionType="button"
-                buttonStyle="solid"
-              >
-                <Radio.Button value="TOTAL" style={{ fontSize: 11, padding: '0 8px' }}>Total Qty</Radio.Button>
-                <Radio.Button value="BUYER_PO" style={{ fontSize: 11, padding: '0 8px' }}>Buyer PO</Radio.Button>
-              </Radio.Group>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Button
-                  size="small"
-                  type="link"
-                  style={{ padding: 0, fontSize: 11, height: 'auto' }}
-                  icon={<EditOutlined style={{ fontSize: 11 }} />}
-                  onClick={() => { setMatchByLineKey(record.key); setMatchByModalOpen(true); }}
-                >
-                  {matchLabel ? `By ${matchLabel}` : 'Match by…'}
-                </Button>
-                {matchLabel && qty > 0 && (
-                  <Tag style={{ fontSize: 10, margin: 0 }}>Base: {qty.toLocaleString()}</Tag>
-                )}
-              </div>
-            </div>
-          );
-        },
-      },
+      // 13. Calc Basis — REMOVED (moved into consumption matrix dialog for trims, inline for fabric)
       // 14. Total Qty
       {
         title: 'Total Qty',
@@ -1663,10 +1874,36 @@ const BOMForm = () => {
           if (!totalQty) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           const allowances = record.processAllowances || [];
           if (allowances.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-          const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-          const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-          const totalShipment = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-          const purchaseQty = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShipment);
+
+          const cMode = record.consumptionMode || 'SIMPLE';
+          const isMatrixMode = !isFabricCategory(record) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+
+          let purchaseQty;
+          if (isMatrixMode && record.consumptionMatrix) {
+            // Per-size allowance calculation
+            const oqg = buildOrderQtyGrid(orderLineSummary);
+            let total = 0;
+            allSizes.forEach((size) => {
+              let sizeReq = 0;
+              Object.entries(record.consumptionMatrix).forEach(([color, szMap]) => {
+                sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
+              });
+              let rejTotal = 0, shipTotal = 0;
+              allowances.forEach((a) => {
+                const sa = a.sizeAllowances?.[size];
+                rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
+                shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
+              });
+              total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
+            });
+            purchaseQty = total;
+          } else {
+            // Flat allowance calculation
+            const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
+            const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
+            const totalShipment = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
+            purchaseQty = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShipment);
+          }
           return (
             <Tag color="green" style={{ fontSize: 12 }}>
               {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -1683,39 +1920,25 @@ const BOMForm = () => {
           if (!isFabricCategory(record)) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           const isDisabled = record.colorInvalid || !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1);
 
-          // Show preview if CAD is uploaded
-          if (record.cadPreviewUrl || record._cadFileId) {
+          // Show file name tooltip if CAD is uploaded or staged
+          if (record.cadPreviewUrl || record._cadFileId || record._cadStagedFile) {
+            const isStaged = !record._cadFileId && record._cadStagedFile;
             return (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                {record.cadPreviewUrl ? (
-                  <Popover
-                    content={<img src={record.cadPreviewUrl} alt="CAD Marker" style={{ maxWidth: 500, maxHeight: 500, borderRadius: 6 }} />}
-                    title="CAD Marker Preview"
-                    trigger="hover"
-                    placement="left"
-                  >
-                    <img
-                      src={record.cadPreviewUrl}
-                      alt="CAD"
-                      style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }}
-                    />
-                  </Popover>
-                ) : (
-                  <Tooltip title={record._cadFileName || 'CAD uploaded'}>
-                    <UploadOutlined style={{ fontSize: 16, color: '#10b981' }} />
-                  </Tooltip>
-                )}
+                <Tooltip title={record._cadFileName || (isStaged ? 'CAD staged' : 'CAD uploaded')}>
+                  <CheckCircleOutlined style={{ fontSize: 20, color: isStaged ? 'var(--primary-color, #6366f1)' : '#10b981', minWidth: 20 }} />
+                </Tooltip>
                 {record._cadUploading ? (
                   <Spin size="small" />
                 ) : (
-                  <Tooltip title="Remove CAD">
+                  <Tooltip title={isStaged ? 'Remove staged CAD' : 'Remove CAD'}>
                     <DeleteOutlined
                       style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}
                       onClick={async () => {
                         if (record._cadFileId) {
                           try { await deleteFile(record._cadFileId); } catch { /* ignore */ }
                         }
-                        updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileId: null, _cadFileName: null });
+                        updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileId: null, _cadFileName: null, _cadStagedFile: null });
                       }}
                     />
                   </Tooltip>
@@ -1730,23 +1953,30 @@ const BOMForm = () => {
               showUploadList={false}
               disabled={isDisabled || record._cadUploading}
               beforeUpload={async (file) => {
-                // Show preview for image files, icon for others
                 const isImage = file.type?.startsWith('image/');
                 const previewUrl = isImage ? URL.createObjectURL(file) : null;
-                updateLineMulti(record.key, { cadPreviewUrl: previewUrl, _cadFileName: file.name, _cadUploading: true });
-                try {
-                  const result = await uploadFile(file, {
-                    module: 'BOM',
-                    entity: 'BOM_LINE',
-                    entityId: record.id || 0,
-                    fileCategory: 'CAD_MARKER',
-                  });
-                  const uploaded = result?.data || result;
-                  updateLineMulti(record.key, { _cadFileId: uploaded.fileId, _cadUploading: false });
-                  message.success('CAD marker uploaded');
-                } catch {
-                  message.error('Failed to upload CAD marker');
-                  updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileName: null, _cadUploading: false });
+
+                if (record.id) {
+                  // Existing saved line — upload immediately with line ID
+                  updateLineMulti(record.key, { cadPreviewUrl: previewUrl, _cadFileName: file.name, _cadUploading: true, _cadStagedFile: null });
+                  try {
+                    const result = await uploadFile(file, {
+                      module: 'BOM',
+                      entity: 'BOM_LINE',
+                      entityId: record.id,
+                      fileCategory: 'CAD_MARKER',
+                    });
+                    const uploaded = result?.data || result;
+                    updateLineMulti(record.key, { _cadFileId: uploaded.fileId, _cadUploading: false });
+                    message.success('CAD marker uploaded');
+                  } catch {
+                    message.error('Failed to upload CAD marker');
+                    updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileName: null, _cadUploading: false });
+                  }
+                } else {
+                  // New unsaved line — stage file locally, upload after BOM save
+                  updateLineMulti(record.key, { cadPreviewUrl: previewUrl, _cadFileName: file.name, _cadStagedFile: file, _cadUploading: false });
+                  message.info('CAD marker staged. It will be uploaded after the BOM line is saved.');
                 }
                 return false;
               }}
@@ -1978,7 +2208,7 @@ const BOMForm = () => {
           theme={{
             components: {
               Table: {
-                rowHoverBg: isDarkMode ? '#263245' : '#f0f5ff',
+                rowHoverBg: isDarkMode ? '#2d3a4d' : '#f0f0ff',
                 fixedHeaderSortActiveBg: isDarkMode ? '#1e293b' : '#ffffff',
               },
             },
@@ -2099,6 +2329,70 @@ const BOMForm = () => {
         isFabric={allowanceIsFabric}
         onApply={handleAllowanceApply}
         onCancel={() => setAllowanceModalOpen(false)}
+        consumptionMode={(() => {
+          const line = lines.find((l) => l.key === allowanceLineKey);
+          return line?.consumptionMode;
+        })()}
+        sizes={allSizes}
+        variantMapping={(() => {
+          const line = lines.find((l) => l.key === allowanceLineKey);
+          return line?.variantMapping;
+        })()}
+        availableVariants={(() => {
+          const line = lines.find((l) => l.key === allowanceLineKey);
+          return line?.availableVariants || [];
+        })()}
+        consumptionMatrix={(() => {
+          const line = lines.find((l) => l.key === allowanceLineKey);
+          return line?.consumptionMatrix;
+        })()}
+        orderLineSummary={orderLineSummary}
+      />
+
+      {/* Consumption Matrix Dialog */}
+      <ConsumptionMatrixDialog
+        key={matrixDialogLineKey || 'closed'}
+        open={matrixDialogLineKey != null}
+        mode={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.consumptionMode || CONSUMPTION_MODE.SIZE_WISE;
+        })()}
+        itemName={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.itemName || '';
+        })()}
+        itemCode={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.itemCode || '';
+        })()}
+        uom={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.uom || '';
+        })()}
+        orderLineSummary={orderLineSummary}
+        consumptionMatrix={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.consumptionMatrix;
+        })()}
+        variantMapping={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.variantMapping;
+        })()}
+        availableVariants={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.availableVariants || [];
+        })()}
+        qtyCalcBasis={(() => {
+          const line = lines.find((l) => l.key === matrixDialogLineKey);
+          return line?.qtyCalcBasis || 'TOTAL';
+        })()}
+        onApply={(updates) => {
+          if (matrixDialogLineKey) {
+            updateLineMulti(matrixDialogLineKey, updates);
+          }
+          setMatrixDialogLineKey(null);
+        }}
+        onCancel={() => setMatrixDialogLineKey(null)}
       />
 
       {/* Buyer PO Picker — shown when Buyer PO basis + color in multiple lines */}

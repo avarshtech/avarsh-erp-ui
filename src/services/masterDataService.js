@@ -44,7 +44,7 @@ export const createCategory = async (data) => {
  * @returns {Promise<Object>} Updated category
  */
 export const updateCategory = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.CATEGORIES, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.CATEGORIES}/${id}`, data);
 };
 
 /**
@@ -100,7 +100,7 @@ export const createSubCategory = async (data) => {
  * @returns {Promise<Object>} Updated sub-category
  */
 export const updateSubCategory = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.SUB_CATEGORIES, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.SUB_CATEGORIES}/${id}`, data);
 };
 
 /**
@@ -156,7 +156,7 @@ export const createItemType = async (data) => {
  * @returns {Promise<Object>} Updated item type
  */
 export const updateItemType = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.ITEM_TYPES, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.ITEM_TYPES}/${id}`, data);
 };
 
 /**
@@ -203,7 +203,7 @@ export const createAttribute = async (data) => {
  * @returns {Promise<Object>} Updated attribute
  */
 export const updateAttribute = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.ATTRIBUTES, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.ATTRIBUTES}/${id}`, data);
 };
 
 /**
@@ -250,7 +250,7 @@ export const createUOM = async (data) => {
  * @returns {Promise<Object>} Updated UOM
  */
 export const updateUOM = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.UOMS, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.UOMS}/${id}`, data);
 };
 
 /**
@@ -297,7 +297,7 @@ export const createVariant = async (data) => {
  * @returns {Promise<Object>} Updated variant
  */
 export const updateVariant = async (id, data) => {
-  return axiosInstance.post(ENDPOINTS.VARIANTS, { id, ...data });
+  return axiosInstance.put(`${ENDPOINTS.VARIANTS}/${id}`, data);
 };
 
 /**

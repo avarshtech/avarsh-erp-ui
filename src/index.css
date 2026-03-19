@@ -76,7 +76,7 @@
 
   /* Table */
   --table-header-bg: #f1f5f9;
-  --table-row-hover: #e0e7ff;
+  --table-row-hover: #f0f0ff;
   --table-border: #e2e8f0;
 
   /* Transitions */
@@ -166,7 +166,7 @@
 
   /* Table */
   --table-header-bg: #334155;
-  --table-row-hover: #475569;
+  --table-row-hover: #2d3a4d;
   --table-border: #475569;
 }
 

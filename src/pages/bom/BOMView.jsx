@@ -1,29 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
-  Modal,
-  Descriptions,
-  Table,
-  Tag,
-  Space,
-  Typography,
-  Button,
-  Spin,
-  Popover,
-  Tooltip,
-  Card,
-  Row,
-  Col,
-  message,
+  Modal, Tag, Space, Typography, Button, Spin, Card, Row, Col, Tooltip, message,
 } from 'antd';
 import {
-  FileTextOutlined,
-  PrinterOutlined,
-  CheckCircleOutlined,
+  FileTextOutlined, CheckCircleOutlined, AppstoreOutlined, ScissorOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { getStatusLabel, BOM_STATUS, calcPurchaseQty } from '../../utils/bomConstants';
 import { getBomById } from '../../services/bomService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 const STATUS_CONFIG = {
   [BOM_STATUS.DRAFT]:   { color: 'default', icon: <FileTextOutlined /> },
@@ -34,7 +20,7 @@ const variantsToTags = (variants) => {
   if (!variants || typeof variants !== 'object') return [];
   return Object.entries(variants)
     .filter(([, v]) => v !== '' && v != null)
-    .map(([k, v]) => `${k}:${v}`);
+    .map(([k, v]) => `${k}: ${v}`);
 };
 
 const processToLabel = (proc) => {
@@ -45,9 +31,10 @@ const processToLabel = (proc) => {
 
 const isFabricLine = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
 
-const BOMView = ({ open, bomData, onClose, onStatusChange }) => {
+const BOMView = ({ open, bomData, onClose }) => {
   const [fullBom, setFullBom] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cadFileNames, setCadFileNames] = useState({}); // { lineId: filename }
 
   useEffect(() => {
     if (!open || !bomData) { setFullBom(null); return; }
@@ -67,247 +54,297 @@ const BOMView = ({ open, bomData, onClose, onStatusChange }) => {
     fetchFull();
   }, [open, bomData]);
 
+  // Load CAD filenames for fabric lines
+  useEffect(() => {
+    const bLines = (fullBom || bomData)?.lines || [];
+    if (!open || !bLines.length) return;
+    setCadFileNames({});
+    const fabIds = bLines.filter((l) => l.id && isFabricLine(l)).map((l) => l.id);
+    if (!fabIds.length) return;
+    fabIds.forEach((lineId) => {
+      getFilesByEntity('BOM_LINE', lineId)
+        .then((files) => {
+          const cadFile = (files?.data || files || []).find((f) => f.fileCategory === 'CAD_MARKER');
+          if (cadFile) {
+            setCadFileNames((prev) => ({ ...prev, [lineId]: cadFile.originalFilename || 'CAD Marker' }));
+          }
+        })
+        .catch(() => {});
+    });
+  }, [open, fullBom, bomData]);
+
   if (!bomData) return null;
   const bom = fullBom || bomData;
   const { orderNo, status, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
   const statusConfig = STATUS_CONFIG[status] || {};
 
-  // Summary stats
-  const linesWithCat = lines.filter((l) => l.categoryName);
-  const fabricCount = linesWithCat.filter(isFabricLine).length;
-  const trimsCount = linesWithCat.length - fabricCount;
+  const fabricLines = lines.filter(isFabricLine);
+  const trimLines = lines.filter((l) => !isFabricLine(l));
 
-  const columns = [
-    { title: '#', width: 45, fixed: 'left', align: 'center', render: (_, __, idx) => idx + 1 },
-    {
-      title: 'Category',
-      dataIndex: 'categoryName',
-      width: 110,
-      render: (text) => text || '-',
-    },
-    {
-      title: 'Sub Category',
-      dataIndex: 'subCategoryName',
-      width: 120,
-      render: (text) => text || '-',
-    },
-    {
-      title: 'Item Name',
-      dataIndex: 'itemName',
-      width: 180,
-      render: (text) => <Text strong>{text || '-'}</Text>,
-    },
-    {
-      title: 'Item Code',
-      dataIndex: 'itemCode',
-      width: 110,
-      render: (text) => <Text type="secondary" style={{ fontSize: 12 }}>{text || '-'}</Text>,
-    },
-    {
-      title: 'Variants',
-      dataIndex: 'variants',
-      width: 180,
-      render: (variants) => {
-        const tags = variantsToTags(variants);
-        if (tags.length === 0) return <Text type="secondary">—</Text>;
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {tags.map((t) => (
-              <Tag key={t} color="geekblue" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Consumption',
-      dataIndex: 'consumptionPerGarment',
-      width: 100,
-      align: 'right',
-      render: (val) => val != null ? Number(val).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '-',
-    },
-    {
-      title: 'UOM',
-      dataIndex: 'uom',
-      width: 70,
-      align: 'center',
-      render: (text) => <Text strong style={{ fontSize: 12 }}>{(text || '-').toUpperCase()}</Text>,
-    },
-    {
-      title: 'Parts',
-      dataIndex: 'partsName',
-      width: 120,
-      render: (value) => {
-        if (!value) return '-';
-        const parts = Array.isArray(value) ? value : [value];
-        return parts.join(', ');
-      },
-    },
-    {
-      title: 'Process',
-      dataIndex: 'processes',
-      width: 180,
-      render: (processes) => {
-        if (!processes || processes.length === 0) return <Text type="secondary">—</Text>;
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {processes.map((p, i) => (
-              <Tag key={i} color="blue" style={{ margin: 0, fontSize: 11 }}>{processToLabel(p)}</Tag>
-            ))}
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Calc Basis',
-      width: 100,
-      align: 'center',
-      render: (_, record) => {
-        const fabric = isFabricLine(record);
-        if (fabric) return <Tag color="blue" style={{ fontSize: 11 }}>Total</Tag>;
-        const basis = record.qtyCalcBasis || 'TOTAL';
-        const attr = record.baseQtyMatchAttr;
-        return (
-          <div style={{ fontSize: 11, textAlign: 'center' }}>
-            <Tag style={{ fontSize: 11, margin: 0 }}>{basis === 'BUYER_PO' ? 'Buyer PO' : 'Total Qty'}</Tag>
-            {attr && <div style={{ marginTop: 2 }}><Text type="secondary" style={{ fontSize: 10 }}>By {attr === 'color+size' ? 'Color+Size' : attr === 'color' ? 'Color' : 'Size'}</Text></div>}
-          </div>
-        );
-      },
-    },
-    {
-      title: 'Total Qty',
-      dataIndex: 'totalQty',
-      width: 100,
-      align: 'right',
-      render: (val) => (
-        <Tag color={val ? 'blue' : 'default'} style={{ fontSize: 12 }}>
-          {val ? Number(val).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
-        </Tag>
-      ),
-    },
-    {
-      title: 'Purchase Qty',
-      width: 110,
-      align: 'right',
-      render: (_, record) => {
-        const totalQty = record.totalQty;
-        if (!totalQty) return <Text type="secondary">—</Text>;
-        const allowances = record.processAllowances || [];
-        if (allowances.length === 0) return <Text type="secondary">—</Text>;
-        const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-        const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-        const totalShip = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-        const pq = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip);
-        return (
-          <Tag color="green" style={{ fontSize: 12 }}>
-            {pq.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-          </Tag>
-        );
-      },
-    },
-    {
-      title: 'CAD',
-      width: 60,
-      align: 'center',
-      render: (_, record) => {
-        if (!isFabricLine(record)) return <Text type="secondary">—</Text>;
-        if (!record.cadPreviewUrl && !record.cadMarkerFileId) return <Text type="secondary">—</Text>;
-        if (record.cadPreviewUrl) {
-          return (
-            <Popover
-              content={<img src={record.cadPreviewUrl} alt="CAD" style={{ maxWidth: 400, maxHeight: 400, borderRadius: 4 }} />}
-              title="CAD Marker"
-              trigger="hover"
-              placement="left"
-            >
-              <img src={record.cadPreviewUrl} alt="CAD" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }} />
-            </Popover>
-          );
-        }
-        return <Tooltip title={record.cadMarkerFileId}><Tag style={{ fontSize: 10 }}>CAD</Tag></Tooltip>;
-      },
-    },
-  ];
+  // Download CAD marker file for a BOM line
+  const handleCadDownload = async (lineId) => {
+    try {
+      const files = await getFilesByEntity('BOM_LINE', lineId);
+      const cadFile = (files?.data || files || []).find((f) => f.fileCategory === 'CAD_MARKER');
+      if (!cadFile) { message.info('No CAD marker file found'); return; }
+      const blob = await downloadFileAsBlob(cadFile.fileId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = cadFile.originalFilename || 'cad-marker';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      message.error('Failed to download CAD marker');
+    }
+  };
 
-  const renderFooter = () => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-      <Space>
-        <Button icon={<PrinterOutlined />} onClick={() => message.info('Print functionality coming soon')}>Print</Button>
-      </Space>
-      <Button onClick={onClose}>Close</Button>
-    </div>
-  );
+  // Compute purchase qty for a line
+  const getLinePurchaseQty = (record) => {
+    const totalQty = record.totalQty;
+    if (!totalQty) return null;
+    const allowances = record.processAllowances || [];
+    if (allowances.length === 0) return null;
+    const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
+    const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
+    const totalShip = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
+    return calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip);
+  };
+
+  // Render a single BOM line card. When wrap=false, returns Card without Col wrapper.
+  const renderLineCard = (line, idx, wrap = true) => {
+    const fabric = isFabricLine(line);
+    const cMode = line.consumptionMode || 'SIMPLE';
+    const isMatrix = !fabric && (cMode === 'SIZE_WISE' || cMode === 'VARIANT_PER_SIZE');
+    const purchaseQty = getLinePurchaseQty(line);
+    const parts = line.partsName ? (Array.isArray(line.partsName) ? line.partsName : [line.partsName]) : [];
+    const processes = line.processes || [];
+    const variantTags = variantsToTags(line.variants);
+
+    const card = (
+        <Card
+          size="small"
+          style={{
+            borderRadius: 10, height: '100%',
+            borderLeft: `4px solid ${fabric ? 'var(--primary-color, #6366f1)' : '#10b981'}`,
+          }}
+          styles={{ body: { padding: '16px 20px' } }}
+        >
+          {/* Header: Item name + code + category */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Text strong style={{ fontSize: 14 }}>{line.itemName || '-'}</Text>
+                {line.itemCode && <Text type="secondary" style={{ fontSize: 11 }}>({line.itemCode})</Text>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <Tag style={{ margin: 0, fontSize: 10 }}>{line.categoryName || '-'}</Tag>
+                <Tag style={{ margin: 0, fontSize: 10 }}>{line.subCategoryName || '-'}</Tag>
+                {fabric && <Tag color="purple" style={{ margin: 0, fontSize: 10 }}>Fabric</Tag>}
+                {!fabric && (
+                  <Tag color="cyan" style={{ margin: 0, fontSize: 10 }}>
+                    {cMode === 'SIZE_WISE' ? 'Size-wise' : cMode === 'VARIANT_PER_SIZE' ? 'Variant/size' : 'Simple'}
+                  </Tag>
+                )}
+              </div>
+            </div>
+            <Tag style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{(line.uom || '-').toUpperCase()}</Tag>
+          </div>
+
+          {/* Variant tags (fabric) */}
+          {fabric && variantTags.length > 0 && (
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+              {variantTags.map((t) => (
+                <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 10 }}>{t}</Tag>
+              ))}
+            </div>
+          )}
+
+          {/* Parts */}
+          {parts.length > 0 && (
+            <div style={{ marginBottom: 10 }}>
+              <Text type="secondary" style={{ fontSize: 10 }}>Parts</Text>
+              <div style={{ fontSize: 12 }}>{parts.join(', ')}</div>
+            </div>
+          )}
+
+          {/* Processes */}
+          {processes.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <Text type="secondary" style={{ fontSize: 10, display: 'block', marginBottom: 4 }}>Process</Text>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {processes.map((p, i) => (
+                  <Tag key={i} color="blue" style={{ margin: 0, fontSize: 10 }}>{processToLabel(p)}</Tag>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quantities */}
+          <div style={{
+            display: 'flex', gap: 16, flexWrap: 'wrap',
+            padding: '10px 14px', borderRadius: 8,
+            background: 'var(--bg-secondary, #f6f8fa)',
+            border: '1px solid var(--border-color, #e8e8e8)',
+          }}>
+            <div>
+              <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
+                {isMatrix ? 'Matrix Total' : 'Consumption'}
+              </Text>
+              <Text strong style={{ fontSize: 14 }}>
+                {isMatrix
+                  ? (line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—')
+                  : (line.consumptionPerGarment != null ? Number(line.consumptionPerGarment).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—')
+                }
+              </Text>
+            </div>
+            <div>
+              <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Total Qty</Text>
+              <Text strong style={{ fontSize: 14, color: 'var(--primary-color, #6366f1)' }}>
+                {line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+              </Text>
+            </div>
+            {purchaseQty != null && (
+              <div>
+                <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
+                <Text strong style={{ fontSize: 14, color: '#10b981' }}>
+                  {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Text>
+              </div>
+            )}
+            {/* CAD download for fabric lines */}
+            {fabric && line.id && cadFileNames[line.id] && (
+              <div style={{ marginLeft: 'auto' }}>
+                <Tooltip title={cadFileNames[line.id]}>
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<DownloadOutlined />}
+                    onClick={() => handleCadDownload(line.id)}
+                    style={{ fontSize: 11, color: 'var(--primary-color, #6366f1)' }}
+                  >
+                    CAD Marker
+                  </Button>
+                </Tooltip>
+              </div>
+            )}
+          </div>
+        </Card>
+    );
+    if (!wrap) return card;
+    return <Col xs={24} md={12} key={line.id || idx}>{card}</Col>;
+  };
 
   return (
     <Modal
       title={
-        <Space>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <Text strong style={{ fontSize: 18 }}>{orderNo || 'BOM'}</Text>
-          <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20 }}>{getStatusLabel(status)}</Tag>
-        </Space>
+          <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20, fontSize: 12 }}>
+            {getStatusLabel(status)}
+          </Tag>
+        </div>
       }
       open={open}
       onCancel={onClose}
-      width={1300}
+      width={1000}
       centered
-      styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: '16px 24px' } }}
-      footer={renderFooter()}
+      styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: '20px 24px' } }}
+      footer={<Button onClick={onClose}>Close</Button>}
     >
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spin tip="Loading BOM details..." /></div>
       ) : (
         <>
-          {/* General Info */}
-          <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 4 }} style={{ marginBottom: 16 }}>
-            <Descriptions.Item label="Order No"><Text code>{orderNo || '-'}</Text></Descriptions.Item>
-            <Descriptions.Item label="Style No"><Text strong>{styleName || '-'}</Text></Descriptions.Item>
-            <Descriptions.Item label="Garment">{garmentName || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Buyer"><Text strong>{buyerName || '-'}</Text></Descriptions.Item>
-            <Descriptions.Item label="Material">{material || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Season">{season || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Order Qty"><Text strong>{(orderQty || 0).toLocaleString()}</Text></Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Tag color={statusConfig.color} style={{ borderRadius: 20 }}>{getStatusLabel(status)}</Tag>
-            </Descriptions.Item>
-            {remarks && <Descriptions.Item label="Remarks" span={4}>{remarks}</Descriptions.Item>}
-          </Descriptions>
-
-          {/* Summary Stats */}
-          <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-            <Col xs={8} md={4}>
-              <Card size="small" style={{ textAlign: 'center', borderLeft: '3px solid #1677ff', borderRadius: 8 }} styles={{ body: { padding: '8px' } }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted, #8c8c8c)' }}>Total Lines</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#1677ff' }}>{lines.length}</div>
-              </Card>
-            </Col>
-            <Col xs={8} md={4}>
-              <Card size="small" style={{ textAlign: 'center', borderLeft: '3px solid #6366f1', borderRadius: 8 }} styles={{ body: { padding: '8px' } }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted, #8c8c8c)' }}>Fabric</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#6366f1' }}>{fabricCount}</div>
-              </Card>
-            </Col>
-            <Col xs={8} md={4}>
-              <Card size="small" style={{ textAlign: 'center', borderLeft: '3px solid #10b981', borderRadius: 8 }} styles={{ body: { padding: '8px' } }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted, #8c8c8c)' }}>Trims</div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>{trimsCount}</div>
-              </Card>
-            </Col>
+          {/* General Info Cards */}
+          <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+            {[
+              { label: 'Style', value: styleName },
+              { label: 'Garment', value: garmentName },
+              { label: 'Buyer', value: buyerName },
+              { label: 'Material', value: material },
+              { label: 'Season', value: season },
+              { label: 'Order Qty', value: orderQty ? orderQty.toLocaleString() : '-', highlight: true },
+            ].map((item) => (
+              <Col xs={12} sm={8} md={4} key={item.label}>
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8,
+                  background: 'var(--bg-secondary, #f6f8fa)',
+                  border: '1px solid var(--border-color, #e8e8e8)',
+                  height: '100%',
+                }}>
+                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{item.label}</Text>
+                  <Text strong style={{ fontSize: 13, color: item.highlight ? 'var(--primary-color, #6366f1)' : undefined }}>
+                    {item.value || '-'}
+                  </Text>
+                </div>
+              </Col>
+            ))}
           </Row>
 
-          {/* BOM Lines Table */}
-          <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 14 }}>
-            BOM Lines
-          </Text>
-          <Table
-            dataSource={lines}
-            columns={columns}
-            rowKey={(record, idx) => record.key || record.id || idx}
-            pagination={false}
-            scroll={{ x: 1800 }}
-            size="small"
-            bordered
-          />
+          {remarks && (
+            <div style={{
+              marginBottom: 20, padding: '8px 14px', borderRadius: 8,
+              background: 'var(--bg-secondary, #f6f8fa)',
+              border: '1px solid var(--border-color, #e8e8e8)',
+              fontSize: 12,
+            }}>
+              <Text type="secondary" style={{ fontSize: 10 }}>Remarks: </Text>
+              <Text>{remarks}</Text>
+            </div>
+          )}
+
+          {/* Side by side when exactly 1 fabric + 1 trim */}
+          {fabricLines.length === 1 && trimLines.length === 1 ? (
+            <Row gutter={[12, 12]}>
+              <Col xs={24} md={12}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <ScissorOutlined style={{ color: 'var(--primary-color, #6366f1)' }} />
+                  <Text strong style={{ fontSize: 14 }}>Fabric</Text>
+                </div>
+                {renderLineCard(fabricLines[0], 'fab-0', false)}
+              </Col>
+              <Col xs={24} md={12}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <AppstoreOutlined style={{ color: '#10b981' }} />
+                  <Text strong style={{ fontSize: 14 }}>Trims</Text>
+                </div>
+                {renderLineCard(trimLines[0], 'trim-0', false)}
+              </Col>
+            </Row>
+          ) : (
+            <>
+              {/* Fabric Lines */}
+              {fabricLines.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <ScissorOutlined style={{ color: 'var(--primary-color, #6366f1)' }} />
+                    <Text strong style={{ fontSize: 14 }}>Fabric</Text>
+                    <Tag style={{ margin: 0, fontSize: 10 }}>{fabricLines.length}</Tag>
+                  </div>
+                  <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+                    {fabricLines.map((line, idx) => renderLineCard(line, `fab-${idx}`))}
+                  </Row>
+                </>
+              )}
+
+              {/* Trim Lines */}
+              {trimLines.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <AppstoreOutlined style={{ color: '#10b981' }} />
+                    <Text strong style={{ fontSize: 14 }}>Trims</Text>
+                    <Tag style={{ margin: 0, fontSize: 10 }}>{trimLines.length}</Tag>
+                  </div>
+                  <Row gutter={[12, 12]}>
+                    {trimLines.map((line, idx) => renderLineCard(line, `trim-${idx}`))}
+                  </Row>
+                </>
+              )}
+            </>
+          )}
         </>
       )}
     </Modal>

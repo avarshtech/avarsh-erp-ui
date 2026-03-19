@@ -52,11 +52,13 @@ export const createSupplier = async (supplierData) => {
 
 /**
  * Update an existing supplier
- * @param {Object} supplierData - Updated supplier data (must include id)
+ * @param {number} id - Supplier ID
+ * @param {Object} supplierData - Updated supplier data
  * @returns {Promise<Object>} Response with updated supplier
  */
-export const updateSupplier = async (supplierData) => {
-  return saveSupplier(supplierData);
+export const updateSupplier = async (id, supplierData) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.SUPPLIERS}/${id}`, supplierData);
+  return response;
 };
 
 /**

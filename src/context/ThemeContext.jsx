@@ -72,7 +72,7 @@ const lightComponentsToken = {
     borderRadius: 12,
     headerBg: '#f1f5f9',
     headerColor: '#1e293b',
-    rowHoverBg: '#e0e7ff',
+    rowHoverBg: '#f0f0ff',
   },
   Card: {
     colorBgContainer: '#ffffff',
@@ -127,7 +127,7 @@ const darkComponentsToken = {
     borderRadius: 12,
     headerBg: '#334155',
     headerColor: '#f1f5f9',
-    rowHoverBg: '#475569',
+    rowHoverBg: '#2d3a4d',
     colorBgContainer: '#1e293b',
     borderColor: '#475569',
   },
