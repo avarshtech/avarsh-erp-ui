@@ -233,44 +233,63 @@ export const calculateConsumption = async (measurementChart, techpack = null) =>
   return upload(`${ENDPOINTS.COST_SHEETS}/calculate-consumption`, formData);
 };
 
-// ==================== ATTACHMENTS ====================
+// ==================== ATTACHMENTS (Generic File Storage) ====================
 
 /**
- * Upload a file attachment to a cost sheet.
- * POST /api/v1/cost-sheets/{id}/attachments (multipart/form-data)
+ * Batch upload categorized file attachments for a cost sheet.
+ * Sends all files in a single network request.
+ * POST /api/v1/files/upload-batch (multipart/form-data)
  * @param {number|string} costSheetId - Cost sheet ID
- * @param {File} file - File to upload
+ * @param {Array<{file: File, category: string}>} items - Files with their categories
  * @param {Function} [onProgress] - Optional upload progress callback
- * @returns {Promise<Object>} AttachmentDTO
+ * @returns {Promise<Array>} FileStorageDTO[]
  */
-export const uploadAttachment = async (costSheetId, file, onProgress) => {
+export const uploadAttachmentsBatch = async (costSheetId, items, onProgress) => {
+  if (!items.length) return [];
   const formData = new FormData();
-  formData.append('file', file);
-  return upload(`${ENDPOINTS.COST_SHEETS}/${costSheetId}/attachments`, formData, onProgress);
+  formData.append('module', 'COSTING');
+  formData.append('entity', 'COST_SHEET');
+  formData.append('entityId', costSheetId);
+  items.forEach(({ file, category }) => {
+    formData.append('files', file);
+    formData.append('fileCategories', category);
+  });
+  return upload('/files/upload-batch', formData, onProgress);
+};
+
+/**
+ * Get all attachments for a cost sheet, grouped by category.
+ * GET /api/v1/files/entity/COST_SHEET/{costSheetId}
+ * @param {number|string} costSheetId - Cost sheet ID
+ * @returns {Promise<Array>} FileStorageDTO[]
+ */
+export const getAttachments = async (costSheetId) => {
+  const response = await axiosInstance.get(`/files/entity/COST_SHEET/${costSheetId}`);
+  return response.data ?? [];
 };
 
 /**
  * Download an attachment file.
- * GET /api/v1/cost-sheets/attachments/{attachmentId}
- * @param {number|string} attachmentId - Attachment ID
+ * GET /api/v1/files/download/{fileId}
+ * @param {string} fileId - File UUID
  * @returns {Promise<Blob>} File binary data
  */
-export const downloadAttachment = async (attachmentId) => {
+export const downloadAttachment = async (fileId) => {
   const response = await axiosInstance.get(
-    `${ENDPOINTS.COST_SHEETS}/attachments/${attachmentId}`,
+    `/files/download/${fileId}`,
     { responseType: 'blob' }
   );
   return response.data;
 };
 
 /**
- * Delete an attachment.
- * DELETE /api/v1/cost-sheets/attachments/{attachmentId}
- * @param {number|string} attachmentId - Attachment ID
+ * Delete an attachment (soft delete).
+ * DELETE /api/v1/files/{fileId}
+ * @param {string} fileId - File UUID
  * @returns {Promise<void>}
  */
-export const deleteAttachment = async (attachmentId) => {
-  await axiosInstance.delete(`${ENDPOINTS.COST_SHEETS}/attachments/${attachmentId}`);
+export const deleteAttachment = async (fileId) => {
+  await axiosInstance.delete(`/files/${fileId}`);
 };
 
 // ==================== WHATSAPP NOTIFICATIONS ====================

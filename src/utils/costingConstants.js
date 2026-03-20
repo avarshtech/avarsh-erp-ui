@@ -190,6 +190,14 @@ export const ALLOWED_FILE_TYPES = [
 
 export const MAX_FILE_SIZE_MB = 5;
 
+// ==================== ATTACHMENT CATEGORIES ====================
+
+export const ATTACHMENT_CATEGORIES = [
+  { value: 'TECHPACK', label: 'Techpack', accept: '.pdf,.doc,.docx,.jpg,.jpeg,.png', icon: 'file-text' },
+  { value: 'MEASUREMENT_CHART', label: 'Measurement Chart', accept: '.pdf,.jpg,.jpeg,.png,.xls,.xlsx', icon: 'file-search' },
+  { value: 'OTHER', label: 'Other Uploads', accept: '.pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx', icon: 'folder-open' },
+];
+
 // ==================== COSTING ID GENERATOR ====================
 
 let costingCounter = 1004; // Starting after seed data

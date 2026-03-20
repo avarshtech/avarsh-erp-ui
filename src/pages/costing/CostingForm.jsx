@@ -33,6 +33,9 @@ import {
   CalculatorOutlined,
   InboxOutlined,
   InfoCircleOutlined,
+  FileTextOutlined,
+  BarChartOutlined,
+  CloudUploadOutlined,
   WhatsAppOutlined,
   PrinterOutlined,
   ImportOutlined,
@@ -47,6 +50,10 @@ import {
   updateCostSheet,
   getPastPOSuggestions,
   getTodaysRate,
+  uploadAttachmentsBatch,
+  getAttachments,
+  downloadAttachment,
+  deleteAttachment,
 } from '../../services/costingService';
 import {
   COSTING_STATUS,
@@ -56,6 +63,7 @@ import {
   TRIM_UOMS,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE_MB,
+  ATTACHMENT_CATEGORIES,
   calcFabricNetCost,
   calcTrimPrice,
   calcTotalMakingPrice,
@@ -109,7 +117,7 @@ const CostingForm = () => {
   const [quoteCurrency, setQuoteCurrency] = useState('USD');
   const [actualRate, setActualRate] = useState(83.80);
   const [todaysRate, setTodaysRate] = useState(83.80);
-  const [fileList, setFileList] = useState([]);
+  const [fileList, setFileList] = useState({ TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] });
   const [usdToInrRate, setUsdToInrRate] = useState(83.80);
   const [styleId, setStyleId] = useState(null);
 
@@ -245,7 +253,7 @@ const CostingForm = () => {
       setCurrency('INR');
       setQuoteCurrency('USD');
       setActualRate(83.80);
-      setFileList([]);
+      setFileList({ TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] });
       setStyleId(null);
       setStyleOptions([]);
       setFabricRows([]);
@@ -318,7 +326,27 @@ const CostingForm = () => {
       setAgentCommissionPct(cs.agentCommissionPct || 0);
       setProfitPct(cs.profitPct || 0);
       setTargetPrice(cs.targetPrice || '');
-      setFileList(cs.attachments || []);
+      // Load categorized attachments from file storage API
+      if (cs.id) {
+        getAttachments(cs.id).then((attachments) => {
+          const grouped = { TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] };
+          (attachments || []).forEach((a) => {
+            const cat = ['TECHPACK', 'MEASUREMENT_CHART'].includes(a.fileCategory) ? a.fileCategory : 'OTHER';
+            grouped[cat].push({
+              uid: a.fileId,
+              name: a.originalFilename,
+              status: 'done',
+              size: a.fileSizeBytes,
+              type: a.fileType,
+              fileId: a.fileId,
+              category: cat,
+            });
+          });
+          setFileList(grouped);
+        }).catch(() => {
+          setFileList({ TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] });
+        });
+      }
 
       // Load per-size overrides from API response
       if (cs.sizeSummaries && cs.sizeSummaries.length > 0) {
@@ -956,7 +984,6 @@ const CostingForm = () => {
       actualRate,
       todaysRate,
       sizes: formValues.sizes || [],
-      attachments: fileList,
       fabricRows: cleanRows(fabricRows),
       localTrims: cleanRows(localTrims),
       importedTrims: cleanRows(importedTrims),
@@ -1000,6 +1027,9 @@ const CostingForm = () => {
         saved = await createCostSheet(payload);
         message.success('Cost sheet created as draft');
       }
+      // Upload new attachments
+      const costSheetId = saved?.id || id;
+      if (costSheetId) await uploadNewFiles(costSheetId);
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
@@ -1027,6 +1057,9 @@ const CostingForm = () => {
         saved = await createCostSheet(payload);
         message.success('Cost sheet created and submitted');
       }
+      // Upload new attachments
+      const costSheetId = saved?.id || id;
+      if (costSheetId) await uploadNewFiles(costSheetId);
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
@@ -1123,10 +1156,47 @@ const CostingForm = () => {
 
   // ==================== FILE UPLOAD ====================
 
-  const uploadProps = {
-    onRemove: (file) => {
-      setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-    },
+  const categoryIcons = {
+    TECHPACK: <FileTextOutlined style={{ color: '#6366f1' }} />,
+    MEASUREMENT_CHART: <BarChartOutlined style={{ color: '#0ea5e9' }} />,
+    OTHER: <CloudUploadOutlined style={{ color: '#10b981' }} />,
+  };
+
+  const handleFileRemove = async (file, category) => {
+    if (file.fileId) {
+      try {
+        await deleteAttachment(file.fileId);
+        message.success('File deleted');
+      } catch {
+        message.error('Failed to delete file');
+        return false;
+      }
+    }
+    setFileList((prev) => ({
+      ...prev,
+      [category]: prev[category].filter((f) => f.uid !== file.uid),
+    }));
+  };
+
+  const handleFileDownload = async (file) => {
+    if (!file.fileId) return;
+    try {
+      const blob = await downloadAttachment(file.fileId);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      message.error('Failed to download file');
+    }
+  };
+
+  const getUploadProps = (category) => ({
+    onRemove: (file) => handleFileRemove(file, category),
+    onDownload: handleFileDownload,
+    showUploadList: { showDownloadIcon: true },
     beforeUpload: (file) => {
       const isAllowed = ALLOWED_FILE_TYPES.includes(file.type);
       if (!isAllowed) {
@@ -1138,10 +1208,25 @@ const CostingForm = () => {
         message.error(`File must be smaller than ${MAX_FILE_SIZE_MB}MB`);
         return Upload.LIST_IGNORE;
       }
-      setFileList((prev) => [...prev, file]);
-      return false; // Prevent auto-upload
+      setFileList((prev) => ({
+        ...prev,
+        [category]: [...prev[category], file],
+      }));
+      return false;
     },
-    fileList,
+    fileList: fileList[category],
+  });
+
+  const uploadNewFiles = async (costSheetId) => {
+    const items = Object.entries(fileList).flatMap(([cat, files]) =>
+      files.filter((f) => !f.fileId).map((f) => ({ file: f, category: cat }))
+    );
+    if (!items.length) return;
+    try {
+      await uploadAttachmentsBatch(costSheetId, items);
+    } catch {
+      message.warning('Failed to upload some attachments');
+    }
   };
 
   // ==================== SECTION STYLES ====================
@@ -1859,17 +1944,44 @@ const CostingForm = () => {
           </Col>
           <Col xs={24} lg={8}>
             <Form.Item label="Attachments">
-              <Dragger {...uploadProps} style={{ padding: '16px 0' }}>
-                <p className="ant-upload-drag-icon" style={{ marginBottom: 8 }}>
-                  <InboxOutlined style={{ color: '#6366f1', fontSize: 36 }} />
-                </p>
-                <p className="ant-upload-text" style={{ fontSize: 13 }}>
-                  Click or drag files to upload
-                </p>
-                <p className="ant-upload-hint" style={{ fontSize: 12 }}>
-                  JPG, PNG, PDF, DOC, XLS (max {MAX_FILE_SIZE_MB}MB)
-                </p>
-              </Dragger>
+              <Row gutter={[0, 10]}>
+                {ATTACHMENT_CATEGORIES.map((cat) => (
+                  <Col span={24} key={cat.value}>
+                    <Card
+                      size="small"
+                      title={
+                        <Space size={6}>
+                          {categoryIcons[cat.value]}
+                          <Typography.Text style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</Typography.Text>
+                          {fileList[cat.value]?.length > 0 && (
+                            <Tag style={{ marginLeft: 4, fontSize: 11 }}>{fileList[cat.value].length}</Tag>
+                          )}
+                        </Space>
+                      }
+                      styles={{ body: { padding: '8px 12px' } }}
+                      style={{
+                        borderRadius: 8,
+                        border: `1px solid ${isDarkMode ? '#333' : '#e5e7eb'}`,
+                      }}
+                    >
+                      <Dragger
+                        {...getUploadProps(cat.value)}
+                        style={{ padding: '6px 0', background: 'transparent', border: `1px dashed ${isDarkMode ? '#444' : '#d9d9d9'}` }}
+                      >
+                        <p className="ant-upload-drag-icon" style={{ marginBottom: 2 }}>
+                          <InboxOutlined style={{ color: '#6366f1', fontSize: 22 }} />
+                        </p>
+                        <p className="ant-upload-text" style={{ fontSize: 12, marginBottom: 0 }}>
+                          Click or drag files
+                        </p>
+                        <p className="ant-upload-hint" style={{ fontSize: 11 }}>
+                          max {MAX_FILE_SIZE_MB}MB
+                        </p>
+                      </Dragger>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
             </Form.Item>
           </Col>
         </Row>
