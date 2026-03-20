@@ -191,8 +191,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const companyName = org?.organisationName || 'Company Name';
   const watermarkText = companyName;
 
-  // PO Type: hard-code to "General" instead of 'Combined'
-  const poType = 'General';
+  const poType = po.poType || 'General';
 
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';
@@ -303,6 +302,32 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const totalQtyDisplay = Object.entries(uomTotals)
     .map(([uom, qty]) => `${formatCurrency(qty)} ${uom}`)
     .join(' | ');
+
+  // Order references section (for Regular/Combined POs)
+  const orderRefsHtml = (po.orderReferences && po.orderReferences.length > 0) ? `
+    <div style="margin: 10px 20px; border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
+      <div style="background: #f5f5f5; padding: 6px 12px; font-weight: 600; font-size: 11px; color: #333; border-bottom: 1px solid #e0e0e0;">
+        Order References
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+        <thead>
+          <tr style="background: #fafafa;">
+            <th style="padding: 4px 10px; text-align: left; border-bottom: 1px solid #eee; font-weight: 600;">Order No</th>
+            <th style="padding: 4px 10px; text-align: left; border-bottom: 1px solid #eee; font-weight: 600;">Style</th>
+            <th style="padding: 4px 10px; text-align: left; border-bottom: 1px solid #eee; font-weight: 600;">Season</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${po.orderReferences.map(ref => `
+            <tr>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.orderNo || '-'}</td>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.styleName || '-'}</td>
+              <td style="padding: 4px 10px; border-bottom: 1px solid #f0f0f0;">${ref.season || '-'}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>` : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -669,6 +694,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="value">${gst.isIgst ? 'IGST' : 'CGST + SGST'}</div>
       </div>
     </div>
+    ${orderRefsHtml}
     <div class="items-section">
       <div class="section-title">Order Items</div>
       <table class="items-table">

@@ -21,6 +21,8 @@ import {
   Tag,
   Descriptions,
   AutoComplete,
+  Segmented,
+  Popover,
 } from 'antd';
 import {
   PlusOutlined,
@@ -31,6 +33,8 @@ import {
   SearchOutlined,
   ExclamationCircleOutlined,
   EditOutlined,
+  InfoCircleOutlined,
+  CloseCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -45,7 +49,9 @@ import { getSuppliers } from '../../services/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/itemService';
 import { useStore } from '../../context/StoreContext';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
-import { PO_STATUS, LINE_ITEM_STATUS } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES } from '../../utils/poStatusConstants';
+import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bomService';
+import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
@@ -322,6 +328,12 @@ const POForm = () => {
   const loadedVariantIdsRef = useRef(new Set());
   const lineItemImagesRef = useRef({});
 
+  // BOM-PO Integration state
+  const [poType, setPoType] = useState(PO_TYPE.GENERAL);
+  const [bomOrders, setBomOrders] = useState([]);
+  const [bomLoading, setBomLoading] = useState(false);
+  const [bomDrawerOpen, setBomDrawerOpen] = useState(false);
+
   // Original PO data for edit mode (to know previous status)
   const [originalPO, setOriginalPO] = useState(null);
   const [entityVersion, setEntityVersion] = useState(null);
@@ -376,6 +388,9 @@ const POForm = () => {
       setPreviewVisible(false);
       setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
       setItemsWithVariants({});
+      setPoType(PO_TYPE.GENERAL);
+      setBomOrders([]);
+      setBomDrawerOpen(false);
       setIsDirty(false);
       // Clean up variant images
       Object.values(lineItemImagesRef.current).forEach((url) => {
@@ -514,6 +529,32 @@ const POForm = () => {
         }
       }
 
+      // Restore PO type and BOM data
+      setPoType(data.poType || PO_TYPE.GENERAL);
+
+      if (data.orderReferences && data.orderReferences.length > 0) {
+        // Fetch BOM data for each order reference
+        const bomPromises = data.orderReferences.map(async (ref) => {
+          try {
+            const bom = await getBomByOrderNo(ref.orderNo);
+            return {
+              orderNo: ref.orderNo,
+              orderId: ref.orderId,
+              bomId: ref.bomId,
+              styleId: ref.styleId,
+              styleName: ref.styleName,
+              season: ref.season,
+              orderQty: bom?.orderQty || null,
+              bomLines: bom?.lines || [],
+            };
+          } catch {
+            return { ...ref, bomLines: [] };
+          }
+        });
+        const orders = await Promise.all(bomPromises);
+        setBomOrders(orders);
+      }
+
       // Map line items
       const mappedItems = (data.lineItems || []).map((item) => ({
         key: String(item.id || Date.now()) + Math.random(),
@@ -537,6 +578,8 @@ const POForm = () => {
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
         variantAttributes: item.variantAttributes || null,
+        bomLineSources: item.bomLineSources || null,
+        _fromBom: !!(item.bomLineSources && item.bomLineSources.length > 0),
         status: item.status || null,
       }));
 
@@ -762,6 +805,200 @@ const POForm = () => {
     setIsDirty(true);
   };
 
+  // PO Type change handler
+  const handlePoTypeChange = useCallback((newType) => {
+    if (lineItems.length > 1 || (lineItems.length === 1 && lineItems[0].itemId)) {
+      Modal.confirm({
+        title: 'Change PO Type',
+        content: 'Changing PO type will clear all line items. Continue?',
+        okText: 'Yes, Change',
+        cancelText: 'Cancel',
+        onOk: () => {
+          setPoType(newType);
+          setBomOrders([]);
+          setLineItems([createEmptyLineItem()]);
+          setIsDirty(true);
+        },
+      });
+    } else {
+      setPoType(newType);
+      setBomOrders([]);
+      setLineItems([createEmptyLineItem()]);
+    }
+  }, [lineItems]);
+
+  // BOM Fetch handler
+  const handleFetchBom = useCallback(async (orderNo) => {
+    if (!orderNo || !orderNo.trim()) {
+      message.warning('Please enter an order number');
+      return;
+    }
+    const trimmedOrderNo = orderNo.trim();
+
+    // Check for duplicate in Combined mode
+    if (poType === PO_TYPE.COMBINED && bomOrders.some(o => o.orderNo === trimmedOrderNo)) {
+      message.warning('This order has already been added');
+      return;
+    }
+
+    setBomLoading(true);
+    try {
+      const bom = await getBomByOrderNo(trimmedOrderNo);
+      if (!bom || !bom.lines || bom.lines.length === 0) {
+        message.error('No BOM found for order ' + trimmedOrderNo + ', or BOM has no lines');
+        return;
+      }
+
+      const orderData = {
+        orderNo: bom.orderNo || trimmedOrderNo,
+        orderId: bom.orderId,
+        bomId: bom.id,
+        styleId: bom.styleId,
+        styleName: bom.styleName,
+        season: bom.season,
+        orderQty: bom.orderQty,
+        bomLines: bom.lines,
+      };
+
+      if (poType === PO_TYPE.REGULAR) {
+        setBomOrders([orderData]);
+      } else {
+        setBomOrders(prev => [...prev, orderData]);
+      }
+      message.success('BOM loaded for order ' + trimmedOrderNo);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        message.error('No BOM found for order ' + trimmedOrderNo);
+      } else {
+        message.error('Failed to fetch BOM');
+        console.error('BOM fetch error:', err);
+      }
+    } finally {
+      setBomLoading(false);
+    }
+  }, [poType, bomOrders]);
+
+  // Remove BOM order (for Combined PO)
+  const removeOrder = useCallback((orderNo) => {
+    setBomOrders(prev => prev.filter(o => o.orderNo !== orderNo));
+    // Remove line items that came from this order's BOM
+    setLineItems(prev => {
+      const remaining = prev.filter(li => {
+        if (!li.bomLineSources) return true;
+        return !li.bomLineSources.every(src => {
+          const order = bomOrders.find(o => o.bomId === src.bomId);
+          return order && order.orderNo === orderNo;
+        });
+      });
+      return remaining.length > 0 ? remaining : [createEmptyLineItem()];
+    });
+    setIsDirty(true);
+  }, [bomOrders]);
+
+  // BOM Line Selection confirm handler
+  const handleBomLineSelectionConfirm = useCallback((selectedLines) => {
+    const createPoLineFromBom = (bomLine, bomId) => ({
+      key: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      itemId: bomLine.itemId,
+      itemCode: bomLine.itemCode,
+      itemName: bomLine.itemName || '',
+      description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
+      qty: String(bomLine.purchaseQty || 0),
+      uom: bomLine.uom || '',
+      uomId: null,
+      primaryUom: '',
+      primaryUomId: null,
+      secondaryUom: '',
+      secondaryUomId: null,
+      unitPrice: '',
+      gstPercent: 0,
+      amount: 0,
+      variantId: bomLine.variantId || null,
+      variantAttributes: bomLine.variants || null,
+      bomLineSources: [{ bomId, lineId: bomLine.id }],
+      _fromBom: true,
+      status: LINE_ITEM_STATUS.DRAFT,
+    });
+
+    let newLines;
+    if (poType === PO_TYPE.COMBINED) {
+      // Merge duplicate item+variant+uom lines
+      const mergeMap = new Map();
+      selectedLines.forEach(({ bomLine, bomId }) => {
+        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.uom || ''}`;
+        if (mergeMap.has(key)) {
+          const existing = mergeMap.get(key);
+          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQty || 0));
+          existing.bomLineSources.push({ bomId, lineId: bomLine.id });
+        } else {
+          mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
+        }
+      });
+      newLines = Array.from(mergeMap.values());
+
+      // Check if any merging happened
+      if (newLines.length < selectedLines.length) {
+        message.info('Lines with same item+variant+UOM merged: quantities combined from multiple orders');
+      }
+    } else {
+      newLines = selectedLines.map(({ bomLine, bomId }) => createPoLineFromBom(bomLine, bomId));
+    }
+
+    setLineItems(newLines);
+    setIsDirty(true);
+
+    // Resolve UOM IDs from item master
+    const itemIds = [...new Set(newLines.map(l => l.itemId).filter(Boolean))];
+    if (itemIds.length > 0) {
+      getItemsByIds(itemIds).then(items => {
+        const itemMap = {};
+        (Array.isArray(items) ? items : items?.content || []).forEach(item => {
+          itemMap[item.id] = item;
+        });
+        setLineItems(prev => prev.map(li => {
+          if (!li._fromBom || !li.itemId) return li;
+          const item = itemMap[li.itemId];
+          if (!item) return li;
+
+          // Resolve UOM
+          const uomStr = (li.uom || '').toLowerCase();
+          let uomId = null;
+          let uomSymbol = li.uom;
+          if (item.primaryUom && (item.primaryUom.symbol || '').toLowerCase() === uomStr) {
+            uomId = item.primaryUom.id;
+            uomSymbol = item.primaryUom.symbol;
+          } else if (item.secondaryUom && (item.secondaryUom.symbol || '').toLowerCase() === uomStr) {
+            uomId = item.secondaryUom.id;
+            uomSymbol = item.secondaryUom.symbol;
+          } else if (item.primaryUom && (item.primaryUom.name || '').toLowerCase() === uomStr) {
+            uomId = item.primaryUom.id;
+            uomSymbol = item.primaryUom.symbol || item.primaryUom.name;
+          } else if (item.secondaryUom && (item.secondaryUom.name || '').toLowerCase() === uomStr) {
+            uomId = item.secondaryUom.id;
+            uomSymbol = item.secondaryUom.symbol || item.secondaryUom.name;
+          }
+
+          return {
+            ...li,
+            uomId: uomId || li.uomId,
+            uom: uomSymbol || li.uom,
+            primaryUom: item.primaryUom?.symbol || '',
+            primaryUomId: item.primaryUom?.id || null,
+            secondaryUom: item.secondaryUom?.symbol || '',
+            secondaryUomId: item.secondaryUom?.id || null,
+          };
+        }));
+
+        // Also update itemsWithVariants for image loading
+        const newItemsMap = {};
+        Object.values(itemMap).forEach(item => {
+          newItemsMap[item.id] = item;
+        });
+        setItemsWithVariants(prev => ({ ...prev, ...newItemsMap }));
+      }).catch(err => console.error('Failed to resolve UOM IDs:', err));
+    }
+  }, [poType]);
+
   // Calculate totals
   const totals = useMemo(() => {
     const subtotal = lineItems.reduce((sum, item) => {
@@ -865,6 +1102,14 @@ const POForm = () => {
       errors.push('Remarks cannot exceed 500 characters');
     }
 
+    // BOM-PO type validations
+    if (poType === PO_TYPE.REGULAR && bomOrders.length === 0) {
+      errors.push('Please load a BOM by entering an order number');
+    }
+    if (poType === PO_TYPE.COMBINED && bomOrders.length < 2) {
+      errors.push('Combined PO requires at least 2 orders');
+    }
+
     // Line items validation
     const validItems = lineItems.filter((item) => item.itemId);
     if (validItems.length === 0) {
@@ -906,26 +1151,28 @@ const POForm = () => {
       }
     });
 
-    // Duplicate line item validation (same item + variant + UOM)
-    const seen = [];
-    validItems.forEach((item, idx) => {
-      const variantKey = item.variantId
-        ? String(item.variantId)
-        : item.variantAttributes
-          ? JSON.stringify(item.variantAttributes)
-          : 'none';
-      const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
-      const existingIdx = seen.findIndex((s) => s.key === dupKey);
-      if (existingIdx >= 0) {
-        const origLineNum = seen[existingIdx].lineNum;
-        const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
-        errors.push(
-          `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
-        );
-      } else {
-        seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
-      }
-    });
+    // Duplicate line item validation (same item + variant + UOM) - only for General PO
+    if (poType === PO_TYPE.GENERAL) {
+      const seen = [];
+      validItems.forEach((item) => {
+        const variantKey = item.variantId
+          ? String(item.variantId)
+          : item.variantAttributes
+            ? JSON.stringify(item.variantAttributes)
+            : 'none';
+        const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
+        const existingIdx = seen.findIndex((s) => s.key === dupKey);
+        if (existingIdx >= 0) {
+          const origLineNum = seen[existingIdx].lineNum;
+          const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
+          errors.push(
+            `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
+          );
+        } else {
+          seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
+        }
+      });
+    }
 
     return errors;
   };
@@ -984,6 +1231,8 @@ const POForm = () => {
 
     return {
       version: entityVersion,
+      poType: poType,
+      orderReferences: poType !== PO_TYPE.GENERAL ? bomOrders.map(o => ({ orderId: o.orderId, orderNo: o.orderNo, bomId: o.bomId, styleId: o.styleId, styleName: o.styleName, season: o.season })) : null,
       supplierId: values.supplierId,
       supplierName: supplier?.name || '',
       poDate: values.poDate?.format('YYYY-MM-DD'),
@@ -1043,6 +1292,7 @@ const POForm = () => {
           totalAmount: item.amount,
           variantId: item.variantId,
           variantAttributes: item.variantAttributes,
+          bomLineSources: item.bomLineSources || null,
           status: lineItemStatus,
         };
       }),
@@ -1187,6 +1437,26 @@ const POForm = () => {
         }
       }
 
+      // Lock BOM lines on submit (Pending_Approval)
+      if (poType !== PO_TYPE.GENERAL) {
+        const byBomId = {};
+        lineItems.forEach(li => {
+          (li.bomLineSources || []).forEach(src => {
+            if (!byBomId[src.bomId]) byBomId[src.bomId] = [];
+            byBomId[src.bomId].push(src.lineId);
+          });
+        });
+        try {
+          await Promise.allSettled(
+            Object.entries(byBomId).map(([bomId, lineIds]) =>
+              updateBomLinePoStatus(Number(bomId), [...new Set(lineIds)], true)
+            )
+          );
+        } catch (err) {
+          console.error('Failed to update BOM line PO status:', err);
+        }
+      }
+
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
@@ -1270,52 +1540,63 @@ const POForm = () => {
       title: 'Item',
       dataIndex: 'itemId',
       width: 220,
-      render: (_, record) => (
-        <ItemSearchInput
-          value={
-            record.itemCode || record.itemName
-              ? `${record.itemCode || ''} - ${record.itemName || ''}`
-              : ''
-          }
-          onSelect={(item) => handleItemSelect(item, record.key)}
-          onChange={(val) => {
-            if (!val) {
-              // Clear all fields when item is cleared
-              setLineItems((prev) =>
-                prev.map((li) =>
-                  li.key === record.key
-                    ? {
-                        ...createEmptyLineItem(),
-                        key: record.key,
-                      }
-                    : li
-                )
-              );
+      render: (_, record) => {
+        // BOM-sourced line: show plain text
+        if (record._fromBom) {
+          return (
+            <div>
+              <Text strong style={{ fontSize: 13 }}>{record.itemCode}</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.itemName}</Text>
+            </div>
+          );
+        }
+        return (
+          <ItemSearchInput
+            value={
+              record.itemCode || record.itemName
+                ? `${record.itemCode || ''} - ${record.itemName || ''}`
+                : ''
             }
-          }}
-          disabled={submitting || savingDraft}
-        />
-      ),
+            onSelect={(item) => handleItemSelect(item, record.key)}
+            onChange={(val) => {
+              if (!val) {
+                // Clear all fields when item is cleared
+                setLineItems((prev) =>
+                  prev.map((li) =>
+                    li.key === record.key
+                      ? {
+                          ...createEmptyLineItem(),
+                          key: record.key,
+                        }
+                      : li
+                  )
+                );
+              }
+            }}
+            disabled={submitting || savingDraft}
+          />
+        );
+      },
     },
     {
       title: 'Variant',
-      width: 130,
+      width: 200,
       render: (_, record) => {
         if (!record.variantId) {
           return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
         }
         const attrs = record.variantAttributes || {};
         const hasMultipleVariants =
-          itemsWithVariants[record.itemId]?.variants?.length > 1;
+          record._fromBom ? false : itemsWithVariants[record.itemId]?.variants?.length > 1;
         const imgUrl = lineItemImages[record.variantId];
 
         return (
           <div
             style={{
               display: 'flex',
-              flexWrap: 'nowrap',
               gap: 6,
-              alignItems: 'center',
+              alignItems: 'flex-start',
               cursor: hasMultipleVariants ? 'pointer' : 'default',
             }}
             onClick={() => {
@@ -1325,44 +1606,52 @@ const POForm = () => {
             }}
             title={hasMultipleVariants ? 'Click to change variant' : ''}
           >
-            {/* Variant image thumbnail */}
+            {/* Variant image thumbnail with hover enlarge */}
             {imgUrl === 'loading' && (
               <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Spin size="small" />
               </div>
             )}
             {imgUrl && imgUrl !== 'loading' && (
-              <img
-                src={imgUrl}
-                alt="variant"
-                style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }}
-              />
+              <Popover
+                content={
+                  <img
+                    src={imgUrl}
+                    alt="variant enlarged"
+                    style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }}
+                  />
+                }
+                trigger="hover"
+                placement="right"
+                overlayInnerStyle={{ padding: 4 }}
+              >
+                <img
+                  src={imgUrl}
+                  alt="variant"
+                  style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }}
+                />
+              </Popover>
             )}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', flex: 1, minWidth: 0 }}>
+              {hasMultipleVariants && (
+                <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)', flexShrink: 0 }} />
+              )}
               {Object.entries(attrs).length > 0 ? (
-                <>
-                  {Object.entries(attrs)
-                    .slice(0, 2)
-                    .map(([key, val]) => {
-                      const kLower = key.toLowerCase();
-                      const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                      const showSwatch = isColorAttr && isPantoneCode(val);
-                      return (
-                        <Tag key={key} style={{ fontSize: 11, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                          {showSwatch && <PantoneColorSwatch value={val} size={14} />}
-                          {showSwatch ? (val.split('/')[0]?.trim() || val) : val}
-                        </Tag>
-                      );
-                    })}
-                  {Object.entries(attrs).length > 2 && (
-                    <Text type="secondary" style={{ fontSize: 10 }}>
-                      +{Object.entries(attrs).length - 2}
-                    </Text>
-                  )}
-                  {hasMultipleVariants && (
-                    <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)' }} />
-                  )}
-                </>
+                Object.entries(attrs).map(([key, val]) => {
+                  const kLower = key.toLowerCase();
+                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                  const showSwatch = isColorAttr && isPantoneCode(val);
+                  return (
+                    <Tag
+                      key={key}
+                      className="bom-variant-tag"
+                      style={{ margin: 0, fontSize: 10, display: 'inline-flex', alignItems: 'center', gap: 3 }}
+                    >
+                      {showSwatch && <PantoneColorSwatch value={val} size={10} />}
+                      {`${key}:${val}`}
+                    </Tag>
+                  );
+                })
               ) : (
                 <Text type="secondary" style={{ fontSize: 11 }}>
                   Default
@@ -1392,26 +1681,36 @@ const POForm = () => {
       title: 'Qty',
       dataIndex: 'qty',
       width: 100,
-      render: (value, record) => (
-        <InputNumber
-          min={0}
-          step={1}
-          precision={2}
-          style={{ width: '100%', height: 40 }}
-          value={value === '' ? null : Number(value)}
-          onChange={(v) =>
-            handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
-          }
-          disabled={submitting || savingDraft || !record.itemId}
-          placeholder="0"
-        />
-      ),
+      align: 'center',
+      render: (value, record) => {
+        if (record._fromBom) {
+          return <Text strong style={{ color: 'var(--primary-color)' }}>{value}</Text>;
+        }
+        return (
+          <InputNumber
+            min={0}
+            step={1}
+            precision={2}
+            style={{ width: '100%', height: 40 }}
+            value={value === '' ? null : Number(value)}
+            onChange={(v) =>
+              handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
+            }
+            disabled={submitting || savingDraft || !record.itemId}
+            placeholder="0"
+          />
+        );
+      },
     },
     {
       title: 'UOM',
       dataIndex: 'uomId',
       width: 110,
+      align: 'center',
       render: (_, record) => {
+        if (record._fromBom) {
+          return <Text>{record.uom || '-'}</Text>;
+        }
         const uomOpts = getUomOptions(record);
         if (uomOpts.length === 0) {
           return <Text type="secondary">-</Text>;
@@ -1476,7 +1775,7 @@ const POForm = () => {
           {
             title: 'IGST',
             width: 100,
-            align: 'right',
+            align: 'center',
             render: (_, record) => {
               const base =
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
@@ -1489,7 +1788,7 @@ const POForm = () => {
           {
             title: 'SGST',
             width: 90,
-            align: 'right',
+            align: 'center',
             render: (_, record) => {
               const base =
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
@@ -1501,7 +1800,7 @@ const POForm = () => {
           {
             title: 'CGST',
             width: 90,
-            align: 'right',
+            align: 'center',
             render: (_, record) => {
               const base =
                 (parseFloat(record.qty) || 0) * (parseFloat(record.unitPrice) || 0);
@@ -1515,7 +1814,7 @@ const POForm = () => {
       title: 'Amount (₹)',
       dataIndex: 'amount',
       width: 120,
-      align: 'right',
+      align: 'center',
       render: (value) => (
         <Text strong style={{ color: 'var(--success-color)', whiteSpace: 'nowrap' }}>
           ₹ {(value || 0).toFixed(2)}
@@ -1525,21 +1824,24 @@ const POForm = () => {
     {
       title: '',
       width: 50,
-      render: (_, record) => (
-        <Popconfirm
-          title="Remove this line item?"
-          onConfirm={() => removeLineItem(record.key)}
-          disabled={lineItems.length === 1}
-        >
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            size="small"
-            disabled={lineItems.length === 1 || submitting || savingDraft}
-          />
-        </Popconfirm>
-      ),
+      render: (_, record) => {
+        if (record._fromBom) return null;
+        return (
+          <Popconfirm
+            title="Remove this line item?"
+            onConfirm={() => removeLineItem(record.key)}
+            disabled={lineItems.length === 1}
+          >
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              disabled={lineItems.length === 1 || submitting || savingDraft}
+            />
+          </Popconfirm>
+        );
+      },
     },
   ];
 
@@ -1723,6 +2025,18 @@ const POForm = () => {
           {/* Supplier Info */}
           <Col xs={24} lg={8}>
             <Card style={{ marginBottom: 24 }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 6 }}>PO Type</Text>
+                <Segmented
+                  size="small"
+                  value={poType}
+                  options={PO_TYPE_OPTIONS}
+                  className="po-type-toggle"
+                  block
+                  onChange={handlePoTypeChange}
+                  disabled={submitting || savingDraft}
+                />
+              </div>
               <Title level={5} style={{ marginBottom: 16 }}>
                 Supplier Information
               </Title>
@@ -1756,6 +2070,19 @@ const POForm = () => {
                       .join(', '),
                   },
                   {
+                    key: 'supplies',
+                    label: 'Supplies',
+                    children: (
+                      <Space size={4}>
+                        {selectedSupplier.suppliesFabric && <Tag color="success">Fabric</Tag>}
+                        {selectedSupplier.suppliesTrims && <Tag color="processing">Trims</Tag>}
+                        {!selectedSupplier.suppliesFabric && !selectedSupplier.suppliesTrims && (
+                          <Tag color="default">Not specified</Tag>
+                        )}
+                      </Space>
+                    ),
+                  },
+                  {
                     key: 'igst',
                     label: 'IGST Applicable',
                     children: (
@@ -1772,6 +2099,36 @@ const POForm = () => {
           </Col>
         </Row>
 
+        {/* Order Info (Regular/Combined PO) — statistic-style grid */}
+        {poType !== PO_TYPE.GENERAL && bomOrders.length > 0 && (
+          <Card size="small" style={{ marginBottom: 24 }}>
+            <Title level={5} style={{ marginTop: 0, marginBottom: 12 }}>Order Information</Title>
+            {bomOrders.map((order, idx) => (
+              <div key={order.orderNo}>
+                {idx > 0 && <Divider style={{ margin: '12px 0' }} />}
+                <Row gutter={[24, 12]}>
+                  <Col xs={12} sm={8} md={6} lg={4}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
+                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6} lg={4}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
+                    <Text strong style={{ fontSize: 14 }}>{order.styleName || '-'}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6} lg={4}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Season</Text>
+                    <Text strong style={{ fontSize: 14 }}>{order.season || '-'}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6} lg={4}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order Qty</Text>
+                    <Text strong style={{ fontSize: 14 }}>{order.orderQty?.toLocaleString('en-IN') || '-'}</Text>
+                  </Col>
+                </Row>
+              </div>
+            ))}
+          </Card>
+        )}
+
         {/* Line Items */}
         <Card style={{ marginBottom: 24 }}>
           <div
@@ -1785,14 +2142,25 @@ const POForm = () => {
             <Title level={5} style={{ margin: 0 }}>
               Line Items
             </Title>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={addLineItem}
-              disabled={submitting || savingDraft}
-            >
-              Add Item
-            </Button>
+            {poType === PO_TYPE.GENERAL ? (
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={addLineItem}
+                disabled={!selectedSupplier || submitting || savingDraft}
+              >
+                Add Item
+              </Button>
+            ) : (
+              <Button
+                type="dashed"
+                icon={<PlusOutlined />}
+                onClick={() => setBomDrawerOpen(true)}
+                disabled={!selectedSupplier || submitting || savingDraft}
+              >
+                Select BOM Lines
+              </Button>
+            )}
           </div>
           <Table
             columns={lineColumns}
@@ -1801,6 +2169,7 @@ const POForm = () => {
             scroll={{ x: 2000 }}
             size="middle"
             rowKey="key"
+            className="centered-header-table"
           />
         </Card>
 
@@ -2035,7 +2404,14 @@ const POForm = () => {
                           </div>
                         )}
                         {imgUrl && imgUrl !== 'loading' && (
-                          <img src={imgUrl} alt="variant" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }} />
+                          <Popover
+                            content={<img src={imgUrl} alt="variant enlarged" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }} />}
+                            trigger="hover"
+                            placement="right"
+                            overlayInnerStyle={{ padding: 4 }}
+                          >
+                            <img src={imgUrl} alt="variant" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }} />
+                          </Popover>
                         )}
                         <div>
                           <Text strong>{r.itemName}</Text>
@@ -2256,6 +2632,21 @@ const POForm = () => {
         item={variantModalState.pendingItem}
         onSelect={handleVariantSelect}
         currentVariantId={variantModalState.currentVariantId || null}
+      />
+
+      {/* BOM Line Selection Drawer */}
+      <BomLineSelectionDrawer
+        open={bomDrawerOpen}
+        onClose={() => setBomDrawerOpen(false)}
+        poType={poType}
+        bomOrders={bomOrders}
+        onBomOrdersChange={setBomOrders}
+        onFetchBom={handleFetchBom}
+        bomLoading={bomLoading}
+        supplierFabric={selectedSupplier?.suppliesFabric || false}
+        supplierTrims={selectedSupplier?.suppliesTrims || false}
+        existingBomLineIds={new Set(lineItems.flatMap(li => (li.bomLineSources || []).map(s => s.lineId)))}
+        onConfirm={handleBomLineSelectionConfirm}
       />
     </div>
   );

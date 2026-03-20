@@ -76,6 +76,27 @@ export const getLineItemStatusLabel = (status) => {
   return LINE_ITEM_STATUS_LABELS[status] || status.replace(/_/g, ' ');
 };
 
+// ==================== PO TYPE (BOM-PO INTEGRATION) ====================
+export const PO_TYPE = {
+  GENERAL: 'General',
+  REGULAR: 'Regular',
+  COMBINED: 'Combined',
+};
+
+export const PO_TYPE_OPTIONS = [
+  { value: PO_TYPE.GENERAL, label: 'General' },
+  { value: PO_TYPE.REGULAR, label: 'Regular' },
+  { value: PO_TYPE.COMBINED, label: 'Combined' },
+];
+
+/** PO statuses that should UNLOCK BOM lines (isPoGenerated = false) */
+export const BOM_UNLOCK_STATUSES = [
+  PO_STATUS.DRAFT,
+  PO_STATUS.REJECTED,
+  PO_STATUS.CANCELLED,
+  PO_STATUS.REFERRED_BACK,
+];
+
 export default {
   PO_STATUS,
   LINE_ITEM_STATUS,
@@ -83,4 +104,7 @@ export default {
   LINE_ITEM_STATUS_LABELS,
   getStatusLabel,
   getLineItemStatusLabel,
+  PO_TYPE,
+  PO_TYPE_OPTIONS,
+  BOM_UNLOCK_STATUSES,
 };

@@ -63,6 +63,7 @@ export const searchPurchaseOrders = async (params = {}) => {
   if (params.poDateEnd) queryParams.append('poDateEnd', params.poDateEnd);
   if (params.deliveryDateStart) queryParams.append('deliveryDateStart', params.deliveryDateStart);
   if (params.deliveryDateEnd) queryParams.append('deliveryDateEnd', params.deliveryDateEnd);
+  if (params.poType) queryParams.append('poType', params.poType);
   const queryString = queryParams.toString();
   const url = `${ENDPOINTS.PURCHASE_ORDERS}/search?${queryString}`;
   const response = await axiosInstance.get(url);

@@ -72,6 +72,7 @@ const POList = () => {
   const [searchText, setSearchText] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(undefined);
+  const [poTypeFilter, setPoTypeFilter] = useState(null);
   const [poDateRange, setPoDateRange] = useState(null);
   const [deliveryDateRange, setDeliveryDateRange] = useState(null);
   const [sortField, setSortField] = useState('id');
@@ -107,6 +108,9 @@ const POList = () => {
         // Add status filter
         if (statusFilter) params.status = statusFilter;
 
+        // Add PO type filter
+        if (poTypeFilter) params.poType = poTypeFilter;
+
         // Add PO date range
         if (poDateRange && poDateRange.length === 2) {
           params.poDateStart = poDateRange[0].format('YYYY-MM-DD');
@@ -133,7 +137,7 @@ const POList = () => {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poDateRange, deliveryDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]
   );
 
   // Debounce search term
@@ -146,7 +150,7 @@ const POList = () => {
   useEffect(() => {
     fetchData(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, poDateRange, deliveryDateRange]);
+  }, [debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]);
 
   // Handle table change (pagination, sorting)
   const handleTableChange = (pag, _filters, sorter) => {
@@ -246,6 +250,16 @@ const POList = () => {
       width: 200,
       ellipsis: true,
       render: (text) => <Text strong>{text || '-'}</Text>,
+    },
+    {
+      title: 'PO Type',
+      dataIndex: 'poType',
+      key: 'poType',
+      width: 110,
+      render: (type) => {
+        const colorMap = { General: 'default', Regular: 'blue', Combined: 'purple' };
+        return <Tag color={colorMap[type] || 'default'}>{type || 'General'}</Tag>;
+      },
     },
     {
       title: 'Delivery Date',
@@ -395,6 +409,20 @@ const POList = () => {
                 label: getStatusLabel(s),
                 value: s,
               }))}
+            />
+          </Col>
+          <Col xs={12} sm={8} md={4} lg={3}>
+            <Select
+              placeholder="PO Type"
+              style={{ width: '100%' }}
+              allowClear
+              value={poTypeFilter}
+              onChange={(val) => setPoTypeFilter(val)}
+              options={[
+                { value: 'General', label: 'General' },
+                { value: 'Regular', label: 'Regular' },
+                { value: 'Combined', label: 'Combined' },
+              ]}
             />
           </Col>
           <Col xs={24} sm={12} md={6} lg={5}>

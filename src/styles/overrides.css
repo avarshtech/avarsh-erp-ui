@@ -1090,6 +1090,46 @@ textarea.ant-input:active {
   color: #fff !important;
 }
 
+/* ============================================================
+   PO TYPE TOGGLE
+   Segmented control in PO supplier card for PO type selection
+   ============================================================ */
+.po-type-toggle {
+  font-size: 12px !important;
+  padding: 2px !important;
+}
+
+.po-type-toggle .ant-segmented-item {
+  padding: 0 10px !important;
+  min-height: 28px !important;
+}
+
+.po-type-toggle .ant-segmented-item-label {
+  font-size: 12px !important;
+  line-height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 4px !important;
+}
+
+.po-type-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.po-type-toggle .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.po-type-toggle .ant-segmented-thumb {
+  background: var(--primary-color) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="dark"] .po-type-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
 
 /* BOM variant attribute tags — purple in light, geekblue in dark */
 .bom-variant-tag {

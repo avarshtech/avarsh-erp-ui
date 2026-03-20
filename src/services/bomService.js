@@ -33,6 +33,16 @@ export const changeBomStatus = async (id, status, version) => {
 };
 
 /**
+ * Get BOM by order number. Used by PO module for Regular/Combined POs.
+ * @param {string} orderNo - Order number to look up
+ * @returns {Promise<Object>} BomDTO with lines
+ */
+export const getBomByOrderNo = async (orderNo) => {
+  const response = await axiosInstance.get(`${BASE_URL}/by-order-no`, { params: { orderNo } });
+  return response.data;
+};
+
+/**
  * Update PO-generated flag on specific BOM lines.
  * Called by PO module when placing or cancelling a PO against BOM lines.
  * @param {number} bomId - BOM ID

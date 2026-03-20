@@ -19,6 +19,8 @@ import {
   Tooltip,
   Upload,
   Progress,
+  Card,
+  Popover,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -45,6 +47,7 @@ import {
   updatePurchaseOrder,
   createActivity,
 } from '../../services/purchaseOrderService';
+import { updateBomLinePoStatus } from '../../services/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
@@ -56,7 +59,7 @@ import {
   hasPermission,
   getCurrentUser,
 } from '../../utils/permissions';
-import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
 import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
@@ -529,6 +532,30 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
 
       await createActivity(po.id, activityPayload);
 
+      // Unlock BOM lines on reject/cancel/referback
+      if (po.poType && po.poType !== 'General') {
+        const newStatus = action.toStatus;
+        const shouldUnlock = BOM_UNLOCK_STATUSES.includes(newStatus);
+        if (shouldUnlock) {
+          const byBomId = {};
+          (po.lineItems || []).forEach((li) => {
+            (li.bomLineSources || []).forEach((src) => {
+              if (!byBomId[src.bomId]) byBomId[src.bomId] = [];
+              byBomId[src.bomId].push(src.lineId);
+            });
+          });
+          try {
+            await Promise.allSettled(
+              Object.entries(byBomId).map(([bomId, lineIds]) =>
+                updateBomLinePoStatus(Number(bomId), [...new Set(lineIds)], false)
+              )
+            );
+          } catch (err) {
+            console.error('Failed to unlock BOM lines:', err);
+          }
+        }
+      }
+
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
       setStatusAction(null);
       setActionReason('');
@@ -755,11 +782,24 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
               </div>
             )}
             {imgUrl && imgUrl !== 'loading' && (
-              <img
-                src={imgUrl}
-                alt="variant"
-                style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)' }}
-              />
+              <Popover
+                content={
+                  <img
+                    src={imgUrl}
+                    alt="variant enlarged"
+                    style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }}
+                  />
+                }
+                trigger="hover"
+                placement="right"
+                overlayInnerStyle={{ padding: 4 }}
+              >
+                <img
+                  src={imgUrl}
+                  alt="variant"
+                  style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }}
+                />
+              </Popover>
             )}
             <div>
               <Text strong>{record.itemName || 'Unknown Item'}</Text>
@@ -1109,6 +1149,11 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                   label: 'Status',
                   children: renderStatusTag(po.status),
                 },
+                po?.poType && po.poType !== 'General' && {
+                  key: 'poType',
+                  label: 'PO Type',
+                  children: <Tag color="purple">{po.poType} PO</Tag>,
+                },
                 {
                   key: 'supplier',
                   label: 'Supplier',
@@ -1146,6 +1191,32 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                 },
               ].filter(Boolean)}
             />
+
+            {/* Order References (BOM PO) — statistic-style grid */}
+            {po?.orderReferences?.length > 0 && (
+              <Card size="small" style={{ marginBottom: 16 }}>
+                <Text strong style={{ display: 'block', marginBottom: 10 }}>Order Information</Text>
+                {po.orderReferences.map((ref, idx) => (
+                  <div key={ref.orderNo}>
+                    {idx > 0 && <Divider style={{ margin: '10px 0' }} />}
+                    <Row gutter={[24, 8]}>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
+                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{ref.orderNo}</Text>
+                      </Col>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
+                        <Text strong style={{ fontSize: 13 }}>{ref.styleName || '-'}</Text>
+                      </Col>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Season</Text>
+                        <Text strong style={{ fontSize: 13 }}>{ref.season || '-'}</Text>
+                      </Col>
+                    </Row>
+                  </div>
+                ))}
+              </Card>
+            )}
 
             {/* Line Items */}
             <Title level={5} style={{ marginBottom: 12 }}>
