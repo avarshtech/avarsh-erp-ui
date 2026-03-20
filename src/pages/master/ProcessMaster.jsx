@@ -162,11 +162,12 @@ const ProcessMaster = ({ onDirtyChange }) => {
       onAdd={canAdd ? handleAdd : undefined}
       onSelectRow={handleSelect}
       onSearch={handleSearch}
+      onCloseForm={handleCancel}
       searchPlaceholder="Search processes..."
       renderForm={() => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* Sticky header */}
-          <div style={{
+          <div className="master-form-header" style={{
             flexShrink: 0,
             position: 'sticky',
             top: 0,

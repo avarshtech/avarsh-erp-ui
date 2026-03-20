@@ -207,10 +207,11 @@ const StyleMaster = ({ onDirtyChange }) => {
       onAdd={canAdd ? handleAdd : undefined}
       onSelectRow={handleSelect}
       onSearch={handleSearch}
+      onCloseForm={handleCancel}
       searchPlaceholder="Search by style no, garment or buyer..."
       renderForm={() => (
           <div style={{ height: '100%', overflowY: 'auto' }}>
-            <div style={{
+            <div className="master-form-header" style={{
               position: 'sticky',
               top: 0,
               zIndex: 10,

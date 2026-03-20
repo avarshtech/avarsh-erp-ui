@@ -452,7 +452,7 @@ const SupplierMaster = () => {
     >
       <div>
       {/* Header */}
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+      <div className="master-form-header" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
         <Input
           placeholder="Search suppliers..."
           prefix={<SearchOutlined />}

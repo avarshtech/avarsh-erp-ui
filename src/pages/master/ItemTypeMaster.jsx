@@ -180,9 +180,10 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       onAdd={canAdd ? handleAdd : undefined}
       onSelectRow={handleSelect}
       onSearch={handleSearch}
+      onCloseForm={handleCancel}
       renderForm={() => (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{
+            <div className="master-form-header" style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',

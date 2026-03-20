@@ -152,7 +152,7 @@ const CostComparison = () => {
     <div className="animate-fade-in-up">
       <div className="page-header">
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} type="text" />
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} />
           <h1>Cost Comparison</h1>
         </Space>
       </div>

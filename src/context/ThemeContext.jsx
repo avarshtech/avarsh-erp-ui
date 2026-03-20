@@ -32,7 +32,17 @@ const lightThemeToken = {
   colorBorder: '#e2e8f0',
   colorBorderSecondary: '#f1f5f9',
   borderRadius: 10,
-  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  fontSize: 14,
+  fontSizeHeading1: 28,
+  fontSizeHeading2: 22,
+  fontSizeHeading3: 18,
+  fontSizeHeading4: 16,
+  fontSizeHeading5: 14,
+  fontSizeSM: 12,
+  fontSizeLG: 16,
+  fontWeightStrong: 600,
+  lineHeight: 1.5,
 };
 
 // Dark theme colors for Ant Design
@@ -53,7 +63,17 @@ const darkThemeToken = {
   colorBorder: '#334155',
   colorBorderSecondary: '#475569',
   borderRadius: 10,
-  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+  fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  fontSize: 14,
+  fontSizeHeading1: 28,
+  fontSizeHeading2: 22,
+  fontSizeHeading3: 18,
+  fontSizeHeading4: 16,
+  fontSizeHeading5: 14,
+  fontSizeSM: 12,
+  fontSizeLG: 16,
+  fontWeightStrong: 600,
+  lineHeight: 1.5,
 };
 
 // Component-level theme overrides for light mode

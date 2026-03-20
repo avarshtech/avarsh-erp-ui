@@ -179,15 +179,16 @@ const CategoryMaster = ({ onDirtyChange }) => {
       onAdd={canAdd ? handleAdd : undefined}
       onSelectRow={handleSelect}
       onSearch={handleSearch}
+      onCloseForm={handleCancel}
       renderForm={() => (
           <div style={{ padding: 24 }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: 24, 
-              borderBottom: '1px solid #f0f0f0', 
-              paddingBottom: 16 
+            <div className="master-form-header" style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 24,
+              borderBottom: '1px solid #f0f0f0',
+              paddingBottom: 16
             }}>
               <h2 style={{ margin: 0 }}>
                 {selectedId ? (isReadOnly ? 'View Category' : 'Edit Category') : 'New Category'}

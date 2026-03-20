@@ -95,6 +95,10 @@ export const searchItems = async (params = {}) => {
   if (params.direction) queryParams.append('direction', params.direction);
   if (params.search) queryParams.append('search', params.search);
   if (params.categoryId) queryParams.append('categoryId', params.categoryId);
+  // Support multiple category IDs
+  if (params.categoryIds && params.categoryIds.length > 0) {
+    params.categoryIds.forEach((id) => queryParams.append('categoryIds', id));
+  }
   if (params.subCategoryId) queryParams.append('subCategoryId', params.subCategoryId);
   if (params.itemTypeId) queryParams.append('itemTypeId', params.itemTypeId);
   if (params.isActive !== undefined && params.isActive !== null && params.isActive !== '') {

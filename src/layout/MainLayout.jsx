@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Layout,
   Menu,
@@ -7,6 +7,7 @@ import {
   Space,
   Input,
   Tooltip,
+  Drawer,
   message,
 } from "antd";
 import {
@@ -27,6 +28,8 @@ import {
   SunOutlined,
   MoonOutlined,
   ClockCircleOutlined,
+  MenuOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
@@ -34,6 +37,7 @@ import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
+import useResponsive from "../hooks/useResponsive";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
 
 const { Header, Sider, Content } = Layout;
@@ -93,12 +97,65 @@ const SessionTimer = () => {
   );
 };
 
+// Sidebar content extracted so it can be shared between Sider and Drawer
+const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick, isDarkMode }) => (
+  <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+    <Menu
+      theme="dark"
+      mode="inline"
+      selectedKeys={selectedKeys}
+      defaultOpenKeys={openKeys}
+      items={menuItems}
+      onClick={onMenuClick}
+      style={{
+        marginTop: 8,
+        border: 'none',
+        background: 'transparent',
+      }}
+    />
+  </div>
+);
+
+const SidebarLogo = ({ collapsed }) => (
+  <div
+    style={{
+      height: 64,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 0,
+      borderBottom: "1px solid rgba(255,255,255,0.1)",
+    }}
+  >
+    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <img
+        src={avarshLogoLight}
+        alt="Avarsh Logo"
+        style={{
+          height: collapsed ? 32 : 40,
+          width: collapsed ? 32 : 'auto',
+          objectFit: 'contain',
+          display: 'block',
+          transition: 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      />
+    </div>
+  </div>
+);
+
 const MainLayoutInner = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
+  const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
+
+  // Close drawer on route change
+  useEffect(() => {
+    if (drawerOpen) setDrawerOpen(false);
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load current user on mount and refresh when auth state changes
   // (e.g., after a background token refresh updates the user session)
@@ -268,9 +325,10 @@ const MainLayoutInner = () => {
     },
   ];
 
-  const handleMenuClick = ({ key }) => {
+  const handleMenuClick = useCallback(({ key }) => {
     navigate(key);
-  };
+    if (isMobileOrTablet) setDrawerOpen(false);
+  }, [navigate, isMobileOrTablet]);
 
   const getSelectedKeys = () => {
     const path = location.pathname;
@@ -288,187 +346,279 @@ const MainLayoutInner = () => {
     return [];
   };
 
+  const selectedKeys = getSelectedKeys();
+  const openKeys = getOpenKeys();
+
+  // Compute layout margins based on device
+  const contentMarginLeft = isMobileOrTablet ? 0 : (collapsed ? 80 : 260);
+  const headerPadding = isMobile ? '0 12px' : '0 24px';
+  const contentMargin = isMobile ? 12 : 24;
+
   return (
     <SessionExpiryGuard>
       <Layout style={{ minHeight: "100vh" }}>
-      <Sider
-        trigger={null}
-        collapsible
-        collapsed={collapsed}
-        collapsedWidth={80}
-        width={260}
-        style={{
-          position: "fixed",
-          height: "100vh",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 100,
-          overflow: 'hidden',
-          background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-          transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
-          willChange: 'width',
-        }}
-      >
-        <div
-          style={{
-            height: 64,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
-          }}
-        >
-          <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-            <img
-              src={avarshLogoLight}
-              alt="Avarsh Logo"
-              style={{
-                height: collapsed ? 32 : 40,
-                width: collapsed ? 32 : 'auto',
-                objectFit: 'contain',
-                display: 'block',
-                transition: 'height 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-              }}
-            />
-          </div>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          <Menu
-            theme="dark"
-            mode="inline"
-            selectedKeys={getSelectedKeys()}
-            defaultOpenKeys={getOpenKeys()}
-            items={menuItems}
-            onClick={handleMenuClick}
+        {/* Desktop: Fixed Sider */}
+        {!isMobileOrTablet && (
+          <Sider
+            trigger={null}
+            collapsible
+            collapsed={collapsed}
+            collapsedWidth={80}
+            width={260}
             style={{
-              marginTop: 8,
-              border: 'none',
-              background: 'transparent',
+              position: "fixed",
+              height: "100vh",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              zIndex: 100,
+              overflow: 'hidden',
+              background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
+              transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+              willChange: 'width',
             }}
-          />
-        </div>
-      </Sider>
-      <Layout
-        style={{ marginLeft: collapsed ? 80 : 260, transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)" }}
-      >
-        <Header
-          style={{
-            padding: "0 24px",
-            background: isDarkMode ? '#1e293b' : '#fff',
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            boxShadow: isDarkMode 
-              ? "0 1px 4px rgba(0,0,0,0.3)" 
-              : "0 1px 4px rgba(0,0,0,0.08)",
-            position: "sticky",
-            top: 0,
-            zIndex: 99,
-            transition: "background-color 0.3s ease, box-shadow 0.3s ease",
-          }}
-        >
-          <Space>
-            <Tooltip title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
-              <span
-                onClick={() => setCollapsed(!collapsed)}
-                style={{
-                  fontSize: 20,
-                  cursor: "pointer",
-                  color: isDarkMode ? '#94a3b8' : '#64748b',
-                  transition: "color 0.3s",
-                }}
-              >
-                {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              </span>
-            </Tooltip>
-            <Input
-              placeholder="Search..."
-              prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}
-              style={{
-                width: 280,
-                borderRadius: 20,
-                marginLeft: 16,
-                background: isDarkMode ? '#334155' : '#fff',
-                borderColor: isDarkMode ? '#475569' : '#e2e8f0',
-              }}
+          >
+            <SidebarLogo collapsed={collapsed} />
+            <SidebarContent
+              menuItems={menuItems}
+              selectedKeys={selectedKeys}
+              openKeys={openKeys}
+              onMenuClick={handleMenuClick}
+              isDarkMode={isDarkMode}
             />
-          </Space>
-          <Space size={20}>
-            <SessionTimer />
-            <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-              <button
-                onClick={toggleTheme}
-                className="theme-toggle-btn"
+          </Sider>
+        )}
+
+        {/* Mobile/Tablet: Drawer Sidebar */}
+        {isMobileOrTablet && (
+          <Drawer
+            placement="left"
+            open={drawerOpen}
+            onClose={() => setDrawerOpen(false)}
+            width={280}
+            closable={false}
+            styles={{
+              body: { padding: 0, background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' },
+              header: { display: 'none' },
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div
                 style={{
+                  height: 64,
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: isDarkMode ? '#334155' : '#f1f5f9',
-                  border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  color: isDarkMode ? '#fbbf24' : '#3d6091',
+                  justifyContent: 'space-between',
+                  padding: '0 16px',
+                  borderBottom: '1px solid rgba(255,255,255,0.1)',
                 }}
               >
-                {isDarkMode ? (
-                  <SunOutlined style={{ fontSize: 18 }} />
-                ) : (
-                  <MoonOutlined style={{ fontSize: 18 }} />
-                )}
-              </button>
-            </Tooltip>
-            <Dropdown 
-              menu={{ 
-                items: userMenuItems, 
-                onClick: handleUserMenuClick,
-                style: { 
-                  minWidth: 220, 
-                  padding: '8px',
-                }
-              }} 
-              trigger={["click"]}
-              placement="bottomRight"
-              styles={{
-                root: {
-                  boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)'
-                }
-              }}
-            >
-              <Space 
-                style={{ 
-                  cursor: "pointer",
-                  padding: '6px 12px',
-                  transition: 'all 0.2s ease',
+                <img
+                  src={avarshLogoLight}
+                  alt="Avarsh Logo"
+                  style={{ height: 36, objectFit: 'contain' }}
+                />
+                <CloseOutlined
+                  onClick={() => setDrawerOpen(false)}
+                  style={{ color: 'rgba(255,255,255,0.65)', fontSize: 18, cursor: 'pointer' }}
+                />
+              </div>
+              <SidebarContent
+                menuItems={menuItems}
+                selectedKeys={selectedKeys}
+                openKeys={openKeys}
+                onMenuClick={handleMenuClick}
+                isDarkMode={isDarkMode}
+              />
+              {/* User info at bottom of drawer */}
+              <div
+                style={{
+                  padding: '16px',
+                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
                 }}
               >
                 <Avatar
                   size={36}
                   style={{
-                    background: isDarkMode
-                      ? "linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)"
-                      : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-                    fontSize: 16,
+                    background: 'linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)',
+                    fontSize: 14,
+                    flexShrink: 0,
                   }}
                   icon={<UserOutlined />}
                 />
-              </Space>
-            </Dropdown>
-          </Space>
-        </Header>
-        <Content
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {currentUser?.name || 'User'}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {currentUser?.email || currentUser?.username || ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Drawer>
+        )}
+
+        <Layout
           style={{
-            margin: 24,
-            minHeight: "calc(100vh - 64px - 48px)",
+            marginLeft: contentMarginLeft,
+            transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
-          <Outlet />
-        </Content>
-      </Layout>
+          <Header
+            style={{
+              padding: headerPadding,
+              background: isDarkMode ? '#1e293b' : '#fff',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              boxShadow: isDarkMode
+                ? "0 1px 4px rgba(0,0,0,0.3)"
+                : "0 1px 4px rgba(0,0,0,0.08)",
+              position: "sticky",
+              top: 0,
+              zIndex: 99,
+              height: isMobile ? 56 : 64,
+              lineHeight: isMobile ? '56px' : '64px',
+              transition: "background-color 0.3s ease, box-shadow 0.3s ease",
+            }}
+          >
+            <Space size={isMobile ? 8 : 16}>
+              {isMobileOrTablet ? (
+                /* Hamburger menu for mobile/tablet */
+                <span
+                  onClick={() => setDrawerOpen(true)}
+                  style={{
+                    fontSize: 22,
+                    cursor: "pointer",
+                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: 4,
+                  }}
+                >
+                  <MenuOutlined />
+                </span>
+              ) : (
+                /* Collapse toggle for desktop */
+                <Tooltip title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
+                  <span
+                    onClick={() => setCollapsed(!collapsed)}
+                    style={{
+                      fontSize: 20,
+                      cursor: "pointer",
+                      color: isDarkMode ? '#94a3b8' : '#64748b',
+                      transition: "color 0.3s",
+                    }}
+                  >
+                    {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  </span>
+                </Tooltip>
+              )}
+              {/* Show logo in header on mobile */}
+              {isMobile && (
+                <img
+                  src={avarshLogoLight}
+                  alt="Avarsh"
+                  style={{
+                    height: 28,
+                    objectFit: 'contain',
+                    filter: isDarkMode ? 'none' : 'brightness(0.2)',
+                  }}
+                />
+              )}
+              {/* Hide search on mobile, show on tablet+ */}
+              {!isMobile && (
+                <Input
+                  placeholder="Search..."
+                  prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}
+                  style={{
+                    width: isTablet ? 200 : 280,
+                    borderRadius: 20,
+                    marginLeft: isMobileOrTablet ? 8 : 16,
+                    background: isDarkMode ? '#334155' : '#fff',
+                    borderColor: isDarkMode ? '#475569' : '#e2e8f0',
+                  }}
+                />
+              )}
+            </Space>
+            <Space size={isMobile ? 8 : 20}>
+              <SessionTimer />
+              <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                <button
+                  onClick={toggleTheme}
+                  className="theme-toggle-btn"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: isMobile ? 36 : 40,
+                    height: isMobile ? 36 : 40,
+                    borderRadius: 10,
+                    background: isDarkMode ? '#334155' : '#f1f5f9',
+                    border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    color: isDarkMode ? '#fbbf24' : '#3d6091',
+                  }}
+                >
+                  {isDarkMode ? (
+                    <SunOutlined style={{ fontSize: isMobile ? 16 : 18 }} />
+                  ) : (
+                    <MoonOutlined style={{ fontSize: isMobile ? 16 : 18 }} />
+                  )}
+                </button>
+              </Tooltip>
+              <Dropdown
+                menu={{
+                  items: userMenuItems,
+                  onClick: handleUserMenuClick,
+                  style: {
+                    minWidth: 220,
+                    padding: '8px',
+                  }
+                }}
+                trigger={["click"]}
+                placement="bottomRight"
+                styles={{
+                  root: {
+                    boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)'
+                  }
+                }}
+              >
+                <Space
+                  style={{
+                    cursor: "pointer",
+                    padding: isMobile ? '4px 6px' : '6px 12px',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <Avatar
+                    size={isMobile ? 32 : 36}
+                    style={{
+                      background: isDarkMode
+                        ? "linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)"
+                        : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      fontSize: isMobile ? 14 : 16,
+                    }}
+                    icon={<UserOutlined />}
+                  />
+                </Space>
+              </Dropdown>
+            </Space>
+          </Header>
+          <Content
+            style={{
+              margin: contentMargin,
+              minHeight: `calc(100vh - ${isMobile ? 56 : 64}px - ${contentMargin * 2}px)`,
+            }}
+          >
+            <Outlet />
+          </Content>
+        </Layout>
       </Layout>
     </SessionExpiryGuard>
   );

@@ -166,6 +166,8 @@ const CostingForm = () => {
         // Fetch buyers
         const buyers = await getBuyers();
         setBuyerOptions((buyers || []).map((b) => ({ value: b.id, label: b.name })));
+        // Buyer dropdown is ready — clear its spinner immediately
+        setOptionsLoading(false);
 
         // Fetch categories to find Fabric, Local Trims, Imported Trims
         const catRes = await getAllCategories();
@@ -182,40 +184,45 @@ const CostingForm = () => {
             })
           : null;
 
-        // Fetch items for each category
-        if (fabricCat) {
-          const fabRes = await searchItems({ categoryId: fabricCat.id, size: 200 });
-          const fabItems = fabRes.data?.content || fabRes.data || [];
-          setFabricItemsRaw(fabItems);
-          setFabricItemOptions(fabItems.map((item) => ({ value: item.id, label: item.itemName })));
-        }
+        // Resolve effective categories
         const effectiveLocalTrimCat = localTrimCat || generalTrimCat;
-        if (effectiveLocalTrimCat) {
-          const ltRes = await searchItems({ categoryId: effectiveLocalTrimCat.id, size: 200 });
-          const ltItems = ltRes.data?.content || ltRes.data || [];
-          setLocalTrimOptions(ltItems.map((item) => ({ value: item.id, label: item.itemName })));
-        }
         const effectiveImportedTrimCat = importedTrimCat || generalTrimCat;
-        if (effectiveImportedTrimCat) {
-          const itRes = await searchItems({ categoryId: effectiveImportedTrimCat.id, size: 200 });
-          const itItems = itRes.data?.content || itRes.data || [];
-          setImportedTrimOptions(itItems.map((item) => ({ value: item.id, label: item.itemName })));
-        }
-
-        // Fetch Manufacturing items
         const mfgCat = categories.find((c) => c.name?.toLowerCase().includes('manufactur'));
-        if (mfgCat) {
-          const mfgRes = await searchItems({ categoryId: mfgCat.id, size: 200 });
-          const mfgItems = mfgRes.data?.content || mfgRes.data || [];
-          setManufacturingOptions(mfgItems.map((item) => ({ value: item.id, label: item.itemName })));
-        }
-
-        // Fetch Overhead items
         const ovhCat = categories.find((c) => c.name?.toLowerCase().includes('overhead'));
-        if (ovhCat) {
-          const ovhRes = await searchItems({ categoryId: ovhCat.id, size: 200 });
-          const ovhItems = ovhRes.data?.content || ovhRes.data || [];
-          setOverheadOptions(ovhItems.map((item) => ({ value: item.id, label: item.itemName })));
+
+        // Collect all unique category IDs and fetch items in a single API call
+        const catMap = {};
+        if (fabricCat) catMap.fabric = fabricCat.id;
+        if (effectiveLocalTrimCat) catMap.localTrim = effectiveLocalTrimCat.id;
+        if (effectiveImportedTrimCat) catMap.importedTrim = effectiveImportedTrimCat.id;
+        if (mfgCat) catMap.manufacturing = mfgCat.id;
+        if (ovhCat) catMap.overhead = ovhCat.id;
+
+        const uniqueCatIds = [...new Set(Object.values(catMap))];
+
+        if (uniqueCatIds.length > 0) {
+          const res = await searchItems({ categoryIds: uniqueCatIds, size: 1000 });
+          const allItems = res.data?.content || res.data || [];
+
+          // Group items by categoryId
+          const byCat = {};
+          for (const item of allItems) {
+            const cid = item.categoryId;
+            if (!byCat[cid]) byCat[cid] = [];
+            byCat[cid].push(item);
+          }
+
+          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName }));
+
+          if (catMap.fabric) {
+            const fabItems = byCat[catMap.fabric] || [];
+            setFabricItemsRaw(fabItems);
+            setFabricItemOptions(toOptions(fabItems));
+          }
+          if (catMap.localTrim) setLocalTrimOptions(toOptions(byCat[catMap.localTrim]));
+          if (catMap.importedTrim) setImportedTrimOptions(toOptions(byCat[catMap.importedTrim]));
+          if (catMap.manufacturing) setManufacturingOptions(toOptions(byCat[catMap.manufacturing]));
+          if (catMap.overhead) setOverheadOptions(toOptions(byCat[catMap.overhead]));
         }
       } catch {
         // Fallback to empty arrays — dropdowns will be empty
@@ -255,27 +262,39 @@ const CostingForm = () => {
     }
   }, [id]);
 
-  // Update today's rate when currencies change
+  // Fetch exchange rates when currencies change
+  // Combines quote→local rate and USD→INR rate into a single effect to avoid duplicate API calls
   useEffect(() => {
-    if (quoteCurrency && quoteCurrency !== currency) {
-      getTodaysRate(quoteCurrency, currency).then((rate) => {
+    let cancelled = false;
+
+    const fetchRates = async () => {
+      const needsQuoteRate = quoteCurrency && quoteCurrency !== currency;
+      const isQuoteUsdToInr = quoteCurrency === 'USD' && currency === 'INR';
+
+      if (needsQuoteRate) {
+        const rate = await getTodaysRate(quoteCurrency, currency);
+        if (cancelled) return;
         setTodaysRate(rate);
-        // Auto-set actual rate from live rate on new sheets (not edit)
         if (!isEdit && rate > 1) {
           setActualRate(Math.round(rate * 100) / 100);
         }
-      });
-    } else {
-      setTodaysRate(1);
-    }
-  }, [currency, quoteCurrency]);
+        // Reuse the same rate if it's already USD→INR
+        if (isQuoteUsdToInr) {
+          setUsdToInrRate(rate);
+        } else {
+          const usdRate = await getTodaysRate('USD', 'INR');
+          if (!cancelled) setUsdToInrRate(usdRate);
+        }
+      } else {
+        setTodaysRate(1);
+        const usdRate = await getTodaysRate('USD', 'INR');
+        if (!cancelled) setUsdToInrRate(usdRate);
+      }
+    };
 
-  // Fetch USD-INR rate for USD Final Price display
-  useEffect(() => {
-    getTodaysRate('USD', 'INR').then((rate) => {
-      setUsdToInrRate(rate);
-    });
-  }, []);
+    fetchRates();
+    return () => { cancelled = true; };
+  }, [currency, quoteCurrency]);
 
   const loadCostSheet = async () => {
     setLoading(true);
@@ -2332,6 +2351,62 @@ const CostingForm = () => {
     },
   ];
 
+  // Skeleton loading state for edit mode
+  if (loading && isEdit) {
+    return (
+      <div className="animate-fade-in-up">
+        <div className="page-header">
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 180 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 140 }} />
+          </Space>
+        </div>
+        {/* General Details skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 200, marginBottom: 16 }} />
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Col xs={12} md={8} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 70, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        {/* Fabric section skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 4 }} />
+        </Card>
+        {/* Trims section skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 140, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 3 }} />
+        </Card>
+        {/* Manufacturing & overhead skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 3 }} />
+        </Card>
+        {/* Summary skeleton */}
+        <Card style={{ marginBottom: 80 }}>
+          <Skeleton.Input active style={{ width: 120, marginBottom: 16 }} />
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4].map((i) => (
+              <Col xs={12} md={6} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-in-up">
       <div className="page-header">
@@ -2339,7 +2414,6 @@ const CostingForm = () => {
           <Button
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate('/costing/list')}
-            type="text"
           />
           <h1>{isEdit ? 'Edit Cost Sheet' : 'Create Cost Sheet'}</h1>
           {costingId && (

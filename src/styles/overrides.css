@@ -1103,3 +1103,110 @@ textarea.ant-input:active {
   border-color: rgba(99, 102, 241, 0.3) !important;
   color: #818cf8 !important;
 }
+
+/* ============================================================
+   RESPONSIVE OVERRIDES
+   ============================================================ */
+
+/* Mobile drawer sidebar — match desktop sidebar styling */
+.ant-drawer .ant-menu-dark .ant-menu-item {
+  border-radius: var(--radius-md);
+  margin: 4px 8px !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-item-selected {
+  background: var(--gradient-primary) !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-sub {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-submenu-title {
+  border-radius: var(--radius-md);
+  margin: 4px 8px !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ---- Master form header inside Drawer — stack on mobile ---- */
+@media (max-width: 992px) {
+  /* Master form header — stack title above buttons on mobile/tablet */
+  .master-form-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    padding: 12px 16px !important;
+  }
+
+  .master-form-header h2 {
+    font-size: 16px !important;
+    margin: 0 !important;
+  }
+
+  .master-form-header > .ant-space,
+  .master-form-header > div > .ant-space {
+    width: 100%;
+    flex-wrap: wrap !important;
+  }
+
+  .master-form-header .ant-space .ant-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* Tablet — slightly tighter form spacing */
+@media (max-width: 992px) {
+  .ant-form-item-label > label {
+    font-size: 13px !important;
+  }
+
+  /* Tighter dropdown menus */
+  .ant-dropdown .ant-dropdown-menu {
+    min-width: 180px !important;
+  }
+}
+
+/* Mobile — form and table layout */
+@media (max-width: 576px) {
+  /* Ant Design Form: vertical layout on mobile */
+  .ant-form-item .ant-form-item-label {
+    padding-bottom: 4px !important;
+  }
+
+  /* Descriptions — force vertical layout */
+  .ant-descriptions-row {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .ant-descriptions-item {
+    padding-bottom: 8px !important;
+  }
+
+  /* Popconfirm — wider on mobile */
+  .ant-popover {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Steps — vertical on mobile */
+  .ant-steps-horizontal:not(.ant-steps-label-vertical) {
+    flex-direction: column !important;
+  }
+
+  .ant-steps-horizontal:not(.ant-steps-label-vertical) .ant-steps-item {
+    padding-left: 0 !important;
+  }
+
+  /* User dropdown menu */
+  .ant-dropdown .ant-dropdown-menu {
+    min-width: 200px !important;
+  }
+}

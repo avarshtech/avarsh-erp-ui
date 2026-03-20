@@ -12,6 +12,7 @@ import {
   Divider,
   Descriptions,
   Statistic,
+  Skeleton,
   message,
   Tooltip,
 } from 'antd';
@@ -121,8 +122,58 @@ const CostingView = () => {
 
   if (loading || !data) {
     return (
-      <div style={{ textAlign: 'center', padding: 100 }}>
-        <Text type="secondary">Loading cost sheet...</Text>
+      <div className="animate-fade-in-up">
+        <div className="page-header">
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 160 }} />
+            <Skeleton.Button active size="small" style={{ width: 80 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 80 }} />
+            <Skeleton.Button active style={{ width: 100 }} />
+            <Skeleton.Button active style={{ width: 100 }} />
+          </Space>
+        </div>
+        {/* General Details skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 140, marginBottom: 16 }} />
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Col xs={12} md={8} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 70, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        {/* Fabric section skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 4 }} />
+        </Card>
+        {/* Trims section skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 3 }} />
+        </Card>
+        {/* Manufacturing skeleton */}
+        <Card style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 170, marginBottom: 16 }} />
+          <Skeleton active paragraph={{ rows: 3 }} />
+        </Card>
+        {/* Summary skeleton */}
+        <Card>
+          <Skeleton.Input active style={{ width: 120, marginBottom: 16 }} />
+          <Row gutter={[16, 16]}>
+            {[1, 2, 3, 4].map((i) => (
+              <Col xs={12} md={6} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 90, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
       </div>
     );
   }
@@ -462,7 +513,7 @@ const CostingView = () => {
     <div className="animate-fade-in-up">
       <div className="page-header">
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} type="text" />
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} />
           <h1>View Cost Sheet</h1>
           <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
             {getStatusLabel(data.status)}

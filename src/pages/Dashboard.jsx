@@ -209,7 +209,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {statsData.map((stat, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
             <Card hoverable>
@@ -262,6 +262,7 @@ const Dashboard = () => {
               dataSource={recentOrders}
               pagination={false}
               size="middle"
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
@@ -310,6 +311,7 @@ const Dashboard = () => {
               dataSource={pendingPOs}
               pagination={false}
               size="middle"
+              scroll={{ x: 'max-content' }}
             />
           </Card>
         </Col>
