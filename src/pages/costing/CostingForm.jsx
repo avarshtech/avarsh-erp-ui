@@ -75,8 +75,6 @@ import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
 import TechpackImportModal from './TechpackImportModal';
 import ConsumptionCalcModal from './ConsumptionCalcModal';
-import useIsTablet from '../../hooks/useIsTablet';
-import CostingFormTablet from './CostingFormTablet';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
@@ -87,7 +85,7 @@ const CostingForm = () => {
   const [form] = Form.useForm();
   const { isDarkMode } = useTheme();
   const isEdit = Boolean(id);
-  const isTablet = useIsTablet();
+
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -769,6 +767,17 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+  const duplicateManufacturingRow = (key) => {
+    setManufacturingRows((prev) => {
+      const idx = prev.findIndex((r) => r.key === key);
+      if (idx === -1) return prev;
+      const clone = { ...prev[idx], key: `m_${Date.now()}` };
+      const next = [...prev];
+      next.splice(idx + 1, 0, clone);
+      return next;
+    });
+    setIsDirty(true);
+  };
 
   const updateOverheadRow = (key, field, value) => {
     setOverheadRows((prev) =>
@@ -2323,140 +2332,6 @@ const CostingForm = () => {
     },
   ];
 
-  // ==================== TABLET LAYOUT ====================
-  if (isTablet) {
-    return (
-      <>
-        <Form
-          form={form}
-          layout="vertical"
-          initialValues={{ currency: 'INR', quoteCurrency: 'USD', date: dayjs() }}
-        >
-          <CostingFormTablet
-            form={form}
-            navigate={navigate}
-            isEdit={isEdit}
-            loading={loading}
-            saving={saving}
-            costingId={costingId}
-            currency={currency}
-            setCurrency={setCurrency}
-            quoteCurrency={quoteCurrency}
-            setQuoteCurrency={setQuoteCurrency}
-            actualRate={actualRate}
-            setActualRate={setActualRate}
-            todaysRate={todaysRate}
-            buyerOptions={buyerOptions}
-            styleOptions={styleOptions}
-            sizeOptions={sizeOptions}
-            fabricItemOptions={fabricItemOptions}
-            localTrimOptions={localTrimOptions}
-            importedTrimOptions={importedTrimOptions}
-            effectiveMfgOptions={effectiveMfgOptions}
-            effectiveOvhOptions={effectiveOvhOptions}
-            optionsLoading={optionsLoading}
-            stylesLoading={stylesLoading}
-            fabricRows={fabricRows}
-            localTrims={localTrims}
-            importedTrims={importedTrims}
-            manufacturingRows={manufacturingRows}
-            overheadRows={overheadRows}
-            addFabricRow={addFabricRow}
-            updateFabricRow={updateFabricRow}
-            deleteFabricRow={deleteFabricRow}
-            duplicateFabricRow={duplicateFabricRow}
-            handleFabricItemSelect={handleFabricItemSelect}
-            openKnitsModal={openKnitsModal}
-            addLocalTrim={addLocalTrim}
-            updateLocalTrim={updateLocalTrim}
-            deleteLocalTrim={deleteLocalTrim}
-            duplicateLocalTrim={duplicateLocalTrim}
-            addImportedTrim={addImportedTrim}
-            updateImportedTrim={updateImportedTrim}
-            deleteImportedTrim={deleteImportedTrim}
-            duplicateImportedTrim={duplicateImportedTrim}
-            addManufacturingRow={addManufacturingRow}
-            updateManufacturingRow={updateManufacturingRow}
-            deleteManufacturingRow={deleteManufacturingRow}
-            duplicateManufacturingRow={duplicateManufacturingRow}
-            addOverheadRow={addOverheadRow}
-            updateOverheadRow={updateOverheadRow}
-            deleteOverheadRow={deleteOverheadRow}
-            duplicateOverheadRow={duplicateOverheadRow}
-            handleBuyerChange={handleBuyerChange}
-            handleStyleChange={handleStyleChange}
-            totalFabricCost={totalFabricCost}
-            totalLocalTrimsCost={totalLocalTrimsCost}
-            totalImportedTrimsCostUsd={totalImportedTrimsCostUsd}
-            totalAccessoriesCost={totalAccessoriesCost}
-            totalManufacturingCost={totalManufacturingCost}
-            totalMarkupCost={totalMarkupCost}
-            totalMakingPrice={totalMakingPrice}
-            totalOverheadCharges={totalOverheadCharges}
-            totalPrice={totalPrice}
-            finalPrice={finalPrice}
-            finalPriceUsd={finalPriceUsd}
-            agentCommissionPct={agentCommissionPct}
-            setAgentCommissionPct={setAgentCommissionPct}
-            profitPct={profitPct}
-            setProfitPct={setProfitPct}
-            targetPrice={targetPrice}
-            setTargetPrice={setTargetPrice}
-            perSizeSummaries={perSizeSummaries}
-            perSizeOverrides={perSizeOverrides}
-            setPerSizeOverrides={setPerSizeOverrides}
-            syncPercentages={syncPercentages}
-            setSyncPercentages={setSyncPercentages}
-            uploadProps={uploadProps}
-            handleSaveDraft={handleSaveDraft}
-            handleSubmit={handleSubmit}
-            handlePrint={handlePrint}
-            printing={printing}
-          />
-        </Form>
-        <KnitsConsumptionModal
-          open={knitsModalOpen}
-          onApply={handleKnitsApply}
-          onCancel={() => setKnitsModalOpen(false)}
-          initialParts={knitsParts}
-        />
-      </>
-    );
-  }
-
-  // ==================== SKELETON LOADING ====================
-  if (loading && isEdit) {
-    return (
-      <div className="animate-fade-in-up">
-        <div className="page-header">
-          <Space>
-            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
-            <Skeleton.Input active style={{ width: 180 }} />
-            <Skeleton.Input active size="small" style={{ width: 100 }} />
-          </Space>
-          <Space>
-            <Skeleton.Button active style={{ width: 140 }} />
-          </Space>
-        </div>
-        {['General Information', 'Fabric', 'Trims', 'Summary'].map((section) => (
-          <Card key={section} style={{ marginBottom: 16 }}>
-            <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
-            <Row gutter={[24, 16]}>
-              {[1, 2, 3, 4].map((i) => (
-                <Col xs={24} md={6} key={i}>
-                  <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
-                  <Skeleton.Input active block />
-                </Col>
-              ))}
-            </Row>
-            <Skeleton active paragraph={{ rows: 3 }} style={{ marginTop: 16 }} />
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  // ==================== DESKTOP LAYOUT ====================
   return (
     <div className="animate-fade-in-up">
       <div className="page-header">
