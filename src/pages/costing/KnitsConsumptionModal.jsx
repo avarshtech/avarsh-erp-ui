@@ -202,6 +202,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
       open={open}
       onCancel={onCancel}
       width={750}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       footer={
         <Space>
           <Button onClick={onCancel}>Cancel</Button>

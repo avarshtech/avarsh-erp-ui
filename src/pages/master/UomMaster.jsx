@@ -55,7 +55,7 @@ const UomMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ decimalPrecision: 2 });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -68,7 +68,7 @@ const UomMaster = ({ onDirtyChange }) => {
     setIsEditing(true);
     form.setFieldsValue(record);
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

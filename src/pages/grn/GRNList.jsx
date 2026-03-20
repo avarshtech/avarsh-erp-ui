@@ -70,7 +70,7 @@ const GRNList = () => {
         <Table columns={columns} dataSource={grnData} loading={loading} scroll={{ x: 1300 }} pagination={{ pageSize: 10, showSizeChanger: true }} rowSelection={{ type: 'checkbox' }} />
       </Card>
 
-      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal({ open: false, record: null })} footer={[<Button key="close" onClick={() => setViewModal({ open: false, record: null })}>Close</Button>]} width={500}>
+      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal(prev => ({ ...prev, open: false }))} afterClose={() => setViewModal({ open: false, record: null })} footer={[<Button key="close" onClick={() => setViewModal(prev => ({ ...prev, open: false }))}>Close</Button>]} width={500} styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}>
         {viewModal.record && (
           <Row gutter={[16, 16]} style={{ padding: 16 }}>
             <Col span={12}><Text type="secondary">GRN Date:</Text><br /><Text strong>{viewModal.record.grnDate}</Text></Col>

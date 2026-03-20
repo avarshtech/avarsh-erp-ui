@@ -53,7 +53,6 @@ const OrderList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [navigatingId, setNavigatingId] = useState(null);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -281,11 +280,7 @@ const OrderList = () => {
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
-                loading={navigatingId === record.id}
-                onClick={() => {
-                  setNavigatingId(record.id);
-                  navigate(`/orders/edit/${record.id}`, { state: { orderData: record } });
-                }}
+                onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
                 style={{ color: '#52c41a' }}
               />
             </Tooltip>

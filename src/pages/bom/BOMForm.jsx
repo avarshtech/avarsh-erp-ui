@@ -12,6 +12,7 @@ import {
   Typography,
   message,
   Spin,
+  Skeleton,
   Popconfirm,
   AutoComplete,
   Tooltip,
@@ -248,7 +249,7 @@ const BOMForm = () => {
   const { clearDirty } = useUnsavedChanges(isDirty);
 
   // ── Page-level state ─────────────────────────────────────────────
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
@@ -457,7 +458,8 @@ const BOMForm = () => {
         message.error('Failed to load BOM');
         navigate('/bom/list');
       } finally {
-        setLoading(false);
+        // Defer so React paints the form with populated values before hiding the skeleton
+        requestAnimationFrame(() => setLoading(false));
       }
     };
     loadBom();
@@ -2020,10 +2022,33 @@ const BOMForm = () => {
 
   // ==================== RENDER ====================
 
-  if (loading && !lines.length) {
+  if (loading && isEdit) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 36 }} spin />} tip="Loading BOM..." />
+      <div className="animate-fade-in-up">
+        <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
+          <Space align="center">
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 160 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 100 }} />
+            <Skeleton.Button active style={{ width: 120 }} />
+          </Space>
+        </div>
+        <Card style={{ marginBottom: 24 }}>
+          <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
+          <Row gutter={[24, 16]}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Col xs={24} md={8} lg={4} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 60, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        <Card>
+          <Skeleton active paragraph={{ rows: 8 }} />
+        </Card>
       </div>
     );
   }
@@ -2399,10 +2424,12 @@ const BOMForm = () => {
       <Modal
         title="Select Buyer PO"
         open={buyerPoPickerOpen}
-        onCancel={() => { setBuyerPoPickerOpen(false); setPendingProcessData(null); }}
+        onCancel={() => setBuyerPoPickerOpen(false)}
+        afterClose={() => setPendingProcessData(null)}
         footer={null}
         width={400}
         destroyOnClose
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
           This color exists in multiple Buyer POs. Select which PO to use for quantity calculation.
@@ -2434,6 +2461,7 @@ const BOMForm = () => {
         footer={null}
         width={560}
         destroyOnClose
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         {(() => {
           const line = lines.find((l) => l.key === matchByLineKey);

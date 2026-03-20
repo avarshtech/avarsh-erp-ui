@@ -327,7 +327,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ active: true, sizes: [] });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 100);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -346,7 +346,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
       active:   record.active !== false,
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 100);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {
@@ -522,7 +522,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
                       if (defaults) {
                         skipDirty.current = true;
                         form.setFieldsValue({ sizes: defaults });
-                        setTimeout(() => { skipDirty.current = false; }, 100);
+                        setTimeout(() => { skipDirty.current = false; }, 300);
                         message.info('Sizes updated to industry standard for selected category & region.');
                       }
                     }

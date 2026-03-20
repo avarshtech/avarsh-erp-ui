@@ -67,7 +67,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ isActive: true, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -80,7 +80,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
       isActive: record.isActive !== false,
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

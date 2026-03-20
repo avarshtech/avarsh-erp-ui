@@ -841,11 +841,16 @@ const ItemMaster = () => {
 
   // Close Modal
   const doCloseModal = () => {
+    // Only close the modal — cleanup happens in afterClose so the
+    // user doesn't see form values disappear during the close animation.
+    setModalOpen(false);
+  };
+
+  const handleAfterClose = () => {
     // Clean up blob URLs to prevent memory leaks
     variants.forEach((v) => {
       if (v._imagePreviewUrl) URL.revokeObjectURL(v._imagePreviewUrl);
     });
-    setModalOpen(false);
     setSelectedItem(null);
     setSelectedItemId(null);
     form.resetFields();
@@ -1522,12 +1527,24 @@ const ItemMaster = () => {
         title={isEditMode ? `Edit Item - ${selectedItem?.itemCode || ''}` : 'Add Item'}
         open={modalOpen}
         onCancel={handleModalClose}
+        afterClose={handleAfterClose}
         width={'80vw'}
-          footer={null}
-          destroyOnHidden
-          styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 } }}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+            <Button onClick={handleModalClose} icon={<CloseOutlined />}>
+              Cancel
+            </Button>
+            {(isEditMode ? canUpdate : canAdd) && (
+              <Button type="primary" onClick={() => form.submit()} loading={submitting} disabled={isEditMode && !unsavedChanges} icon={<SaveOutlined />}>
+                {isEditMode ? 'Update' : 'Save'}
+              </Button>
+            )}
+          </div>
+        }
+        destroyOnHidden
+        centered
+        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 } }}
       >
-        <Spin spinning={metaDataLoading}>
           <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
@@ -1539,6 +1556,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
+                    loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     options={formCategories.map((cat) => ({ value: String(cat.id ?? ''), label: String(cat.name ?? '') }))}
                   />
@@ -1553,6 +1571,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Subcategory"
                     onChange={handleFormSubcategoryChange}
+                    loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     disabled={!isEditMode && !form.getFieldValue('categoryId')}
                     options={formSubcategories.map((sc) => ({ value: String(sc.id ?? ''), label: String(sc.name ?? '') }))}
@@ -1571,6 +1590,7 @@ const ItemMaster = () => {
                   <Select
                     placeholder="Select Item Type"
                     onChange={handleFormItemTypeChange}
+                    loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
                     options={formItemTypes.map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
@@ -1909,21 +1929,7 @@ const ItemMaster = () => {
               </div>
             )}
 
-            <Divider />
-
-            {/* Form Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <Button onClick={handleModalClose} icon={<CloseOutlined />}>
-                Cancel
-              </Button>
-              {(isEditMode ? canUpdate : canAdd) && (
-                <Button type="primary" htmlType="submit" loading={submitting} disabled={isEditMode && !unsavedChanges} icon={<SaveOutlined />}>
-                  {isEditMode ? 'Update' : 'Save'}
-                </Button>
-              )}
-            </div>
           </Form>
-        </Spin>
       </Modal>
       {/* View Drawer */}
       <Drawer

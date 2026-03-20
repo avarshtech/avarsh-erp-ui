@@ -101,7 +101,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
     form.resetFields();
     setDescription('');
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 100);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -116,7 +116,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
     // Set the description (HTML) as-is from the API
     setDescription(record.description || '');
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

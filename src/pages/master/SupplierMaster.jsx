@@ -288,6 +288,9 @@ const SupplierMaster = () => {
 
   const doCloseSupplierModal = () => {
     setModalVisible(false);
+  };
+
+  const handleSupplierAfterClose = () => {
     setEditingSupplier(null);
     form.resetFields();
     setSupplierUnsaved(false);
@@ -615,9 +618,10 @@ const SupplierMaster = () => {
         title={editingSupplier ? 'Update Supplier' : 'Add Supplier'}
         open={modalVisible}
         onCancel={() => handleSupplierModalClose()}
+        afterClose={handleSupplierAfterClose}
         centered
         width={960}
-        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: 16 } }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingRight: 16 } }}
         footer={[
           <Button
             key="cancel"

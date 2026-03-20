@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Modal, Tag, Space, Typography, Button, Spin, Card, Row, Col, Tooltip, message,
+  Modal, Tag, Space, Typography, Button, Spin, Skeleton, Card, Row, Col, Tooltip, message,
 } from 'antd';
 import {
   FileTextOutlined, CheckCircleOutlined, AppstoreOutlined, ScissorOutlined, DownloadOutlined,
@@ -251,11 +251,20 @@ const BOMView = ({ open, bomData, onClose }) => {
       onCancel={onClose}
       width={1000}
       centered
-      styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: '20px 24px' } }}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '20px 24px' } }}
       footer={<Button onClick={onClose}>Close</Button>}
     >
       {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}><Spin tip="Loading BOM details..." /></div>
+        <div style={{ padding: '8px 0' }}>
+          <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Col xs={12} sm={8} md={4} key={i}>
+                <Skeleton.Input active size="small" style={{ width: '100%', height: 48 }} block />
+              </Col>
+            ))}
+          </Row>
+          <Skeleton active paragraph={{ rows: 8 }} />
+        </div>
       ) : (
         <>
           {/* General Info Cards */}

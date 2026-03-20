@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Card, Row, Col, Typography, Table, Button, Space, Tag, Input, message,
-  Statistic, Avatar, DatePicker, Select, Tooltip, Empty, Spin, Descriptions
+  Statistic, Avatar, DatePicker, Select, Tooltip, Empty, Spin, Skeleton, Descriptions
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, SafetyOutlined, LoginOutlined,
@@ -210,9 +210,16 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <Spin spinning={loading}>
         <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          {stats.map((stat, i) => (
+          {loading ? (
+            [1, 2, 3, 4].map((i) => (
+              <Col xs={12} sm={6} key={i}>
+                <Card>
+                  <Skeleton active paragraph={{ rows: 2 }} />
+                </Card>
+              </Col>
+            ))
+          ) : stats.map((stat, i) => (
             <Col xs={12} sm={6} key={i}>
               <Card hoverable style={{ borderTop: `3px solid ${stat.color}` }}>
                 <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -236,7 +243,6 @@ const AdminDashboard = () => {
             </Col>
           ))}
         </Row>
-      </Spin>
 
       {/* Activity Logs */}
       <Card

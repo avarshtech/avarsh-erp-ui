@@ -68,7 +68,7 @@ const VariantMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ dataType: 'string', values: [] });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -85,7 +85,7 @@ const VariantMaster = ({ onDirtyChange }) => {
       values: record.values || [],
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {
@@ -216,11 +216,12 @@ const VariantMaster = ({ onDirtyChange }) => {
                 </Button>
                 {!isReadOnly && (
                   <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>
-                    <Button 
-                      type="primary" 
-                      onClick={() => form.submit()} 
+                    <Button
+                      type="primary"
+                      onClick={() => form.submit()}
                       icon={<SaveOutlined />}
                       loading={submitting}
+                      disabled={selectedId && !unsavedChanges}
                     >
                       Save Changes
                     </Button>

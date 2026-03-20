@@ -16,6 +16,7 @@ import {
   Popconfirm,
   Divider,
   Spin,
+  Skeleton,
   Modal,
   Tag,
   Descriptions,
@@ -192,6 +193,7 @@ const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
       footer={null}
       closable={false}
       maskClosable={false}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
         This item has {variants.length} variants. Please select one:
@@ -276,7 +278,7 @@ const POForm = () => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(!!id);
 
   // Master data
   const [suppliersList, setSuppliersList] = useState([]);
@@ -543,7 +545,8 @@ const POForm = () => {
       message.error('Failed to load purchase order');
       navigate('/purchase-orders/list');
     } finally {
-      setPageLoading(false);
+      // Defer so React paints the form with populated values before hiding the skeleton
+      requestAnimationFrame(() => setPageLoading(false));
     }
   };
 
@@ -1542,8 +1545,40 @@ const POForm = () => {
 
   if (pageLoading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" />
+      <div className="animate-fade-in-up">
+        <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 200 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 120 }} />
+            <Skeleton.Button active style={{ width: 140 }} />
+          </Space>
+        </div>
+        <Row gutter={24}>
+          <Col xs={24} lg={16}>
+            <Card style={{ marginBottom: 24 }}>
+              <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+              <Row gutter={24}>
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Col xs={24} md={12} key={i} style={{ marginBottom: 16 }}>
+                    <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                    <Skeleton.Input active block />
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+          </Col>
+          <Col xs={24} lg={8}>
+            <Card style={{ marginBottom: 24 }}>
+              <Skeleton active paragraph={{ rows: 4 }} />
+            </Card>
+          </Col>
+        </Row>
+        <Card>
+          <Skeleton active paragraph={{ rows: 5 }} />
+        </Card>
       </div>
     );
   }
@@ -1902,7 +1937,7 @@ const POForm = () => {
         onCancel={() => setPreviewVisible(false)}
         width={1100}
         style={{ top: 20 }}
-        styles={{ body: { maxHeight: 'calc(90vh - 160px)', overflowY: 'auto', padding: '24px' } }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '24px' } }}
         footer={[
           <Button key="back" onClick={() => setPreviewVisible(false)}>
             Go Back & Edit

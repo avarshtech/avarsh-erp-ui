@@ -79,11 +79,14 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
   };
 
   const handleClose = () => {
+    onClose();
+  };
+
+  const handleAfterClose = () => {
     setStep('upload');
     setResult(null);
     setMeasurementFile(null);
     setTechpackFile(null);
-    onClose();
   };
 
   // ── Derived values ───────────────────────────────────────────────────────────
@@ -180,6 +183,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
     <Modal
       open={open}
       onCancel={handleClose}
+      afterClose={handleAfterClose}
       title={
         <Space>
           <ThunderboltOutlined style={{ color: '#faad14' }} />
@@ -187,6 +191,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
         </Space>
       }
       width={860}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       footer={
         step === 'result' ? (
           <Space style={{ width: '100%', justifyContent: 'space-between' }}>

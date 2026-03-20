@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, App as AntdApp } from 'antd';
+import { ConfigProvider, App as AntdApp, Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
@@ -56,6 +57,9 @@ const useModalScrollReset = () => {
     return () => observer.disconnect();
   }, []);
 };
+
+// Set global Spin indicator to LoadingOutlined for all Spin components
+Spin.setDefaultIndicator(<LoadingOutlined style={{ fontSize: 24 }} spin />);
 
 // Inner component that uses theme context
 const ThemedApp = () => {

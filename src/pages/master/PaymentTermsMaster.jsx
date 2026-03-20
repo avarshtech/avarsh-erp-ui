@@ -73,7 +73,7 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ active: true });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -89,7 +89,7 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
       active: record.active !== false,
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

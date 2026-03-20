@@ -41,7 +41,6 @@ const BOMList = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
-  const [navigatingId, setNavigatingId] = useState(null);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -233,11 +232,7 @@ const BOMList = () => {
                 type="text"
                 size="small"
                 icon={<EditOutlined />}
-                loading={navigatingId === record.id}
-                onClick={() => {
-                  setNavigatingId(record.id);
-                  navigate(`/bom/edit/${record.id}`, { state: { bomData: record } });
-                }}
+                onClick={() => navigate(`/bom/edit/${record.id}`, { state: { bomData: record } })}
                 style={{ color: '#52c41a' }}
               />
             </Tooltip>

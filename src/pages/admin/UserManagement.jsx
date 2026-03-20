@@ -151,9 +151,6 @@ const UserManagement = () => {
         message.success('User created successfully');
       }
       setModalVisible(false);
-      form.resetFields();
-      setFormDirty(false);
-      initialFormValuesRef.current = null;
       fetchUsers();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save user');
@@ -171,18 +168,17 @@ const UserManagement = () => {
         okText: 'Discard',
         okType: 'danger',
         cancelText: 'Keep Editing',
-        onOk: () => {
-          setModalVisible(false);
-          form.resetFields();
-          setFormDirty(false);
-          initialFormValuesRef.current = null;
-        },
+        onOk: () => setModalVisible(false),
       });
     } else {
       setModalVisible(false);
-      form.resetFields();
-      initialFormValuesRef.current = null;
     }
+  };
+
+  const handleModalAfterClose = () => {
+    form.resetFields();
+    setFormDirty(false);
+    initialFormValuesRef.current = null;
   };
 
   const handleDelete = async (userId) => {
@@ -302,7 +298,22 @@ const UserManagement = () => {
       </Card>
 
       {/* Add/Edit Modal */}
-      <Modal title={editingUser ? 'Edit User' : 'Add New User'} open={modalVisible} onCancel={handleModalClose} footer={null} width={600}>
+      <Modal
+        title={editingUser ? 'Edit User' : 'Add New User'}
+        open={modalVisible}
+        onCancel={handleModalClose}
+        afterClose={handleModalAfterClose}
+        width={600}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+        footer={
+          <div style={{ textAlign: 'right' }}>
+            <Space>
+              <Button onClick={handleModalClose}>Cancel</Button>
+              <Button type="primary" onClick={() => form.submit()} disabled={editingUser && !formDirty} loading={saving}>{editingUser ? 'Update' : 'Create'}</Button>
+            </Space>
+          </div>
+        }
+      >
         <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={handleValuesChange} initialValues={{ isActive: true }}>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="name" label="Full Name" rules={[{ required: true, message: 'Please enter full name' }]}><Input placeholder="Enter full name" /></Form.Item></Col>
@@ -317,12 +328,6 @@ const UserManagement = () => {
             <Col span={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
             <Col span={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
           </Row>
-          <div style={{ textAlign: 'right', marginTop: 24 }}>
-            <Space>
-              <Button onClick={handleModalClose}>Cancel</Button>
-              <Button type="primary" htmlType="submit" disabled={editingUser && !formDirty} loading={saving}>{editingUser ? 'Update' : 'Create'}</Button>
-            </Space>
-          </div>
         </Form>
       </Modal>
 
@@ -330,8 +335,18 @@ const UserManagement = () => {
       <Modal
         title={<Space><LockOutlined style={{ color: '#faad14' }} /><span>Reset Password - {resetPwdUserName}</span></Space>}
         open={resetPwdModalVisible}
-        onCancel={() => { setResetPwdModalVisible(false); resetPwdForm.resetFields(); }}
-        footer={null} width={450} destroyOnHidden
+        onCancel={() => setResetPwdModalVisible(false)}
+        afterClose={() => resetPwdForm.resetFields()}
+        width={450}
+        destroyOnHidden
+        footer={
+          <div style={{ textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => setResetPwdModalVisible(false)}>Cancel</Button>
+              <Button type="primary" onClick={() => resetPwdForm.submit()} loading={resettingPwd} icon={<KeyOutlined />}>Reset Password</Button>
+            </Space>
+          </div>
+        }
       >
         <Form form={resetPwdForm} layout="vertical" onFinish={handleAdminResetPwd} style={{ marginTop: 16 }}>
           <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Please enter new password' }, { min: 6, message: 'Password must be at least 6 characters' }]}>
@@ -340,12 +355,6 @@ const UserManagement = () => {
           <Form.Item name="confirmPassword" label="Confirm Password" dependencies={['newPassword']} rules={[{ required: true, message: 'Please confirm the password' }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('newPassword') === value) return Promise.resolve(); return Promise.reject(new Error('Passwords do not match')); } })]}>
             <Input.Password placeholder="Confirm new password" prefix={<LockOutlined />} />
           </Form.Item>
-          <div style={{ textAlign: 'right', marginTop: 24 }}>
-            <Space>
-              <Button onClick={() => { setResetPwdModalVisible(false); resetPwdForm.resetFields(); }}>Cancel</Button>
-              <Button type="primary" htmlType="submit" loading={resettingPwd} icon={<KeyOutlined />}>Reset Password</Button>
-            </Space>
-          </div>
         </Form>
       </Modal>
 

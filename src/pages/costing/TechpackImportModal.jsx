@@ -162,13 +162,15 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
   return (
     <Modal
       open={open}
-      onCancel={() => { form.resetFields(); onClose(); }}
+      onCancel={onClose}
+      afterClose={() => form.resetFields()}
       title={<Space><PlusOutlined /> Quick Create Item</Space>}
       width={540}
       onOk={handleSave}
       okText="Create Item"
       okButtonProps={{ loading: saving }}
       destroyOnClose
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       <Alert
         type="info" showIcon
@@ -442,6 +444,10 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
   };
 
   const handleClose = () => {
+    onClose();
+  };
+
+  const handleAfterClose = () => {
     setStep('upload');
     setExtracted(null);
     setBuyerCreateOpen(false);
@@ -451,7 +457,6 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
     setOverrides({ fabric: {}, localTrim: {}, importedTrim: {}, manufacturing: {} });
     buyerForm.resetFields();
     styleForm.resetFields();
-    onClose();
   };
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -473,8 +478,10 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
       <Modal
         open={open}
         onCancel={handleClose}
+        afterClose={handleAfterClose}
         title={<Space><ImportOutlined /> Import from Techpack PDF</Space>}
         width={880}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
         footer={
           step === 'review' ? (
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>

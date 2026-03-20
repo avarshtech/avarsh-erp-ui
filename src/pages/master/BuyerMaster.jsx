@@ -260,6 +260,9 @@ const BuyerMaster = () => {
 
   const doCloseModal = () => {
     setModalVisible(false);
+  };
+
+  const handleAfterClose = () => {
     setEditingBuyer(null);
     form.resetFields();
     setShippingLocations([]);
@@ -312,8 +315,6 @@ const BuyerMaster = () => {
         ]);
       }
       setLocationModalVisible(false);
-      locationForm.resetFields();
-      setEditingLocation(null);
       setUnsavedChanges(true);
     } catch {
       // validation error
@@ -680,9 +681,10 @@ const BuyerMaster = () => {
           title={editingBuyer ? 'Update Buyer' : 'Add Buyer'}
           open={modalVisible}
           onCancel={() => handleModalClose()}
+          afterClose={handleAfterClose}
           centered
           width={960}
-          styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingRight: 16 } }}
+          styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden', paddingRight: 16 } }}
           footer={[
             <Button key="cancel" onClick={() => handleModalClose()}>
               Cancel
@@ -828,14 +830,15 @@ const BuyerMaster = () => {
         <Modal
           title={editingLocation ? 'Edit Shipping Location' : 'Add Shipping Location'}
           open={locationModalVisible}
-          onCancel={() => {
-            setLocationModalVisible(false);
+          onCancel={() => setLocationModalVisible(false)}
+          afterClose={() => {
             locationForm.resetFields();
             setEditingLocation(null);
           }}
           width={640}
           onOk={handleLocationSubmit}
           okText={editingLocation ? 'Update' : 'Add'}
+          styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
         >
           <Form form={locationForm} layout="vertical" requiredMark>
             <Row gutter={16}>

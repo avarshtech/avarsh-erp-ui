@@ -67,7 +67,7 @@ const PartsMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ isActive: true });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -80,7 +80,7 @@ const PartsMaster = ({ onDirtyChange }) => {
       isActive: record.isActive !== false,
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

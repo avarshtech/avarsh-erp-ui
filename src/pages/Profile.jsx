@@ -10,6 +10,7 @@ import {
   Button,
   Tag,
   Spin,
+  Skeleton,
   message,
 } from 'antd';
 import {
@@ -83,9 +84,26 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
-        <Spin size="large" />
-      </div>
+      <Row gutter={[24, 24]}>
+        <Col span={24}>
+          <Card>
+            <Row gutter={[48, 24]} align="middle">
+              <Col xs={24} md={6} style={{ textAlign: 'center' }}>
+                <Skeleton.Avatar active size={140} />
+                <Skeleton active title={{ width: '60%' }} paragraph={{ rows: 1, width: ['40%'] }} style={{ marginTop: 16 }} />
+              </Col>
+              <Col xs={24} md={18}>
+                <Skeleton active paragraph={{ rows: 4 }} />
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+        <Col span={24}>
+          <Card>
+            <Skeleton active paragraph={{ rows: 6 }} />
+          </Card>
+        </Col>
+      </Row>
     );
   }
 

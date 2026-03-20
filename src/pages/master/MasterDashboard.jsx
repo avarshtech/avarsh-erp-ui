@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { Menu, Breadcrumb, Spin, Button, Tooltip, message, ConfigProvider, Modal } from 'antd';
+import { Menu, Breadcrumb, Spin, Skeleton, Button, Tooltip, message, ConfigProvider, Modal } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
@@ -388,8 +388,9 @@ const MasterDashboard = () => {
     const { Component, loadingKey, label } = activeItem;
     if (loadingKey && loading[loadingKey]) {
       return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
-          <Spin size="large" tip={`Loading ${label.toLowerCase()}...`} />
+        <div style={{ padding: 24 }}>
+          <Skeleton active title={{ width: '30%' }} paragraph={{ rows: 0 }} style={{ marginBottom: 24 }} />
+          <Skeleton active paragraph={{ rows: 8 }} />
         </div>
       );
     }

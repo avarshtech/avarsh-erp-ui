@@ -11,6 +11,7 @@ import {
   Input,
   Timeline,
   Spin,
+  Skeleton,
   App,
   Popconfirm,
   Select,
@@ -1016,7 +1017,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
         width={1200}
         style={{ top: 20 }}
         styles={{
-          body: { height: 'calc(90vh - 160px)', overflowY: 'auto', padding: '24px' },
+          body: { maxHeight: '70vh', overflowY: 'auto', padding: '24px' },
         }}
         footer={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1084,9 +1085,10 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
         }
       >
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 80, gap: 12 }}>
-            <Spin size="large" />
-            <Text type="secondary">Loading PO details...</Text>
+          <div style={{ padding: '16px 0' }}>
+            <Skeleton active title={{ width: '40%' }} paragraph={{ rows: 2, width: ['100%', '60%'] }} style={{ marginBottom: 24 }} />
+            <Divider />
+            <Skeleton active paragraph={{ rows: 6 }} />
           </div>
         ) : po ? (
           <>
@@ -1499,8 +1501,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       <Modal
         title={statusAction ? `${statusAction.label} Purchase Order` : ''}
         open={!!statusAction}
-        onCancel={() => {
-          setStatusAction(null);
+        onCancel={() => setStatusAction(null)}
+        afterClose={() => {
           setActionReason('');
           setRejectionCategory(null);
         }}

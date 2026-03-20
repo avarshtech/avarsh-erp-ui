@@ -9,6 +9,7 @@ import {
   Divider,
   Empty,
   Spin,
+  Skeleton,
   Card,
   Space,
   Descriptions,
@@ -170,9 +171,12 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
   };
 
   const handleClose = () => {
+    onClose();
+  };
+
+  const handleAfterClose = () => {
     setSelectedVersion(null);
     setHistory([]);
-    onClose();
   };
 
   // Derived state
@@ -509,15 +513,21 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
       }
       open={open}
       onCancel={handleClose}
+      afterClose={handleAfterClose}
       footer={null}
       width={1400}
       destroyOnClose
-      styles={{ body: { maxHeight: '80vh', overflowY: 'auto', padding: '16px 24px' } }}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 24px' } }}
     >
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 80 }}>
-          <Spin size="large" />
-        </div>
+        <Row gutter={24} style={{ padding: '16px 0' }}>
+          <Col xs={24} md={5}>
+            <Skeleton active paragraph={{ rows: 6 }} />
+          </Col>
+          <Col xs={24} md={19}>
+            <Skeleton active title={{ width: '30%' }} paragraph={{ rows: 8 }} />
+          </Col>
+        </Row>
       ) : history.length === 0 ? (
         <Empty description="No history available for this cost sheet" />
       ) : (

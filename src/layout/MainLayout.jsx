@@ -136,6 +136,17 @@ const MainLayoutInner = () => {
       moduleId: "dashboard",
     },
     {
+      key: "/costing",
+      icon: <DollarOutlined />,
+      label: "Costing",
+      moduleId: "costing",
+      children: [
+        { key: "/costing/list", label: "Cost Sheet List" },
+        { key: "/costing/new", label: "New Cost Sheet" },
+        { key: "/costing/compare", label: "Compare" },
+      ],
+    },
+    {
       key: "/orders",
       icon: <ShoppingCartOutlined />,
       label: "Orders",
@@ -173,17 +184,6 @@ const MainLayoutInner = () => {
       children: [
         { key: "/grn/list", label: "GRN List" },
         { key: "/grn/new", label: "New GRN" },
-      ],
-    },
-    {
-      key: "/costing",
-      icon: <DollarOutlined />,
-      label: "Costing",
-      moduleId: "costing",
-      children: [
-        { key: "/costing/list", label: "Cost Sheet List" },
-        { key: "/costing/new", label: "New Cost Sheet" },
-        { key: "/costing/compare", label: "Compare" },
       ],
     },
     {

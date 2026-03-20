@@ -56,7 +56,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({ attributeIds: [], uomIds: [] });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
@@ -73,7 +73,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       uomIds: record.uomIds || record.uoms?.map(u => u.id) || [],
     });
     markDirty(false);
-    setTimeout(() => { skipDirty.current = false; }, 0);
+    setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSave = async (values) => {

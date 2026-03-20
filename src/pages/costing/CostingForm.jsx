@@ -21,6 +21,7 @@ import {
   Checkbox,
   message,
   Statistic,
+  Skeleton,
 } from 'antd';
 import {
   PlusOutlined,
@@ -358,7 +359,8 @@ const CostingForm = () => {
       message.error('Failed to load cost sheet');
       navigate('/costing/list');
     } finally {
-      setLoading(false);
+      // Defer so React paints the form with populated values before hiding the skeleton
+      requestAnimationFrame(() => setLoading(false));
     }
   };
 
@@ -2419,6 +2421,38 @@ const CostingForm = () => {
           initialParts={knitsParts}
         />
       </>
+    );
+  }
+
+  // ==================== SKELETON LOADING ====================
+  if (loading && isEdit) {
+    return (
+      <div className="animate-fade-in-up">
+        <div className="page-header">
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 180 }} />
+            <Skeleton.Input active size="small" style={{ width: 100 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 140 }} />
+          </Space>
+        </div>
+        {['General Information', 'Fabric', 'Trims', 'Summary'].map((section) => (
+          <Card key={section} style={{ marginBottom: 16 }}>
+            <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
+            <Row gutter={[24, 16]}>
+              {[1, 2, 3, 4].map((i) => (
+                <Col xs={24} md={6} key={i}>
+                  <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                  <Skeleton.Input active block />
+                </Col>
+              ))}
+            </Row>
+            <Skeleton active paragraph={{ rows: 3 }} style={{ marginTop: 16 }} />
+          </Card>
+        ))}
+      </div>
     );
   }
 

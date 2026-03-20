@@ -398,9 +398,6 @@ const RoleAccess = () => {
         message.success('Role created successfully');
       }
       setModalVisible(false);
-      form.resetFields();
-      setPermissions(getEmptyPermissions());
-      setFormDirty(false);
       fetchRoles();
     } catch (error) {
       message.error(error.errorMessage || 'Failed to save role');
@@ -419,18 +416,17 @@ const RoleAccess = () => {
         okText: 'Discard',
         okType: 'danger',
         cancelText: 'Keep Editing',
-        onOk: () => {
-          setModalVisible(false);
-          form.resetFields();
-          setPermissions(getEmptyPermissions());
-          setFormDirty(false);
-        },
+        onOk: () => setModalVisible(false),
       });
     } else {
       setModalVisible(false);
-      form.resetFields();
-      setPermissions(getEmptyPermissions());
     }
+  };
+
+  const handleModalAfterClose = () => {
+    form.resetFields();
+    setPermissions(getEmptyPermissions());
+    setFormDirty(false);
   };
 
   // Handle delete
@@ -837,10 +833,11 @@ const RoleAccess = () => {
         title={editingRole ? "Edit Role" : "Add New Role"}
         open={modalVisible}
         onCancel={handleModalClose}
+        afterClose={handleModalAfterClose}
         width={1100}
         style={{ top: 20 }}
         styles={{
-          body: { maxHeight: "calc(100vh - 220px)", overflowY: "auto", paddingBottom: 0 },
+          body: { maxHeight: "70vh", overflowY: "auto", paddingBottom: 0 },
         }}
         footer={
           <div style={{ textAlign: "right" }}>
