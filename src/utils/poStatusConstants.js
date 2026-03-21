@@ -89,6 +89,22 @@ export const PO_TYPE_OPTIONS = [
   { value: PO_TYPE.COMBINED, label: 'Combined' },
 ];
 
+// ==================== E-WAY BILL ====================
+export const EWAY_BILL_STATUS = {
+  ACTIVE: 'ACTIVE',
+  CANCELLED: 'CANCELLED',
+  REJECTED: 'REJECTED',
+};
+
+export const EWAY_BILL_THRESHOLD = 50000;
+
+export const EWAY_BILL_CANCEL_REASONS = [
+  { value: 1, label: 'Duplicate' },
+  { value: 2, label: 'Order Cancelled' },
+  { value: 3, label: 'Data Entry Mistake' },
+  { value: 4, label: 'Others' },
+];
+
 /** PO statuses that should UNLOCK BOM lines (isPoGenerated = false) */
 export const BOM_UNLOCK_STATUSES = [
   PO_STATUS.DRAFT,
@@ -107,4 +123,7 @@ export default {
   PO_TYPE,
   PO_TYPE_OPTIONS,
   BOM_UNLOCK_STATUSES,
+  EWAY_BILL_STATUS,
+  EWAY_BILL_THRESHOLD,
+  EWAY_BILL_CANCEL_REASONS,
 };

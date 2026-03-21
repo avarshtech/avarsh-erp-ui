@@ -23,6 +23,7 @@ import {
   AutoComplete,
   Segmented,
   Popover,
+  Switch,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,6 +36,7 @@ import {
   EditOutlined,
   InfoCircleOutlined,
   CloseCircleOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -49,9 +51,11 @@ import { getSuppliers } from '../../services/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/itemService';
 import { useStore } from '../../context/StoreContext';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
-import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
+import { generateEwayBill } from '../../services/purchaseOrderService';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bomService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
+import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
@@ -320,6 +324,9 @@ const POForm = () => {
     currentVariantId: null,
   });
 
+  // Fabric processing stages dialog state
+  const [stagesDialogState, setStagesDialogState] = useState({ open: false, lineKey: null });
+
   // Items with their variants (keyed by itemId) - used for variant column display
   const [itemsWithVariants, setItemsWithVariants] = useState({});
 
@@ -330,6 +337,7 @@ const POForm = () => {
 
   // BOM-PO Integration state
   const [poType, setPoType] = useState(PO_TYPE.GENERAL);
+  const [isProcessPo, setIsProcessPo] = useState(false);
   const [bomOrders, setBomOrders] = useState([]);
   const [bomLoading, setBomLoading] = useState(false);
   const [bomDrawerOpen, setBomDrawerOpen] = useState(false);
@@ -363,6 +371,21 @@ const POForm = () => {
       amount: 0,
       variantId: null,
       variantAttributes: null,
+      hsnCode: '',
+      categoryName: '',
+      processingStages: null,
+    };
+  }
+
+  function createEmptyProcessLineItem() {
+    return {
+      key: String(Date.now()) + Math.random(),
+      processName: '',
+      description: '',
+      qty: '',
+      unitPrice: '',
+      gstPercent: 0,
+      amount: 0,
     };
   }
 
@@ -389,6 +412,7 @@ const POForm = () => {
       setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
       setItemsWithVariants({});
       setPoType(PO_TYPE.GENERAL);
+      setIsProcessPo(false);
       setBomOrders([]);
       setBomDrawerOpen(false);
       setIsDirty(false);
@@ -529,8 +553,9 @@ const POForm = () => {
         }
       }
 
-      // Restore PO type and BOM data
+      // Restore PO type and Process PO flag
       setPoType(data.poType || PO_TYPE.GENERAL);
+      setIsProcessPo(data.isProcessPo || false);
 
       if (data.orderReferences && data.orderReferences.length > 0) {
         // Fetch BOM data for each order reference
@@ -561,6 +586,7 @@ const POForm = () => {
         itemId: item.itemId || '',
         itemCode: item.itemCode || '',
         itemName: item.itemName || '',
+        processName: item.processName || '',
         description: item.description || '',
         qty: String(item.quantity || item.qty || ''),
         uom: item.uomSymbol || item.uom || '',
@@ -578,6 +604,9 @@ const POForm = () => {
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
         variantAttributes: item.variantAttributes || null,
+        hsnCode: item.hsnCode || '',
+        categoryName: item.categoryName || '',
+        processingStages: item.processingStages || null,
         bomLineSources: item.bomLineSources || null,
         _fromBom: !!(item.bomLineSources && item.bomLineSources.length > 0),
         status: item.status || null,
@@ -720,6 +749,8 @@ const POForm = () => {
               gstPercent: gst,
               variantId: variant?.id || null,
               variantAttributes: variant?.attributes || null,
+              hsnCode: item.hsnCode || '',
+              categoryName: item.categoryName || '',
               amount,
             };
           }
@@ -793,7 +824,7 @@ const POForm = () => {
   };
 
   const addLineItem = () => {
-    setLineItems((prev) => [...prev, createEmptyLineItem()]);
+    setLineItems((prev) => [...prev, isProcessPo ? createEmptyProcessLineItem() : createEmptyLineItem()]);
   };
 
   const removeLineItem = (key) => {
@@ -807,7 +838,8 @@ const POForm = () => {
 
   // PO Type change handler
   const handlePoTypeChange = useCallback((newType) => {
-    if (lineItems.length > 1 || (lineItems.length === 1 && lineItems[0].itemId)) {
+    const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
+    if (hasData) {
       Modal.confirm({
         title: 'Change PO Type',
         content: 'Changing PO type will clear all line items. Continue?',
@@ -815,6 +847,7 @@ const POForm = () => {
         cancelText: 'Cancel',
         onOk: () => {
           setPoType(newType);
+          if (newType !== PO_TYPE.GENERAL) setIsProcessPo(false);
           setBomOrders([]);
           setLineItems([createEmptyLineItem()]);
           setIsDirty(true);
@@ -822,8 +855,30 @@ const POForm = () => {
       });
     } else {
       setPoType(newType);
+      if (newType !== PO_TYPE.GENERAL) setIsProcessPo(false);
       setBomOrders([]);
       setLineItems([createEmptyLineItem()]);
+    }
+  }, [lineItems]);
+
+  // Process PO toggle handler
+  const handleProcessPoToggle = useCallback((checked) => {
+    const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
+    if (hasData) {
+      Modal.confirm({
+        title: checked ? 'Switch to Process PO' : 'Switch to Standard PO',
+        content: 'This will clear all line items. Continue?',
+        okText: 'Yes, Switch',
+        cancelText: 'Cancel',
+        onOk: () => {
+          setIsProcessPo(checked);
+          setLineItems([checked ? createEmptyProcessLineItem() : createEmptyLineItem()]);
+          setIsDirty(true);
+        },
+      });
+    } else {
+      setIsProcessPo(checked);
+      setLineItems([checked ? createEmptyProcessLineItem() : createEmptyLineItem()]);
     }
   }, [lineItems]);
 
@@ -915,6 +970,9 @@ const POForm = () => {
       amount: 0,
       variantId: bomLine.variantId || null,
       variantAttributes: bomLine.variants || null,
+      hsnCode: bomLine.hsnCode || '',
+      categoryName: bomLine.categoryName || '',
+      processingStages: null,
       bomLineSources: [{ bomId, lineId: bomLine.id }],
       _fromBom: true,
       status: LINE_ITEM_STATUS.DRAFT,
@@ -946,57 +1004,6 @@ const POForm = () => {
 
     setLineItems(newLines);
     setIsDirty(true);
-
-    // Resolve UOM IDs from item master
-    const itemIds = [...new Set(newLines.map(l => l.itemId).filter(Boolean))];
-    if (itemIds.length > 0) {
-      getItemsByIds(itemIds).then(items => {
-        const itemMap = {};
-        (Array.isArray(items) ? items : items?.content || []).forEach(item => {
-          itemMap[item.id] = item;
-        });
-        setLineItems(prev => prev.map(li => {
-          if (!li._fromBom || !li.itemId) return li;
-          const item = itemMap[li.itemId];
-          if (!item) return li;
-
-          // Resolve UOM
-          const uomStr = (li.uom || '').toLowerCase();
-          let uomId = null;
-          let uomSymbol = li.uom;
-          if (item.primaryUom && (item.primaryUom.symbol || '').toLowerCase() === uomStr) {
-            uomId = item.primaryUom.id;
-            uomSymbol = item.primaryUom.symbol;
-          } else if (item.secondaryUom && (item.secondaryUom.symbol || '').toLowerCase() === uomStr) {
-            uomId = item.secondaryUom.id;
-            uomSymbol = item.secondaryUom.symbol;
-          } else if (item.primaryUom && (item.primaryUom.name || '').toLowerCase() === uomStr) {
-            uomId = item.primaryUom.id;
-            uomSymbol = item.primaryUom.symbol || item.primaryUom.name;
-          } else if (item.secondaryUom && (item.secondaryUom.name || '').toLowerCase() === uomStr) {
-            uomId = item.secondaryUom.id;
-            uomSymbol = item.secondaryUom.symbol || item.secondaryUom.name;
-          }
-
-          return {
-            ...li,
-            uomId: uomId || li.uomId,
-            uom: uomSymbol || li.uom,
-            primaryUom: item.primaryUom?.symbol || '',
-            primaryUomId: item.primaryUom?.id || null,
-            secondaryUom: item.secondaryUom?.symbol || '',
-            secondaryUomId: item.secondaryUom?.id || null,
-          };
-        }));
-
-        // Also update itemsWithVariants for image loading
-        const newItemsMap = {};
-        Object.values(itemMap).forEach(item => {
-          newItemsMap[item.id] = item;
-        });
-        setItemsWithVariants(prev => ({ ...prev, ...newItemsMap }));
-      }).catch(err => console.error('Failed to resolve UOM IDs:', err));
-    }
   }, [poType]);
 
   // Calculate totals
@@ -1111,67 +1118,112 @@ const POForm = () => {
     }
 
     // Line items validation
-    const validItems = lineItems.filter((item) => item.itemId);
-    if (validItems.length === 0) {
-      errors.push('At least one line item with an item selected is required');
-    }
+    const isBomPo = poType === PO_TYPE.REGULAR || poType === PO_TYPE.COMBINED;
 
-    lineItems.forEach((item, idx) => {
-      // If item is not selected but row exists among multiple rows, flag it
-      if (!item.itemId) {
-        // Allow a single empty row only if it's the sole row (default state)
-        if (lineItems.length > 1 || validItems.length > 0) {
-          errors.push(`Line item ${idx + 1}: Item is required`);
+    if (isProcessPo) {
+      // Process PO validation
+      const validItems = lineItems.filter((item) => item.processName?.trim());
+      if (validItems.length === 0) {
+        errors.push('At least one line item with a process name is required');
+      }
+
+      lineItems.forEach((item, idx) => {
+        const lineNum = idx + 1;
+        if (!item.processName?.trim()) {
+          if (lineItems.length > 1 || validItems.length > 0) {
+            errors.push(`Line item ${lineNum}: Process Name is required`);
+          }
+          return;
         }
-        return;
-      }
+        const qty = parseFloat(item.qty);
+        const unitPrice = parseFloat(item.unitPrice);
 
-      const qty = parseFloat(item.qty);
-      const unitPrice = parseFloat(item.unitPrice);
-
-      if (item.qty === '' || isNaN(qty) || qty < 1) {
-        errors.push(`Line item ${idx + 1}: Quantity must be at least 1`);
-      }
-
-      if (isSubmit) {
-        // Submit requires unit price > 0
-        if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
-          errors.push(`Line item ${idx + 1}: Unit Price must be greater than 0`);
+        if (!item.description || !item.description.trim()) {
+          errors.push(`Line item ${lineNum}: Description is required`);
         }
-      } else {
-        // Draft allows unit price = 0, but not negative
-        if (item.unitPrice !== '' && !isNaN(unitPrice) && unitPrice < 0) {
-          errors.push(`Line item ${idx + 1}: Unit Price cannot be negative`);
+        if (item.qty === '' || isNaN(qty) || qty < 1) {
+          errors.push(`Line item ${lineNum}: Quantity must be at least 1`);
         }
-      }
-
-      // UOM validation
-      if (!item.uomId) {
-        errors.push(`Line item ${idx + 1}: UOM is required`);
-      }
-    });
-
-    // Duplicate line item validation (same item + variant + UOM) - only for General PO
-    if (poType === PO_TYPE.GENERAL) {
-      const seen = [];
-      validItems.forEach((item) => {
-        const variantKey = item.variantId
-          ? String(item.variantId)
-          : item.variantAttributes
-            ? JSON.stringify(item.variantAttributes)
-            : 'none';
-        const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
-        const existingIdx = seen.findIndex((s) => s.key === dupKey);
-        if (existingIdx >= 0) {
-          const origLineNum = seen[existingIdx].lineNum;
-          const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
-          errors.push(
-            `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
-          );
+        if (isSubmit) {
+          if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
+            errors.push(`Line item ${lineNum}: Unit Price must be greater than 0`);
+          }
         } else {
-          seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
+          if (item.unitPrice !== '' && !isNaN(unitPrice) && unitPrice < 0) {
+            errors.push(`Line item ${lineNum}: Unit Price cannot be negative`);
+          }
         }
       });
+    } else {
+      // Standard PO validation
+      const validItems = lineItems.filter((item) => item.itemId);
+      if (validItems.length === 0) {
+        errors.push('At least one line item with an item selected is required');
+      }
+
+      lineItems.forEach((item, idx) => {
+        const lineNum = idx + 1;
+
+        if (!item.itemId) {
+          if (lineItems.length > 1 || validItems.length > 0) {
+            errors.push(`Line item ${lineNum}: Item is required`);
+          }
+          return;
+        }
+
+        const qty = parseFloat(item.qty);
+        const unitPrice = parseFloat(item.unitPrice);
+
+        if (!item.description || !item.description.trim()) {
+          errors.push(`Line item ${lineNum}: Description is required`);
+        }
+
+        if (isBomPo) {
+          if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
+            errors.push(`Line item ${lineNum}: Unit Price must be greater than 0`);
+          }
+        } else {
+          if (item.qty === '' || isNaN(qty) || qty < 1) {
+            errors.push(`Line item ${lineNum}: Quantity must be at least 1`);
+          }
+          if (isSubmit) {
+            if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
+              errors.push(`Line item ${lineNum}: Unit Price must be greater than 0`);
+            }
+          } else {
+            if (item.unitPrice !== '' && !isNaN(unitPrice) && unitPrice < 0) {
+              errors.push(`Line item ${lineNum}: Unit Price cannot be negative`);
+            }
+          }
+          if (!item.uomId) {
+            errors.push(`Line item ${lineNum}: UOM is required`);
+          }
+        }
+      });
+
+      // Duplicate check — only for General non-process PO
+      if (poType === PO_TYPE.GENERAL) {
+        const seen = [];
+        const validItems2 = lineItems.filter((item) => item.itemId);
+        validItems2.forEach((item) => {
+          const variantKey = item.variantId
+            ? String(item.variantId)
+            : item.variantAttributes
+              ? JSON.stringify(item.variantAttributes)
+              : 'none';
+          const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
+          const existingIdx = seen.findIndex((s) => s.key === dupKey);
+          if (existingIdx >= 0) {
+            const origLineNum = seen[existingIdx].lineNum;
+            const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
+            errors.push(
+              `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
+            );
+          } else {
+            seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
+          }
+        });
+      }
     }
 
     return errors;
@@ -1218,7 +1270,9 @@ const POForm = () => {
       (t) => t.id === values.termsConditionId
     );
 
-    const validItems = lineItems.filter((item) => item.itemId);
+    const validItems = isProcessPo
+      ? lineItems.filter((item) => item.processName?.trim())
+      : lineItems.filter((item) => item.itemId);
     const isIgst = supplier?.igstApplicable || false;
 
     // Determine line item status based on PO status
@@ -1232,6 +1286,7 @@ const POForm = () => {
     return {
       version: entityVersion,
       poType: poType,
+      isProcessPo: isProcessPo,
       orderReferences: poType !== PO_TYPE.GENERAL ? bomOrders.map(o => ({ orderId: o.orderId, orderNo: o.orderNo, bomId: o.bomId, styleId: o.styleId, styleName: o.styleName, season: o.season })) : null,
       supplierId: values.supplierId,
       supplierName: supplier?.name || '',
@@ -1274,13 +1329,14 @@ const POForm = () => {
         const taxValue = parseFloat((cgstValue + sgstValue + igstValue).toFixed(2));
 
         return {
-          itemId: item.itemId,
-          itemCode: item.itemCode,
-          itemName: item.itemName,
+          itemId: isProcessPo ? null : item.itemId,
+          itemCode: isProcessPo ? null : item.itemCode,
+          itemName: isProcessPo ? null : item.itemName,
+          processName: isProcessPo ? item.processName : null,
           description: item.description,
           quantity: qty,
-          uomId: item.uomId,
-          uomName: item.uom,
+          uomId: isProcessPo ? null : item.uomId,
+          uomName: isProcessPo ? null : item.uom,
           unitPrice,
           cgst: isIgst ? null : cgst,
           sgst: isIgst ? null : sgst,
@@ -1290,9 +1346,12 @@ const POForm = () => {
           igstValue: isIgst ? igstValue : null,
           taxValue,
           totalAmount: item.amount,
-          variantId: item.variantId,
-          variantAttributes: item.variantAttributes,
-          bomLineSources: item.bomLineSources || null,
+          variantId: isProcessPo ? null : item.variantId,
+          variantAttributes: isProcessPo ? null : item.variantAttributes,
+          hsnCode: isProcessPo ? null : (item.hsnCode || null),
+          categoryName: isProcessPo ? null : (item.categoryName || null),
+          processingStages: isProcessPo ? null : (item.processingStages || null),
+          bomLineSources: isProcessPo ? null : (item.bomLineSources || null),
           status: lineItemStatus,
         };
       }),
@@ -1584,7 +1643,7 @@ const POForm = () => {
       width: 200,
       render: (_, record) => {
         if (!record.variantId) {
-          return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+          return <div style={{ display: 'flex', justifyContent: 'center' }}><Text type="secondary" style={{ fontSize: 12 }}>-</Text></div>;
         }
         const attrs = record.variantAttributes || {};
         const hasMultipleVariants =
@@ -1676,6 +1735,42 @@ const POForm = () => {
           disabled={submitting || savingDraft || !record.itemId}
         />
       ),
+    },
+    {
+      title: 'HSN',
+      dataIndex: 'hsnCode',
+      width: 120,
+      align: 'center',
+      render: (value, record) => {
+        const isFabric = (record.categoryName || '').toLowerCase().includes('fabric');
+        const hasStages = record.processingStages && record.processingStages.length > 0;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>{value || '-'}</Text>
+            {isFabric && record.itemId && (
+              <Button
+                type="text"
+                size="small"
+                icon={<ExperimentOutlined />}
+                style={{
+                  fontSize: 13,
+                  color: hasStages ? 'var(--success-color, #52c41a)' : 'var(--primary-color)',
+                  padding: '0 4px',
+                }}
+                onClick={() => {
+                  const deliveryDate = form.getFieldValue('deliveryDate');
+                  if (!deliveryDate) {
+                    message.warning('Please select an Expected Delivery Date before adding processing stages.');
+                    return;
+                  }
+                  setStagesDialogState({ open: true, lineKey: record.key });
+                }}
+                title={hasStages ? `${record.processingStages.length} processing stage(s)` : 'Add processing stages'}
+              />
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Qty',
@@ -1842,6 +1937,151 @@ const POForm = () => {
           </Popconfirm>
         );
       },
+    },
+  ];
+
+  // Process PO columns — simplified: Process Name, Description, Qty, Unit Price, GST, Tax, Amount, Delete
+  const processLineColumns = [
+    {
+      title: '#',
+      width: 45,
+      align: 'center',
+      render: (_, __, index) => index + 1,
+    },
+    {
+      title: 'Process Name',
+      dataIndex: 'processName',
+      width: 220,
+      render: (_, record) => (
+        <Input
+          placeholder="e.g. Dyeing, Printing, Washing"
+          value={record.processName}
+          onChange={(e) => handleLineItemChange(record.key, 'processName', e.target.value)}
+          disabled={submitting || savingDraft}
+        />
+      ),
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      width: 200,
+      render: (_, record) => (
+        <Input
+          placeholder="Description"
+          value={record.description}
+          onChange={(e) => handleLineItemChange(record.key, 'description', e.target.value)}
+          disabled={submitting || savingDraft}
+        />
+      ),
+    },
+    {
+      title: 'Qty',
+      dataIndex: 'qty',
+      width: 100,
+      render: (_, record) => (
+        <InputNumber
+          min={0}
+          style={{ width: '100%' }}
+          value={record.qty !== '' ? Number(record.qty) : null}
+          onChange={(v) => handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')}
+          disabled={submitting || savingDraft}
+        />
+      ),
+    },
+    {
+      title: 'Unit Price (₹)',
+      dataIndex: 'unitPrice',
+      width: 120,
+      render: (_, record) => (
+        <InputNumber
+          min={0}
+          style={{ width: '100%' }}
+          value={record.unitPrice !== '' ? Number(record.unitPrice) : null}
+          onChange={(v) => handleLineItemChange(record.key, 'unitPrice', v !== null ? v : '')}
+          disabled={submitting || savingDraft}
+        />
+      ),
+    },
+    {
+      title: 'GST %',
+      dataIndex: 'gstPercent',
+      width: 90,
+      render: (value, record) => (
+        <Select
+          style={{ width: '100%' }}
+          value={value}
+          onChange={(v) => handleLineItemChange(record.key, 'gstPercent', v)}
+          options={TAX_OPTIONS}
+          disabled={submitting || savingDraft || !record.processName}
+        />
+      ),
+    },
+    ...(isIgstApplicable
+      ? [
+          {
+            title: 'IGST',
+            width: 100,
+            align: 'center',
+            render: (_, record) => {
+              const qty = parseFloat(record.qty) || 0;
+              const price = parseFloat(record.unitPrice) || 0;
+              const gst = parseFloat(record.gstPercent) || 0;
+              return <Text type="secondary">{((qty * price * gst) / 100).toFixed(2)}</Text>;
+            },
+          },
+        ]
+      : [
+          {
+            title: 'SGST',
+            width: 90,
+            align: 'center',
+            render: (_, record) => {
+              const qty = parseFloat(record.qty) || 0;
+              const price = parseFloat(record.unitPrice) || 0;
+              const gst = parseFloat(record.gstPercent) || 0;
+              return <Text type="secondary">{((qty * price * (gst / 2)) / 100).toFixed(2)}</Text>;
+            },
+          },
+          {
+            title: 'CGST',
+            width: 90,
+            align: 'center',
+            render: (_, record) => {
+              const qty = parseFloat(record.qty) || 0;
+              const price = parseFloat(record.unitPrice) || 0;
+              const gst = parseFloat(record.gstPercent) || 0;
+              return <Text type="secondary">{((qty * price * (gst / 2)) / 100).toFixed(2)}</Text>;
+            },
+          },
+        ]),
+    {
+      title: 'Amount (₹)',
+      width: 120,
+      align: 'right',
+      render: (_, record) => (
+        <Text strong style={{ color: 'var(--success-color, #52c41a)' }}>
+          {(record.amount || 0).toFixed(2)}
+        </Text>
+      ),
+    },
+    {
+      title: '',
+      width: 50,
+      render: (_, record) => (
+        <Popconfirm
+          title="Remove this line item?"
+          onConfirm={() => removeLineItem(record.key)}
+          disabled={lineItems.length === 1}
+        >
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            size="small"
+            disabled={lineItems.length === 1 || submitting || savingDraft}
+          />
+        </Popconfirm>
+      ),
     },
   ];
 
@@ -2037,6 +2277,18 @@ const POForm = () => {
                   disabled={submitting || savingDraft}
                 />
               </div>
+              {poType === PO_TYPE.GENERAL && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 10px', borderRadius: 6, background: isProcessPo ? 'var(--primary-bg, #f0f0ff)' : 'transparent' }}>
+                  <Switch
+                    size="small"
+                    checked={isProcessPo}
+                    onChange={handleProcessPoToggle}
+                    disabled={submitting || savingDraft}
+                  />
+                  <Text style={{ fontSize: 12 }}>Process PO</Text>
+                  {isProcessPo && <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>Outsourced Processing</Tag>}
+                </div>
+              )}
               <Title level={5} style={{ marginBottom: 16 }}>
                 Supplier Information
               </Title>
@@ -2149,7 +2401,7 @@ const POForm = () => {
                 onClick={addLineItem}
                 disabled={!selectedSupplier || submitting || savingDraft}
               >
-                Add Item
+                {isProcessPo ? 'Add Process' : 'Add Item'}
               </Button>
             ) : (
               <Button
@@ -2163,10 +2415,10 @@ const POForm = () => {
             )}
           </div>
           <Table
-            columns={lineColumns}
+            columns={isProcessPo ? processLineColumns : lineColumns}
             dataSource={lineItems}
             pagination={false}
-            scroll={{ x: 2000 }}
+            scroll={{ x: isProcessPo ? 1200 : 2000 }}
             size="middle"
             rowKey="key"
             className="centered-header-table"
@@ -2648,6 +2900,25 @@ const POForm = () => {
         existingBomLineIds={new Set(lineItems.flatMap(li => (li.bomLineSources || []).map(s => s.lineId)))}
         onConfirm={handleBomLineSelectionConfirm}
       />
+      {/* Fabric processing stages dialog */}
+      {stagesDialogState.open && (() => {
+        const lineItem = lineItems.find((li) => li.key === stagesDialogState.lineKey);
+        return lineItem ? (
+          <FabricStagesDialog
+            open
+            onClose={() => setStagesDialogState({ open: false, lineKey: null })}
+            onSave={(stages) => {
+              handleLineItemChange(stagesDialogState.lineKey, 'processingStages', stages);
+            }}
+            stages={lineItem.processingStages}
+            poDate={form.getFieldValue('poDate')}
+            deliveryDate={form.getFieldValue('deliveryDate')}
+            itemName={lineItem.itemName}
+            itemCode={lineItem.itemCode}
+            variantAttributes={lineItem.variantAttributes}
+          />
+        ) : null;
+      })()}
     </div>
   );
 };

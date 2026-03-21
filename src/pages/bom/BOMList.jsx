@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -109,7 +109,7 @@ const BOMList = () => {
   };
 
   // Delete
-  const handleDelete = async (record) => {
+  const handleDelete = useCallback(async (record) => {
     setDeletingId(record.id);
     try {
       await deleteBom(record.id);
@@ -120,23 +120,15 @@ const BOMList = () => {
     } finally {
       setDeletingId(null);
     }
-  };
+  }, [fetchData, pagination.current, pagination.pageSize]);
 
   // View
-  const handleView = (record) => {
+  const handleView = useCallback((record) => {
     setViewingBom(record);
     setViewModalVisible(true);
-  };
+  }, []);
 
-  // Can edit?
-  const canEditBom = (record) =>
-    EDITABLE_STATUSES.includes(record.status) && canUpdate;
-
-  // Can delete? (only DRAFT)
-  const canDeleteBom = (record) =>
-    record.status === BOM_STATUS.DRAFT && canDelete;
-
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Order No',
       dataIndex: 'orderNo',
@@ -226,7 +218,7 @@ const BOMList = () => {
               />
             </Tooltip>
           )}
-          {canEditBom(record) && (
+          {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
             <Tooltip title="Edit">
               <Button
                 type="text"
@@ -237,7 +229,7 @@ const BOMList = () => {
               />
             </Tooltip>
           )}
-          {canDeleteBom(record) && (
+          {record.status === BOM_STATUS.DRAFT && canDelete && (
             <Popconfirm
               title="Delete BOM"
               description={`Are you sure you want to delete "${record.orderNo}"?`}
@@ -260,7 +252,7 @@ const BOMList = () => {
         </Space>
       ),
     },
-  ];
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
 
   return (
     <div className="animate-fade-in-up">

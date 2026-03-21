@@ -186,17 +186,17 @@ const ConsumptionMatrixDialog = ({
       )}
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 500 }}>
-          <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 3 }}>
             <tr>
-              <th style={{ ...thStyle, minWidth: 90, background: 'var(--card-bg, #fff)' }}></th>
+              <th style={{ ...thStyle, minWidth: 90, ...stickyFirstCol, zIndex: 4 }}></th>
               {sizes.map((s) => (
                 <th key={s} style={{ ...thStyle, textAlign: 'center', minWidth: 95, background: 'var(--card-bg, #fff)' }}>{s}</th>
               ))}
-              <th style={{ ...thStyle, textAlign: 'center', minWidth: 90, background: 'var(--card-bg, #fff)' }}>Total</th>
+              <th style={{ ...thStyle, textAlign: 'center', minWidth: 90, ...stickyLastCol, zIndex: 4 }}>Total</th>
             </tr>
             {mode === CONSUMPTION_MODE.VARIANT_PER_SIZE && (
               <tr>
-                <td style={{ ...tdStyle, fontWeight: 600, fontSize: 11, padding: '6px 8px', background: 'var(--card-bg, #fff)' }}>Variant</td>
+                <td style={{ ...tdStyle, fontWeight: 600, fontSize: 11, padding: '6px 8px', ...stickyFirstCol, zIndex: 4 }}>Variant</td>
                 {sizes.map((s) => (
                   <td key={s} style={{ ...tdStyle, padding: '4px 6px', background: 'var(--card-bg, #fff)' }}>
                     <Select
@@ -212,7 +212,7 @@ const ConsumptionMatrixDialog = ({
                     />
                   </td>
                 ))}
-                <td style={{ ...tdStyle, background: 'var(--card-bg, #fff)' }}></td>
+                <td style={{ ...tdStyle, ...stickyLastCol, zIndex: 4 }}></td>
               </tr>
             )}
           </thead>
@@ -223,16 +223,21 @@ const ConsumptionMatrixDialog = ({
               return (
                 <React.Fragment key={color}>
                   <tr>
-                    <td colSpan={sizes.length + 2} style={{
+                    <td style={{
                       padding: '6px 10px 2px', borderBottom: 'none',
                       fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
                       color: 'var(--primary-color, #6366f1)',
+                      ...stickyFirstCol,
                     }}>
                       {color}
                     </td>
+                    {sizes.map((s) => (
+                      <td key={s} style={{ borderBottom: 'none' }} />
+                    ))}
+                    <td style={{ borderBottom: 'none', ...stickyLastCol }} />
                   </tr>
                   <tr>
-                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px' }}>Consumption</td>
+                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px', ...stickyFirstCol }}>Consumption</td>
                     {sizes.map((size) => {
                       const hasOrderQty = (qtyGrid[color]?.[size] || 0) > 0;
                       return (
@@ -251,10 +256,10 @@ const ConsumptionMatrixDialog = ({
                         </td>
                       );
                     })}
-                    <td style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px' }}></td>
+                    <td style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px', ...stickyLastCol }}></td>
                   </tr>
                   <tr>
-                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px' }}>Order Qty</td>
+                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px', ...stickyFirstCol }}>Order Qty</td>
                     {sizes.map((size) => {
                       const oq = qtyGrid[color]?.[size] || 0;
                       colorOrdTotal += oq;
@@ -264,12 +269,12 @@ const ConsumptionMatrixDialog = ({
                         </td>
                       );
                     })}
-                    <td style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px' }}>
+                    <td style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px', ...stickyLastCol }}>
                       <Text strong style={{ fontSize: 11 }}>{colorOrdTotal ? colorOrdTotal.toLocaleString() : '—'}</Text>
                     </td>
                   </tr>
                   <tr>
-                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px', borderBottom: '2px solid var(--border-color, #e8e8e8)' }}>Requirement</td>
+                    <td style={{ ...tdStyle, fontSize: 10, color: 'var(--text-muted, #999)', padding: '4px 10px', borderBottom: '2px solid var(--border-color, #e8e8e8)', ...stickyFirstCol }}>Requirement</td>
                     {sizes.map((size) => {
                       const c = Number(matrix[color]?.[size]) || 0;
                       const o = qtyGrid[color]?.[size] || 0;
@@ -281,7 +286,7 @@ const ConsumptionMatrixDialog = ({
                         </td>
                       );
                     })}
-                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary-color, #6366f1)', padding: '4px 6px', borderBottom: '2px solid var(--border-color, #e8e8e8)' }}>
+                    <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, color: 'var(--primary-color, #6366f1)', padding: '4px 6px', borderBottom: '2px solid var(--border-color, #e8e8e8)', ...stickyLastCol }}>
                       {colorReqTotal ? colorReqTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
                     </td>
                   </tr>
@@ -289,7 +294,7 @@ const ConsumptionMatrixDialog = ({
               );
             })}
             <tr style={{ background: 'var(--bg-secondary, #f6f8fa)' }}>
-              <td style={{ ...tdStyle, fontWeight: 700, padding: '8px 10px' }}>TOTAL</td>
+              <td style={{ ...tdStyle, fontWeight: 700, padding: '8px 10px', ...stickyFirstCol, background: 'var(--bg-secondary, #f6f8fa)' }}>TOTAL</td>
               {sizes.map((size) => {
                 let colTotal = 0;
                 colors.forEach((color) => {
@@ -301,7 +306,7 @@ const ConsumptionMatrixDialog = ({
                   </td>
                 );
               })}
-              <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, fontSize: 14, color: 'var(--primary-color, #6366f1)', padding: '6px' }}>
+              <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 700, fontSize: 14, color: 'var(--primary-color, #6366f1)', padding: '6px', ...stickyLastCol, background: 'var(--bg-secondary, #f6f8fa)' }}>
                 {(() => {
                   const t = calcMatrixTotal(matrix, qtyGrid);
                   return t ? t.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—';
@@ -413,6 +418,16 @@ const tdStyle = {
   padding: '6px',
   borderBottom: '1px solid var(--border-color, #e8e8e8)',
   whiteSpace: 'nowrap',
+};
+
+const stickyFirstCol = {
+  position: 'sticky', left: 0, zIndex: 1,
+  background: 'var(--card-bg, #fff)',
+};
+
+const stickyLastCol = {
+  position: 'sticky', right: 0, zIndex: 1,
+  background: 'var(--card-bg, #fff)',
 };
 
 export default ConsumptionMatrixDialog;

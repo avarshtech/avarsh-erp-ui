@@ -148,6 +148,25 @@ export const createActivity = async (poId, payload) => {
   return res.data;
 };
 
+// ==================== E-WAY BILL ====================
+
+const EWAY_BILL_ENDPOINT = '/eway-bill';
+
+export const generateEwayBill = async (data) => {
+  const response = await axiosInstance.post(`${EWAY_BILL_ENDPOINT}/generate`, data);
+  return response.data;
+};
+
+export const cancelEwayBill = async (data) => {
+  const response = await axiosInstance.post(`${EWAY_BILL_ENDPOINT}/cancel`, data);
+  return response.data;
+};
+
+export const rejectEwayBill = async (data) => {
+  const response = await axiosInstance.post(`${EWAY_BILL_ENDPOINT}/reject`, data);
+  return response.data;
+};
+
 export default {
   getPurchaseOrders,
   searchPurchaseOrders,
@@ -156,4 +175,7 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   createActivity,
+  generateEwayBill,
+  cancelEwayBill,
+  rejectEwayBill,
 };

@@ -29,7 +29,6 @@ const CategoryMaster = ({ onDirtyChange }) => {
   // Update filtered data when categories change
   useEffect(() => {
     setFilteredData(categories);
-    console.debug('CategoryMaster: categories from store, count=', categories?.length, categories);
   }, [categories]);
 
   const columns = [

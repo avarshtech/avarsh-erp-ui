@@ -7,8 +7,9 @@ export const getAllProcesses = async () => {
   return response.data;
 };
 
-export const getActiveProcesses = async () => {
-  const response = await axiosInstance.get(`${BASE_URL}/active`);
+export const getActiveProcesses = async (category) => {
+  const params = category ? { category } : {};
+  const response = await axiosInstance.get(`${BASE_URL}/active`, { params });
   return response.data;
 };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -45,6 +45,15 @@ import POView from './POView';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
+
+// Format currency — pure function, defined outside component
+const formatCurrency = (amount) => {
+  if (amount === null || amount === undefined) return '₹ 0.00';
+  return `₹ ${Number(amount).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 // Status config mapping — keys are DB enum values
 const STATUS_CONFIG = {
@@ -188,10 +197,10 @@ const POList = () => {
   };
 
   // View PO
-  const handleView = (record) => {
+  const handleView = useCallback((record) => {
     setViewingPO(record);
     setViewModalVisible(true);
-  };
+  }, []);
 
   // After status action in view, refresh list
   const handleStatusActionComplete = () => {
@@ -200,24 +209,7 @@ const POList = () => {
     fetchData(pagination.current, pagination.pageSize);
   };
 
-  // Format currency
-  const formatCurrency = (amount) => {
-    if (amount === null || amount === undefined) return '₹ 0.00';
-    return `₹ ${Number(amount).toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
-
-  // Can edit this PO?
-  const canEditPO = (record) =>
-    (record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK) &&
-    canUpdate;
-
-  // Can delete this PO?
-  const canDeletePO = (record) => record.status === PO_STATUS.DRAFT && canDelete;
-
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'PO Number',
       dataIndex: 'poNumber',
@@ -325,7 +317,7 @@ const POList = () => {
               />
             </Tooltip>
           )}
-          {canEditPO(record) && (
+          {(record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK) && canUpdate && (
             <Tooltip title="Edit">
               <Button
                 type="text"
@@ -336,7 +328,7 @@ const POList = () => {
               />
             </Tooltip>
           )}
-          {canDeletePO(record) && (
+          {record.status === PO_STATUS.DRAFT && canDelete && (
             <Popconfirm
               title="Delete Purchase Order"
               description={`Are you sure you want to delete "${record.poNumber}"?`}
@@ -368,7 +360,7 @@ const POList = () => {
         </Space>
       ),
     },
-  ];
+  ], [handleView, navigate, fetchData, pagination.current, pagination.pageSize, deletingId, canView, canUpdate, canDelete]);
 
   return (
     <div className="animate-fade-in-up">

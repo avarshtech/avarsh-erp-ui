@@ -80,7 +80,6 @@ const GRNForm = () => {
 
   const handleSubmit = (values) => {
     const grnData = { ...values, poNumber: selectedPO?.value, supplier: selectedPO?.supplier, lineItems, totalReceived: getTotalReceived(), totalAccepted: getTotalAccepted(), totalRejected: getTotalRejected(), totalAmount: getTotalAmount() };
-    console.log('GRN Data:', grnData);
     message.success('GRN created successfully!');
     navigate('/grn/list');
   };

@@ -192,6 +192,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const watermarkText = companyName;
 
   const poType = po.poType || 'General';
+  const isProcessPo = po.isProcessPo || false;
 
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';
@@ -278,24 +279,43 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       gstColumnsHtml = `<td class="num">${halfPercent}%</td><td class="num">${halfPercent}%</td><td class="num">${formatCurrency(halfAmt)}</td><td class="num">${formatCurrency(halfAmt)}</td>`;
     }
 
-    lineItemsHtml += `
-      <tr>
-        <td class="center">${idx + 1}</td>
-        <td class="desc-cell">
-          <div style="display:flex;gap:6px;align-items:flex-start;">
-            ${variantImageHtml ? `<div style="flex-shrink:0;">${variantImageHtml}</div>` : ''}
-            <div>
-              <div class="desc-content">${descParts.join('<br>')}</div>
-              ${swatchHtml ? `<div class="swatches-row">${swatchHtml}</div>` : ''}
+    if (isProcessPo) {
+      lineItemsHtml += `
+        <tr>
+          <td class="center">${idx + 1}</td>
+          <td class="desc-cell">
+            <div class="desc-content"><strong>${item.processName || '-'}</strong></div>
+          </td>
+          <td class="desc-cell">
+            <div class="desc-content">${item.description || '-'}</div>
+          </td>
+          <td class="num">${formatCurrency(price)}</td>
+          <td class="center nowrap">${qty}</td>
+          <td class="num">${formatCurrency(base)}</td>
+          ${gstColumnsHtml}
+          <td class="num total-col">${formatCurrency(totalWithTax)}</td>
+        </tr>`;
+    } else {
+      lineItemsHtml += `
+        <tr>
+          <td class="center">${idx + 1}</td>
+          <td class="desc-cell">
+            <div style="display:flex;gap:6px;align-items:flex-start;">
+              ${variantImageHtml ? `<div style="flex-shrink:0;">${variantImageHtml}</div>` : ''}
+              <div>
+                <div class="desc-content">${descParts.join('<br>')}</div>
+                ${swatchHtml ? `<div class="swatches-row">${swatchHtml}</div>` : ''}
+              </div>
             </div>
-          </div>
-        </td>
-        <td class="num">${formatCurrency(price)}</td>
-        <td class="center nowrap">${qty}&nbsp;${uom}</td>
-        <td class="num">${formatCurrency(base)}</td>
-        ${gstColumnsHtml}
-        <td class="num total-col">${formatCurrency(totalWithTax)}</td>
-      </tr>`;
+          </td>
+          <td class="center">${item.hsnCode || '-'}</td>
+          <td class="num">${formatCurrency(price)}</td>
+          <td class="center nowrap">${qty}&nbsp;${uom}</td>
+          <td class="num">${formatCurrency(base)}</td>
+          ${gstColumnsHtml}
+          <td class="num total-col">${formatCurrency(totalWithTax)}</td>
+        </tr>`;
+    }
   });
 
   // Build total qty summary
@@ -644,7 +664,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         </div>
       </div>
       <div class="po-badge">
-        <div class="po-label">Purchase Order</div>
+        <div class="po-label">${isProcessPo ? 'Process Purchase Order' : 'Purchase Order'}</div>
         <div class="po-number">${poNumber}</div>
         <div class="po-status">${getStatusLabel(po.status)}</div>
       </div>
@@ -683,7 +703,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       </div>
       <div class="po-detail-item">
         <div class="label">PO Type</div>
-        <div class="value">${poType}</div>
+        <div class="value">${isProcessPo ? 'Process PO' : poType}</div>
       </div>
       <div class="po-detail-item">
         <div class="label">Delivery Date</div>
@@ -696,15 +716,25 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
     </div>
     ${orderRefsHtml}
     <div class="items-section">
-      <div class="section-title">Order Items</div>
+      <div class="section-title">${isProcessPo ? 'Process Items' : 'Order Items'}</div>
       <table class="items-table">
         <thead>
           <tr>
+            ${isProcessPo ? `
             <th style="width:22px;">SN</th>
-            <th class="desc-col">Description / Color</th>
+            <th class="desc-col">Process Name</th>
+            <th class="desc-col" style="width:120px;">Description</th>
             <th style="width:50px;">Rate</th>
             <th style="width:55px;">Qty</th>
             <th style="width:65px;">Base Value</th>
+            ` : `
+            <th style="width:22px;">SN</th>
+            <th class="desc-col">Description / Color</th>
+            <th style="width:60px;">HSN</th>
+            <th style="width:50px;">Rate</th>
+            <th style="width:55px;">Qty</th>
+            <th style="width:65px;">Base Value</th>
+            `}
             ${gst.isIgst ? `
             <th style="width:35px;">IGST%</th>
             <th style="width:55px;">IGST</th>
@@ -780,6 +810,32 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
     <div class="amount-words">
       <strong>Amount in Words:</strong> ${amountInWords}
     </div>
+    ${(po.ewayBillNo) ? `
+    <div style="margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden;">
+      <div style="background: #f1f5f9; padding: 5px 8px; font-size: 8px; font-weight: 600; color: #374151; border-bottom: 1px solid #e2e8f0;">
+        E-way Bill Details
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #e2e8f0;">
+        <div style="background: white; padding: 6px 8px;">
+          <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">E-way Bill No</div>
+          <div style="font-size: 10px; font-weight: 700; color: #1e293b; font-family: monospace; margin-top: 2px;">${po.ewayBillNo}</div>
+        </div>
+        <div style="background: white; padding: 6px 8px;">
+          <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Status</div>
+          <div style="font-size: 9px; font-weight: 600; margin-top: 2px;">
+            <span style="display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 7px; background: ${po.ewayBillStatus === 'ACTIVE' ? '#dcfce7; color: #166534' : po.ewayBillStatus === 'CANCELLED' ? '#fef2f2; color: #991b1b' : '#f0f0f0; color: #595959'};">${po.ewayBillStatus || 'ACTIVE'}</span>
+          </div>
+        </div>
+        <div style="background: white; padding: 6px 8px;">
+          <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Generated Date</div>
+          <div style="font-size: 9px; font-weight: 600; color: #1e293b; margin-top: 2px;">${formatDate(po.ewayBillDate)}</div>
+        </div>
+        <div style="background: white; padding: 6px 8px;">
+          <div style="font-size: 7px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Valid Until</div>
+          <div style="font-size: 9px; font-weight: 600; color: #1e293b; margin-top: 2px;">${formatDate(po.ewayBillValidUpto)}</div>
+        </div>
+      </div>
+    </div>` : ''}
     ${termsContent ? `
     <div class="terms-section">
       <div class="terms-header">Terms & Conditions</div>

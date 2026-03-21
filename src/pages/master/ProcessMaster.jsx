@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography, Row, Col, Divider } from 'antd';
+import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography, Row, Col, Divider, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -9,6 +9,12 @@ import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 
 const MODULE_ID = 'process-master';
+
+const PROCESS_CATEGORIES = [
+  { value: 'Fabric', label: 'Fabric' },
+  { value: 'Trims', label: 'Trims' },
+  { value: 'General', label: 'General' },
+];
 
 const ProcessMaster = ({ onDirtyChange }) => {
   const [data, setData] = useState([]);
@@ -50,6 +56,12 @@ const ProcessMaster = ({ onDirtyChange }) => {
       sorter: (a, b) => (a.processName || '').localeCompare(b.processName || ''),
     },
     {
+      title: 'Category',
+      dataIndex: 'category',
+      width: 100,
+      render: (val) => val ? <Tag>{val}</Tag> : <Tag color="default">—</Tag>,
+    },
+    {
       title: 'Status',
       dataIndex: 'isActive',
       width: 90,
@@ -65,7 +77,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ isActive: true, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
+    form.setFieldsValue({ isActive: true, category: null, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
@@ -142,7 +154,8 @@ const ProcessMaster = ({ onDirtyChange }) => {
     setFilteredData(
       data.filter((item) =>
         item.processName?.toLowerCase().includes(lower) ||
-        item.description?.toLowerCase().includes(lower)
+        item.description?.toLowerCase().includes(lower) ||
+        item.category?.toLowerCase().includes(lower)
       )
     );
   };
@@ -223,6 +236,9 @@ const ProcessMaster = ({ onDirtyChange }) => {
               >
                 <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
                   <Input placeholder="e.g. Fabric Dyeing" maxLength={200} />
+                </Form.Item>
+                <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
+                  <Select placeholder="Select category" options={PROCESS_CATEGORIES} allowClear />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />

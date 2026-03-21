@@ -48,14 +48,14 @@ const MasterSplitView = ({
         justifyContent: 'space-between',
         alignItems: 'center',
         gap: isMobile ? 8 : 12,
-        flexWrap: isMobile ? 'wrap' : 'nowrap',
+        flexWrap: 'wrap',
       }}>
         <Input
           placeholder={searchPlaceholder}
           prefix={<SearchOutlined style={{ color: searchIconColor }} />}
           onChange={(e) => onSearch?.(e.target.value)}
           allowClear
-          style={{ width: isMobile ? '100%' : 280, flex: isMobile ? '1 1 100%' : '0 0 280px' }}
+          style={{ flex: '1 1 180px', maxWidth: 280, minWidth: 0 }}
         />
         {onAdd && (
           <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} style={{ flexShrink: 0 }}>

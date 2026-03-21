@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -157,7 +157,7 @@ const CostingList = () => {
     fetchData(pag.current, pag.pageSize, newSort, newDirection);
   };
 
-  const handleDelete = async (record) => {
+  const handleDelete = useCallback(async (record) => {
     setDeletingId(record.id);
     try {
       await deleteCostSheet(record.id);
@@ -168,9 +168,9 @@ const CostingList = () => {
     } finally {
       setDeletingId(null);
     }
-  };
+  }, [fetchData, pagination.current, pagination.pageSize]);
 
-  const handleDuplicate = async (record) => {
+  const handleDuplicate = useCallback(async (record) => {
     setDuplicatingId(record.id);
     try {
       const dup = await duplicateCostSheet(record.id);
@@ -181,7 +181,7 @@ const CostingList = () => {
     } finally {
       setDuplicatingId(null);
     }
-  };
+  }, [fetchData, pagination.pageSize]);
 
   const handleClearFilters = () => {
     setSearchText('');
@@ -192,12 +192,12 @@ const CostingList = () => {
     setDateRange(null);
   };
 
-  const handleViewHistory = (record) => {
+  const handleViewHistory = useCallback((record) => {
     setHistoryRecord(record);
     setHistoryModalOpen(true);
-  };
+  }, []);
 
-  const handlePrint = async (record) => {
+  const handlePrint = useCallback(async (record) => {
     setPrintingId(record.id);
     try {
       const fullData = await getCostSheetById(record.id);
@@ -207,15 +207,9 @@ const CostingList = () => {
     } finally {
       setPrintingId(null);
     }
-  };
+  }, []);
 
-  const canEditSheet = (record) =>
-    EDITABLE_STATUSES.includes(record.status) && canUpdate;
-
-  const canDeleteSheet = (record) =>
-    DELETABLE_STATUSES.includes(record.status) && canDelete;
-
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Costing ID',
       dataIndex: 'costingId',
@@ -355,7 +349,7 @@ const CostingList = () => {
               />
             </Tooltip>
           )}
-          {canEditSheet(record) && (
+          {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
             <Tooltip title="Edit">
               <Button
                 type="text"
@@ -397,7 +391,7 @@ const CostingList = () => {
               />
             </Tooltip>
           )}
-          {canDeleteSheet(record) && (
+          {DELETABLE_STATUSES.includes(record.status) && canDelete && (
             <Popconfirm
               title="Delete Cost Sheet"
               description={`Are you sure you want to delete "${record.costingId}"?`}
@@ -420,7 +414,7 @@ const CostingList = () => {
         </Space>
       ),
     },
-  ];
+  ], [navigate, handleDelete, handleDuplicate, handlePrint, handleViewHistory, deletingId, duplicatingId, printingId, canView, canUpdate, canDelete]);
 
   return (
     <div className="animate-fade-in-up">

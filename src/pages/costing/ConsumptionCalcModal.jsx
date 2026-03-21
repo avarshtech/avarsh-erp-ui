@@ -10,7 +10,6 @@
  * Apply options:
  *   "Use this value"    → sets consumption on the current fabric row for that specific size
  *   "Apply average"     → sets average consumption on the current fabric row
- *   "Apply per size"    → splits the current row into one row per size with correct consumption
  */
 import { useState } from 'react';
 import {
@@ -19,7 +18,7 @@ import {
 } from 'antd';
 import {
   ThunderboltOutlined, FileImageOutlined, FileTextOutlined,
-  SplitCellsOutlined, CheckCircleOutlined, CalculatorOutlined,
+  CheckCircleOutlined, CalculatorOutlined,
 } from '@ant-design/icons';
 import { calculateConsumption } from '../../services/costingService';
 
@@ -67,17 +66,6 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
     handleClose();
   };
 
-  /** Split the current fabric row into one row per size */
-  const handleApplyPerSize = () => {
-    onApply({
-      splitBySizes: true,
-      consumptionPerSize: result.consumptionPerSize,
-      uom: result.uom,
-      sizes: result.sizes || Object.keys(result.consumptionPerSize || {}),
-    });
-    handleClose();
-  };
-
   const handleClose = () => {
     onClose();
   };
@@ -108,12 +96,13 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
     {
       title: 'Size',
       dataIndex: 'size',
-      width: 70,
-      render: (v) => <Tag style={{ fontWeight: 600 }}>{v}</Tag>,
+      width: 80,
+      render: (v) => <Tag style={{ fontWeight: 600, margin: 0 }}>{v}</Tag>,
     },
     {
       title: `Consumption (${result?.uom || ''})`,
       dataIndex: 'value',
+      width: 160,
       render: (v) => (
         <Text strong style={{ fontFamily: 'monospace', fontSize: 13 }}>
           {Number(v).toFixed(4)}
@@ -121,22 +110,25 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
       ),
     },
     {
-      title: '',
-      width: 140,
+      title: 'Action',
+      width: 120,
+      align: 'center',
       render: (_, r) => (
         <Button
-          size="small" type="primary" ghost
+          size="small"
+          type="link"
           icon={<CheckCircleOutlined />}
           onClick={() => handleApplyValue(r.size, r.value)}
+          style={{ fontSize: 12 }}
         >
-          Use this value
+          Use this
         </Button>
       ),
     },
     // For Knits: allow opening the manual parts calculator pre-filled with AI data
     ...(isKnits && onOpenKnitsCalc ? [{
       title: '',
-      width: 155,
+      width: 150,
       render: (_, r) => (
         <Tooltip title="Pre-fill the Knits Parts Calculator with AI values for this size — review & adjust before applying">
           <Button
@@ -190,24 +182,19 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           AI Fabric Consumption Calculator
         </Space>
       }
-      width={860}
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      width={780}
+      styles={{ body: { maxHeight: '72vh', overflowY: 'auto', overflowX: 'hidden', padding: '20px 24px' } }}
       footer={
         step === 'result' ? (
-          <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Button onClick={() => setStep('upload')}>Upload Different Files</Button>
             <Space>
               <Button onClick={handleClose}>Cancel</Button>
-              <Tooltip title={`Creates ${sizeData.length} fabric rows — one per size`}>
-                <Button icon={<SplitCellsOutlined />} onClick={handleApplyPerSize}>
-                  Apply per size
-                </Button>
-              </Tooltip>
               <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleApplyAverage}>
                 Apply average ({avg} {result?.uom})
               </Button>
             </Space>
-          </Space>
+          </div>
         ) : null
       }
       destroyOnClose
@@ -216,9 +203,9 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
       {/* ── Step 1: Upload ──────────────────────────────────────────── */}
       {step === 'upload' && (
         <Spin spinning={loading} tip="AI is reading measurements and calculating consumption…">
-          <Row gutter={16} style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             {/* Measurement chart — required */}
-            <Col span={15}>
+            <div style={{ flex: 3, minWidth: 0 }}>
               <Text strong>
                 Size Spec / Measurement Chart <Text type="danger">*</Text>
               </Text>
@@ -230,10 +217,10 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 multiple={false}
                 beforeUpload={(f) => { setMeasurementFile(f); return false; }}
                 showUploadList={false}
-                style={{ padding: '18px 8px' }}
+                style={{ padding: '16px 8px' }}
               >
                 <FileImageOutlined
-                  style={{ fontSize: 38, color: measurementFile ? '#52c41a' : '#1677ff' }}
+                  style={{ fontSize: 36, color: measurementFile ? '#52c41a' : '#1677ff' }}
                 />
                 <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
                   {measurementFile
@@ -245,23 +232,23 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                   PNG / JPG / PDF accepted
                 </p>
               </Dragger>
-            </Col>
+            </div>
 
             {/* Techpack — optional */}
-            <Col span={9}>
+            <div style={{ flex: 2, minWidth: 0 }}>
               <Text strong>Techpack PDF <Text type="secondary">(optional)</Text></Text>
               <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 6 }}>
-                Provides GSM, Woven/Knits classification, panel construction
+                GSM, Woven/Knits classification, panel info
               </Text>
               <Dragger
                 accept=".pdf"
                 multiple={false}
                 beforeUpload={(f) => { setTechpackFile(f); return false; }}
                 showUploadList={false}
-                style={{ padding: '18px 8px' }}
+                style={{ padding: '16px 8px' }}
               >
                 <FileTextOutlined
-                  style={{ fontSize: 38, color: techpackFile ? '#52c41a' : '#8c8c8c' }}
+                  style={{ fontSize: 36, color: techpackFile ? '#52c41a' : '#8c8c8c' }}
                 />
                 <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
                   {techpackFile
@@ -271,12 +258,12 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 </p>
                 <p style={{ fontSize: 11, color: '#8c8c8c', margin: 0 }}>PDF only</p>
               </Dragger>
-            </Col>
-          </Row>
+            </div>
+          </div>
 
           {fabricRow && (
             <Alert
-              type="info" showIcon style={{ marginBottom: 12 }}
+              type="info" showIcon style={{ marginBottom: 16 }}
               message={`Fabric row: ${fabricRow.fabricType || fabricRow.description || '—'} · ${fabricRow.classification || 'classification unknown'}`}
             />
           )}
@@ -285,7 +272,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
             type="primary" block icon={<ThunderboltOutlined />}
             onClick={handleCalculate} loading={loading}
             disabled={!measurementFile}
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: 16 }}
           >
             Calculate Consumption with AI
           </Button>
@@ -328,7 +315,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           {/* AI assumptions */}
           {result.assumptions && (
             <Alert
-              type="info" showIcon style={{ marginBottom: 12 }}
+              type="info" showIcon style={{ marginBottom: 16 }}
               message="AI Analysis"
               description={
                 <Paragraph style={{ margin: 0, fontSize: 12 }}>
@@ -358,10 +345,10 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
             </details>
           )}
 
-          <Divider style={{ margin: '8px 0' }} />
+          <Divider style={{ margin: '12px 0' }} />
 
           {/* Summary statistics */}
-          <Row gutter={16} style={{ marginBottom: 12 }}>
+          <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={8}>
               <Statistic
                 title="Smallest size"
@@ -389,13 +376,17 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           </Row>
 
           {/* Per-size consumption table */}
-          <Text strong style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>
+          <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 13 }}>
             Consumption per Size — {sizeData.length} sizes
           </Text>
           <Table
-            size="small" pagination={false}
-            dataSource={sizeData} columns={sizeColumns}
+            size="small"
+            pagination={false}
+            bordered
+            dataSource={sizeData}
+            columns={sizeColumns}
             scroll={{ y: 280 }}
+            tableLayout="fixed"
           />
         </div>
       )}

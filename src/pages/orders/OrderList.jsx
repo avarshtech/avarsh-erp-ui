@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
@@ -38,6 +38,15 @@ import OrderView from './OrderView';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
+
+// Format currency — pure function, defined outside component to avoid recreation
+const formatCurrency = (amount, currency) => {
+  if (amount === null || amount === undefined) return `${getCurrencySymbol(currency)} 0.00`;
+  return `${getCurrencySymbol(currency)} ${Number(amount).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+};
 
 // Status config mapping
 const STATUS_CONFIG = {
@@ -133,7 +142,7 @@ const OrderList = () => {
   };
 
   // Delete
-  const handleDelete = async (record) => {
+  const handleDelete = useCallback(async (record) => {
     setDeletingId(record.id);
     try {
       await deleteOrder(record.id);
@@ -144,13 +153,13 @@ const OrderList = () => {
     } finally {
       setDeletingId(null);
     }
-  };
+  }, [fetchData, pagination.current, pagination.pageSize]);
 
   // View
-  const handleView = (record) => {
+  const handleView = useCallback((record) => {
     setViewingOrder(record);
     setViewModalVisible(true);
-  };
+  }, []);
 
   const handleStatusActionComplete = () => {
     setViewModalVisible(false);
@@ -158,24 +167,7 @@ const OrderList = () => {
     fetchData(pagination.current, pagination.pageSize);
   };
 
-  // Format currency
-  const formatCurrency = (amount, currency) => {
-    if (amount === null || amount === undefined) return `${getCurrencySymbol(currency)} 0.00`;
-    return `${getCurrencySymbol(currency)} ${Number(amount).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
-
-  // Can edit?
-  const canEditOrder = (record) =>
-    EDITABLE_STATUSES.includes(record.status) && canUpdate;
-
-  // Can delete?
-  const canDeleteOrder = (record) =>
-    DELETABLE_STATUSES.includes(record.status) && canDelete;
-
-  const columns = [
+  const columns = useMemo(() => [
     {
       title: 'Order No',
       dataIndex: 'orderNo',
@@ -274,7 +266,7 @@ const OrderList = () => {
               />
             </Tooltip>
           )}
-          {canEditOrder(record) && (
+          {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
             <Tooltip title="Edit">
               <Button
                 type="text"
@@ -285,7 +277,7 @@ const OrderList = () => {
               />
             </Tooltip>
           )}
-          {canDeleteOrder(record) && (
+          {DELETABLE_STATUSES.includes(record.status) && canDelete && (
             <Popconfirm
               title="Delete Order"
               description={`Are you sure you want to delete "${record.orderNo}"?`}
@@ -308,7 +300,7 @@ const OrderList = () => {
         </Space>
       ),
     },
-  ];
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
 
   return (
     <div className="animate-fade-in-up">

@@ -36,6 +36,7 @@ import {
   CheckCircleOutlined,
   WarningOutlined,
   InfoCircleOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
@@ -58,8 +59,10 @@ import {
   buildOrderQtyGrid,
   calcMatrixTotal,
 } from '../../utils/bomConstants';
+import { calculateConsumption } from '../../services/costingService';
 import ProcessAllowanceModal from './ProcessAllowanceModal';
 import ConsumptionMatrixDialog from './ConsumptionMatrixDialog';
+import ConsumptionCalcModal from '../costing/ConsumptionCalcModal';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -321,6 +324,10 @@ const BOMForm = () => {
   const [buyerPoPickerOptions, setBuyerPoPickerOptions] = useState([]); // [{ buyerPoNo, qty }]
   const [pendingProcessData, setPendingProcessData] = useState(null); // stashed data to open allowance after PO pick
 
+  // ── AI Consumption Calculator Modal ────────────────────────────
+  const [consumptionModalOpen, setConsumptionModalOpen] = useState(false);
+  const [consumptionLineKey, setConsumptionLineKey] = useState(null);
+  const [consumptionFabricRow, setConsumptionFabricRow] = useState(null);
 
   // ==================== LOAD DROPDOWN DATA ====================
 
@@ -808,7 +815,7 @@ const BOMForm = () => {
           processes: [],
           processAllowances: [],
         });
-        if (!valid) message.error({ content: errorMsg, key: 'variant-validation' });
+        if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
       };
       confirmIfHasData(lineKey, doChange);
     },
@@ -836,7 +843,7 @@ const BOMForm = () => {
         const variant = (line?.availableVariants || []).find((v) => v.id === variantId);
         const sorted = sortAttrs(variant?.attributes || {});
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
-        if (!valid) message.error({ content: errorMsg, key: 'variant-validation' });
+        if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
           l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, consumptionMatrix: null, variantMapping: null } : l,
         );
@@ -1114,7 +1121,8 @@ const BOMForm = () => {
 
   // ==================== PROCESS OPTIONS ====================
 
-  const processOptions = useMemo(() => {
+  /** All process options (sorted) */
+  const allProcessOptions = useMemo(() => {
     return processesList
       .sort((a, b) => (a.processName || '').localeCompare(b.processName || ''))
       .map((p) => ({
@@ -1123,6 +1131,20 @@ const BOMForm = () => {
         process: p,
       }));
   }, [processesList]);
+
+  /** Filtered process options per line category */
+  const getProcessOptionsForLine = useCallback((line) => {
+    const fabric = isFabricCategory(line);
+    const matchCategory = fabric ? 'fabric' : 'trims';
+    return allProcessOptions.filter((opt) => {
+      const cat = (opt.process.category || '').toLowerCase();
+      // Show if: category matches, or is "general", or no category set
+      return !cat || cat === 'general' || cat === matchCategory;
+    });
+  }, [allProcessOptions]);
+
+  // Backward-compat: flat list used in other places (allowance dialog, payload builder)
+  const processOptions = allProcessOptions;
 
   // ==================== SUMMARY ====================
 
@@ -1174,6 +1196,36 @@ const BOMForm = () => {
     }, 0);
     return { total, fabricLines, trimLines, completedLines, totalPurchaseQty };
   }, [lines, computeTotalQty]);
+
+  // ==================== AI CONSUMPTION CALCULATOR ====================
+
+  const openConsumptionModal = useCallback((lineKey, record) => {
+    setConsumptionLineKey(lineKey);
+    setConsumptionFabricRow({
+      fabricType: record.itemName || '',
+      description: record.itemCode || '',
+      classification: '', // AI will determine from measurement chart
+    });
+    setConsumptionModalOpen(true);
+  }, []);
+
+  const handleConsumptionApply = useCallback(({ splitBySizes, consumption, uom, consumptionPerSize, sizes }) => {
+    if (!consumptionLineKey) return;
+    if (!splitBySizes) {
+      // Single value or average — update consumption on the current line
+      updateLine(consumptionLineKey, 'consumptionPerGarment', consumption);
+    } else {
+      // "Apply per size" — apply average to the single fabric line
+      // (fabric BOM lines use SIMPLE consumption mode, one value per garment)
+      const values = Object.values(consumptionPerSize || {});
+      if (values.length) {
+        const avg = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10000) / 10000;
+        updateLine(consumptionLineKey, 'consumptionPerGarment', avg);
+        message.info(`Applied average consumption (${avg}) across ${values.length} sizes.`);
+      }
+    }
+    setIsDirty(true);
+  }, [consumptionLineKey, updateLine]);
 
   // ==================== SAVE / SUBMIT ====================
 
@@ -1336,10 +1388,7 @@ const BOMForm = () => {
         }
       }
 
-      // ── CAD Marker (submit only, fabric only) ──
-      if (mode === 'submit' && fabric && !l._cadFileId && !l.cadPreviewUrl && !l._cadStagedFile) {
-        errors.push(`Line ${n}: CAD marker file is required for submission.`);
-      }
+      // ── CAD Marker — optional for both draft and submit ──
 
       // ── Total Qty check (submit only) ──
       if (mode === 'submit') {
@@ -1632,18 +1681,26 @@ const BOMForm = () => {
                 {showVariantDropdown && record.variantId && (() => {
                   const tags = variantsToTags(record.variants);
                   return tags.length > 0 ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {variants.length > 1 && (
-                        <Tooltip title="Change variant">
-                          <EditOutlined
-                            style={{ fontSize: 11, color: '#1677ff', cursor: 'pointer' }}
-                            onClick={() => { setVariantEditLineKey(record.key); handleVariantSelect(record.key, null); }}
-                          />
-                        </Tooltip>
-                      )}
-                      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                        {tags.map((t) => <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 10 }}>{t}</Tag>)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {variants.length > 1 && (
+                          <Tooltip title="Change variant">
+                            <EditOutlined
+                              style={{ fontSize: 11, color: '#1677ff', cursor: 'pointer' }}
+                              onClick={() => { setVariantEditLineKey(record.key); handleVariantSelect(record.key, null); }}
+                            />
+                          </Tooltip>
+                        )}
+                        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                          {tags.map((t) => <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 10 }}>{t}</Tag>)}
+                        </div>
                       </div>
+                      {record.colorInvalid && (
+                        <Text type="warning" style={{ fontSize: 10, color: '#faad14', lineHeight: 1.3 }}>
+                          <WarningOutlined style={{ marginRight: 3 }} />
+                          Color not found in order
+                        </Text>
+                      )}
                     </div>
                   ) : null;
                 })()}
@@ -1680,23 +1737,31 @@ const BOMForm = () => {
           const tags = variantsToTags(record.variants);
           if (tags.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {variants.length > 1 && (
-                <Tooltip title="Change variant">
-                  <EditOutlined
-                    style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer', flexShrink: 0 }}
-                    onClick={() => {
-                      setVariantEditLineKey(record.key);
-                      handleVariantSelect(record.key, null);
-                    }}
-                  />
-                </Tooltip>
-              )}
-              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                {tags.map((t) => (
-                  <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
-                ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {variants.length > 1 && (
+                  <Tooltip title="Change variant">
+                    <EditOutlined
+                      style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer', flexShrink: 0 }}
+                      onClick={() => {
+                        setVariantEditLineKey(record.key);
+                        handleVariantSelect(record.key, null);
+                      }}
+                    />
+                  </Tooltip>
+                )}
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {tags.map((t) => (
+                    <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
+                  ))}
+                </div>
               </div>
+              {record.colorInvalid && (
+                <Text type="warning" style={{ fontSize: 10, color: '#faad14', lineHeight: 1.3 }}>
+                  <WarningOutlined style={{ marginRight: 3 }} />
+                  Color not found in order
+                </Text>
+              )}
             </div>
           );
         },
@@ -1728,23 +1793,36 @@ const BOMForm = () => {
             );
           }
 
-          // Fabric: InputNumber + base qty below
+          // Fabric: InputNumber + AI button + base qty below
           // SIMPLE trims: InputNumber only
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <InputNumber
-                min={0}
-                step={0.001}
-                precision={4}
-                size="small"
-                style={{ width: '100%' }}
-                placeholder={record.colorInvalid ? 'Invalid color' : !record.itemId ? 'Select item first' : !record.variantId && (record.availableVariants || []).length > 1 ? 'Select variant first' : '0.0000'}
-                value={value}
-                onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
-                controls={false}
-                disabled={record.colorInvalid || !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
-              />
-              {fabric && record.variantId && !record.colorInvalid && (() => {
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
+                <InputNumber
+                  min={0}
+                  step={0.001}
+                  precision={4}
+                  size="small"
+                  style={{ flex: 1 }}
+                  placeholder={!record.itemId ? 'Select item first' : !record.variantId && (record.availableVariants || []).length > 1 ? 'Select variant first' : '0.0000'}
+                  value={value}
+                  onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
+                  controls={false}
+                  disabled={!record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
+                />
+                {fabric && (
+                  <Tooltip title="Calculate from Measurement Chart (AI)">
+                    <Button
+                      icon={<ThunderboltOutlined />}
+                      onClick={() => openConsumptionModal(record.key, record)}
+                      size="small"
+                      type="text"
+                      style={{ color: '#faad14', flexShrink: 0 }}
+                    />
+                  </Tooltip>
+                )}
+              </div>
+              {fabric && record.variantId && (() => {
                 const color = getVariantAttr(record, 'color');
                 const { qty } = getColorQty(record);
                 if (!qty) return null;
@@ -1831,7 +1909,7 @@ const BOMForm = () => {
               size="small"
               value={value || []}
               onChange={(v) => handleProcessChange(record.key, v)}
-              options={processOptions}
+              options={getProcessOptionsForLine(record)}
               showSearch={{ optionFilterProp: 'label' }}
               disabled={(() => {
                 const cMode = record.consumptionMode || 'SIMPLE';
@@ -1920,7 +1998,7 @@ const BOMForm = () => {
         align: 'center',
         render: (_, record) => {
           if (!isFabricCategory(record)) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-          const isDisabled = record.colorInvalid || !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1);
+          const isDisabled = !record.itemId || (!record.variantId && (record.availableVariants || []).length > 1);
 
           // Show file name tooltip if CAD is uploaded or staged
           if (record.cadPreviewUrl || record._cadFileId || record._cadStagedFile) {
@@ -2692,6 +2770,14 @@ const BOMForm = () => {
           );
         })()}
       </Modal>
+
+      {/* ── AI Consumption Calculator Modal ──────────────────────── */}
+      <ConsumptionCalcModal
+        open={consumptionModalOpen}
+        onClose={() => setConsumptionModalOpen(false)}
+        onApply={handleConsumptionApply}
+        fabricRow={consumptionFabricRow}
+      />
 
       {/* ── Auto-generated row styling ─────────────────────────── */}
       <style>{`

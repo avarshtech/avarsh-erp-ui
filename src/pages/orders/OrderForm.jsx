@@ -163,7 +163,7 @@ const CostingAttachmentCard = ({ attachment }) => {
 
 // ==================== COMPONENT DETAILS DIALOG ====================
 
-const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
+const ComponentDialog = ({ open, components, onSave, onCancel }) => {
   const [rows, setRows] = useState(() =>
     components && components.length > 0
       ? components
@@ -175,7 +175,7 @@ const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
 
   // Sync when components prop changes (e.g. reopening)
   useEffect(() => {
-    if (visible) {
+    if (open) {
       setRows(
         components && components.length > 0
           ? components
@@ -185,7 +185,7 @@ const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
             ]
       );
     }
-  }, [visible, components]);
+  }, [open, components]);
 
   const handleChange = (key, field, value) => {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
@@ -273,7 +273,7 @@ const ComponentDialog = ({ visible, components, onSave, onCancel }) => {
   return (
     <Modal
       title="Component Details"
-      open={visible}
+      open={open}
       onOk={handleOk}
       onCancel={onCancel}
       okText="Save Components"
@@ -934,7 +934,7 @@ const OrderForm = () => {
     setCostingLoading(true);
     try {
       const costing = await getCostSheetByCostingId(val);
-      if (costing.status?.toUpperCase() !== 'APPROVED') {
+      if (costing.status?.toUpperCase() !== 'FINAL') {
         message.error('Costing is not approved. Only approved costings can be used for order creation.');
         setCostingLoading(false);
         return;
@@ -1313,7 +1313,7 @@ const OrderForm = () => {
 
       {/* Component Details Dialog */}
       <ComponentDialog
-        visible={componentModalVisible}
+        open={componentModalVisible}
         components={formComponents}
         onSave={(saved) => {
           setFormComponents(saved);

@@ -21,6 +21,8 @@ import {
   Progress,
   Card,
   Popover,
+  Row,
+  Col,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -40,12 +42,14 @@ import {
   PaperClipOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getPurchaseOrderById,
   updatePurchaseOrder,
   createActivity,
+  cancelEwayBill,
 } from '../../services/purchaseOrderService';
 import { updateBomLinePoStatus } from '../../services/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -59,7 +63,7 @@ import {
   hasPermission,
   getCurrentUser,
 } from '../../utils/permissions';
-import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_STATUS, EWAY_BILL_THRESHOLD, EWAY_BILL_CANCEL_REASONS } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
 import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
@@ -118,6 +122,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   const [actionReason, setActionReason] = useState('');
   const [rejectionCategory, setRejectionCategory] = useState(null);
   const [printLoading, setPrintLoading] = useState(false);
+  const [ewayBillCancelLoading, setEwayBillCancelLoading] = useState(false);
 
   // Load full PO data when modal opens
   useEffect(() => {
@@ -760,6 +765,26 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
     }
   };
 
+  const handleCancelEwayBill = async (cancelReasonCode, cancelRemarks) => {
+    if (!po?.ewayBillNo) return;
+    setEwayBillCancelLoading(true);
+    try {
+      await cancelEwayBill({
+        poId: po.id,
+        ewayBillNo: po.ewayBillNo,
+        cancelReasonCode,
+        cancelRemarks,
+      });
+      message.success('E-way Bill cancelled successfully');
+      setPo((prev) => ({ ...prev, ewayBillStatus: 'CANCELLED' }));
+      if (onRefresh) onRefresh();
+    } catch {
+      message.error('Failed to cancel E-way Bill');
+    } finally {
+      setEwayBillCancelLoading(false);
+    }
+  };
+
   // Line items columns
   const lineItemColumns = [
     {
@@ -839,6 +864,59 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       dataIndex: 'description',
       width: 180,
       render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
+    },
+    {
+      title: 'HSN',
+      key: 'hsn',
+      dataIndex: 'hsnCode',
+      width: 110,
+      align: 'center',
+      render: (v, r) => {
+        const hasStages = r.processingStages && r.processingStages.length > 0;
+        return (
+          <div style={{ textAlign: 'center' }}>
+            <Text type="secondary">{v || '-'}</Text>
+            {hasStages && (
+              <Popover
+                trigger="click"
+                placement="bottomLeft"
+                overlayStyle={{ maxWidth: 320 }}
+                content={
+                  <div style={{ minWidth: 220 }}>
+                    <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                      Processing Stages
+                    </Text>
+                    {r.processingStages.map((s, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '4px 0',
+                          borderBottom: i < r.processingStages.length - 1 ? '1px solid #f0f0f0' : 'none',
+                        }}
+                      >
+                        <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>{s.stageName}</Tag>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          {s.completionDate || '-'}
+                        </Text>
+                      </div>
+                    ))}
+                  </div>
+                }
+              >
+                <Tag
+                  color="purple"
+                  style={{ cursor: 'pointer', marginTop: 4, fontSize: 10, display: 'inline-block' }}
+                >
+                  {r.processingStages.length} stage{r.processingStages.length > 1 ? 's' : ''}
+                </Tag>
+              </Popover>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Qty',
@@ -941,6 +1019,89 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
             },
           },
         ]
+      : []),
+  ];
+
+  const processLineItemColumns = [
+    {
+      title: '#',
+      width: 45,
+      align: 'center',
+      render: (_, __, i) => i + 1,
+    },
+    {
+      title: 'Process Name',
+      key: 'processName',
+      dataIndex: 'processName',
+      width: 200,
+      render: (v) => <Text strong>{v || '-'}</Text>,
+    },
+    {
+      title: 'Description',
+      dataIndex: 'description',
+      width: 200,
+      render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
+    },
+    {
+      title: 'Qty',
+      key: 'qty',
+      width: 70,
+      align: 'center',
+      render: (_, r) => r.quantity || r.qty || 0,
+    },
+    {
+      title: 'Unit Price',
+      dataIndex: 'unitPrice',
+      width: 100,
+      align: 'right',
+      render: (v) => formatCurrency(v),
+    },
+    ...(hasIgst
+      ? [{ title: 'IGST %', key: 'igst', width: 80, align: 'center', render: (_, r) => `${r.igst || r.gstPercent || 0}%` }]
+      : [
+          { title: 'SGST %', key: 'sgst', width: 80, align: 'center', render: (_, r) => `${r.sgstPercent || r.sgst || 0}%` },
+          { title: 'CGST %', key: 'cgst', width: 80, align: 'center', render: (_, r) => `${r.cgstPercent || r.cgst || 0}%` },
+        ]),
+    {
+      title: 'Amount',
+      key: 'totalAmount',
+      width: 110,
+      align: 'right',
+      render: (_, r) => (
+        <Text strong style={{ whiteSpace: 'nowrap' }}>{formatCurrency(r.totalAmount || r.amount || 0)}</Text>
+      ),
+    },
+    ...(showStatusColumn
+      ? [{
+          title: 'Status',
+          key: 'lineStatus',
+          width: 120,
+          align: 'center',
+          render: (_, r) => {
+            const st = r.status || PO_STATUS.DRAFT;
+            const lineConfig = STATUS_CONFIG[st] || { color: 'default' };
+            return <Tag color={lineConfig.color} style={{ borderRadius: 12 }}>{getLineItemStatusLabel(st)}</Tag>;
+          },
+        }]
+      : []),
+    ...(canMarkLineCompleted
+      ? [{
+          title: '',
+          key: 'lineAction',
+          width: 100,
+          render: (_, r) => {
+            if (r.status === LINE_ITEM_STATUS.COMPLETED) return <Tag color="success">Done</Tag>;
+            return (
+              <Tooltip title="Mark as complete">
+                <Button size="small" type="link" icon={<CheckCircleOutlined />}
+                  onClick={() => handleMarkLineItemCompleted(r)}
+                  loading={completingLineId === (r.id || r.itemId)}>
+                  Complete
+                </Button>
+              </Tooltip>
+            );
+          },
+        }]
       : []),
   ];
 
@@ -1149,10 +1310,15 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                   label: 'Status',
                   children: renderStatusTag(po.status),
                 },
-                po?.poType && po.poType !== 'General' && {
+                (po?.isProcessPo || (po?.poType && po.poType !== 'General')) && {
                   key: 'poType',
                   label: 'PO Type',
-                  children: <Tag color="purple">{po.poType} PO</Tag>,
+                  children: (
+                    <Space>
+                      {po?.poType && po.poType !== 'General' && <Tag color="purple">{po.poType} PO</Tag>}
+                      {po?.isProcessPo && <Tag color="purple" icon={<ExperimentOutlined />}>Process PO</Tag>}
+                    </Space>
+                  ),
                 },
                 {
                   key: 'supplier',
@@ -1224,7 +1390,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
             </Title>
             <Table
               dataSource={po.lineItems || []}
-              columns={lineItemColumns}
+              columns={po?.isProcessPo ? processLineItemColumns : lineItemColumns}
               pagination={false}
               scroll={{ x: 900 }}
               size="small"
@@ -1360,6 +1526,85 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                 </div>
               </div>
             </div>
+
+            {/* E-way Bill Details — visible for Process POs with e-way bill data */}
+            {po?.isProcessPo && po?.ewayBillNo && (
+              <Card
+                size="small"
+                style={{ marginBottom: 24 }}
+                title={
+                  <Space>
+                    <FileTextOutlined />
+                    <span>E-way Bill Details</span>
+                    <Tag color={
+                      po.ewayBillStatus === 'ACTIVE' ? 'success'
+                        : po.ewayBillStatus === 'CANCELLED' ? 'error'
+                        : 'default'
+                    }>
+                      {po.ewayBillStatus || 'ACTIVE'}
+                    </Tag>
+                  </Space>
+                }
+              >
+                <Row gutter={[24, 12]}>
+                  <Col xs={12} sm={8} md={6}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>E-way Bill No</Text>
+                    <Text strong style={{ fontSize: 14, fontFamily: 'monospace' }}>{po.ewayBillNo}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Generated Date</Text>
+                    <Text strong>{formatDate(po.ewayBillDate)}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Valid Until</Text>
+                    <Text strong>{formatDate(po.ewayBillValidUpto)}</Text>
+                  </Col>
+                  <Col xs={12} sm={8} md={6}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Status</Text>
+                    <Tag color={po.ewayBillStatus === 'ACTIVE' ? 'success' : po.ewayBillStatus === 'CANCELLED' ? 'error' : 'default'}>
+                      {po.ewayBillStatus || 'ACTIVE'}
+                    </Tag>
+                  </Col>
+                </Row>
+                {po.ewayBillStatus === 'ACTIVE' && (
+                  <div style={{ marginTop: 12, textAlign: 'right' }}>
+                    <Popconfirm
+                      title="Cancel E-way Bill"
+                      description={
+                        <div style={{ maxWidth: 300 }}>
+                          <Select
+                            placeholder="Select cancel reason"
+                            style={{ width: '100%', marginBottom: 8 }}
+                            options={EWAY_BILL_CANCEL_REASONS}
+                            onChange={(val) => {
+                              document.getElementById('ewb-cancel-reason-code').value = val;
+                            }}
+                          />
+                          <Input.TextArea
+                            id="ewb-cancel-remarks"
+                            placeholder="Cancel remarks..."
+                            rows={2}
+                          />
+                          <input type="hidden" id="ewb-cancel-reason-code" />
+                        </div>
+                      }
+                      onConfirm={() => {
+                        const code = document.getElementById('ewb-cancel-reason-code')?.value;
+                        const remarks = document.getElementById('ewb-cancel-remarks')?.value;
+                        if (!code) { message.warning('Please select a cancel reason'); return; }
+                        handleCancelEwayBill(Number(code), remarks || '');
+                      }}
+                      okText="Cancel E-way Bill"
+                      okButtonProps={{ danger: true, loading: ewayBillCancelLoading }}
+                    >
+                      <Button danger size="small" loading={ewayBillCancelLoading}>
+                        Cancel E-way Bill
+                      </Button>
+                    </Popconfirm>
+                  </div>
+                )}
+              </Card>
+            )}
 
             {/* Activity Log & Notes — shown when entries exist or PO is not a draft */}
             {(notes.length > 0 || po?.status !== PO_STATUS.DRAFT) && (
