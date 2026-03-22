@@ -90,6 +90,7 @@ const createEmptyLine = () => ({
   partsName: '',
   consumptionPerGarment: null,
   colorInvalid: false, // true when variant color not found in order lines
+  overrideBaseQty: null, // manual base qty when variant color not in order (fabric only)
   qtyCalcBasis: 'TOTAL', // per-line calc basis
   consumptionMode: 'SIMPLE', // 'SIMPLE', 'SIZE_WISE', 'VARIANT_PER_SIZE'
   consumptionMatrix: null, // { color: { size: consumption } }
@@ -112,16 +113,24 @@ const formatOrderNo = (raw, prev = '') => {
   if (!raw || raw.length < prefix.length) return prefix;
   const isDeleting = raw.length < prev.length;
   if (isDeleting && raw.length <= prefix.length) return prefix;
-  const after = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  let digits = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  // When deleting and the removed char was a separator (- or /),
+  // also remove the digit before it so backspace feels natural
+  if (isDeleting && prev.length > prefix.length) {
+    const removedChar = prev[raw.length];
+    if (removedChar === '-' || removedChar === '/') {
+      digits = digits.slice(0, -1);
+    }
+  }
   let result = prefix;
-  for (let i = 0; i < after.length; i++) {
+  for (let i = 0; i < digits.length; i++) {
     if (i === 2) result += '-';
     if (i === 4) result += '/';
-    result += after[i];
+    result += digits[i];
   }
   if (!isDeleting) {
-    if (after.length === 2 && !result.endsWith('-')) result += '-';
-    if (after.length === 4 && !result.endsWith('/')) result += '/';
+    if (digits.length === 2 && !result.endsWith('-')) result += '-';
+    if (digits.length === 4 && !result.endsWith('/')) result += '/';
   }
   return result;
 };
@@ -331,7 +340,10 @@ const BOMForm = () => {
 
   // ==================== LOAD DROPDOWN DATA ====================
 
+  const dropdownFetchedRef = useRef(false);
   useEffect(() => {
+    if (dropdownFetchedRef.current) return;
+    dropdownFetchedRef.current = true;
     const loadData = async () => {
       const [processResult, metaResult, partsResult] = await Promise.allSettled([getActiveProcesses(), getItemMetaData(), getActiveParts()]);
       if (processResult.status === 'fulfilled') {
@@ -352,8 +364,11 @@ const BOMForm = () => {
 
   // ==================== LOAD EXISTING BOM (Edit Mode) ====================
 
+  const bomFetchedRef = useRef(false);
   useEffect(() => {
     if (!isEdit) return;
+    if (bomFetchedRef.current) return;
+    bomFetchedRef.current = true;
     const loadBom = async () => {
       setLoading(true);
       try {
@@ -374,8 +389,8 @@ const BOMForm = () => {
         setRemarks(bom.remarks || '');
 
         if (bom.lines?.length > 0) {
-          // Step 1: Render lines immediately from BOM response (no API wait)
-          const mappedLines = bom.lines.map((l) => {
+          // Step 1: Map lines from BOM response
+          let mappedLines = bom.lines.map((l) => {
             let itemTypeId = null;
             if (l.categoryId && l.subCategoryId && l.itemTypeName && metaData.length > 0) {
               const cat = metaData.find((c) => c.id === l.categoryId);
@@ -412,39 +427,41 @@ const BOMForm = () => {
               consumptionMatrix: l.consumptionMatrix || null,
               variantMapping: l.variantMapping || null,
               totalQty: l.totalQty,
+              _savedBaseQty: l.baseQty || null,
               cadPreviewUrl: null,
               _cadFileId: null,
               isPoGenerated: l.isPoGenerated || false,
               remarks: l.remarks || '',
             };
           });
-          setLines(mappedLines);
-
-          // Step 2: Single bulk fetch for all item details (variants, UOM, itemTypeId)
+          // Step 2: Bulk fetch item details (variants, UOM, itemTypeId) before rendering
           const itemIds = [...new Set(bom.lines.map((l) => l.itemId).filter(Boolean))];
           if (itemIds.length > 0) {
-            getItemsByIds(itemIds)
-              .then((res) => {
-                const items = res?.data || res || [];
-                const itemMap = {};
-                (Array.isArray(items) ? items : []).forEach((item) => { itemMap[item.id] = item; });
-                setLines((prev) => prev.map((line) => {
-                  const item = itemMap[line.itemId];
-                  if (!item) return line;
-                  const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
-                  return {
-                    ...line,
-                    availableVariants: activeVariants,
-                    primaryUom: item.uomSymbol || line.primaryUom,
-                    secondaryUom: item.secondaryUomSymbol || '',
-                    itemTypeId: line.itemTypeId || item.itemTypeId || null,
-                  };
-                }));
-              })
-              .catch(() => { /* item details unavailable — variant editing won't work */ });
+            try {
+              const res = await getItemsByIds(itemIds);
+              const items = res?.data || res || [];
+              const itemMap = {};
+              (Array.isArray(items) ? items : []).forEach((item) => { itemMap[item.id] = item; });
+              mappedLines = mappedLines.map((line) => {
+                const item = itemMap[line.itemId];
+                if (!item) return line;
+                const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
+                return {
+                  ...line,
+                  availableVariants: activeVariants,
+                  primaryUom: item.uomSymbol || line.primaryUom,
+                  secondaryUom: item.secondaryUomSymbol || '',
+                  itemTypeId: line.itemTypeId || item.itemTypeId || null,
+                };
+              });
+            } catch {
+              /* item details unavailable — variant editing won't work */
+            }
           }
 
-          // Load CAD files for fabric lines only (async, non-blocking)
+          setLines(mappedLines);
+
+          // Load CAD files for fabric lines only (async, non-blocking — doesn't block skeleton)
           const linesWithId = mappedLines.filter((l) => l.id && isFabricCategory(l));
           for (const l of linesWithId) {
             getFilesByEntity('BOM_LINE', l.id)
@@ -470,11 +487,14 @@ const BOMForm = () => {
       }
     };
     loadBom();
-  }, [id, isEdit, navigate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, isEdit]);
 
   // Lazy-load order summary for edit mode (non-blocking, runs after form renders)
+  const orderSummaryFetchedRef = useRef(false);
   useEffect(() => {
-    if (!isEdit || !orderNo || orderLineSummary.length > 0) return;
+    if (!isEdit || !orderNo || orderSummaryFetchedRef.current) return;
+    orderSummaryFetchedRef.current = true;
     const loadOrderSummary = async () => {
       setOrderSummaryLoading(true);
       try {
@@ -794,6 +814,7 @@ const BOMForm = () => {
         if (firstVariant && isVariantDuplicate(firstVariant.id, lineKey)) {
           message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
           firstVariant = null; // force dropdown to show for manual selection
+          setVariantEditLineKey(lineKey); // auto-open variant dropdown
         }
         const selectedAttrs = sortAttrs(firstVariant?.attributes);
         const { valid, errorMsg } = firstVariant ? validateVariantInOrder(selectedAttrs, fabric) : { valid: true };
@@ -826,14 +847,14 @@ const BOMForm = () => {
   const handleVariantSelect = useCallback(
     (lineKey, variantId) => {
       if (variantId === null) {
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
         return;
       }
       // Check duplicate
       if (isVariantDuplicate(variantId, lineKey)) {
         message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
         // Clear selection and keep dropdown open
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
         setVariantEditLineKey(lineKey);
         return;
       }
@@ -845,7 +866,7 @@ const BOMForm = () => {
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
         if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
-          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, consumptionMatrix: null, variantMapping: null } : l,
+          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, consumptionMatrix: null, variantMapping: null } : l,
         );
       });
       setIsDirty(true);
@@ -862,6 +883,17 @@ const BOMForm = () => {
     const key = Object.keys(line.variants).find((k) => k.toLowerCase() === attrName.toLowerCase());
     return key ? String(line.variants[key]).trim() : null;
   }, []);
+
+  /** Check if a fabric line's variant color is NOT found in any order line. */
+  const isFabricColorMissing = useCallback((line) => {
+    if (!isFabricCategory(line) || !line.variantId) return false;
+    const color = getVariantAttr(line, 'color');
+    if (!color) return false;
+    if (orderLineSummary.length === 0) return false;
+    return !orderLineSummary.some((ol) =>
+      ol.colors.some((c) => c.name && c.name.trim().toLowerCase() === color.toLowerCase())
+    );
+  }, [orderLineSummary, getVariantAttr]);
 
   /**
    * Get garment quantity for a BOM line based on category (Fabric vs Trims).
@@ -889,6 +921,12 @@ const BOMForm = () => {
           const match = ol.colors.find((c) => c.name && c.name.trim().toLowerCase() === color.toLowerCase());
           if (match) totalColorQty += match.qty || 0;
         });
+
+        // If color not found in order, use manual override or saved base qty
+        if (totalColorQty === 0) {
+          const override = line.overrideBaseQty || line._savedBaseQty;
+          if (override > 0) return { qty: Number(override), needsPoPick: false, matchingLines: [] };
+        }
         return { qty: totalColorQty, needsPoPick: false, matchingLines: [] };
       }
 
@@ -1230,7 +1268,7 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
       ...rest,
       // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
       variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
@@ -1301,8 +1339,16 @@ const BOMForm = () => {
    */
   const validateBom = (mode) => {
     const errors = [];
-    if (!orderId) {
+    if (!orderNoInput?.trim() || orderNoInput.trim() === 'SG/') {
       errors.push('Order number is required.');
+      return { valid: false, errors };
+    }
+    if (!ORDER_NO_PATTERN.test(orderNoInput.trim())) {
+      errors.push('Order number format is invalid (expected: SG/25-26/1001)');
+      return { valid: false, errors };
+    }
+    if (!orderId) {
+      errors.push('Order number has not been verified — click outside the field or press Enter to look it up');
       return { valid: false, errors };
     }
     if (lines.length === 0) {
@@ -1567,8 +1613,7 @@ const BOMForm = () => {
             value={value || ''}
             onSelect={(item) => handleBomItemSelect(record.key, item)}
             onClear={() => {
-              const doClear = () => updateLineMulti(record.key, { ...resetItemFields });
-              confirmIfHasData(record.key, doClear);
+              updateLineMulti(record.key, { ...resetItemFields });
             }}
             disabled={!record.itemTypeId}
             categoryId={record.categoryId}
@@ -1695,7 +1740,7 @@ const BOMForm = () => {
                           {tags.map((t) => <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 10 }}>{t}</Tag>)}
                         </div>
                       </div>
-                      {record.colorInvalid && (
+                      {isFabricColorMissing(record) && (
                         <Text type="warning" style={{ fontSize: 10, color: '#faad14', lineHeight: 1.3 }}>
                           <WarningOutlined style={{ marginRight: 3 }} />
                           Color not found in order
@@ -1795,15 +1840,16 @@ const BOMForm = () => {
 
           // Fabric: InputNumber + AI button + base qty below
           // SIMPLE trims: InputNumber only
+          const showOverrideInput = fabric && record.variantId && isFabricColorMissing(record);
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: showOverrideInput ? 4 : 6 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <InputNumber
                   min={0}
                   step={0.001}
                   precision={4}
                   size="small"
-                  style={{ flex: 1 }}
+                  style={{ flex: 1, minWidth: 0 }}
                   placeholder={!record.itemId ? 'Select item first' : !record.variantId && (record.availableVariants || []).length > 1 ? 'Select variant first' : '0.0000'}
                   value={value}
                   onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
@@ -1825,6 +1871,28 @@ const BOMForm = () => {
               {fabric && record.variantId && (() => {
                 const color = getVariantAttr(record, 'color');
                 const { qty } = getColorQty(record);
+
+                // Color not in order — show compact base qty input
+                if (isFabricColorMissing(record)) {
+                  return (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <InputNumber
+                        min={0}
+                        size="small"
+                        style={{ flex: 1, minWidth: 0 }}
+                        placeholder="Base qty"
+                        controls={false}
+                        value={record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null)}
+                        onChange={(v) => updateLine(record.key, 'overrideBaseQty', v || null)}
+                        status="warning"
+                      />
+                      <Tooltip title="Color not in order — enter base quantity">
+                        <WarningOutlined style={{ fontSize: 13, color: '#faad14', flexShrink: 0 }} />
+                      </Tooltip>
+                    </div>
+                  );
+                }
+
                 if (!qty) return null;
                 return (
                   <Tag
@@ -2193,6 +2261,7 @@ const BOMForm = () => {
               value={orderNoInput || (isEdit ? '' : 'SG/')}
               onChange={(e) => !isEdit && setOrderNoInput(formatOrderNo(e.target.value, orderNoInput))}
               onBlur={!isEdit ? handleOrderNoBlur : undefined}
+              onPressEnter={!isEdit ? (e) => { e.target.blur(); } : undefined}
               suffix={orderLoading ? <LoadingOutlined spin /> : null}
               disabled={isEdit}
             />

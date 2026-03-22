@@ -108,7 +108,7 @@ const Login = () => {
             Welcome Back
           </Title>
           <Text type="secondary" style={styles.subtitle}>
-            Sign in to continue to Avarsh ERP
+            Sign in to continue with Avarsh ERP
           </Text>
         </div>
 

@@ -317,7 +317,7 @@ const POList = () => {
               />
             </Tooltip>
           )}
-          {(record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK) && canUpdate && (
+          {(record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK || record.status === PO_STATUS.REJECTED) && canUpdate && (
             <Tooltip title="Edit">
               <Button
                 type="text"

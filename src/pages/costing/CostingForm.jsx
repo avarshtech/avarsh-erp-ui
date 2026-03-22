@@ -104,7 +104,7 @@ const CostingForm = () => {
 
   // Unsaved changes guard
   const [isDirty, setIsDirty] = useState(false);
-  useUnsavedChanges(isDirty);
+  const { clearDirty } = useUnsavedChanges(isDirty);
 
   // State
   const [loading, setLoading] = useState(false);
@@ -1036,6 +1036,7 @@ const CostingForm = () => {
       });
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
+      clearDirty();
       navigate('/costing/list');
     } catch {
       message.error('Failed to save cost sheet');
@@ -1066,6 +1067,7 @@ const CostingForm = () => {
       });
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
+      clearDirty();
       navigate('/costing/list');
     } catch {
       message.error('Please fill all required fields');

@@ -43,7 +43,10 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   ExperimentOutlined,
+  DollarOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   getPurchaseOrderById,
@@ -97,11 +100,10 @@ const REJECTION_CATEGORIES = [
 
 const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [po, setPo] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [completingLineId, setCompletingLineId] = useState(null);
-
   // Activity state
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
@@ -588,10 +590,19 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
     );
   };
 
-  // Determine IGST applicability from PO data
-  const isIgstApplicable = po?.isIgstApplicable || po?.igstApplicable || false;
+  // Determine IGST applicability from PO data or line items
+  // The PO entity may not store this flag, so derive from line item tax fields:
+  // if any line item has igst/igstPercent > 0 (and sgst/cgst are null/0), it's IGST
+  const isIgstApplicable = useMemo(() => {
+    if (po?.isIgstApplicable || po?.igstApplicable) return true;
+    if (!po?.lineItems?.length) return false;
+    return po.lineItems.some((li) => {
+      const igstVal = parseFloat(li.igst || li.igstPercent || 0);
+      return igstVal > 0;
+    });
+  }, [po]);
 
-  // Compute totals from line items (not from flat PO values)
+  // Compute totals from line items — prefer stored tax values, fall back to percentage calc
   const totals = useMemo(() => {
     if (!po) return { subtotal: 0, sgst: 0, cgst: 0, igst: 0, grandTotal: 0 };
 
@@ -602,26 +613,39 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
     );
 
     let sgst = 0, cgst = 0, igst = 0;
-    items.forEach((item) => {
-      const base = (parseFloat(item.quantity || item.qty || 0)) * (parseFloat(item.unitPrice) || 0);
-      let gstPercent = 0;
-      if (item.gstPercent !== undefined && item.gstPercent !== null) {
-        gstPercent = parseFloat(item.gstPercent) || 0;
-      } else if (isIgstApplicable) {
-        gstPercent = parseFloat(item.igstPercent ?? item.igst ?? 0) || 0;
-      } else {
-        gstPercent =
-          (parseFloat(item.sgstPercent ?? item.sgst ?? 0) || 0) +
-          (parseFloat(item.cgstPercent ?? item.cgst ?? 0) || 0);
-      }
-      const gstAmount = (base * gstPercent) / 100;
-      if (isIgstApplicable) {
-        igst += gstAmount;
-      } else {
-        sgst += gstAmount / 2;
-        cgst += gstAmount / 2;
-      }
-    });
+    // Use stored tax values (sgstValue/cgstValue/igstValue) if available
+    const hasStoredValues = items.some((item) =>
+      item.sgstValue != null || item.cgstValue != null || item.igstValue != null
+    );
+
+    if (hasStoredValues) {
+      items.forEach((item) => {
+        sgst += parseFloat(item.sgstValue || 0);
+        cgst += parseFloat(item.cgstValue || 0);
+        igst += parseFloat(item.igstValue || 0);
+      });
+    } else {
+      items.forEach((item) => {
+        const base = (parseFloat(item.quantity || item.qty || 0)) * (parseFloat(item.unitPrice) || 0);
+        let gstPercent = 0;
+        if (item.gstPercent !== undefined && item.gstPercent !== null) {
+          gstPercent = parseFloat(item.gstPercent) || 0;
+        } else if (isIgstApplicable) {
+          gstPercent = parseFloat(item.igstPercent ?? item.igst ?? 0) || 0;
+        } else {
+          gstPercent =
+            (parseFloat(item.sgstPercent ?? item.sgst ?? 0) || 0) +
+            (parseFloat(item.cgstPercent ?? item.cgst ?? 0) || 0);
+        }
+        const gstAmount = (base * gstPercent) / 100;
+        if (isIgstApplicable) {
+          igst += gstAmount;
+        } else {
+          sgst += gstAmount / 2;
+          cgst += gstAmount / 2;
+        }
+      });
+    }
 
     const grandTotal = po.grandTotal || (subtotal + sgst + cgst + igst);
     return {
@@ -644,6 +668,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       const unitPrice = parseFloat(item.unitPrice) || 0;
       const base = qty * unitPrice;
 
+      // Derive the total GST percentage for grouping
       let gstPercent = 0;
       if (item.gstPercent !== undefined && item.gstPercent !== null) {
         gstPercent = parseFloat(item.gstPercent) || 0;
@@ -656,16 +681,24 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       }
 
       if (gstPercent === 0 || base === 0) return;
-      const gstAmount = (base * gstPercent) / 100;
 
       if (!groups[gstPercent]) {
         groups[gstPercent] = { igst: 0, sgst: 0, cgst: 0, taxableAmount: 0 };
       }
-      if (isIgstApplicable) {
-        groups[gstPercent].igst += gstAmount;
+
+      // Use stored tax values if available, otherwise calculate
+      if (item.igstValue != null || item.sgstValue != null || item.cgstValue != null) {
+        groups[gstPercent].igst += parseFloat(item.igstValue || 0);
+        groups[gstPercent].sgst += parseFloat(item.sgstValue || 0);
+        groups[gstPercent].cgst += parseFloat(item.cgstValue || 0);
       } else {
-        groups[gstPercent].sgst += gstAmount / 2;
-        groups[gstPercent].cgst += gstAmount / 2;
+        const gstAmount = (base * gstPercent) / 100;
+        if (isIgstApplicable) {
+          groups[gstPercent].igst += gstAmount;
+        } else {
+          groups[gstPercent].sgst += gstAmount / 2;
+          groups[gstPercent].cgst += gstAmount / 2;
+        }
       }
       groups[gstPercent].taxableAmount += base;
     });
@@ -677,93 +710,11 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
 
   const hasIgst = isIgstApplicable || totals.igst > 0;
 
-  // Can mark individual line items as completed when PO is with supplier
-  const canMarkLineCompleted =
-    po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
-    po?.status === PO_STATUS.PARTIALLY_RECEIVED;
-
   // Show status column only after PO is sent to supplier
   const showStatusColumn =
     po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
     po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
     po?.status === PO_STATUS.COMPLETED;
-
-  // Mark a single line item as completed
-  const handleMarkLineItemCompleted = async (lineItem) => {
-    if (!po) return;
-    const lineId = lineItem.id || lineItem.itemId;
-    setCompletingLineId(lineId);
-    try {
-      const updatedLineItems = (po.lineItems || []).map((li) => {
-        if ((li.id || li.itemId) === lineId) {
-          return { ...li, status: LINE_ITEM_STATUS.COMPLETED };
-        }
-        return li;
-      });
-
-      // Check if ALL line items are now completed
-      const allCompleted = updatedLineItems.every(
-        (li) => li.status === LINE_ITEM_STATUS.COMPLETED
-      );
-
-      const newPoStatus = allCompleted
-        ? PO_STATUS.COMPLETED
-        : PO_STATUS.PARTIALLY_RECEIVED;
-
-      await updatePurchaseOrder(po.id, {
-        ...po,
-        status: newPoStatus,
-        lineItems: updatedLineItems,
-        version: po.version,
-      });
-
-      const currentUser = getCurrentUser();
-      const name = currentUser?.name || '';
-      const lineLabel = lineItem.itemName || lineItem.itemCode || 'Line item';
-      const actComment = JSON.stringify(
-        allCompleted
-          ? { type: 'all_complete', by: name }
-          : { type: 'line_complete', item: lineLabel, by: name }
-      );
-
-      const activityRes = await createActivity(po.id, {
-        comment: actComment,
-        status: newPoStatus,
-        isSystemGenerated: true,
-        name,
-      });
-      setNotes((prev) => [
-        ...prev,
-        {
-          id: activityRes.id,
-          text: activityRes.comment || actComment,
-          isSystemGenerated: activityRes.isSystemGenerated ?? true,
-          status: activityRes.status ?? null,
-          timestamp: activityRes.createdAt || new Date().toISOString(),
-          user: activityRes.name || 'System',
-          edited: activityRes.edited || false,
-        },
-      ]);
-      setPo((prev) => ({
-        ...prev,
-        status: newPoStatus,
-        lineItems: updatedLineItems,
-      }));
-
-      message.success(
-        allCompleted
-          ? 'All line items completed — PO marked as Completed'
-          : `"${lineLabel}" marked as completed`
-      );
-
-      // Notify parent to refresh list but keep dialog open
-      if (onRefresh) onRefresh();
-    } catch {
-      message.error('Failed to update line item status');
-    } finally {
-      setCompletingLineId(null);
-    }
-  };
 
   const handleCancelEwayBill = async (cancelReasonCode, cancelRemarks) => {
     if (!po?.ewayBillNo) return;
@@ -877,42 +828,12 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
           <div style={{ textAlign: 'center' }}>
             <Text type="secondary">{v || '-'}</Text>
             {hasStages && (
-              <Popover
-                trigger="click"
-                placement="bottomLeft"
-                overlayStyle={{ maxWidth: 320 }}
-                content={
-                  <div style={{ minWidth: 220 }}>
-                    <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
-                      Processing Stages
-                    </Text>
-                    {r.processingStages.map((s, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '4px 0',
-                          borderBottom: i < r.processingStages.length - 1 ? '1px solid #f0f0f0' : 'none',
-                        }}
-                      >
-                        <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>{s.stageName}</Tag>
-                        <Text type="secondary" style={{ fontSize: 11 }}>
-                          {s.completionDate || '-'}
-                        </Text>
-                      </div>
-                    ))}
-                  </div>
-                }
+              <Tag
+                color="purple"
+                style={{ marginTop: 4, fontSize: 10, display: 'inline-block' }}
               >
-                <Tag
-                  color="purple"
-                  style={{ cursor: 'pointer', marginTop: 4, fontSize: 10, display: 'inline-block' }}
-                >
-                  {r.processingStages.length} stage{r.processingStages.length > 1 ? 's' : ''}
-                </Tag>
-              </Popover>
+                {r.processingStages.length} stage{r.processingStages.length > 1 ? 's' : ''}
+              </Tag>
             )}
           </div>
         );
@@ -993,33 +914,6 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
           },
         ]
       : []),
-    ...(canMarkLineCompleted
-      ? [
-          {
-            title: '',
-            key: 'lineAction',
-            width: 100,
-            render: (_, r) => {
-              if (r.status === LINE_ITEM_STATUS.COMPLETED) {
-                return <Tag color="success">Done</Tag>;
-              }
-              return (
-                <Tooltip title="Mark as complete">
-                  <Button
-                    size="small"
-                    type="link"
-                    icon={<CheckCircleOutlined />}
-                    onClick={() => handleMarkLineItemCompleted(r)}
-                    loading={completingLineId === (r.id || r.itemId)}
-                  >
-                    Complete
-                  </Button>
-                </Tooltip>
-              );
-            },
-          },
-        ]
-      : []),
   ];
 
   const processLineItemColumns = [
@@ -1081,25 +975,6 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
             const st = r.status || PO_STATUS.DRAFT;
             const lineConfig = STATUS_CONFIG[st] || { color: 'default' };
             return <Tag color={lineConfig.color} style={{ borderRadius: 12 }}>{getLineItemStatusLabel(st)}</Tag>;
-          },
-        }]
-      : []),
-    ...(canMarkLineCompleted
-      ? [{
-          title: '',
-          key: 'lineAction',
-          width: 100,
-          render: (_, r) => {
-            if (r.status === LINE_ITEM_STATUS.COMPLETED) return <Tag color="success">Done</Tag>;
-            return (
-              <Tooltip title="Mark as complete">
-                <Button size="small" type="link" icon={<CheckCircleOutlined />}
-                  onClick={() => handleMarkLineItemCompleted(r)}
-                  loading={completingLineId === (r.id || r.itemId)}>
-                  Complete
-                </Button>
-              </Tooltip>
-            );
           },
         }]
       : []),
@@ -1281,7 +1156,20 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                 </Button>
               ))}
             </Space>
-            <Button onClick={onClose}>Close</Button>
+            <Space>
+              {po && (po.status === PO_STATUS.DRAFT || po.status === PO_STATUS.REFERRED_BACK || po.status === PO_STATUS.REJECTED) && hasPermission('purchase-orders', 'update') && (
+                <Button
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    onClose();
+                    navigate(`/purchase-orders/edit/${po.id}`);
+                  }}
+                >
+                  Edit
+                </Button>
+              )}
+              <Button onClick={onClose}>Close</Button>
+            </Space>
           </div>
         }
       >
@@ -1399,133 +1287,240 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
               style={{ marginBottom: 24 }}
             />
 
-            {/* Order Summary */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
-              <div
-                style={{
-                  width: 360,
-                  background: 'var(--bg-secondary, #f8f9fa)',
-                  borderRadius: 12,
-                  padding: 20,
-                }}
-              >
-                <Title level={5} style={{ margin: '0 0 12px' }}>
-                  Order Summary
-                </Title>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text>Subtotal</Text>
-                  <Text strong>{formatCurrency(totals.subtotal)}</Text>
-                </div>
+            {/* Processing Stages + Order Summary — side by side */}
+            <Row gutter={24} style={{ marginBottom: 24 }}>
+              {/* Processing Stages (left) — only when stages exist */}
+              {(() => {
+                const itemsWithStages = (po.lineItems || []).filter(
+                  (li) => li.processingStages && li.processingStages.length > 0
+                );
+                if (itemsWithStages.length === 0) return null;
 
-                {/* GST Breakup */}
-                {gstBreakup.length > 0 && (
-                  <>
-                    <Divider style={{ margin: '4px 0' }} />
-                    <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
-                      GST BREAKUP
-                    </Text>
-                    {gstBreakup.map((group, idx) => (
-                      <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
-                        <Text
-                          type="secondary"
-                          style={{ fontSize: 12, display: 'block' }}
-                        >
-                          GST @ {group.percent}%
-                        </Text>
-                        {hasIgst ? (
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              paddingLeft: 12,
-                            }}
-                          >
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              IGST ({group.percent}%)
-                            </Text>
-                            <Text style={{ fontSize: 12 }}>
-                              {formatCurrency(group.igst)}
-                            </Text>
+                return (
+                  <Col xs={24} md={12}>
+                    <Card
+                      size="small"
+                      style={{ height: '100%' }}
+                      title={
+                        <Space>
+                          <ExperimentOutlined style={{ color: 'var(--primary-color)' }} />
+                          <span>Processing Stages</span>
+                          <Tag color="purple" style={{ marginLeft: 4 }}>
+                            {itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0)} stage{itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0) !== 1 ? 's' : ''}
+                          </Tag>
+                        </Space>
+                      }
+                    >
+                      {itemsWithStages.map((li, liIdx) => {
+                        const label = li.itemName || li.processName || li.itemCode || `Item ${liIdx + 1}`;
+                        const stages = li.processingStages || [];
+                        const sortedStages = [...stages].sort((a, b) => {
+                          if (!a.completionDate) return 1;
+                          if (!b.completionDate) return -1;
+                          return dayjs(a.completionDate).diff(dayjs(b.completionDate));
+                        });
+
+                        return (
+                          <div key={li.id || li.itemId || liIdx}>
+                            {liIdx > 0 && <Divider style={{ margin: '12px 0' }} />}
+                            <div style={{ marginBottom: 10 }}>
+                              <Text strong style={{ fontSize: 13 }}>{label}</Text>
+                              {li.itemCode && li.itemName && (
+                                <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>{li.itemCode}</Text>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 4 }}>
+                              {sortedStages.map((stage, sIdx) => {
+                                const targetDate = stage.completionDate ? dayjs(stage.completionDate) : null;
+                                const isOverdue = targetDate && targetDate.isBefore(dayjs(), 'day');
+                                const isToday = targetDate && targetDate.isSame(dayjs(), 'day');
+                                const isUpcoming = targetDate && targetDate.isAfter(dayjs(), 'day') && targetDate.diff(dayjs(), 'day') <= 3;
+                                const isLast = sIdx === sortedStages.length - 1;
+
+                                let dotColor = 'var(--primary-color, #6366f1)';
+                                let dateColor = undefined;
+                                if (isOverdue) {
+                                  dotColor = 'var(--error-color, #ef4444)';
+                                  dateColor = 'var(--error-color, #ef4444)';
+                                } else if (isToday) {
+                                  dotColor = 'var(--warning-color, #f59e0b)';
+                                  dateColor = 'var(--warning-color, #f59e0b)';
+                                } else if (isUpcoming) {
+                                  dotColor = 'var(--warning-color, #f59e0b)';
+                                }
+
+                                return (
+                                  <div key={sIdx} style={{ display: 'flex', gap: 12, minHeight: 40 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
+                                      <div
+                                        style={{
+                                          width: 10,
+                                          height: 10,
+                                          borderRadius: '50%',
+                                          background: dotColor,
+                                          flexShrink: 0,
+                                          marginTop: 5,
+                                        }}
+                                      />
+                                      {!isLast && (
+                                        <div style={{ width: 2, flex: 1, background: 'var(--border-color, #e2e8f0)', marginTop: 2 }} />
+                                      )}
+                                    </div>
+                                    <div style={{ flex: 1, paddingBottom: isLast ? 0 : 8 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                        <Text strong style={{ fontSize: 13 }}>{stage.stageName}</Text>
+                                        {isOverdue && <Tag color="error" style={{ margin: 0, fontSize: 10 }}>Overdue</Tag>}
+                                        {isToday && <Tag color="warning" style={{ margin: 0, fontSize: 10 }}>Today</Tag>}
+                                      </div>
+                                      {targetDate && (
+                                        <Text
+                                          type="secondary"
+                                          style={{ fontSize: 12, display: 'block', marginTop: 2, color: dateColor }}
+                                        >
+                                          Target: {targetDate.format('DD MMM YYYY')}
+                                          {isOverdue && ` (${dayjs().diff(targetDate, 'day')} day${dayjs().diff(targetDate, 'day') !== 1 ? 's' : ''} overdue)`}
+                                        </Text>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        ) : (
-                          <>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                paddingLeft: 12,
-                              }}
-                            >
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                SGST ({group.percent / 2}%)
-                              </Text>
-                              <Text style={{ fontSize: 12 }}>
-                                {formatCurrency(group.sgst)}
-                              </Text>
-                            </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                paddingLeft: 12,
-                              }}
-                            >
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                CGST ({group.percent / 2}%)
-                              </Text>
-                              <Text style={{ fontSize: 12 }}>
-                                {formatCurrency(group.cgst)}
-                              </Text>
-                            </div>
-                          </>
-                        )}
-                        {idx < gstBreakup.length - 1 && (
-                          <Divider variant="dashed" style={{ margin: '4px 0' }} />
-                        )}
-                      </div>
-                    ))}
-                  </>
-                )}
+                        );
+                      })}
+                    </Card>
+                  </Col>
+                );
+              })()}
 
-                <Divider style={{ margin: '8px 0' }} />
-
-                {hasIgst ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text>Total IGST</Text>
-                    <Text>{formatCurrency(totals.igst)}</Text>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text>Total SGST</Text>
-                      <Text>{formatCurrency(totals.sgst)}</Text>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text>Total CGST</Text>
-                      <Text>{formatCurrency(totals.cgst)}</Text>
-                    </div>
-                  </>
-                )}
-
-                <Divider style={{ margin: '8px 0' }} />
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    borderRadius: 8,
-                    background: 'var(--primary-color)',
-                  }}
+              {/* Order Summary (right — or full width when no stages) */}
+              <Col xs={24} md={{ span: 12, offset: (po.lineItems || []).some((li) => li.processingStages?.length > 0) ? 0 : 12 }}>
+                <Card
+                  size="small"
+                  style={{ height: '100%' }}
+                  title={
+                    <Space>
+                      <DollarOutlined style={{ color: 'var(--primary-color)' }} />
+                      <span>Order Summary</span>
+                    </Space>
+                  }
                 >
-                  <Text strong style={{ color: '#fff', fontSize: 15 }}>
-                    Grand Total
-                  </Text>
-                  <Text strong style={{ color: '#fff', fontSize: 18 }}>
-                    {formatCurrency(totals.grandTotal)}
-                  </Text>
-                </div>
-              </div>
-            </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text>Subtotal</Text>
+                    <Text strong>{formatCurrency(totals.subtotal)}</Text>
+                  </div>
+
+                  {/* GST Breakup */}
+                  {gstBreakup.length > 0 && (
+                    <>
+                      <Divider style={{ margin: '4px 0' }} />
+                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
+                        GST BREAKUP
+                      </Text>
+                      {gstBreakup.map((group, idx) => (
+                        <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
+                          <Text
+                            type="secondary"
+                            style={{ fontSize: 12, display: 'block' }}
+                          >
+                            GST @ {group.percent}%
+                          </Text>
+                          {hasIgst ? (
+                            <div
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingLeft: 12,
+                              }}
+                            >
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                IGST ({group.percent}%)
+                              </Text>
+                              <Text style={{ fontSize: 12 }}>
+                                {formatCurrency(group.igst)}
+                              </Text>
+                            </div>
+                          ) : (
+                            <>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  paddingLeft: 12,
+                                }}
+                              >
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  SGST ({group.percent / 2}%)
+                                </Text>
+                                <Text style={{ fontSize: 12 }}>
+                                  {formatCurrency(group.sgst)}
+                                </Text>
+                              </div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  paddingLeft: 12,
+                                }}
+                              >
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  CGST ({group.percent / 2}%)
+                                </Text>
+                                <Text style={{ fontSize: 12 }}>
+                                  {formatCurrency(group.cgst)}
+                                </Text>
+                              </div>
+                            </>
+                          )}
+                          {idx < gstBreakup.length - 1 && (
+                            <Divider variant="dashed" style={{ margin: '4px 0' }} />
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  <Divider style={{ margin: '8px 0' }} />
+
+                  {hasIgst ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text>Total IGST</Text>
+                      <Text>{formatCurrency(totals.igst)}</Text>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text>Total SGST</Text>
+                        <Text>{formatCurrency(totals.sgst)}</Text>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text>Total CGST</Text>
+                        <Text>{formatCurrency(totals.cgst)}</Text>
+                      </div>
+                    </>
+                  )}
+
+                  <Divider style={{ margin: '8px 0' }} />
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      background: 'var(--primary-color)',
+                    }}
+                  >
+                    <Text strong style={{ color: '#fff', fontSize: 15 }}>
+                      Grand Total
+                    </Text>
+                    <Text strong style={{ color: '#fff', fontSize: 18 }}>
+                      {formatCurrency(totals.grandTotal)}
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+            </Row>
 
             {/* E-way Bill Details — visible for Process POs with e-way bill data */}
             {po?.isProcessPo && po?.ewayBillNo && (

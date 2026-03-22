@@ -37,6 +37,7 @@ import {
   InfoCircleOutlined,
   CloseCircleOutlined,
   ExperimentOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -382,6 +383,7 @@ const POForm = () => {
       key: String(Date.now()) + Math.random(),
       processName: '',
       description: '',
+      hsnCode: '',
       qty: '',
       unitPrice: '',
       gstPercent: 0,
@@ -904,6 +906,11 @@ const POForm = () => {
         return;
       }
 
+      if (bom.status === 'DRAFT') {
+        message.error('BOM for order ' + trimmedOrderNo + ' is still in Draft status. Only Created BOMs can be used for PO.');
+        return;
+      }
+
       const orderData = {
         orderNo: bom.orderNo || trimmedOrderNo,
         orderId: bom.orderId,
@@ -1348,7 +1355,7 @@ const POForm = () => {
           totalAmount: item.amount,
           variantId: isProcessPo ? null : item.variantId,
           variantAttributes: isProcessPo ? null : item.variantAttributes,
-          hsnCode: isProcessPo ? null : (item.hsnCode || null),
+          hsnCode: item.hsnCode || null,
           categoryName: isProcessPo ? null : (item.categoryName || null),
           processingStages: isProcessPo ? null : (item.processingStages || null),
           bomLineSources: isProcessPo ? null : (item.bomLineSources || null),
@@ -1447,14 +1454,23 @@ const POForm = () => {
       supplierGstin: supplier?.gstin || '',
       supplierCity: supplier?.city || '',
       supplierState: supplier?.state || '',
+      supplierEmail: supplier?.email || '',
+      supplierPhone: supplier?.phone || '',
+      suppliesFabric: supplier?.suppliesFabric || false,
+      suppliesTrims: supplier?.suppliesTrims || false,
       termsDisplay: terms?.name || '',
       poDateDisplay: form.getFieldValue('poDate')?.format('DD-MMM-YYYY'),
       deliveryDateDisplay: form.getFieldValue('deliveryDate')?.format('DD-MMM-YYYY'),
       remarks: form.getFieldValue('remarks') || '',
-      lineItemsDisplay: lineItems.filter((item) => item.itemId),
+      lineItemsDisplay: isProcessPo
+        ? lineItems.filter((item) => item.processName)
+        : lineItems.filter((item) => item.itemId),
       totals,
       gstBreakup,
       isIgstApplicable,
+      poType,
+      isProcessPo,
+      bomOrders,
     });
     setPreviewVisible(true);
   };
@@ -1633,7 +1649,7 @@ const POForm = () => {
                 );
               }
             }}
-            disabled={submitting || savingDraft}
+            disabled={!selectedSupplier || submitting || savingDraft}
           />
         );
       },
@@ -1957,7 +1973,7 @@ const POForm = () => {
           placeholder="e.g. Dyeing, Printing, Washing"
           value={record.processName}
           onChange={(e) => handleLineItemChange(record.key, 'processName', e.target.value)}
-          disabled={submitting || savingDraft}
+          disabled={!selectedSupplier || submitting || savingDraft}
         />
       ),
     },
@@ -1970,7 +1986,21 @@ const POForm = () => {
           placeholder="Description"
           value={record.description}
           onChange={(e) => handleLineItemChange(record.key, 'description', e.target.value)}
-          disabled={submitting || savingDraft}
+          disabled={!selectedSupplier || submitting || savingDraft}
+        />
+      ),
+    },
+    {
+      title: 'HSN Code',
+      dataIndex: 'hsnCode',
+      width: 130,
+      render: (_, record) => (
+        <Input
+          placeholder="e.g. 9988"
+          value={record.hsnCode}
+          onChange={(e) => handleLineItemChange(record.key, 'hsnCode', e.target.value)}
+          disabled={!selectedSupplier || submitting || savingDraft}
+          maxLength={8}
         />
       ),
     },
@@ -1984,7 +2014,7 @@ const POForm = () => {
           style={{ width: '100%' }}
           value={record.qty !== '' ? Number(record.qty) : null}
           onChange={(v) => handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')}
-          disabled={submitting || savingDraft}
+          disabled={!selectedSupplier || submitting || savingDraft}
         />
       ),
     },
@@ -1998,7 +2028,7 @@ const POForm = () => {
           style={{ width: '100%' }}
           value={record.unitPrice !== '' ? Number(record.unitPrice) : null}
           onChange={(v) => handleLineItemChange(record.key, 'unitPrice', v !== null ? v : '')}
-          disabled={submitting || savingDraft}
+          disabled={!selectedSupplier || submitting || savingDraft}
         />
       ),
     },
@@ -2012,7 +2042,7 @@ const POForm = () => {
           value={value}
           onChange={(v) => handleLineItemChange(record.key, 'gstPercent', v)}
           options={TAX_OPTIONS}
-          disabled={submitting || savingDraft || !record.processName}
+          disabled={!selectedSupplier || submitting || savingDraft || !record.processName}
         />
       ),
     },
@@ -2133,7 +2163,8 @@ const POForm = () => {
           <h1>{isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}</h1>
         </Space>
         <div className="header-actions">
-          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') && (
+          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') &&
+            !(isEditMode && originalPO && (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK)) && (
             <Button
               icon={<SaveOutlined />}
               onClick={handleSaveDraft}
@@ -2278,7 +2309,7 @@ const POForm = () => {
                 />
               </div>
               {poType === PO_TYPE.GENERAL && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 10px', borderRadius: 6, background: isProcessPo ? 'var(--primary-bg, #f0f0ff)' : 'transparent' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 10px', borderRadius: 6, background: isProcessPo ? 'var(--bg-tertiary, #f0f0ff)' : 'transparent', border: isProcessPo ? '1px solid var(--border-color, #d9d9d9)' : '1px solid transparent' }}>
                   <Switch
                     size="small"
                     checked={isProcessPo}
@@ -2556,7 +2587,7 @@ const POForm = () => {
         title="Purchase Order Preview"
         open={previewVisible}
         onCancel={() => setPreviewVisible(false)}
-        width={1100}
+        width={1200}
         style={{ top: 20 }}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '24px' } }}
         footer={[
@@ -2576,8 +2607,8 @@ const POForm = () => {
       >
         {previewData && (
           <div>
-            {/* Supplier & Header Info */}
-            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }} items={[
+            {/* PO Header Details */}
+            <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 24 }} items={[
               {
                 key: 'supplier',
                 label: 'Supplier',
@@ -2588,15 +2619,15 @@ const POForm = () => {
                 label: 'PO Date',
                 children: previewData.poDateDisplay,
               },
+              {
+                key: 'expectedDelivery',
+                label: 'Expected Delivery',
+                children: previewData.deliveryDateDisplay,
+              },
               previewData.supplierGstin && {
                 key: 'supplierGstin',
                 label: 'Supplier GSTIN',
                 children: previewData.supplierGstin,
-              },
-              {
-                key: 'deliveryDate',
-                label: 'Expected Delivery Date',
-                children: previewData.deliveryDateDisplay,
               },
               (previewData.supplierCity || previewData.supplierState) && {
                 key: 'supplierLocation',
@@ -2605,16 +2636,20 @@ const POForm = () => {
                   .filter(Boolean)
                   .join(', '),
               },
+              (previewData.isProcessPo || (previewData.poType && previewData.poType !== 'General')) && {
+                key: 'poType',
+                label: 'PO Type',
+                children: (
+                  <Space>
+                    {previewData.poType && previewData.poType !== 'General' && <Tag color="purple">{previewData.poType} PO</Tag>}
+                    {previewData.isProcessPo && <Tag color="purple" icon={<ExperimentOutlined />}>Process PO</Tag>}
+                  </Space>
+                ),
+              },
               {
                 key: 'terms',
                 label: 'Terms & Conditions',
                 children: previewData.termsDisplay || 'Not specified',
-              },
-              previewData.remarks && {
-                key: 'remarks',
-                label: 'Remarks',
-                span: 2,
-                children: previewData.remarks,
               },
               {
                 key: 'taxType',
@@ -2625,7 +2660,45 @@ const POForm = () => {
                   </Tag>
                 ),
               },
+              previewData.remarks && {
+                key: 'remarks',
+                label: 'Remarks',
+                span: 3,
+                children: previewData.remarks,
+              },
             ].filter(Boolean)} />
+
+            {/* Order References (BOM PO) */}
+            {previewData.poType !== 'General' && previewData.bomOrders?.length > 0 && (
+              <Card size="small" style={{ marginBottom: 16 }}>
+                <Text strong style={{ display: 'block', marginBottom: 10 }}>Order Information</Text>
+                {previewData.bomOrders.map((order, idx) => (
+                  <div key={order.orderNo}>
+                    {idx > 0 && <Divider style={{ margin: '10px 0' }} />}
+                    <Row gutter={[24, 8]}>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
+                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                      </Col>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
+                        <Text strong style={{ fontSize: 13 }}>{order.styleName || '-'}</Text>
+                      </Col>
+                      <Col xs={12} sm={8} md={6}>
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Season</Text>
+                        <Text strong style={{ fontSize: 13 }}>{order.season || '-'}</Text>
+                      </Col>
+                      {order.orderQty && (
+                        <Col xs={12} sm={8} md={6}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order Qty</Text>
+                          <Text strong style={{ fontSize: 13 }}>{order.orderQty?.toLocaleString('en-IN')}</Text>
+                        </Col>
+                      )}
+                    </Row>
+                  </div>
+                ))}
+              </Card>
+            )}
 
             {/* Line Items */}
             <Title level={5} style={{ marginBottom: 12 }}>
@@ -2637,15 +2710,48 @@ const POForm = () => {
               pagination={false}
               rowKey="key"
               className="centered-header-table"
-              columns={[
+              scroll={{ x: previewData.isProcessPo ? 800 : 1100 }}
+              columns={previewData.isProcessPo ? [
+                { title: '#', width: 40, align: 'center', render: (_, __, i) => i + 1 },
                 {
-                  title: '#',
-                  width: 40,
-                  align: 'center',
-                  render: (_, __, i) => i + 1,
+                  title: 'Process Name',
+                  dataIndex: 'processName',
+                  width: 200,
+                  render: (v) => <Text strong>{v || '-'}</Text>,
                 },
                 {
+                  title: 'Description',
+                  dataIndex: 'description',
+                  width: 200,
+                  render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
+                },
+                { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
+                {
+                  title: 'Unit Price',
+                  dataIndex: 'unitPrice',
+                  width: 100,
+                  align: 'right',
+                  render: (v) => `₹ ${parseFloat(v || 0).toFixed(2)}`,
+                },
+                {
+                  title: 'GST %',
+                  dataIndex: 'gstPercent',
+                  width: 70,
+                  align: 'center',
+                  render: (v) => `${v || 0}%`,
+                },
+                {
+                  title: 'Amount',
+                  dataIndex: 'amount',
+                  width: 110,
+                  align: 'right',
+                  render: (v) => <Text strong>₹ {(v || 0).toFixed(2)}</Text>,
+                },
+              ] : [
+                { title: '#', width: 40, align: 'center', render: (_, __, i) => i + 1 },
+                {
                   title: 'Item',
+                  width: 220,
                   render: (_, r) => {
                     const imgUrl = r.variantId ? lineItemImages[r.variantId] : null;
                     return (
@@ -2667,36 +2773,65 @@ const POForm = () => {
                         )}
                         <div>
                           <Text strong>{r.itemName}</Text>
-                          <br />
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {r.itemCode}
-                          </Text>
-                          {r.variantAttributes &&
-                            Object.keys(r.variantAttributes).length > 0 && (
-                              <div style={{ marginTop: 4 }}>
-                                {Object.entries(r.variantAttributes).map(([k, v]) => {
-                                  const kLower = k.toLowerCase();
-                                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                                  const showSwatch = isColorAttr && isPantoneCode(v);
-                                  return (
-                                    <Tag
-                                      key={k}
-                                      style={{ fontSize: 10, margin: '0 4px 2px 0', display: 'inline-flex', alignItems: 'center', gap: 3 }}
-                                    >
-                                      {showSwatch && <PantoneColorSwatch value={v} size={14} />}
-                                      {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
-                                    </Tag>
-                                  );
-                                })}
-                              </div>
-                            )}
+                          {r.itemCode && (
+                            <>
+                              <br />
+                              <Text type="secondary" style={{ fontSize: 12 }}>{r.itemCode}</Text>
+                            </>
+                          )}
+                          {r.variantAttributes && Object.keys(r.variantAttributes).length > 0 && (
+                            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {Object.entries(r.variantAttributes).map(([k, v]) => {
+                                const kLower = k.toLowerCase();
+                                const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                                const showSwatch = isColorAttr && isPantoneCode(v);
+                                return (
+                                  <Tag key={k} style={{ fontSize: 10, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                                    {showSwatch && <PantoneColorSwatch value={v} size={14} />}
+                                    {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
+                                  </Tag>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
                   },
                 },
+                {
+                  title: 'Description',
+                  dataIndex: 'description',
+                  width: 160,
+                  render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
+                },
+                {
+                  title: 'HSN',
+                  dataIndex: 'hsnCode',
+                  width: 100,
+                  align: 'center',
+                  render: (v, r) => {
+                    const hasStages = r.processingStages && r.processingStages.length > 0;
+                    return (
+                      <div style={{ textAlign: 'center' }}>
+                        <Text type="secondary">{v || '-'}</Text>
+                        {hasStages && (
+                          <Tag color="purple" style={{ marginTop: 4, fontSize: 10, display: 'inline-block' }}>
+                            {r.processingStages.length} stage{r.processingStages.length > 1 ? 's' : ''}
+                          </Tag>
+                        )}
+                      </div>
+                    );
+                  },
+                },
                 { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
-                { title: 'UOM', dataIndex: 'uom', width: 80, align: 'center' },
+                {
+                  title: 'UOM',
+                  dataIndex: 'uom',
+                  width: 80,
+                  align: 'center',
+                  render: (v) => (v || '-').toUpperCase(),
+                },
                 {
                   title: 'Unit Price',
                   dataIndex: 'unitPrice',
@@ -2709,171 +2844,183 @@ const POForm = () => {
                   dataIndex: 'gstPercent',
                   width: 70,
                   align: 'center',
-                  render: (v) => `${v}%`,
+                  render: (v) => `${v || 0}%`,
                 },
                 {
                   title: 'Amount',
                   dataIndex: 'amount',
                   width: 110,
                   align: 'right',
-                  render: (v) => (
-                    <Text strong>₹ {(v || 0).toFixed(2)}</Text>
-                  ),
+                  render: (v) => <Text strong>₹ {(v || 0).toFixed(2)}</Text>,
                 },
               ]}
             />
 
-            {/* Totals */}
-            <div
-              style={{
-                marginTop: 16,
-                display: 'flex',
-                justifyContent: 'flex-end',
-              }}
-            >
-              <div
-                style={{
-                  width: 360,
-                  background: 'var(--bg-secondary, #f8f9fa)',
-                  borderRadius: 12,
-                  padding: 20,
-                }}
-              >
-                <Title level={5} style={{ margin: '0 0 12px' }}>
-                  Order Summary
-                </Title>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text>Subtotal</Text>
-                  <Text strong>₹ {previewData.totals.subtotal.toFixed(2)}</Text>
-                </div>
+            {/* Processing Stages + Order Summary — side by side */}
+            <Row gutter={24} style={{ marginTop: 16, marginBottom: 8 }}>
+              {/* Processing Stages (left) — only when stages exist */}
+              {(() => {
+                const itemsWithStages = previewData.lineItemsDisplay.filter(
+                  (li) => li.processingStages && li.processingStages.length > 0
+                );
+                if (itemsWithStages.length === 0) return null;
 
-                {/* GST Breakup in preview */}
-                {previewData.gstBreakup?.length > 0 && (
-                  <>
-                    <Divider style={{ margin: '4px 0' }} />
-                    <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
-                      GST BREAKUP
-                    </Text>
-                    {previewData.gstBreakup.map((group, idx) => (
-                      <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
-                        <Text
-                          type="secondary"
-                          style={{ fontSize: 12, display: 'block' }}
-                        >
-                          GST @ {group.percent}%
-                        </Text>
-                        {previewData.isIgstApplicable ? (
-                          <div
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              paddingLeft: 12,
-                            }}
-                          >
-                            <Text type="secondary" style={{ fontSize: 12 }}>
-                              IGST ({group.percent}%)
-                            </Text>
-                            <Text style={{ fontSize: 12 }}>₹ {group.igst.toFixed(2)}</Text>
+                return (
+                  <Col xs={24} md={12}>
+                    <Card
+                      size="small"
+                      style={{ height: '100%' }}
+                      title={
+                        <Space>
+                          <ExperimentOutlined style={{ color: 'var(--primary-color)' }} />
+                          <span>Processing Stages</span>
+                          <Tag color="purple" style={{ marginLeft: 4 }}>
+                            {itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0)} stage{itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0) !== 1 ? 's' : ''}
+                          </Tag>
+                        </Space>
+                      }
+                    >
+                      {itemsWithStages.map((li, liIdx) => {
+                        const label = li.itemName || li.processName || li.itemCode || `Item ${liIdx + 1}`;
+                        const stages = li.processingStages || [];
+                        const sortedStages = [...stages].sort((a, b) => {
+                          if (!a.completionDate) return 1;
+                          if (!b.completionDate) return -1;
+                          return dayjs(a.completionDate).diff(dayjs(b.completionDate));
+                        });
+
+                        return (
+                          <div key={li.key || liIdx}>
+                            {liIdx > 0 && <Divider style={{ margin: '12px 0' }} />}
+                            <div style={{ marginBottom: 10 }}>
+                              <Text strong style={{ fontSize: 13 }}>{label}</Text>
+                              {li.itemCode && li.itemName && (
+                                <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>{li.itemCode}</Text>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 4 }}>
+                              {sortedStages.map((stage, sIdx) => {
+                                const targetDate = stage.completionDate ? dayjs(stage.completionDate) : null;
+                                const isLast = sIdx === sortedStages.length - 1;
+
+                                return (
+                                  <div key={sIdx} style={{ display: 'flex', gap: 12, minHeight: 40 }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
+                                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--primary-color, #6366f1)', flexShrink: 0, marginTop: 5 }} />
+                                      {!isLast && (
+                                        <div style={{ width: 2, flex: 1, background: 'var(--border-color, #e2e8f0)', marginTop: 2 }} />
+                                      )}
+                                    </div>
+                                    <div style={{ flex: 1, paddingBottom: isLast ? 0 : 8 }}>
+                                      <Text strong style={{ fontSize: 13 }}>{stage.stageName}</Text>
+                                      {targetDate && (
+                                        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2 }}>
+                                          Target: {targetDate.format('DD MMM YYYY')}
+                                        </Text>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        ) : (
-                          <>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                paddingLeft: 12,
-                              }}
-                            >
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                SGST ({group.percent / 2}%)
-                              </Text>
-                              <Text style={{ fontSize: 12 }}>₹ {group.sgst.toFixed(2)}</Text>
+                        );
+                      })}
+                    </Card>
+                  </Col>
+                );
+              })()}
+
+              {/* Order Summary */}
+              <Col xs={24} md={{ span: 12, offset: previewData.lineItemsDisplay.some((li) => li.processingStages?.length > 0) ? 0 : 12 }}>
+                <Card
+                  size="small"
+                  style={{ height: '100%' }}
+                  title={
+                    <Space>
+                      <DollarOutlined style={{ color: 'var(--primary-color)' }} />
+                      <span>Order Summary</span>
+                    </Space>
+                  }
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text>Subtotal</Text>
+                    <Text strong>₹ {previewData.totals.subtotal.toFixed(2)}</Text>
+                  </div>
+
+                  {/* GST Breakup */}
+                  {previewData.gstBreakup?.length > 0 && (
+                    <>
+                      <Divider style={{ margin: '4px 0' }} />
+                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
+                        GST BREAKUP
+                      </Text>
+                      {previewData.gstBreakup.map((group, idx) => (
+                        <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
+                          <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                            GST @ {group.percent}%
+                          </Text>
+                          {previewData.isIgstApplicable ? (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
+                              <Text type="secondary" style={{ fontSize: 12 }}>IGST ({group.percent}%)</Text>
+                              <Text style={{ fontSize: 12 }}>₹ {group.igst.toFixed(2)}</Text>
                             </div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                paddingLeft: 12,
-                              }}
-                            >
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                CGST ({group.percent / 2}%)
-                              </Text>
-                              <Text style={{ fontSize: 12 }}>₹ {group.cgst.toFixed(2)}</Text>
-                            </div>
-                          </>
-                        )}
-                        {idx < previewData.gstBreakup.length - 1 && (
-                          <Divider variant="dashed" style={{ margin: '4px 0' }} />
-                        )}
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>SGST ({group.percent / 2}%)</Text>
+                                <Text style={{ fontSize: 12 }}>₹ {group.sgst.toFixed(2)}</Text>
+                              </div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
+                                <Text type="secondary" style={{ fontSize: 12 }}>CGST ({group.percent / 2}%)</Text>
+                                <Text style={{ fontSize: 12 }}>₹ {group.cgst.toFixed(2)}</Text>
+                              </div>
+                            </>
+                          )}
+                          {idx < previewData.gstBreakup.length - 1 && (
+                            <Divider variant="dashed" style={{ margin: '4px 0' }} />
+                          )}
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  <Divider style={{ margin: '8px 0' }} />
+
+                  {previewData.isIgstApplicable ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <Text>Total IGST</Text>
+                      <Text>₹ {previewData.totals.igst.toFixed(2)}</Text>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text>Total SGST</Text>
+                        <Text>₹ {previewData.totals.sgst.toFixed(2)}</Text>
                       </div>
-                    ))}
-                  </>
-                )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Text>Total CGST</Text>
+                        <Text>₹ {previewData.totals.cgst.toFixed(2)}</Text>
+                      </div>
+                    </>
+                  )}
 
-                <Divider style={{ margin: '8px 0' }} />
-
-                {previewData.isIgstApplicable ? (
+                  <Divider style={{ margin: '8px 0' }} />
                   <div
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
-                      marginBottom: 8,
+                      padding: '12px 16px',
+                      borderRadius: 8,
+                      background: 'var(--primary-color)',
                     }}
                   >
-                    <Text>Total IGST</Text>
-                    <Text>₹ {previewData.totals.igst.toFixed(2)}</Text>
+                    <Text strong style={{ color: '#fff', fontSize: 15 }}>Grand Total</Text>
+                    <Text strong style={{ color: '#fff', fontSize: 18 }}>₹ {previewData.totals.grandTotal.toFixed(2)}</Text>
                   </div>
-                ) : (
-                  <>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: 4,
-                      }}
-                    >
-                      <Text>Total SGST</Text>
-                      <Text>₹ {previewData.totals.sgst.toFixed(2)}</Text>
-                    </div>
-                    <div
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        marginBottom: 8,
-                      }}
-                    >
-                      <Text>Total CGST</Text>
-                      <Text>₹ {previewData.totals.cgst.toFixed(2)}</Text>
-                    </div>
-                  </>
-                )}
-
-                <Divider style={{ margin: '8px 0' }} />
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '10px 12px',
-                    borderRadius: 8,
-                    background: 'var(--primary-color)',
-                  }}
-                >
-                  <Text strong style={{ color: '#fff' }}>
-                    Grand Total
-                  </Text>
-                  <Text strong style={{ color: '#fff', fontSize: 18 }}>
-                    ₹ {previewData.totals.grandTotal.toFixed(2)}
-                  </Text>
-                </div>
-              </div>
-            </div>
+                </Card>
+              </Col>
+            </Row>
           </div>
         )}
       </Modal>

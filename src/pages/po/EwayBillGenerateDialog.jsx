@@ -34,13 +34,12 @@ const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$
 
 /**
  * Modal dialog for generating an E-way Bill for Process POs.
- * Required when PO total >= INR 50,000 per Indian GST regulations.
+ * Required when PO total > INR 50,000 per Indian GST Rule 138 ("exceeding fifty thousand rupees").
  */
 const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
   const [form] = Form.useForm();
   const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
-  const [hsnMap, setHsnMap] = useState({});
 
   const transMode = Form.useWatch('transMode', form);
 
@@ -65,30 +64,20 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
         ellipsis: true,
       },
       {
+        title: 'HSN Code',
+        dataIndex: 'hsnCode',
+        key: 'hsnCode',
+        width: 120,
+      },
+      {
         title: 'Qty',
         dataIndex: 'qty',
         key: 'qty',
         width: 80,
         align: 'right',
       },
-      {
-        title: 'HSN Code',
-        key: 'hsnCode',
-        width: 160,
-        render: (_, __, index) => (
-          <Input
-            placeholder="e.g. 9988"
-            value={hsnMap[index] || ''}
-            onChange={(e) =>
-              setHsnMap((prev) => ({ ...prev, [index]: e.target.value }))
-            }
-            status={hsnMap[index] ? '' : 'error'}
-            maxLength={8}
-          />
-        ),
-      },
     ],
-    [hsnMap],
+    [],
   );
 
   const lineItems = useMemo(
@@ -103,13 +92,6 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
-
-      // Validate HSN codes for all line items
-      const missingHsn = lineItems.some((_, index) => !hsnMap[index]?.trim());
-      if (missingHsn) {
-        message.error('Please enter HSN codes for all line items');
-        return;
-      }
 
       const payload = {
         poId: poData.id,
@@ -133,7 +115,6 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
         vehicleType: values.vehicleType || '',
         transporterId: values.transporterId || '',
         transporterName: values.transporterName || '',
-        itemHsnCodes: { ...hsnMap },
       };
 
       setLoading(true);
@@ -160,7 +141,6 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
 
   const handleAfterClose = () => {
     form.resetFields();
-    setHsnMap({});
   };
 
   return (
@@ -449,10 +429,10 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
           </Row>
         </Card>
 
-        {/* HSN Codes */}
+        {/* Line Items */}
         <Card
           size="small"
-          title={<Title level={5} style={{ margin: 0 }}>HSN Codes</Title>}
+          title={<Title level={5} style={{ margin: 0 }}>Line Items</Title>}
         >
           <Table
             columns={lineItemColumns}

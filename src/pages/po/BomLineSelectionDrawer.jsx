@@ -37,16 +37,24 @@ const formatOrderNo = (raw, prev = '') => {
   if (!raw || raw.length < prefix.length) return prefix;
   const isDeleting = raw.length < prev.length;
   if (isDeleting && raw.length <= prefix.length) return prefix;
-  const after = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  let digits = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  // When deleting and the removed char was a separator (- or /),
+  // also remove the digit before it so backspace feels natural
+  if (isDeleting && prev.length > prefix.length) {
+    const removedChar = prev[raw.length];
+    if (removedChar === '-' || removedChar === '/') {
+      digits = digits.slice(0, -1);
+    }
+  }
   let result = prefix;
-  for (let i = 0; i < after.length; i++) {
+  for (let i = 0; i < digits.length; i++) {
     if (i === 2) result += '-';
     if (i === 4) result += '/';
-    result += after[i];
+    result += digits[i];
   }
   if (!isDeleting) {
-    if (after.length === 2 && !result.endsWith('-')) result += '-';
-    if (after.length === 4 && !result.endsWith('/')) result += '/';
+    if (digits.length === 2 && !result.endsWith('-')) result += '-';
+    if (digits.length === 4 && !result.endsWith('/')) result += '/';
   }
   return result;
 };

@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   Card, Table, Button, Input, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, message, Tooltip, Divider, Badge, Checkbox, Typography, Empty,
-  Drawer, Descriptions, Alert,
+  Drawer, Descriptions, Alert, Skeleton,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined,
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
-  ClearOutlined, AppstoreOutlined, FileImageOutlined,
+  ClearOutlined, AppstoreOutlined, FileImageOutlined, LoadingOutlined,
 } from '@ant-design/icons';
 import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/itemService';
 import { hasPermission } from '../../utils/permissions';
@@ -166,6 +166,7 @@ const ItemMaster = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
+  const [formReady, setFormReady] = useState(false);
   // View Drawer State
   const [viewDrawerVisible, setViewDrawerVisible] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
@@ -191,6 +192,8 @@ const ItemMaster = () => {
   // Suggestion State (for item name autocomplete)
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const nonItemNameChangesRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const debounceRef = useRef(null);
   const lastQueryRef = useRef('');
@@ -348,6 +351,7 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
+      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -414,6 +418,7 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
+      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -710,9 +715,11 @@ const ItemMaster = () => {
     suppressSuggestionsRef.current = false;
     lastQueryRef.current = '';
     noResultPrefixRef.current = '';
-    fetchMetaData();
+    setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
+    nonItemNameChangesRef.current = false;
+    fetchMetaData().then(() => setFormReady(true));
   };
 
   // Open Edit Modal
@@ -727,15 +734,18 @@ const ItemMaster = () => {
     lastQueryRef.current = (item.itemName || '').trim();
     setSuggestions([]);
     setShowSuggestions(false);
+    setFormReady(false);
+    setModalOpen(true);
+    setUnsavedChanges(false);
+    nonItemNameChangesRef.current = false;
     fetchMetaData().then((metaDataList) => {
       initializeEditForm(item, metaDataList);
+      setFormReady(true);
       // Load variant images in background after form is rendered
       if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
         loadVariantImages(item.variants);
       }
     });
-    setModalOpen(true);
-    setUnsavedChanges(false);
   };
 
   // Open View Drawer
@@ -859,6 +869,8 @@ const ItemMaster = () => {
     setShowSuggestions(false);
     setDuplicateVariantIndex(null);
     setUnsavedChanges(false);
+    nonItemNameChangesRef.current = false;
+    setFormReady(false);
     setVariantImagesLoading(false);
   };
 
@@ -888,6 +900,7 @@ const ItemMaster = () => {
   const handleVariantAttributeChange = (variantIndex, attributeId, value) => {
     setDuplicateVariantIndex(null);
     setUnsavedChanges(true);
+    nonItemNameChangesRef.current = true;
     setVariants((prev) => {
       const updated = [...prev];
       updated[variantIndex] = { ...updated[variantIndex], [attributeId]: value };
@@ -911,6 +924,7 @@ const ItemMaster = () => {
     setVariants((prev) => [...prev, newVariant]);
     setActiveVariantIndex(variants.length);
     setUnsavedChanges(true);
+    nonItemNameChangesRef.current = true;
   };
 
   const deleteVariant = (indexToDelete) => {
@@ -940,6 +954,7 @@ const ItemMaster = () => {
     }
 
     setUnsavedChanges(true);
+    nonItemNameChangesRef.current = true;
 
     setDuplicateVariantIndex(null);
 
@@ -1003,14 +1018,19 @@ const ItemMaster = () => {
       if (noResultPrefixRef.current && query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
         setSuggestions([]);
         setShowSuggestions(false);
+        setSuggestionsLoading(false);
         lastQueryRef.current = query;
         return;
       }
 
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      setSuggestionsLoading(true);
       debounceRef.current = setTimeout(async () => {
         try {
-          if (lastQueryRef.current === query) return;
+          if (lastQueryRef.current === query) {
+            setSuggestionsLoading(false);
+            return;
+          }
           const res = await autocompleteItems(query);
           let results = [];
           if (Array.isArray(res)) results = res;
@@ -1030,12 +1050,15 @@ const ItemMaster = () => {
           console.error('Item search failed:', error);
           setSuggestions([]);
           setShowSuggestions(false);
+        } finally {
+          setSuggestionsLoading(false);
         }
       }, 300);
     } else {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setSuggestions([]);
       setShowSuggestions(false);
+      setSuggestionsLoading(false);
       lastQueryRef.current = '';
       noResultPrefixRef.current = '';
     }
@@ -1045,10 +1068,11 @@ const ItemMaster = () => {
     };
   }, [itemNameValue]);
 
-  // Apply selected item from suggestions
-  const applySelectedItem = (item) => {
+  // Apply selected item from suggestions (internal — skips confirmation)
+  const doApplySelectedItem = (item) => {
     if (!item) return;
 
+    setSelectedItem(item);
     setSelectedItemId(item.id);
     form.setFieldsValue({
       itemName: item.itemName || '',
@@ -1078,7 +1102,6 @@ const ItemMaster = () => {
           setFormUomOptions(itemType.uoms || []);
 
           // Load variants
-          // Load variants
           if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
             const loadedVariants = item.variants.map((variant) => {
               const variantObj = {
@@ -1107,7 +1130,33 @@ const ItemMaster = () => {
     setSuggestions([]);
     setShowSuggestions(false);
     suppressSuggestionsRef.current = true;
-    setUnsavedChanges(true);
+    setUnsavedChanges(false);
+    nonItemNameChangesRef.current = false;
+  };
+
+  // Apply selected item with unsaved changes guard (ignores itemName-only changes)
+  const applySelectedItem = (item) => {
+    if (!item) return;
+
+    if (nonItemNameChangesRef.current) {
+      Modal.confirm({
+        title: 'Unsaved changes',
+        content: 'You have unsaved changes. Selecting a different item will discard them. Continue?',
+        okText: 'Discard & Continue',
+        cancelText: 'Cancel',
+        onOk: () => doApplySelectedItem(item),
+        onCancel: () => {
+          // Restore the previous item name in the input
+          setSuggestions([]);
+          setShowSuggestions(false);
+          suppressSuggestionsRef.current = true;
+          form.setFieldsValue({ itemName: selectedItem?.itemName || '' });
+        },
+      });
+      return;
+    }
+
+    doApplySelectedItem(item);
   };
 
   // Form Submit
@@ -1535,7 +1584,7 @@ const ItemMaster = () => {
               Cancel
             </Button>
             {(isEditMode ? canUpdate : canAdd) && (
-              <Button type="primary" onClick={() => form.submit()} loading={submitting} disabled={isEditMode && !unsavedChanges} icon={<SaveOutlined />}>
+              <Button type="primary" onClick={() => form.submit()} loading={submitting} disabled={!formReady || (isEditMode && !unsavedChanges)} icon={<SaveOutlined />}>
                 {isEditMode ? 'Update' : 'Save'}
               </Button>
             )}
@@ -1545,7 +1594,88 @@ const ItemMaster = () => {
         centered
         styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', overflowX: 'hidden', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 } }}
       >
-          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
+        {!formReady ? (
+          <div style={{ padding: '16px 0' }}>
+            {/* Row 1: Category + Subcategory */}
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 80, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 100, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+            </Row>
+            {/* Row 2: Item Type + Item Name */}
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 80, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 90, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+            </Row>
+            {/* Row 3: Primary UOM + Secondary UOM + HSN Code */}
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 100, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+              <Col xs={24} md={8}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 120, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+              <Col xs={24} md={8}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 80, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+            </Row>
+            {/* Row 4: Active checkbox */}
+            <div style={{ marginBottom: 24 }}>
+              <Skeleton.Input active size="small" style={{ width: 100, height: 22 }} />
+            </div>
+            {/* Row 5: Variants section placeholder */}
+            <div style={{ background: 'var(--card-bg)', borderRadius: 8, padding: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 140, height: 20, marginBottom: 16 }} />
+              <Row gutter={16}>
+                <Col xs={24} md={8}>
+                  <Skeleton.Input active block style={{ height: 32, marginBottom: 12 }} />
+                </Col>
+                <Col xs={24} md={8}>
+                  <Skeleton.Input active block style={{ height: 32, marginBottom: 12 }} />
+                </Col>
+                <Col xs={24} md={8}>
+                  <Skeleton.Input active block style={{ height: 32, marginBottom: 12 }} />
+                </Col>
+              </Row>
+              <Skeleton.Image active style={{ width: 120, height: 120, marginTop: 8 }} />
+            </div>
+          </div>
+        ) : (
+          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={(changedValues) => {
+            setUnsavedChanges(true);
+            const changedKeys = Object.keys(changedValues);
+            if (changedKeys.some((key) => key !== 'itemName')) {
+              nonItemNameChangesRef.current = true;
+            }
+          }}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
@@ -1607,6 +1737,8 @@ const ItemMaster = () => {
                     <Input
                       placeholder="Enter Item Name"
                       value={form.getFieldValue('itemName')}
+                      allowClear
+                      suffix={suggestionsLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
                       onChange={(e) => {
                         form.setFieldsValue({ itemName: e.target.value });
                         suppressSuggestionsRef.current = false;
@@ -1666,7 +1798,12 @@ const ItemMaster = () => {
                   label="Primary UOM"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
-                  <Select placeholder="Select Primary UOM" disabled={!isEditMode && !form.getFieldValue('itemTypeId')} options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))} />
+                  <Select
+                    placeholder="Select Primary UOM"
+                    disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
+                    options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
+                    onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
+                  />
                 </Form.Item>
               </Col>
               <Col xs={24} md={8}>
@@ -1689,6 +1826,7 @@ const ItemMaster = () => {
                       allowClear
                       disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
                       options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
+                      onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
                     />
                 </Form.Item>
               </Col>
@@ -1931,6 +2069,7 @@ const ItemMaster = () => {
             )}
 
           </Form>
+        )}
       </Modal>
       {/* View Drawer */}
       <Drawer

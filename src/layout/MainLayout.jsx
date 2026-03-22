@@ -65,7 +65,7 @@ const SessionTimer = () => {
       : (isDarkMode ? 'rgba(129, 140, 248, 0.12)' : 'rgba(99, 102, 241, 0.08)');
 
   return (
-    <Tooltip title="Session expiring soon — click the dialog close (X) to continue working">
+    <Tooltip title="Session expiring soon — Save your work, sign out and login again.">
       <div
         style={{
           display: 'flex',

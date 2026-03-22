@@ -226,7 +226,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
           </div>
 
           {/* Form content */}
-          <div style={{ flex: 1, padding: 24 }}>
+          <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
               <Form
                 form={form}
                 layout="vertical"

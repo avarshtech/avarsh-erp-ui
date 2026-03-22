@@ -23,6 +23,8 @@ import {
   Tooltip,
   Spin,
   Skeleton,
+  Upload,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -37,6 +39,10 @@ import {
   FileImageOutlined,
   FileOutlined,
   DownloadOutlined,
+  RobotOutlined,
+  UploadOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -45,7 +51,8 @@ import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../..
 import { getBuyers, getBuyerById } from '../../services/buyerService';
 import { getAllPaymentTerms } from '../../services/paymentTermsService';
 import { getCostSheetByCostingId, downloadAttachment } from '../../services/costingService';
-import { getAllSizePresets } from '../../services/sizePresetService';
+import { getAllSizePresets, createSizePreset } from '../../services/sizePresetService';
+import { extractOrderLine } from '../../services/aiService';
 import { getStyleById } from '../../services/styleService';
 import {
   ORDER_STATUS,
@@ -65,17 +72,25 @@ const formatCostingId = (raw, prev = '') => {
   if (!raw || raw.length < prefix.length) return prefix;
   const isDeleting = raw.length < prev.length;
   if (isDeleting && raw.length <= prefix.length) return prefix;
-  const after = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  let digits = raw.slice(prefix.length).replace(/[^0-9]/g, '');
+  // When deleting and the removed char was a separator (- or /),
+  // also remove the digit before it so backspace feels natural
+  if (isDeleting && prev.length > prefix.length) {
+    const removedChar = prev[raw.length]; // char that was just deleted
+    if (removedChar === '-' || removedChar === '/') {
+      digits = digits.slice(0, -1);
+    }
+  }
   let result = prefix;
-  for (let i = 0; i < after.length; i++) {
+  for (let i = 0; i < digits.length; i++) {
     if (i === 2) result += '-';
     if (i === 4) result += '/';
-    result += after[i];
+    result += digits[i];
   }
   // Append separator immediately when segment is complete (not deleting)
   if (!isDeleting) {
-    if (after.length === 2 && !result.endsWith('-')) result += '-';
-    if (after.length === 4 && !result.endsWith('/')) result += '/';
+    if (digits.length === 2 && !result.endsWith('-')) result += '-';
+    if (digits.length === 4 && !result.endsWith('/')) result += '/';
   }
   return result;
 };
@@ -648,6 +663,120 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
   );
 };
 
+// ==================== QUICK-ADD SIZE PRESET MODAL ====================
+
+const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
+  const [presetName, setPresetName] = useState('');
+  const [category, setCategory] = useState('');
+  const [region, setRegion] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!presetName.trim()) {
+      message.warning('Please enter a preset name');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await createSizePreset({
+        name: presetName.trim(),
+        category: category || null,
+        region: region || null,
+        sizes,
+        active: true,
+      });
+      message.success(`Size preset "${presetName}" created successfully`);
+      onSuccess(response.data);
+    } catch {
+      message.error('Failed to create size preset');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Quick Add Size Preset"
+      open={open}
+      onCancel={onCancel}
+      onOk={handleSave}
+      confirmLoading={saving}
+      okText="Create & Use"
+      destroyOnClose
+      afterClose={() => {
+        setPresetName('');
+        setCategory('');
+        setRegion('');
+      }}
+    >
+      <Alert
+        type="info"
+        showIcon
+        icon={<ExclamationCircleOutlined />}
+        message="New sizes detected from buyer PO"
+        description={
+          <span>
+            The extracted sizes <strong>[{sizes.join(', ')}]</strong> don't match any existing size preset.
+            Create a new preset to continue.
+          </span>
+        }
+        style={{ marginBottom: 16 }}
+      />
+      <Form layout="vertical">
+        <Form.Item label="Preset Name" required>
+          <Input
+            placeholder='e.g. "US Women XS-3XL"'
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+          />
+        </Form.Item>
+        <Form.Item label="Sizes (from document)">
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {sizes.map((s) => (
+              <Tag key={s} color="blue">{s}</Tag>
+            ))}
+          </div>
+        </Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item label="Category">
+              <Select
+                placeholder="Select category"
+                value={category || undefined}
+                onChange={setCategory}
+                allowClear
+                options={[
+                  { value: 'Adult', label: 'Adult' },
+                  { value: 'Children', label: 'Children' },
+                  { value: 'Numeric', label: 'Numeric' },
+                  { value: 'Custom', label: 'Custom' },
+                ]}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Region">
+              <Select
+                placeholder="Select region"
+                value={region || undefined}
+                onChange={setRegion}
+                allowClear
+                options={[
+                  { value: 'US', label: 'US' },
+                  { value: 'EU', label: 'EU' },
+                  { value: 'UK', label: 'UK' },
+                  { value: 'Asia', label: 'Asia' },
+                  { value: 'Global', label: 'Global' },
+                ]}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Form>
+    </Modal>
+  );
+};
+
 // Cell styles
 const thStyle = {
   padding: '8px 6px',
@@ -722,6 +851,14 @@ const OrderForm = () => {
   const [componentModalVisible, setComponentModalVisible] = useState(false);
   const [formComponents, setFormComponents] = useState([]);
 
+  // AI extraction state
+  const [extractingLineKey, setExtractingLineKey] = useState(null);
+  const [quickAddSizes, setQuickAddSizes] = useState([]);
+  const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);
+  const [pendingExtraction, setPendingExtraction] = useState(null); // holds { lineKey, data } while waiting for preset creation
+  const [lineExtractionMsg, setLineExtractionMsg] = useState({}); // { [lineKey]: { type, text } }
+  const lineExtractionTimers = useRef({});
+
   const isEdit = !!id;
   const orderStatus = existingOrder?.status;
   const isReferredBack = orderStatus === ORDER_STATUS.REFERRED_BACK;
@@ -733,6 +870,7 @@ const OrderForm = () => {
   // Watch form values
   const formCurrency = Form.useWatch('currency', form);
   const watchedBuyerId = Form.useWatch('buyerId', form);
+  const watchedStyleNo = Form.useWatch('styleNo', form);
 
   // Buyer destinations derived from selected buyer
   const buyerDestinations = useMemo(() => {
@@ -899,6 +1037,194 @@ const OrderForm = () => {
     setIsDirty(true);
   };
 
+  // ==================== AI EXTRACTION ====================
+
+  /** Dismiss a line message with fade-out, then remove from state */
+  const dismissLineMessage = useCallback((lineKey) => {
+    // Mark as fading
+    setLineExtractionMsg((prev) => {
+      if (!prev[lineKey]) return prev;
+      return { ...prev, [lineKey]: { ...prev[lineKey], fading: true } };
+    });
+    // Remove after transition completes
+    setTimeout(() => {
+      setLineExtractionMsg((prev) => {
+        const next = { ...prev };
+        delete next[lineKey];
+        return next;
+      });
+    }, 500);
+  }, []);
+
+  /** Show an inline message on a specific order line, auto-dismiss after duration */
+  const showLineMessage = useCallback((lineKey, type, text, durationMs = 15000) => {
+    // Clear any existing timer for this line
+    if (lineExtractionTimers.current[lineKey]) {
+      clearTimeout(lineExtractionTimers.current[lineKey]);
+    }
+    setLineExtractionMsg((prev) => ({ ...prev, [lineKey]: { type, text, fading: false } }));
+    lineExtractionTimers.current[lineKey] = setTimeout(() => {
+      dismissLineMessage(lineKey);
+      delete lineExtractionTimers.current[lineKey];
+    }, durationMs);
+  }, [dismissLineMessage]);
+
+  /**
+   * Find a matching size preset for the extracted sizes.
+   * Returns the preset if all extracted sizes are contained in a preset's sizes (order-independent).
+   */
+  const findMatchingSizePreset = useCallback((extractedSizes) => {
+    if (!extractedSizes?.length) return null;
+    const normalized = extractedSizes.map((s) => s.trim().toUpperCase());
+    return sizePresetsList.find((preset) => {
+      const presetNorm = (preset.sizes || []).map((s) => s.trim().toUpperCase());
+      return normalized.length === presetNorm.length &&
+        normalized.every((s) => presetNorm.includes(s));
+    }) || null;
+  }, [sizePresetsList]);
+
+  /**
+   * Apply extracted data to an order line.
+   */
+  const applyExtractionToLine = useCallback((lineKey, data, presetId, presetSizes) => {
+    setOrderLines((prev) =>
+      prev.map((line) => {
+        if (line.key !== lineKey) return line;
+
+        const sizes = presetSizes;
+        // Map sizePrices — convert BigDecimal strings to numbers, use preset size order
+        const sizePrices = {};
+        sizes.forEach((s) => {
+          const extracted = data.sizePrices;
+          if (extracted) {
+            // Try exact match first, then case-insensitive
+            const val = extracted[s] ?? extracted[s.toUpperCase()] ?? extracted[s.toLowerCase()];
+            sizePrices[s] = val != null ? Number(val) : 0;
+          } else {
+            sizePrices[s] = 0;
+          }
+        });
+
+        // Build color rows from extraction
+        const colorRows = (data.colorRows || []).map((cr, idx) => {
+          const quantities = {};
+          sizes.forEach((s) => {
+            const q = cr.quantities;
+            if (q) {
+              const val = q[s] ?? q[s.toUpperCase()] ?? q[s.toLowerCase()];
+              quantities[s] = val != null ? Number(val) : 0;
+            } else {
+              quantities[s] = 0;
+            }
+          });
+          const total = Object.values(quantities).reduce((a, b) => a + b, 0);
+          const rowValue = sizes.reduce(
+            (sum, s) => sum + (quantities[s] || 0) * (sizePrices[s] || 0),
+            0
+          );
+          return {
+            key: `c_${Date.now()}_${idx}`,
+            colorName: cr.colorName || '',
+            quantities,
+            total,
+            rowValue,
+          };
+        });
+
+        // Fallback — if no color rows extracted, keep existing
+        const finalColorRows = colorRows.length > 0 ? colorRows : line.colorRows;
+
+        const updated = {
+          ...line,
+          buyerPoNo: data.buyerPoNo || line.buyerPoNo,
+          destination: data.destination || line.destination,
+          sizePreset: presetId,
+          sizes,
+          sizePrices,
+          colorRows: finalColorRows,
+        };
+
+        // Recalc totals
+        const lineQty = finalColorRows.reduce((sum, r) => sum + (r.total || 0), 0);
+        const lineTotal = finalColorRows.reduce((sum, r) => sum + (r.rowValue || 0), 0);
+        return { ...updated, lineQty, lineTotal };
+      })
+    );
+    setIsDirty(true);
+  }, []);
+
+  /**
+   * Handle file upload for AI extraction on a specific order line.
+   */
+  const handleExtractFromFile = useCallback(async (lineKey, file) => {
+    const styleNo = form.getFieldValue('styleNo');
+    if (!styleNo?.trim()) {
+      message.warning('Style No is required. Please enter a valid Costing ID first.');
+      return false;
+    }
+
+    setExtractingLineKey(lineKey);
+    try {
+      const data = await extractOrderLine(file, styleNo.trim());
+
+      if (!data.styleFound) {
+        showLineMessage(lineKey, 'warning',
+          `Style "${styleNo}" was not found in the uploaded document. ${data.notes || ''}`
+        );
+        setExtractingLineKey(null);
+        return false;
+      }
+
+      // Try to find matching size preset
+      const matchedPreset = findMatchingSizePreset(data.sizes);
+
+      if (matchedPreset) {
+        // Direct match — apply immediately
+        applyExtractionToLine(lineKey, data, matchedPreset.id, matchedPreset.sizes);
+        showLineMessage(lineKey, 'success',
+          `Extracted successfully! Size preset "${matchedPreset.name}" matched.`
+        );
+      } else if (data.sizes?.length > 0) {
+        // No matching preset — show quick-add modal
+        setQuickAddSizes(data.sizes);
+        setPendingExtraction({ lineKey, data });
+        setQuickAddModalOpen(true);
+      } else {
+        // Extracted but no sizes found — apply what we have (buyerPoNo, colors without sizes)
+        showLineMessage(lineKey, 'info',
+          'Extracted buyer PO info. No size breakdown found in document.'
+        );
+        handleLineChange(lineKey, { buyerPoNo: data.buyerPoNo || '' });
+      }
+    } catch (err) {
+      console.error('AI extraction failed:', err);
+      showLineMessage(lineKey, 'error',
+        'Failed to extract data from file. Please try again.'
+      );
+    } finally {
+      setExtractingLineKey(null);
+    }
+    return false; // prevent Upload from auto-uploading
+  }, [form, findMatchingSizePreset, applyExtractionToLine, handleLineChange, showLineMessage]);
+
+  /**
+   * Handle quick-add size preset success — apply pending extraction.
+   */
+  const handleQuickAddPresetSuccess = useCallback((newPreset) => {
+    setQuickAddModalOpen(false);
+    // Add the new preset to the list
+    setSizePresetsList((prev) => [...prev, newPreset]);
+
+    if (pendingExtraction) {
+      const { lineKey, data } = pendingExtraction;
+      applyExtractionToLine(lineKey, data, newPreset.id, newPreset.sizes);
+      setPendingExtraction(null);
+      message.success(
+        `Size preset "${newPreset.name}" created and extraction applied.`
+      );
+    }
+  }, [pendingExtraction, applyExtractionToLine]);
+
   // Computed totals
   const totalOrderQty = useMemo(
     () => orderLines.reduce((sum, l) => sum + (l.lineQty || 0), 0),
@@ -996,21 +1322,29 @@ const OrderForm = () => {
     const errors = [];
     const values = form.getFieldsValue();
 
-    // Always required
-    if (!values.costingId?.trim()) errors.push('Costing ID is required');
-    if (!values.buyerId) errors.push('Buyer is required');
-
-    if (isSubmit) {
-      if (!values.component) errors.push('Component is required');
-      if (values.component === 'Multiple' && formComponents.length < 2) {
-        errors.push('Please define at least 2 components for Multiple component type');
-      }
-      if (!values.paymentTerms) errors.push('Payment Terms is required');
-      if (!values.paymentDays || values.paymentDays <= 0) {
-        errors.push('Payment Days is required and must be greater than 0');
-      }
+    // ── Order Details (in form layout order) ──
+    if (!values.costingId?.trim() || values.costingId.trim() === 'CST/') {
+      errors.push('Costing ID is required');
+    } else if (!COSTING_ID_PATTERN.test(values.costingId.trim())) {
+      errors.push('Costing ID format is invalid (expected: CST/25-26/1001)');
+    } else if (!values.buyerId) {
+      errors.push('Costing ID has not been verified — click outside the field or press Enter to look it up');
     }
+    if (!values.material) errors.push('Material is required');
+    if (!values.component) errors.push('Component is required');
+    if (values.component === 'Multiple' && formComponents.length < 2) {
+      errors.push('Please define at least 2 components for Multiple component type');
+    }
+    if (!values.paymentTerms) errors.push('Payment Terms is required');
+    if (!values.paymentDays || values.paymentDays <= 0) {
+      errors.push('Payment Days is required and must be greater than 0');
+    }
+    if (!values.fabricDescription?.trim()) errors.push('Fabric Description is required');
 
+    // Stop here if order details have errors — don't validate lines yet
+    if (errors.length > 0) return errors;
+
+    // ── Order Lines ──
     if (orderLines.length === 0) errors.push('At least one Order Line is required');
 
     // Check for duplicate Buyer PO + Destination
@@ -1328,6 +1662,18 @@ const OrderForm = () => {
         }}
       />
 
+      {/* Quick-Add Size Preset Modal (for AI extraction with unmatched sizes) */}
+      <QuickAddSizePresetModal
+        open={quickAddModalOpen}
+        sizes={quickAddSizes}
+        onSuccess={handleQuickAddPresetSuccess}
+        onCancel={() => {
+          setQuickAddModalOpen(false);
+          setPendingExtraction(null);
+          setQuickAddSizes([]);
+        }}
+      />
+
       <Form
         form={form}
         layout="vertical"
@@ -1348,11 +1694,12 @@ const OrderForm = () => {
                 name="costingId"
                 label="Costing ID"
                 rules={[{ required: true, message: 'Enter costing ID' }]}
-                normalize={(val) => formatCostingId(val || '', '')}
+                normalize={(val, prevVal) => formatCostingId(val || '', prevVal || '')}
               >
                 <Input
                   placeholder="CST/25-26/1001"
                   onBlur={handleCostingIdBlur}
+                  onPressEnter={(e) => { e.target.blur(); }}
                   suffix={costingLoading ? <LoadingOutlined spin /> : null}
                 />
               </Form.Item>
@@ -1573,7 +1920,20 @@ const OrderForm = () => {
         </Card>
 
         {/* ==================== ORDER LINES ==================== */}
-        <Card style={{ marginBottom: 16 }}>
+        <Card
+          style={{
+            marginBottom: 16,
+            ...(!watchedStyleNo?.trim() ? { opacity: 0.5, pointerEvents: 'none' } : {}),
+          }}
+        >
+          {!watchedStyleNo?.trim() && (
+            <Alert
+              type="info"
+              showIcon
+              message="Enter a valid Costing ID above to enable order lines"
+              style={{ marginBottom: 16 }}
+            />
+          )}
           <div
             style={{
               display: 'flex',
@@ -1585,7 +1945,7 @@ const OrderForm = () => {
             <Title level={5} style={{ margin: 0 }}>
               Order Lines ({orderLines.length})
             </Title>
-            <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddLine}>
+            <Button type="dashed" icon={<PlusOutlined />} onClick={handleAddLine} disabled={!watchedStyleNo?.trim()}>
               Add Order Line
             </Button>
           </div>
@@ -1751,6 +2111,73 @@ const OrderForm = () => {
                   )}
 
                   <Divider style={{ margin: '8px 0 16px' }} />
+
+                  {/* AI Extract from Buyer PO */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 12,
+                      padding: '8px 12px',
+                      background: 'var(--primary-light, rgba(99, 102, 241, 0.06))',
+                      borderRadius: 8,
+                      border: '1px dashed var(--primary-color, #6366f1)',
+                    }}
+                  >
+                    <Space size={8}>
+                      <RobotOutlined style={{ fontSize: 16, color: 'var(--primary-color, #6366f1)' }} />
+                      <Text style={{ fontSize: 13, color: 'var(--primary-color, #6366f1)' }}>
+                        Auto-fill from Buyer PO
+                      </Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>
+                        Upload a buyer PO to extract sizes, colors, quantities & prices
+                      </Text>
+                    </Space>
+                    <Upload
+                      accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
+                      showUploadList={false}
+                      beforeUpload={(file) => {
+                        handleExtractFromFile(line.key, file);
+                        return false;
+                      }}
+                      disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
+                    >
+                      <Tooltip title={!watchedStyleNo?.trim() ? 'Enter a valid Costing ID first' : undefined}>
+                        <Button
+                          icon={extractingLineKey === line.key ? <LoadingOutlined spin /> : <UploadOutlined />}
+                          loading={extractingLineKey === line.key}
+                          type="primary"
+                          size="small"
+                          disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
+                        >
+                          {extractingLineKey === line.key ? 'Extracting...' : 'Upload & Extract'}
+                        </Button>
+                      </Tooltip>
+                    </Upload>
+                  </div>
+
+                  {/* Inline extraction message */}
+                  {lineExtractionMsg[line.key] && (
+                    <div
+                      style={{
+                        marginBottom: 12,
+                        opacity: lineExtractionMsg[line.key].fading ? 0 : 1,
+                        maxHeight: lineExtractionMsg[line.key].fading ? 0 : 200,
+                        overflow: 'hidden',
+                        transition: 'opacity 0.4s ease-out, max-height 0.4s ease-out, margin 0.4s ease-out',
+                        ...(lineExtractionMsg[line.key].fading ? { marginBottom: 0 } : {}),
+                      }}
+                    >
+                      <Alert
+                        type={lineExtractionMsg[line.key].type}
+                        message={lineExtractionMsg[line.key].text}
+                        showIcon
+                        closable
+                        onClose={() => dismissLineMessage(line.key)}
+                      />
+                    </div>
+                  )}
 
                   {/* Size Breakdown */}
                   <SizeBreakdownTable

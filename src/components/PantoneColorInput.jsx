@@ -29,6 +29,7 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
   const [colorName, setColorName] = useState('');
   const [originalName, setOriginalName] = useState('');
   const debounceRef = useRef(null);
+  const lastSearchedCodeRef = useRef(null);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
   const nameInputRef = useRef(null);
@@ -44,6 +45,7 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
       setInputValue('');
       setSuggestions([]);
       setDropdownOpen(false);
+      lastSearchedCodeRef.current = null;
       onChange('');
       return;
     }
@@ -53,10 +55,19 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
     // Check for pantone code pattern to trigger API search
     const match = raw.match(PANTONE_PATTERN);
     if (match) {
-      onChange(''); // Clear value while searching pantone
-      triggerSearch(match[1]);
+      const matchedCode = match[1];
+      if (matchedCode !== lastSearchedCodeRef.current) {
+        // Pantone code changed — trigger API search
+        lastSearchedCodeRef.current = matchedCode;
+        onChange(''); // Clear value while searching pantone
+        triggerSearch(matchedCode);
+      } else {
+        // Same pantone code, user is editing the name portion — no API call
+        onChange(raw.trim());
+      }
     } else {
       // Free-text: commit value immediately so parent state is always in sync
+      lastSearchedCodeRef.current = null;
       onChange(raw.trim());
       setSuggestions([]);
       setDropdownOpen(false);
@@ -139,6 +150,7 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
     setSelectedCode(null);
     setColorName('');
     setOriginalName('');
+    lastSearchedCodeRef.current = null;
   };
 
   // Re-enter editing mode with the existing Pantone value preserved
@@ -152,10 +164,17 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
       setColorName(name);
       setOriginalName(name);
       // Don't call onChange('') — keep value intact until user confirms or cancels
+      // Auto-focus the name input after render
+      setTimeout(() => nameInputRef.current?.focus(), 0);
     } else {
       // Non-Pantone text value: put it back in the input for editing
       setInputValue(value);
       onChange('');
+      // Pre-set the last searched code so editing the name won't re-trigger API search
+      const codeMatch = value.match(PANTONE_PATTERN);
+      lastSearchedCodeRef.current = codeMatch ? codeMatch[1] : null;
+      // Auto-focus the text input after render
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   };
 
@@ -172,8 +191,9 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
         // If user typed free text and blurred, save the free text value
         if (inputValue.trim() && !value && !selectedCode) {
           onChange(inputValue.trim());
-          setInputValue('');
         }
+        // Always clear inputValue on blur so the display chip renders when value is set
+        setInputValue('');
       }
     }, 200);
   };
@@ -195,8 +215,8 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
           }}
         >
           <PantoneColorSwatch value={selectedCode} size={26} showPopover={false} />
-          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 2 }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{selectedCode}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1 }}>{selectedCode}</span>
             <Input
               ref={nameInputRef}
               size="small"
@@ -205,7 +225,7 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
               onChange={(e) => setColorName(e.target.value)}
               onKeyDown={handleNameKeyDown}
               variant="borderless"
-              style={{ padding: 0, fontSize: 13 }}
+              style={{ padding: '2px 4px', fontSize: 13, height: 24 }}
             />
           </div>
           <Space size={4}>
@@ -219,8 +239,8 @@ const PantoneColorInput = ({ value, onChange, placeholder }) => {
             </Tooltip>
           </Space>
         </div>
-      ) : value ? (
-        /* State: Has a saved value (display with swatch) */
+      ) : value && !inputValue ? (
+        /* State: Has a saved value (display with swatch) — hidden while typing to keep input mounted */
         <div
           style={{
             display: 'flex',

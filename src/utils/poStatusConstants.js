@@ -96,6 +96,7 @@ export const EWAY_BILL_STATUS = {
   REJECTED: 'REJECTED',
 };
 
+/** E-way bill required when PO value strictly exceeds this amount (use > not >=) per GST Rule 138 */
 export const EWAY_BILL_THRESHOLD = 50000;
 
 export const EWAY_BILL_CANCEL_REASONS = [
