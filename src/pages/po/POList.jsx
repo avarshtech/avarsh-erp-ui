@@ -32,6 +32,7 @@ import {
   StopOutlined,
   SendOutlined,
   InboxOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -42,6 +43,7 @@ import {
 import { hasPermission } from '../../utils/permissions';
 import { PO_STATUS, getStatusLabel } from '../../utils/poStatusConstants';
 import POView from './POView';
+import POVersionHistory from './POVersionHistory';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -93,6 +95,10 @@ const POList = () => {
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingPO, setViewingPO] = useState(null);
+
+  // History modal state
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyPO, setHistoryPO] = useState(null);
 
   // Permissions
   const canView = hasPermission('purchase-orders', 'view');
@@ -303,7 +309,7 @@ const POList = () => {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 120,
+      width: 150,
       render: (_, record) => (
         <Space size="small">
           {canView && (
@@ -314,6 +320,17 @@ const POList = () => {
                 icon={<EyeOutlined />}
                 onClick={() => handleView(record)}
                 style={{ color: '#1890ff' }}
+              />
+            </Tooltip>
+          )}
+          {canView && record.status !== PO_STATUS.DRAFT && (
+            <Tooltip title="Version History">
+              <Button
+                type="text"
+                size="small"
+                icon={<HistoryOutlined />}
+                onClick={() => { setHistoryPO(record); setHistoryOpen(true); }}
+                style={{ color: '#722ed1' }}
               />
             </Tooltip>
           )}
@@ -473,6 +490,14 @@ const POList = () => {
         }}
         onStatusChange={handleStatusActionComplete}
         onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+      />
+
+      {/* PO Version History Modal */}
+      <POVersionHistory
+        open={historyOpen}
+        onClose={() => { setHistoryOpen(false); setHistoryPO(null); }}
+        poId={historyPO?.id}
+        poNumber={historyPO?.poNumber}
       />
     </div>
   );

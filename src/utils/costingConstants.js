@@ -87,25 +87,6 @@ export const FABRIC_TYPES = [
   { value: 'Denim', label: 'Denim' },
 ];
 
-// ==================== UNIT OF MEASUREMENT ====================
-
-export const FABRIC_UOMS = [
-  { value: 'meters', label: 'Meters' },
-  { value: 'yards', label: 'Yards' },
-  { value: 'kgs', label: 'Kgs' },
-];
-
-export const TRIM_UOMS = [
-  { value: 'pcs', label: 'Pieces' },
-  { value: 'sets', label: 'Sets' },
-  { value: 'pairs', label: 'Pairs' },
-  { value: 'meters', label: 'Meters' },
-  { value: 'yards', label: 'Yards' },
-  { value: 'cones', label: 'Cones' },
-  { value: 'rolls', label: 'Rolls' },
-  { value: 'dozen', label: 'Dozen' },
-];
-
 // ==================== TRIMS / ACCESSORIES ====================
 
 export const LOCAL_TRIM_ITEMS = [

@@ -1,6 +1,7 @@
 import { Modal, Table, InputNumber, Typography, Space, Tag, Button, Tooltip, Row, Col, Card, Select } from 'antd';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { HolderOutlined } from '@ant-design/icons';
+import { numericInputProps } from '../../utils/inputHelpers';
 import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal, calcVariantBreakdown } from '../../utils/bomConstants';
 
 const { Text } = Typography;
@@ -141,6 +142,7 @@ const ProcessAllowanceModal = ({
             onChange={(v) => updateRow(record.processId, 'shrinkageInches', v)}
             onBlur={(e) => handleBlur(record.processId, 'shrinkageInches', e)}
             addonAfter="in"
+            {...numericInputProps}
           />
         ),
       },
@@ -160,6 +162,7 @@ const ProcessAllowanceModal = ({
             onChange={(v) => updateRow(record.processId, 'processLossPercent', v)}
             onBlur={(e) => handleBlur(record.processId, 'processLossPercent', e)}
             addonAfter="%"
+            {...numericInputProps}
           />
         ),
       },
@@ -180,6 +183,7 @@ const ProcessAllowanceModal = ({
           onChange={(v) => updateRow(record.processId, 'rejectionPercent', v)}
           onBlur={(e) => handleBlur(record.processId, 'rejectionPercent', e)}
           addonAfter={isFabric ? '%' : undefined}
+          {...numericInputProps}
         />
       ),
     },
@@ -197,6 +201,7 @@ const ProcessAllowanceModal = ({
           style={{ width: '100%' }}
           value={value}
           onChange={(v) => updateRow(record.processId, 'shipmentAllowancePercent', v)}
+          {...numericInputProps}
           onBlur={(e) => handleBlur(record.processId, 'shipmentAllowancePercent', e)}
           addonAfter={isFabric ? '%' : undefined}
         />
@@ -445,6 +450,7 @@ const ProcessAllowanceModal = ({
                         style={{ width: '100%' }}
                         value={r.sizeAllowances?.[s]?.rejectionPercent ?? r.rejectionPercent ?? 0}
                         onChange={(v) => updateSizeAllowance(r.processId, s, 'rejectionPercent', v)}
+                        {...numericInputProps}
                       />
                     </td>
                   ))}
@@ -459,6 +465,7 @@ const ProcessAllowanceModal = ({
                         style={{ width: '100%' }}
                         value={r.sizeAllowances?.[s]?.shipmentAllowancePercent ?? r.shipmentAllowancePercent ?? 0}
                         onChange={(v) => updateSizeAllowance(r.processId, s, 'shipmentAllowancePercent', v)}
+                        {...numericInputProps}
                       />
                     </td>
                   ))}
@@ -490,6 +497,7 @@ const ProcessAllowanceModal = ({
                   style={{ width: 90 }}
                   value={qf.val}
                   onChange={(v) => updateQf('val', v)}
+                  {...numericInputProps}
                   placeholder="0.00"
                 />
                 <Select

@@ -148,6 +148,43 @@ export const createActivity = async (poId, payload) => {
   return res.data;
 };
 
+// ==================== VERSION HISTORY ====================
+
+/**
+ * Get all version history entries for a PO (newest first)
+ * @param {number} poId - Purchase order ID
+ * @returns {Promise<Array>} Version history entries
+ */
+export const getPoVersionHistory = async (poId) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.PURCHASE_ORDERS}/${poId}/versions`);
+  return response.data;
+};
+
+/**
+ * Get the latest version snapshot for a PO (for change detection)
+ * @param {number} poId - Purchase order ID
+ * @returns {Promise<Object|null>} Latest version or null if no versions
+ */
+export const getPoLatestVersion = async (poId) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.PURCHASE_ORDERS}/${poId}/versions/latest`);
+  return response.status === 204 ? null : response.data;
+};
+
+// ==================== STAGE COMPLETION ====================
+
+/**
+ * Update a processing stage's completion status
+ * @param {Object} data - { lineItemId, stageIndex, completed, actualCompletionDate }
+ * @returns {Promise<Object>} Updated line item DTO
+ */
+export const updateStageCompletion = async (data) => {
+  const response = await axiosInstance.put(
+    `${ENDPOINTS.PURCHASE_ORDERS}/line-items/stage-completion`,
+    data
+  );
+  return response.data;
+};
+
 // ==================== E-WAY BILL ====================
 
 const EWAY_BILL_ENDPOINT = '/eway-bill';
@@ -175,6 +212,9 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   createActivity,
+  getPoVersionHistory,
+  getPoLatestVersion,
+  updateStageCompletion,
   generateEwayBill,
   cancelEwayBill,
   rejectEwayBill,

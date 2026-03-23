@@ -178,7 +178,8 @@ const SupplierMaster = () => {
       removeItem('suppliers', id);
       message.success('Supplier deleted successfully');
     } catch (error) {
-      message.error(error?.errorMessage || 'Failed to delete supplier');
+      // Error toast already shown by axiosInstance interceptor
+      console.error('Failed to delete supplier:', error);
     } finally {
       setDeletingId(null);
     }
@@ -280,7 +281,8 @@ const SupplierMaster = () => {
         // Form validation error - already handled by Ant Design
         return;
       }
-      message.error(error?.errorMessage || `Failed to ${editingSupplier ? 'update' : 'create'} supplier`);
+      // Error toast already shown by axiosInstance interceptor
+      console.error('Failed to save supplier:', error);
     } finally {
       setSubmitting(false);
     }

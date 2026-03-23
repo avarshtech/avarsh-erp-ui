@@ -25,6 +25,7 @@ import {
   Popover,
   Switch,
 } from 'antd';
+import { numericInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -302,9 +303,8 @@ const POForm = () => {
   // IGST applicability (determined by supplier)
   const [isIgstApplicable, setIsIgstApplicable] = useState(false);
 
-  // Preview dialog
-  const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewData, setPreviewData] = useState(null);
+  // Change detection for resubmit warning
+  const [changeCheckLoading, setChangeCheckLoading] = useState(false);
 
   // Dirty state for unsaved changes warning
   const [isDirty, setIsDirtyState] = useState(false);
@@ -410,7 +410,6 @@ const POForm = () => {
       setSelectedSupplier(null);
       setOriginalPO(null);
       setIsIgstApplicable(false);
-      setPreviewVisible(false);
       setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
       setItemsWithVariants({});
       setPoType(PO_TYPE.GENERAL);
@@ -911,6 +910,19 @@ const POForm = () => {
         return;
       }
 
+      // Combined PO: validate same buyer across all orders
+      if (poType === PO_TYPE.COMBINED && bomOrders.length > 0 && bom.buyerId) {
+        const existingBuyerId = bomOrders[0].buyerId;
+        const existingBuyerName = bomOrders[0].buyerName;
+        if (existingBuyerId && bom.buyerId !== existingBuyerId) {
+          message.error(
+            `Cannot combine orders from different buyers. Existing orders belong to "${existingBuyerName || 'Buyer #' + existingBuyerId}",` +
+            ` but order ${trimmedOrderNo} belongs to "${bom.buyerName || 'Buyer #' + bom.buyerId}".`
+          );
+          return;
+        }
+      }
+
       const orderData = {
         orderNo: bom.orderNo || trimmedOrderNo,
         orderId: bom.orderId,
@@ -919,6 +931,8 @@ const POForm = () => {
         styleName: bom.styleName,
         season: bom.season,
         orderQty: bom.orderQty,
+        buyerId: bom.buyerId,
+        buyerName: bom.buyerName,
         bomLines: bom.lines,
       };
 
@@ -1202,9 +1216,7 @@ const POForm = () => {
               errors.push(`Line item ${lineNum}: Unit Price cannot be negative`);
             }
           }
-          if (!item.uomId) {
-            errors.push(`Line item ${lineNum}: UOM is required`);
-          }
+
         }
       });
 
@@ -1218,13 +1230,13 @@ const POForm = () => {
             : item.variantAttributes
               ? JSON.stringify(item.variantAttributes)
               : 'none';
-          const dupKey = `${item.itemId}|${variantKey}|${item.uomId || ''}`;
+          const dupKey = `${item.itemId}|${variantKey}`;
           const existingIdx = seen.findIndex((s) => s.key === dupKey);
           if (existingIdx >= 0) {
             const origLineNum = seen[existingIdx].lineNum;
             const currLineNum = lineItems.findIndex((li) => li.key === item.key) + 1;
             errors.push(
-              `Line items ${origLineNum} and ${currLineNum} are duplicates (same item, variant, and UOM)`
+              `Line items ${origLineNum} and ${currLineNum} are duplicates (same item and variant)`
             );
           } else {
             seen.push({ key: dupKey, lineNum: lineItems.findIndex((li) => li.key === item.key) + 1 });
@@ -1424,7 +1436,44 @@ const POForm = () => {
     }
   };
 
-  // Submit for Approval - show preview first
+  // Check if the PO has changes compared to the last submitted version
+  const hasChangesFromLastVersion = async () => {
+    if (!isEditMode || !id) return true; // new PO always has "changes"
+    try {
+      const { getPoLatestVersion } = await import('../../services/purchaseOrderService');
+      const latest = await getPoLatestVersion(id);
+      if (!latest?.snapshot) return true; // no previous version, treat as changed
+
+      const snapshot = latest.snapshot;
+      const currentPayload = buildPayload(PO_STATUS.PENDING_APPROVAL);
+
+      // Compare key fields
+      const fieldsToCompare = ['supplierId', 'deliveryDate', 'remarks', 'poType'];
+      for (const field of fieldsToCompare) {
+        if (String(currentPayload[field] ?? '') !== String(snapshot[field] ?? '')) return true;
+      }
+
+      // Compare line items
+      const currentLines = currentPayload.lineItems || [];
+      const snapshotLines = snapshot.lineItems || [];
+      if (currentLines.length !== snapshotLines.length) return true;
+
+      for (let i = 0; i < currentLines.length; i++) {
+        const cl = currentLines[i];
+        const sl = snapshotLines[i];
+        const lineFields = ['itemId', 'variantId', 'quantity', 'unitPrice', 'description', 'processName'];
+        for (const f of lineFields) {
+          if (String(cl[f] ?? '') !== String(sl[f] ?? '')) return true;
+        }
+      }
+
+      return false;
+    } catch {
+      return true; // on error, allow submit
+    }
+  };
+
+  // Submit for Approval — with resubmit change detection
   const handleSubmitClick = async () => {
     const errors = validateForm(true);
     if (errors.length > 0) {
@@ -1433,50 +1482,46 @@ const POForm = () => {
       return;
     }
 
-    // Validate Ant form fields
     try {
       await form.validateFields();
     } catch {
       return;
     }
 
-    // Build preview data and show preview
-    // Prefer supplierId from the loaded purchase order (originalPO) when editing,
-    // because the form value may occasionally be undefined while data is loading.
-    const supplierIdForPreview = (originalPO && originalPO.supplierId) ? originalPO.supplierId : form.getFieldValue('supplierId');
-    const supplier = suppliersList.find((s) => Number(s.id) === Number(supplierIdForPreview));
-    const terms = termsConditionsList.find(
-      (t) => t.id === form.getFieldValue('termsConditionId')
-    );
+    // For resubmit: check if user made any changes
+    const isResubmit = isEditMode && originalPO &&
+      (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK);
 
-    setPreviewData({
-      supplierDisplay: supplier?.name || '',
-      supplierGstin: supplier?.gstin || '',
-      supplierCity: supplier?.city || '',
-      supplierState: supplier?.state || '',
-      supplierEmail: supplier?.email || '',
-      supplierPhone: supplier?.phone || '',
-      suppliesFabric: supplier?.suppliesFabric || false,
-      suppliesTrims: supplier?.suppliesTrims || false,
-      termsDisplay: terms?.name || '',
-      poDateDisplay: form.getFieldValue('poDate')?.format('DD-MMM-YYYY'),
-      deliveryDateDisplay: form.getFieldValue('deliveryDate')?.format('DD-MMM-YYYY'),
-      remarks: form.getFieldValue('remarks') || '',
-      lineItemsDisplay: isProcessPo
-        ? lineItems.filter((item) => item.processName)
-        : lineItems.filter((item) => item.itemId),
-      totals,
-      gstBreakup,
-      isIgstApplicable,
-      poType,
-      isProcessPo,
-      bomOrders,
+    if (isResubmit) {
+      setChangeCheckLoading(true);
+      const changed = await hasChangesFromLastVersion();
+      setChangeCheckLoading(false);
+
+      if (!changed) {
+        Modal.confirm({
+          title: 'No Changes Detected',
+          icon: <ExclamationCircleOutlined />,
+          content: 'No changes were made since the last submission. Are you sure you want to re-submit without changes?',
+          okText: 'Re-submit Anyway',
+          cancelText: 'Go Back & Edit',
+          onOk: () => doSubmit(),
+        });
+        return;
+      }
+    }
+
+    // Confirm before submit
+    Modal.confirm({
+      title: 'Submit for Approval',
+      icon: <SendOutlined style={{ color: 'var(--primary-color)' }} />,
+      content: 'Are you sure you want to submit this purchase order for approval?',
+      okText: 'Submit',
+      onOk: () => doSubmit(),
     });
-    setPreviewVisible(true);
   };
 
-  // Confirm submit from preview
-  const handleConfirmSubmit = async () => {
+  // Actual submit logic
+  const doSubmit = async () => {
     setSubmitting(true);
     try {
       const payload = buildPayload(PO_STATUS.PENDING_APPROVAL);
@@ -1535,7 +1580,6 @@ const POForm = () => {
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
-      setPreviewVisible(false);
       navigate('/purchase-orders/list');
     } catch {
       message.error('Failed to submit purchase order');
@@ -1576,31 +1620,6 @@ const POForm = () => {
     if (current && current < tomorrow) return true;
     if (current && poDate && current <= poDate) return true;
     return false;
-  };
-
-  // Build UOM options for a line item
-  const getUomOptions = (record) => {
-    const opts = [];
-    const primaryId = record.primaryUomId ?? record.uomId;
-    const primaryName = record.primaryUom ?? record.uom;
-    const secondaryId = record.secondaryUomId;
-    const secondaryName = record.secondaryUom;
-
-    if (primaryId && primaryName) {
-      opts.push({ value: primaryId, label: primaryName.toUpperCase() });
-    }
-    if (secondaryId && secondaryName && secondaryId !== primaryId) {
-      opts.push({ value: secondaryId, label: secondaryName.toUpperCase() });
-    }
-    // Fallback
-    if (opts.length === 0 && (record.uom || record.primaryUom)) {
-      const fallbackName = record.uom || record.primaryUom;
-      opts.push({
-        value: record.uomId || fallbackName,
-        label: fallbackName.toUpperCase(),
-      });
-    }
-    return opts;
   };
 
   // Line items table columns
@@ -1795,13 +1814,15 @@ const POForm = () => {
       align: 'center',
       render: (value, record) => {
         if (record._fromBom) {
-          return <Text strong style={{ color: 'var(--primary-color)' }}>{value}</Text>;
+          const uomLabel = (record.uom || record.primaryUom || '').toUpperCase();
+          return <Text strong style={{ color: 'var(--primary-color)' }}>{value}{uomLabel ? ` ${uomLabel}` : ''}</Text>;
         }
         return (
           <InputNumber
             min={0}
             step={1}
             precision={2}
+            controls={false}
             style={{ width: '100%', height: 40 }}
             value={value === '' ? null : Number(value)}
             onChange={(v) =>
@@ -1809,37 +1830,8 @@ const POForm = () => {
             }
             disabled={submitting || savingDraft || !record.itemId}
             placeholder="0"
-          />
-        );
-      },
-    },
-    {
-      title: 'UOM',
-      dataIndex: 'uomId',
-      width: 110,
-      align: 'center',
-      render: (_, record) => {
-        if (record._fromBom) {
-          return <Text>{record.uom || '-'}</Text>;
-        }
-        const uomOpts = getUomOptions(record);
-        if (uomOpts.length === 0) {
-          return <Text type="secondary">-</Text>;
-        }
-        if (uomOpts.length === 1) {
-          return <Text>{uomOpts[0].label}</Text>;
-        }
-        return (
-          <Select
-            style={{ width: '100%' }}
-            value={record.uomId || undefined}
-            onChange={(val) => {
-              const found = uomOpts.find((o) => o.value === val);
-              handleLineItemChange(record.key, 'uomId', val);
-              handleLineItemChange(record.key, 'uom', found?.label || '');
-            }}
-            options={uomOpts}
-            disabled={submitting || savingDraft || !record.itemId}
+            addonAfter={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+            {...numericInputProps}
           />
         );
       },
@@ -1853,6 +1845,7 @@ const POForm = () => {
           min={0}
           step={0.01}
           precision={2}
+          controls={false}
           style={{ width: '100%', height: 40 }}
           value={value === '' ? null : Number(value)}
           onChange={(v) =>
@@ -1864,6 +1857,7 @@ const POForm = () => {
           }
           disabled={submitting || savingDraft || !record.itemId}
           placeholder="0.00"
+          {...numericInputProps}
         />
       ),
     },
@@ -2015,6 +2009,7 @@ const POForm = () => {
           value={record.qty !== '' ? Number(record.qty) : null}
           onChange={(v) => handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')}
           disabled={!selectedSupplier || submitting || savingDraft}
+          {...numericInputProps}
         />
       ),
     },
@@ -2029,6 +2024,7 @@ const POForm = () => {
           value={record.unitPrice !== '' ? Number(record.unitPrice) : null}
           onChange={(v) => handleLineItemChange(record.key, 'unitPrice', v !== null ? v : '')}
           disabled={!selectedSupplier || submitting || savingDraft}
+          {...numericInputProps}
         />
       ),
     },
@@ -2581,449 +2577,6 @@ const POForm = () => {
           </Col>
         </Row>
       </Form>
-
-      {/* Preview Dialog */}
-      <Modal
-        title="Purchase Order Preview"
-        open={previewVisible}
-        onCancel={() => setPreviewVisible(false)}
-        width={1200}
-        style={{ top: 20 }}
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '24px' } }}
-        footer={[
-          <Button key="back" onClick={() => setPreviewVisible(false)}>
-            Go Back & Edit
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            icon={<SendOutlined />}
-            loading={submitting}
-            onClick={handleConfirmSubmit}
-          >
-            Confirm & Submit
-          </Button>,
-        ]}
-      >
-        {previewData && (
-          <div>
-            {/* PO Header Details */}
-            <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 24 }} items={[
-              {
-                key: 'supplier',
-                label: 'Supplier',
-                children: <Text strong>{previewData.supplierDisplay}</Text>,
-              },
-              {
-                key: 'poDate',
-                label: 'PO Date',
-                children: previewData.poDateDisplay,
-              },
-              {
-                key: 'expectedDelivery',
-                label: 'Expected Delivery',
-                children: previewData.deliveryDateDisplay,
-              },
-              previewData.supplierGstin && {
-                key: 'supplierGstin',
-                label: 'Supplier GSTIN',
-                children: previewData.supplierGstin,
-              },
-              (previewData.supplierCity || previewData.supplierState) && {
-                key: 'supplierLocation',
-                label: 'Supplier Location',
-                children: [previewData.supplierCity, previewData.supplierState]
-                  .filter(Boolean)
-                  .join(', '),
-              },
-              (previewData.isProcessPo || (previewData.poType && previewData.poType !== 'General')) && {
-                key: 'poType',
-                label: 'PO Type',
-                children: (
-                  <Space>
-                    {previewData.poType && previewData.poType !== 'General' && <Tag color="purple">{previewData.poType} PO</Tag>}
-                    {previewData.isProcessPo && <Tag color="purple" icon={<ExperimentOutlined />}>Process PO</Tag>}
-                  </Space>
-                ),
-              },
-              {
-                key: 'terms',
-                label: 'Terms & Conditions',
-                children: previewData.termsDisplay || 'Not specified',
-              },
-              {
-                key: 'taxType',
-                label: 'Tax Type',
-                children: (
-                  <Tag color={previewData.isIgstApplicable ? 'blue' : 'green'}>
-                    {previewData.isIgstApplicable ? 'IGST' : 'SGST / CGST'}
-                  </Tag>
-                ),
-              },
-              previewData.remarks && {
-                key: 'remarks',
-                label: 'Remarks',
-                span: 3,
-                children: previewData.remarks,
-              },
-            ].filter(Boolean)} />
-
-            {/* Order References (BOM PO) */}
-            {previewData.poType !== 'General' && previewData.bomOrders?.length > 0 && (
-              <Card size="small" style={{ marginBottom: 16 }}>
-                <Text strong style={{ display: 'block', marginBottom: 10 }}>Order Information</Text>
-                {previewData.bomOrders.map((order, idx) => (
-                  <div key={order.orderNo}>
-                    {idx > 0 && <Divider style={{ margin: '10px 0' }} />}
-                    <Row gutter={[24, 8]}>
-                      <Col xs={12} sm={8} md={6}>
-                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
-                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
-                      </Col>
-                      <Col xs={12} sm={8} md={6}>
-                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
-                        <Text strong style={{ fontSize: 13 }}>{order.styleName || '-'}</Text>
-                      </Col>
-                      <Col xs={12} sm={8} md={6}>
-                        <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Season</Text>
-                        <Text strong style={{ fontSize: 13 }}>{order.season || '-'}</Text>
-                      </Col>
-                      {order.orderQty && (
-                        <Col xs={12} sm={8} md={6}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order Qty</Text>
-                          <Text strong style={{ fontSize: 13 }}>{order.orderQty?.toLocaleString('en-IN')}</Text>
-                        </Col>
-                      )}
-                    </Row>
-                  </div>
-                ))}
-              </Card>
-            )}
-
-            {/* Line Items */}
-            <Title level={5} style={{ marginBottom: 12 }}>
-              Line Items ({previewData.lineItemsDisplay.length})
-            </Title>
-            <Table
-              dataSource={previewData.lineItemsDisplay}
-              size="small"
-              pagination={false}
-              rowKey="key"
-              className="centered-header-table"
-              scroll={{ x: previewData.isProcessPo ? 800 : 1100 }}
-              columns={previewData.isProcessPo ? [
-                { title: '#', width: 40, align: 'center', render: (_, __, i) => i + 1 },
-                {
-                  title: 'Process Name',
-                  dataIndex: 'processName',
-                  width: 200,
-                  render: (v) => <Text strong>{v || '-'}</Text>,
-                },
-                {
-                  title: 'Description',
-                  dataIndex: 'description',
-                  width: 200,
-                  render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
-                },
-                { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
-                {
-                  title: 'Unit Price',
-                  dataIndex: 'unitPrice',
-                  width: 100,
-                  align: 'right',
-                  render: (v) => `₹ ${parseFloat(v || 0).toFixed(2)}`,
-                },
-                {
-                  title: 'GST %',
-                  dataIndex: 'gstPercent',
-                  width: 70,
-                  align: 'center',
-                  render: (v) => `${v || 0}%`,
-                },
-                {
-                  title: 'Amount',
-                  dataIndex: 'amount',
-                  width: 110,
-                  align: 'right',
-                  render: (v) => <Text strong>₹ {(v || 0).toFixed(2)}</Text>,
-                },
-              ] : [
-                { title: '#', width: 40, align: 'center', render: (_, __, i) => i + 1 },
-                {
-                  title: 'Item',
-                  width: 220,
-                  render: (_, r) => {
-                    const imgUrl = r.variantId ? lineItemImages[r.variantId] : null;
-                    return (
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                        {imgUrl === 'loading' && (
-                          <div style={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Spin size="small" />
-                          </div>
-                        )}
-                        {imgUrl && imgUrl !== 'loading' && (
-                          <Popover
-                            content={<img src={imgUrl} alt="variant enlarged" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }} />}
-                            trigger="hover"
-                            placement="right"
-                            overlayInnerStyle={{ padding: 4 }}
-                          >
-                            <img src={imgUrl} alt="variant" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }} />
-                          </Popover>
-                        )}
-                        <div>
-                          <Text strong>{r.itemName}</Text>
-                          {r.itemCode && (
-                            <>
-                              <br />
-                              <Text type="secondary" style={{ fontSize: 12 }}>{r.itemCode}</Text>
-                            </>
-                          )}
-                          {r.variantAttributes && Object.keys(r.variantAttributes).length > 0 && (
-                            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                              {Object.entries(r.variantAttributes).map(([k, v]) => {
-                                const kLower = k.toLowerCase();
-                                const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                                const showSwatch = isColorAttr && isPantoneCode(v);
-                                return (
-                                  <Tag key={k} style={{ fontSize: 10, margin: 0, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-                                    {showSwatch && <PantoneColorSwatch value={v} size={14} />}
-                                    {k}: {showSwatch ? (v.split('/')[0]?.trim() || v) : v}
-                                  </Tag>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  },
-                },
-                {
-                  title: 'Description',
-                  dataIndex: 'description',
-                  width: 160,
-                  render: (v) => <span style={{ wordBreak: 'break-word' }}>{v || '-'}</span>,
-                },
-                {
-                  title: 'HSN',
-                  dataIndex: 'hsnCode',
-                  width: 100,
-                  align: 'center',
-                  render: (v, r) => {
-                    const hasStages = r.processingStages && r.processingStages.length > 0;
-                    return (
-                      <div style={{ textAlign: 'center' }}>
-                        <Text type="secondary">{v || '-'}</Text>
-                        {hasStages && (
-                          <Tag color="purple" style={{ marginTop: 4, fontSize: 10, display: 'inline-block' }}>
-                            {r.processingStages.length} stage{r.processingStages.length > 1 ? 's' : ''}
-                          </Tag>
-                        )}
-                      </div>
-                    );
-                  },
-                },
-                { title: 'Qty', dataIndex: 'qty', width: 70, align: 'center' },
-                {
-                  title: 'UOM',
-                  dataIndex: 'uom',
-                  width: 80,
-                  align: 'center',
-                  render: (v) => (v || '-').toUpperCase(),
-                },
-                {
-                  title: 'Unit Price',
-                  dataIndex: 'unitPrice',
-                  width: 100,
-                  align: 'right',
-                  render: (v) => `₹ ${parseFloat(v || 0).toFixed(2)}`,
-                },
-                {
-                  title: 'GST %',
-                  dataIndex: 'gstPercent',
-                  width: 70,
-                  align: 'center',
-                  render: (v) => `${v || 0}%`,
-                },
-                {
-                  title: 'Amount',
-                  dataIndex: 'amount',
-                  width: 110,
-                  align: 'right',
-                  render: (v) => <Text strong>₹ {(v || 0).toFixed(2)}</Text>,
-                },
-              ]}
-            />
-
-            {/* Processing Stages + Order Summary — side by side */}
-            <Row gutter={24} style={{ marginTop: 16, marginBottom: 8 }}>
-              {/* Processing Stages (left) — only when stages exist */}
-              {(() => {
-                const itemsWithStages = previewData.lineItemsDisplay.filter(
-                  (li) => li.processingStages && li.processingStages.length > 0
-                );
-                if (itemsWithStages.length === 0) return null;
-
-                return (
-                  <Col xs={24} md={12}>
-                    <Card
-                      size="small"
-                      style={{ height: '100%' }}
-                      title={
-                        <Space>
-                          <ExperimentOutlined style={{ color: 'var(--primary-color)' }} />
-                          <span>Processing Stages</span>
-                          <Tag color="purple" style={{ marginLeft: 4 }}>
-                            {itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0)} stage{itemsWithStages.reduce((sum, li) => sum + li.processingStages.length, 0) !== 1 ? 's' : ''}
-                          </Tag>
-                        </Space>
-                      }
-                    >
-                      {itemsWithStages.map((li, liIdx) => {
-                        const label = li.itemName || li.processName || li.itemCode || `Item ${liIdx + 1}`;
-                        const stages = li.processingStages || [];
-                        const sortedStages = [...stages].sort((a, b) => {
-                          if (!a.completionDate) return 1;
-                          if (!b.completionDate) return -1;
-                          return dayjs(a.completionDate).diff(dayjs(b.completionDate));
-                        });
-
-                        return (
-                          <div key={li.key || liIdx}>
-                            {liIdx > 0 && <Divider style={{ margin: '12px 0' }} />}
-                            <div style={{ marginBottom: 10 }}>
-                              <Text strong style={{ fontSize: 13 }}>{label}</Text>
-                              {li.itemCode && li.itemName && (
-                                <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>{li.itemCode}</Text>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingLeft: 4 }}>
-                              {sortedStages.map((stage, sIdx) => {
-                                const targetDate = stage.completionDate ? dayjs(stage.completionDate) : null;
-                                const isLast = sIdx === sortedStages.length - 1;
-
-                                return (
-                                  <div key={sIdx} style={{ display: 'flex', gap: 12, minHeight: 40 }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, flexShrink: 0 }}>
-                                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: 'var(--primary-color, #6366f1)', flexShrink: 0, marginTop: 5 }} />
-                                      {!isLast && (
-                                        <div style={{ width: 2, flex: 1, background: 'var(--border-color, #e2e8f0)', marginTop: 2 }} />
-                                      )}
-                                    </div>
-                                    <div style={{ flex: 1, paddingBottom: isLast ? 0 : 8 }}>
-                                      <Text strong style={{ fontSize: 13 }}>{stage.stageName}</Text>
-                                      {targetDate && (
-                                        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2 }}>
-                                          Target: {targetDate.format('DD MMM YYYY')}
-                                        </Text>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </Card>
-                  </Col>
-                );
-              })()}
-
-              {/* Order Summary */}
-              <Col xs={24} md={{ span: 12, offset: previewData.lineItemsDisplay.some((li) => li.processingStages?.length > 0) ? 0 : 12 }}>
-                <Card
-                  size="small"
-                  style={{ height: '100%' }}
-                  title={
-                    <Space>
-                      <DollarOutlined style={{ color: 'var(--primary-color)' }} />
-                      <span>Order Summary</span>
-                    </Space>
-                  }
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text>Subtotal</Text>
-                    <Text strong>₹ {previewData.totals.subtotal.toFixed(2)}</Text>
-                  </div>
-
-                  {/* GST Breakup */}
-                  {previewData.gstBreakup?.length > 0 && (
-                    <>
-                      <Divider style={{ margin: '4px 0' }} />
-                      <Text strong style={{ color: 'var(--primary-color)', fontSize: 12 }}>
-                        GST BREAKUP
-                      </Text>
-                      {previewData.gstBreakup.map((group, idx) => (
-                        <div key={group.percent} style={{ paddingLeft: 12, marginTop: 4 }}>
-                          <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                            GST @ {group.percent}%
-                          </Text>
-                          {previewData.isIgstApplicable ? (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
-                              <Text type="secondary" style={{ fontSize: 12 }}>IGST ({group.percent}%)</Text>
-                              <Text style={{ fontSize: 12 }}>₹ {group.igst.toFixed(2)}</Text>
-                            </div>
-                          ) : (
-                            <>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
-                                <Text type="secondary" style={{ fontSize: 12 }}>SGST ({group.percent / 2}%)</Text>
-                                <Text style={{ fontSize: 12 }}>₹ {group.sgst.toFixed(2)}</Text>
-                              </div>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 12 }}>
-                                <Text type="secondary" style={{ fontSize: 12 }}>CGST ({group.percent / 2}%)</Text>
-                                <Text style={{ fontSize: 12 }}>₹ {group.cgst.toFixed(2)}</Text>
-                              </div>
-                            </>
-                          )}
-                          {idx < previewData.gstBreakup.length - 1 && (
-                            <Divider variant="dashed" style={{ margin: '4px 0' }} />
-                          )}
-                        </div>
-                      ))}
-                    </>
-                  )}
-
-                  <Divider style={{ margin: '8px 0' }} />
-
-                  {previewData.isIgstApplicable ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <Text>Total IGST</Text>
-                      <Text>₹ {previewData.totals.igst.toFixed(2)}</Text>
-                    </div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <Text>Total SGST</Text>
-                        <Text>₹ {previewData.totals.sgst.toFixed(2)}</Text>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <Text>Total CGST</Text>
-                        <Text>₹ {previewData.totals.cgst.toFixed(2)}</Text>
-                      </div>
-                    </>
-                  )}
-
-                  <Divider style={{ margin: '8px 0' }} />
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '12px 16px',
-                      borderRadius: 8,
-                      background: 'var(--primary-color)',
-                    }}
-                  >
-                    <Text strong style={{ color: '#fff', fontSize: 15 }}>Grand Total</Text>
-                    <Text strong style={{ color: '#fff', fontSize: 18 }}>₹ {previewData.totals.grandTotal.toFixed(2)}</Text>
-                  </div>
-                </Card>
-              </Col>
-            </Row>
-          </div>
-        )}
-      </Modal>
 
       {/* Variant Selection Modal */}
       <VariantSelectionModal

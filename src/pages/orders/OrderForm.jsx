@@ -26,6 +26,7 @@ import {
   Upload,
   Alert,
 } from 'antd';
+import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -43,6 +44,7 @@ import {
   UploadOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  EditOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -54,6 +56,8 @@ import { getCostSheetByCostingId, downloadAttachment } from '../../services/cost
 import { getAllSizePresets, createSizePreset } from '../../services/sizePresetService';
 import { extractOrderLine } from '../../services/aiService';
 import { getStyleById } from '../../services/styleService';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import FileUpload from '../../components/FileUpload';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,
@@ -267,6 +271,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
           value={v}
           onChange={(val) => handleChange(r.key, 'qtyPerSet', val || 1)}
           style={{ width: '100%' }}
+          {...integerInputProps}
         />
       ),
     },
@@ -496,6 +501,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                 onChange={(v) => setBulkPrice(v || 0)}
                 style={{ width: 100, height: 32 }}
                 placeholder="0.00"
+                {...numericInputProps}
               />
               <Button type="primary" style={{ height: 32 }} onClick={handleApplyBulkPrice}>
                 Apply All
@@ -552,6 +558,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                         value={sizePrices[s] || 0}
                         onChange={(v) => handleSizePriceChange(s, v)}
                         style={{ width: '100%' }}
+                        {...numericInputProps}
                       />
                     )}
                   </td>
@@ -589,6 +596,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                           value={row.quantities?.[s] || 0}
                           onChange={(v) => handleQtyChange(row.key, s, v)}
                           style={{ width: '100%' }}
+                          {...integerInputProps}
                         />
                       )}
                     </td>
@@ -797,6 +805,7 @@ const tdStyle = {
 
 const createEmptyLine = () => ({
   key: `line_${Date.now()}`,
+  lineId: null, // backend ID — null for new lines
   buyerPoNo: '',
   destination: '',
   dispatchDate: null,
@@ -809,6 +818,11 @@ const createEmptyLine = () => ({
   ],
   lineQty: 0,
   lineTotal: 0,
+  // Garment image fields (underscore-prefixed, not sent to API)
+  _imageFile: null,         // locally selected File (new lines only)
+  _imagePreviewUrl: null,   // blob URL for display
+  _existingImage: null,     // server-side FileStorageDTO
+  _imageUploading: false,   // loading state during upload/delete
 });
 
 // ==================== ORDER FORM ====================
@@ -935,6 +949,7 @@ const OrderForm = () => {
     if (order.components?.length > 0) setFormComponents(order.components);
     const lines = (order.orderLines || []).map((l) => ({
       key: `line_${l.id || Date.now() + Math.random()}`,
+      lineId: l.id || null,
       buyerPoNo: l.buyerPoNo || '',
       destination: l.destination || '',
       dispatchDate: l.dispatchDate ? dayjs(l.dispatchDate) : null,
@@ -951,14 +966,24 @@ const OrderForm = () => {
       })),
       lineQty: l.lineQty || 0,
       lineTotal: l.lineTotal || 0,
+      _imageFile: null,
+      _imagePreviewUrl: null,
+      _existingImage: null,
+      _imageUploading: false,
     }));
     setOrderLines(lines.length > 0 ? lines : [createEmptyLine()]);
     setActiveKeys(lines.map((l) => l.key));
+    // Load existing garment images for lines that have IDs
+    loadLineImages(lines.filter((l) => l.lineId));
   }, [form]);
 
   // Reset form state when switching from edit to new order
   useEffect(() => {
     if (!id) {
+      // Clean up blob URLs from previous edit
+      orderLines.forEach((l) => {
+        if (l._imagePreviewUrl) URL.revokeObjectURL(l._imagePreviewUrl);
+      });
       form.resetFields();
       setExistingOrder(null);
       setEntityVersion(null);
@@ -969,6 +994,7 @@ const OrderForm = () => {
       setIsDirty(false);
       setPageLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, form]);
 
   // Load existing order for edit — use passed location state first, fall back to API
@@ -1032,9 +1058,200 @@ const OrderForm = () => {
       message.warning('At least one order line is required');
       return;
     }
+    // Clean up blob URL for the removed line
+    const removed = orderLines.find((l) => l.key === lineKey);
+    if (removed?._imagePreviewUrl) URL.revokeObjectURL(removed._imagePreviewUrl);
     setOrderLines((prev) => prev.filter((l) => l.key !== lineKey));
     setActiveKeys((prev) => prev.filter((k) => k !== lineKey));
     setIsDirty(true);
+  };
+
+  // ==================== LINE GARMENT IMAGE ====================
+
+  /** Load existing garment images for order lines that have backend IDs */
+  const loadLineImages = async (lines) => {
+    const linesWithIds = (lines || []).filter((l) => l.lineId);
+    if (linesWithIds.length === 0) return;
+
+    const results = await Promise.all(
+      linesWithIds.map(async (l) => {
+        try {
+          const files = await getFilesByEntity('ORDER_LINE', l.lineId);
+          const imageFile = (files || []).find((f) =>
+            ['IMAGE', 'PHOTO'].includes(f.fileCategory),
+          );
+          if (!imageFile) return null;
+          const blob = await downloadFileAsBlob(imageFile.fileId);
+          const previewUrl = URL.createObjectURL(blob);
+          return { lineId: l.lineId, imageFile, previewUrl };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setOrderLines((prev) =>
+      prev.map((l) => {
+        const result = results.find((r) => r?.lineId === l.lineId);
+        if (result) {
+          return { ...l, _existingImage: result.imageFile, _imagePreviewUrl: result.previewUrl };
+        }
+        return l;
+      }),
+    );
+  };
+
+  /** Handle garment image selection for a line */
+  const handleLineImageSelect = async (lineKey, file) => {
+    const line = orderLines.find((l) => l.key === lineKey);
+    if (!line) return;
+
+    // Revoke old preview URL if it was from a locally selected file
+    if (line._imagePreviewUrl && line._imageFile) {
+      URL.revokeObjectURL(line._imagePreviewUrl);
+    }
+    const previewUrl = URL.createObjectURL(file);
+
+    if (line.lineId) {
+      // Existing line — upload immediately
+      setOrderLines((prev) =>
+        prev.map((l) =>
+          l.key === lineKey
+            ? { ...l, _imageFile: null, _imagePreviewUrl: previewUrl, _imageUploading: true }
+            : l,
+        ),
+      );
+      try {
+        // Delete old image if replacing
+        if (line._existingImage?.fileId) {
+          await deleteFile(line._existingImage.fileId).catch((err) =>
+            console.error('Failed to delete old line image:', err),
+          );
+        }
+        const result = await uploadFile(file, {
+          module: 'ORDER',
+          entity: 'ORDER_LINE',
+          entityId: line.lineId,
+          fileCategory: 'IMAGE',
+        });
+        const uploaded = result?.data || result;
+        setOrderLines((prev) =>
+          prev.map((l) =>
+            l.key === lineKey
+              ? { ...l, _existingImage: uploaded, _imageFile: null, _imagePreviewUrl: previewUrl, _imageUploading: false }
+              : l,
+          ),
+        );
+        message.success('Garment image uploaded');
+      } catch {
+        message.error('Image upload failed. Please try again.');
+        URL.revokeObjectURL(previewUrl);
+        setOrderLines((prev) =>
+          prev.map((l) =>
+            l.key === lineKey
+              ? { ...l, _imageFile: null, _imagePreviewUrl: line._existingImage ? line._imagePreviewUrl : null, _imageUploading: false }
+              : l,
+          ),
+        );
+      }
+    } else {
+      // New line — stage locally, upload after save
+      setOrderLines((prev) =>
+        prev.map((l) =>
+          l.key === lineKey
+            ? { ...l, _imageFile: file, _imagePreviewUrl: previewUrl }
+            : l,
+        ),
+      );
+      setIsDirty(true);
+      message.info('Image staged. It will be uploaded when the order is saved.');
+    }
+  };
+
+  /** Handle garment image removal for a line */
+  const handleLineImageRemove = async (lineKey) => {
+    const line = orderLines.find((l) => l.key === lineKey);
+    if (!line) return;
+
+    if (line._imagePreviewUrl) URL.revokeObjectURL(line._imagePreviewUrl);
+
+    const hasExistingImage = !!line._existingImage?.fileId;
+
+    if (hasExistingImage && line.lineId) {
+      // Existing line with server image — delete immediately
+      setOrderLines((prev) =>
+        prev.map((l) =>
+          l.key === lineKey
+            ? { ...l, _imageFile: null, _imagePreviewUrl: null, _existingImage: null, _imageUploading: true }
+            : l,
+        ),
+      );
+      try {
+        await deleteFile(line._existingImage.fileId);
+        setOrderLines((prev) =>
+          prev.map((l) => (l.key === lineKey ? { ...l, _imageUploading: false } : l)),
+        );
+        message.success('Image removed');
+      } catch {
+        message.error('Failed to remove image. Please try again.');
+        setOrderLines((prev) =>
+          prev.map((l) =>
+            l.key === lineKey
+              ? { ...l, _existingImage: line._existingImage, _imageUploading: false }
+              : l,
+          ),
+        );
+      }
+    } else {
+      // New line or locally staged file — just clear locally
+      setOrderLines((prev) =>
+        prev.map((l) =>
+          l.key === lineKey
+            ? { ...l, _imageFile: null, _imagePreviewUrl: null }
+            : l,
+        ),
+      );
+      setIsDirty(true);
+    }
+  };
+
+  /** Upload staged images for newly created lines after order save */
+  const processLineImages = async (savedOrder) => {
+    if (!savedOrder?.orderLines?.length) return;
+
+    const fileOps = [];
+    let uploadFailures = 0;
+
+    for (let i = 0; i < orderLines.length; i++) {
+      const local = orderLines[i];
+      // Skip lines that already had an ID — their images were uploaded immediately
+      if (local.lineId) continue;
+      if (!local._imageFile) continue;
+
+      const savedLine = savedOrder.orderLines[i];
+      if (!savedLine?.id) continue;
+
+      fileOps.push(
+        uploadFile(local._imageFile, {
+          module: 'ORDER',
+          entity: 'ORDER_LINE',
+          entityId: savedLine.id,
+          fileCategory: 'IMAGE',
+        }).catch(() => {
+          uploadFailures++;
+        }),
+      );
+    }
+
+    if (fileOps.length > 0) {
+      await Promise.allSettled(fileOps);
+    }
+
+    if (uploadFailures > 0) {
+      message.warning(
+        `Order saved, but ${uploadFailures} image upload${uploadFailures > 1 ? 's' : ''} failed. You can re-upload by editing the order.`,
+      );
+    }
   };
 
   // ==================== AI EXTRACTION ====================
@@ -1475,6 +1692,8 @@ const OrderForm = () => {
         message.success('Order saved as draft');
       }
       if (saved?.version != null) setEntityVersion(saved.version);
+      // Upload staged garment images for new lines
+      await processLineImages(saved);
       setIsDirty(false);
       clearDirty();
       navigate('/orders/list');
@@ -1510,6 +1729,8 @@ const OrderForm = () => {
             savedOrder = await createOrder(data);
           }
           if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
+          // Upload staged garment images for new lines
+          await processLineImages(savedOrder);
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
@@ -1855,6 +2076,7 @@ const OrderForm = () => {
                   min={1}
                   controls={false}
                   placeholder="e.g. 60"
+                  {...integerInputProps}
                 />
               </Form.Item>
             </Col>
@@ -1980,107 +2202,142 @@ const OrderForm = () => {
               ),
               children: (
                 <div>
-                  {/* Line Fields */}
-                  <Row gutter={16}>
-                    <Col xs={24} sm={12} md={8}>
-                      <Form.Item
-                        label={
-                          <span>
-                            Buyer PO No <span style={{ color: '#ff4d4f' }}>*</span>
-                          </span>
-                        }
-                        style={{ marginBottom: 12 }}
-                      >
-                        <Input
-                          placeholder="Buyer PO Number"
-                          value={line.buyerPoNo}
-                          onChange={(e) =>
-                            handleLineChange(line.key, { buyerPoNo: e.target.value })
-                          }
-                        />
-                      </Form.Item>
+                  {/* ── Section 1: Line Details + Garment Image ── */}
+                  <Row gutter={20}>
+                    {/* Left: Form fields */}
+                    <Col xs={24} md={16}>
+                      <Row gutter={12}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span>Buyer PO No <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            style={{ marginBottom: 12 }}
+                          >
+                            <Input
+                              placeholder="Buyer PO Number"
+                              value={line.buyerPoNo}
+                              onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span>Destination <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            style={{ marginBottom: 12 }}
+                          >
+                            <Select
+                              placeholder={buyerDestinations.length > 0 ? 'Select destination' : 'Select a buyer first'}
+                              showSearch
+                              value={line.destination || undefined}
+                              options={buyerDestinations}
+                              disabled={buyerDestinations.length === 0}
+                              filterOption={(input, option) => option.label.toLowerCase().includes(input.toLowerCase())}
+                              onChange={(v) => handleLineChange(line.key, { destination: v })}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            label={<span>Dispatch Date <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            style={{ marginBottom: 12 }}
+                          >
+                            <DatePicker
+                              style={{ width: '100%' }}
+                              value={line.dispatchDate}
+                              disabledDate={(current) => current && current <= dayjs().endOf('day')}
+                              onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
+                            <Input
+                              disabled
+                              style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
+                              prefix={<ClockCircleOutlined />}
+                              value={(() => {
+                                if (!line.dispatchDate) return '';
+                                const orderDate = form.getFieldValue('orderDate');
+                                const base = orderDate ? dayjs(orderDate) : dayjs();
+                                return `${dayjs(line.dispatchDate).diff(base, 'day')} days`;
+                              })()}
+                              placeholder="—"
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
                     </Col>
-                    <Col xs={24} sm={12} md={8}>
-                      <Form.Item
-                        label={
-                          <span>
-                            Destination <span style={{ color: '#ff4d4f' }}>*</span>
-                          </span>
-                        }
-                        style={{ marginBottom: 12 }}
+
+                    {/* Right: Garment Image */}
+                    <Col xs={24} md={8}>
+                      <div
+                        style={{
+                          padding: 12,
+                          borderRadius: 10,
+                          border: '1px solid var(--border-color, #e5e7eb)',
+                          background: 'var(--bg-secondary, #f8fafc)',
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column',
+                        }}
                       >
-                        <Select
-                          placeholder={
-                            buyerDestinations.length > 0
-                              ? 'Select destination'
-                              : 'Select a buyer first'
-                          }
-                          showSearch
-                          value={line.destination || undefined}
-                          options={buyerDestinations}
-                          disabled={buyerDestinations.length === 0}
-                          filterOption={(input, option) =>
-                            option.label.toLowerCase().includes(input.toLowerCase())
-                          }
-                          onChange={(v) => handleLineChange(line.key, { destination: v })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={8}>
-                      <Form.Item
-                        label={
-                          <span>
-                            Dispatch Date <span style={{ color: '#ff4d4f' }}>*</span>
-                          </span>
-                        }
-                        style={{ marginBottom: 12 }}
-                      >
-                        <DatePicker
-                          style={{ width: '100%' }}
-                          value={line.dispatchDate}
-                          disabledDate={(current) =>
-                            current && current <= dayjs().endOf('day')
-                          }
-                          onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} sm={12} md={8}>
-                      <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
-                        <Input
-                          disabled
-                          style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
-                          prefix={<ClockCircleOutlined />}
-                          value={(() => {
-                            if (!line.dispatchDate) return '';
-                            const orderDate = form.getFieldValue('orderDate');
-                            const base = orderDate ? dayjs(orderDate) : dayjs();
-                            return `${dayjs(line.dispatchDate).diff(base, 'day')} days`;
-                          })()}
-                          placeholder="—"
-                        />
-                      </Form.Item>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8, display: 'block' }}
+                        >
+                          Garment Image
+                        </Text>
+                        <div style={{ flex: 1 }}>
+                          <FileUpload
+                            accept="image/png,image/jpeg,image/jpg"
+                            maxSizeMB={10}
+                            previewUrl={line._imagePreviewUrl}
+                            fileName={line._existingImage?.originalFilename || line._imageFile?.name || null}
+                            fileType={line._existingImage?.fileType || line._imageFile?.type || null}
+                            fileSize={line._existingImage?.fileSizeBytes || line._imageFile?.size || null}
+                            onSelect={(file) => handleLineImageSelect(line.key, file)}
+                            onRemove={() => handleLineImageRemove(line.key)}
+                            disabled={line._imageUploading}
+                            loading={line._imageUploading}
+                            compact
+                            placeholder="Click or drag to upload"
+                            hint="PNG, JPG up to 10 MB"
+                          />
+                        </div>
+                        {!line.lineId && line._imageFile && (
+                          <Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
+                            Will upload on save
+                          </Text>
+                        )}
+                      </div>
                     </Col>
                   </Row>
 
-                  {/* Components — shown when Multiple component is selected */}
+                  {/* ── Section 2: Components (Multiple only) ── */}
                   {formComponents.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          marginBottom: 8,
-                        }}
-                      >
-                        <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-                          Components
-                        </Text>
+                    <div
+                      style={{
+                        marginTop: 4,
+                        marginBottom: 12,
+                        padding: '10px 14px',
+                        borderRadius: 10,
+                        border: '1px solid var(--border-color, #e5e7eb)',
+                        background: 'var(--bg-secondary, #f8fafc)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <Space size={6}>
+                          <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                            Components
+                          </Text>
+                          <Tag style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 5px', borderRadius: 10 }}>
+                            {formComponents.length}
+                          </Tag>
+                        </Space>
                         <Button
                           type="link"
                           size="small"
-                          style={{ padding: 0, fontSize: 11, height: 'auto' }}
+                          icon={<EditOutlined />}
+                          style={{ padding: 0, fontSize: 12, height: 'auto' }}
                           onClick={() => setComponentModalVisible(true)}
                         >
                           Edit
@@ -2094,14 +2351,17 @@ const OrderForm = () => {
                               display: 'flex',
                               alignItems: 'center',
                               gap: 6,
-                              padding: '5px 10px',
-                              border: '1px solid var(--border-color, #e5e7eb)',
-                              borderRadius: 8,
-                              background: 'var(--bg-secondary, #f8fafc)',
+                              padding: '4px 12px',
+                              border: '1px solid var(--primary-color, #6366f1)',
+                              borderRadius: 20,
+                              background: 'var(--primary-light, rgba(99, 102, 241, 0.06))',
                             }}
                           >
-                            <Text strong style={{ fontSize: 12 }}>{comp.name}</Text>
-                            <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 5px' }}>
+                            <Text style={{ fontSize: 12, color: 'var(--primary-color, #6366f1)' }}>{comp.name}</Text>
+                            <Tag
+                              color="blue"
+                              style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 6px', borderRadius: 10 }}
+                            >
                               ×{comp.qtyPerSet || 1}
                             </Tag>
                           </div>
@@ -2110,82 +2370,93 @@ const OrderForm = () => {
                     </div>
                   )}
 
-                  <Divider style={{ margin: '8px 0 16px' }} />
-
-                  {/* AI Extract from Buyer PO */}
+                  {/* ── Section 3: Size & Color Matrix ── */}
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: 12,
-                      padding: '8px 12px',
-                      background: 'var(--primary-light, rgba(99, 102, 241, 0.06))',
-                      borderRadius: 8,
-                      border: '1px dashed var(--primary-color, #6366f1)',
+                      marginTop: formComponents.length > 0 ? 0 : 4,
+                      padding: '12px 14px',
+                      borderRadius: 10,
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      background: 'var(--card-bg, #fff)',
                     }}
                   >
-                    <Space size={8}>
-                      <RobotOutlined style={{ fontSize: 16, color: 'var(--primary-color, #6366f1)' }} />
-                      <Text style={{ fontSize: 13, color: 'var(--primary-color, #6366f1)' }}>
-                        Auto-fill from Buyer PO
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        Upload a buyer PO to extract sizes, colors, quantities & prices
-                      </Text>
-                    </Space>
-                    <Upload
-                      accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
-                      showUploadList={false}
-                      beforeUpload={(file) => {
-                        handleExtractFromFile(line.key, file);
-                        return false;
-                      }}
-                      disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
-                    >
-                      <Tooltip title={!watchedStyleNo?.trim() ? 'Enter a valid Costing ID first' : undefined}>
-                        <Button
-                          icon={extractingLineKey === line.key ? <LoadingOutlined spin /> : <UploadOutlined />}
-                          loading={extractingLineKey === line.key}
-                          type="primary"
-                          size="small"
-                          disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
-                        >
-                          {extractingLineKey === line.key ? 'Extracting...' : 'Upload & Extract'}
-                        </Button>
-                      </Tooltip>
-                    </Upload>
-                  </div>
-
-                  {/* Inline extraction message */}
-                  {lineExtractionMsg[line.key] && (
+                    {/* AI Extract bar */}
                     <div
                       style={{
-                        marginBottom: 12,
-                        opacity: lineExtractionMsg[line.key].fading ? 0 : 1,
-                        maxHeight: lineExtractionMsg[line.key].fading ? 0 : 200,
-                        overflow: 'hidden',
-                        transition: 'opacity 0.4s ease-out, max-height 0.4s ease-out, margin 0.4s ease-out',
-                        ...(lineExtractionMsg[line.key].fading ? { marginBottom: 0 } : {}),
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: 8,
+                        marginBottom: 14,
+                        padding: '8px 12px',
+                        background: 'var(--primary-light, rgba(99, 102, 241, 0.06))',
+                        borderRadius: 8,
+                        border: '1px dashed var(--primary-color, #6366f1)',
                       }}
                     >
-                      <Alert
-                        type={lineExtractionMsg[line.key].type}
-                        message={lineExtractionMsg[line.key].text}
-                        showIcon
-                        closable
-                        onClose={() => dismissLineMessage(line.key)}
-                      />
+                      <Space size={8} wrap>
+                        <RobotOutlined style={{ fontSize: 16, color: 'var(--primary-color, #6366f1)' }} />
+                        <Text style={{ fontSize: 13, color: 'var(--primary-color, #6366f1)', fontWeight: 500 }}>
+                          Auto-fill from Buyer PO
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          Upload to extract sizes, colors, quantities & prices
+                        </Text>
+                      </Space>
+                      <Upload
+                        accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.csv"
+                        showUploadList={false}
+                        beforeUpload={(file) => {
+                          handleExtractFromFile(line.key, file);
+                          return false;
+                        }}
+                        disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
+                      >
+                        <Tooltip title={!watchedStyleNo?.trim() ? 'Enter a valid Costing ID first' : undefined}>
+                          <Button
+                            icon={extractingLineKey === line.key ? <LoadingOutlined spin /> : <UploadOutlined />}
+                            loading={extractingLineKey === line.key}
+                            type="primary"
+                            size="small"
+                            disabled={extractingLineKey != null || !watchedStyleNo?.trim()}
+                          >
+                            {extractingLineKey === line.key ? 'Extracting...' : 'Upload & Extract'}
+                          </Button>
+                        </Tooltip>
+                      </Upload>
                     </div>
-                  )}
 
-                  {/* Size Breakdown */}
-                  <SizeBreakdownTable
-                    line={line}
-                    currency={formCurrency}
-                    onLineChange={(changes) => handleLineChange(line.key, changes)}
-                    sizePresets={sizePresetsList}
-                  />
+                    {/* Inline extraction message */}
+                    {lineExtractionMsg[line.key] && (
+                      <div
+                        style={{
+                          marginBottom: 12,
+                          opacity: lineExtractionMsg[line.key].fading ? 0 : 1,
+                          maxHeight: lineExtractionMsg[line.key].fading ? 0 : 200,
+                          overflow: 'hidden',
+                          transition: 'opacity 0.4s ease-out, max-height 0.4s ease-out, margin 0.4s ease-out',
+                          ...(lineExtractionMsg[line.key].fading ? { marginBottom: 0 } : {}),
+                        }}
+                      >
+                        <Alert
+                          type={lineExtractionMsg[line.key].type}
+                          message={lineExtractionMsg[line.key].text}
+                          showIcon
+                          closable
+                          onClose={() => dismissLineMessage(line.key)}
+                        />
+                      </div>
+                    )}
+
+                    {/* Size Breakdown */}
+                    <SizeBreakdownTable
+                      line={line}
+                      currency={formCurrency}
+                      onLineChange={(changes) => handleLineChange(line.key, changes)}
+                      sizePresets={sizePresetsList}
+                    />
+                  </div>
                 </div>
               ),
             }))}

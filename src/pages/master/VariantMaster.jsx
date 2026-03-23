@@ -129,8 +129,8 @@ const VariantMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save attribute:', error);
-      message.error(selectedId ? 'Failed to update attribute' : 'Failed to create attribute');
     } finally {
       setSubmitting(false);
     }
@@ -156,8 +156,8 @@ const VariantMaster = ({ onDirtyChange }) => {
           message.success('Attribute deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete attribute:', error);
-          message.error('Failed to delete attribute');
         }
       },
     });

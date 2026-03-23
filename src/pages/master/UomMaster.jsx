@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
 import { Form, Input, Button, Space, message, Tag, InputNumber, Modal } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { integerInputProps } from '../../utils/inputHelpers';
 import { useStore } from '../../context/StoreContext';
 import { createUOM, updateUOM, deleteUOM } from '../../services/masterDataService';
 import { hasPermission } from '../../utils/permissions';
@@ -112,8 +113,8 @@ const UomMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save UOM:', error);
-      message.error(selectedId ? 'Failed to update UOM' : 'Failed to create UOM');
     } finally {
       setSubmitting(false);
     }
@@ -139,8 +140,8 @@ const UomMaster = ({ onDirtyChange }) => {
           message.success('UOM deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete UOM:', error);
-          message.error('Failed to delete UOM');
         }
       },
     });
@@ -235,7 +236,7 @@ const UomMaster = ({ onDirtyChange }) => {
                 <Input placeholder="e.g. kg" style={{ width: '50%' }} />
               </Form.Item>
               <Form.Item name="decimalPrecision" label="Decimal Precision">
-                <InputNumber min={0} max={6} style={{ width: '50%' }} />
+                <InputNumber min={0} max={6} style={{ width: '50%' }} {...integerInputProps} />
               </Form.Item>
             </Form>
           </div>

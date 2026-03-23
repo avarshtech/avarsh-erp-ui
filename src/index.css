@@ -275,6 +275,8 @@ body {
   font-size: 13px !important;
   font-weight: 600 !important;
   color: var(--text-primary) !important;
+  text-align: center !important;
+  white-space: nowrap !important;
   border-bottom: 2px solid var(--border-color) !important;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
@@ -296,6 +298,61 @@ body {
 
 .ant-table-empty .ant-empty-description {
   color: var(--text-muted);
+}
+
+/* Section Add Row Buttons */
+.btn-section-add {
+  width: 100%;
+  border-style: dashed !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-section-add:hover {
+  opacity: 0.85;
+}
+.btn-section-add.btn-fabric {
+  color: #0ea5e9 !important;
+  border-color: #0ea5e9 !important;
+}
+.btn-section-add.btn-fabric:hover {
+  background: rgba(14, 165, 233, 0.06) !important;
+}
+.btn-section-add.btn-trims {
+  color: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
+}
+.btn-section-add.btn-trims:hover {
+  background: rgba(139, 92, 246, 0.06) !important;
+}
+.btn-section-add.btn-manufacturing {
+  color: #f59e0b !important;
+  border-color: #f59e0b !important;
+}
+.btn-section-add.btn-manufacturing:hover {
+  background: rgba(245, 158, 11, 0.06) !important;
+}
+.btn-section-add.btn-overhead {
+  color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+.btn-section-add.btn-overhead:hover {
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+/* Segmented Control — dark mode fix */
+[data-theme="dark"] .ant-segmented {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .ant-segmented-item {
+  color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+[data-theme="dark"] .ant-segmented-thumb {
+  background: var(--primary-color) !important;
 }
 
 /* Pagination */

@@ -8,6 +8,7 @@ import {
   CreditCardOutlined, ColumnWidthOutlined, ExclamationCircleOutlined,
   ToolOutlined,
   ScissorOutlined,
+  DollarOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -23,6 +24,7 @@ import PaymentTermsMaster from './PaymentTermsMaster';
 import SizePresetMaster from './SizePresetMaster';
 import ProcessMaster from './ProcessMaster';
 import PartsMaster from './PartsMaster';
+import OverheadMaster from './OverheadMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
@@ -168,6 +170,15 @@ const NAV_GROUPS = [
         Component: TermsConditionsMaster,
         loadingKey: null,
         description: 'Contract and terms templates for purchase orders',
+      },
+      {
+        key: 'overhead',
+        label: 'Overheads',
+        icon: <DollarOutlined />,
+        moduleId: 'overhead-master',
+        Component: OverheadMaster,
+        loadingKey: null,
+        description: 'Overhead and markup cost categories for costing',
       },
     ],
   },

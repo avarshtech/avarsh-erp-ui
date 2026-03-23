@@ -4,7 +4,6 @@ import {
   Input,
   InputNumber,
   Select,
-  DatePicker,
   Button,
   Card,
   Row,
@@ -22,7 +21,9 @@ import {
   message,
   Statistic,
   Skeleton,
+  Modal,
 } from 'antd';
+import { numericInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -37,7 +38,6 @@ import {
   BarChartOutlined,
   CloudUploadOutlined,
   WhatsAppOutlined,
-  PrinterOutlined,
   ImportOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
@@ -59,8 +59,6 @@ import {
   COSTING_STATUS,
   FABRIC_CLASSIFICATIONS,
   CURRENCIES,
-  FABRIC_UOMS,
-  TRIM_UOMS,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE_MB,
   ATTACHMENT_CATEGORIES,
@@ -78,6 +76,9 @@ import { getBuyers } from '../../services/buyerService';
 import { getStylesByBuyerId } from '../../services/styleService';
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
+import { getActiveProcesses, createProcess } from '../../services/processService';
+import { getActiveOverheads, createOverhead } from '../../services/overheadService';
+import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
@@ -113,6 +114,7 @@ const CostingForm = () => {
   const [printing, setPrinting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
   const [costingId, setCostingId] = useState('');
+  const [savedDate, setSavedDate] = useState(null);
   const [currency, setCurrency] = useState('INR');
   const [quoteCurrency, setQuoteCurrency] = useState('USD');
   const [actualRate, setActualRate] = useState(83.80);
@@ -126,10 +128,24 @@ const CostingForm = () => {
   const [styleOptions, setStyleOptions] = useState([]);
   const [fabricItemOptions, setFabricItemOptions] = useState([]);
   const [fabricItemsRaw, setFabricItemsRaw] = useState([]);
+  const [localTrimItemsRaw, setLocalTrimItemsRaw] = useState([]);
+  const [importedTrimItemsRaw, setImportedTrimItemsRaw] = useState([]);
   const [localTrimOptions, setLocalTrimOptions] = useState([]);
   const [importedTrimOptions, setImportedTrimOptions] = useState([]);
-  const [manufacturingOptions, setManufacturingOptions] = useState([]);
-  const [overheadOptions, setOverheadOptions] = useState([]);
+  const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
+  const [overheadItems, setOverheadItems] = useState([]);
+
+  // Quick Add modal state
+  const [quickAddProcessOpen, setQuickAddProcessOpen] = useState(false);
+  const [quickAddProcessLoading, setQuickAddProcessLoading] = useState(false);
+  const [quickAddProcessForm] = Form.useForm();
+  const [pendingMfgRowKey, setPendingMfgRowKey] = useState(null);
+  const [quickAddOverheadOpen, setQuickAddOverheadOpen] = useState(false);
+  const [quickAddOverheadLoading, setQuickAddOverheadLoading] = useState(false);
+  const [quickAddOverheadForm] = Form.useForm();
+  const [pendingOvhRowKey, setPendingOvhRowKey] = useState(null);
+  const canAddProcess = hasPermission('process-master', 'add');
+  const canAddOverhead = hasPermission('overhead-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
@@ -195,16 +211,11 @@ const CostingForm = () => {
         // Resolve effective categories
         const effectiveLocalTrimCat = localTrimCat || generalTrimCat;
         const effectiveImportedTrimCat = importedTrimCat || generalTrimCat;
-        const mfgCat = categories.find((c) => c.name?.toLowerCase().includes('manufactur'));
-        const ovhCat = categories.find((c) => c.name?.toLowerCase().includes('overhead'));
-
         // Collect all unique category IDs and fetch items in a single API call
         const catMap = {};
         if (fabricCat) catMap.fabric = fabricCat.id;
         if (effectiveLocalTrimCat) catMap.localTrim = effectiveLocalTrimCat.id;
         if (effectiveImportedTrimCat) catMap.importedTrim = effectiveImportedTrimCat.id;
-        if (mfgCat) catMap.manufacturing = mfgCat.id;
-        if (ovhCat) catMap.overhead = ovhCat.id;
 
         const uniqueCatIds = [...new Set(Object.values(catMap))];
 
@@ -220,17 +231,37 @@ const CostingForm = () => {
             byCat[cid].push(item);
           }
 
-          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName }));
+          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName, itemCode: item.itemCode }));
 
           if (catMap.fabric) {
             const fabItems = byCat[catMap.fabric] || [];
             setFabricItemsRaw(fabItems);
             setFabricItemOptions(toOptions(fabItems));
           }
-          if (catMap.localTrim) setLocalTrimOptions(toOptions(byCat[catMap.localTrim]));
-          if (catMap.importedTrim) setImportedTrimOptions(toOptions(byCat[catMap.importedTrim]));
-          if (catMap.manufacturing) setManufacturingOptions(toOptions(byCat[catMap.manufacturing]));
-          if (catMap.overhead) setOverheadOptions(toOptions(byCat[catMap.overhead]));
+          if (catMap.localTrim) {
+            const ltItems = byCat[catMap.localTrim] || [];
+            setLocalTrimItemsRaw(ltItems);
+            setLocalTrimOptions(toOptions(ltItems));
+          }
+          if (catMap.importedTrim) {
+            const itItems = byCat[catMap.importedTrim] || [];
+            setImportedTrimItemsRaw(itItems);
+            setImportedTrimOptions(toOptions(itItems));
+          }
+        }
+
+        // Fetch processes (Manufacturing) and overheads from their dedicated masters
+        const [mfgResult, ovhResult] = await Promise.allSettled([
+          getActiveProcesses('Manufacturing'),
+          getActiveOverheads(),
+        ]);
+        if (mfgResult.status === 'fulfilled') {
+          const procs = Array.isArray(mfgResult.value) ? mfgResult.value : mfgResult.value?.data || [];
+          setManufacturingProcesses(procs.map((p) => ({ value: p.id, label: p.processName, defaultCost: p.defaultCost || 0 })));
+        }
+        if (ovhResult.status === 'fulfilled') {
+          const ovhs = Array.isArray(ovhResult.value) ? ovhResult.value : ovhResult.value?.data || [];
+          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.overheadName, defaultCost: o.defaultCost || 0 })));
         }
       } catch {
         // Fallback to empty arrays — dropdowns will be empty
@@ -249,6 +280,7 @@ const CostingForm = () => {
       // Reset all state for a blank new cost sheet
       form.resetFields();
       setCostingId('Auto-generated');
+      setSavedDate(null);
       setEntityVersion(null);
       setCurrency('INR');
       setQuoteCurrency('USD');
@@ -318,7 +350,11 @@ const CostingForm = () => {
       // and the Table + update/delete functions depend on `key` for row identity.
       const withKeys = (rows, prefix) =>
         (rows || []).map((r, i) => ({ ...r, key: r.key || `${prefix}_${Date.now()}_${i}` }));
-      setFabricRows(withKeys(cs.fabricRows, 'f'));
+      // Normalise UOM: API returns uomId + uomName; set uom (symbol) for display/conversion
+      setFabricRows(withKeys(cs.fabricRows, 'f').map((r) => ({
+        ...r,
+        uom: r.uom || r.uomSymbol || r.uomName || '',
+      })));
       setLocalTrims(withKeys(cs.localTrims, 'lt'));
       setImportedTrims(withKeys(cs.importedTrims, 'it'));
       setManufacturingRows(withKeys(cs.manufacturingRows, 'm'));
@@ -388,8 +424,8 @@ const CostingForm = () => {
         }
       }
 
+      setSavedDate(cs.date ? dayjs(cs.date) : null);
       form.setFieldsValue({
-        date: cs.date ? dayjs(cs.date) : null,
         buyerId: cs.buyerId,
         styleNo: cs.styleId || null,
         garmentName: cs.garmentName,
@@ -575,23 +611,27 @@ const CostingForm = () => {
     // 3. Map fabric rows
     if (result.fabricRows?.length) {
       setFabricRows(
-        result.fabricRows.map((r, i) => ({
-          key:              `f_import_${Date.now()}_${i}`,
-          itemId:           r.matchedItemId   || null,
-          fabricType:       r.matchedItemName || r.extractedName || '',
-          classification:   r.classification  || 'Woven',
-          description:      r.notes           || '',
-          consumption:      '',
-          uom:              r.uom || 'meters',
-          fabricPrice:      '',
-          fabricWidthStd:   '',
-          fabricWidthVendor: '',
-          vendorId:         null,
-          vendorName:       '',
-          allowancePct:     0,
-          netCost:          0,
-          sizes:            '',
-        }))
+        result.fabricRows.map((r, i) => {
+          const rawItem = r.matchedItemId ? fabricItemsRaw.find((item) => item.id === r.matchedItemId) : null;
+          return {
+            key:              `f_import_${Date.now()}_${i}`,
+            itemId:           r.matchedItemId   || null,
+            fabricType:       r.matchedItemName || r.extractedName || '',
+            classification:   r.classification  || 'Woven',
+            description:      r.notes           || '',
+            consumption:      '',
+            uom:              rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
+            uomId:            rawItem?.uomId || null,
+            fabricPrice:      '',
+            fabricWidthStd:   '',
+            fabricWidthVendor: '',
+            vendorId:         null,
+            vendorName:       '',
+            allowancePct:     0,
+            netCost:          0,
+            sizes:            '',
+          };
+        })
       );
     }
 
@@ -636,7 +676,7 @@ const CostingForm = () => {
       setManufacturingRows(
         result.manufacturingRows.map((r, i) => ({
           key:      `m_import_${Date.now()}_${i}`,
-          itemId:   r.matchedItemId   || null,
+          processId: null,
           process:  r.matchedItemName || r.extractedName || '',
           cost:     '',
           comments: r.notes || '',
@@ -663,6 +703,7 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
+
   const addFabricRow = () => {
     setFabricRows((prev) => [
       ...prev,
@@ -673,7 +714,8 @@ const CostingForm = () => {
         classification: 'Woven',
         description: '',
         consumption: '',
-        uom: 'meters',
+        uom: '',
+        uomId: null,
         fabricPrice: '',
         fabricWidthStd: '',
         fabricWidthVendor: '',
@@ -693,7 +735,15 @@ const CostingForm = () => {
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
-        const updated = { ...r, itemId, fabricType: option.label };
+        const updated = {
+          ...r,
+          itemId,
+          fabricType: option.label,
+          // Set UOM from item's secondary UOM (fallback to primary)
+          uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
+          uomId: rawItem?.uomId || r.uomId || null,
+          primaryUom: rawItem?.uomSymbol || '',
+        };
         // Auto-set classification from subcategory
         if (rawItem?.subCategoryName) {
           const subName = rawItem.subCategoryName.toLowerCase();
@@ -722,11 +772,13 @@ const CostingForm = () => {
     });
   };
 
-  const updateLocalTrim = (key, field, value) => {
+  const updateLocalTrim = (key, fieldOrObj, value) => {
     setLocalTrims((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
-        const updated = { ...r, [field]: value };
+        const updated = typeof fieldOrObj === 'object'
+          ? { ...r, ...fieldOrObj }
+          : { ...r, [fieldOrObj]: value };
         updated.price = calcTrimPrice(updated.consumption, updated.cost);
         return updated;
       })
@@ -737,7 +789,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', cost: '', price: 0, sizes: '' },
+      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', cost: '', price: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -758,11 +810,13 @@ const CostingForm = () => {
     });
   };
 
-  const updateImportedTrim = (key, field, value) => {
+  const updateImportedTrim = (key, fieldOrObj, value) => {
     setImportedTrims((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
-        const updated = { ...r, [field]: value };
+        const updated = typeof fieldOrObj === 'object'
+          ? { ...r, ...fieldOrObj }
+          : { ...r, [fieldOrObj]: value };
         updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd);
         return updated;
       })
@@ -773,7 +827,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: 'pcs', costUsd: '', priceUsd: 0, sizes: '' },
+      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', costUsd: '', priceUsd: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -794,9 +848,12 @@ const CostingForm = () => {
     });
   };
 
-  const updateManufacturingRow = (key, field, value) => {
+  const updateManufacturingRow = (key, fieldOrObj, value) => {
     setManufacturingRows((prev) =>
-      prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        return typeof fieldOrObj === 'object' ? { ...r, ...fieldOrObj } : { ...r, [fieldOrObj]: value };
+      })
     );
     setIsDirty(true);
   };
@@ -804,7 +861,7 @@ const CostingForm = () => {
   const addManufacturingRow = () => {
     setManufacturingRows((prev) => [
       ...prev,
-      { key: `m_${Date.now()}`, itemId: null, process: '', cost: '', comments: '', sizes: '' },
+      { key: `m_${Date.now()}`, processId: null, process: '', cost: '', comments: '', sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -826,9 +883,12 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
-  const updateOverheadRow = (key, field, value) => {
+  const updateOverheadRow = (key, fieldOrObj, value) => {
     setOverheadRows((prev) =>
-      prev.map((r) => (r.key === key ? { ...r, [field]: value } : r))
+      prev.map((r) => {
+        if (r.key !== key) return r;
+        return typeof fieldOrObj === 'object' ? { ...r, ...fieldOrObj } : { ...r, [fieldOrObj]: value };
+      })
     );
     setIsDirty(true);
   };
@@ -836,7 +896,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, itemId: null, description: '', cost: '', comments: '', sizes: '' },
+      { key: `o_${Date.now()}`, overheadId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -870,7 +930,8 @@ const CostingForm = () => {
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== knitsRowKey) return r;
-        const updated = { ...r, consumption: Math.round(totalConsumption * 10000) / 10000, knitsParts: parts };
+        const finalConsumption = Math.round(totalConsumption * 10000) / 10000;
+        const updated = { ...r, consumption: finalConsumption, knitsParts: parts };
         updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
         return updated;
       })
@@ -898,7 +959,7 @@ const CostingForm = () => {
             key:         `${consumptionRowKey}_sz_${i}_${Date.now()}`,
             sizes:       size,
             consumption: c,
-            uom:         result.uom || source.uom,
+            uom:         source.uom || result.uom,
             netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct),
           };
         });
@@ -908,7 +969,7 @@ const CostingForm = () => {
       setFabricRows((prev) =>
         prev.map((r) => {
           if (r.key !== consumptionRowKey) return r;
-          const updated = { ...r, consumption: result.consumption, uom: result.uom || r.uom };
+          const updated = { ...r, consumption: result.consumption, uom: r.uom || result.uom };
           updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
           return updated;
         })
@@ -944,9 +1005,9 @@ const CostingForm = () => {
   };
 
   // Past PO suggestions
-  const loadSuggestions = async (type, itemName) => {
-    if (!itemName) return;
-    const suggestions = await getPastPOSuggestions(type, itemName);
+  const loadSuggestions = async (type, itemId) => {
+    if (!itemId) return;
+    const suggestions = await getPastPOSuggestions(type, itemId);
     setPOSuggestions(suggestions);
     setSuggestionVisible(suggestions.length > 0);
   };
@@ -965,14 +1026,14 @@ const CostingForm = () => {
     const selectedStyle = styleOptions.find((s) => s.value === formValues.styleNo);
     const resolvedStyleNo = selectedStyle ? selectedStyle.label : formValues.styleNo;
 
-    // Strip `key` from row arrays and ensure itemId is included
+    // Strip `key` from row arrays before sending to API
     const cleanRows = (rows) => rows.map(({ key, ...rest }) => rest);
 
     return {
       version: entityVersion,
       costingId,
       status,
-      date: formValues.date?.format('YYYY-MM-DD'),
+      date: dayjs().format('YYYY-MM-DD'),
       buyerId: formValues.buyerId,
       buyerName: selectedBuyer?.label || '',
       styleId,
@@ -1093,7 +1154,7 @@ const CostingForm = () => {
       const printData = {
         costingId,
         status: isEdit ? 'Draft' : 'Draft',
-        date: values.date?.format('YYYY-MM-DD'),
+        date: (savedDate || dayjs()).format('YYYY-MM-DD'),
         buyerName: selectedBuyer?.label || '',
         styleNo: selectedStyle?.label || values.styleNo || '',
         garmentName: values.garmentName,
@@ -1246,10 +1307,18 @@ const CostingForm = () => {
     fontWeight: 600,
   };
 
+  // ==================== HELPERS ====================
+
+  const getConsumptionUom = (record, rawItems) => {
+    if (!record.itemId) return '';
+    const item = rawItems?.find((i) => i.id === record.itemId);
+    return item?.secondaryUomSymbol || item?.uomSymbol || '';
+  };
+
   // ==================== COLUMN DEFINITIONS ====================
 
   const fabricColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => <span style={{ textAlign: 'center', display: 'block' }}>{i + 1}</span> },
     {
       title: 'Sizes',
       dataIndex: 'sizes',
@@ -1268,9 +1337,9 @@ const CostingForm = () => {
       ),
     },
     {
-      title: 'Fabric Type',
+      title: 'Fabric Name',
       dataIndex: 'itemId',
-      width: 150,
+      width: 160,
       render: (val, record) => (
         <Select
           value={record.itemId || undefined}
@@ -1280,7 +1349,7 @@ const CostingForm = () => {
           optionFilterProp="label"
           placeholder="Select"
           onChange={(v, opt) => handleFabricItemSelect(record.key, v, opt)}
-          onFocus={() => loadSuggestions('fabric', record.fabricType)}
+          onFocus={() => loadSuggestions('fabric', record.itemId)}
           size="small"
         />
       ),
@@ -1288,7 +1357,7 @@ const CostingForm = () => {
     {
       title: 'Classification',
       dataIndex: 'classification',
-      width: 110,
+      width: 120,
       render: (val, record) => (
         <Select
           value={val}
@@ -1302,7 +1371,6 @@ const CostingForm = () => {
     {
       title: 'Description',
       dataIndex: 'description',
-      width: 160,
       render: (val, record) => (
         <Input
           value={val}
@@ -1315,17 +1383,20 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 145,
+      width: 160,
       render: (val, record) => (
-        <Space.Compact style={{ width: '100%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <InputNumber
             value={val}
             min={0}
             step={0.01}
+            controls={false}
             placeholder="Qty"
             onChange={(v) => updateFabricRow(record.key, 'consumption', v)}
             size="small"
-            style={{ width: record.classification === 'Knits' ? '58%' : '78%' }}
+            style={{ flex: 1 }}
+            addonAfter={getConsumptionUom(record, fabricItemsRaw)?.toUpperCase() || undefined}
+            {...numericInputProps}
           />
           {record.classification === 'Knits' && (
             <Tooltip title="Knits Consumption Calculator (manual parts)">
@@ -1333,8 +1404,8 @@ const CostingForm = () => {
                 icon={<CalculatorOutlined />}
                 onClick={() => openKnitsModal(record.key)}
                 size="small"
-                type="primary"
-                ghost
+                type="text"
+                style={{ color: '#6366f1', flexShrink: 0 }}
               />
             </Tooltip>
           )}
@@ -1343,46 +1414,35 @@ const CostingForm = () => {
               icon={<ThunderboltOutlined />}
               onClick={() => openConsumptionModal(record.key, record)}
               size="small"
-              style={{ color: '#faad14', borderColor: '#faad14' }}
+              type="text"
+              style={{ color: '#faad14', flexShrink: 0 }}
             />
           </Tooltip>
-        </Space.Compact>
-      ),
-    },
-    {
-      title: 'UOM',
-      dataIndex: 'uom',
-      width: 100,
-      render: (val, record) => (
-        <Select
-          value={val || 'meters'}
-          style={{ width: '100%' }}
-          options={FABRIC_UOMS}
-          onChange={(v) => updateFabricRow(record.key, 'uom', v)}
-          size="small"
-        />
+        </div>
       ),
     },
     {
       title: `Price (${getCurrencySymbol(currency)})`,
       dataIndex: 'fabricPrice',
-      width: 110,
+      width: 130,
       render: (val, record) => (
         <InputNumber
           value={val}
           min={0}
           step={0.01}
+          controls={false}
           placeholder="Price"
           onChange={(v) => updateFabricRow(record.key, 'fabricPrice', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },
     {
       title: 'Width (Std)',
       dataIndex: 'fabricWidthStd',
-      width: 90,
+      width: 100,
       render: (val, record) => (
         <Input
           value={val}
@@ -1395,7 +1455,7 @@ const CostingForm = () => {
     {
       title: 'Width (Vendor)',
       dataIndex: 'fabricWidthVendor',
-      width: 95,
+      width: 110,
       render: (val, record) => (
         <Input
           value={val}
@@ -1408,16 +1468,18 @@ const CostingForm = () => {
     {
       title: 'Allowance %',
       dataIndex: 'allowancePct',
-      width: 95,
+      width: 100,
       render: (val, record) => (
         <InputNumber
           value={val}
           min={0}
           max={100}
+          controls={false}
           placeholder="%"
           onChange={(v) => updateFabricRow(record.key, 'allowancePct', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },
@@ -1448,7 +1510,7 @@ const CostingForm = () => {
   ];
 
   const localTrimColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => <span style={{ textAlign: 'center', display: 'block' }}>{i + 1}</span> },
     {
       title: 'Sizes',
       dataIndex: 'sizes',
@@ -1469,7 +1531,6 @@ const CostingForm = () => {
     {
       title: 'Item',
       dataIndex: 'itemId',
-      width: 160,
       render: (_, record) => (
         <Select
           value={record.itemId || undefined}
@@ -1479,8 +1540,8 @@ const CostingForm = () => {
           optionFilterProp="label"
           placeholder="Select item"
           onChange={(v, opt) => {
-            updateLocalTrim(record.key, 'itemId', v);
-            updateLocalTrim(record.key, 'item', opt.label);
+            const rawItem = localTrimItemsRaw.find((i) => i.id === v);
+            updateLocalTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
           }}
           size="small"
         />
@@ -1505,37 +1566,23 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 100,
+      width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} />
-      ),
-    },
-    {
-      title: 'UOM',
-      dataIndex: 'uom',
-      width: 100,
-      render: (val, record) => (
-        <Select
-          value={val || 'pcs'}
-          style={{ width: '100%' }}
-          options={TRIM_UOMS}
-          onChange={(v) => updateLocalTrim(record.key, 'uom', v)}
-          size="small"
-        />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} addonAfter={getConsumptionUom(record, localTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
       title: `Cost (${getCurrencySymbol(currency)})`,
       dataIndex: 'cost',
-      width: 110,
+      width: 120,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateLocalTrim(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateLocalTrim(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
       title: `Price (${getCurrencySymbol(currency)})`,
       dataIndex: 'price',
-      width: 110,
+      width: 120,
       render: (val) => (
         <Text strong>{formatCurrency(val, currency)}</Text>
       ),
@@ -1557,7 +1604,7 @@ const CostingForm = () => {
   ];
 
   const importedTrimColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => <span style={{ textAlign: 'center', display: 'block' }}>{i + 1}</span> },
     {
       title: 'Sizes',
       dataIndex: 'sizes',
@@ -1578,7 +1625,6 @@ const CostingForm = () => {
     {
       title: 'Item',
       dataIndex: 'itemId',
-      width: 160,
       render: (_, record) => (
         <Select
           value={record.itemId || undefined}
@@ -1588,8 +1634,8 @@ const CostingForm = () => {
           optionFilterProp="label"
           placeholder="Select item"
           onChange={(v, opt) => {
-            updateImportedTrim(record.key, 'itemId', v);
-            updateImportedTrim(record.key, 'item', opt.label);
+            const rawItem = importedTrimItemsRaw.find((i) => i.id === v);
+            updateImportedTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
           }}
           size="small"
         />
@@ -1614,37 +1660,23 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 100,
+      width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} />
-      ),
-    },
-    {
-      title: 'UOM',
-      dataIndex: 'uom',
-      width: 100,
-      render: (val, record) => (
-        <Select
-          value={val || 'pcs'}
-          style={{ width: '100%' }}
-          options={TRIM_UOMS}
-          onChange={(v) => updateImportedTrim(record.key, 'uom', v)}
-          size="small"
-        />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} addonAfter={getConsumptionUom(record, importedTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
       title: 'Cost ($ USD)',
       dataIndex: 'costUsd',
-      width: 110,
+      width: 120,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateImportedTrim(record.key, 'costUsd', v)} size="small" style={{ width: '100%' }} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateImportedTrim(record.key, 'costUsd', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
       title: 'Price ($ USD)',
       dataIndex: 'priceUsd',
-      width: 110,
+      width: 120,
       render: (val) => (
         <Text strong>{formatCurrency(val, 'USD')}</Text>
       ),
@@ -1667,23 +1699,23 @@ const CostingForm = () => {
 
   // Merge saved row values into API options so existing values always display
   const effectiveMfgOptions = useMemo(() => {
-    const apiIds = new Set(manufacturingOptions.map((o) => o.value));
+    const apiIds = new Set(manufacturingProcesses.map((o) => o.value));
     const extras = manufacturingRows
-      .filter((r) => r.itemId && !apiIds.has(r.itemId))
-      .map((r) => ({ value: r.itemId, label: r.process || `Item #${r.itemId}` }));
-    return [...manufacturingOptions, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
-  }, [manufacturingOptions, manufacturingRows]);
+      .filter((r) => r.processId && !apiIds.has(r.processId))
+      .map((r) => ({ value: r.processId, label: r.process || `Process #${r.processId}` }));
+    return [...manufacturingProcesses, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
+  }, [manufacturingProcesses, manufacturingRows]);
 
   const effectiveOvhOptions = useMemo(() => {
-    const apiIds = new Set(overheadOptions.map((o) => o.value));
+    const apiIds = new Set(overheadItems.map((o) => o.value));
     const extras = overheadRows
-      .filter((r) => r.itemId && !apiIds.has(r.itemId))
-      .map((r) => ({ value: r.itemId, label: r.description || `Item #${r.itemId}` }));
-    return [...overheadOptions, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
-  }, [overheadOptions, overheadRows]);
+      .filter((r) => r.overheadId && !apiIds.has(r.overheadId))
+      .map((r) => ({ value: r.overheadId, label: r.description || `Overhead #${r.overheadId}` }));
+    return [...overheadItems, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
+  }, [overheadItems, overheadRows]);
 
   const manufacturingColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => <span style={{ textAlign: 'center', display: 'block' }}>{i + 1}</span> },
     {
       title: 'Sizes',
       dataIndex: 'sizes',
@@ -1703,21 +1735,34 @@ const CostingForm = () => {
     },
     {
       title: 'Process',
-      dataIndex: 'itemId',
+      dataIndex: 'processId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.processId || undefined}
           style={{ width: '100%' }}
           options={effectiveMfgOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select process"
           onChange={(v, opt) => {
-            updateManufacturingRow(record.key, 'itemId', v);
-            updateManufacturingRow(record.key, 'process', opt.label);
+            const defaultCost = opt.defaultCost || 0;
+            updateManufacturingRow(record.key, {
+              processId: v,
+              process: opt.label,
+              ...(defaultCost > 0 && !record.cost ? { cost: defaultCost } : {}),
+            });
           }}
           size="small"
+          dropdownRender={canAddProcess ? (menu) => (
+            <>
+              {menu}
+              <Divider style={{ margin: '4px 0' }} />
+              <Button type="link" icon={<PlusOutlined />} style={{ width: '100%', textAlign: 'left' }} onClick={() => { setPendingMfgRowKey(record.key); setQuickAddProcessOpen(true); }}>
+                Add New Process
+              </Button>
+            </>
+          ) : undefined}
         />
       ),
     },
@@ -1726,7 +1771,7 @@ const CostingForm = () => {
       dataIndex: 'cost',
       width: 130,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateManufacturingRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateManufacturingRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
@@ -1753,7 +1798,7 @@ const CostingForm = () => {
   ];
 
   const overheadColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => <span style={{ textAlign: 'center', display: 'block' }}>{i + 1}</span> },
     {
       title: 'Sizes',
       dataIndex: 'sizes',
@@ -1773,21 +1818,34 @@ const CostingForm = () => {
     },
     {
       title: 'Description',
-      dataIndex: 'itemId',
+      dataIndex: 'overheadId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.overheadId || undefined}
           style={{ width: '100%' }}
           options={effectiveOvhOptions}
           showSearch
           optionFilterProp="label"
           placeholder="Select category"
           onChange={(v, opt) => {
-            updateOverheadRow(record.key, 'itemId', v);
-            updateOverheadRow(record.key, 'description', opt.label);
+            const defaultCost = opt.defaultCost || 0;
+            updateOverheadRow(record.key, {
+              overheadId: v,
+              description: opt.label,
+              ...(defaultCost > 0 && !record.cost ? { cost: defaultCost } : {}),
+            });
           }}
           size="small"
+          dropdownRender={canAddOverhead ? (menu) => (
+            <>
+              {menu}
+              <Divider style={{ margin: '4px 0' }} />
+              <Button type="link" icon={<PlusOutlined />} style={{ width: '100%', textAlign: 'left' }} onClick={() => { setPendingOvhRowKey(record.key); setQuickAddOverheadOpen(true); }}>
+                Add New Overhead
+              </Button>
+            </>
+          ) : undefined}
         />
       ),
     },
@@ -1796,7 +1854,7 @@ const CostingForm = () => {
       dataIndex: 'cost',
       width: 130,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} placeholder="Cost" onChange={(v) => updateOverheadRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateOverheadRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
@@ -1834,19 +1892,14 @@ const CostingForm = () => {
       ),
       style: sectionHeaderStyle('#6366f1'),
       children: (
-        <Row gutter={24}>
-          <Col xs={24} lg={16}>
-            <Row gutter={16}>
-              <Col xs={12} md={8}>
-                <Form.Item label="Costing ID">
-                  <Input value={costingId} disabled />
-                </Form.Item>
-              </Col>
-              <Col xs={12} md={8}>
-                <Form.Item label="Date" name="date" rules={[{ required: true, message: 'Date is required' }]}>
-                  <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
-                </Form.Item>
-              </Col>
+        <Row gutter={16}>
+              {isEdit && (
+                <Col xs={12} md={8}>
+                  <Form.Item label="Costing ID">
+                    <Input value={costingId} disabled />
+                  </Form.Item>
+                </Col>
+              )}
               <Col xs={24} md={8}>
                 <Form.Item label="Buyer" name="buyerId" rules={[{ required: true, message: 'Buyer is required' }]}>
                   <Select
@@ -1877,7 +1930,7 @@ const CostingForm = () => {
                   <Input placeholder="Auto-filled from style" readOnly />
                 </Form.Item>
               </Col>
-              <Col xs={12} md={4}>
+              <Col xs={12} md={6}>
                 <Form.Item label="Season" name="seasonCode">
                   <Select
                     placeholder="Season"
@@ -1889,7 +1942,7 @@ const CostingForm = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={12} md={4}>
+              <Col xs={12} md={6}>
                 <Form.Item label="Year" name="seasonYear">
                   <Select
                     placeholder="Year"
@@ -1923,8 +1976,10 @@ const CostingForm = () => {
                     value={actualRate}
                     min={0}
                     step={0.01}
+                    controls={false}
                     style={{ width: '100%', height: 40 }}
                     onChange={setActualRate}
+                    {...numericInputProps}
                   />
                 </Form.Item>
               </Col>
@@ -1942,51 +1997,49 @@ const CostingForm = () => {
                   />
                 </Form.Item>
               </Col>
-            </Row>
-          </Col>
-          <Col xs={24} lg={8}>
-            <Form.Item label="Attachments">
-              <Row gutter={[0, 10]}>
-                {ATTACHMENT_CATEGORIES.map((cat) => (
-                  <Col span={24} key={cat.value}>
-                    <Card
-                      size="small"
-                      title={
-                        <Space size={6}>
-                          {categoryIcons[cat.value]}
-                          <Typography.Text style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</Typography.Text>
-                          {fileList[cat.value]?.length > 0 && (
-                            <Tag style={{ marginLeft: 4, fontSize: 11 }}>{fileList[cat.value].length}</Tag>
-                          )}
-                        </Space>
-                      }
-                      styles={{ body: { padding: '8px 12px' } }}
-                      style={{
-                        borderRadius: 8,
-                        border: `1px solid ${isDarkMode ? '#333' : '#e5e7eb'}`,
-                      }}
-                    >
-                      <Dragger
-                        {...getUploadProps(cat.value)}
-                        style={{ padding: '6px 0', background: 'transparent', border: `1px dashed ${isDarkMode ? '#444' : '#d9d9d9'}` }}
+              <Col xs={24}>
+                <Form.Item label={<Text strong style={{ fontSize: 15, color: '#6366f1' }}>Attachments</Text>} style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', gap: 16 }}>
+                    {ATTACHMENT_CATEGORIES.map((cat) => (
+                      <Card
+                        key={cat.value}
+                        size="small"
+                        title={
+                          <Space size={6}>
+                            {categoryIcons[cat.value]}
+                            <Typography.Text style={{ fontSize: 13, fontWeight: 600 }}>{cat.label}</Typography.Text>
+                            {fileList[cat.value]?.length > 0 && (
+                              <Tag style={{ marginLeft: 4, fontSize: 11 }}>{fileList[cat.value].length}</Tag>
+                            )}
+                          </Space>
+                        }
+                        styles={{ body: { padding: '8px 12px' } }}
+                        style={{
+                          flex: 1,
+                          borderRadius: 8,
+                          border: `1px solid ${isDarkMode ? '#333' : '#e5e7eb'}`,
+                        }}
                       >
-                        <p className="ant-upload-drag-icon" style={{ marginBottom: 2 }}>
-                          <InboxOutlined style={{ color: '#6366f1', fontSize: 22 }} />
-                        </p>
-                        <p className="ant-upload-text" style={{ fontSize: 12, marginBottom: 0 }}>
-                          Click or drag files
-                        </p>
-                        <p className="ant-upload-hint" style={{ fontSize: 11 }}>
-                          max {MAX_FILE_SIZE_MB}MB
-                        </p>
-                      </Dragger>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
-            </Form.Item>
-          </Col>
-        </Row>
+                        <Dragger
+                          {...getUploadProps(cat.value)}
+                          style={{ padding: '6px 0', background: 'transparent', border: `1px dashed ${isDarkMode ? '#444' : '#d9d9d9'}` }}
+                        >
+                          <p className="ant-upload-drag-icon" style={{ marginBottom: 2 }}>
+                            <InboxOutlined style={{ color: '#6366f1', fontSize: 22 }} />
+                          </p>
+                          <p className="ant-upload-text" style={{ fontSize: 12, marginBottom: 0 }}>
+                            Click or drag files
+                          </p>
+                          <p className="ant-upload-hint" style={{ fontSize: 11 }}>
+                            max {MAX_FILE_SIZE_MB}MB
+                          </p>
+                        </Dragger>
+                      </Card>
+                    ))}
+                  </div>
+                </Form.Item>
+              </Col>
+            </Row>
       ),
     },
     {
@@ -2014,25 +2067,25 @@ const CostingForm = () => {
               fabricRows.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={11}>
+                    <Table.Summary.Cell index={0} colSpan={10}>
                       <Text strong>Total Fabric Cost</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={11}>
+                    <Table.Summary.Cell index={10}>
                       <Text strong style={{ color: 'var(--primary-color)', fontSize: 14 }}>
                         {formatCurrency(totalFabricCost, currency)}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={12} />
+                    <Table.Summary.Cell index={11} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
             }
           />
           <Button
-            type="dashed"
+            className="btn-section-add btn-fabric"
             icon={<PlusOutlined />}
             onClick={addFabricRow}
-            style={{ width: '100%', marginTop: 12 }}
+            style={{ marginTop: 12 }}
           >
             Add Fabric
           </Button>
@@ -2067,19 +2120,19 @@ const CostingForm = () => {
               localTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={8}>
+                    <Table.Summary.Cell index={0} colSpan={7}>
                       <Text strong>Local Accessories Total</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8}>
+                    <Table.Summary.Cell index={7}>
                       <Text strong>{formatCurrency(totalLocalTrimsCost, currency)}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={9} />
+                    <Table.Summary.Cell index={8} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
             }
           />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addLocalTrim} style={{ width: '100%', marginTop: 8 }}>
+          <Button className="btn-section-add btn-trims" icon={<PlusOutlined />} onClick={addLocalTrim} style={{ marginTop: 8 }}>
             Add Local Item
           </Button>
 
@@ -2100,19 +2153,19 @@ const CostingForm = () => {
               importedTrims.length > 0 ? (
                 <Table.Summary fixed>
                   <Table.Summary.Row style={summaryRowStyle}>
-                    <Table.Summary.Cell index={0} colSpan={8}>
+                    <Table.Summary.Cell index={0} colSpan={7}>
                       <Text strong>Imported Accessories Total (USD)</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={8}>
+                    <Table.Summary.Cell index={7}>
                       <Text strong>{formatCurrency(totalImportedTrimsCostUsd, 'USD')}</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={9} />
+                    <Table.Summary.Cell index={8} />
                   </Table.Summary.Row>
                 </Table.Summary>
               ) : null
             }
           />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addImportedTrim} style={{ width: '100%', marginTop: 8 }}>
+          <Button className="btn-section-add btn-trims" icon={<PlusOutlined />} onClick={addImportedTrim} style={{ marginTop: 8 }}>
             Add Imported Item
           </Button>
 
@@ -2149,6 +2202,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
+            scroll={{ x: 700 }}
             locale={{ emptyText: 'No manufacturing costs added.' }}
             summary={() =>
               manufacturingRows.length > 0 ? (
@@ -2168,7 +2222,7 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addManufacturingRow} style={{ width: '100%', marginTop: 12 }}>
+          <Button className="btn-section-add btn-manufacturing" icon={<PlusOutlined />} onClick={addManufacturingRow} style={{ marginTop: 12 }}>
             Add Process
           </Button>
         </>
@@ -2193,6 +2247,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
+            scroll={{ x: 700 }}
             locale={{ emptyText: 'No overhead costs added.' }}
             summary={() =>
               overheadRows.length > 0 ? (
@@ -2212,7 +2267,7 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button type="dashed" icon={<PlusOutlined />} onClick={addOverheadRow} style={{ width: '100%', marginTop: 12 }}>
+          <Button className="btn-section-add btn-overhead" icon={<PlusOutlined />} onClick={addOverheadRow} style={{ marginTop: 12 }}>
             Add Overhead
           </Button>
         </>
@@ -2298,6 +2353,7 @@ const CostingForm = () => {
                 onChange={(v) => { setAgentCommissionPct(v); setIsDirty(true); }}
                 style={{ width: '100%' }}
                 addonAfter="%"
+                {...numericInputProps}
               />
             </Col>
             <Col xs={12} md={4}>
@@ -2312,6 +2368,7 @@ const CostingForm = () => {
                 onChange={(v) => { setProfitPct(v); setTargetPrice(''); setIsDirty(true); }}
                 style={{ width: '100%' }}
                 addonAfter="%"
+                {...numericInputProps}
               />
             </Col>
             <Col xs={12} md={4}>
@@ -2325,6 +2382,7 @@ const CostingForm = () => {
                 placeholder="Auto-calc profit"
                 onChange={(v) => { setTargetPrice(v); setIsDirty(true); }}
                 style={{ width: '100%' }}
+                {...numericInputProps}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -2416,6 +2474,7 @@ const CostingForm = () => {
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], agentCommissionPct: v },
                               })); setIsDirty(true); }}
+                              {...numericInputProps}
                             />
                           </div>
                           <div style={{ marginBottom: 4 }}>
@@ -2428,6 +2487,7 @@ const CostingForm = () => {
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], profitPct: v },
                               })); setIsDirty(true); }}
+                              {...numericInputProps}
                             />
                           </div>
                           <div>
@@ -2441,6 +2501,7 @@ const CostingForm = () => {
                                 ...prev,
                                 [ps.sizeKey]: { ...prev[ps.sizeKey], targetPrice: v },
                               })); setIsDirty(true); }}
+                              {...numericInputProps}
                             />
                           </div>
                         </div>
@@ -2523,17 +2584,22 @@ const CostingForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <Space>
           <Button
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate('/costing/list')}
           />
           <h1>{isEdit ? 'Edit Cost Sheet' : 'Create Cost Sheet'}</h1>
-          {costingId && (
+          {isEdit && costingId && (
             <Tag color="blue" style={{ fontSize: 13, padding: '2px 10px' }}>
               {costingId}
             </Tag>
+          )}
+          {isEdit && savedDate && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              {savedDate.format('DD-MMM-YYYY')}
+            </Text>
           )}
         </Space>
         <div className="header-actions">
@@ -2542,6 +2608,23 @@ const CostingForm = () => {
             onClick={() => setTechpackModalOpen(true)}
           >
             Import from Techpack
+          </Button>
+          <Button
+            icon={<SaveOutlined />}
+            onClick={handleSaveDraft}
+            loading={savingDraft}
+            disabled={submitting}
+          >
+            Save as Draft
+          </Button>
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={handleSubmit}
+            loading={submitting}
+            disabled={savingDraft}
+          >
+            Submit
           </Button>
         </div>
       </div>
@@ -2552,63 +2635,14 @@ const CostingForm = () => {
         initialValues={{
           currency: 'INR',
           quoteCurrency: 'USD',
-          date: dayjs(),
         }}
         onValuesChange={() => setIsDirty(true)}
       >
         <Collapse
           defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
           items={collapseItems}
-          style={{ marginBottom: 80 }}
         />
       </Form>
-
-      {/* Sticky Footer */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '12px 24px',
-          background: isDarkMode ? '#1e293b' : '#fff',
-          borderTop: `1px solid ${isDarkMode ? '#334155' : '#e2e8f0'}`,
-          boxShadow: '0 -2px 8px rgba(0,0,0,0.1)',
-          zIndex: 100,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 12,
-        }}
-      >
-        <Button onClick={() => navigate('/costing/list')} disabled={savingDraft || submitting}>
-          Cancel
-        </Button>
-        <Button
-          icon={<PrinterOutlined />}
-          onClick={handlePrint}
-          loading={printing}
-          disabled={savingDraft || submitting}
-        >
-          Print / PDF
-        </Button>
-        <Button
-          icon={<SaveOutlined />}
-          onClick={handleSaveDraft}
-          loading={savingDraft}
-          disabled={submitting}
-        >
-          Save as Draft
-        </Button>
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={handleSubmit}
-          loading={submitting}
-          disabled={savingDraft}
-        >
-          Submit
-        </Button>
-      </div>
 
       {/* Knits Consumption Modal */}
       <KnitsConsumptionModal
@@ -2633,6 +2667,88 @@ const CostingForm = () => {
         onOpenKnitsCalc={handleOpenKnitsCalcFromAI}
         fabricRow={consumptionFabricRow}
       />
+
+      {/* Quick Add Process Modal */}
+      <Modal
+        title="Add New Process"
+        open={quickAddProcessOpen}
+        onCancel={() => { setQuickAddProcessOpen(false); quickAddProcessForm.resetFields(); }}
+        onOk={() => quickAddProcessForm.submit()}
+        confirmLoading={quickAddProcessLoading}
+        okText="Create"
+        destroyOnClose
+        width={420}
+      >
+        <Form form={quickAddProcessForm} layout="vertical" onFinish={async (values) => {
+          setQuickAddProcessLoading(true);
+          try {
+            const created = await createProcess({ ...values, category: 'Manufacturing', isActive: true });
+            setManufacturingProcesses((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
+            if (pendingMfgRowKey) {
+              updateManufacturingRow(pendingMfgRowKey, {
+                processId: created.id,
+                process: created.processName,
+                ...(values.defaultCost > 0 ? { cost: values.defaultCost } : {}),
+              });
+            }
+            message.success(`Process "${created.processName}" created`);
+            setQuickAddProcessOpen(false);
+            quickAddProcessForm.resetFields();
+          } catch {
+            message.error('Failed to create process');
+          } finally {
+            setQuickAddProcessLoading(false);
+          }
+        }}>
+          <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
+            <Input placeholder="e.g. Cutting, Sewing, Washing" maxLength={200} />
+          </Form.Item>
+          <Form.Item name="defaultCost" label="Default Cost">
+            <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Quick Add Overhead Modal */}
+      <Modal
+        title="Add New Overhead"
+        open={quickAddOverheadOpen}
+        onCancel={() => { setQuickAddOverheadOpen(false); quickAddOverheadForm.resetFields(); }}
+        onOk={() => quickAddOverheadForm.submit()}
+        confirmLoading={quickAddOverheadLoading}
+        okText="Create"
+        destroyOnClose
+        width={420}
+      >
+        <Form form={quickAddOverheadForm} layout="vertical" onFinish={async (values) => {
+          setQuickAddOverheadLoading(true);
+          try {
+            const created = await createOverhead({ ...values, isActive: true });
+            setOverheadItems((prev) => [...prev, { value: created.id, label: created.overheadName, defaultCost: created.defaultCost || 0 }]);
+            if (pendingOvhRowKey) {
+              updateOverheadRow(pendingOvhRowKey, {
+                overheadId: created.id,
+                description: created.overheadName,
+                ...(values.defaultCost > 0 ? { cost: values.defaultCost } : {}),
+              });
+            }
+            message.success(`Overhead "${created.overheadName}" created`);
+            setQuickAddOverheadOpen(false);
+            quickAddOverheadForm.resetFields();
+          } catch {
+            message.error('Failed to create overhead');
+          } finally {
+            setQuickAddOverheadLoading(false);
+          }
+        }}>
+          <Form.Item name="overheadName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
+            <Input placeholder="e.g. Testing Fees, Freight, Commission" maxLength={200} />
+          </Form.Item>
+          <Form.Item name="defaultCost" label="Default Cost">
+            <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 15.00" style={{ width: '100%' }} {...numericInputProps} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

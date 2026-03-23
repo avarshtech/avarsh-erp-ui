@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
 import { Form, Input, Button, Space, message, Tag, InputNumber, Switch, Modal, Typography, Row, Col } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 import { useStore } from '../../context/StoreContext';
@@ -130,8 +131,8 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save payment terms:', error);
-      message.error(selectedId ? 'Failed to update payment terms' : 'Failed to create payment terms');
     } finally {
       setSubmitting(false);
     }
@@ -157,8 +158,8 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
           message.success('Payment terms deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete payment terms:', error);
-          message.error('Failed to delete payment terms');
         }
       },
     });
@@ -271,12 +272,12 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
                       label="Payment Days"
                       rules={[{ required: true, message: 'Please enter payment days' }]}
                     >
-                      <InputNumber min={0} max={365} controls={false} placeholder="e.g. 30" addonAfter="days" style={{ width: 100 }} />
+                      <InputNumber min={0} max={365} controls={false} placeholder="e.g. 30" addonAfter="days" style={{ width: 100 }} {...integerInputProps} />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
                     <Form.Item name="advancePercentage" label="Advance Percentage">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 50" addonAfter="%" style={{ width: 100 }} />
+                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 50" addonAfter="%" style={{ width: 100 }} {...numericInputProps} />
                     </Form.Item>
                   </Col>
                   <Col span={8}>

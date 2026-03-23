@@ -14,6 +14,7 @@ import {
   Divider,
   App,
 } from 'antd';
+import { integerInputProps } from '../../utils/inputHelpers';
 import { generateEwayBill } from '../../services/purchaseOrderService';
 
 const { Title } = Typography;
@@ -240,7 +241,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
                   },
                 ]}
               >
-                <InputNumber placeholder="600001" style={{ width: '100%' }} controls={false} />
+                <InputNumber placeholder="600001" style={{ width: '100%' }} controls={false} {...integerInputProps} />
               </Form.Item>
             </Col>
             <Col span={4}>
@@ -257,7 +258,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
                   },
                 ]}
               >
-                <InputNumber placeholder="33" style={{ width: '100%' }} controls={false} />
+                <InputNumber placeholder="33" style={{ width: '100%' }} controls={false} {...integerInputProps} />
               </Form.Item>
             </Col>
           </Row>
@@ -331,7 +332,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
                   },
                 ]}
               >
-                <InputNumber placeholder="600001" style={{ width: '100%' }} controls={false} />
+                <InputNumber placeholder="600001" style={{ width: '100%' }} controls={false} {...integerInputProps} />
               </Form.Item>
             </Col>
             <Col span={4}>
@@ -348,7 +349,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
                   },
                 ]}
               >
-                <InputNumber placeholder="33" style={{ width: '100%' }} controls={false} />
+                <InputNumber placeholder="33" style={{ width: '100%' }} controls={false} {...integerInputProps} />
               </Form.Item>
             </Col>
           </Row>
@@ -379,7 +380,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
                   { type: 'number', min: 1, message: 'Must be at least 1 KM' },
                 ]}
               >
-                <InputNumber placeholder="Distance in KM" style={{ width: '100%' }} min={1} />
+                <InputNumber placeholder="Distance in KM" style={{ width: '100%' }} min={1} {...integerInputProps} />
               </Form.Item>
             </Col>
             <Col span={8}>

@@ -176,8 +176,8 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
       // Refresh from server to ensure consistency
       await fetchData(true);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save terms & conditions:', error);
-      message.error(selectedId ? 'Failed to update terms & conditions' : 'Failed to create terms & conditions');
     } finally {
       setSubmitting(false);
     }
@@ -204,8 +204,8 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
           handleCancel();
           await fetchData(true);
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete terms & conditions:', error);
-          message.error('Failed to delete terms & conditions');
         }
       },
     });

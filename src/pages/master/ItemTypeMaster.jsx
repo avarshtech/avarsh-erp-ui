@@ -118,8 +118,8 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save item type:', error);
-      message.error(selectedId ? 'Failed to update item type' : 'Failed to create item type');
     } finally {
       setSubmitting(false);
     }
@@ -145,8 +145,8 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
           message.success('Item type deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete item type:', error);
-          message.error('Failed to delete item type');
         }
       },
     });

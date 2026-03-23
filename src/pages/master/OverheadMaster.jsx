@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Switch, Modal, Typography } from 'antd';
+import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
-import { getAllParts, createPart, updatePart, deletePart } from '../../services/partsService';
+import { getAllOverheads, createOverhead, updateOverhead, deleteOverhead } from '../../services/overheadService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 
-const MODULE_ID = 'parts-master';
+const MODULE_ID = 'overhead-master';
 
-const PartsMaster = ({ onDirtyChange }) => {
+const OverheadMaster = ({ onDirtyChange }) => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,12 +31,12 @@ const PartsMaster = ({ onDirtyChange }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getAllParts();
+      const result = await getAllOverheads();
       const list = Array.isArray(result) ? result : (result?.data || []);
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load parts');
+      message.error('Failed to load overheads');
     } finally {
       setLoading(false);
     }
@@ -45,9 +46,16 @@ const PartsMaster = ({ onDirtyChange }) => {
 
   const columns = [
     {
-      title: 'Part Name',
-      dataIndex: 'partName',
-      sorter: (a, b) => (a.partName || '').localeCompare(b.partName || ''),
+      title: 'Overhead Name',
+      dataIndex: 'overheadName',
+      sorter: (a, b) => (a.overheadName || '').localeCompare(b.overheadName || ''),
+    },
+    {
+      title: 'Default Cost',
+      dataIndex: 'defaultCost',
+      width: 110,
+      align: 'center',
+      render: (val) => val ? `₹ ${Number(val).toFixed(2)}` : '—',
     },
     {
       title: 'Status',
@@ -60,18 +68,18 @@ const PartsMaster = ({ onDirtyChange }) => {
   ];
 
   const handleAdd = () => {
-    if (!canAdd) { message.warning('You do not have permission to add parts'); return; }
+    if (!canAdd) { message.warning('You do not have permission to add overheads'); return; }
     skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ isActive: true });
+    form.setFieldsValue({ isActive: true, defaultCost: null });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
-    if (!canView && !canUpdate) { message.warning('You do not have permission to view parts'); return; }
+    if (!canView && !canUpdate) { message.warning('You do not have permission to view overheads'); return; }
     skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
@@ -84,18 +92,18 @@ const PartsMaster = ({ onDirtyChange }) => {
   };
 
   const handleSave = async (values) => {
-    if (selectedId && !canUpdate) { message.warning('You do not have permission to update parts'); return; }
-    if (!selectedId && !canAdd) { message.warning('You do not have permission to add parts'); return; }
+    if (selectedId && !canUpdate) { message.warning('You do not have permission to update overheads'); return; }
+    if (!selectedId && !canAdd) { message.warning('You do not have permission to add overheads'); return; }
 
     setSubmitting(true);
     try {
       if (selectedId) {
         const selectedRecord = data.find(p => p.id === selectedId);
-        await updatePart(selectedId, { ...values, version: selectedRecord?.version });
-        message.success('Part updated successfully');
+        await updateOverhead(selectedId, { ...values, version: selectedRecord?.version });
+        message.success('Overhead updated successfully');
       } else {
-        await createPart(values);
-        message.success('Part created successfully');
+        await createOverhead(values);
+        message.success('Overhead created successfully');
       }
       markDirty(false);
       setIsEditing(false);
@@ -109,18 +117,18 @@ const PartsMaster = ({ onDirtyChange }) => {
   };
 
   const handleDelete = () => {
-    if (!canDelete) { message.warning('You do not have permission to delete parts'); return; }
+    if (!canDelete) { message.warning('You do not have permission to delete overheads'); return; }
     Modal.confirm({
-      title: 'Delete Part',
+      title: 'Delete Overhead',
       icon: <ExclamationCircleOutlined />,
-      content: 'Are you sure you want to delete this part? This action cannot be undone.',
+      content: 'Are you sure you want to delete this overhead? This action cannot be undone.',
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          await deletePart(selectedId);
-          message.success('Part deleted successfully');
+          await deleteOverhead(selectedId);
+          message.success('Overhead deleted successfully');
           handleCancel();
           fetchData();
         } catch {
@@ -141,7 +149,9 @@ const PartsMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.partName?.toLowerCase().includes(lower)
+        item.overheadName?.toLowerCase().includes(lower) ||
+        item.description?.toLowerCase().includes(lower) ||
+        item.category?.toLowerCase().includes(lower)
       )
     );
   };
@@ -150,9 +160,9 @@ const PartsMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
-      title="Parts"
-      subtitle="Manufacturing"
-      addLabel="Add Part"
+      title="Overheads"
+      subtitle="Cost Categories"
+      addLabel="Add Overhead"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}
@@ -162,7 +172,7 @@ const PartsMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       onCloseForm={handleCancel}
-      searchPlaceholder="Search parts..."
+      searchPlaceholder="Search overheads..."
       renderForm={() => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* Sticky header */}
@@ -180,10 +190,10 @@ const PartsMaster = ({ onDirtyChange }) => {
           }}>
             <div>
               <h2 style={{ margin: 0 }}>
-                {selectedId ? (isReadOnly ? 'View Part' : 'Edit Part') : 'New Part'}
+                {selectedId ? (isReadOnly ? 'View Overhead' : 'Edit Overhead') : 'New Overhead'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the part details below' : 'Define a garment part name for BOM routing'}
+                {selectedId ? 'Modify the overhead details below' : 'Define a new overhead cost category'}
               </Text>
             </div>
             <Space>
@@ -212,7 +222,7 @@ const PartsMaster = ({ onDirtyChange }) => {
           </div>
 
           {/* Form content */}
-          <div style={{ flex: 1, padding: 24 }}>
+          <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
               <Form
                 form={form}
                 layout="vertical"
@@ -220,8 +230,11 @@ const PartsMaster = ({ onDirtyChange }) => {
                 disabled={isReadOnly}
                 onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
               >
-                <Form.Item name="partName" label="Part Name" rules={[{ required: true, message: 'Please enter a part name' }]}>
-                  <Input placeholder="e.g. Body, Sleeve, Collar" maxLength={200} />
+                <Form.Item name="overheadName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
+                  <Input placeholder="e.g. Testing & Inspection" maxLength={200} />
+                </Form.Item>
+                <Form.Item name="defaultCost" label="Default Cost">
+                  <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />
@@ -238,4 +251,4 @@ const PartsMaster = ({ onDirtyChange }) => {
   );
 };
 
-export default PartsMaster;
+export default OverheadMaster;

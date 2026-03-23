@@ -24,6 +24,7 @@ import {
   ConfigProvider,
   Segmented,
 } from 'antd';
+import { numericInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -734,6 +735,28 @@ const BOMForm = () => {
   );
 
   /**
+   * Partial color match: variant color "18-1655 TCX / Mars Red" should match
+   * order color "18-1655", "Mars Red", "Red", etc.
+   * Splits both on common separators (/ , -) and checks if any token from the
+   * order color appears in the variant color or vice-versa.
+   */
+  const colorMatchesPartial = useCallback((variantColor, orderColor) => {
+    if (!variantColor || !orderColor) return false;
+    const vc = variantColor.trim().toLowerCase();
+    const oc = orderColor.trim().toLowerCase();
+    // Exact match
+    if (vc === oc) return true;
+    // Direct substring containment
+    if (vc.includes(oc) || oc.includes(vc)) return true;
+    // Token-based: split variant on " / ", "/", " - " separators → check each token
+    const variantTokens = vc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
+    const orderTokens = oc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
+    return variantTokens.some((vt) =>
+      orderTokens.some((ot) => vt.includes(ot) || ot.includes(vt)),
+    );
+  }, []);
+
+  /**
    * Validate variant attributes against order data.
    * Fabric: color must exist in order lines.
    * Trims: at least one of color/size must match order data; if neither matches → invalid.
@@ -744,14 +767,14 @@ const BOMForm = () => {
       if (!variants || typeof variants !== 'object') return { valid: true };
       const colorKey = Object.keys(variants).find((k) => k.toLowerCase() === 'color');
       const sizeKey = Object.keys(variants).find((k) => k.toLowerCase() === 'size');
-      const color = colorKey ? String(variants[colorKey]).trim().toLowerCase() : null;
+      const color = colorKey ? String(variants[colorKey]).trim() : null;
       const size = sizeKey ? String(variants[sizeKey]).trim().toLowerCase() : null;
 
       if (fabric) {
-        // Fabric: validate color only
+        // Fabric: validate color only (partial match for Pantone-style names)
         if (!color) return { valid: true };
         const found = orderLineSummary.some((ol) =>
-          ol.colors.some((c) => c.name && c.name.trim().toLowerCase() === color),
+          ol.colors.some((c) => c.name && colorMatchesPartial(color, c.name)),
         );
         return found
           ? { valid: true }
@@ -762,7 +785,7 @@ const BOMForm = () => {
       if (!color && !size) return { valid: true }; // no matchable attributes
 
       const colorExists = color && orderLineSummary.some((ol) =>
-        ol.colors.some((c) => c.name && c.name.trim().toLowerCase() === color),
+        ol.colors.some((c) => c.name && colorMatchesPartial(color, c.name)),
       );
       const sizeExists = size && orderLineSummary.some((ol) =>
         ol.colors.some((c) =>
@@ -781,7 +804,7 @@ const BOMForm = () => {
         errorMsg: `${parts.join(' and ')} ${parts.length > 1 ? 'do' : 'does'} not match any order line values. Verify the variant attributes match the order data.`,
       };
     },
-    [orderLineSummary],
+    [orderLineSummary, colorMatchesPartial],
   );
 
   /** Check if a variant is already used in another BOM line */
@@ -826,7 +849,7 @@ const BOMForm = () => {
           primaryUomId: item.uomId || null,
           secondaryUom: item.secondaryUomSymbol || '',
           secondaryUomId: item.secondaryUomId || null,
-          uom: item.uomSymbol || '',
+          uom: item.secondaryUomSymbol || item.uomSymbol || '',
           availableVariants: activeVariants,
           variantId: firstVariant?.id || null,
           variants: firstVariant ? selectedAttrs : {},
@@ -884,16 +907,16 @@ const BOMForm = () => {
     return key ? String(line.variants[key]).trim() : null;
   }, []);
 
-  /** Check if a fabric line's variant color is NOT found in any order line. */
+  /** Check if a fabric line's variant color is NOT found in any order line (partial match). */
   const isFabricColorMissing = useCallback((line) => {
     if (!isFabricCategory(line) || !line.variantId) return false;
     const color = getVariantAttr(line, 'color');
     if (!color) return false;
     if (orderLineSummary.length === 0) return false;
     return !orderLineSummary.some((ol) =>
-      ol.colors.some((c) => c.name && c.name.trim().toLowerCase() === color.toLowerCase())
+      ol.colors.some((c) => c.name && colorMatchesPartial(color, c.name))
     );
-  }, [orderLineSummary, getVariantAttr]);
+  }, [orderLineSummary, getVariantAttr, colorMatchesPartial]);
 
   /**
    * Get garment quantity for a BOM line based on category (Fabric vs Trims).
@@ -912,13 +935,13 @@ const BOMForm = () => {
       const fabric = isFabricCategory(line);
 
       if (fabric) {
-        // ── FABRIC: always Total across all lines, match by color ──
+        // ── FABRIC: always Total across all lines, match by color (partial) ──
         const color = getVariantAttr(line, 'color');
         if (!color) return { qty: orderQty || 0, needsPoPick: false, matchingLines: [] };
 
         let totalColorQty = 0;
         orderLineSummary.forEach((ol) => {
-          const match = ol.colors.find((c) => c.name && c.name.trim().toLowerCase() === color.toLowerCase());
+          const match = ol.colors.find((c) => c.name && colorMatchesPartial(color, c.name));
           if (match) totalColorQty += match.qty || 0;
         });
 
@@ -934,7 +957,7 @@ const BOMForm = () => {
       // Matrix modes are handled by computeMatrixTotalQty, not this function.
       return { qty: orderQty || 0, needsPoPick: false, matchingLines: [] };
     },
-    [orderLineSummary, orderQty, getVariantAttr],
+    [orderLineSummary, orderQty, getVariantAttr, colorMatchesPartial],
   );
 
   // Compute total qty for matrix modes (SIZE_WISE / VARIANT_PER_SIZE)
@@ -1250,11 +1273,8 @@ const BOMForm = () => {
   const handleConsumptionApply = useCallback(({ splitBySizes, consumption, uom, consumptionPerSize, sizes }) => {
     if (!consumptionLineKey) return;
     if (!splitBySizes) {
-      // Single value or average — update consumption on the current line
       updateLine(consumptionLineKey, 'consumptionPerGarment', consumption);
     } else {
-      // "Apply per size" — apply average to the single fabric line
-      // (fabric BOM lines use SIMPLE consumption mode, one value per garment)
       const values = Object.values(consumptionPerSize || {});
       if (values.length) {
         const avg = Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10000) / 10000;
@@ -1795,9 +1815,11 @@ const BOMForm = () => {
                     />
                   </Tooltip>
                 )}
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', minWidth: 0, overflow: 'hidden' }}>
                   {tags.map((t) => (
-                    <Tag key={t} className="bom-variant-tag" style={{ margin: 0, fontSize: 11 }}>{t}</Tag>
+                    <Tooltip key={t} title={t}>
+                      <Tag className="bom-variant-tag" style={{ margin: 0, fontSize: 11, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t}</Tag>
+                    </Tooltip>
                   ))}
                 </div>
               </div>
@@ -1815,19 +1837,23 @@ const BOMForm = () => {
       {
         title: 'Consumption',
         dataIndex: 'consumptionPerGarment',
-        width: 130,
+        width: 190,
         align: 'center',
         render: (value, record) => {
           const fabric = isFabricCategory(record);
           const cMode = record.consumptionMode || 'SIMPLE';
           const isMatrix = !fabric && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+          const consumptionUom = record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() : '';
 
           if (isMatrix) {
-            // Matrix mode: show total req (read-only) + edit icon
+            // Matrix mode: show total req (read-only) + UOM + edit icon
             const total = computeTotalQty(record);
             return (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                <Text style={{ fontSize: 12 }}>{total ? total.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}</Text>
+                <Text style={{ fontSize: 12 }}>
+                  {total ? total.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                  {consumptionUom ? <Text type="secondary" style={{ fontSize: 10, marginLeft: 3 }}>{consumptionUom}</Text> : null}
+                </Text>
                 <Tooltip title="Edit consumption matrix">
                   <EditOutlined
                     style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer' }}
@@ -1855,6 +1881,8 @@ const BOMForm = () => {
                   onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
                   controls={false}
                   disabled={!record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
+                  addonAfter={record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+                  {...numericInputProps}
                 />
                 {fabric && (
                   <Tooltip title="Calculate from Measurement Chart (AI)">
@@ -1885,6 +1913,7 @@ const BOMForm = () => {
                         value={record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null)}
                         onChange={(v) => updateLine(record.key, 'overrideBaseQty', v || null)}
                         status="warning"
+                        {...numericInputProps}
                       />
                       <Tooltip title="Color not in order — enter base quantity">
                         <WarningOutlined style={{ fontSize: 13, color: '#faad14', flexShrink: 0 }} />
@@ -1894,48 +1923,23 @@ const BOMForm = () => {
                 }
 
                 if (!qty) return null;
+                const label = `${color || 'All'}: ${qty.toLocaleString()}`;
                 return (
-                  <Tag
-                    style={{
-                      fontSize: 10, margin: 0, padding: '1px 8px',
-                      textAlign: 'center', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                    color="processing"
-                  >
-                    {color || 'All'}: {qty.toLocaleString()}
-                  </Tag>
+                  <Tooltip title={label}>
+                    <Tag
+                      style={{
+                        fontSize: 10, margin: 0, padding: '1px 6px',
+                        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        display: 'block',
+                      }}
+                      color="processing"
+                    >
+                      {label}
+                    </Tag>
+                  </Tooltip>
                 );
               })()}
             </div>
-          );
-        },
-      },
-      // 10. UOM
-      {
-        title: 'UOM',
-        dataIndex: 'uom',
-        width: 100,
-        render: (value, record) => {
-          const primary = record.primaryUom;
-          const secondary = record.secondaryUom;
-          const hasSecondary = secondary && secondary !== primary;
-          if (!hasSecondary) {
-            // No secondary — just show the symbol centered
-            return <div style={{ textAlign: 'center' }}><Text strong style={{ fontSize: 12 }}>{(primary || value || '-').toUpperCase()}</Text></div>;
-          }
-          // Both primary and secondary — show dropdown
-          const opts = [
-            { value: primary, label: primary.toUpperCase() },
-            { value: secondary, label: secondary.toUpperCase() },
-          ];
-          return (
-            <Select
-              style={{ width: '100%' }}
-              size="small"
-              value={value || primary || undefined}
-              onChange={(v) => updateLine(record.key, 'uom', v)}
-              options={opts}
-            />
           );
         },
       },
@@ -2005,11 +2009,10 @@ const BOMForm = () => {
         align: 'center',
         render: (_, record) => {
           const total = computeTotalQty(record);
-          return (
-            <Tag color={total ? 'blue' : 'default'} style={{ fontSize: 12 }}>
-              {total != null ? total.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '-'}
-            </Tag>
-          );
+          const uom = (record.primaryUom || record.uom || '').toUpperCase();
+          return total != null
+            ? <Text style={{ fontSize: 12 }}>{total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
+            : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
         },
       },
       // 15. Purchase Qty (Total Qty + allowances)
@@ -2052,10 +2055,9 @@ const BOMForm = () => {
             const totalShipment = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
             purchaseQty = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShipment);
           }
+          const uom = (record.primaryUom || record.uom || '').toUpperCase();
           return (
-            <Tag color="green" style={{ fontSize: 12 }}>
-              {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-            </Tag>
+            <Text style={{ fontSize: 12 }}>{purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
           );
         },
       },
@@ -2626,7 +2628,7 @@ const BOMForm = () => {
           // the full picture for every match-by option)
           const filteredLines = orderLineSummary.map((ol) => {
             const relevantColors = ol.colors.filter((cr) => {
-              const colorMatch = varColor && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase();
+              const colorMatch = varColor && cr.name && colorMatchesPartial(varColor, cr.name);
               const sizeMatch = varSize && cr.quantities && Object.keys(cr.quantities).some(
                 (s) => s.trim().toLowerCase() === varSize.toLowerCase() && cr.quantities[s] > 0,
               );
@@ -2655,14 +2657,14 @@ const BOMForm = () => {
               if (basis === QTY_CALC_BASIS.BUYER_PO && line.selectedBuyerPoNo && ol.buyerPoNo !== line.selectedBuyerPoNo) return;
               ol.colors.forEach((cr) => {
                 if (attr === 'color') {
-                  if (varColor && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase()) total += cr.qty;
+                  if (varColor && cr.name && colorMatchesPartial(varColor, cr.name)) total += cr.qty;
                 } else if (attr === 'size') {
                   if (varSize && cr.quantities) {
                     const sk = Object.keys(cr.quantities).find((s) => s.trim().toLowerCase() === varSize.toLowerCase());
                     if (sk) total += cr.quantities[sk];
                   }
                 } else if (attr === 'color+size') {
-                  if (varColor && varSize && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase() && cr.quantities) {
+                  if (varColor && varSize && cr.name && colorMatchesPartial(varColor, cr.name) && cr.quantities) {
                     const sk = Object.keys(cr.quantities).find((s) => s.trim().toLowerCase() === varSize.toLowerCase());
                     if (sk) total += cr.quantities[sk];
                   }
@@ -2674,7 +2676,7 @@ const BOMForm = () => {
 
           // Buyer PO dropdown: POs where ANY variant attribute (color OR size) matches
           const matchingPOs = orderLineSummary.filter((ol) => {
-            const hasColorMatch = varColor && ol.colors.some((cr) => cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase());
+            const hasColorMatch = varColor && ol.colors.some((cr) => cr.name && colorMatchesPartial(varColor, cr.name));
             const hasSizeMatch = varSize && ol.colors.some((cr) =>
               cr.quantities && Object.keys(cr.quantities).some((s) => s.trim().toLowerCase() === varSize.toLowerCase()),
             );
@@ -2753,7 +2755,7 @@ const BOMForm = () => {
                         <tbody>
                           {displayLines.map((ol) =>
                             ol.colors.map((cr, ci) => {
-                              const isColorMatch = varColor && cr.name && cr.name.trim().toLowerCase() === varColor.toLowerCase();
+                              const isColorMatch = varColor && cr.name && colorMatchesPartial(varColor, cr.name);
                               const hasSizeMatch = varSize && cr.quantities && Object.keys(cr.quantities).some(
                                 (s) => s.trim().toLowerCase() === varSize.toLowerCase() && cr.quantities[s] > 0,
                               );

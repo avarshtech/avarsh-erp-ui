@@ -113,8 +113,8 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save sub-category:', error);
-      message.error(selectedId ? 'Failed to update sub-category' : 'Failed to create sub-category');
     } finally {
       setSubmitting(false);
     }
@@ -140,8 +140,8 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
           message.success('Sub-category deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete sub-category:', error);
-          message.error('Failed to delete sub-category');
         }
       },
     });

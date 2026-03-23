@@ -15,6 +15,8 @@ import {
   Col,
   Alert,
   Popconfirm,
+  Spin,
+  Image,
 } from 'antd';
 import {
   CheckCircleOutlined,
@@ -28,11 +30,13 @@ import {
   ClockCircleOutlined,
   CheckOutlined,
   CloseOutlined,
+  FileImageOutlined,
 } from '@ant-design/icons';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { changeOrderStatus } from '../../services/orderService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import {
   hasPermission,
   canSubmitOrder,
@@ -89,6 +93,9 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
 
+  // Garment images per order line: { [lineId]: { loading, previewUrl } }
+  const [lineImages, setLineImages] = useState({});
+
   const referBackTextareaRef = useRef(null);
   const cancelTextareaRef = useRef(null);
 
@@ -111,8 +118,53 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
       setReferBackReason('');
       setShowCancelInput(false);
       setCancelReason('');
+      // Clean up blob URLs for line images
+      Object.values(lineImages).forEach((img) => {
+        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
+      });
+      setLineImages({});
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  // Load garment images for order lines when modal opens
+  useEffect(() => {
+    if (!open || !orderData?.orderLines?.length) return;
+    let cancelled = false;
+
+    const loadImages = async () => {
+      const linesWithIds = orderData.orderLines.filter((l) => l.id);
+      if (linesWithIds.length === 0) return;
+
+      // Mark lines as loading
+      const loadingState = {};
+      linesWithIds.forEach((l) => { loadingState[l.id] = { loading: true, previewUrl: null }; });
+      setLineImages(loadingState);
+
+      await Promise.all(
+        linesWithIds.map(async (l) => {
+          try {
+            const files = await getFilesByEntity('ORDER_LINE', l.id);
+            const imageFile = (files || []).find((f) =>
+              ['IMAGE', 'PHOTO'].includes(f.fileCategory),
+            );
+            if (!imageFile || cancelled) return;
+            const blob = await downloadFileAsBlob(imageFile.fileId);
+            if (cancelled) return;
+            const previewUrl = URL.createObjectURL(blob);
+            setLineImages((prev) => ({ ...prev, [l.id]: { loading: false, previewUrl } }));
+          } catch {
+            if (!cancelled) {
+              setLineImages((prev) => ({ ...prev, [l.id]: { loading: false, previewUrl: null } }));
+            }
+          }
+        }),
+      );
+    };
+
+    loadImages();
+    return () => { cancelled = true; };
+  }, [open, orderData]);
 
   if (!orderData) return null;
 
@@ -717,6 +769,26 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
               </Text>
             </Col>
           </Row>
+          {/* Garment Image */}
+          {line.id && lineImages[line.id] && (
+            <div style={{ marginTop: 8, marginBottom: 8 }}>
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                Garment Image
+              </Text>
+              {lineImages[line.id].loading ? (
+                <Spin size="small" />
+              ) : lineImages[line.id].previewUrl ? (
+                <Image
+                  src={lineImages[line.id].previewUrl}
+                  alt="Garment"
+                  width={80}
+                  height={80}
+                  style={{ objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-color, #e5e7eb)' }}
+                  preview={{ mask: 'View' }}
+                />
+              ) : null}
+            </div>
+          )}
           <Divider style={{ margin: '8px 0' }} />
           {renderSizeBreakdown(line)}
         </Card>

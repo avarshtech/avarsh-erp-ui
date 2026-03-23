@@ -114,8 +114,8 @@ const CategoryMaster = ({ onDirtyChange }) => {
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save category:', error);
-      message.error(selectedId ? 'Failed to update category' : 'Failed to create category');
     } finally {
       setSubmitting(false);
     }
@@ -141,8 +141,8 @@ const CategoryMaster = ({ onDirtyChange }) => {
           message.success('Category deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete category:', error);
-          message.error('Failed to delete category');
         }
       },
     });

@@ -388,7 +388,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
       setSelectedId(null);
       await fetchData(true);
     } catch {
-      message.error(selectedId ? 'Failed to update' : 'Failed to create');
+      // Error toast already shown by axiosInstance interceptor
     } finally {
       setSubmitting(false);
     }
@@ -411,7 +411,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
           handleCancel();
           await fetchData(true);
         } catch {
-          message.error('Failed to delete size preset');
+          // Error toast already shown by axiosInstance interceptor
         }
       },
     });

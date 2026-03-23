@@ -993,6 +993,14 @@ const ItemMaster = () => {
     return { isDuplicate: false, index1: -1, index2: -1 };
   };
 
+  // Watch category to conditionally require secondary UOM for fabric items
+  const watchedCategoryId = Form.useWatch('categoryId', form);
+  const isFabricCategory = useMemo(() => {
+    if (!watchedCategoryId) return false;
+    const cat = metaData.find((c) => c.id === parseInt(watchedCategoryId));
+    return cat?.name?.toLowerCase().includes('fabric') || false;
+  }, [watchedCategoryId, metaData]);
+
   // Item Name Suggestions
   const itemNameValue = Form.useWatch('itemName', form);
   
@@ -1284,8 +1292,8 @@ const ItemMaster = () => {
       } catch (e) {}
       fetchItems(1, pagination.pageSize, sortConfig.field, sortConfig.order === 'ascend' ? 'asc' : 'desc');
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save item:', error);
-      message.error(error.errorMessage || 'Failed to save item');
     } finally {
       setSubmitting(false);
     }
@@ -1811,6 +1819,7 @@ const ItemMaster = () => {
                   name="secondaryUomId"
                   label="Secondary UOM"
                   rules={[
+                    { required: isFabricCategory, message: 'Secondary UOM is required for fabric items' },
                     ({ getFieldValue }) => ({
                       validator(_, value) {
                         if (value && value === getFieldValue('uomId')) {
@@ -1822,8 +1831,8 @@ const ItemMaster = () => {
                   ]}
                 >
                     <Select
-                      placeholder="Select Secondary UOM (optional)"
-                      allowClear
+                      placeholder={isFabricCategory ? 'Select Secondary UOM (required)' : 'Select Secondary UOM (optional)'}
+                      allowClear={!isFabricCategory}
                       disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
                       options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                       onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}

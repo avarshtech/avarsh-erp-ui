@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Switch, Modal, Row, Col, Typography } from 'antd';
+import { Form, Input, Button, Space, message, Tag, Select, Switch, Modal, Row, Col, Typography, Alert } from 'antd';
 const { Text } = Typography;
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { saveStyle, deleteStyle } from '../../services/styleService';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import FileUpload from '../../components/FileUpload';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
@@ -21,6 +23,13 @@ const StyleMaster = ({ onDirtyChange }) => {
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
+
+  // Style image state
+  const [imageFile, setImageFile] = useState(null);           // locally staged File (new styles only)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null); // blob URL for display
+  const [existingImage, setExistingImage] = useState(null);   // server-side FileStorageDTO
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -73,6 +82,124 @@ const StyleMaster = ({ onDirtyChange }) => {
     },
   ];
 
+  // ==================== IMAGE HELPERS ====================
+
+  const clearImageState = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setExistingImage(null);
+    setImageUploading(false);
+    setImageLoading(false);
+  };
+
+  /** Load existing style image by style ID */
+  const loadStyleImage = async (styleId) => {
+    if (!styleId) return;
+    setImageLoading(true);
+    try {
+      const files = await getFilesByEntity('STYLE', styleId);
+      const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+      if (!img) { setImageLoading(false); return; }
+      const blob = await downloadFileAsBlob(img.fileId);
+      const url = URL.createObjectURL(blob);
+      setExistingImage(img);
+      setImagePreviewUrl(url);
+    } catch {
+      // Image not found or failed to load — non-critical
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  /** Handle image selection */
+  const handleImageSelect = async (file) => {
+    // Revoke old preview if it was from a locally selected file
+    if (imagePreviewUrl && imageFile) URL.revokeObjectURL(imagePreviewUrl);
+    const previewUrl = URL.createObjectURL(file);
+
+    if (selectedId) {
+      // Existing style — upload immediately
+      setImagePreviewUrl(previewUrl);
+      setImageFile(null);
+      setImageUploading(true);
+      try {
+        // Delete old image if replacing
+        if (existingImage?.fileId) {
+          await deleteFile(existingImage.fileId).catch((err) =>
+            console.error('Failed to delete old style image:', err),
+          );
+        }
+        const result = await uploadFile(file, {
+          module: 'STYLE',
+          entity: 'STYLE',
+          entityId: selectedId,
+          fileCategory: 'IMAGE',
+        });
+        const uploaded = result?.data || result;
+        setExistingImage(uploaded);
+        setImageUploading(false);
+        message.success('Style image uploaded');
+      } catch {
+        message.error('Image upload failed. Please try again.');
+        URL.revokeObjectURL(previewUrl);
+        setImagePreviewUrl(existingImage ? imagePreviewUrl : null);
+        setImageUploading(false);
+      }
+    } else {
+      // New style — stage locally, upload after save
+      setImageFile(file);
+      setImagePreviewUrl(previewUrl);
+      markDirty(true);
+      message.info('Image staged. It will be uploaded when the style is saved.');
+    }
+  };
+
+  /** Handle image removal */
+  const handleImageRemove = async () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+
+    if (existingImage?.fileId && selectedId) {
+      // Existing style with server image — delete immediately
+      const prevImage = existingImage;
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      setExistingImage(null);
+      setImageUploading(true);
+      try {
+        await deleteFile(prevImage.fileId);
+        setImageUploading(false);
+        message.success('Image removed');
+      } catch {
+        message.error('Failed to remove image. Please try again.');
+        setExistingImage(prevImage);
+        setImageUploading(false);
+      }
+    } else {
+      // New style or locally staged file — just clear
+      setImageFile(null);
+      setImagePreviewUrl(null);
+      markDirty(true);
+    }
+  };
+
+  /** Upload staged image after creating a new style */
+  const processStyleImage = async (savedStyle) => {
+    if (!imageFile || !savedStyle?.id) return;
+    try {
+      await uploadFile(imageFile, {
+        module: 'STYLE',
+        entity: 'STYLE',
+        entityId: savedStyle.id,
+        fileCategory: 'IMAGE',
+      });
+    } catch {
+      message.warning('Style saved, but image upload failed. You can re-upload by editing the style.');
+    }
+  };
+
+  // ==================== CRUD HANDLERS ====================
+
   const handleAdd = () => {
     if (!canAdd) {
       message.warning('You do not have permission to add styles');
@@ -81,6 +208,7 @@ const StyleMaster = ({ onDirtyChange }) => {
     skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
+    clearImageState();
     form.resetFields();
     form.setFieldsValue({ isActive: true });
     markDirty(false);
@@ -93,6 +221,7 @@ const StyleMaster = ({ onDirtyChange }) => {
       return;
     }
     skipDirty.current = true;
+    clearImageState();
     setSelectedId(record.id);
     setIsEditing(true);
     form.setFieldsValue({
@@ -100,6 +229,7 @@ const StyleMaster = ({ onDirtyChange }) => {
       isActive: record.isActive !== false,
     });
     markDirty(false);
+    loadStyleImage(record.id);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
@@ -131,6 +261,10 @@ const StyleMaster = ({ onDirtyChange }) => {
         ...(selectedId ? { id: selectedId, version: selectedRecord?.version } : {}),
       };
       const saved = await saveStyle(payload);
+      // Upload staged image for new styles
+      if (!selectedId) {
+        await processStyleImage(saved);
+      }
       if (selectedId) {
         updateItem('styles', selectedId, saved);
         message.success('Style updated successfully');
@@ -140,11 +274,12 @@ const StyleMaster = ({ onDirtyChange }) => {
         message.success('Style created successfully');
       }
       markDirty(false);
+      clearImageState();
       setIsEditing(false);
       setSelectedId(null);
     } catch (error) {
+      // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save style:', error);
-      message.error(selectedId ? 'Failed to update style' : 'Failed to create style');
     } finally {
       setSubmitting(false);
     }
@@ -170,8 +305,8 @@ const StyleMaster = ({ onDirtyChange }) => {
           message.success('Style deleted successfully');
           handleCancel();
         } catch (error) {
+          // Error toast already shown by axiosInstance interceptor
           console.error('Failed to delete style:', error);
-          message.error('Failed to delete style');
         }
       },
     });
@@ -181,6 +316,7 @@ const StyleMaster = ({ onDirtyChange }) => {
     setIsEditing(false);
     setSelectedId(null);
     form.resetFields();
+    clearImageState();
     markDirty(false);
   };
 
@@ -319,6 +455,45 @@ const StyleMaster = ({ onDirtyChange }) => {
               <Form.Item name="description" label="Fabric Description">
                 <Input.TextArea rows={3} placeholder="Fabric description (optional)" maxLength={500} />
               </Form.Item>
+
+              {/* Style Image */}
+              <div
+                style={{
+                  padding: 14,
+                  borderRadius: 10,
+                  border: '1px solid var(--border-color, #e5e7eb)',
+                  background: 'var(--bg-secondary, #f8fafc)',
+                  marginBottom: 24,
+                }}
+              >
+                <Text
+                  type="secondary"
+                  style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 10, display: 'block' }}
+                >
+                  Style Image
+                </Text>
+                <FileUpload
+                  accept="image/png,image/jpeg,image/jpg"
+                  maxSizeMB={10}
+                  previewUrl={imagePreviewUrl}
+                  fileName={existingImage?.originalFilename || imageFile?.name || null}
+                  fileType={existingImage?.fileType || imageFile?.type || null}
+                  fileSize={existingImage?.fileSizeBytes || imageFile?.size || null}
+                  onSelect={handleImageSelect}
+                  onRemove={handleImageRemove}
+                  disabled={isReadOnly || imageUploading}
+                  loading={imageUploading || imageLoading}
+                  compact
+                  placeholder="Click or drag to upload style image"
+                  hint="PNG, JPG up to 10 MB"
+                />
+                {!selectedId && imageFile && (
+                  <Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
+                    Will upload on save
+                  </Text>
+                )}
+              </div>
+
               <Form.Item name="isActive" label="Active" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
               </Form.Item>

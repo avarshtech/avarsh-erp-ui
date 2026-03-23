@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Form, Input, Select, DatePicker, InputNumber, Button, Card, Row, Col, Table, Space, Typography, message, Popconfirm, Descriptions, Tag, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, SaveOutlined, ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { numericInputProps } from '../../utils/inputHelpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../utils/permissions';
@@ -71,8 +72,8 @@ const GRNForm = () => {
     { title: 'UOM', dataIndex: 'uom', width: 80 },
     { title: 'Ordered', dataIndex: 'orderedQty', width: 90, align: 'center' },
     { title: 'Pending', dataIndex: 'pendingQty', width: 90, align: 'center', render: (v) => <Tag color="blue">{v}</Tag> },
-    { title: 'Received', dataIndex: 'receivedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.pendingQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'receivedQty', val)} /> },
-    { title: 'Rejected', dataIndex: 'rejectedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.receivedQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'rejectedQty', val)} /> },
+    { title: 'Received', dataIndex: 'receivedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.pendingQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'receivedQty', val)} {...numericInputProps} /> },
+    { title: 'Rejected', dataIndex: 'rejectedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.receivedQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'rejectedQty', val)} {...numericInputProps} /> },
     { title: 'Accepted', dataIndex: 'acceptedQty', width: 90, align: 'center', render: (v) => <Text strong style={{ color: '#22c55e' }}>{v}</Text> },
     { title: 'Rate', dataIndex: 'unitPrice', width: 80, render: (v) => `$${v.toFixed(2)}` },
     { title: 'Amount', dataIndex: 'amount', width: 100, render: (v) => <Text strong style={{ color: '#10b981' }}>${v.toFixed(2)}</Text> },

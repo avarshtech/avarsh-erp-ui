@@ -777,6 +777,12 @@ textarea.ant-input:active {
   background: rgba(255, 255, 255, 0.05) !important;
 }
 
+/* Collapse section tables — stretch to fill the card width (no right-side gap) */
+.ant-collapse .ant-table-body > table,
+.ant-collapse .ant-table-content > table {
+  min-width: 100% !important;
+}
+
 /* ============================================================
    COLLAPSE / ACCORDION
    ============================================================ */
@@ -1143,6 +1149,72 @@ textarea.ant-input:active {
   background-color: rgba(99, 102, 241, 0.15) !important;
   border-color: rgba(99, 102, 241, 0.3) !important;
   color: #818cf8 !important;
+}
+
+/* ============================================================
+   PO VIEW DIALOG — Line Item Cards & Close Button
+   ============================================================ */
+
+/* Line item card hover effect */
+.po-line-item-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.po-line-item-card:hover {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.10);
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .po-line-item-card:hover {
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18);
+}
+
+/* PO View modal — close button always visible above scroll */
+.po-view-modal .ant-modal-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.po-view-modal .ant-modal-close {
+  position: absolute !important;
+  top: 12px !important;
+  right: 16px !important;
+  z-index: 20 !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  background: var(--card-bg, #fff) !important;
+  border: 1px solid var(--border-color, #e8e8e8) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-color, #333) !important;
+  transition: all 0.2s ease !important;
+}
+
+.po-view-modal .ant-modal-close:hover {
+  background: var(--bg-secondary, #f5f5f5) !important;
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .po-view-modal .ant-modal-close {
+  background: var(--card-bg, #1e293b) !important;
+  border-color: var(--border-color, #334155) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .po-view-modal .ant-modal-close:hover {
+  color: var(--primary-color) !important;
+  background: #334155 !important;
+}
+
+/* PO View modal body — scroll without overlapping close */
+.po-view-modal .ant-modal-body {
+  padding-top: 0 !important;
 }
 
 /* ============================================================

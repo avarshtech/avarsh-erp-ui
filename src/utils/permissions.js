@@ -22,6 +22,7 @@
  *   "payment-terms":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "process-master":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "parts-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
  * }
@@ -148,6 +149,12 @@ export const MODULES = {
     path: '/master → Parts tab',
     group: 'master',
   },
+  OVERHEAD_MASTER: {
+    id: 'overhead-master',
+    name: 'Overheads',
+    path: '/master → Overheads tab',
+    group: 'master',
+  },
   USERS: {
     id: 'users',
     name: 'Users',
@@ -238,6 +245,7 @@ export const PERMISSION_GROUPS = [
       { id: 'terms-conditions',name: 'Terms & Conditions',        description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
       { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
+      { id: 'overhead-master', name: 'Overheads',                  description: 'Costing, Shipment',     operations: STANDARD_OPERATIONS },
     ],
   },
   {
@@ -431,7 +439,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
-    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions'] },
+    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master'] },
     { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
   ];
 

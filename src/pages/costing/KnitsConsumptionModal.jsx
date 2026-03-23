@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 import {
   Modal,
   Table,
@@ -116,6 +117,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           onChange={(v) => handleFieldChange(record.key, 'length', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },
@@ -131,6 +133,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           onChange={(v) => handleFieldChange(record.key, 'width', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },
@@ -146,6 +149,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           onChange={(v) => handleFieldChange(record.key, 'nop', v)}
           size="small"
           style={{ width: '100%' }}
+          {...integerInputProps}
         />
       ),
     },
@@ -161,6 +165,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           onChange={(v) => handleFieldChange(record.key, 'gsm', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },
@@ -177,6 +182,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           onChange={(v) => handleFieldChange(record.key, 'gramsPerPart', v)}
           size="small"
           style={{ width: '100%' }}
+          {...numericInputProps}
         />
       ),
     },

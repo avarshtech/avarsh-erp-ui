@@ -182,7 +182,8 @@ const BuyerMaster = () => {
       removeItem('buyers', id);
       message.success('Buyer deleted successfully');
     } catch (error) {
-      message.error(error?.errorMessage || 'Failed to delete buyer');
+      // Error toast already shown by axiosInstance interceptor
+      console.error('Failed to delete buyer:', error);
     } finally {
       setDeletingId(null);
     }
@@ -252,7 +253,8 @@ const BuyerMaster = () => {
       setShippingLocations([]);
     } catch (error) {
       if (error?.errorFields) return;
-      message.error(error?.errorMessage || `Failed to ${editingBuyer ? 'update' : 'create'} buyer`);
+      // Error toast already shown by axiosInstance interceptor
+      console.error('Failed to save buyer:', error);
     } finally {
       setSubmitting(false);
     }

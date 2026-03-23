@@ -67,8 +67,7 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.fabricType)}</td>
       <td class="center">${esc(row.classification)}</td>
       <td>${esc(row.description) || '-'}</td>
-      <td class="num">${row.consumption != null ? fmtNum(row.consumption, 4) : '-'}</td>
-      <td class="center">${esc(row.uom) || '-'}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption, 4)} ${(row.uomSymbol || row.uom || row.uomName || '').toUpperCase()}`.trim() : '-'}</td>
       <td class="num">${fmtNum(row.fabricPrice)}</td>
       <td class="center">${row.fabricWidthStd || '-'}</td>
       <td class="center">${row.fabricWidthVendor || '-'}</td>
@@ -88,8 +87,7 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.item)}</td>
       <td>${esc(row.code) || '-'}</td>
       <td class="center">${esc(row.size) || '-'}</td>
-      <td class="num">${fmtNum(row.consumption)}</td>
-      <td class="center">${esc(row.uom) || '-'}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${(row.uom || '').toUpperCase()}`.trim() : '-'}</td>
       <td class="num">${fmtNum(row.cost)}</td>
       <td class="num highlight-cell">${fmtNum(row.price)}</td>
     </tr>`;
@@ -105,8 +103,7 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.item)}</td>
       <td>${esc(row.code) || '-'}</td>
       <td class="center">${esc(row.size) || '-'}</td>
-      <td class="num">${fmtNum(row.consumption)}</td>
-      <td class="center">${esc(row.uom) || '-'}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${(row.uom || '').toUpperCase()}`.trim() : '-'}</td>
       <td class="num">${fmtNum(row.costUsd)}</td>
       <td class="num highlight-cell">${fmtNum(row.priceUsd)}</td>
     </tr>`;
@@ -529,8 +526,7 @@ const buildCostingHtml = (cs, org) => {
             <th>Fabric Type</th>
             <th>Class</th>
             <th>Description</th>
-            <th style="width:58px;">Consumption</th>
-            <th style="width:40px;">UOM</th>
+            <th style="width:80px;">Consumption</th>
             <th style="width:55px;">Price (${getCurrencySymbol(currency)})</th>
             <th style="width:42px;">Width Std</th>
             <th style="width:48px;">Width Vend</th>
@@ -542,7 +538,7 @@ const buildCostingHtml = (cs, org) => {
         <tbody>
           ${fabricHtml}
           <tr class="total-row">
-            <td colspan="12" style="text-align:right;padding-right:8px;"><strong>Total Fabric Cost</strong></td>
+            <td colspan="11" style="text-align:right;padding-right:8px;"><strong>Total Fabric Cost</strong></td>
             <td class="num"><strong>${fmtNum(cs.totalFabricCost)}</strong></td>
           </tr>
         </tbody>
@@ -561,8 +557,7 @@ const buildCostingHtml = (cs, org) => {
             <th>Item</th>
             <th>Code</th>
             <th style="width:50px;">Size</th>
-            <th style="width:58px;">Consumption</th>
-            <th style="width:40px;">UOM</th>
+            <th style="width:80px;">Consumption</th>
             <th style="width:60px;">Cost (${getCurrencySymbol(currency)})</th>
             <th style="width:65px;">Price (${getCurrencySymbol(currency)})</th>
           </tr>
@@ -570,7 +565,7 @@ const buildCostingHtml = (cs, org) => {
         <tbody>
           ${localTrimsHtml}
           <tr class="total-row">
-            <td colspan="8" style="text-align:right;padding-right:8px;"><strong>Total Local Trims</strong></td>
+            <td colspan="7" style="text-align:right;padding-right:8px;"><strong>Total Local Trims</strong></td>
             <td class="num"><strong>${fmtNum(cs.totalLocalTrimsCost)}</strong></td>
           </tr>
         </tbody>
@@ -589,8 +584,7 @@ const buildCostingHtml = (cs, org) => {
             <th>Item</th>
             <th>Code</th>
             <th style="width:50px;">Size</th>
-            <th style="width:58px;">Consumption</th>
-            <th style="width:40px;">UOM</th>
+            <th style="width:80px;">Consumption</th>
             <th style="width:60px;">Cost ($ USD)</th>
             <th style="width:65px;">Price ($ USD)</th>
           </tr>
@@ -598,7 +592,7 @@ const buildCostingHtml = (cs, org) => {
         <tbody>
           ${importedTrimsHtml}
           <tr class="total-row">
-            <td colspan="8" style="text-align:right;padding-right:8px;"><strong>Total Imported Trims (USD)</strong></td>
+            <td colspan="7" style="text-align:right;padding-right:8px;"><strong>Total Imported Trims (USD)</strong></td>
             <td class="num"><strong>$ ${fmtNum(cs.totalImportedTrimsCostUsd)}</strong></td>
           </tr>
         </tbody>

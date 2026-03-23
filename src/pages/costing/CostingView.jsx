@@ -197,59 +197,56 @@ const CostingView = () => {
   });
 
   const fabricColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
-    { title: 'Fabric Type', dataIndex: 'fabricType', width: 150 },
-    { title: 'Classification', dataIndex: 'classification', width: 100 },
-    { title: 'Description', dataIndex: 'description', width: 160 },
-    { title: 'Consumption', dataIndex: 'consumption', width: 100, render: (v) => v?.toFixed(4) || '-' },
-    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
-    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 100, render: (v) => formatCurrency(v, data.currency) },
-    { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 90 },
-    { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 95 },
-    { title: 'Vendor', dataIndex: 'vendorName', width: 150, ellipsis: true },
-    { title: 'Allowance %', dataIndex: 'allowancePct', width: 90, render: (v) => `${v || 0}%` },
-    { title: `Net Cost`, dataIndex: 'netCost', width: 120, render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>{formatCurrency(v, data.currency)}</Text> },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Fabric Name', dataIndex: 'fabricType', width: 160, align: 'center' },
+    { title: 'Classification', dataIndex: 'classification', width: 120, align: 'center' },
+    { title: 'Description', dataIndex: 'description', align: 'center' },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${(record.uomSymbol || record.uom || record.uomName || '').toUpperCase()}`.trim() : '-' },
+    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 100, align: 'center' },
+    { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 110, align: 'center' },
+    { title: 'Vendor', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
+    { title: 'Allowance %', dataIndex: 'allowancePct', width: 100, align: 'center', render: (v) => `${v || 0}%` },
+    { title: 'Net Cost', dataIndex: 'netCost', width: 120, align: 'center', render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>{formatCurrency(v, data.currency)}</Text> },
   ];
 
   const localTrimColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
-    { title: 'Item', dataIndex: 'item', width: 160 },
-    { title: 'Code', dataIndex: 'code', width: 130 },
-    { title: 'Size', dataIndex: 'size', width: 90 },
-    { title: 'Consumption', dataIndex: 'consumption', width: 100 },
-    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
-    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 110, render: (v) => formatCurrency(v, data.currency) },
-    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'price', width: 110, render: (v) => <Text strong>{formatCurrency(v, data.currency)}</Text> },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Item', dataIndex: 'item', align: 'center' },
+    { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
+    { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
+    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'price', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, data.currency)}</Text> },
   ];
 
   const importedTrimColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
-    { title: 'Item', dataIndex: 'item', width: 160 },
-    { title: 'Code', dataIndex: 'code', width: 130 },
-    { title: 'Size', dataIndex: 'size', width: 90 },
-    { title: 'Consumption', dataIndex: 'consumption', width: 100 },
-    { title: 'UOM', dataIndex: 'uom', width: 100, render: (v) => v || '-' },
-    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 110, render: (v) => formatCurrency(v, 'USD') },
-    { title: 'Price ($ USD)', dataIndex: 'priceUsd', width: 110, render: (v) => <Text strong>{formatCurrency(v, 'USD')}</Text> },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Item', dataIndex: 'item', align: 'center' },
+    { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
+    { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
+    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 120, align: 'center', render: (v) => formatCurrency(v, 'USD') },
+    { title: 'Price ($ USD)', dataIndex: 'priceUsd', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, 'USD')}</Text> },
   ];
 
   const mfgColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
-    { title: 'Process', dataIndex: 'process', width: 200 },
-    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, render: (v) => formatCurrency(v, data.currency) },
-    { title: 'Comments', dataIndex: 'comments' },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Process', dataIndex: 'process', width: 200, align: 'center' },
+    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Comments', dataIndex: 'comments', align: 'center' },
   ];
 
   const overheadColumns = [
-    { title: 'S.No', width: 50, render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, render: (v) => v || '-' },
-    { title: 'Description', dataIndex: 'description', width: 200 },
-    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, render: (v) => formatCurrency(v, data.currency) },
-    { title: 'Comments', dataIndex: 'comments' },
+    { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
+    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Description', dataIndex: 'description', width: 200, align: 'center' },
+    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Comments', dataIndex: 'comments', align: 'center' },
   ];
 
   const summaryRowStyle = {
@@ -265,7 +262,6 @@ const CostingView = () => {
       children: (
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }}>
           <Descriptions.Item label="Costing ID"><Text strong>{data.costingId}</Text></Descriptions.Item>
-          <Descriptions.Item label="Date">{data.date ? dayjs(data.date).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
           <Descriptions.Item label="Status">
             <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20 }}>
               {getStatusLabel(data.status)}
@@ -299,12 +295,12 @@ const CostingView = () => {
           pagination={false}
           size="small"
           rowKey="key"
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1300 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
-                <Table.Summary.Cell index={0} colSpan={12}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
-                <Table.Summary.Cell index={12}>
+                <Table.Summary.Cell index={0} colSpan={11}><Text strong>Total Fabric Cost</Text></Table.Summary.Cell>
+                <Table.Summary.Cell index={11}>
                   <Text strong style={{ color: 'var(--primary-color)' }}>{formatCurrency(data.totalFabricCost, data.currency)}</Text>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
@@ -329,8 +325,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={8}><Text strong>Local Total</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={8}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Local Total</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalLocalTrimsCost, data.currency)}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -341,8 +337,8 @@ const CostingView = () => {
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
-                  <Table.Summary.Cell index={0} colSpan={8}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={8}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={0} colSpan={7}><Text strong>Imported Total (USD)</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={7}><Text strong>{formatCurrency(data.totalImportedTrimsCostUsd, 'USD')}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )}
@@ -363,7 +359,7 @@ const CostingView = () => {
       ),
       style: sectionHeaderStyle('#f59e0b'),
       children: (
-        <Table dataSource={data.manufacturingRows} columns={mfgColumns} pagination={false} size="small" rowKey="key"
+        <Table dataSource={data.manufacturingRows} columns={mfgColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 580 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
@@ -386,7 +382,7 @@ const CostingView = () => {
       ),
       style: sectionHeaderStyle('#ef4444'),
       children: (
-        <Table dataSource={data.overheadRows} columns={overheadColumns} pagination={false} size="small" rowKey="key"
+        <Table dataSource={data.overheadRows} columns={overheadColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 580 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
@@ -511,13 +507,21 @@ const CostingView = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
+      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} />
           <h1>View Cost Sheet</h1>
+          <Tag color="blue" style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
+            {data.costingId}
+          </Tag>
           <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
             {getStatusLabel(data.status)}
           </Tag>
+          {data.date && (
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              {dayjs(data.date).format('DD-MMM-YYYY')}
+            </Text>
+          )}
         </Space>
         <div className="header-actions">
           <Space>

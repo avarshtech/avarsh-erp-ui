@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { numericInputProps } from '../../utils/inputHelpers';
 import {
-  Modal, InputNumber, Select, Button, Typography, Tag, Tooltip, Card, Row, Col, Space, Segmented,
+  Modal, InputNumber, Select, Button, Typography, Tooltip, Card, Row, Col, Space, Segmented,
 } from 'antd';
 import {
   QTY_CALC_BASIS, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal,
@@ -249,6 +250,7 @@ const ConsumptionMatrixDialog = ({
                               value={matrix[color]?.[size] ?? null}
                               onChange={(v) => updateCell(color, size, v)}
                               disabled={disabled} placeholder="0.0000"
+                              {...numericInputProps}
                             />
                           ) : (
                             <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
@@ -321,7 +323,7 @@ const ConsumptionMatrixDialog = ({
 
   return (
     <Modal
-      title={<span>Consumption Matrix <Text style={{ fontWeight: 400, fontSize: 13, marginLeft: 8 }}>{itemName}</Text>{itemCode && <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>({itemCode})</Text>}{uom && <Tag style={{ marginLeft: 8, fontSize: 10, verticalAlign: 'middle' }}>{uom.toUpperCase()}</Tag>}</span>}
+      title={<span>Consumption Matrix <Text style={{ fontWeight: 400, fontSize: 13, marginLeft: 8 }}>{itemName}</Text>{itemCode && <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>({itemCode})</Text>}</span>}
       open={open}
       width={Math.max(650, Math.min(1050, 380 + allSizes.length * 110))}
       destroyOnClose
@@ -355,6 +357,7 @@ const ConsumptionMatrixDialog = ({
             onChange={setFillValue}
             placeholder="0.0000"
             addonAfter={uom ? uom.toUpperCase() : undefined}
+            {...numericInputProps}
           />
           <Select
             size="small"

@@ -1,22 +1,26 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography, Row, Col, Divider, Select } from 'antd';
-import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography, Row, Col, Divider, Select, Alert, Segmented } from 'antd';
+import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined, DollarOutlined, PercentageOutlined } from '@ant-design/icons';
+import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/processService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
+import { useStore } from '../../context/StoreContext';
 
 const MODULE_ID = 'process-master';
 
-const PROCESS_CATEGORIES = [
-  { value: 'Fabric', label: 'Fabric' },
-  { value: 'Trims', label: 'Trims' },
-  { value: 'General', label: 'General' },
-];
-
 const ProcessMaster = ({ onDirtyChange }) => {
+  const { categories } = useStore();
+
+  const categoryOptions = useMemo(() =>
+    (categories || [])
+      .filter((c) => c.isActive !== false)
+      .map((c) => ({ value: c.name, label: c.name })),
+  [categories]);
+
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,6 +66,15 @@ const ProcessMaster = ({ onDirtyChange }) => {
       render: (val) => val ? <Tag>{val}</Tag> : <Tag color="default">—</Tag>,
     },
     {
+      title: 'Type',
+      width: 90,
+      render: (_, record) => {
+        if (record.defaultCost > 0) return <Tag color="blue">Cost</Tag>;
+        if (record.defaultShrinkageInches || record.defaultProcessLossPercent || record.defaultRejectionPercent || record.defaultShipmentAllowancePercent) return <Tag color="purple">Allowance</Tag>;
+        return <Tag color="default">—</Tag>;
+      },
+    },
+    {
       title: 'Status',
       dataIndex: 'isActive',
       width: 90,
@@ -77,7 +90,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ isActive: true, category: null, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
+    form.setFieldsValue({ isActive: true, category: null, processDefaultType: 'COST', defaultCost: null, defaultShrinkageInches: 0.00, defaultProcessLossPercent: 0.00, defaultRejectionPercent: 0.00, defaultShipmentAllowancePercent: 0.00 });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
@@ -87,9 +100,13 @@ const ProcessMaster = ({ onDirtyChange }) => {
     skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
+    const hasAllowance = !!(record.defaultShrinkageInches || record.defaultProcessLossPercent || record.defaultRejectionPercent || record.defaultShipmentAllowancePercent);
+    const hasCost = !!(record.defaultCost);
+    const processDefaultType = hasCost ? 'COST' : hasAllowance ? 'ALLOWANCE' : 'COST';
     form.setFieldsValue({
       ...record,
       isActive: record.isActive !== false,
+      processDefaultType,
     });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
@@ -101,12 +118,22 @@ const ProcessMaster = ({ onDirtyChange }) => {
 
     setSubmitting(true);
     try {
+      const { processDefaultType, ...payload } = values;
+      if (processDefaultType !== 'ALLOWANCE') {
+        payload.defaultShrinkageInches = 0;
+        payload.defaultProcessLossPercent = 0;
+        payload.defaultRejectionPercent = 0;
+        payload.defaultShipmentAllowancePercent = 0;
+      }
+      if (processDefaultType !== 'COST') {
+        payload.defaultCost = 0;
+      }
       if (selectedId) {
         const selectedRecord = data.find(p => p.id === selectedId);
-        await updateProcess(selectedId, { ...values, version: selectedRecord?.version });
+        await updateProcess(selectedId, { ...payload, version: selectedRecord?.version });
         message.success('Process updated successfully');
       } else {
-        await createProcess(values);
+        await createProcess(payload);
         message.success('Process created successfully');
       }
       markDirty(false);
@@ -114,7 +141,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
       setSelectedId(null);
       fetchData();
     } catch {
-      message.error(selectedId ? 'Failed to update process' : 'Failed to create process');
+      // Error toast already shown by axiosInstance interceptor
     } finally {
       setSubmitting(false);
     }
@@ -136,7 +163,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
           handleCancel();
           fetchData();
         } catch {
-          message.error('Failed to delete process');
+          // Error toast already shown by axiosInstance interceptor
         }
       },
     });
@@ -238,35 +265,76 @@ const ProcessMaster = ({ onDirtyChange }) => {
                   <Input placeholder="e.g. Fabric Dyeing" maxLength={200} />
                 </Form.Item>
                 <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
-                  <Select placeholder="Select category" options={PROCESS_CATEGORIES} allowClear />
+                  <Select placeholder="Select category" options={categoryOptions} showSearch optionFilterProp="label" allowClear />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />
                 </Form.Item>
 
-                <Divider orientation="left" style={{ margin: '8px 0 16px' }}>Default Allowances</Divider>
-                <Row gutter={16}>
-                  <Col span={6}>
-                    <Form.Item name="defaultShrinkageInches" label="Shrinkage">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="inches" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={6}>
-                    <Form.Item name="defaultProcessLossPercent" label="Process Loss">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={6}>
-                    <Form.Item name="defaultRejectionPercent" label="Rejection">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} />
-                    </Form.Item>
-                  </Col>
-                  <Col span={6}>
-                    <Form.Item name="defaultShipmentAllowancePercent" label="Shipment">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} />
-                    </Form.Item>
-                  </Col>
-                </Row>
+                <Divider orientation="left" style={{ margin: '8px 0 16px' }}>Process Defaults</Divider>
+                <Form.Item name="processDefaultType" label="Default Type" style={{ marginBottom: 12 }}>
+                  <Segmented
+                    block
+                    options={[
+                      { label: <Space><DollarOutlined /> Cost</Space>, value: 'COST' },
+                      { label: <Space><PercentageOutlined /> Allowance</Space>, value: 'ALLOWANCE' },
+                    ]}
+                  />
+                </Form.Item>
+
+                <Form.Item noStyle shouldUpdate={(prev, cur) => prev.processDefaultType !== cur.processDefaultType}>
+                  {() => {
+                    const type = form.getFieldValue('processDefaultType');
+                    if (type === 'COST') return (
+                      <>
+                        <Alert
+                          type="info"
+                          showIcon
+                          icon={<InfoCircleOutlined />}
+                          message="Set a default cost for this process. When selected in a Costing sheet, this value will be auto-filled as the process cost."
+                          style={{ marginBottom: 16, fontSize: 12 }}
+                        />
+                        <Form.Item name="defaultCost" label="Default Cost">
+                          <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
+                        </Form.Item>
+                      </>
+                    );
+                    if (type === 'ALLOWANCE') return (
+                      <>
+                        <Alert
+                          type="info"
+                          showIcon
+                          icon={<InfoCircleOutlined />}
+                          message="Set default allowance values for this process. When selected in a BOM, these values will be auto-applied to calculate purchase quantities."
+                          style={{ marginBottom: 16, fontSize: 12 }}
+                        />
+                        <Row gutter={16}>
+                          <Col span={6}>
+                            <Form.Item name="defaultShrinkageInches" label="Shrinkage">
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="in" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} {...numericInputProps} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={6}>
+                            <Form.Item name="defaultProcessLossPercent" label="Process Loss">
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} {...numericInputProps} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={6}>
+                            <Form.Item name="defaultRejectionPercent" label="Rejection">
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} {...numericInputProps} />
+                            </Form.Item>
+                          </Col>
+                          <Col span={6}>
+                            <Form.Item name="defaultShipmentAllowancePercent" label="Shipment">
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} {...numericInputProps} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </>
+                    );
+                    return null;
+                  }}
+                </Form.Item>
 
                 <Form.Item name="isActive" label="Active" valuePropName="checked">
                   <Switch checkedChildren="Active" unCheckedChildren="Inactive" />

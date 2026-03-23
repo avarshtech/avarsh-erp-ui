@@ -150,7 +150,7 @@ const BOMView = ({ open, bomData, onClose }) => {
                 )}
               </div>
             </div>
-            <Tag style={{ fontSize: 12, fontWeight: 700, margin: 0 }}>{(line.uom || '-').toUpperCase()}</Tag>
+            {/* UOM shown inline with values below */}
           </div>
 
           {/* Variant tags (fabric) */}
@@ -198,12 +198,14 @@ const BOMView = ({ open, bomData, onClose }) => {
                   ? (line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—')
                   : (line.consumptionPerGarment != null ? Number(line.consumptionPerGarment).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—')
                 }
+                {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
               </Text>
             </div>
             <div>
               <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Total Qty</Text>
               <Text strong style={{ fontSize: 14, color: 'var(--primary-color, #6366f1)' }}>
                 {line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
               </Text>
             </div>
             {purchaseQty != null && (
@@ -211,6 +213,7 @@ const BOMView = ({ open, bomData, onClose }) => {
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
                 <Text strong style={{ fontSize: 14, color: '#10b981' }}>
                   {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
                 </Text>
               </div>
             )}
