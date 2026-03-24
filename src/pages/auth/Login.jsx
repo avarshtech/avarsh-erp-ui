@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, Typography, Checkbox, message, Spin } from 'antd';
+import { Form, Input, Button, Typography, Checkbox, message, Spin } from 'antd';
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authenticateUser, isAuthenticated, initializeSession } from '../../services/authService';
@@ -20,7 +20,6 @@ const Login = () => {
   const { isDarkMode } = useTheme();
   const [messageApi, contextHolder] = message.useMessage();
 
-  // Check if already logged in (or if session can be restored via refresh cookie)
   useEffect(() => {
     const checkAuth = async () => {
       if (isAuthenticated()) {
@@ -29,7 +28,6 @@ const Login = () => {
         setCheckingAuth(false);
         return;
       }
-      // If a sessionActive flag exists, try to restore session via the HttpOnly cookie
       if (hasSessionActiveFlag()) {
         const success = await initializeSession();
         if (success) {
@@ -44,7 +42,6 @@ const Login = () => {
     checkAuth();
   }, [navigate, location]);
 
-  // Load remembered username
   useEffect(() => {
     const rememberedUsername = localStorage.getItem('rememberedUsername');
     if (rememberedUsername) {
@@ -60,7 +57,6 @@ const Login = () => {
       const result = await authenticateUser(username, password);
 
       if (result.success) {
-        // Handle remember me
         if (remember) {
           localStorage.setItem('rememberedUsername', username);
         } else {
@@ -68,8 +64,6 @@ const Login = () => {
         }
 
         messageApi.success(`Welcome back, ${result.user.name}!`);
-        
-        // Navigate to intended destination or first accessible route
         const from = location.state?.from?.pathname;
         const target = from || getFirstAccessibleRoute();
         navigate(target, { replace: true });
@@ -85,34 +79,79 @@ const Login = () => {
 
   if (checkingAuth) {
     return (
-      <div style={styles.loadingContainer}>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: isDarkMode
+          ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+          : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+      }}>
         <Spin size="large" />
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: isDarkMode
+        ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+        : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%)',
+      padding: 20,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
       {contextHolder}
-      {/* Background decoration */}
-      <div style={styles.backgroundDecoration} />
-      
-      <Card style={styles.card} variant="borderless">
-        {/* Logo and Header */}
-        <div style={styles.logoContainer}>
-          <img src={isDarkMode ? avarshLogoLight : avarshLogoDark} alt="Avarsh Logo" style={styles.logo} />
+
+      {/* Decorative circles */}
+      <div style={{
+        position: 'absolute', top: '-15%', right: '-10%',
+        width: '50%', height: '70%', borderRadius: '50%',
+        background: isDarkMode ? 'rgba(99, 102, 241, 0.06)' : 'rgba(255, 255, 255, 0.08)',
+      }} />
+      <div style={{
+        position: 'absolute', bottom: '-20%', left: '-10%',
+        width: '40%', height: '60%', borderRadius: '50%',
+        background: isDarkMode ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.05)',
+      }} />
+
+      <div style={{
+        width: '100%',
+        maxWidth: 440,
+        background: 'var(--card-bg)',
+        borderRadius: 20,
+        boxShadow: isDarkMode
+          ? '0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05)'
+          : '0 24px 80px rgba(0, 0, 0, 0.2)',
+        padding: '40px 36px 32px',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <img
+            src={isDarkMode ? avarshLogoLight : avarshLogoDark}
+            alt="Avarsh Logo"
+            style={{ height: 52, width: 'auto', objectFit: 'contain' }}
+          />
         </div>
 
-        <div style={styles.headerContainer}>
-          <Title level={2} style={styles.title}>
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Title level={2} style={{ marginBottom: 6, color: 'var(--text-primary)', fontWeight: 700 }}>
             Welcome Back
           </Title>
-          <Text type="secondary" style={styles.subtitle}>
+          <Text style={{ fontSize: 14, color: 'var(--text-muted)' }}>
             Sign in to continue with Avarsh ERP
           </Text>
         </div>
 
-        {/* Login Form */}
+        {/* Form */}
         <Form
           form={form}
           name="login"
@@ -120,7 +159,6 @@ const Login = () => {
           onFinish={handleSubmit}
           autoComplete="off"
           requiredMark={false}
-          style={styles.form}
         >
           <Form.Item
             name="username"
@@ -130,11 +168,11 @@ const Login = () => {
             ]}
           >
             <Input
-              prefix={<UserOutlined style={styles.inputIcon} />}
+              prefix={<UserOutlined style={{ color: 'var(--text-muted)', fontSize: 16 }} />}
               placeholder="Username"
               size="large"
               autoComplete="username"
-              style={styles.input}
+              style={{ borderRadius: 10, height: 48 }}
             />
           </Form.Item>
 
@@ -146,23 +184,23 @@ const Login = () => {
             ]}
           >
             <Input.Password
-              prefix={<LockOutlined style={styles.inputIcon} />}
+              prefix={<LockOutlined style={{ color: 'var(--text-muted)', fontSize: 16 }} />}
               placeholder="Password"
               size="large"
               autoComplete="current-password"
               iconRender={(visible) =>
                 visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />
               }
-              style={styles.input}
+              style={{ borderRadius: 10, height: 48 }}
             />
           </Form.Item>
 
           <Form.Item>
-            <div style={styles.optionsRow}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Form.Item name="remember" valuePropName="checked" noStyle>
-                <Checkbox>Remember me</Checkbox>
+                <Checkbox style={{ color: 'var(--text-secondary)' }}>Remember me</Checkbox>
               </Form.Item>
-              <Link href="#" style={styles.forgotLink}>
+              <Link href="#" style={{ color: 'var(--primary-color)', fontSize: 13 }}>
                 Forgot password?
               </Link>
             </div>
@@ -175,136 +213,45 @@ const Login = () => {
               size="large"
               loading={loading}
               block
-              style={styles.submitButton}
+              className="action-btn"
+              style={{
+                height: 48,
+                borderRadius: 10,
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: '0.02em',
+              }}
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </Form.Item>
         </Form>
 
-        {/* Footer */}
-        <div style={styles.footer}>
-          <Text type="secondary" style={styles.footerText}>
+        {/* Divider */}
+        <div style={{
+          textAlign: 'center',
+          paddingTop: 20,
+          borderTop: '1px solid var(--border-color)',
+        }}>
+          <Text style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             © {new Date().getFullYear()} Avarsh Technologies. All rights reserved.
           </Text>
         </div>
-      </Card>
+      </div>
 
-      {/* Version info */}
-      <Text type="secondary" style={styles.versionText}>
-        Version 1.0.0
+      {/* Version */}
+      <Text style={{
+        position: 'absolute',
+        bottom: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        fontSize: 11,
+        color: isDarkMode ? 'rgba(148, 163, 184, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+      }}>
+        Version 1.05.01
       </Text>
     </div>
   );
-};
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '20px',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  loadingContainer: {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-  },
-  backgroundDecoration: {
-    position: 'absolute',
-    top: '-50%',
-    right: '-20%',
-    width: '80%',
-    height: '150%',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '50%',
-    transform: 'rotate(-15deg)',
-  },
-  card: {
-    width: '100%',
-    maxWidth: 420,
-    borderRadius: 16,
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-    padding: '20px 10px',
-    background: '#ffffff',
-    position: 'relative',
-    zIndex: 1,
-  },
-  logoContainer: {
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  logo: {
-    height: 60,
-    width: 'auto',
-    objectFit: 'contain',
-  },
-  headerContainer: {
-    textAlign: 'center',
-    marginBottom: 32,
-  },
-  title: {
-    marginBottom: 8,
-    color: '#1f2937',
-    fontWeight: 600,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: '#6b7280',
-  },
-  form: {
-    marginTop: 8,
-  },
-  input: {
-    borderRadius: 10,
-    height: 48,
-  },
-  inputIcon: {
-    color: '#9ca3af',
-    fontSize: 16,
-  },
-  optionsRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  forgotLink: {
-    color: '#6366f1',
-    fontSize: 14,
-  },
-  submitButton: {
-    height: 48,
-    borderRadius: 10,
-    fontSize: 16,
-    fontWeight: 500,
-    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-    border: 'none',
-    boxShadow: '0 4px 14px rgba(99, 102, 241, 0.4)',
-  },
-  footer: {
-    textAlign: 'center',
-    marginTop: 24,
-    paddingTop: 16,
-    borderTop: '1px solid #f3f4f6',
-  },
-  footerText: {
-    fontSize: 12,
-    color: '#9ca3af',
-  },
-  versionText: {
-    position: 'absolute',
-    bottom: 20,
-    left: '50%',
-    transform: 'translateX(-50%)',
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.6)',
-  },
 };
 
 export default Login;

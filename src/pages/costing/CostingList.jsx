@@ -2,34 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
-  Button,
   Space,
-  Input,
-  Tag,
-  Select,
   Typography,
   message,
-  Row,
-  Col,
   Tooltip,
-  Popconfirm,
-  DatePicker,
 } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  CopyOutlined,
-  FileTextOutlined,
-  CheckCircleOutlined,
-  SendOutlined,
-  ReloadOutlined,
-  ExclamationCircleOutlined,
-  HistoryOutlined,
-  PrinterOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -41,7 +18,6 @@ import {
 import { hasPermission } from '../../utils/permissions';
 import {
   COSTING_STATUS,
-  STATUS_COLORS,
   getStatusLabel,
   EDITABLE_STATUSES,
   DELETABLE_STATUSES,
@@ -51,15 +27,18 @@ import {
 import { getBuyers } from '../../services/buyerService';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import CostingHistoryModal from './CostingHistoryModal';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import RecordLink from '../../components/RecordLink';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import EmptyState from '../../components/EmptyState';
+import { COSTING_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getTablePagination } from '../../utils/paginationConfig';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
-
-const STATUS_CONFIG = {
-  [COSTING_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [COSTING_STATUS.FINAL]: { color: 'blue', icon: <SendOutlined /> },
-  [COSTING_STATUS.APPROVED]: { color: 'green', icon: <CheckCircleOutlined /> },
-};
 
 const CostingList = () => {
   const navigate = useNavigate();
@@ -70,8 +49,7 @@ const CostingList = () => {
     pageSize: 25,
     total: 0,
   });
-  const [searchText, setSearchText] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [buyerFilter, setBuyerFilter] = useState(undefined);
   const [seasonFilter, setSeasonFilter] = useState(undefined);
@@ -128,12 +106,6 @@ const CostingList = () => {
     [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, buyerFilter, seasonFilter, dateRange]
   );
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
   // Fetch buyer options on mount
   useEffect(() => {
     getBuyers()
@@ -185,7 +157,6 @@ const CostingList = () => {
 
   const handleClearFilters = () => {
     setSearchText('');
-    setDebouncedSearch('');
     setStatusFilter(undefined);
     setBuyerFilter(undefined);
     setSeasonFilter(undefined);
@@ -209,6 +180,54 @@ const CostingList = () => {
     }
   }, []);
 
+  const filters = useMemo(() => [
+    {
+      type: 'select',
+      span: { xs: 12, sm: 8, md: 4, lg: 3 },
+      props: {
+        placeholder: 'Buyer',
+        value: buyerFilter,
+        onChange: setBuyerFilter,
+        options: buyerOptions,
+      },
+    },
+    {
+      type: 'select',
+      span: { xs: 12, sm: 8, md: 3, lg: 3 },
+      props: {
+        placeholder: 'Season',
+        value: seasonFilter,
+        onChange: setSeasonFilter,
+        options: SEASONS,
+        showSearch: false,
+      },
+    },
+    {
+      type: 'rangePicker',
+      span: { xs: 24, sm: 12, md: 5, lg: 4 },
+      props: {
+        placeholder: ['Date From', 'Date To'],
+        value: dateRange,
+        onChange: setDateRange,
+        allowClear: true,
+      },
+    },
+    {
+      type: 'select',
+      span: { xs: 12, sm: 8, md: 3, lg: 3 },
+      props: {
+        placeholder: 'Status',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: Object.values(COSTING_STATUS).map((s) => ({
+          label: getStatusLabel(s),
+          value: s,
+        })),
+        showSearch: false,
+      },
+    },
+  ], [buyerFilter, buyerOptions, seasonFilter, dateRange, statusFilter]);
+
   const columns = useMemo(() => [
     {
       title: 'Costing ID',
@@ -218,13 +237,10 @@ const CostingList = () => {
       width: 160,
       sorter: true,
       render: (text, record) => (
-        <Text
-          strong
-          style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
+        <RecordLink
+          text={text}
           onClick={() => navigate(`/costing/${record.id}`)}
-        >
-          {text}
-        </Text>
+        />
       ),
     },
     {
@@ -272,9 +288,11 @@ const CostingList = () => {
       align: 'right',
       sorter: true,
       render: (amount, record) => (
-        <Text strong style={{ color: 'var(--success-color)' }}>
-          {formatCurrency(amount, record.currency)}
-        </Text>
+        <CurrencyDisplay
+          amount={amount}
+          currency={record.currency}
+          color="var(--success-color)"
+        />
       ),
     },
     {
@@ -286,16 +304,12 @@ const CostingList = () => {
       render: (amount, record) => {
         const hasSizes = record.sizeSummaries && record.sizeSummaries.length > 0;
         const content = (
-          <div>
-            <Text strong style={{ color: 'var(--primary-color)' }}>
-              {formatCurrency(amount, record.quoteCurrency)}
-            </Text>
-            <div>
-              <Text type="secondary" style={{ fontSize: 11 }}>
-                {formatCurrency(record.finalPriceUsd || amount, 'USD')}
-              </Text>
-            </div>
-          </div>
+          <CurrencyDisplay
+            amount={amount}
+            currency={record.quoteCurrency}
+            color="var(--primary-color)"
+            secondary={formatCurrency(record.finalPriceUsd || amount, 'USD')}
+          />
         );
         if (!hasSizes) return content;
         return (
@@ -318,98 +332,58 @@ const CostingList = () => {
       dataIndex: 'status',
       key: 'status',
       width: 120,
-      render: (status) => {
-        const config = STATUS_CONFIG[status] || {};
-        return (
-          <Tag
-            color={config.color || 'default'}
-            icon={config.icon}
-            style={{ borderRadius: 20 }}
-          >
-            {getStatusLabel(status)}
-          </Tag>
-        );
-      },
+      render: (status) => (
+        <StatusTag
+          status={status}
+          config={COSTING_STATUS_CONFIG}
+          getLabel={getStatusLabel}
+        />
+      ),
     },
     {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 180,
+      width: 200,
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => navigate(`/costing/${record.id}`)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="view"
+              onClick={() => navigate(`/costing/${record.id}`)}
+            />
           )}
           {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/costing/edit/${record.id}`)}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="edit"
+              onClick={() => navigate(`/costing/edit/${record.id}`)}
+            />
           )}
-          <Tooltip title="Duplicate">
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={() => handleDuplicate(record)}
-              loading={duplicatingId === record.id}
-              style={{ color: '#722ed1' }}
-            />
-          </Tooltip>
-          <Tooltip title="Print">
-            <Button
-              type="text"
-              size="small"
-              icon={<PrinterOutlined />}
-              onClick={() => handlePrint(record)}
-              loading={printingId === record.id}
-              style={{ color: '#0ea5e9' }}
-            />
-          </Tooltip>
+          <ActionButton
+            action="duplicate"
+            onClick={() => handleDuplicate(record)}
+            loading={duplicatingId === record.id}
+          />
+          <ActionButton
+            action="print"
+            onClick={() => handlePrint(record)}
+            loading={printingId === record.id}
+          />
           {(record.status === COSTING_STATUS.APPROVED || record.status === COSTING_STATUS.FINAL) && (
-            <Tooltip title="History">
-              <Button
-                type="text"
-                size="small"
-                icon={<HistoryOutlined />}
-                onClick={() => handleViewHistory(record)}
-                style={{ color: '#faad14' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="history"
+              onClick={() => handleViewHistory(record)}
+            />
           )}
           {DELETABLE_STATUSES.includes(record.status) && canDelete && (
-            <Popconfirm
+            <DeleteConfirm
               title="Delete Cost Sheet"
-              description={`Are you sure you want to delete "${record.costingId}"?`}
+              recordLabel={record.costingId}
               onConfirm={() => handleDelete(record)}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton action="delete" />
+            </DeleteConfirm>
           )}
         </Space>
       ),
@@ -418,91 +392,26 @@ const CostingList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Costing Module</h1>
-        <div className="header-actions">
-          {canAdd && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/costing/new')}
-            >
-              New Cost Sheet
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Costing Module">
+        {canAdd && (
+          <ActionButton
+            action="create"
+            text="New Cost Sheet"
+            onClick={() => navigate('/costing/new')}
+          />
+        )}
+      </PageHeader>
 
       <Card>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <Input
-              placeholder="Search ID, buyer, style..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={12} sm={8} md={4} lg={3}>
-            <Select
-              placeholder="Buyer"
-              style={{ width: '100%' }}
-              allowClear
-              showSearch
-              optionFilterProp="label"
-              value={buyerFilter}
-              onChange={setBuyerFilter}
-              options={buyerOptions}
-            />
-          </Col>
-          <Col xs={12} sm={8} md={3} lg={3}>
-            <Select
-              placeholder="Season"
-              style={{ width: '100%' }}
-              allowClear
-              value={seasonFilter}
-              onChange={setSeasonFilter}
-              options={SEASONS}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={5} lg={4}>
-            <RangePicker
-              placeholder={['Date From', 'Date To']}
-              value={dateRange}
-              onChange={setDateRange}
-              format="DD-MMM-YYYY"
-              style={{ width: '100%', height: '40px' }}
-              allowClear
-            />
-          </Col>
-          <Col xs={12} sm={8} md={3} lg={3}>
-            <Select
-              placeholder="Status"
-              style={{ width: '100%' }}
-              allowClear
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={Object.values(COSTING_STATUS).map((s) => ({
-                label: getStatusLabel(s),
-                value: s,
-              }))}
-            />
-          </Col>
-          <Col flex="auto" style={{ textAlign: 'right' }}>
-            <Space>
-              <Button type="link" onClick={handleClearFilters}>
-                Clear
-              </Button>
-              <Tooltip title="Refresh">
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => fetchData(pagination.current, pagination.pageSize)}
-                />
-              </Tooltip>
-            </Space>
-          </Col>
-        </Row>
+        <SearchFilterBar
+          searchText={searchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchPlaceholder="Search ID, buyer, style..."
+          filters={filters}
+          onClear={handleClearFilters}
+          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          style={{ marginBottom: 16 }}
+        />
 
         <Table
           columns={columns}
@@ -511,12 +420,14 @@ const CostingList = () => {
           rowKey="id"
           scroll={{ x: 1400 }}
           onChange={handleTableChange}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '25', '50'],
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} cost sheets`,
+          pagination={getTablePagination(pagination, 'cost sheets')}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="No cost sheets found"
+                description="Try adjusting your filters or create a new cost sheet."
+              />
+            ),
           }}
         />
       </Card>

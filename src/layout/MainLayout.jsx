@@ -107,6 +107,7 @@ const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick, isDark
       defaultOpenKeys={openKeys}
       items={menuItems}
       onClick={onMenuClick}
+      className="sidebar-menu"
       style={{
         marginTop: 8,
         border: 'none',
@@ -123,8 +124,8 @@ const SidebarLogo = ({ collapsed }) => (
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      padding: 0,
-      borderBottom: "1px solid rgba(255,255,255,0.1)",
+      padding: '0 20px',
+      borderBottom: "1px solid var(--sidebar-border)",
     }}
   >
     <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
@@ -140,6 +141,22 @@ const SidebarLogo = ({ collapsed }) => (
         }}
       />
     </div>
+  </div>
+);
+
+const SidebarVersion = () => (
+  <div
+    style={{
+      padding: '10px 16px',
+      textAlign: 'center',
+      color: 'var(--sidebar-version-color)',
+      fontSize: 11,
+      fontWeight: 500,
+      letterSpacing: '0.5px',
+      borderTop: '1px solid var(--sidebar-border)',
+    }}
+  >
+    Version 1.05.01
   </div>
 );
 
@@ -354,6 +371,11 @@ const MainLayoutInner = () => {
   const headerPadding = isMobile ? '0 12px' : '0 24px';
   const contentMargin = isMobile ? 12 : 24;
 
+  // Sidebar gradient based on theme
+  const sidebarGradient = isDarkMode
+    ? 'linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #1e293b 100%)'
+    : 'linear-gradient(180deg, #312e81 0%, #3730a3 50%, #4338ca 100%)';
+
   return (
     <SessionExpiryGuard>
       <Layout style={{ minHeight: "100vh" }}>
@@ -373,19 +395,24 @@ const MainLayoutInner = () => {
               bottom: 0,
               zIndex: 100,
               overflow: 'hidden',
-              background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-              transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+              background: sidebarGradient,
+              transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
               willChange: 'width',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <SidebarLogo collapsed={collapsed} />
-            <SidebarContent
-              menuItems={menuItems}
-              selectedKeys={selectedKeys}
-              openKeys={openKeys}
-              onMenuClick={handleMenuClick}
-              isDarkMode={isDarkMode}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <SidebarLogo collapsed={collapsed} />
+              <SidebarContent
+                menuItems={menuItems}
+                selectedKeys={selectedKeys}
+                openKeys={openKeys}
+                onMenuClick={handleMenuClick}
+                isDarkMode={isDarkMode}
+              />
+              {!collapsed && <SidebarVersion />}
+            </div>
           </Sider>
         )}
 
@@ -398,7 +425,7 @@ const MainLayoutInner = () => {
             width={280}
             closable={false}
             styles={{
-              body: { padding: 0, background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)' },
+              body: { padding: 0, background: sidebarGradient },
               header: { display: 'none' },
             }}
           >
@@ -409,8 +436,8 @@ const MainLayoutInner = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '0 16px',
-                  borderBottom: '1px solid rgba(255,255,255,0.1)',
+                  padding: '0 20px',
+                  borderBottom: '1px solid var(--sidebar-border)',
                 }}
               >
                 <img
@@ -433,8 +460,8 @@ const MainLayoutInner = () => {
               {/* User info at bottom of drawer */}
               <div
                 style={{
-                  padding: '16px',
-                  borderTop: '1px solid rgba(255,255,255,0.1)',
+                  padding: '12px 16px',
+                  borderTop: '1px solid var(--sidebar-border)',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 12,
@@ -443,21 +470,22 @@ const MainLayoutInner = () => {
                 <Avatar
                   size={36}
                   style={{
-                    background: 'linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)',
+                    background: 'var(--gradient-primary)',
                     fontSize: 14,
                     flexShrink: 0,
                   }}
                   icon={<UserOutlined />}
                 />
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ color: '#f1f5f9', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {currentUser?.name || 'User'}
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {currentUser?.email || currentUser?.username || ''}
                   </div>
                 </div>
               </div>
+              <SidebarVersion />
             </div>
           </Drawer>
         )}
@@ -465,25 +493,23 @@ const MainLayoutInner = () => {
         <Layout
           style={{
             marginLeft: contentMarginLeft,
-            transition: "margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+            transition: "margin-left 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
           <Header
             style={{
               padding: headerPadding,
-              background: isDarkMode ? '#1e293b' : '#fff',
+              background: 'var(--header-bg)',
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              boxShadow: isDarkMode
-                ? "0 1px 4px rgba(0,0,0,0.3)"
-                : "0 1px 4px rgba(0,0,0,0.08)",
+              boxShadow: 'var(--header-shadow)',
               position: "sticky",
               top: 0,
               zIndex: 99,
               height: isMobile ? 56 : 64,
               lineHeight: isMobile ? '56px' : '64px',
-              transition: "background-color 0.3s ease, box-shadow 0.3s ease",
+              transition: "background-color var(--transition-normal), box-shadow var(--transition-normal)",
             }}
           >
             <Space size={isMobile ? 8 : 16}>
@@ -494,7 +520,7 @@ const MainLayoutInner = () => {
                   style={{
                     fontSize: 22,
                     cursor: "pointer",
-                    color: isDarkMode ? '#94a3b8' : '#64748b',
+                    color: 'var(--text-secondary)',
                     display: 'flex',
                     alignItems: 'center',
                     padding: 4,
@@ -510,8 +536,8 @@ const MainLayoutInner = () => {
                     style={{
                       fontSize: 20,
                       cursor: "pointer",
-                      color: isDarkMode ? '#94a3b8' : '#64748b',
-                      transition: "color 0.3s",
+                      color: 'var(--text-secondary)',
+                      transition: "color var(--transition-normal)",
                     }}
                   >
                     {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -534,13 +560,13 @@ const MainLayoutInner = () => {
               {!isMobile && (
                 <Input
                   placeholder="Search..."
-                  prefix={<SearchOutlined style={{ color: isDarkMode ? '#64748b' : '#94a3b8' }} />}
+                  prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
                   style={{
                     width: isTablet ? 200 : 280,
                     borderRadius: 20,
                     marginLeft: isMobileOrTablet ? 8 : 16,
-                    background: isDarkMode ? '#334155' : '#fff',
-                    borderColor: isDarkMode ? '#475569' : '#e2e8f0',
+                    background: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
                   }}
                 />
               )}
@@ -558,10 +584,10 @@ const MainLayoutInner = () => {
                     width: isMobile ? 36 : 40,
                     height: isMobile ? 36 : 40,
                     borderRadius: 10,
-                    background: isDarkMode ? '#334155' : '#f1f5f9',
-                    border: `1px solid ${isDarkMode ? '#475569' : '#e2e8f0'}`,
+                    background: 'var(--bg-tertiary)',
+                    border: '1px solid var(--border-color)',
                     cursor: 'pointer',
-                    transition: 'all 0.3s ease',
+                    transition: 'all var(--transition-normal)',
                     color: isDarkMode ? '#fbbf24' : '#3d6091',
                   }}
                 >
@@ -599,9 +625,7 @@ const MainLayoutInner = () => {
                   <Avatar
                     size={isMobile ? 32 : 36}
                     style={{
-                      background: isDarkMode
-                        ? "linear-gradient(135deg, #818cf8 0%, #a78bfa 100%)"
-                        : "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+                      background: 'var(--gradient-primary)',
                       fontSize: isMobile ? 14 : 16,
                     }}
                     icon={<UserOutlined />}

@@ -8,7 +8,6 @@ import {
   Tag,
   Divider,
   Empty,
-  Spin,
   Skeleton,
   Card,
   Space,
@@ -16,27 +15,22 @@ import {
   Statistic,
 } from 'antd';
 import {
-  CheckCircleOutlined,
-  FileTextOutlined,
-  SendOutlined,
   ClockCircleOutlined,
   SwapOutlined,
   PlusCircleOutlined,
   MinusCircleOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getCostSheetHistory } from '../../services/costingService';
-import { formatCurrency, COSTING_STATUS } from '../../utils/costingConstants';
+import { formatCurrency } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { useTheme } from '../../context/ThemeContext';
+import StatusTag from '../../components/StatusTag';
+import { COSTING_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getStatusLabel } from '../../utils/costingConstants';
 
 const { Text, Title } = Typography;
-
-const STATUS_CONFIG = {
-  [COSTING_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [COSTING_STATUS.FINAL]: { color: 'blue', icon: <SendOutlined /> },
-  [COSTING_STATUS.APPROVED]: { color: 'green', icon: <CheckCircleOutlined /> },
-};
 
 // ==================== FIELD DEFINITIONS ====================
 
@@ -314,14 +308,14 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
                     </td>
                     <td style={{ ...cellStyle, textDecoration: 'line-through', opacity: 0.6 }}>
                       {d.key === 'status' ? (
-                        <Tag color={STATUS_CONFIG[d.prev]?.color || 'default'} style={{ borderRadius: 12 }}>{d.prev}</Tag>
+                        <StatusTag status={d.prev} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} size="small" />
                       ) : (
                         formatFieldVal(d.prev, d.key, previousSnap)
                       )}
                     </td>
                     <td style={{ ...cellStyle, fontWeight: 700, color: '#d97706' }}>
                       {d.key === 'status' ? (
-                        <Tag color={STATUS_CONFIG[d.curr]?.color || 'default'} style={{ borderRadius: 12 }}>{d.curr}</Tag>
+                        <StatusTag status={d.curr} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} size="small" />
                       ) : (
                         formatFieldVal(d.curr, d.key, currentSnap)
                       )}
@@ -465,7 +459,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
           <Descriptions.Item label="Costing ID"><Text strong>{snap.costingId}</Text></Descriptions.Item>
           <Descriptions.Item label="Date">{snap.date ? dayjs(snap.date).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
           <Descriptions.Item label="Status">
-            <Tag color={STATUS_CONFIG[snap.status]?.color} icon={STATUS_CONFIG[snap.status]?.icon} style={{ borderRadius: 20 }}>{snap.status}</Tag>
+            <StatusTag status={snap.status} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} />
           </Descriptions.Item>
           <Descriptions.Item label="Buyer"><Text strong>{snap.buyerName}</Text></Descriptions.Item>
           <Descriptions.Item label="Style #">{snap.styleNo}</Descriptions.Item>
@@ -479,7 +473,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
 
         <Row gutter={[16, 12]}>
           <Col xs={12} md={4}>
-            <Statistic title="Fabric" value={snap.totalFabricCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#0ea5e9' }} />
+            <Statistic title="Fabric" value={snap.totalFabricCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: 'var(--info-color)' }} />
           </Col>
           <Col xs={12} md={4}>
             <Statistic title="Trims" value={snap.totalAccessoriesCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#8b5cf6' }} />
@@ -507,7 +501,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
     <Modal
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <ClockCircleOutlined style={{ color: '#faad14', fontSize: 20 }} />
+          <ClockCircleOutlined style={{ color: 'var(--warning-color)', fontSize: 20 }} />
           <span>Costing History — {costingId}</span>
         </div>
       }
@@ -534,17 +528,17 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
         <Row gutter={24}>
           {/* Left Panel — Timeline */}
           <Col xs={24} md={5}>
-            <Title level={5} style={{ marginBottom: 16, color: '#faad14' }}>
+            <Title level={5} style={{ marginBottom: 16, color: 'var(--warning-color)' }}>
               Versions
             </Title>
             <Timeline
               items={[...history].reverse().map((entry) => {
                 const isSelected = selectedVersion?.version === entry.version;
-                const config = STATUS_CONFIG[entry.status] || {};
+                const statusEntry = COSTING_STATUS_CONFIG[entry.status] || {};
                 const changeCount = versionChangeCounts[entry.version];
 
                 return {
-                  color: isSelected ? '#faad14' : (config.color === 'default' ? 'gray' : config.color || 'blue'),
+                  color: isSelected ? 'var(--warning-color)' : (statusEntry.color === 'default' ? 'gray' : statusEntry.color || 'blue'),
                   children: (
                     <div
                       onClick={() => setSelectedVersion(entry)}
@@ -559,13 +553,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
                         <Text strong style={{ fontSize: 13 }}>V{entry.version}</Text>
-                        <Tag
-                          color={config.color || 'default'}
-                          icon={config.icon}
-                          style={{ borderRadius: 12, fontSize: 10 }}
-                        >
-                          {entry.status}
-                        </Tag>
+                        <StatusTag status={entry.status} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} size="small" />
                       </div>
                       <div style={{ marginBottom: 2 }}>
                         {changeCount === -1 ? (
@@ -601,7 +589,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
                 {/* Comparison Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
                   <Title level={5} style={{ margin: 0, fontSize: 15 }}>
-                    <SwapOutlined style={{ marginRight: 8, color: '#faad14' }} />
+                    <SwapOutlined style={{ marginRight: 8, color: 'var(--warning-color)' }} />
                     Version {previousVersion.version} vs Version {selectedVersion.version}
                   </Title>
                   <div style={{ display: 'flex', gap: 12 }}>
@@ -630,7 +618,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
                 {/* Fabric Diff */}
                 {renderRowDiffSection(
                   diffResults.fabric,
-                  'Fabric Cost Breakup', '#0ea5e9',
+                  'Fabric Cost Breakup', 'var(--info-color)',
                   FABRIC_FIELD_LABELS,
                   (row) => `${row.fabricType} — ${row.description}`
                 )}

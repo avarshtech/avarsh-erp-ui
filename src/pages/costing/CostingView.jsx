@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
-  Button,
   Row,
   Col,
   Space,
@@ -14,17 +13,7 @@ import {
   Statistic,
   Skeleton,
   message,
-  Tooltip,
 } from 'antd';
-import {
-  EditOutlined,
-  CopyOutlined,
-  PrinterOutlined,
-  ArrowLeftOutlined,
-  CheckCircleOutlined,
-  FileTextOutlined,
-  SendOutlined,
-} from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -43,14 +32,14 @@ import { getCurrencySymbol } from '../../utils/orderConstants';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
+import { ActionButton } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import DraftWatermark from '../../components/DraftWatermark';
+import StatusSteps from '../../components/StatusSteps';
+import { COSTING_STATUS_CONFIG, COSTING_STATUS_FLOW } from '../../utils/statusConfig';
 
 const { Text, Title } = Typography;
-
-const STATUS_CONFIG = {
-  [COSTING_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [COSTING_STATUS.FINAL]: { color: 'blue', icon: <SendOutlined /> },
-  [COSTING_STATUS.APPROVED]: { color: 'green', icon: <CheckCircleOutlined /> },
-};
 
 const CostingView = () => {
   const { id } = useParams();
@@ -178,7 +167,6 @@ const CostingView = () => {
     );
   }
 
-  const statusConfig = STATUS_CONFIG[data.status] || {};
   const isEditable = EDITABLE_STATUSES.includes(data.status);
 
   const finalPriceUsd = (() => {
@@ -196,10 +184,17 @@ const CostingView = () => {
     border: `1px solid ${isDarkMode ? `${color}33` : `${color}22`}`,
   });
 
+  const renderSizes = (v) => {
+    if (!v) return '-';
+    const arr = v.split(',').map((s) => s.trim()).filter(Boolean);
+    if (arr.length <= 1) return v;
+    return <span>{arr[0]} <Tag style={{ marginLeft: 2 }}>+{arr.length - 1}</Tag></span>;
+  };
+
   const fabricColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
-    { title: 'Fabric Name', dataIndex: 'fabricType', width: 160, align: 'center' },
+    { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
+    { title: 'Fabric Name', dataIndex: 'fabricType', width: 240, align: 'center' },
     { title: 'Classification', dataIndex: 'classification', width: 120, align: 'center' },
     { title: 'Description', dataIndex: 'description', align: 'center' },
     { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${(record.uomSymbol || record.uom || record.uomName || '').toUpperCase()}`.trim() : '-' },
@@ -213,7 +208,7 @@ const CostingView = () => {
 
   const localTrimColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
@@ -224,7 +219,7 @@ const CostingView = () => {
 
   const importedTrimColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
@@ -235,7 +230,7 @@ const CostingView = () => {
 
   const mfgColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Process', dataIndex: 'process', width: 200, align: 'center' },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v) => formatCurrency(v, data.currency) },
     { title: 'Comments', dataIndex: 'comments', align: 'center' },
@@ -243,7 +238,7 @@ const CostingView = () => {
 
   const overheadColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
-    { title: 'Sizes', dataIndex: 'sizes', width: 100, align: 'center', render: (v) => v || '-' },
+    { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Description', dataIndex: 'description', width: 200, align: 'center' },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v) => formatCurrency(v, data.currency) },
     { title: 'Comments', dataIndex: 'comments', align: 'center' },
@@ -263,9 +258,7 @@ const CostingView = () => {
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }}>
           <Descriptions.Item label="Costing ID"><Text strong>{data.costingId}</Text></Descriptions.Item>
           <Descriptions.Item label="Status">
-            <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20 }}>
-              {getStatusLabel(data.status)}
-            </Tag>
+            <StatusTag status={data.status} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} />
           </Descriptions.Item>
           <Descriptions.Item label="Buyer"><Text strong>{data.buyerName}</Text></Descriptions.Item>
           <Descriptions.Item label="Style #">{data.styleNo}</Descriptions.Item>
@@ -283,11 +276,11 @@ const CostingView = () => {
       key: 'fabric',
       label: (
         <Space>
-          <Text strong style={{ fontSize: 15, color: '#0ea5e9' }}>Fabric Cost Breakup</Text>
+          <Text strong style={{ fontSize: 15, color: 'var(--info-color)' }}>Fabric Cost Breakup</Text>
           <Tag color="blue">{formatCurrency(data.totalFabricCost, data.currency)}</Tag>
         </Space>
       ),
-      style: sectionHeaderStyle('#0ea5e9'),
+      style: sectionHeaderStyle('var(--info-color)'),
       children: (
         <Table
           dataSource={data.fabricRows}
@@ -295,7 +288,7 @@ const CostingView = () => {
           pagination={false}
           size="small"
           rowKey="key"
-          scroll={{ x: 1300 }}
+          scroll={{ x: 1440 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
@@ -321,7 +314,7 @@ const CostingView = () => {
       children: (
         <>
           <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>Local Accessories</Text>
-          <Table dataSource={data.localTrims} columns={localTrimColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 800 }}
+          <Table dataSource={data.localTrims} columns={localTrimColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 860 }}
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
@@ -333,7 +326,7 @@ const CostingView = () => {
           />
           <Divider style={{ margin: '16px 0' }} />
           <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>Imported Accessories</Text>
-          <Table dataSource={data.importedTrims} columns={importedTrimColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 800 }}
+          <Table dataSource={data.importedTrims} columns={importedTrimColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 860 }}
             summary={() => (
               <Table.Summary fixed>
                 <Table.Summary.Row style={summaryRowStyle}>
@@ -359,7 +352,7 @@ const CostingView = () => {
       ),
       style: sectionHeaderStyle('#f59e0b'),
       children: (
-        <Table dataSource={data.manufacturingRows} columns={mfgColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 580 }}
+        <Table dataSource={data.manufacturingRows} columns={mfgColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 640 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
@@ -382,7 +375,7 @@ const CostingView = () => {
       ),
       style: sectionHeaderStyle('#ef4444'),
       children: (
-        <Table dataSource={data.overheadRows} columns={overheadColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 580 }}
+        <Table dataSource={data.overheadRows} columns={overheadColumns} pagination={false} size="small" rowKey="key" scroll={{ x: 640 }}
           summary={() => (
             <Table.Summary fixed>
               <Table.Summary.Row style={summaryRowStyle}>
@@ -410,7 +403,7 @@ const CostingView = () => {
         >
           <Row gutter={[24, 16]}>
             <Col xs={12} md={6}>
-              <Statistic title="Fabric Cost" value={data.totalFabricCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#0ea5e9' }} />
+              <Statistic title="Fabric Cost" value={data.totalFabricCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: 'var(--info-color)' }} />
             </Col>
             <Col xs={12} md={6}>
               <Statistic title="Trims / Accessories" value={data.totalAccessoriesCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#8b5cf6' }} />
@@ -507,50 +500,49 @@ const CostingView = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
+      <PageHeader
+        title="View Cost Sheet"
+        backPath="/costing/list"
+        subtitle={data.date ? dayjs(data.date).format('DD-MMM-YYYY') : undefined}
+        status={
+          <Space>
+            <Tag color="blue" style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
+              {data.costingId}
+            </Tag>
+            <StatusTag status={data.status} config={COSTING_STATUS_CONFIG} getLabel={getStatusLabel} />
+          </Space>
+        }
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      >
         <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} />
-          <h1>View Cost Sheet</h1>
-          <Tag color="blue" style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
-            {data.costingId}
-          </Tag>
-          <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20, fontSize: 13, padding: '2px 12px' }}>
-            {getStatusLabel(data.status)}
-          </Tag>
-          {data.date && (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              {dayjs(data.date).format('DD-MMM-YYYY')}
-            </Text>
+          {isEditable && canUpdate && (
+            <ActionButton action="edit" text="Edit" onClick={() => navigate(`/costing/edit/${id}`)} />
+          )}
+          {canAdd && (
+            <ActionButton action="duplicate" text="Duplicate" onClick={handleDuplicate} loading={duplicating} />
+          )}
+          <ActionButton action="print" text="Print / PDF" onClick={handlePrint} loading={printing} />
+          {data.status === COSTING_STATUS.FINAL && canApprove && (
+            <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
           )}
         </Space>
-        <div className="header-actions">
-          <Space>
-            {isEditable && canUpdate && (
-              <Button icon={<EditOutlined />} onClick={() => navigate(`/costing/edit/${id}`)}>
-                Edit
-              </Button>
-            )}
-            {canAdd && (
-              <Button icon={<CopyOutlined />} onClick={handleDuplicate} loading={duplicating}>
-                Duplicate
-              </Button>
-            )}
-            <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printing}>
-              Print / PDF
-            </Button>
-            {data.status === COSTING_STATUS.FINAL && canApprove && (
-              <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove} loading={approving}>
-                Approve
-              </Button>
-            )}
-          </Space>
-        </div>
-      </div>
+      </PageHeader>
 
+      <StatusSteps
+        statusFlow={COSTING_STATUS_FLOW}
+        currentStatus={data.status}
+        statusConfig={COSTING_STATUS_CONFIG}
+        getLabel={getStatusLabel}
+        size="small"
+        style={{ marginBottom: 16 }}
+      />
+
+      <DraftWatermark status={data.status} draftStatuses={['Draft']}>
       <Collapse
         defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
         items={collapseItems}
       />
+      </DraftWatermark>
     </div>
   );
 };

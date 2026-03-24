@@ -12,23 +12,19 @@ import {
   Col,
   Checkbox,
   message,
-  Popconfirm,
-  Tooltip,
   Typography,
-  Empty,
   Drawer,
   Descriptions,
   Divider,
 } from 'antd';
 import {
-  PlusOutlined,
   SearchOutlined,
-  EditOutlined,
-  DeleteOutlined,
   EyeOutlined,
-  ExclamationCircleOutlined,
   BankOutlined,
 } from '@ant-design/icons';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusBadge from '../../components/StatusBadge';
+import EmptyState from '../../components/EmptyState';
 import dayjs from 'dayjs';
 import {
   getSuppliers,
@@ -327,9 +323,7 @@ const SupplierMaster = () => {
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
       ellipsis: true,
       render: (name, record) => (
-        <Button type="link" onClick={() => handleView(record)} style={{ padding: 0 }}>
-          <Text strong>{name}</Text>
-        </Button>
+        <Text strong style={{ color: 'var(--primary-color)', cursor: 'pointer' }} onClick={() => handleView(record)}>{name}</Text>
       ),
     },
     {
@@ -384,9 +378,7 @@ const SupplierMaster = () => {
       key: 'active',
       width: 90,
       render: (active) => (
-        <Tag color={active !== false ? 'success' : 'default'}>
-          {active !== false ? 'Active' : 'Inactive'}
-        </Tag>
+        <StatusBadge status={active !== false ? 'active' : 'inactive'} />
       ),
     },
     {
@@ -397,46 +389,19 @@ const SupplierMaster = () => {
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="middle"
-                icon={<EyeOutlined />}
-                onClick={() => handleView(record)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton action="view" onClick={() => handleView(record)} />
           )}
           {canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleEdit(record)}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton action="edit" onClick={() => handleEdit(record)} />
           )}
           {canDelete && (
-            <Popconfirm
-              title="Delete Supplier"
-              description={`Are you sure you want to delete "${record.name}"?`}
+            <DeleteConfirm
+              recordLabel={record.name}
               onConfirm={() => handleDelete(record.id)}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton action="delete" />
+            </DeleteConfirm>
           )}
         </Space>
       ),
@@ -448,7 +413,7 @@ const SupplierMaster = () => {
       title={
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Suppliers</div>
-          <div style={{ fontSize: 12, color: '#888' }}>Purchase Order</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Purchase Order</div>
         </div>
       }
     >
@@ -464,9 +429,7 @@ const SupplierMaster = () => {
           style={{ width: 280 }}
         />
         {canAdd && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-            Add Supplier
-          </Button>
+          <ActionButton action="create" text="Add Supplier" onClick={handleAdd} />
         )}
       </div>
 
@@ -487,16 +450,12 @@ const SupplierMaster = () => {
         }}
         locale={{
           emptyText: (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="No suppliers found"
-            >
-              {canAdd && (
-                <Button type="primary" onClick={handleAdd}>
-                  Add Supplier
-                </Button>
-              )}
-            </Empty>
+            <EmptyState
+              title="No suppliers found"
+              description="Add your first supplier to get started"
+              actionLabel={canAdd ? 'Add Supplier' : undefined}
+              onAction={canAdd ? handleAdd : undefined}
+            />
           ),
         }}
       />
@@ -519,16 +478,14 @@ const SupplierMaster = () => {
         extra={
           <Space>
             {canUpdate && (
-              <Button
-                type="primary"
-                icon={<EditOutlined />}
+              <ActionButton
+                action="edit"
+                text="Edit"
                 onClick={() => {
                   setViewDrawerVisible(false);
                   handleEdit(viewingSupplier);
                 }}
-              >
-                Edit
-              </Button>
+              />
             )}
           </Space>
         }
@@ -538,9 +495,7 @@ const SupplierMaster = () => {
             <div style={{ marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <Title level={4} style={{ margin: 0 }}>{viewingSupplier.name}</Title>
-                <Tag color={viewingSupplier.active !== false ? 'success' : 'default'}>
-                  {viewingSupplier.active !== false ? 'Active' : 'Inactive'}
-                </Tag>
+                <StatusBadge status={viewingSupplier.active !== false ? 'active' : 'inactive'} />
               </div>
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Supplies:</span>

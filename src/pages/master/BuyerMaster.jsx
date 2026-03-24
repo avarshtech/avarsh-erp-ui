@@ -11,10 +11,7 @@ import {
   Row,
   Col,
   message,
-  Popconfirm,
-  Tooltip,
   Typography,
-  Empty,
   Drawer,
   Descriptions,
   Divider,
@@ -23,13 +20,13 @@ import {
 import {
   PlusOutlined,
   SearchOutlined,
-  EditOutlined,
-  DeleteOutlined,
   EyeOutlined,
-  ExclamationCircleOutlined,
   BankOutlined,
   EnvironmentOutlined,
 } from '@ant-design/icons';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusBadge from '../../components/StatusBadge';
+import EmptyState from '../../components/EmptyState';
 import dayjs from 'dayjs';
 import {
   getBuyers,
@@ -353,9 +350,7 @@ const BuyerMaster = () => {
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
       ellipsis: true,
       render: (name, record) => (
-        <Button type="link" onClick={() => handleView(record)} style={{ padding: 0 }}>
-          <Text strong>{name}</Text>
-        </Button>
+        <Text strong style={{ color: 'var(--primary-color)', cursor: 'pointer' }} onClick={() => handleView(record)}>{name}</Text>
       ),
     },
     {
@@ -401,9 +396,7 @@ const BuyerMaster = () => {
       key: 'active',
       width: 90,
       render: (active) => (
-        <Tag color={active !== false ? 'success' : 'default'}>
-          {active !== false ? 'Active' : 'Inactive'}
-        </Tag>
+        <StatusBadge status={active !== false ? 'active' : 'inactive'} />
       ),
     },
     {
@@ -414,41 +407,19 @@ const BuyerMaster = () => {
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="middle"
-                icon={<EyeOutlined />}
-                onClick={() => handleView(record)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton action="view" onClick={() => handleView(record)} />
           )}
           {canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => handleEdit(record)}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton action="edit" onClick={() => handleEdit(record)} />
           )}
           {canDelete && (
-            <Popconfirm
-              title="Delete Buyer"
-              description={`Are you sure you want to delete "${record.name}"?`}
+            <DeleteConfirm
+              recordLabel={record.name}
               onConfirm={() => handleDelete(record.id)}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton action="delete" />
+            </DeleteConfirm>
           )}
         </Space>
       ),
@@ -492,24 +463,8 @@ const BuyerMaster = () => {
       width: 80,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="Edit">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditLocation(record)}
-              style={{ color: '#1890ff' }}
-            />
-          </Tooltip>
-          <Tooltip title="Remove">
-            <Button
-              type="text"
-              size="small"
-              icon={<DeleteOutlined />}
-              danger
-              onClick={() => handleDeleteLocation(record.key)}
-            />
-          </Tooltip>
+          <ActionButton action="edit" onClick={() => handleEditLocation(record)} />
+          <ActionButton action="delete" onClick={() => handleDeleteLocation(record.key)} />
         </Space>
       ),
     },
@@ -520,7 +475,7 @@ const BuyerMaster = () => {
       title={
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Buyers</div>
-          <div style={{ fontSize: 12, color: '#888' }}>Order Entry</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Order Entry</div>
         </div>
       }
     >
@@ -536,9 +491,7 @@ const BuyerMaster = () => {
             style={{ width: 280 }}
           />
           {canAdd && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-              Add Buyer
-            </Button>
+            <ActionButton action="create" text="Add Buyer" onClick={handleAdd} />
           )}
         </div>
 
@@ -559,16 +512,12 @@ const BuyerMaster = () => {
           }}
           locale={{
             emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No buyers found"
-              >
-                {canAdd && (
-                  <Button type="primary" onClick={handleAdd}>
-                    Add Buyer
-                  </Button>
-                )}
-              </Empty>
+              <EmptyState
+                title="No buyers found"
+                description="Add your first buyer to get started"
+                actionLabel={canAdd ? 'Add Buyer' : undefined}
+                onAction={canAdd ? handleAdd : undefined}
+              />
             ),
           }}
         />
@@ -591,16 +540,14 @@ const BuyerMaster = () => {
           extra={
             <Space>
               {canUpdate && (
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
+                <ActionButton
+                  action="edit"
+                  text="Edit"
                   onClick={() => {
                     setViewDrawerVisible(false);
                     handleEdit(viewingBuyer);
                   }}
-                >
-                  Edit
-                </Button>
+                />
               )}
             </Space>
           }
@@ -610,9 +557,7 @@ const BuyerMaster = () => {
               <div style={{ marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <Title level={4} style={{ margin: 0 }}>{viewingBuyer.name}</Title>
-                  <Tag color={viewingBuyer.active !== false ? 'success' : 'default'}>
-                    {viewingBuyer.active !== false ? 'Active' : 'Inactive'}
-                  </Tag>
+                  <StatusBadge status={viewingBuyer.active !== false ? 'active' : 'inactive'} />
                 </div>
               </div>
 

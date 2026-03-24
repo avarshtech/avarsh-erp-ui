@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Modal,
-  Timeline,
   Tag,
   Typography,
   Spin,
@@ -11,32 +10,23 @@ import {
   Col,
   Space,
   Empty,
-  Collapse,
   Badge,
-  Divider,
-  Tooltip,
 } from 'antd';
 import {
   HistoryOutlined,
   ClockCircleOutlined,
   UserOutlined,
-  ShopOutlined,
-  CalendarOutlined,
-  DollarOutlined,
   NumberOutlined,
-  FileTextOutlined,
-  CheckCircleOutlined,
-  TagOutlined,
   SwapOutlined,
-  DownOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getPoVersionHistory } from '../../services/purchaseOrderService';
+import StatusTag from '../../components/StatusTag';
+import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getStatusLabel } from '../../utils/poStatusConstants';
+import { formatCurrency } from '../../utils/formatters';
 
 const { Text, Title } = Typography;
-
-const formatCurrency = (val) =>
-  `₹ ${(parseFloat(val) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
   const [loading, setLoading] = useState(false);
@@ -148,7 +138,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
       ) : (
         <Row style={{ height: '100%' }}>
           {/* Left sidebar: Version timeline */}
-          <Col xs={24} md={7} style={{ borderRight: '1px solid var(--border-color, #f0f0f0)', padding: '20px 0' }}>
+          <Col xs={24} md={7} style={{ borderRight: '1px solid var(--border-color, #f0f0f0)', padding: '20px 0', background: 'var(--bg-secondary)' }}>
             <div style={{ padding: '0 16px 12px' }}>
               <Text strong style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
                 Versions ({versions.length})
@@ -169,7 +159,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
                       cursor: 'pointer',
                       marginBottom: 6,
                       border: isSelected ? '2px solid var(--primary-color)' : '1px solid var(--border-color, #f0f0f0)',
-                      background: isSelected ? 'var(--primary-bg, #f0f0ff)' : 'transparent',
+                      background: isSelected ? 'var(--primary-light)' : 'transparent',
                       transition: 'all 0.15s ease',
                     }}
                   >
@@ -193,8 +183,8 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
                       <div style={{ marginTop: 6 }}>
                         {changes.slice(0, 3).map((c, ci) => (
                           <div key={ci} style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                            <SwapOutlined style={{ fontSize: 10, color: '#faad14' }} />
-                            <Text style={{ fontSize: 10, color: '#8c8c8c' }}>{c}</Text>
+                            <SwapOutlined style={{ fontSize: 10, color: 'var(--warning-color)' }} />
+                            <Text style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{c}</Text>
                           </div>
                         ))}
                         {changes.length > 3 && <Text type="secondary" style={{ fontSize: 10, paddingLeft: 14 }}>+{changes.length - 3} more</Text>}
@@ -215,7 +205,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <Title level={4} style={{ margin: 0 }}>Version {selectedVersion.versionNumber}</Title>
-                      <Tag color="blue" style={{ borderRadius: 20 }}>{snapshot.status ? snapshot.status.replace(/_/g, ' ') : '-'}</Tag>
+                      <StatusTag status={snapshot.status} config={PO_STATUS_CONFIG} getLabel={getStatusLabel} />
                     </div>
                     <Space size="large">
                       <Text type="secondary" style={{ fontSize: 12 }}>

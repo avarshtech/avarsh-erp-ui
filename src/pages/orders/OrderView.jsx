@@ -1,40 +1,21 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  Modal,
-  Descriptions,
-  Tag,
   Card,
   Typography,
   Space,
-  Button,
   Table,
   Input,
   message,
-  Divider,
-  Row,
-  Col,
   Alert,
   Popconfirm,
   Spin,
-  Image,
 } from 'antd';
 import {
-  CheckCircleOutlined,
-  FileTextOutlined,
-  EditOutlined,
-  SendOutlined,
-  RollbackOutlined,
-  UndoOutlined,
-  StopOutlined,
-  PrinterOutlined,
-  ClockCircleOutlined,
-  CheckOutlined,
-  CloseOutlined,
-  FileImageOutlined,
+  CalendarOutlined,
+  ShoppingOutlined,
 } from '@ant-design/icons';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { changeOrderStatus } from '../../services/orderService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import {
@@ -48,22 +29,20 @@ import {
 import {
   ORDER_STATUS,
   getStatusLabel,
-  EDITABLE_STATUSES,
   getCurrencySymbol,
 } from '../../utils/orderConstants';
+import { ActionButton } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import ViewDialog from '../../components/ViewDialog';
+import DetailCard from '../../components/DetailCard';
+import LineItemCard from '../../components/LineItemCard';
+import ImagePreview from '../../components/ImagePreview';
+import StatusSteps from '../../components/StatusSteps';
+import DraftWatermark from '../../components/DraftWatermark';
+import { formatCurrency, formatDate } from '../../utils/formatters';
+import { ORDER_STATUS_CONFIG, ORDER_STATUS_FLOW } from '../../utils/statusConfig';
 
 const { Text, Title } = Typography;
-
-const STATUS_CONFIG = {
-  [ORDER_STATUS.DRAFT]:                { color: 'default', icon: <FileTextOutlined /> },
-  [ORDER_STATUS.CONFIRMED]:            { color: 'green',   icon: <CheckCircleOutlined /> },
-  [ORDER_STATUS.REFER_BACK_REQUESTED]: { color: 'orange',  icon: <ClockCircleOutlined /> },
-  [ORDER_STATUS.REFERRED_BACK]:        { color: 'orange',  icon: <UndoOutlined /> },
-  [ORDER_STATUS.CANCEL_REQUESTED]:     { color: 'red',     icon: <ClockCircleOutlined /> },
-  [ORDER_STATUS.CANCELLED]:            { color: 'red',     icon: <StopOutlined /> },
-  [ORDER_STATUS.IN_PRODUCTION]:        { color: 'blue',    icon: <CheckCircleOutlined /> },
-  [ORDER_STATUS.COMPLETED]:            { color: 'green',   icon: <CheckCircleOutlined /> },
-};
 
 const thStyle = {
   padding: '8px 10px',
@@ -193,7 +172,6 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
   } = orderData;
 
   const currSymbol = getCurrencySymbol(currency);
-  const statusConfig = STATUS_CONFIG[status] || {};
 
   // Edit is only available once refer back is APPROVED (status = REFERRED_BACK), not while pending
   const canEdit = status === ORDER_STATUS.REFERRED_BACK && hasPermission('orders', 'update');
@@ -310,13 +288,13 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
           <tbody>
             <tr style={{ backgroundColor: 'var(--primary-light)' }}>
               <td style={tdStyle}>
-                <Text strong style={{ fontSize: 12, color: '#1890ff' }}>
+                <Text strong style={{ fontSize: 12, color: 'var(--primary-color)' }}>
                   Price{currency ? ` (${currency})` : ''}
                 </Text>
               </td>
               {sizes.map((s) => (
                 <td key={s} style={{ ...tdStyle, textAlign: 'center' }}>
-                  <Text style={{ color: '#1890ff' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
+                  <Text style={{ color: 'var(--primary-color)' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
                 </td>
               ))}
               <td style={tdStyle} />
@@ -374,12 +352,15 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
 
   // ── Footer ───────────────────────────────────────────────────────────────────
   const renderFooter = () => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+    <>
       {/* Left */}
       <Space>
-        <Button icon={<PrinterOutlined />} loading={printLoading} onClick={handlePrint}>
-          Print
-        </Button>
+        <ActionButton
+          action="print"
+          text="Print"
+          loading={printLoading}
+          onClick={handlePrint}
+        />
 
         {/* Approve — shown when a request is pending and user has approve permission */}
         {isPendingApproval && canApproveOrderAction() && (
@@ -395,9 +376,10 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
             cancelText="No"
             okButtonProps={{ loading: actionLoading, type: 'primary' }}
           >
-            <Button icon={<CheckOutlined />} style={{ color: '#52c41a', borderColor: '#52c41a' }}>
-              Approve
-            </Button>
+            <ActionButton
+              action="approve"
+              text="Approve"
+            />
           </Popconfirm>
         )}
 
@@ -411,389 +393,381 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
             cancelText="No"
             okButtonProps={{ danger: true, loading: actionLoading }}
           >
-            <Button icon={<CloseOutlined />} danger>
-              Reject
-            </Button>
+            <ActionButton
+              action="reject"
+              text="Reject"
+            />
           </Popconfirm>
         )}
 
         {/* Refer Back request — only for CONFIRMED, hide when pending approval */}
         {canReferBackOrder() && status === ORDER_STATUS.CONFIRMED && !showReferBackInput && (
-          <Button
-            icon={<RollbackOutlined />}
+          <ActionButton
+            action="refer-back"
+            text="Refer Back"
             onClick={() => { setShowReferBackInput(true); setShowCancelInput(false); setCancelReason(''); }}
-            style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
-          >
-            Refer Back
-          </Button>
+          />
         )}
 
         {/* Cancel request — only for CONFIRMED, hide when pending approval */}
         {canCancelOrder() && status === ORDER_STATUS.CONFIRMED && !showCancelInput && (
-          <Button
-            icon={<StopOutlined />}
+          <ActionButton
+            action="cancel"
+            text="Cancel Order"
             danger
             onClick={() => { setShowCancelInput(true); setShowReferBackInput(false); setReferBackReason(''); }}
-          >
-            Cancel Order
-          </Button>
+          />
         )}
       </Space>
 
       {/* Right */}
       <Space>
         {canEdit && (
-          <Button
-            icon={<EditOutlined />}
+          <ActionButton
+            action="edit"
+            text="Edit Order"
             onClick={() => { onClose(); navigate(`/orders/edit/${orderData.id}`, { state: { orderData } }); }}
-          >
-            Edit Order
-          </Button>
+          />
         )}
         {canSubmitOrder() && (status === ORDER_STATUS.DRAFT || status === ORDER_STATUS.REFERRED_BACK) && (
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
+          <ActionButton
+            action="save"
+            text={status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
             loading={actionLoading}
             onClick={handleSubmit}
-          >
-            {status === ORDER_STATUS.REFERRED_BACK ? 'Resubmit Order' : 'Submit Order'}
-          </Button>
+          />
         )}
-        <Button onClick={onClose}>Close</Button>
+        <ActionButton
+          action="close"
+          text="Close"
+          onClick={onClose}
+        />
       </Space>
-    </div>
+    </>
   );
 
+  // ── Hero header for ViewDialog ─────────────────────────────────────────────
+  const heroConfig = {
+    title: orderNo,
+    status: <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />,
+    subtitle: buyerName,
+    subtitleIcon: <ShoppingOutlined />,
+    meta: [
+      { icon: <CalendarOutlined />, text: formatDate(orderDate) },
+      ...(styleNo ? [{ text: `Style: ${styleNo}` }] : []),
+      ...(garmentType ? [{ text: garmentType }] : []),
+    ],
+    highlight: {
+      label: 'Total Value',
+      value: formatCurrency(totalOrderValue, currency),
+    },
+  };
+
   return (
-    <Modal
-      title={
-        <Space>
-          <Text strong style={{ fontSize: 18 }}>{orderNo}</Text>
-          <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20 }}>
-            {getStatusLabel(status)}
-          </Tag>
-        </Space>
-      }
+    <ViewDialog
       open={open}
-      onCancel={onClose}
+      onClose={onClose}
       width={1100}
-      centered
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 16px 16px 24px' } }}
+      hero={heroConfig}
       footer={renderFooter()}
     >
-      {/* ── Refer-back request input ── */}
-      {showReferBackInput && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: '#fa8c16' }}>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Text strong>Reason for Referring Back:</Text>
-            <Input.TextArea
-              ref={referBackTextareaRef}
-              rows={3}
-              placeholder="Enter reason (minimum 50 characters)..."
-              value={referBackReason}
-              onChange={(e) => setReferBackReason(e.target.value)}
-              showCount
-              maxLength={500}
-            />
-            {referBackReason.length > 0 && referBackReason.length < 50 && (
-              <Text type="danger" style={{ fontSize: 12 }}>
-                Minimum 50 characters required ({50 - referBackReason.length} more needed)
-              </Text>
-            )}
-            <Space>
-              <Button
-                type="primary"
-                size="small"
-                loading={actionLoading}
-                disabled={referBackReason.trim().length < 50}
-                onClick={async () => {
-                  await handleRequestReferBack();
-                  setShowReferBackInput(false);
-                  setReferBackReason('');
-                }}
-                style={referBackReason.trim().length >= 50 ? { backgroundColor: '#fa8c16', borderColor: '#fa8c16' } : {}}
-              >
-                Submit Request
-              </Button>
-              <Button size="small" onClick={() => { setShowReferBackInput(false); setReferBackReason(''); }}>
-                Cancel
-              </Button>
-            </Space>
-          </Space>
-        </Card>
-      )}
-
-      {/* ── Cancel request input ── */}
-      {showCancelInput && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: '#ff4d4f' }}>
-          <Space direction="vertical" style={{ width: '100%' }}>
-            <Text strong style={{ color: '#ff4d4f' }}>Reason for Cancellation:</Text>
-            <Input.TextArea
-              ref={cancelTextareaRef}
-              rows={3}
-              placeholder="Enter reason (minimum 50 characters)..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              showCount
-              maxLength={500}
-            />
-            {cancelReason.length > 0 && cancelReason.length < 50 && (
-              <Text type="danger" style={{ fontSize: 12 }}>
-                Minimum 50 characters required ({50 - cancelReason.length} more needed)
-              </Text>
-            )}
-            <Space>
-              <Button
-                type="primary"
-                danger
-                size="small"
-                loading={actionLoading}
-                disabled={cancelReason.trim().length < 50}
-                onClick={async () => {
-                  await handleRequestCancel();
-                  setShowCancelInput(false);
-                  setCancelReason('');
-                }}
-              >
-                Submit Request
-              </Button>
-              <Button size="small" onClick={() => { setShowCancelInput(false); setCancelReason(''); }}>
-                Cancel
-              </Button>
-            </Space>
-          </Space>
-        </Card>
-      )}
-
-      {/* ── Pending refer-back approval banner ── */}
-      {isReferBackPending && existingReferBackReason && (
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="Refer Back Requested — Pending Approval"
-          description={existingReferBackReason}
-        />
-      )}
-
-      {/* ── Pending cancel approval banner ── */}
-      {isCancelPending && existingCancelReason && (
-        <Alert
-          type="error"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="Cancellation Requested — Pending Approval"
-          description={existingCancelReason}
-        />
-      )}
-
-      {/* ── Approved refer-back reason (order is now REFERRED_BACK) ── */}
-      {status === ORDER_STATUS.REFERRED_BACK && existingReferBackReason && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: '#fa8c16', backgroundColor: 'var(--accent-light)' }}>
-          <Text strong style={{ color: '#fa8c16' }}>Refer Back Reason: </Text>
-          <Text>{existingReferBackReason}</Text>
-        </Card>
-      )}
-
-      {/* ── Cancelled order reason ── */}
-      {status === ORDER_STATUS.CANCELLED && existingCancelReason && (
-        <Card size="small" style={{ marginBottom: 16, borderColor: '#ff4d4f', backgroundColor: 'var(--accent-light)' }}>
-          <Text strong style={{ color: '#ff4d4f' }}>Cancellation Reason: </Text>
-          <Text>{existingCancelReason}</Text>
-        </Card>
-      )}
-
-      {/* ── Order Header ── */}
-      <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }} style={{ marginBottom: 16 }}>
-        <Descriptions.Item label="Costing ID">
-          <Text code>{costingId || '—'}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="Order No">
-          <Text strong>{orderNo}</Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="Order Date">
-          {orderDate ? dayjs(orderDate).format('DD-MMM-YYYY') : '—'}
-        </Descriptions.Item>
-
-        <Descriptions.Item label="Buyer">{buyerName || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Style No">{styleNo || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Garment Type">{garmentType || '—'}</Descriptions.Item>
-
-        <Descriptions.Item label="Season">{season || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Material">{material || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Component">
-          {component || '—'}
-          {component === 'Multiple' && components.length > 0 && (
-            <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>
-              ({components.map((c) => c.name).join(', ')})
-            </Text>
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label="Currency">{currency || '—'}</Descriptions.Item>
-
-        <Descriptions.Item label="Payment Terms">{paymentTermsName || '—'}</Descriptions.Item>
-        <Descriptions.Item label="Payment Days">
-          {paymentDays != null ? `${paymentDays} days` : '—'}
-        </Descriptions.Item>
-        <Descriptions.Item label="Order Qty">
-          <Text strong>{(totalOrderQty || 0).toLocaleString()}</Text>
-        </Descriptions.Item>
-
-        <Descriptions.Item label="Total Order Value">
-          <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
-            {fmtCurrency(totalOrderValue)}
-          </Text>
-        </Descriptions.Item>
-        <Descriptions.Item label="Fabric Description" span={2}>{fabricDescription || '—'}</Descriptions.Item>
-        {remarks && (
-          <Descriptions.Item label="Remarks" span={3}>{remarks}</Descriptions.Item>
-        )}
-      </Descriptions>
-
-      {/* ── Assortment Summary ── */}
-      {assortmentSummary.length > 0 && (
-        <Card size="small" title="Assortment Summary" style={{ marginBottom: 16 }}>
-          <Table
-            dataSource={assortmentSummary}
-            rowKey="key"
-            pagination={false}
+      <DraftWatermark status={status}>
+        {/* Status Steps */}
+        <div style={{ marginBottom: 20 }}>
+          <StatusSteps
+            statusFlow={ORDER_STATUS_FLOW}
+            currentStatus={status}
+            statusConfig={ORDER_STATUS_CONFIG}
+            getLabel={getStatusLabel}
             size="small"
-            columns={[
-              {
-                title: 'Buyer PO No',
-                dataIndex: 'buyerPoNo',
-                key: 'buyerPoNo',
-                width: 130,
-                render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
-              },
-              {
-                title: 'Destination',
-                dataIndex: 'destination',
-                key: 'destination',
-                ellipsis: true,
-                render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
-              },
-              {
-                title: 'Color / Print',
-                dataIndex: 'colorRows',
-                key: 'colorRows',
-                render: (rows) =>
-                  rows.length === 0 ? (
-                    <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
-                  ) : (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
-                      {rows.map((c, i) => (
-                        <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                          {c.colorName || '—'}
-                          <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
-                        </Text>
-                      ))}
-                    </div>
-                  ),
-              },
-              {
-                title: 'Total Qty',
-                dataIndex: 'lineQty',
-                key: 'lineQty',
-                width: 90,
-                align: 'right',
-                render: (v) => <Text strong>{v.toLocaleString()}</Text>,
-              },
-              {
-                title: 'Avg Price',
-                key: 'avgPrice',
-                width: 100,
-                align: 'right',
-                render: (_, r) => `${currSymbol} ${(r.lineQty > 0 ? r.lineTotal / r.lineQty : 0).toFixed(2)}`,
-              },
-              {
-                title: 'Total Value',
-                dataIndex: 'lineTotal',
-                key: 'lineTotal',
-                width: 120,
-                align: 'right',
-                render: (v) => (
-                  <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
-                    {fmtCurrency(v)}
-                  </Text>
-                ),
-              },
-            ]}
           />
-        </Card>
-      )}
+        </div>
 
-      {/* ── Order Lines ── */}
-      <Title level={5} style={{ marginBottom: 12 }}>
-        Order Lines ({orderLines.length})
-      </Title>
-      {orderLines.map((line, idx) => (
-        <Card
-          key={line.key || idx}
-          size="small"
-          style={{ marginBottom: 12 }}
-          title={
-            <Space wrap>
-              <Tag color="blue">#{idx + 1}</Tag>
-              {line.buyerPoNo && <Text strong>PO: {line.buyerPoNo}</Text>}
-              {line.destination && <Text type="secondary">{line.destination}</Text>}
-              <Text type="secondary">|</Text>
-              <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
-              <Text type="secondary">|</Text>
-              <Text style={{ color: 'var(--success-color, #10b981)' }}>
-                {fmtCurrency(line.lineTotal)}
-              </Text>
-            </Space>
-          }
-        >
-          <Row gutter={[16, 8]} style={{ marginBottom: 12 }}>
-            <Col xs={12} sm={6}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Buyer PO No</Text>
-              <Text strong>{line.buyerPoNo || '—'}</Text>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Destination</Text>
-              <Text strong>{line.destination || '—'}</Text>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Dispatch Date</Text>
-              <Text strong>
-                {line.dispatchDate ? dayjs(line.dispatchDate).format('DD-MMM-YYYY') : '—'}
-              </Text>
-            </Col>
-            <Col xs={12} sm={6}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Lead Time</Text>
-              <Text strong>
-                {line.leadTime != null ? `${line.leadTime} days` : '—'}
-              </Text>
-            </Col>
-          </Row>
-          {/* Garment Image */}
-          {line.id && lineImages[line.id] && (
-            <div style={{ marginTop: 8, marginBottom: 8 }}>
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
-                Garment Image
-              </Text>
-              {lineImages[line.id].loading ? (
-                <Spin size="small" />
-              ) : lineImages[line.id].previewUrl ? (
-                <Image
-                  src={lineImages[line.id].previewUrl}
-                  alt="Garment"
-                  width={80}
-                  height={80}
-                  style={{ objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border-color, #e5e7eb)' }}
-                  preview={{ mask: 'View' }}
+        {/* ── Refer-back request input ── */}
+        {showReferBackInput && (
+          <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-refer-back-color)' }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong>Reason for Referring Back:</Text>
+              <Input.TextArea
+                ref={referBackTextareaRef}
+                rows={3}
+                placeholder="Enter reason (minimum 50 characters)..."
+                value={referBackReason}
+                onChange={(e) => setReferBackReason(e.target.value)}
+                showCount
+                maxLength={500}
+              />
+              {referBackReason.length > 0 && referBackReason.length < 50 && (
+                <Text type="danger" style={{ fontSize: 12 }}>
+                  Minimum 50 characters required ({50 - referBackReason.length} more needed)
+                </Text>
+              )}
+              <Space>
+                <ActionButton
+                  action="save"
+                  text="Submit Request"
+                  size="small"
+                  loading={actionLoading}
+                  disabled={referBackReason.trim().length < 50}
+                  onClick={async () => {
+                    await handleRequestReferBack();
+                    setShowReferBackInput(false);
+                    setReferBackReason('');
+                  }}
+                  style={referBackReason.trim().length >= 50 ? { backgroundColor: 'var(--btn-refer-back-color)', borderColor: 'var(--btn-refer-back-color)' } : {}}
                 />
-              ) : null}
-            </div>
+                <ActionButton
+                  action="close"
+                  text="Cancel"
+                  size="small"
+                  onClick={() => { setShowReferBackInput(false); setReferBackReason(''); }}
+                />
+              </Space>
+            </Space>
+          </Card>
+        )}
+
+        {/* ── Cancel request input ── */}
+        {showCancelInput && (
+          <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-delete-color)' }}>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Text strong style={{ color: 'var(--btn-delete-color)' }}>Reason for Cancellation:</Text>
+              <Input.TextArea
+                ref={cancelTextareaRef}
+                rows={3}
+                placeholder="Enter reason (minimum 50 characters)..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                showCount
+                maxLength={500}
+              />
+              {cancelReason.length > 0 && cancelReason.length < 50 && (
+                <Text type="danger" style={{ fontSize: 12 }}>
+                  Minimum 50 characters required ({50 - cancelReason.length} more needed)
+                </Text>
+              )}
+              <Space>
+                <ActionButton
+                  action="save"
+                  text="Submit Request"
+                  size="small"
+                  danger
+                  loading={actionLoading}
+                  disabled={cancelReason.trim().length < 50}
+                  onClick={async () => {
+                    await handleRequestCancel();
+                    setShowCancelInput(false);
+                    setCancelReason('');
+                  }}
+                />
+                <ActionButton
+                  action="close"
+                  text="Cancel"
+                  size="small"
+                  onClick={() => { setShowCancelInput(false); setCancelReason(''); }}
+                />
+              </Space>
+            </Space>
+          </Card>
+        )}
+
+        {/* ── Pending refer-back approval banner ── */}
+        {isReferBackPending && existingReferBackReason && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Refer Back Requested — Pending Approval"
+            description={existingReferBackReason}
+          />
+        )}
+
+        {/* ── Pending cancel approval banner ── */}
+        {isCancelPending && existingCancelReason && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="Cancellation Requested — Pending Approval"
+            description={existingCancelReason}
+          />
+        )}
+
+        {/* ── Approved refer-back reason (order is now REFERRED_BACK) ── */}
+        {status === ORDER_STATUS.REFERRED_BACK && existingReferBackReason && (
+          <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-refer-back-color)', backgroundColor: 'var(--accent-light)' }}>
+            <Text strong style={{ color: 'var(--btn-refer-back-color)' }}>Refer Back Reason: </Text>
+            <Text>{existingReferBackReason}</Text>
+          </Card>
+        )}
+
+        {/* ── Cancelled order reason ── */}
+        {status === ORDER_STATUS.CANCELLED && existingCancelReason && (
+          <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-delete-color)', backgroundColor: 'var(--accent-light)' }}>
+            <Text strong style={{ color: 'var(--btn-delete-color)' }}>Cancellation Reason: </Text>
+            <Text>{existingCancelReason}</Text>
+          </Card>
+        )}
+
+        {/* ── Order Header ── */}
+        <DetailCard title="Order Details" style={{ marginBottom: 16 }}>
+          <DetailCard.Field label="Costing ID" value={costingId} span={8} />
+          <DetailCard.Field label="Order No" value={orderNo} span={8} />
+          <DetailCard.Field label="Order Date" value={formatDate(orderDate)} span={8} />
+          <DetailCard.Field label="Buyer" value={buyerName} span={8} />
+          <DetailCard.Field label="Style No" value={styleNo} span={8} />
+          <DetailCard.Field label="Garment Type" value={garmentType} span={8} />
+          <DetailCard.Field label="Season" value={season} span={8} />
+          <DetailCard.Field label="Material" value={material} span={8} />
+          <DetailCard.Field
+            label="Component"
+            value={
+              component === 'Multiple' && components.length > 0
+                ? `${component} (${components.map((c) => c.name).join(', ')})`
+                : component
+            }
+            span={8}
+          />
+          <DetailCard.Field label="Currency" value={currency} span={8} />
+          <DetailCard.Field label="Payment Terms" value={paymentTermsName} span={8} />
+          <DetailCard.Field
+            label="Payment Days"
+            value={paymentDays != null ? `${paymentDays} days` : null}
+            span={8}
+          />
+          <DetailCard.Field
+            label="Order Qty"
+            value={<Text strong>{(totalOrderQty || 0).toLocaleString()}</Text>}
+            span={8}
+          />
+          <DetailCard.Field
+            label="Total Order Value"
+            value={
+              <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
+                {fmtCurrency(totalOrderValue)}
+              </Text>
+            }
+            span={8}
+          />
+          <DetailCard.Field label="Fabric Description" value={fabricDescription} span={8} />
+          {remarks && (
+            <DetailCard.Field label="Remarks" value={remarks} span={24} />
           )}
-          <Divider style={{ margin: '8px 0' }} />
-          {renderSizeBreakdown(line)}
-        </Card>
-      ))}
-    </Modal>
+        </DetailCard>
+
+        {/* ── Assortment Summary ── */}
+        {assortmentSummary.length > 0 && (
+          <Card size="small" title="Assortment Summary" style={{ marginBottom: 16 }}>
+            <Table
+              dataSource={assortmentSummary}
+              rowKey="key"
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: 'Buyer PO No',
+                  dataIndex: 'buyerPoNo',
+                  key: 'buyerPoNo',
+                  width: 130,
+                  render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
+                },
+                {
+                  title: 'Destination',
+                  dataIndex: 'destination',
+                  key: 'destination',
+                  ellipsis: true,
+                  render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
+                },
+                {
+                  title: 'Color / Print',
+                  dataIndex: 'colorRows',
+                  key: 'colorRows',
+                  render: (rows) =>
+                    rows.length === 0 ? (
+                      <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+                    ) : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                        {rows.map((c, i) => (
+                          <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                            {c.colorName || '—'}
+                            <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
+                          </Text>
+                        ))}
+                      </div>
+                    ),
+                },
+                {
+                  title: 'Total Qty',
+                  dataIndex: 'lineQty',
+                  key: 'lineQty',
+                  width: 90,
+                  align: 'right',
+                  render: (v) => <Text strong>{v.toLocaleString()}</Text>,
+                },
+                {
+                  title: 'Avg Price',
+                  key: 'avgPrice',
+                  width: 100,
+                  align: 'right',
+                  render: (_, r) => `${currSymbol} ${(r.lineQty > 0 ? r.lineTotal / r.lineQty : 0).toFixed(2)}`,
+                },
+                {
+                  title: 'Total Value',
+                  dataIndex: 'lineTotal',
+                  key: 'lineTotal',
+                  width: 120,
+                  align: 'right',
+                  render: (v) => (
+                    <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
+                      {fmtCurrency(v)}
+                    </Text>
+                  ),
+                },
+              ]}
+            />
+          </Card>
+        )}
+
+        {/* ── Order Lines ── */}
+        <Title level={5} style={{ marginBottom: 12 }}>
+          Order Lines ({orderLines.length})
+        </Title>
+        {orderLines.map((line, idx) => {
+          const lineImg = line.id ? lineImages[line.id] : null;
+          const imageElement = lineImg ? (
+            lineImg.loading ? (
+              <Spin size="small" />
+            ) : lineImg.previewUrl ? (
+              <ImagePreview
+                src={lineImg.previewUrl}
+                alt="Garment"
+                size={64}
+                previewSize={240}
+              />
+            ) : null
+          ) : null;
+
+          return (
+            <LineItemCard
+              key={line.key || idx}
+              index={idx + 1}
+              image={imageElement}
+              title={line.buyerPoNo ? `PO: ${line.buyerPoNo}` : undefined}
+              subtitle={line.destination || undefined}
+              amount={fmtCurrency(line.lineTotal)}
+              pills={[
+                { label: 'Qty', value: (line.lineQty || 0).toLocaleString() },
+                ...(line.dispatchDate ? [{ label: 'Dispatch', value: formatDate(line.dispatchDate) }] : []),
+                ...(line.leadTime != null ? [{ label: 'Lead Time', value: `${line.leadTime} days` }] : []),
+              ]}
+              style={{ marginBottom: 12 }}
+            >
+              {renderSizeBreakdown(line)}
+            </LineItemCard>
+          );
+        })}
+      </DraftWatermark>
+    </ViewDialog>
   );
 };
 

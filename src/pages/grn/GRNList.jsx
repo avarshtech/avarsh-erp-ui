@@ -1,12 +1,29 @@
 import { useState } from 'react';
-import { Table, Card, Button, Space, Input, Tag, Dropdown, DatePicker, Select, Typography, Modal, message, Row, Col, Statistic, Timeline } from 'antd';
-import { PlusOutlined, SearchOutlined, FilterOutlined, ExportOutlined, EyeOutlined, EditOutlined, MoreOutlined, PrinterOutlined, CheckCircleOutlined, InboxOutlined, TruckOutlined, FileSearchOutlined } from '@ant-design/icons';
+import { Table, Card, Space, Input, DatePicker, Select, Typography, Modal, message, Row, Col } from 'antd';
+import { FilterOutlined, ExportOutlined, SearchOutlined, CheckCircleOutlined, InboxOutlined, TruckOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
+import { ActionButton } from '../../components/buttons';
+import PageHeader from '../../components/PageHeader';
+import RecordLink from '../../components/RecordLink';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import StatusTag from '../../components/StatusTag';
+import EmptyState from '../../components/EmptyState';
+import StatCard from '../../components/StatCard';
+import { formatNumber } from '../../utils/formatters';
+import { getTablePagination } from '../../utils/paginationConfig';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
+
+const GRN_LIST_STATUS_CONFIG = {
+  'Pending': { color: 'gold', icon: InboxOutlined },
+  'In Progress': { color: 'blue', icon: TruckOutlined },
+  'Quality Check': { color: 'purple', icon: FileSearchOutlined },
+  'Partial Rejection': { color: 'orange', icon: InboxOutlined },
+  'Completed': { color: 'green', icon: CheckCircleOutlined },
+};
 
 const GRNList = () => {
   const navigate = useNavigate();
@@ -21,63 +38,82 @@ const GRNList = () => {
     { key: '4', grnNumber: 'GRN-2024-0092', grnDate: '2024-01-26', poNumber: 'PO-2024-0150', supplier: 'Denim Suppliers Co', invoiceNumber: 'INV-DSC-567', items: 2, receivedQty: 3000, rejectedQty: 0, totalValue: 24750.00, status: 'Completed', warehouse: 'Main Warehouse' },
   ];
 
-  const statusConfig = {
-    'Pending': { color: 'gold', icon: <InboxOutlined /> },
-    'In Progress': { color: 'blue', icon: <TruckOutlined /> },
-    'Quality Check': { color: 'purple', icon: <FileSearchOutlined /> },
-    'Partial Rejection': { color: 'orange', icon: <InboxOutlined /> },
-    'Completed': { color: 'green', icon: <CheckCircleOutlined /> },
-  };
-
   const columns = [
-    { title: 'GRN Number', dataIndex: 'grnNumber', fixed: 'left', width: 140, render: (text, record) => <Text strong style={{ color: '#6366f1', cursor: 'pointer' }} onClick={() => setViewModal({ open: true, record })}>{text}</Text> },
+    { title: 'GRN Number', dataIndex: 'grnNumber', fixed: 'left', width: 140, render: (text, record) => <RecordLink text={text} onClick={() => setViewModal({ open: true, record })} /> },
     { title: 'GRN Date', dataIndex: 'grnDate', width: 110 },
-    { title: 'PO Number', dataIndex: 'poNumber', width: 130, render: (text) => <Text style={{ color: '#6366f1' }}>{text}</Text> },
+    { title: 'PO Number', dataIndex: 'poNumber', width: 130, render: (text) => <Text style={{ color: 'var(--primary-color)' }}>{text}</Text> },
     { title: 'Supplier', dataIndex: 'supplier', width: 170 },
     { title: 'Invoice #', dataIndex: 'invoiceNumber', width: 150 },
-    { title: 'Received Qty', width: 120, align: 'center', render: (_, record) => <><Text strong style={{ color: '#22c55e' }}>{record.receivedQty.toLocaleString()}</Text>{record.rejectedQty > 0 && <><br /><Text style={{ color: '#ef4444', fontSize: 12 }}>Rej: {record.rejectedQty}</Text></>}</> },
-    { title: 'Total Value', dataIndex: 'totalValue', width: 120, align: 'right', render: (v) => <Text strong style={{ color: '#10b981' }}>${v.toLocaleString()}</Text> },
-    { title: 'Status', dataIndex: 'status', width: 140, fixed: 'right', render: (status) => <Tag color={statusConfig[status]?.color} icon={statusConfig[status]?.icon} style={{ borderRadius: 20 }}>{status}</Tag> },
-    { title: 'Actions', fixed: 'right', width: 80, render: (_, record) => { const items = []; if (hasPermission('grn', 'view')) items.push({ key: 'view', icon: <EyeOutlined />, label: 'View' }); if (hasPermission('grn', 'update')) items.push({ key: 'edit', icon: <EditOutlined />, label: 'Edit' }); if (items.length > 0) items.push({ key: 'print', icon: <PrinterOutlined />, label: 'Print' }); if (items.length === 0) return null; return <Dropdown menu={{ items, onClick: ({ key }) => key === 'view' ? setViewModal({ open: true, record }) : key === 'edit' ? navigate(`/grn/edit/${record.key}`) : message.success('Printing...') }} trigger={['click']}><Button type="text" icon={<MoreOutlined />} /></Dropdown>; } },
+    { title: 'Received Qty', width: 120, align: 'center', render: (_, record) => <><Text strong style={{ color: 'var(--success-color)' }}>{formatNumber(record.receivedQty)}</Text>{record.rejectedQty > 0 && <><br /><Text style={{ color: 'var(--error-color)', fontSize: 12 }}>Rej: {record.rejectedQty}</Text></>}</> },
+    { title: 'Total Value', dataIndex: 'totalValue', width: 120, align: 'right', render: (v) => <CurrencyDisplay amount={v} currency="USD" /> },
+    { title: 'Status', dataIndex: 'status', width: 140, fixed: 'right', render: (status) => <StatusTag status={status} config={GRN_LIST_STATUS_CONFIG} /> },
+    { title: 'Actions', fixed: 'right', width: 100, render: (_, record) => (
+      <Space size="small">
+        {hasPermission('grn', 'view') && (
+          <ActionButton action="view" onClick={() => setViewModal({ open: true, record })} />
+        )}
+        {hasPermission('grn', 'update') && (
+          <ActionButton action="edit" onClick={() => navigate(`/grn/edit/${record.key}`)} />
+        )}
+        {(hasPermission('grn', 'view') || hasPermission('grn', 'update')) && (
+          <ActionButton action="print" onClick={() => message.success('Printing...')} />
+        )}
+      </Space>
+    ) },
   ];
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Goods Received Notes</h1>
-        <div className="header-actions">
-          <Button icon={<ExportOutlined />}>Export</Button>
-          <PermissionGuard module="grn" operation="add">
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/grn/new')}>New GRN</Button>
-          </PermissionGuard>
-        </div>
-      </div>
+      <PageHeader title="Goods Received Notes">
+        <ActionButton action="custom" text="Export" icon={<ExportOutlined />} />
+        <PermissionGuard module="grn" operation="add">
+          <ActionButton action="create" text="New GRN" onClick={() => navigate('/grn/new')} />
+        </PermissionGuard>
+      </PageHeader>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {[{ title: 'Total GRNs', value: 89, color: '#6366f1' }, { title: 'Pending', value: 5, color: '#f59e0b' }, { title: 'Total Value', value: 125000, prefix: '$', color: '#10b981' }, { title: 'Quality Issues', value: 8, color: '#ef4444' }].map((stat, i) => (
-          <Col xs={12} sm={6} key={i}><Card size="small" hoverable><Statistic title={stat.title} value={stat.value} prefix={stat.prefix} valueStyle={{ color: stat.color, fontWeight: 600 }} /></Card></Col>
-        ))}
+        <Col xs={12} sm={6}>
+          <StatCard title="Total GRNs" value={89} color="var(--primary-color)" icon={<InboxOutlined />} />
+        </Col>
+        <Col xs={12} sm={6}>
+          <StatCard title="Pending" value={5} color="var(--warning-color)" icon={<TruckOutlined />} />
+        </Col>
+        <Col xs={12} sm={6}>
+          <StatCard title="Total Value" value={125000} prefix="$" color="var(--success-color)" icon={<CheckCircleOutlined />} />
+        </Col>
+        <Col xs={12} sm={6}>
+          <StatCard title="Quality Issues" value={8} color="var(--error-color)" icon={<FileSearchOutlined />} />
+        </Col>
       </Row>
 
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
           <Input placeholder="Search GRN..." prefix={<SearchOutlined />} style={{ width: 250 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
           <Select placeholder="Supplier" style={{ width: 180 }} allowClear options={[{ label: 'Fabric World Inc', value: '1' }, { label: 'Thread Masters', value: '2' }]} />
-          <Select placeholder="Status" style={{ width: 150 }} allowClear options={Object.keys(statusConfig).map((s) => ({ label: s, value: s }))} />
+          <Select placeholder="Status" style={{ width: 150 }} allowClear options={Object.keys(GRN_LIST_STATUS_CONFIG).map((s) => ({ label: s, value: s }))} />
           <RangePicker style={{ width: 280 }} />
-          <Button icon={<FilterOutlined />}>More Filters</Button>
+          <ActionButton action="custom" text="More Filters" icon={<FilterOutlined />} />
         </Space>
-        <Table columns={columns} dataSource={grnData} loading={loading} scroll={{ x: 1300 }} pagination={{ pageSize: 10, showSizeChanger: true }} rowSelection={{ type: 'checkbox' }} />
+        <Table
+          columns={columns}
+          dataSource={grnData}
+          loading={loading}
+          scroll={{ x: 1300 }}
+          pagination={getTablePagination({ pageSize: 10 }, 'GRNs')}
+          rowSelection={{ type: 'checkbox' }}
+          locale={{
+            emptyText: <EmptyState title="No GRNs found" description="Create a new GRN to get started" />,
+          }}
+        />
       </Card>
 
-      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal(prev => ({ ...prev, open: false }))} afterClose={() => setViewModal({ open: false, record: null })} footer={[<Button key="close" onClick={() => setViewModal(prev => ({ ...prev, open: false }))}>Close</Button>]} width={500} styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}>
+      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal(prev => ({ ...prev, open: false }))} afterClose={() => setViewModal({ open: false, record: null })} footer={[<ActionButton key="close" action="close" text="Close" onClick={() => setViewModal(prev => ({ ...prev, open: false }))} />]} width={500} styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}>
         {viewModal.record && (
           <Row gutter={[16, 16]} style={{ padding: 16 }}>
             <Col span={12}><Text type="secondary">GRN Date:</Text><br /><Text strong>{viewModal.record.grnDate}</Text></Col>
             <Col span={12}><Text type="secondary">PO Number:</Text><br /><Text strong>{viewModal.record.poNumber}</Text></Col>
             <Col span={12}><Text type="secondary">Supplier:</Text><br /><Text strong>{viewModal.record.supplier}</Text></Col>
             <Col span={12}><Text type="secondary">Invoice:</Text><br /><Text strong>{viewModal.record.invoiceNumber}</Text></Col>
-            <Col span={24}><Timeline style={{ marginTop: 16 }} items={[{ color: 'green', children: `GRN Created - ${viewModal.record.grnDate}` }, { color: 'blue', children: 'Quality Check' }, { color: 'green', children: 'Posted to Inventory' }]} /></Col>
           </Row>
         )}
       </Modal>

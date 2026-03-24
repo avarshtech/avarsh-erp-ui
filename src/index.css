@@ -29,7 +29,7 @@
   --info-color: #3b82f6;
 
   /* Neutral Colors */
-  --bg-primary: #f8fafc;
+  --bg-primary: #e9eef4;
   --bg-secondary: #ffffff;
   --bg-tertiary: #f1f5f9;
   --bg-elevated: #ffffff;
@@ -56,9 +56,16 @@
   --gradient-dark: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
 
-  /* Sidebar */
-  --sidebar-bg: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-  --sidebar-border: rgba(255, 255, 255, 0.1);
+  /* Sidebar — dark gray with subtle cool tint */
+  --sidebar-bg: linear-gradient(180deg, #334155 0%, #2d3a4a 50%, #263244 100%);
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-item-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-item-selected: rgba(129, 140, 248, 0.12);
+  --sidebar-item-accent: rgba(129, 140, 248, 0.5);
+  --sidebar-text: rgba(255, 255, 255, 0.7);
+  --sidebar-text-selected: rgba(224, 231, 255, 0.9);
+  --sidebar-submenu-bg: transparent;
+  --sidebar-version-color: rgba(255, 255, 255, 0.6);
   
   /* Header */
   --header-bg: #ffffff;
@@ -90,6 +97,25 @@
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-full: 9999px;
+
+  /* Button Semantic Colors */
+  --btn-create-color: #6366f1;
+  --btn-save-color: #6366f1;
+  --btn-save-draft-color: #64748b;
+  --btn-edit-color: #10b981;
+  --btn-view-color: #3b82f6;
+  --btn-delete-color: #ef4444;
+  --btn-approve-color: #22c55e;
+  --btn-reject-color: #ef4444;
+  --btn-refer-back-color: #f59e0b;
+  --btn-cancel-color: #64748b;
+  --btn-duplicate-color: #8b5cf6;
+  --btn-print-color: #0ea5e9;
+  --btn-history-color: #f59e0b;
+  --btn-upload-color: #6366f1;
+  --btn-refresh-color: #64748b;
+  --btn-ai-color: #a855f7;
+  --btn-send-color: #0ea5e9;
 }
 
 /* ============================================================
@@ -118,7 +144,7 @@
   --error-color: #f87171;
   --info-color: #60a5fa;
 
-  /* Neutral Colors - Dark palette */
+  /* Neutral Colors - Dark palette — matches sidebar gradient */
   --bg-primary: #0f172a;
   --bg-secondary: #1e293b;
   --bg-tertiary: #334155;
@@ -147,8 +173,15 @@
   --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
 
   /* Sidebar */
-  --sidebar-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  --sidebar-border: rgba(255, 255, 255, 0.05);
+  --sidebar-bg: linear-gradient(180deg, #0f172a 0%, #1e1b4b 50%, #1e293b 100%);
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-item-hover: rgba(255, 255, 255, 0.08);
+  --sidebar-item-selected: rgba(129, 140, 248, 0.1);
+  --sidebar-item-accent: rgba(129, 140, 248, 0.5);
+  --sidebar-text: rgba(255, 255, 255, 0.7);
+  --sidebar-text-selected: rgba(224, 231, 255, 0.85);
+  --sidebar-submenu-bg: rgba(0, 0, 0, 0.2);
+  --sidebar-version-color: rgba(255, 255, 255, 0.6);
   
   /* Header */
   --header-bg: #1e293b;
@@ -168,6 +201,25 @@
   --table-header-bg: #334155;
   --table-row-hover: #2d3a4d;
   --table-border: #475569;
+
+  /* Button Semantic Colors — Dark */
+  --btn-create-color: #818cf8;
+  --btn-save-color: #818cf8;
+  --btn-save-draft-color: #94a3b8;
+  --btn-edit-color: #34d399;
+  --btn-view-color: #60a5fa;
+  --btn-delete-color: #f87171;
+  --btn-approve-color: #4ade80;
+  --btn-reject-color: #f87171;
+  --btn-refer-back-color: #fbbf24;
+  --btn-cancel-color: #94a3b8;
+  --btn-duplicate-color: #a78bfa;
+  --btn-print-color: #38bdf8;
+  --btn-history-color: #fbbf24;
+  --btn-upload-color: #818cf8;
+  --btn-refresh-color: #94a3b8;
+  --btn-ai-color: #c084fc;
+  --btn-send-color: #38bdf8;
 }
 
 * {
@@ -198,7 +250,11 @@ body {
    ============================================================ */
 .ant-layout {
   background: var(--bg-primary) !important;
-  transition: background-color var(--transition-normal);
+  transition: background var(--transition-normal);
+}
+
+[data-theme="dark"] .ant-layout {
+  background: #0f172a !important;
 }
 
 .ant-layout-sider {
@@ -207,26 +263,51 @@ body {
   transition: background var(--transition-normal);
 }
 
-.ant-menu-dark {
+/* Sidebar menu — shared styles for both light and dark theme */
+.sidebar-menu.ant-menu-dark,
+.sidebar-menu.ant-menu-light {
   background: transparent !important;
 }
 
-.ant-menu-dark .ant-menu-item {
-  border-radius: var(--radius-md);
-  margin: 4px 8px !important;
+.sidebar-menu .ant-menu-item {
+  border-radius: var(--radius-sm) !important;
+  margin: 3px 6px !important;
+  color: var(--sidebar-text) !important;
   transition: all var(--transition-normal);
 }
 
-.ant-menu-dark .ant-menu-item:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+.sidebar-menu .ant-menu-item:hover {
+  background: var(--sidebar-item-hover) !important;
+  color: var(--sidebar-text-selected) !important;
 }
 
-.ant-menu-dark .ant-menu-item-selected {
-  background: var(--gradient-primary) !important;
+.sidebar-menu .ant-menu-item-selected {
+  background: var(--sidebar-item-selected) !important;
+  color: var(--sidebar-text-selected) !important;
+  border-left: 3px solid var(--sidebar-item-accent) !important;
 }
 
-.ant-menu-dark .ant-menu-sub {
-  background: rgba(0, 0, 0, 0.2) !important;
+.sidebar-menu .ant-menu-submenu-title {
+  border-radius: var(--radius-sm) !important;
+  margin: 3px 6px !important;
+  color: var(--sidebar-text) !important;
+  transition: all var(--transition-normal);
+}
+
+.sidebar-menu .ant-menu-submenu-title:hover {
+  background: var(--sidebar-item-hover) !important;
+  color: var(--sidebar-text-selected) !important;
+}
+
+.sidebar-menu .ant-menu-sub {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+.sidebar-menu.ant-menu-light .ant-menu-submenu-arrow {
+  color: var(--sidebar-text) !important;
 }
 
 /* Card */
@@ -1410,4 +1491,82 @@ th.ant-descriptions-item-label {
   .filter-bar > .ant-btn {
     flex: 0 0 auto;
   }
+}
+
+/* Record Link */
+.record-link {
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+.record-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+/* ============================================================
+   ACTION BUTTON — Color enforcement for Ant Design override
+   ============================================================ */
+
+/* Colored action buttons: enforce color via CSS custom property with !important to beat AntD specificity */
+.action-btn-colored.ant-btn-text:not(:disabled) {
+  color: var(--action-btn-color) !important;
+}
+
+.action-btn-colored.ant-btn-text:not(:disabled):hover {
+  color: var(--action-btn-color) !important;
+  background: color-mix(in srgb, var(--action-btn-color) 10%, transparent) !important;
+}
+
+.action-btn-colored.ant-btn-default:not(:disabled):not(.ant-btn-dangerous) {
+  color: var(--action-btn-color) !important;
+  border-color: var(--action-btn-color) !important;
+}
+
+.action-btn-colored.ant-btn-default:not(:disabled):not(.ant-btn-dangerous):hover {
+  color: #fff !important;
+  background: var(--action-btn-color) !important;
+  border-color: var(--action-btn-color) !important;
+}
+
+/* Primary action buttons gradient */
+.ant-btn-primary.action-btn:not(:disabled) {
+  background: var(--gradient-primary) !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+.ant-btn-primary.action-btn:not(:disabled):hover {
+  background: var(--gradient-primary) !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+  filter: brightness(1.1);
+}
+
+[data-theme="dark"] .ant-btn-primary.action-btn:not(:disabled) {
+  box-shadow: 0 2px 6px rgba(129, 140, 248, 0.25);
+}
+
+[data-theme="dark"] .ant-btn-primary.action-btn:not(:disabled):hover {
+  box-shadow: 0 4px 12px rgba(129, 140, 248, 0.35);
+}
+
+/* Danger action buttons */
+.action-btn.ant-btn-dangerous.ant-btn-default:not(:disabled) {
+  color: var(--error-color) !important;
+  border-color: var(--error-color) !important;
+}
+
+.action-btn.ant-btn-dangerous.ant-btn-default:not(:disabled):hover {
+  background: var(--error-color) !important;
+  color: #fff !important;
+  border-color: var(--error-color) !important;
+}
+
+.action-btn.ant-btn-dangerous.ant-btn-text:not(:disabled) {
+  color: var(--error-color) !important;
+}
+
+.action-btn.ant-btn-dangerous.ant-btn-text:not(:disabled):hover {
+  color: var(--error-color) !important;
+  background: color-mix(in srgb, var(--error-color) 10%, transparent) !important;
 }

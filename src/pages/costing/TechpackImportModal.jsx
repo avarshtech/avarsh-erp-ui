@@ -507,7 +507,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
               style={{ padding: '32px 16px' }}
             >
               <p className="ant-upload-drag-icon">
-                <FileTextOutlined style={{ fontSize: 48, color: '#1677ff' }} />
+                <FileTextOutlined style={{ fontSize: 48, color: 'var(--primary-color)' }} />
               </p>
               <p className="ant-upload-text">Click or drag a Buyer Techpack PDF here</p>
               <p className="ant-upload-hint">
@@ -548,7 +548,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                     <Text strong>{extracted.buyerName || '—'}</Text>
                     <MatchTag matched={!!matchedBuyer.id} />
                     {matchedBuyer.id
-                      ? <Text style={{ fontSize: 12, color: '#52c41a' }}>{matchedBuyer.name}</Text>
+                      ? <Text style={{ fontSize: 12, color: 'var(--success-color)' }}>{matchedBuyer.name}</Text>
                       : (
                         <Button
                           size="small" icon={<PlusOutlined />}
@@ -564,7 +564,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                   {buyerCreateOpen && !matchedBuyer.id && (
                     <Card
                       size="small"
-                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: '#1677ff' }}
+                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: 'var(--primary-color)' }}
                     >
                       <Form form={buyerForm} layout="vertical" size="small">
                         <Row gutter={12}>
@@ -615,7 +615,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                     <Text strong>{extracted.styleNo || '—'}</Text>
                     <MatchTag matched={!!matchedStyle.id} />
                     {matchedStyle.id
-                      ? <Text style={{ fontSize: 12, color: '#52c41a' }}>Linked to existing style</Text>
+                      ? <Text style={{ fontSize: 12, color: 'var(--success-color)' }}>Linked to existing style</Text>
                       : (
                         <Button
                           size="small" icon={<PlusOutlined />}
@@ -631,7 +631,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                   {styleCreateOpen && !matchedStyle.id && (
                     <Card
                       size="small"
-                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: '#1677ff' }}
+                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: 'var(--primary-color)' }}
                     >
                       <Form form={styleForm} layout="vertical" size="small">
                         <Row gutter={12}>

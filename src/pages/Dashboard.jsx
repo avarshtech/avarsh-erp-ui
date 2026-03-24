@@ -1,17 +1,17 @@
-import { Row, Col, Card, Statistic, Table, Tag, Progress, Space, Typography } from 'antd';
+import { Row, Col, Card, Table, Tag, Progress, Space, Typography } from 'antd';
 import {
   ShoppingCartOutlined,
   FileTextOutlined,
   ShoppingOutlined,
   InboxOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Navigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { hasModuleAccess, getFirstAccessibleRoute } from '../utils/permissions';
+import PageHeader from '../components/PageHeader';
+import StatCard from '../components/StatCard';
 
 const { Title, Text } = Typography;
 
@@ -25,39 +25,35 @@ const Dashboard = () => {
       return <Navigate to={firstRoute} replace />;
     }
   }
-  
+
   const statsData = [
     {
       title: 'Total Orders',
       value: 1284,
       icon: <ShoppingCartOutlined />,
       growth: 12.5,
-      color: isDarkMode ? '#818cf8' : '#6366f1',
-      bgColor: isDarkMode ? '#312e81' : '#e0e7ff',
+      color: 'var(--primary-color)',
     },
     {
       title: 'Active BOMs',
       value: 89,
       icon: <FileTextOutlined />,
       growth: 8.2,
-      color: isDarkMode ? '#4ade80' : '#10b981',
-      bgColor: isDarkMode ? '#14532d' : '#d1fae5',
+      color: 'var(--success-color)',
     },
     {
       title: 'Pending POs',
       value: 156,
       icon: <ShoppingOutlined />,
       growth: -3.1,
-      color: isDarkMode ? '#fbbf24' : '#f59e0b',
-      bgColor: isDarkMode ? '#78350f' : '#fef3c7',
+      color: 'var(--warning-color)',
     },
     {
       title: 'GRN Today',
       value: 24,
       icon: <InboxOutlined />,
       growth: 18.7,
-      color: isDarkMode ? '#f87171' : '#ef4444',
-      bgColor: isDarkMode ? '#7f1d1d' : '#fee2e2',
+      color: 'var(--error-color)',
     },
   ];
 
@@ -132,7 +128,7 @@ const Dashboard = () => {
       title: 'Order ID',
       dataIndex: 'orderId',
       key: 'orderId',
-      render: (text) => <Text strong style={{ color: isDarkMode ? '#818cf8' : '#6366f1' }}>{text}</Text>,
+      render: (text) => <Text strong style={{ color: 'var(--primary-color)' }}>{text}</Text>,
     },
     {
       title: 'Customer',
@@ -192,7 +188,7 @@ const Dashboard = () => {
       title: 'Amount',
       dataIndex: 'amount',
       key: 'amount',
-      render: (amount) => <Text strong style={{ color: isDarkMode ? '#4ade80' : '#10b981' }}>{amount}</Text>,
+      render: (amount) => <Text strong style={{ color: 'var(--success-color)' }}>{amount}</Text>,
     },
     {
       title: 'Due Date',
@@ -203,52 +199,20 @@ const Dashboard = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <Text type="secondary">Welcome back! Here's what's happening with your garments business.</Text>
-      </div>
+      <PageHeader title="Dashboard" subtitle="Welcome back! Here's what's happening with your garments business." />
 
       {/* Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {statsData.map((stat, index) => (
           <Col xs={24} sm={12} lg={6} key={index}>
-            <Card hoverable>
-              <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 14 }}>{stat.title}</Text>
-                  <Title level={2} style={{ margin: '8px 0', fontWeight: 700 }}>
-                    {stat.value.toLocaleString()}
-                  </Title>
-                  <Space>
-                    {stat.growth >= 0 ? (
-                      <Text style={{ color: '#22c55e', fontSize: 12 }}>
-                        <ArrowUpOutlined /> {stat.growth}%
-                      </Text>
-                    ) : (
-                      <Text style={{ color: '#ef4444', fontSize: 12 }}>
-                        <ArrowDownOutlined /> {Math.abs(stat.growth)}%
-                      </Text>
-                    )}
-                    <Text type="secondary" style={{ fontSize: 12 }}>vs last month</Text>
-                  </Space>
-                </div>
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 12,
-                    background: stat.bgColor,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 24,
-                    color: stat.color,
-                  }}
-                >
-                  {stat.icon}
-                </div>
-              </Space>
-            </Card>
+            <StatCard
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              color={stat.color}
+              trend={stat.growth >= 0 ? 'up' : 'down'}
+              trendValue={`${Math.abs(stat.growth)}% vs last month`}
+            />
           </Col>
         ))}
       </Row>
@@ -268,34 +232,34 @@ const Dashboard = () => {
         </Col>
         <Col xs={24} lg={8}>
           <Card title="Production Progress">
-            <Space orientation="vertical" style={{ width: '100%' }} size={16}>
+            <Space direction="vertical" style={{ width: '100%' }} size={16}>
               <div>
                 <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text>Cutting Department</Text>
                   <Text strong>85%</Text>
                 </Space>
-                <Progress percent={85} strokeColor="#6366f1" showInfo={false} />
+                <Progress percent={85} strokeColor="var(--primary-color)" showInfo={false} />
               </div>
               <div>
                 <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text>Sewing Lines</Text>
                   <Text strong>72%</Text>
                 </Space>
-                <Progress percent={72} strokeColor="#10b981" showInfo={false} />
+                <Progress percent={72} strokeColor="var(--success-color)" showInfo={false} />
               </div>
               <div>
                 <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text>Finishing</Text>
                   <Text strong>58%</Text>
                 </Space>
-                <Progress percent={58} strokeColor="#f59e0b" showInfo={false} />
+                <Progress percent={58} strokeColor="var(--warning-color)" showInfo={false} />
               </div>
               <div>
                 <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text>Packing</Text>
                   <Text strong>45%</Text>
                 </Space>
-                <Progress percent={45} strokeColor="#ef4444" showInfo={false} />
+                <Progress percent={45} strokeColor="var(--error-color)" showInfo={false} />
               </div>
             </Space>
           </Card>
@@ -317,10 +281,10 @@ const Dashboard = () => {
         </Col>
         <Col xs={24} lg={8}>
           <Card title="Quick Stats">
-            <Space orientation="vertical" style={{ width: '100%' }} size={16}>
+            <Space direction="vertical" style={{ width: '100%' }} size={16}>
               <Card size="small" style={{ background: isDarkMode ? '#14532d' : '#f0fdf4' }}>
                 <Space>
-                  <CheckCircleOutlined style={{ fontSize: 24, color: isDarkMode ? '#4ade80' : '#22c55e' }} />
+                  <CheckCircleOutlined style={{ fontSize: 24, color: 'var(--success-color)' }} />
                   <div>
                     <Text type="secondary">Completed Today</Text>
                     <Title level={4} style={{ margin: 0 }}>12 Orders</Title>
@@ -329,7 +293,7 @@ const Dashboard = () => {
               </Card>
               <Card size="small" style={{ background: isDarkMode ? '#78350f' : '#fef3c7' }}>
                 <Space>
-                  <ClockCircleOutlined style={{ fontSize: 24, color: isDarkMode ? '#fbbf24' : '#f59e0b' }} />
+                  <ClockCircleOutlined style={{ fontSize: 24, color: 'var(--warning-color)' }} />
                   <div>
                     <Text type="secondary">Pending Approval</Text>
                     <Title level={4} style={{ margin: 0 }}>8 POs</Title>
@@ -338,7 +302,7 @@ const Dashboard = () => {
               </Card>
               <Card size="small" style={{ background: isDarkMode ? '#312e81' : '#e0e7ff' }}>
                 <Space>
-                  <InboxOutlined style={{ fontSize: 24, color: isDarkMode ? '#818cf8' : '#6366f1' }} />
+                  <InboxOutlined style={{ fontSize: 24, color: 'var(--primary-color)' }} />
                   <div>
                     <Text type="secondary">Expected Deliveries</Text>
                     <Title level={4} style={{ margin: 0 }}>5 GRNs</Title>

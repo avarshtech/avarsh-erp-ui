@@ -2,74 +2,33 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
-  Button,
-  Space,
-  Input,
   Tag,
-  Select,
   Typography,
-  Modal,
   message,
-  Row,
-  Col,
-  Tooltip,
-  Popconfirm,
-  DatePicker,
+  Space,
 } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  CheckCircleOutlined,
-  CloseCircleOutlined,
-  FileTextOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
-  UndoOutlined,
-  ReloadOutlined,
-  StopOutlined,
-  SendOutlined,
-  InboxOutlined,
-  HistoryOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import {
   searchPurchaseOrders,
   deletePurchaseOrder,
 } from '../../services/purchaseOrderService';
 import { hasPermission } from '../../utils/permissions';
 import { PO_STATUS, getStatusLabel } from '../../utils/poStatusConstants';
+import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
+import { formatDate } from '../../utils/formatters';
+import { getTablePagination } from '../../utils/paginationConfig';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import PageHeader from '../../components/PageHeader';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import RecordLink from '../../components/RecordLink';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import EmptyState from '../../components/EmptyState';
 import POView from './POView';
 import POVersionHistory from './POVersionHistory';
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
-
-// Format currency — pure function, defined outside component
-const formatCurrency = (amount) => {
-  if (amount === null || amount === undefined) return '₹ 0.00';
-  return `₹ ${Number(amount).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-// Status config mapping — keys are DB enum values
-const STATUS_CONFIG = {
-  [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [PO_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: <ClockCircleOutlined /> },
-  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined /> },
-  [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined /> },
-  [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined /> },
-  [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined /> },
-  [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <UndoOutlined /> },
-  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined /> },
-  [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined /> },
-  [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined /> },
-};
 
 const POList = () => {
   const navigate = useNavigate();
@@ -80,8 +39,7 @@ const POList = () => {
     pageSize: 10,
     total: 0,
   });
-  const [searchText, setSearchText] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [poTypeFilter, setPoTypeFilter] = useState(null);
   const [poDateRange, setPoDateRange] = useState(null);
@@ -155,12 +113,6 @@ const POList = () => {
     [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]
   );
 
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
   // Re-fetch when any filter (including debounced search) changes
   useEffect(() => {
     fetchData(1, pagination.pageSize);
@@ -180,27 +132,6 @@ const POList = () => {
   const handleStatusFilter = (value) => setStatusFilter(value);
   const handlePoDateRangeChange = (dates) => setPoDateRange(dates);
   const handleDeliveryDateRangeChange = (dates) => setDeliveryDateRange(dates);
-
-  // Delete PO
-  const handleDelete = (record) => {
-    Modal.confirm({
-      title: 'Delete Purchase Order',
-      icon: <ExclamationCircleOutlined />,
-      content: `Are you sure you want to delete ${record.poNumber}? This action cannot be undone.`,
-      okText: 'Delete',
-      okType: 'danger',
-      cancelText: 'Cancel',
-      onOk: async () => {
-        try {
-          await deletePurchaseOrder(record.id);
-          message.success(`${record.poNumber} deleted successfully`);
-          fetchData(pagination.current, pagination.pageSize);
-        } catch {
-          message.error('Failed to delete purchase order');
-        }
-      },
-    });
-  };
 
   // View PO
   const handleView = useCallback((record) => {
@@ -224,13 +155,7 @@ const POList = () => {
       width: 150,
       sorter: true,
       render: (text, record) => (
-        <Text
-          strong
-          style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
-          onClick={() => handleView(record)}
-        >
-          {text}
-        </Text>
+        <RecordLink text={text} onClick={() => handleView(record)} />
       ),
     },
     {
@@ -239,7 +164,7 @@ const POList = () => {
       key: 'poDate',
       width: 120,
       sorter: true,
-      render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
+      render: (date) => formatDate(date),
     },
     {
       title: 'Supplier',
@@ -265,7 +190,7 @@ const POList = () => {
       key: 'deliveryDate',
       width: 120,
       sorter: true,
-      render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
+      render: (date) => formatDate(date),
     },
     {
       title: 'Items',
@@ -281,29 +206,16 @@ const POList = () => {
       width: 140,
       align: 'right',
       sorter: true,
-      render: (amount) => (
-        <Text strong style={{ color: 'var(--success-color)' }}>
-          {formatCurrency(amount)}
-        </Text>
-      ),
+      render: (amount) => <CurrencyDisplay amount={amount} />,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       width: 160,
-      render: (status) => {
-        const config = STATUS_CONFIG[status] || {};
-        return (
-          <Tag
-            color={config.color || 'default'}
-            icon={config.icon}
-            style={{ borderRadius: 20 }}
-          >
-            {getStatusLabel(status)}
-          </Tag>
-        );
-      },
+      render: (status) => (
+        <StatusTag status={status} config={PO_STATUS_CONFIG} getLabel={getStatusLabel} />
+      ),
     },
     {
       title: 'Actions',
@@ -313,42 +225,30 @@ const POList = () => {
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => handleView(record)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="view"
+              size="small"
+              onClick={() => handleView(record)}
+            />
           )}
           {canView && record.status !== PO_STATUS.DRAFT && (
-            <Tooltip title="Version History">
-              <Button
-                type="text"
-                size="small"
-                icon={<HistoryOutlined />}
-                onClick={() => { setHistoryPO(record); setHistoryOpen(true); }}
-                style={{ color: '#722ed1' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="history"
+              size="small"
+              onClick={() => { setHistoryPO(record); setHistoryOpen(true); }}
+            />
           )}
           {(record.status === PO_STATUS.DRAFT || record.status === PO_STATUS.REFERRED_BACK || record.status === PO_STATUS.REJECTED) && canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/purchase-orders/edit/${record.id}`)}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="edit"
+              size="small"
+              onClick={() => navigate(`/purchase-orders/edit/${record.id}`)}
+            />
           )}
           {record.status === PO_STATUS.DRAFT && canDelete && (
-            <Popconfirm
+            <DeleteConfirm
               title="Delete Purchase Order"
-              description={`Are you sure you want to delete "${record.poNumber}"?`}
+              recordLabel={record.poNumber}
               onConfirm={() => {
                 setDeletingId(record.id);
                 return deletePurchaseOrder(record.id)
@@ -359,20 +259,13 @@ const POList = () => {
                   .catch(() => message.error('Failed to delete purchase order'))
                   .finally(() => setDeletingId(null));
               }}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton
+                action="delete"
+                size="small"
+              />
+            </DeleteConfirm>
           )}
         </Space>
       ),
@@ -381,88 +274,71 @@ const POList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Purchase Orders</h1>
-        <div className="header-actions">
-          {hasPermission('purchase-orders', 'add') && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/purchase-orders/new')}
-            >
-              New Purchase Order
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Purchase Orders">
+        {hasPermission('purchase-orders', 'add') && (
+          <ActionButton
+            action="create"
+            text="New Purchase Order"
+            onClick={() => navigate('/purchase-orders/new')}
+          />
+        )}
+      </PageHeader>
 
       <Card>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <Input
-              placeholder="Search PO number, supplier..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={12} sm={8} md={4} lg={3}>
-            <Select
-              placeholder="Status"
-              style={{ width: '100%' }}
-              allowClear
-              value={statusFilter}
-              onChange={handleStatusFilter}
-              options={Object.keys(STATUS_CONFIG).map((s) => ({
-                label: getStatusLabel(s),
-                value: s,
-              }))}
-            />
-          </Col>
-          <Col xs={12} sm={8} md={4} lg={3}>
-            <Select
-              placeholder="PO Type"
-              style={{ width: '100%' }}
-              allowClear
-              value={poTypeFilter}
-              onChange={(val) => setPoTypeFilter(val)}
-              options={[
-                { value: 'General', label: 'General' },
-                { value: 'Regular', label: 'Regular' },
-                { value: 'Combined', label: 'Combined' },
-              ]}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <RangePicker
-              placeholder={['PO Date From', 'PO Date To']}
-              value={poDateRange}
-              onChange={handlePoDateRangeChange}
-              format="DD-MMM-YYYY"
-              style={{ width: '100%', height: '40px' }}
-              allowClear
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <RangePicker
-              placeholder={['Delivery From', 'Delivery To']}
-              value={deliveryDateRange}
-              onChange={handleDeliveryDateRangeChange}
-              format="DD-MMM-YYYY"
-              style={{ width: '100%', height: '40px' }}
-              allowClear
-            />
-          </Col>
-          <Col flex="auto" style={{ textAlign: 'right' }}>
-            <Tooltip title="Refresh">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => fetchData(pagination.current, pagination.pageSize)}
-              />
-            </Tooltip>
-          </Col>
-        </Row>
+        <SearchFilterBar
+          searchText={searchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchPlaceholder="Search PO number, supplier..."
+          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          filters={[
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
+                placeholder: 'Status',
+                value: statusFilter,
+                onChange: handleStatusFilter,
+                options: Object.keys(PO_STATUS_CONFIG).map((s) => ({
+                  label: getStatusLabel(s),
+                  value: s,
+                })),
+              },
+            },
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
+                placeholder: 'PO Type',
+                value: poTypeFilter,
+                onChange: (val) => setPoTypeFilter(val),
+                options: [
+                  { value: 'General', label: 'General' },
+                  { value: 'Regular', label: 'Regular' },
+                  { value: 'Combined', label: 'Combined' },
+                ],
+              },
+            },
+            {
+              type: 'rangePicker',
+              span: { xs: 24, sm: 12, md: 6, lg: 5 },
+              props: {
+                placeholder: ['PO Date From', 'PO Date To'],
+                value: poDateRange,
+                onChange: handlePoDateRangeChange,
+              },
+            },
+            {
+              type: 'rangePicker',
+              span: { xs: 24, sm: 12, md: 6, lg: 5 },
+              props: {
+                placeholder: ['Delivery From', 'Delivery To'],
+                value: deliveryDateRange,
+                onChange: handleDeliveryDateRangeChange,
+              },
+            },
+          ]}
+          style={{ marginBottom: 16 }}
+        />
 
         <Table
           columns={columns}
@@ -471,11 +347,14 @@ const POList = () => {
           rowKey="id"
           scroll={{ x: 1200 }}
           onChange={handleTableChange}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} purchase orders`,
+          pagination={getTablePagination(pagination, 'purchase orders')}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="No Purchase Orders"
+                description="No purchase orders found matching your criteria."
+              />
+            ),
           }}
         />
       </Card>

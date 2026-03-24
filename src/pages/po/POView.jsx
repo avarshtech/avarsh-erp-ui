@@ -37,14 +37,10 @@ import {
   UserOutlined,
   SettingOutlined,
   InboxOutlined,
-  PrinterOutlined,
   PaperClipOutlined,
   DeleteOutlined,
   DownloadOutlined,
   ExperimentOutlined,
-  DollarOutlined,
-  EditOutlined,
-  HistoryOutlined,
   ShopOutlined,
   CalendarOutlined,
   TagOutlined,
@@ -76,22 +72,25 @@ import {
 import { PO_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_CANCEL_REASONS } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
 import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { ActionButton } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import POVersionHistory from './POVersionHistory';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-// Status config — keys are DB enum values
+// Status config — keys are DB enum values (kept for activity rendering and hero header bg/text)
 const STATUS_CONFIG = {
   [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined />, bg: '#f5f5f5', text: '#8c8c8c' },
   [PO_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: <ClockCircleOutlined />, bg: '#fffbe6', text: '#d48806' },
-  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined />, bg: '#e6f4ff', text: '#1677ff' },
+  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined />, bg: '#e6f4ff', text: 'var(--primary-color)' },
   [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined />, bg: '#e6fffb', text: '#13c2c2' },
-  [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined />, bg: '#f6ffed', text: '#52c41a' },
-  [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined />, bg: '#fff2f0', text: '#ff4d4f' },
+  [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined />, bg: '#f6ffed', text: 'var(--success-color)' },
+  [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined />, bg: '#fff2f0', text: 'var(--error-color)' },
   [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined />, bg: '#fff7e6', text: '#fa541c' },
-  [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <RollbackOutlined />, bg: '#fff7e6', text: '#fa8c16' },
-  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined />, bg: '#f9f0ff', text: '#722ed1' },
+  [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <RollbackOutlined />, bg: '#fff7e6', text: 'var(--warning-color)' },
+  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined />, bg: '#f9f0ff', text: 'var(--btn-duplicate-color)' },
   [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined />, bg: '#fff0f6', text: '#eb2f96' },
 };
 
@@ -314,10 +313,10 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   // Status Actions
   // ========================
   const statusActions = [
-    { key: 'approve', label: 'Approve', icon: <CheckCircleOutlined />, color: '#52c41a', type: 'primary', fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.SENT_TO_SUPPLIER, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canApprovePO, requiresReason: false },
-    { key: 'reject', label: 'Reject', icon: <CloseCircleOutlined />, color: '#ff4d4f', type: 'default', danger: true, fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.REJECTED, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canRejectPO, requiresReason: true },
+    { key: 'approve', label: 'Approve', icon: <CheckCircleOutlined />, color: 'var(--success-color)', type: 'primary', fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.SENT_TO_SUPPLIER, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canApprovePO, requiresReason: false },
+    { key: 'reject', label: 'Reject', icon: <CloseCircleOutlined />, color: 'var(--error-color)', type: 'default', danger: true, fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.REJECTED, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canRejectPO, requiresReason: true },
     { key: 'cancel', label: 'Cancel', icon: <StopOutlined />, type: 'default', fromStatus: [PO_STATUS.PENDING_APPROVAL, PO_STATUS.DRAFT, PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.CANCELLED, lineItemStatus: PO_STATUS.CANCELLED, canPerform: canCancelPO, requiresReason: true },
-    { key: 'refer_back', label: 'Refer Back', icon: <RollbackOutlined />, color: '#faad14', type: 'default', fromStatus: [PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.REFERRED_BACK, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canReferBackPO, requiresReason: true },
+    { key: 'refer_back', label: 'Refer Back', icon: <RollbackOutlined />, color: 'var(--warning-color)', type: 'default', fromStatus: [PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.REFERRED_BACK, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canReferBackPO, requiresReason: true },
   ];
 
   const availableActions = po ? statusActions.filter((a) => a.fromStatus.includes(po.status) && a.canPerform()) : [];
@@ -556,33 +555,33 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       }
       if (data?.type === 'line_complete') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircleOutlined style={{ color: 'var(--success-color)' }} />
           <Text>Line item <Text strong>"{data.item}"</Text> marked as completed</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
         </div>);
       }
       if (data?.type === 'all_complete') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <CheckCircleOutlined style={{ color: '#52c41a' }} /><Text>All line items received —</Text>
+          <CheckCircleOutlined style={{ color: 'var(--success-color)' }} /><Text>All line items received —</Text>
           <Tag color="success" icon={<CheckCircleOutlined />} style={{ margin: 0 }}>PO Completed</Tag>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
         </div>);
       }
       if (data?.type === 'file_upload') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <PaperClipOutlined style={{ color: '#1677ff' }} /><Text>Attached: <Text strong>{data.fileName}</Text></Text>
+          <PaperClipOutlined style={{ color: 'var(--primary-color)' }} /><Text>Attached: <Text strong>{data.fileName}</Text></Text>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
         </div>);
       }
       if (data?.type === 'file_delete') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <DeleteOutlined style={{ color: '#ff4d4f' }} /><Text>Removed: <Text strong style={{ textDecoration: 'line-through', opacity: 0.7 }}>{data.fileName}</Text></Text>
+          <DeleteOutlined style={{ color: 'var(--error-color)' }} /><Text>Removed: <Text strong style={{ textDecoration: 'line-through', opacity: 0.7 }}>{data.fileName}</Text></Text>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
         </div>);
       }
       if (data?.type === 'stage_complete') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          <CheckCircleOutlined style={{ color: 'var(--success-color)' }} />
           <Text>Stage <Text strong>"{data.stageName}"</Text> marked as completed for <Text strong>{data.itemLabel}</Text></Text>
           {data.actualDate && <Tag style={{ margin: 0, fontSize: 10 }}>{dayjs(data.actualDate).format('DD MMM YYYY')}</Tag>}
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
@@ -590,7 +589,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
       }
       if (data?.type === 'stage_revert') {
         return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <UndoOutlined style={{ color: '#faad14' }} />
+          <UndoOutlined style={{ color: 'var(--warning-color)' }} />
           <Text>Stage <Text strong>"{data.stageName}"</Text> completion reverted for <Text strong>{data.itemLabel}</Text></Text>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
         </div>);
@@ -637,7 +636,6 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
         })
       : [];
     const st = record.status || PO_STATUS.DRAFT;
-    const stCfg = STATUS_CONFIG[st] || { color: 'default' };
     const gstLabel = hasIgst
       ? `IGST ${record.igst || record.igstPercent || 0}%`
       : `SGST ${record.sgstPercent || record.sgst || 0}% + CGST ${record.cgstPercent || record.cgst || 0}%`;
@@ -713,7 +711,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
               {formatCurrency(record.totalAmount || record.amount || 0)}
             </Text>
             {showStatusColumn && (
-              <Tag color={stCfg.color} style={{ borderRadius: 12, marginTop: 6, fontSize: 11 }}>{getLineItemStatusLabel(st)}</Tag>
+              <StatusTag status={st} config={PO_STATUS_CONFIG} getLabel={getLineItemStatusLabel} size="small" style={{ marginTop: 6 }} />
             )}
           </div>
         </div>
@@ -753,8 +751,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <ExperimentOutlined style={{ color: '#722ed1', fontSize: 13 }} />
-                <Text strong style={{ fontSize: 12, color: '#722ed1' }}>Processing Stages</Text>
+                <ExperimentOutlined style={{ color: 'var(--btn-duplicate-color)', fontSize: 13 }} />
+                <Text strong style={{ fontSize: 12, color: 'var(--btn-duplicate-color)' }}>Processing Stages</Text>
                 <Tag color="purple" style={{ fontSize: 10, margin: 0 }}>{sortedStages.length}</Tag>
                 {(() => {
                   const done = sortedStages.filter((s) => s.isCompleted).length;
@@ -968,21 +966,27 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px' }}>
             <Space size="middle">
               {po && canPrintPO && (
-                <Button icon={<PrinterOutlined />} onClick={handlePrint} loading={printLoading}>Print PO</Button>
+                <ActionButton action="print" text="Print PO" onClick={handlePrint} loading={printLoading} />
               )}
-              {availableActions.map((action) => (
-                <Button
-                  key={action.key} type={action.type} danger={action.danger} icon={action.icon}
-                  onClick={() => handleStatusAction(action)} loading={actionLoading}
-                  style={action.color && !action.danger ? { backgroundColor: action.color, borderColor: action.color, color: '#fff' } : action.danger ? { borderColor: '#ff4d4f' } : undefined}
-                >{action.label}</Button>
-              ))}
+              {availableActions.map((action) => {
+                const actionMap = { approve: 'approve', reject: 'reject', cancel: 'cancel', refer_back: 'refer-back' };
+                return (
+                  <ActionButton
+                    key={action.key}
+                    action={actionMap[action.key] || 'custom'}
+                    text={action.label}
+                    onClick={() => handleStatusAction(action)}
+                    loading={actionLoading}
+                    danger={action.danger}
+                  />
+                );
+              })}
             </Space>
             <Space>
               {po && (po.status === PO_STATUS.DRAFT || po.status === PO_STATUS.REFERRED_BACK || po.status === PO_STATUS.REJECTED) && hasPermission('purchase-orders', 'update') && (
-                <Button icon={<EditOutlined />} onClick={() => { onClose(); navigate(`/purchase-orders/edit/${po.id}`); }}>Edit</Button>
+                <ActionButton action="edit" text="Edit" onClick={() => { onClose(); navigate(`/purchase-orders/edit/${po.id}`); }} />
               )}
-              <Button onClick={onClose}>Close</Button>
+              <ActionButton action="close" text="Close" onClick={onClose} />
             </Space>
           </div>
         }
@@ -1007,7 +1011,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                     <Title level={3} style={{ margin: 0, letterSpacing: '-0.02em' }}>{po.poNumber || po.poNo}</Title>
-                    <Tag color={statusCfg.color} icon={statusCfg.icon} style={{ fontSize: 13, padding: '3px 14px', borderRadius: 20 }}>{getStatusLabel(po.status)}</Tag>
+                    <StatusTag status={po.status} config={PO_STATUS_CONFIG} getLabel={getStatusLabel} style={{ fontSize: 13, padding: '3px 14px' }} />
                     {po?.isProcessPo && <Tag color="purple" icon={<ExperimentOutlined />} style={{ borderRadius: 20, fontSize: 12 }}>Process PO</Tag>}
                     {po?.poType && po.poType !== 'General' && <Tag color="purple" style={{ borderRadius: 20, fontSize: 12 }}>{po.poType} PO</Tag>}
                   </div>
@@ -1164,24 +1168,12 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                     <Text strong style={{ fontSize: 15 }}>Line Items</Text>
                     <Badge count={po.lineItems?.length || 0} style={{ backgroundColor: 'var(--primary-color)' }} />
                   </div>
-                  <Tooltip title="View submission version history">
-                    <Button
-                      type="default"
-                      icon={<HistoryOutlined />}
-                      onClick={() => setHistoryOpen(true)}
-                      style={{
-                        borderRadius: 8,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontWeight: 500,
-                        borderColor: 'var(--primary-color)',
-                        color: 'var(--primary-color)',
-                      }}
-                    >
-                      History
-                    </Button>
-                  </Tooltip>
+                  <ActionButton
+                    action="history"
+                    text="History"
+                    tooltip="View submission version history"
+                    onClick={() => setHistoryOpen(true)}
+                  />
                 </div>
                 <div>
                   {(po.lineItems || []).map((item, idx) => renderLineItemCard(item, idx))}
@@ -1217,7 +1209,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                           onConfirm={() => { const code = document.getElementById('ewb-cancel-reason-code')?.value; const remarks = document.getElementById('ewb-cancel-remarks')?.value; if (!code) { message.warning('Please select a cancel reason'); return; } handleCancelEwayBill(Number(code), remarks || ''); }}
                           okText="Cancel E-way Bill" okButtonProps={{ danger: true, loading: ewayBillCancelLoading }}
                         >
-                          <Button danger size="small" loading={ewayBillCancelLoading}>Cancel E-way Bill</Button>
+                          <ActionButton action="cancel" text="Cancel E-way Bill" size="small" danger loading={ewayBillCancelLoading} />
                         </Popconfirm>
                       </Col>
                     )}
@@ -1262,7 +1254,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                             <PermissionGuard module="purchase-orders" operation="update">
                               <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginTop: 12 }}>
                                 <TextArea placeholder="Add a note..." value={newNote} onChange={(e) => setNewNote(e.target.value)} style={{ flex: 1, minHeight: 60, resize: 'none' }} disabled={addingNote} />
-                                <Button type="primary" icon={<SendOutlined />} onClick={handleAddNote} loading={addingNote} disabled={!newNote.trim() || addingNote}>Add</Button>
+                                <ActionButton action="send" text="Add" onClick={handleAddNote} loading={addingNote} disabled={!newNote.trim() || addingNote} />
                               </div>
                             </PermissionGuard>
                           )}
@@ -1278,7 +1270,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                             <div style={{ marginBottom: 12 }}>
                               <PermissionGuard module="purchase-orders" operation="update">
                                 <Upload showUploadList={false} beforeUpload={handleFileUpload} disabled={uploadingFile}>
-                                  <Button icon={<PaperClipOutlined />} loading={uploadingFile} disabled={uploadingFile} style={{ borderStyle: 'dashed', color: 'var(--primary-color)', borderColor: 'var(--primary-color)' }}>Attach File</Button>
+                                  <ActionButton action="upload" text="Attach File" icon={<PaperClipOutlined />} loading={uploadingFile} disabled={uploadingFile} style={{ borderStyle: 'dashed', color: 'var(--primary-color)', borderColor: 'var(--primary-color)' }} />
                                 </Upload>
                               </PermissionGuard>
                             </div>
@@ -1299,10 +1291,10 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                                       {f.fileSizeBytes && <Text type="secondary" style={{ fontSize: 11 }}>{formatFileSize(f.fileSizeBytes)}</Text>}
                                     </div>
                                     <div style={{ display: 'flex', flexShrink: 0, gap: 2 }}>
-                                      <Tooltip title="Download"><Button type="text" size="small" icon={<DownloadOutlined style={{ fontSize: 13 }} />} loading={downloadingFileId === f.fileId} onClick={() => handleFileDownload(f)} /></Tooltip>
+                                      <ActionButton action="custom" icon={<DownloadOutlined style={{ fontSize: 13 }} />} tooltip="Download" size="small" loading={downloadingFileId === f.fileId} onClick={() => handleFileDownload(f)} />
                                       <PermissionGuard module="purchase-orders" operation="update">
                                         <Popconfirm title={`Remove "${fileName}"?`} description="This will permanently delete the attachment." onConfirm={() => handleFileDelete(f)} okText="Remove" cancelText="Cancel" okButtonProps={{ danger: true, loading: deletingFileId === f.fileId }}>
-                                          <Tooltip title="Remove"><Button type="text" size="small" danger icon={<DeleteOutlined style={{ fontSize: 13 }} />} /></Tooltip>
+                                          <ActionButton action="delete" size="small" />
                                         </Popconfirm>
                                       </PermissionGuard>
                                     </div>
@@ -1346,8 +1338,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
           const config = {
             reject: {
               icon: <CloseCircleOutlined style={{ fontSize: 28 }} />,
-              color: '#ff4d4f',
-              bg: 'color-mix(in srgb, #ff4d4f 8%, transparent)',
+              color: 'var(--error-color)',
+              bg: 'color-mix(in srgb, var(--error-color) 8%, transparent)',
               title: 'Reject Purchase Order',
               subtitle: 'This PO will be sent back to the creator for revision.',
               flowLabel: 'Pending Approval → Rejected',
@@ -1356,8 +1348,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
             },
             cancel: {
               icon: <StopOutlined style={{ fontSize: 28 }} />,
-              color: '#fa541c',
-              bg: 'color-mix(in srgb, #fa541c 8%, transparent)',
+              color: 'var(--btn-cancel-color)',
+              bg: 'color-mix(in srgb, var(--btn-cancel-color) 8%, transparent)',
               title: 'Cancel Purchase Order',
               subtitle: 'This action will cancel the PO. Line items will be marked as cancelled.',
               flowLabel: `${getStatusLabel(po?.status)} → Cancelled`,
@@ -1366,8 +1358,8 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
             },
             refer_back: {
               icon: <RollbackOutlined style={{ fontSize: 28 }} />,
-              color: '#fa8c16',
-              bg: 'color-mix(in srgb, #fa8c16 8%, transparent)',
+              color: 'var(--warning-color)',
+              bg: 'color-mix(in srgb, var(--warning-color) 8%, transparent)',
               title: 'Refer Back Purchase Order',
               subtitle: 'The PO will be sent back to the supplier for revision and re-submission.',
               flowLabel: 'Sent to Supplier → Referred Back',
@@ -1418,7 +1410,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                 {isReject && (
                   <div style={{ marginBottom: 16 }}>
                     <Text strong style={{ display: 'block', marginBottom: 6, fontSize: 13 }}>
-                      Rejection Category <span style={{ color: '#ff4d4f' }}>*</span>
+                      Rejection Category <span style={{ color: 'var(--error-color)' }}>*</span>
                     </Text>
                     <Select
                       placeholder="Select the primary reason for rejection"
@@ -1436,7 +1428,7 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <Text strong style={{ fontSize: 13 }}>
                       {isReject ? 'Rejection Reason' : isReferBack ? 'Feedback for Supplier' : 'Cancellation Reason'}
-                      {' '}<span style={{ color: '#ff4d4f' }}>*</span>
+                      {' '}<span style={{ color: 'var(--error-color)' }}>*</span>
                     </Text>
                     <Text type="secondary" style={{ fontSize: 11 }}>
                       Min {MIN_CHARS} characters

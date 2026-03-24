@@ -1,19 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Typography, Table, Button, Space, Tag, Input, message,
-  Statistic, Avatar, DatePicker, Select, Tooltip, Empty, Spin, Skeleton, Descriptions
+  Card, Row, Col, Typography, Table, Space, Tag, Input, message,
+  Avatar, DatePicker, Select, Tooltip,
 } from 'antd';
 import {
   UserOutlined, TeamOutlined, SafetyOutlined, LoginOutlined,
-  ReloadOutlined, SearchOutlined, CheckCircleOutlined,
+  SearchOutlined, CheckCircleOutlined,
   CloseCircleOutlined, DesktopOutlined, MobileOutlined,
-  ClockCircleOutlined, FilterOutlined
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { getUsers } from '../../services/userService';
 import { getRoles } from '../../services/roleService';
 import { getActivityLogsByDateRange } from '../../services/activityLogService';
+import PageHeader from '../../components/PageHeader';
+import StatCard from '../../components/StatCard';
+import EmptyState from '../../components/EmptyState';
+import { ActionButton } from '../../components/buttons';
+import { getTablePagination } from '../../utils/paginationConfig';
 
 dayjs.extend(relativeTime);
 
@@ -104,10 +109,10 @@ const AdminDashboard = () => {
   });
 
   const stats = [
-    { title: 'Total Users', value: totalUsers, icon: <UserOutlined />, color: '#6366f1', suffix: <Text type="secondary" style={{ fontSize: 13 }}>{activeUsers} active</Text> },
-    { title: 'Total Roles', value: totalRoles, icon: <TeamOutlined />, color: '#8b5cf6', suffix: <Text type="secondary" style={{ fontSize: 13 }}>{totalRoles} defined</Text> },
-    { title: 'Successful Logins', value: recentLogins, icon: <LoginOutlined />, color: '#10b981', suffix: <Text type="secondary" style={{ fontSize: 13 }}>in selected range</Text> },
-    { title: 'Failed Attempts', value: failedLogins, icon: <SafetyOutlined />, color: failedLogins > 0 ? '#ef4444' : '#64748b', suffix: <Text type="secondary" style={{ fontSize: 13 }}>in selected range</Text> },
+    { title: 'Total Users', value: totalUsers, icon: <UserOutlined />, color: 'var(--primary-color)', suffix: <Text type="secondary" style={{ fontSize: 13 }}>{activeUsers} active</Text> },
+    { title: 'Total Roles', value: totalRoles, icon: <TeamOutlined />, color: 'var(--primary-hover)', suffix: <Text type="secondary" style={{ fontSize: 13 }}>{totalRoles} defined</Text> },
+    { title: 'Successful Logins', value: recentLogins, icon: <LoginOutlined />, color: 'var(--success-color)', suffix: <Text type="secondary" style={{ fontSize: 13 }}>in selected range</Text> },
+    { title: 'Failed Attempts', value: failedLogins, icon: <SafetyOutlined />, color: failedLogins > 0 ? 'var(--error-color)' : 'var(--text-muted)', suffix: <Text type="secondary" style={{ fontSize: 13 }}>in selected range</Text> },
   ];
 
   const activityColumns = [
@@ -132,7 +137,7 @@ const AdminDashboard = () => {
       width: 180,
       render: (name) => (
         <Space>
-          <Avatar size="small" style={{ background: '#6366f1' }}>{(name || '?')[0]?.toUpperCase()}</Avatar>
+          <Avatar size="small" style={{ background: 'var(--primary-color)' }}>{(name || '?')[0]?.toUpperCase()}</Avatar>
           <Text strong>{name || '-'}</Text>
         </Space>
       ),
@@ -156,8 +161,8 @@ const AdminDashboard = () => {
       filters: [{ text: 'Success', value: true }, { text: 'Failed', value: false }],
       onFilter: (value, record) => record.isSuccess === value,
       render: (isSuccess) => isSuccess
-        ? <CheckCircleOutlined style={{ color: '#10b981', fontSize: 16 }} />
-        : <CloseCircleOutlined style={{ color: '#ef4444', fontSize: 16 }} />,
+        ? <CheckCircleOutlined style={{ color: 'var(--success-color)', fontSize: 16 }} />
+        : <CloseCircleOutlined style={{ color: 'var(--error-color)', fontSize: 16 }} />,
     },
     {
       title: 'Device / Browser',
@@ -202,47 +207,25 @@ const AdminDashboard = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Admin Dashboard</h1>
-        <Button icon={<ReloadOutlined />} onClick={() => { fetchStats(); fetchActivityLogs(); }}>
-          Refresh
-        </Button>
-      </div>
+      <PageHeader title="Admin Dashboard">
+        <ActionButton action="refresh" text="Refresh" onClick={() => { fetchStats(); fetchActivityLogs(); }} />
+      </PageHeader>
 
       {/* Stats Cards */}
-        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-          {loading ? (
-            [1, 2, 3, 4].map((i) => (
-              <Col xs={12} sm={6} key={i}>
-                <Card>
-                  <Skeleton active paragraph={{ rows: 2 }} />
-                </Card>
-              </Col>
-            ))
-          ) : stats.map((stat, i) => (
-            <Col xs={12} sm={6} key={i}>
-              <Card hoverable style={{ borderTop: `3px solid ${stat.color}` }}>
-                <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <div>
-                    <Text type="secondary" style={{ fontSize: 13 }}>{stat.title}</Text>
-                    <div style={{ fontSize: 28, fontWeight: 700, color: stat.color, lineHeight: 1.2, marginTop: 4 }}>
-                      {stat.value}
-                    </div>
-                    {stat.suffix && <div style={{ marginTop: 2 }}>{stat.suffix}</div>}
-                  </div>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12,
-                    background: `${stat.color}15`, display: 'flex',
-                    alignItems: 'center', justifyContent: 'center',
-                    color: stat.color, fontSize: 20,
-                  }}>
-                    {stat.icon}
-                  </div>
-                </Space>
-              </Card>
-            </Col>
-          ))}
-        </Row>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        {stats.map((stat, i) => (
+          <Col xs={12} sm={6} key={i}>
+            <StatCard
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              color={stat.color}
+              suffix={stat.suffix}
+              loading={loading}
+            />
+          </Col>
+        ))}
+      </Row>
 
       {/* Activity Logs */}
       <Card
@@ -294,21 +277,11 @@ const AdminDashboard = () => {
           dataSource={filteredLogs}
           rowKey={(record) => record.id || `${record.userId}-${record.activityTimestamp}`}
           loading={activityLoading}
-          pagination={{
-            showSizeChanger: true,
-            defaultPageSize: 20,
-            pageSizeOptions: ['10', '20', '50', '100'],
-            showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} records`,
-          }}
+          pagination={getTablePagination({ defaultPageSize: 20, pageSizeOptions: ['10', '20', '50', '100'] }, 'records')}
           scroll={{ x: 1100 }}
           size="small"
           locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="No activity logs found for the selected date range"
-              />
-            ),
+            emptyText: <EmptyState description="No activity logs found for the selected date range" />,
           }}
         />
       </Card>

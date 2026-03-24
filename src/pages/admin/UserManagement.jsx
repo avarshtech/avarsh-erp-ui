@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Card, Table, Button, Space, Input, Tag, Modal, Form, Select, message,
-  Avatar, Badge, Popconfirm, Typography, Row, Col, Tooltip, Drawer, Divider, Switch,
+  Card, Table, Space, Input, Tag, Modal, Form, Select, message,
+  Avatar, Typography, Row, Col, Drawer, Divider, Switch,
 } from 'antd';
 import {
-  PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, UserOutlined,
-  MailOutlined, PhoneOutlined, ReloadOutlined, KeyOutlined,
+  SearchOutlined, UserOutlined,
+  MailOutlined, PhoneOutlined, KeyOutlined,
   ExclamationCircleOutlined, LockOutlined,
 } from '@ant-design/icons';
 import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService';
@@ -13,9 +13,14 @@ import { adminResetPassword, getCurrentUser } from '../../services/authService';
 import { getRoles } from '../../services/roleService';
 import PermissionGuard from '../../components/PermissionGuard';
 import { isAdminRole } from '../../utils/permissions';
-import dayjs from 'dayjs';
-
-const { Title, Text } = Typography;
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusBadge from '../../components/StatusBadge';
+import PageHeader from '../../components/PageHeader';
+import EmptyState from '../../components/EmptyState';
+import { formatDate } from '../../utils/formatters';
+import { getTablePagination } from '../../utils/paginationConfig';
+import { MODAL_WIDTHS } from '../../utils/uiConstants';
+const { Text } = Typography;
 
 const UserManagement = () => {
   const [loading, setLoading] = useState(false);
@@ -223,7 +228,7 @@ const UserManagement = () => {
       title: 'User', key: 'user',
       render: (_, record) => (
         <Space>
-          <Avatar style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }} icon={<UserOutlined />}>
+          <Avatar style={{ background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)' }} icon={<UserOutlined />}>
             {record.name?.charAt(0)?.toUpperCase()}
           </Avatar>
           <div>
@@ -235,7 +240,7 @@ const UserManagement = () => {
     },
     {
       title: 'Email', dataIndex: 'email', key: 'email',
-      render: (email) => <Space><MailOutlined style={{ color: '#8c8c8c' }} /><Text>{email}</Text></Space>,
+      render: (email) => <Space><MailOutlined style={{ color: 'var(--text-muted)' }} /><Text>{email}</Text></Space>,
     },
     {
       title: 'Role', dataIndex: 'role', key: 'role',
@@ -247,33 +252,39 @@ const UserManagement = () => {
     },
     {
       title: 'Status', dataIndex: 'active', key: 'status', align: 'center',
-      render: (active) => <Badge status={active !== false ? 'success' : 'default'} text={active !== false ? 'Active' : 'Inactive'} />,
+      render: (active) => <StatusBadge status={active !== false ? 'active' : 'inactive'} />,
     },
     {
       title: 'Last Login', dataIndex: 'lastLogin', key: 'lastLogin',
-      render: (date) => date ? dayjs(date).format('DD MMM YYYY HH:mm') : 'Never',
+      render: (date) => date ? formatDate(date, 'DD MMM YYYY HH:mm') : 'Never',
     },
     {
       title: 'Actions', key: 'actions', align: 'center', width: 180,
       render: (_, record) => (
         <Space size="small">
-          <Tooltip title="View Details">
-            <Button type="text" icon={<UserOutlined />} onClick={() => viewUserDetails(record)} />
-          </Tooltip>
+          <ActionButton action="view" size="small" onClick={() => viewUserDetails(record)} />
           <PermissionGuard module="users" operation="update">
-            <Tooltip title="Edit">
-              <Button type="text" icon={<EditOutlined />} onClick={() => openModal(record)} />
-            </Tooltip>
+            <ActionButton action="edit" size="small" onClick={() => openModal(record)} />
           </PermissionGuard>
           {isAdmin && (
-            <Tooltip title="Reset Password">
-              <Button type="text" icon={<LockOutlined />} onClick={() => openResetPwdModal(record.id, record.name)} style={{ color: '#faad14' }} />
-            </Tooltip>
+            <ActionButton
+              action="custom"
+              icon={<LockOutlined />}
+              color="var(--btn-history-color)"
+              tooltip="Reset Password"
+              size="small"
+              onClick={() => openResetPwdModal(record.id, record.name)}
+            />
           )}
           <PermissionGuard module="users" operation="delete">
-            <Popconfirm title="Delete User" description="Are you sure you want to delete this user?" onConfirm={() => handleDelete(record.id)} okText="Yes" cancelText="No" icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />} okButtonProps={{ danger: true, loading: deletingId === record.id }}>
-              <Tooltip title="Delete"><Button type="text" danger icon={<DeleteOutlined />} /></Tooltip>
-            </Popconfirm>
+            <DeleteConfirm
+              title="Delete User"
+              recordLabel={record.name}
+              onConfirm={() => handleDelete(record.id)}
+              loading={deletingId === record.id}
+            >
+              <ActionButton action="delete" size="small" />
+            </DeleteConfirm>
           </PermissionGuard>
         </Space>
       ),
@@ -283,18 +294,26 @@ const UserManagement = () => {
   return (
     <div>
       <Card>
-        <div style={{ marginBottom: 24 }}>
-          <Row justify="space-between" align="middle">
-            <Col><Title level={4} style={{ margin: 0 }}>User Management</Title><Text type="secondary">Manage user accounts and access</Text></Col>
-            <Col><PermissionGuard module="users" operation="add"><Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>Add User</Button></PermissionGuard></Col>
-          </Row>
-        </div>
+        <PageHeader title="User Management" subtitle="Manage user accounts and access">
+          <PermissionGuard module="users" operation="add">
+            <ActionButton action="create" text="Add User" onClick={() => openModal()} />
+          </PermissionGuard>
+        </PageHeader>
         <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={12} md={8}><Input placeholder="Search by name, username, or email..." prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear /></Col>
+          <Col xs={24} sm={12} md={8}><Input placeholder="Search by name, username, or email..." prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear /></Col>
           <Col xs={24} sm={8} md={4}><Select style={{ width: '100%' }} value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} /></Col>
-          <Col><Tooltip title="Refresh"><Button icon={<ReloadOutlined />} onClick={fetchUsers} /></Tooltip></Col>
+          <Col><ActionButton action="refresh" tooltip="Refresh" onClick={fetchUsers} /></Col>
         </Row>
-        <Table columns={columns} dataSource={filteredUsers} rowKey="id" loading={loading} pagination={{ showSizeChanger: true, showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} users` }} />
+        <Table
+          columns={columns}
+          dataSource={filteredUsers}
+          rowKey="id"
+          loading={loading}
+          pagination={getTablePagination(undefined, 'users')}
+          locale={{
+            emptyText: <EmptyState description="No users found" />,
+          }}
+        />
       </Card>
 
       {/* Add/Edit Modal */}
@@ -303,13 +322,13 @@ const UserManagement = () => {
         open={modalVisible}
         onCancel={handleModalClose}
         afterClose={handleModalAfterClose}
-        width={600}
+        width={MODAL_WIDTHS.MEDIUM}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
         footer={
           <div style={{ textAlign: 'right' }}>
             <Space>
-              <Button onClick={handleModalClose}>Cancel</Button>
-              <Button type="primary" onClick={() => form.submit()} disabled={editingUser && !formDirty} loading={saving}>{editingUser ? 'Update' : 'Create'}</Button>
+              <ActionButton action="cancel" text="Cancel" onClick={handleModalClose} />
+              <ActionButton action="save" text={editingUser ? 'Update' : 'Create'} onClick={() => form.submit()} disabled={editingUser && !formDirty} loading={saving} />
             </Space>
           </div>
         }
@@ -333,17 +352,17 @@ const UserManagement = () => {
 
       {/* Admin Password Reset Modal */}
       <Modal
-        title={<Space><LockOutlined style={{ color: '#faad14' }} /><span>Reset Password - {resetPwdUserName}</span></Space>}
+        title={<Space><LockOutlined style={{ color: 'var(--warning-color)' }} /><span>Reset Password - {resetPwdUserName}</span></Space>}
         open={resetPwdModalVisible}
         onCancel={() => setResetPwdModalVisible(false)}
         afterClose={() => resetPwdForm.resetFields()}
-        width={450}
+        width={MODAL_WIDTHS.SMALL}
         destroyOnHidden
         footer={
           <div style={{ textAlign: 'right' }}>
             <Space>
-              <Button onClick={() => setResetPwdModalVisible(false)}>Cancel</Button>
-              <Button type="primary" onClick={() => resetPwdForm.submit()} loading={resettingPwd} icon={<KeyOutlined />}>Reset Password</Button>
+              <ActionButton action="cancel" text="Cancel" onClick={() => setResetPwdModalVisible(false)} />
+              <ActionButton action="custom" text="Reset Password" icon={<KeyOutlined />} color="var(--btn-history-color)" onClick={() => resetPwdForm.submit()} loading={resettingPwd} />
             </Space>
           </div>
         }
@@ -363,25 +382,30 @@ const UserManagement = () => {
         {selectedUser && (
           <div>
             <div style={{ textAlign: 'center', marginBottom: 24 }}>
-              <Avatar size={80} style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }} icon={<UserOutlined />}>{selectedUser.name?.charAt(0)?.toUpperCase()}</Avatar>
-              <Title level={4} style={{ marginTop: 12, marginBottom: 4 }}>{selectedUser.name}</Title>
+              <Avatar size={80} style={{ background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)' }} icon={<UserOutlined />}>{selectedUser.name?.charAt(0)?.toUpperCase()}</Avatar>
+              <h3 style={{ marginTop: 12, marginBottom: 4 }}>{selectedUser.name}</h3>
               <Text type="secondary">@{selectedUser.username}</Text>
             </div>
             <Divider />
             <div style={{ marginBottom: 16 }}><Text type="secondary">Email</Text><div><MailOutlined /> {selectedUser.email}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Phone</Text><div><PhoneOutlined /> {selectedUser.phone || 'Not provided'}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Role</Text><div><Tag color="blue">{typeof selectedUser.role === 'object' ? selectedUser.role?.name : selectedUser.role || selectedUser.roleName}</Tag></div></div>
-            <div style={{ marginBottom: 16 }}><Text type="secondary">Status</Text><div><Badge status={selectedUser.active !== false ? 'success' : 'default'} text={selectedUser.active !== false ? 'Active' : 'Inactive'} /></div></div>
-            <div style={{ marginBottom: 16 }}><Text type="secondary">Created</Text><div>{selectedUser.createdAt ? dayjs(selectedUser.createdAt).format('DD MMM YYYY HH:mm') : 'Unknown'}</div></div>
+            <div style={{ marginBottom: 16 }}><Text type="secondary">Status</Text><div><StatusBadge status={selectedUser.active !== false ? 'active' : 'inactive'} /></div></div>
+            <div style={{ marginBottom: 16 }}><Text type="secondary">Created</Text><div>{formatDate(selectedUser.createdAt, 'DD MMM YYYY HH:mm')}</div></div>
             <Divider />
             <Space direction="vertical" style={{ width: '100%' }}>
               <PermissionGuard module="users" operation="update">
-                <Button block icon={<EditOutlined />} onClick={() => { setDrawerVisible(false); openModal(selectedUser); }}>Edit User</Button>
+                <ActionButton action="edit" text="Edit User" block onClick={() => { setDrawerVisible(false); openModal(selectedUser); }} />
               </PermissionGuard>
               {isAdmin && (
-                <Button block icon={<LockOutlined />} onClick={() => openResetPwdModal(selectedUser.id, selectedUser.name)} style={{ borderColor: '#faad14', color: '#faad14' }}>
-                  Reset Password
-                </Button>
+                <ActionButton
+                  action="custom"
+                  text="Reset Password"
+                  icon={<LockOutlined />}
+                  color="var(--btn-history-color)"
+                  block
+                  onClick={() => openResetPwdModal(selectedUser.id, selectedUser.name)}
+                />
               )}
             </Space>
           </div>

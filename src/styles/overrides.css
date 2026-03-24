@@ -305,29 +305,34 @@ textarea.ant-input:active {
   padding: 0 !important;
 }
 
+/* Popup submenus (collapsed sidebar flyouts) — keep card styling */
 .ant-menu-submenu-popup > .ant-menu,
-.ant-menu-submenu > .ant-menu,
-.ant-menu-dark .ant-menu-submenu-popup,
-.ant-menu-dark.ant-menu-submenu > .ant-menu,
 .ant-menu-submenu-popup .ant-menu-sub {
   background: #001529 !important;
   border-radius: 8px !important;
   padding: 8px 0 !important;
   min-width: 200px !important;
-  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.2), 
-              0 3px 6px -4px rgba(0, 0, 0, 0.15), 
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.2),
+              0 3px 6px -4px rgba(0, 0, 0, 0.15),
               0 9px 28px 8px rgba(0, 0, 0, 0.1) !important;
   overflow: visible !important;
 }
 
-/* Dark theme submenu popup */
 [data-theme="dark"] .ant-menu-submenu-popup > .ant-menu,
-[data-theme="dark"] .ant-menu-submenu > .ant-menu,
-[data-theme="dark"] .ant-menu-dark .ant-menu-submenu-popup,
-[data-theme="dark"] .ant-menu-dark.ant-menu-submenu > .ant-menu,
 [data-theme="dark"] .ant-menu-submenu-popup .ant-menu-sub {
   background: #0f172a !important;
   border: 1px solid #334155 !important;
+}
+
+/* Inline submenus (expanded sidebar) — transparent, no card effect */
+.sidebar-menu .ant-menu-sub.ant-menu-inline,
+.ant-menu-submenu > .ant-menu.ant-menu-inline {
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  min-width: unset !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .ant-menu-submenu-popup .ant-menu-item {
@@ -403,7 +408,7 @@ textarea.ant-input:active {
 .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title {
   display: flex !important;
   align-items: center !important;
-  height: 48px !important;
+  height: 40px !important;
   margin: 4px 12px !important;
   padding: 0 16px !important;
   border-radius: 8px !important;
@@ -428,10 +433,27 @@ textarea.ant-input:active {
   margin-inline-start: 0 !important;
 }
 
-/* Submenu children items - add extra left padding for hierarchy */
+/* Submenu <ul> — indent the entire list, tight item spacing */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-sub.ant-menu-inline {
+  margin-left: 48px !important;
+}
+
 .ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-sub .ant-menu-item {
-  margin-left: 24px !important;
-  padding-left: 20px !important;
+  margin: 1px 6px !important;
+  padding-left: 16px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-sub.ant-menu-inline {
+  margin-left: 48px !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-sub .ant-menu-item {
+  margin: 1px 6px !important;
+  padding-left: 16px !important;
+  height: 36px !important;
+  line-height: 36px !important;
 }
 
 /* Expanded sidebar hover effect - always dark style */
@@ -440,10 +462,12 @@ textarea.ant-input:active {
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Selected item styling - always dark style */
-.ant-menu-dark .ant-menu-item-selected {
-  background: var(--primary-color) !important;
-  border-radius: 8px !important;
+/* Selected item styling - subtle tint, not solid fill */
+.sidebar-menu .ant-menu-item-selected {
+  background: var(--sidebar-item-selected) !important;
+  border-left: 3px solid var(--sidebar-item-accent) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--sidebar-text-selected) !important;
 }
 
 /* ============================================================
@@ -694,26 +718,34 @@ textarea.ant-input:active {
    ============================================================ */
 
 .ant-layout-sider {
-  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-              min-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-              max-width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
-              flex 0.32s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
   will-change: width;
 }
 
 /* Fade menu item labels in/out during collapse animation */
 .ant-menu-inline-collapsed .ant-menu-title-content {
   opacity: 0;
-  transition: opacity 0.18s ease !important;
+  transition: opacity 0.15s ease !important;
 }
 .ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-title-content {
   opacity: 1;
-  transition: opacity 0.22s ease 0.12s !important;
+  transition: opacity 0.25s ease 0.1s !important;
 }
 
-/* Smooth the sub-menu expand/collapse arrow */
+/* Smooth the sub-menu expand/collapse arrow + submenu open/close */
 .ant-menu-submenu-arrow {
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-menu-inline .ant-menu-submenu-title,
+.ant-menu-inline .ant-menu-item {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Smooth submenu expand height animation */
+.ant-menu-sub.ant-menu-inline {
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease !important;
 }
 
 /* Sidebar: make ant-layout-sider-children a flex column so the menu area can scroll */
@@ -724,26 +756,62 @@ textarea.ant-input:active {
   overflow: hidden !important;
 }
 
-/* Sidebar menu scroll area — thin dark-themed scrollbar */
+/* Sidebar scrollbar — same proportional style as page scrollbar but for dark bg */
+.ant-layout-sider::-webkit-scrollbar,
+.ant-layout-sider *::-webkit-scrollbar,
+.ant-drawer-body::-webkit-scrollbar,
+.ant-drawer-body *::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-track,
+.ant-layout-sider *::-webkit-scrollbar-track,
+.ant-drawer-body::-webkit-scrollbar-track,
+.ant-drawer-body *::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 9999px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-thumb,
+.ant-layout-sider *::-webkit-scrollbar-thumb,
+.ant-drawer-body::-webkit-scrollbar-thumb,
+.ant-drawer-body *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 9999px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-thumb:hover,
+.ant-layout-sider *::-webkit-scrollbar-thumb:hover,
+.ant-drawer-body::-webkit-scrollbar-thumb:hover,
+.ant-drawer-body *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+.ant-layout-sider,
+.ant-layout-sider *,
+.ant-drawer-body,
+.ant-drawer-body * {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Sidebar menu scroll area */
 .ant-layout-sider-children > div:last-child {
   flex: 1;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
 }
 .ant-layout-sider-children > div:last-child::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 .ant-layout-sider-children > div:last-child::-webkit-scrollbar-track {
   background: transparent;
 }
 .ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
   border-radius: 4px;
 }
 .ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* Ant Design table scrollbar — dark mode fix
@@ -1231,12 +1299,16 @@ textarea.ant-input:active {
   background: rgba(255, 255, 255, 0.1) !important;
 }
 
-.ant-drawer .ant-menu-dark .ant-menu-item-selected {
-  background: var(--gradient-primary) !important;
+.ant-drawer .sidebar-menu .ant-menu-item-selected {
+  background: var(--sidebar-item-selected) !important;
+  border-left: 3px solid var(--sidebar-item-accent) !important;
+  color: var(--sidebar-text-selected) !important;
 }
 
-.ant-drawer .ant-menu-dark .ant-menu-sub {
-  background: rgba(0, 0, 0, 0.2) !important;
+.ant-drawer .sidebar-menu .ant-menu-sub {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .ant-drawer .ant-menu-dark .ant-menu-submenu-title {

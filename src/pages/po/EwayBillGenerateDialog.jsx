@@ -11,7 +11,6 @@ import {
   Col,
   Table,
   Typography,
-  Divider,
   App,
 } from 'antd';
 import { integerInputProps } from '../../utils/inputHelpers';

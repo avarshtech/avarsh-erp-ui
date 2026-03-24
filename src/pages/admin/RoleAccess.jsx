@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
   Table,
-  Button,
   Space,
   Input,
   Tag,
@@ -13,7 +12,6 @@ import {
   Row,
   Col,
   Tooltip,
-  Popconfirm,
   Checkbox,
   Divider,
   Badge,
@@ -22,11 +20,7 @@ import {
   Collapse,
 } from 'antd';
 import {
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
   SearchOutlined,
-  ReloadOutlined,
   ExclamationCircleOutlined,
   SafetyOutlined,
   DashboardOutlined,
@@ -45,9 +39,14 @@ import {
   PERMISSION_GROUPS,
 } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
-import dayjs from 'dayjs';
-
-const { Title, Text } = Typography;
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusBadge from '../../components/StatusBadge';
+import PageHeader from '../../components/PageHeader';
+import EmptyState from '../../components/EmptyState';
+import { formatDate } from '../../utils/formatters';
+import { getTablePagination } from '../../utils/paginationConfig';
+import { MODAL_WIDTHS } from '../../utils/uiConstants';
+const { Text } = Typography;
 
 // Icon map for group rendering
 const GROUP_ICONS = {
@@ -451,7 +450,7 @@ const RoleAccess = () => {
       key: 'name',
       render: (name, record) => (
         <Space>
-          <SafetyOutlined style={{ color: '#6366f1' }} />
+          <SafetyOutlined style={{ color: 'var(--primary-color)' }} />
           <div>
             <Text strong>{name}</Text>
             {record.isSystem && (
@@ -478,7 +477,7 @@ const RoleAccess = () => {
         <Badge
           count={count || 0}
           showZero
-          style={{ backgroundColor: '#6366f1' }}
+          style={{ backgroundColor: 'var(--primary-color)' }}
         />
       ),
     },
@@ -502,19 +501,14 @@ const RoleAccess = () => {
       key: 'status',
       align: 'center',
       width: 100,
-      render: (active) => (
-        <Badge
-          status={active !== false ? 'success' : 'default'}
-          text={active !== false ? 'Active' : 'Inactive'}
-        />
-      ),
+      render: (active) => <StatusBadge status={active !== false ? 'active' : 'inactive'} />,
     },
     {
       title: 'Created',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 120,
-      render: (date) => date ? dayjs(date).format('DD MMM YYYY') : '-',
+      render: (date) => formatDate(date, 'DD MMM YYYY'),
     },
     {
       title: 'Actions',
@@ -524,35 +518,28 @@ const RoleAccess = () => {
       render: (_, record) => (
         <Space size="small">
           <PermissionGuard module="roles" operation="update">
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                icon={<EditOutlined />}
-                onClick={() => openModal(record)}
-                disabled={record.isSystem}
-              />
-            </Tooltip>
+            <ActionButton
+              action="edit"
+              size="small"
+              onClick={() => openModal(record)}
+              disabled={record.isSystem}
+            />
           </PermissionGuard>
           <PermissionGuard module="roles" operation="delete">
-            <Popconfirm
+            <DeleteConfirm
               title="Delete Role"
-              description="Are you sure? This will affect all users with this role."
+              recordLabel={record.name}
               onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
               disabled={record.isSystem}
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
             >
-              <Tooltip title={record.isSystem ? 'System roles cannot be deleted' : 'Delete'}>
-                <Button
-                  type="text"
-                  danger
-                  icon={<DeleteOutlined />}
-                  disabled={record.isSystem}
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton
+                action="delete"
+                size="small"
+                tooltip={record.isSystem ? 'System roles cannot be deleted' : 'Delete'}
+                disabled={record.isSystem}
+              />
+            </DeleteConfirm>
           </PermissionGuard>
         </Space>
       ),
@@ -610,17 +597,17 @@ const RoleAccess = () => {
           </div>
           {isPOApproval && (
             <Tooltip title="Requires Purchase Orders access to be enabled">
-              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
           {isOrderActions && (
             <Tooltip title="Requires Orders access to be enabled">
-              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
           {isCostingApproval && (
             <Tooltip title="Requires Costing access to be enabled">
-              <LinkOutlined style={{ color: '#8b5cf6', fontSize: 12 }} />
+              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
         </div>
@@ -707,7 +694,7 @@ const RoleAccess = () => {
       <div style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
-            <Title level={5} style={{ margin: 0 }}>Permission Matrix</Title>
+            <h4 style={{ margin: 0 }}>Permission Matrix</h4>
             <Text type="secondary" style={{ fontSize: 12 }}>
               Configure page access and operations for this role
             </Text>
@@ -772,45 +759,25 @@ const RoleAccess = () => {
   return (
     <div>
       <Card>
-        <div style={{ marginBottom: 24 }}>
-          <Row justify="space-between" align="middle">
-            <Col>
-              <Title level={4} style={{ margin: 0 }}>
-                Role & Access Management
-              </Title>
-              <Text type="secondary">
-                Define roles and configure permissions
-              </Text>
-            </Col>
-            <Col>
-              <PermissionGuard module="roles" operation="add">
-                <Button
-                  type="primary"
-                  icon={<PlusOutlined />}
-                  onClick={() => openModal()}
-                >
-                  Add Role
-                </Button>
-              </PermissionGuard>
-            </Col>
-          </Row>
-        </div>
+        <PageHeader title="Role & Access Management" subtitle="Define roles and configure permissions">
+          <PermissionGuard module="roles" operation="add">
+            <ActionButton action="create" text="Add Role" onClick={() => openModal()} />
+          </PermissionGuard>
+        </PageHeader>
 
         {/* Filters */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col xs={24} sm={12} md={8}>
             <Input
               placeholder="Search by role name or description..."
-              prefix={<SearchOutlined style={{ color: "#bfbfbf" }} />}
+              prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               allowClear
             />
           </Col>
           <Col>
-            <Tooltip title="Refresh">
-              <Button icon={<ReloadOutlined />} onClick={fetchRoles} />
-            </Tooltip>
+            <ActionButton action="refresh" tooltip="Refresh" onClick={fetchRoles} />
           </Col>
         </Row>
 
@@ -820,10 +787,9 @@ const RoleAccess = () => {
           dataSource={filteredRoles}
           rowKey="id"
           loading={loading}
-          pagination={{
-            showSizeChanger: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} roles`,
+          pagination={getTablePagination(undefined, 'roles')}
+          locale={{
+            emptyText: <EmptyState description="No roles found" />,
           }}
         />
       </Card>
@@ -834,7 +800,7 @@ const RoleAccess = () => {
         open={modalVisible}
         onCancel={handleModalClose}
         afterClose={handleModalAfterClose}
-        width={1100}
+        width={MODAL_WIDTHS.LARGE}
         style={{ top: 20 }}
         styles={{
           body: { maxHeight: "70vh", overflowY: "auto", paddingBottom: 0 },
@@ -842,15 +808,14 @@ const RoleAccess = () => {
         footer={
           <div style={{ textAlign: "right" }}>
             <Space>
-              <Button onClick={handleModalClose}>Cancel</Button>
-              <Button
-                type="primary"
+              <ActionButton action="cancel" text="Cancel" onClick={handleModalClose} />
+              <ActionButton
+                action="save"
+                text={editingRole ? "Update Role" : "Create Role"}
                 onClick={() => form.submit()}
                 disabled={editingRole && !formDirty}
                 loading={saving}
-              >
-                {editingRole ? "Update Role" : "Create Role"}
-              </Button>
+              />
             </Space>
           </div>
         }

@@ -1,5 +1,5 @@
 import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { Menu, Breadcrumb, Spin, Skeleton, Button, Tooltip, message, ConfigProvider, Modal } from 'antd';
+import { Breadcrumb, Skeleton, Button, Tooltip, message, Modal } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
@@ -39,6 +39,15 @@ import { getStyles } from '../../services/styleService';
 import { getAllPaymentTerms } from '../../services/paymentTermsService';
 import { getAllSizePresets } from '../../services/sizePresetService';
 
+// Group accent colors for left border on group headers
+const GROUP_ACCENT = {
+  business: 'var(--info-color)',
+  catalog: 'var(--btn-duplicate-color)',
+  style: 'var(--success-color)',
+  commercial: 'var(--warning-color)',
+  manufacturing: 'var(--error-color)',
+};
+
 // Static navigation config — add new master data entries here
 const NAV_GROUPS = [
   {
@@ -61,7 +70,7 @@ const NAV_GROUPS = [
         moduleId: 'supplier-info',
         Component: SupplierMaster,
         loadingKey: null,
-        description: 'Fabric, trim and accessories vendors',
+        description: 'Fabric, trims and accessories vendors',
       },
     ],
   },
@@ -220,6 +229,57 @@ const getAccessibleGroups = () =>
     }))
     .filter(group => group.items.length > 0);
 
+/* ── Inline styles ── */
+
+const navItemBase = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '8px 16px',
+  margin: '1px 8px',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontSize: 13,
+  fontWeight: 500,
+  position: 'relative',
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  color: 'var(--text-secondary)',
+  userSelect: 'none',
+  borderLeft: '3px solid transparent',
+};
+
+const navItemSelected = {
+  ...navItemBase,
+  background: 'var(--primary-light)',
+  color: 'var(--primary-color)',
+  borderLeft: '3px solid var(--primary-color)',
+  fontWeight: 600,
+};
+
+const navItemDefault = {
+  ...navItemBase,
+};
+
+const collapsedItemBase = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 34,
+  height: 34,
+  margin: '2px auto',
+  borderRadius: 'var(--radius-sm)',
+  cursor: 'pointer',
+  fontSize: 16,
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  color: 'var(--text-secondary)',
+};
+
+const collapsedItemSelected = {
+  ...collapsedItemBase,
+  background: 'var(--primary-light)',
+  color: 'var(--primary-color)',
+};
+
 const MasterDashboard = () => {
   const { isDarkMode } = useTheme();
   const {
@@ -236,6 +296,7 @@ const MasterDashboard = () => {
   const [selectedKey, setSelectedKey] = useState(() => accessibleItems[0]?.key ?? 'buyer');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [childIsDirty, setChildIsDirty] = useState(false);
+  const [hoveredKey, setHoveredKey] = useState(null);
 
   // Warn on browser tab close/refresh when a child form is dirty
   useUnsavedChanges(childIsDirty);
@@ -359,29 +420,6 @@ const MasterDashboard = () => {
     fetchAllMetaData();
   }, []);
 
-  // Build Ant Design Menu items from accessible groups only
-  const menuItems = useMemo(() =>
-    accessibleGroups.map(group => ({
-      type: 'group',
-      label: (
-        <span style={{
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.09em',
-          textTransform: 'uppercase',
-          color: isDarkMode ? '#64748b' : '#94a3b8',
-        }}>
-          {group.label}
-        </span>
-      ),
-      children: group.items.map(item => ({
-        key: item.key,
-        icon: <span style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>{item.icon}</span>,
-        label: <span style={{ fontSize: 13 }}>{item.label}</span>,
-      })),
-    }))
-  , [accessibleGroups, isDarkMode]);
-
   // Active item lookup (from accessible items only)
   const activeItem = useMemo(() =>
     accessibleItems.find(item => item.key === selectedKey) ?? accessibleItems[0]
@@ -408,9 +446,32 @@ const MasterDashboard = () => {
     return <Component onDirtyChange={setChildIsDirty} />;
   };
 
-  const borderColor = isDarkMode ? '#334155' : '#e2e8f0';
-  const navBg = isDarkMode ? '#1e293b' : '#ffffff';
-  const descriptionColor = isDarkMode ? '#64748b' : '#94a3b8';
+  const descriptionColor = 'var(--text-secondary)';
+
+  // Compute item style with hover state
+  const getItemStyle = (itemKey) => {
+    if (itemKey === selectedKey) return navItemSelected;
+    if (itemKey === hoveredKey) {
+      return {
+        ...navItemDefault,
+        background: 'var(--primary-light)',
+        color: 'var(--primary-color)',
+      };
+    }
+    return navItemDefault;
+  };
+
+  const getCollapsedItemStyle = (itemKey) => {
+    if (itemKey === selectedKey) return collapsedItemSelected;
+    if (itemKey === hoveredKey) {
+      return {
+        ...collapsedItemBase,
+        background: 'var(--primary-light)',
+        color: 'var(--primary-color)',
+      };
+    }
+    return collapsedItemBase;
+  };
 
   return (
     <div className="animate-fade-in-up" style={{
@@ -432,116 +493,143 @@ const MasterDashboard = () => {
 
         {/* ── Left navigation panel ── */}
         <div style={{
-          width: navCollapsed ? 44 : 240,
+          width: navCollapsed ? 56 : 248,
           flexShrink: 0,
-          background: navBg,
-          borderRadius: 12,
-          border: `1px solid ${borderColor}`,
+          background: 'var(--card-bg)',
+          borderRadius: 'var(--radius-lg)',
+          border: '1px solid var(--border-color)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          transition: 'width 0.32s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           willChange: 'width',
         }}>
-          {/* Panel header — pinned */}
-          <div style={{
-            padding: navCollapsed ? '12px 0' : '10px 16px 10px',
-            borderBottom: `1px solid ${borderColor}`,
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: navCollapsed ? 'center' : 'space-between',
-          }}>
-            {!navCollapsed && (
-              <div style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.09em',
-                textTransform: 'uppercase',
-                color: descriptionColor,
-              }}>
-                Categories
-              </div>
-            )}
-            <Tooltip title={navCollapsed ? 'Expand menu' : 'Collapse menu'} placement="right">
-              <Button
-                type="text"
-                size="small"
-                icon={navCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setNavCollapsed(v => !v)}
-                style={{ color: descriptionColor, flexShrink: 0 }}
-              />
-            </Tooltip>
-          </div>
 
-          {/* Navigation menu — scrollable */}
-          {navCollapsed ? (
-            /* Collapsed: icon-only list with tooltips */
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-              {accessibleGroups.map((group, gi) => (
+          {/* Navigation items — scrollable */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: navCollapsed ? '8px 0' : '4px 0',
+          }}>
+            {navCollapsed ? (
+              /* ── Collapsed: icon grid with tooltips ── */
+              accessibleGroups.map((group, gi) => (
                 <div key={group.groupKey}>
                   {gi > 0 && (
-                    <div style={{ margin: '4px 6px', borderTop: `1px solid ${borderColor}` }} />
+                    <div style={{
+                      margin: '6px 10px',
+                      borderTop: '1px solid var(--border-color)',
+                    }} />
                   )}
                   {group.items.map(item => (
                     <Tooltip key={item.key} title={item.label} placement="right">
                       <div
                         onClick={() => handleMenuSelect(item.key)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          height: 36,
-                          cursor: 'pointer',
-                          borderRadius: 6,
-                          margin: '2px 4px',
-                          fontSize: 15,
-                          backgroundColor: selectedKey === item.key
-                            ? (isDarkMode ? '#312e81' : '#ede9fe')
-                            : 'transparent',
-                          color: selectedKey === item.key
-                            ? '#6366f1'
-                            : (isDarkMode ? '#94a3b8' : '#64748b'),
-                          transition: 'background-color 0.15s, color 0.15s',
-                        }}
+                        onMouseEnter={() => setHoveredKey(item.key)}
+                        onMouseLeave={() => setHoveredKey(null)}
+                        style={getCollapsedItemStyle(item.key)}
                       >
                         {item.icon}
                       </div>
                     </Tooltip>
                   ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            /* Expanded: full labelled menu */
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              <ConfigProvider
-                theme={{
-                  components: {
-                    Menu: {
-                      itemSelectedBg: isDarkMode ? '#312e81' : '#ede9fe',
-                      itemSelectedColor: '#6366f1',
-                      itemBg: 'transparent',
-                      itemHoverBg: isDarkMode ? '#1e3a5f' : '#f5f3ff',
-                      itemHoverColor: isDarkMode ? '#a5b4fc' : '#6366f1',
-                    },
-                  },
+              ))
+            ) : (
+              /* ── Expanded: grouped items with accent headers ── */
+              accessibleGroups.map((group, gi) => (
+                <div key={group.groupKey} style={{ marginTop: gi > 0 ? 4 : 0 }}>
+                  {/* Group header */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0,
+                    padding: '10px 16px 6px 16px',
+                    marginTop: gi > 0 ? 4 : 4,
+                  }}>
+                    <div style={{
+                      width: 2,
+                      height: 12,
+                      borderRadius: 1,
+                      background: GROUP_ACCENT[group.groupKey] || 'var(--border-color)',
+                      marginRight: 8,
+                      flexShrink: 0,
+                    }} />
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'var(--text-muted)',
+                      lineHeight: 1,
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}>
+                      {group.label}
+                    </span>
+                  </div>
+
+                  {/* Group items */}
+                  {group.items.map(item => (
+                    <div
+                      key={item.key}
+                      onClick={() => handleMenuSelect(item.key)}
+                      onMouseEnter={() => setHoveredKey(item.key)}
+                      onMouseLeave={() => setHoveredKey(null)}
+                      style={getItemStyle(item.key)}
+                    >
+                      <span style={{
+                        fontSize: 15,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                        opacity: item.key === selectedKey || item.key === hoveredKey ? 1 : 0.7,
+                        transition: 'opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }}>
+                        {item.icon}
+                      </span>
+                      <span style={{
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}>
+                        {item.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── Collapse/Expand button at bottom ── */}
+          <div style={{
+            borderTop: '1px solid var(--border-color)',
+            padding: '6px',
+            display: 'flex',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Tooltip title={navCollapsed ? 'Expand menu' : 'Collapse menu'} placement="right">
+              <Button
+                type="text"
+                size="small"
+                icon={navCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={() => setNavCollapsed(v => !v)}
+                style={{
+                  color: 'var(--text-muted)',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 'var(--radius-sm)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
-              >
-                <Menu
-                  mode="inline"
-                  selectedKeys={[selectedKey]}
-                  onClick={({ key }) => handleMenuSelect(key)}
-                  items={menuItems}
-                  style={{
-                    border: 'none',
-                    background: 'transparent',
-                    padding: '4px 0 8px',
-                  }}
-                />
-              </ConfigProvider>
-            </div>
-          )}
+              />
+            </Tooltip>
+          </div>
         </div>
 
         {/* ── Right content panel ── */}
@@ -551,7 +639,9 @@ const MasterDashboard = () => {
             display: 'flex',
             alignItems: 'baseline',
             justifyContent: 'space-between',
-            marginBottom: 14,
+            paddingBottom: 12,
+            marginBottom: 12,
+            borderBottom: '1px solid var(--border-color)',
             flexWrap: 'wrap',
             gap: 4,
             flexShrink: 0,

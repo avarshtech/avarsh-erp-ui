@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Button, Input, Select, Switch, Form, Space, Tag, Modal,
-  Typography, message, Tooltip, Alert,
+  Typography, message, Tooltip,
 } from 'antd';
 import {
   SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined,

@@ -2,27 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
-  Button,
   Space,
-  Input,
   Tag,
-  Select,
   Typography,
   message,
-  Row,
-  Col,
-  Tooltip,
-  Popconfirm,
 } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  ReloadOutlined,
-  ExclamationCircleOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { searchBoms, deleteBom } from '../../services/bomService';
 import { BOM_STATUS, getStatusLabel, EDITABLE_STATUSES } from '../../utils/bomConstants';
@@ -30,12 +14,17 @@ import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import BOMView from './BOMView';
 
-const { Text } = Typography;
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import RecordLink from '../../components/RecordLink';
+import EmptyState from '../../components/EmptyState';
+import { BOM_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getTablePagination } from '../../utils/paginationConfig';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 
-const STATUS_COLORS = {
-  DRAFT: 'default',
-  CREATED: 'green',
-};
+const { Text } = Typography;
 
 const BOMList = () => {
   const navigate = useNavigate();
@@ -47,8 +36,7 @@ const BOMList = () => {
     pageSize: 10,
     total: 0,
   });
-  const [searchText, setSearchText] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -91,11 +79,6 @@ const BOMList = () => {
   }, [debouncedSearch, statusFilter, pagination.current, pagination.pageSize, sortField, sortDirection]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
-
-  useEffect(() => {
     fetchData();
   }, [fetchData]);
 
@@ -128,6 +111,13 @@ const BOMList = () => {
     setViewModalVisible(true);
   }, []);
 
+  const statusFilterOptions = useMemo(() =>
+    Object.keys(BOM_STATUS_CONFIG).map((s) => ({
+      label: getStatusLabel(s),
+      value: s,
+    })),
+  []);
+
   const columns = useMemo(() => [
     {
       title: 'Order No',
@@ -137,13 +127,7 @@ const BOMList = () => {
       width: 160,
       sorter: true,
       render: (text, record) => (
-        <Text
-          strong
-          style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
-          onClick={() => handleView(record)}
-        >
-          {text}
-        </Text>
+        <RecordLink text={text} onClick={() => handleView(record)} />
       ),
     },
     {
@@ -192,12 +176,11 @@ const BOMList = () => {
       key: 'status',
       width: 110,
       render: (status) => (
-        <Tag
-          color={STATUS_COLORS[status] || 'default'}
-          style={{ borderRadius: 20 }}
-        >
-          {getStatusLabel(status)}
-        </Tag>
+        <StatusTag
+          status={status}
+          config={BOM_STATUS_CONFIG}
+          getLabel={getStatusLabel}
+        />
       ),
     },
     {
@@ -208,46 +191,28 @@ const BOMList = () => {
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => handleView(record)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="view"
+              size="small"
+              onClick={() => handleView(record)}
+            />
           )}
           {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/bom/edit/${record.id}`, { state: { bomData: record } })}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="edit"
+              size="small"
+              onClick={() => navigate(`/bom/edit/${record.id}`, { state: { bomData: record } })}
+            />
           )}
           {record.status === BOM_STATUS.DRAFT && canDelete && (
-            <Popconfirm
+            <DeleteConfirm
               title="Delete BOM"
-              description={`Are you sure you want to delete "${record.orderNo}"?`}
+              recordLabel={record.orderNo}
               onConfirm={() => handleDelete(record)}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton action="delete" size="small" />
+            </DeleteConfirm>
           )}
         </Space>
       ),
@@ -256,54 +221,36 @@ const BOMList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Bill of Materials</h1>
-        <div className="header-actions">
-          <PermissionGuard module="bom" operation="add">
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/bom/new')}
-            >
-              Create BOM
-            </Button>
-          </PermissionGuard>
-        </div>
-      </div>
+      <PageHeader title="Bill of Materials">
+        <PermissionGuard module="bom" operation="add">
+          <ActionButton
+            action="create"
+            text="Create BOM"
+            onClick={() => navigate('/bom/new')}
+          />
+        </PermissionGuard>
+      </PageHeader>
 
       <Card>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <Input
-              placeholder="Search order no, style, buyer..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={12} sm={8} md={4} lg={3}>
-            <Select
-              placeholder="Status"
-              style={{ width: '100%' }}
-              allowClear
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={Object.keys(STATUS_COLORS).map((s) => ({
-                label: getStatusLabel(s),
-                value: s,
-              }))}
-            />
-          </Col>
-          <Col>
-            <Tooltip title="Refresh">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => fetchData(pagination.current, pagination.pageSize)}
-              />
-            </Tooltip>
-          </Col>
-        </Row>
+        <SearchFilterBar
+          searchText={searchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchPlaceholder="Search order no, style, buyer..."
+          filters={[
+            {
+              type: 'select',
+              props: {
+                placeholder: 'Status',
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: statusFilterOptions,
+              },
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+            },
+          ]}
+          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          style={{ marginBottom: 16 }}
+        />
 
         <Table
           columns={columns}
@@ -312,12 +259,14 @@ const BOMList = () => {
           rowKey="id"
           scroll={{ x: 1000 }}
           onChange={handleTableChange}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} BOMs`,
+          pagination={getTablePagination(pagination, 'BOMs')}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="No BOMs found"
+                description="Create a new Bill of Materials to get started."
+              />
+            ),
           }}
         />
       </Card>

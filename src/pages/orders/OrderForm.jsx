@@ -11,17 +11,14 @@ import {
   Col,
   Space,
   Typography,
-  Statistic,
   message,
   Collapse,
   Tag,
-  Divider,
   Modal,
   Table,
   Popconfirm,
   FloatButton,
   Tooltip,
-  Spin,
   Skeleton,
   Upload,
   Alert,
@@ -30,9 +27,6 @@ import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
-  SaveOutlined,
-  ArrowLeftOutlined,
-  SendOutlined,
   CaretRightOutlined,
   ClockCircleOutlined,
   LoadingOutlined,
@@ -42,10 +36,13 @@ import {
   DownloadOutlined,
   RobotOutlined,
   UploadOutlined,
-  CheckCircleOutlined,
   ExclamationCircleOutlined,
   EditOutlined,
 } from '@ant-design/icons';
+import { ActionButton } from '../../components/buttons';
+import PageHeader from '../../components/PageHeader';
+import StatusTag from '../../components/StatusTag';
+import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
@@ -110,9 +107,9 @@ const formatBytes = (bytes) => {
 
 const getFileIcon = (fileType) => {
   if (!fileType) return <FileOutlined style={{ fontSize: 28, color: '#8c8c8c' }} />;
-  if (fileType === 'application/pdf') return <FilePdfOutlined style={{ fontSize: 28, color: '#f5222d' }} />;
-  if (fileType.startsWith('image/')) return <FileImageOutlined style={{ fontSize: 28, color: '#fa8c16' }} />;
-  return <FileOutlined style={{ fontSize: 28, color: '#1890ff' }} />;
+  if (fileType === 'application/pdf') return <FilePdfOutlined style={{ fontSize: 28, color: 'var(--error-color)' }} />;
+  if (fileType.startsWith('image/')) return <FileImageOutlined style={{ fontSize: 28, color: 'var(--warning-color)' }} />;
+  return <FileOutlined style={{ fontSize: 28, color: 'var(--primary-color)' }} />;
 };
 
 const CostingAttachmentCard = ({ attachment }) => {
@@ -464,7 +461,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
       {/* Size preset selector */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Space>
-          <Text strong style={{ fontSize: 13 }}>Size Preset: <span style={{ color: '#ff4d4f' }}>*</span></Text>
+          <Text strong style={{ fontSize: 13 }}>Size Preset: <span style={{ color: 'var(--error-color)' }}>*</span></Text>
           <Select
             style={{ width: 180 }}
             value={sizePreset || undefined}
@@ -527,7 +524,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-secondary, #f8fafc)' }}>
                 <th style={{ ...thStyle, minWidth: 180 }}>
-                  Color/Print <span style={{ color: '#ff4d4f' }}>*</span>
+                  Color/Print <span style={{ color: 'var(--error-color)' }}>*</span>
                 </th>
                 {sizes.map((s) => (
                   <th key={s} style={{ ...thStyle, textAlign: 'center', minWidth: 80 }}>{s}</th>
@@ -541,14 +538,14 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
               {/* Price Row */}
               <tr style={{ backgroundColor: 'var(--primary-light)' }}>
                 <td style={tdStyle}>
-                  <Text strong style={{ fontSize: 12, color: '#1890ff' }}>
+                  <Text strong style={{ fontSize: 12, color: 'var(--primary-color)' }}>
                     Price{currency ? ` (${currency})` : ''}
                   </Text>
                 </td>
                 {sizes.map((s) => (
                   <td key={s} style={{ ...tdStyle, textAlign: 'center' }}>
                     {readOnly ? (
-                      <Text style={{ color: '#1890ff' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
+                      <Text style={{ color: 'var(--primary-color)' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
                     ) : (
                       <InputNumber
                         size="small"
@@ -631,7 +628,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                   </td>
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <Text strong style={{ color: grandQty > 0 ? 'var(--success-color, #10b981)' : '#ff4d4f', fontSize: 14 }}>
+                  <Text strong style={{ color: grandQty > 0 ? 'var(--success-color, #10b981)' : 'var(--error-color)', fontSize: 14 }}>
                     {grandQty.toLocaleString()}
                   </Text>
                 </td>
@@ -1806,62 +1803,51 @@ const OrderForm = () => {
   return (
     <div className="animate-fade-in-up">
       {/* Page Header */}
-      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/orders/list')} />
-          <h1>{isEdit ? 'Edit Order' : 'Create New Order'}</h1>
-          {existingOrder && (
-            <Tag
-              color={
-                orderStatus === ORDER_STATUS.DRAFT
-                  ? 'default'
-                  : orderStatus === ORDER_STATUS.REFERRED_BACK
-                  ? 'orange'
-                  : 'green'
-              }
-            >
-              {getStatusLabel(orderStatus)}
-            </Tag>
-          )}
-        </Space>
-        <div className="header-actions">
-          {canSaveAsDraft && !isReferredBack && (
-            <Button icon={<SaveOutlined />} onClick={handleSaveDraft} loading={savingDraft} disabled={submitting}>
-              Save as Draft
-            </Button>
-          )}
-          {canSubmit && !isReferredBack && (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSubmitOrder}
-              loading={submitting}
-              disabled={savingDraft}
-            >
-              Submit Order
-            </Button>
-          )}
-          {canSubmit && isReferredBack && (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSubmitOrder}
-              loading={submitting}
-              disabled={savingDraft}
-            >
-              Resubmit Order
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={isEdit ? 'Edit Order' : 'Create New Order'}
+        backPath="/orders/list"
+        status={existingOrder && (
+          <StatusTag status={orderStatus} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />
+        )}
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      >
+        {canSaveAsDraft && !isReferredBack && (
+          <ActionButton
+            action="save"
+            variant="draft"
+            text="Save as Draft"
+            onClick={handleSaveDraft}
+            loading={savingDraft}
+            disabled={submitting}
+          />
+        )}
+        {canSubmit && !isReferredBack && (
+          <ActionButton
+            action="save"
+            text="Submit Order"
+            onClick={handleSubmitOrder}
+            loading={submitting}
+            disabled={savingDraft}
+          />
+        )}
+        {canSubmit && isReferredBack && (
+          <ActionButton
+            action="save"
+            text="Resubmit Order"
+            onClick={handleSubmitOrder}
+            loading={submitting}
+            disabled={savingDraft}
+          />
+        )}
+      </PageHeader>
 
       {/* Referred Back Reason */}
       {isReferredBack && existingOrder?.referBackReason && (
         <Card
           size="small"
-          style={{ marginBottom: 16, borderColor: '#fa8c16', backgroundColor: 'var(--accent-light)' }}
+          style={{ marginBottom: 16, borderColor: 'var(--warning-color)', backgroundColor: 'var(--accent-light)' }}
         >
-          <Text strong style={{ color: '#fa8c16' }}>Refer Back Reason: </Text>
+          <Text strong style={{ color: 'var(--warning-color)' }}>Refer Back Reason: </Text>
           <Text>{existingOrder.referBackReason}</Text>
         </Card>
       )}
@@ -2105,11 +2091,11 @@ const OrderForm = () => {
             <Col xs={12} sm={8} md={6} lg={4}>
               <Card
                 size="small"
-                style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid #1677ff' }}
+                style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid var(--primary-color)' }}
                 styles={{ body: { padding: '12px 16px' } }}
               >
                 <div style={{ fontSize: 12, color: 'var(--text-secondary, #8c8c8c)', marginBottom: 4 }}>Order Qty</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: '#1677ff' }}>{totalOrderQty.toLocaleString()}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }}>{totalOrderQty.toLocaleString()}</div>
               </Card>
             </Col>
             <Col xs={12} sm={8} md={6} lg={4}>
@@ -2209,7 +2195,7 @@ const OrderForm = () => {
                       <Row gutter={12}>
                         <Col xs={24} sm={12}>
                           <Form.Item
-                            label={<span>Buyer PO No <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            label={<span>Buyer PO No <span style={{ color: 'var(--error-color)' }}>*</span></span>}
                             style={{ marginBottom: 12 }}
                           >
                             <Input
@@ -2221,7 +2207,7 @@ const OrderForm = () => {
                         </Col>
                         <Col xs={24} sm={12}>
                           <Form.Item
-                            label={<span>Destination <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            label={<span>Destination <span style={{ color: 'var(--error-color)' }}>*</span></span>}
                             style={{ marginBottom: 12 }}
                           >
                             <Select
@@ -2237,7 +2223,7 @@ const OrderForm = () => {
                         </Col>
                         <Col xs={24} sm={12}>
                           <Form.Item
-                            label={<span>Dispatch Date <span style={{ color: '#ff4d4f' }}>*</span></span>}
+                            label={<span>Dispatch Date <span style={{ color: 'var(--error-color)' }}>*</span></span>}
                             style={{ marginBottom: 12 }}
                           >
                             <DatePicker

@@ -29,17 +29,13 @@ import { numericInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
-  SaveOutlined,
-  ArrowLeftOutlined,
   SendOutlined,
-  SearchOutlined,
   ExclamationCircleOutlined,
   EditOutlined,
-  InfoCircleOutlined,
-  CloseCircleOutlined,
   ExperimentOutlined,
-  DollarOutlined,
 } from '@ant-design/icons';
+import PageHeader from '../../components/PageHeader';
+import { ActionButton } from '../../components/buttons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -2153,36 +2149,32 @@ const POForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={handleGoBack} />
-          <h1>{isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}</h1>
-        </Space>
-        <div className="header-actions">
-          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') &&
-            !(isEditMode && originalPO && (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK)) && (
-            <Button
-              icon={<SaveOutlined />}
-              onClick={handleSaveDraft}
-              loading={savingDraft}
-              disabled={submitting || (isEditMode && !isDirty)}
-            >
-              Save as Draft
-            </Button>
-          )}
-          {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') && (
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSubmitClick}
-              loading={submitting}
-              disabled={savingDraft}
-            >
-              Submit for Approval
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title={isEditMode ? 'Edit Purchase Order' : 'Create Purchase Order'}
+        onBack={handleGoBack}
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      >
+        {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') &&
+          !(isEditMode && originalPO && (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK)) && (
+          <ActionButton
+            action="save"
+            variant="draft"
+            text="Save as Draft"
+            onClick={handleSaveDraft}
+            loading={savingDraft}
+            disabled={submitting || (isEditMode && !isDirty)}
+          />
+        )}
+        {hasPermission('purchase-orders', isEditMode ? 'update' : 'add') && (
+          <ActionButton
+            action="save"
+            text="Submit for Approval"
+            onClick={handleSubmitClick}
+            loading={submitting}
+            disabled={savingDraft}
+          />
+        )}
+      </PageHeader>
 
       <Form
         form={form}

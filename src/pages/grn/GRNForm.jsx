@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { Form, Input, Select, DatePicker, InputNumber, Button, Card, Row, Col, Table, Space, Typography, message, Popconfirm, Descriptions, Tag, Alert } from 'antd';
-import { PlusOutlined, DeleteOutlined, SaveOutlined, ArrowLeftOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import { Form, Input, Select, DatePicker, InputNumber, Card, Row, Col, Table, Typography, message, Descriptions, Tag, Alert } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../utils/permissions';
+import PageHeader from '../../components/PageHeader';
+import { ActionButton } from '../../components/buttons';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -74,9 +75,9 @@ const GRNForm = () => {
     { title: 'Pending', dataIndex: 'pendingQty', width: 90, align: 'center', render: (v) => <Tag color="blue">{v}</Tag> },
     { title: 'Received', dataIndex: 'receivedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.pendingQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'receivedQty', val)} {...numericInputProps} /> },
     { title: 'Rejected', dataIndex: 'rejectedQty', width: 100, render: (v, record) => <InputNumber min={0} max={record.receivedQty} style={{ width: '100%' }} value={v} onChange={(val) => handleLineChange(record.key, 'rejectedQty', val)} {...numericInputProps} /> },
-    { title: 'Accepted', dataIndex: 'acceptedQty', width: 90, align: 'center', render: (v) => <Text strong style={{ color: '#22c55e' }}>{v}</Text> },
+    { title: 'Accepted', dataIndex: 'acceptedQty', width: 90, align: 'center', render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>{v}</Text> },
     { title: 'Rate', dataIndex: 'unitPrice', width: 80, render: (v) => `$${v.toFixed(2)}` },
-    { title: 'Amount', dataIndex: 'amount', width: 100, render: (v) => <Text strong style={{ color: '#10b981' }}>${v.toFixed(2)}</Text> },
+    { title: 'Amount', dataIndex: 'amount', width: 100, render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>${v.toFixed(2)}</Text> },
   ];
 
   const handleSubmit = (values) => {
@@ -87,13 +88,10 @@ const GRNForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <Space><Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/grn/list')} /><h1>{id ? 'Edit GRN' : 'Create Goods Received Note'}</h1></Space>
-        <div className="header-actions">
-          {hasPermission('grn', id ? 'update' : 'add') && <Button icon={<SaveOutlined />}>Save as Draft</Button>}
-          {hasPermission('grn', id ? 'update' : 'add') && <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => form.submit()}>Post GRN</Button>}
-        </div>
-      </div>
+      <PageHeader title={id ? 'Edit GRN' : 'Create Goods Received Note'} backPath="/grn/list">
+        {hasPermission('grn', id ? 'update' : 'add') && <ActionButton action="save" variant="draft" text="Save as Draft" />}
+        {hasPermission('grn', id ? 'update' : 'add') && <ActionButton action="save" text="Post GRN" onClick={() => form.submit()} />}
+      </PageHeader>
 
       <Form form={form} layout="vertical" onFinish={handleSubmit} initialValues={{ grnDate: dayjs() }}>
         <Row gutter={24}>
@@ -134,13 +132,13 @@ const GRNForm = () => {
             {getTotalRejected() > 0 && <Alert title={`${getTotalRejected()} items marked as rejected. Please ensure quality inspection notes are added.`} type="warning" showIcon style={{ marginBottom: 16 }} />}
             <Table columns={columns} dataSource={lineItems} pagination={false} scroll={{ x: 1000 }} size="middle" summary={() => (
               <Table.Summary fixed>
-                <Table.Summary.Row style={{ background: '#f8fafc' }}>
+                <Table.Summary.Row style={{ background: 'var(--bg-secondary)' }}>
                   <Table.Summary.Cell index={0} colSpan={5}><Text strong>Totals</Text></Table.Summary.Cell>
                   <Table.Summary.Cell index={1} align="center"><Text strong>{getTotalReceived()}</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={2} align="center"><Text strong style={{ color: '#ef4444' }}>{getTotalRejected()}</Text></Table.Summary.Cell>
-                  <Table.Summary.Cell index={3} align="center"><Text strong style={{ color: '#22c55e' }}>{getTotalAccepted()}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={2} align="center"><Text strong style={{ color: 'var(--error-color)' }}>{getTotalRejected()}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={3} align="center"><Text strong style={{ color: 'var(--success-color)' }}>{getTotalAccepted()}</Text></Table.Summary.Cell>
                   <Table.Summary.Cell index={4}></Table.Summary.Cell>
-                  <Table.Summary.Cell index={5}><Text strong style={{ color: '#10b981' }}>${getTotalAmount().toFixed(2)}</Text></Table.Summary.Cell>
+                  <Table.Summary.Cell index={5}><Text strong style={{ color: 'var(--success-color)' }}>${getTotalAmount().toFixed(2)}</Text></Table.Summary.Cell>
                 </Table.Summary.Row>
               </Table.Summary>
             )} />

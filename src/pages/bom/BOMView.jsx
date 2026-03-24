@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
 import {
-  Modal, Tag, Space, Typography, Button, Spin, Skeleton, Card, Row, Col, Tooltip, message,
+  Tag, Typography, Button, Tooltip, message, Row, Col,
 } from 'antd';
 import {
-  FileTextOutlined, CheckCircleOutlined, AppstoreOutlined, ScissorOutlined, DownloadOutlined,
+  AppstoreOutlined, ScissorOutlined, DownloadOutlined,
 } from '@ant-design/icons';
-import { getStatusLabel, BOM_STATUS, calcPurchaseQty } from '../../utils/bomConstants';
+import { getStatusLabel, calcPurchaseQty } from '../../utils/bomConstants';
 import { getBomById } from '../../services/bomService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 
-const { Text, Title } = Typography;
+import ViewDialog from '../../components/ViewDialog';
+import DetailCard from '../../components/DetailCard';
+import StatusTag from '../../components/StatusTag';
+import StatusSteps from '../../components/StatusSteps';
+import DraftWatermark from '../../components/DraftWatermark';
+import { ActionButton } from '../../components/buttons';
+import { BOM_STATUS_CONFIG, BOM_STATUS_FLOW } from '../../utils/statusConfig';
+import { formatNumber } from '../../utils/formatters';
 
-const STATUS_CONFIG = {
-  [BOM_STATUS.DRAFT]:   { color: 'default', icon: <FileTextOutlined /> },
-  [BOM_STATUS.CREATED]: { color: 'green',   icon: <CheckCircleOutlined /> },
-};
+const { Text } = Typography;
 
 const variantsToTags = (variants) => {
   if (!variants || typeof variants !== 'object') return [];
@@ -76,7 +80,6 @@ const BOMView = ({ open, bomData, onClose }) => {
   if (!bomData) return null;
   const bom = fullBom || bomData;
   const { orderNo, status, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
-  const statusConfig = STATUS_CONFIG[status] || {};
 
   const fabricLines = lines.filter(isFabricLine);
   const trimLines = lines.filter((l) => !isFabricLine(l));
@@ -113,7 +116,7 @@ const BOMView = ({ open, bomData, onClose }) => {
     return calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip);
   };
 
-  // Render a single BOM line card. When wrap=false, returns Card without Col wrapper.
+  // Render a single BOM line card
   const renderLineCard = (line, idx, wrap = true) => {
     const fabric = isFabricLine(line);
     const cMode = line.consumptionMode || 'SIMPLE';
@@ -124,13 +127,17 @@ const BOMView = ({ open, bomData, onClose }) => {
     const variantTags = variantsToTags(line.variants);
 
     const card = (
-        <Card
-          size="small"
+        <div
           style={{
-            borderRadius: 10, height: '100%',
-            borderLeft: `4px solid ${fabric ? 'var(--primary-color, #6366f1)' : '#10b981'}`,
+            borderRadius: 'var(--radius-md, 10px)',
+            height: '100%',
+            borderLeft: `4px solid ${fabric ? 'var(--primary-color, #6366f1)' : 'var(--color-success, #10b981)'}`,
+            border: '1px solid var(--border-color)',
+            borderLeftWidth: 4,
+            borderLeftColor: fabric ? 'var(--primary-color, #6366f1)' : 'var(--color-success, #10b981)',
+            background: 'var(--card-bg)',
+            padding: '16px 20px',
           }}
-          styles={{ body: { padding: '16px 20px' } }}
         >
           {/* Header: Item name + code + category */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -150,7 +157,6 @@ const BOMView = ({ open, bomData, onClose }) => {
                 )}
               </div>
             </div>
-            {/* UOM shown inline with values below */}
           </div>
 
           {/* Variant tags (fabric) */}
@@ -185,7 +191,7 @@ const BOMView = ({ open, bomData, onClose }) => {
           {/* Quantities */}
           <div style={{
             display: 'flex', gap: 16, flexWrap: 'wrap',
-            padding: '10px 14px', borderRadius: 8,
+            padding: '10px 14px', borderRadius: 'var(--radius-sm, 8px)',
             background: 'var(--bg-secondary, #f6f8fa)',
             border: '1px solid var(--border-color, #e8e8e8)',
           }}>
@@ -195,8 +201,8 @@ const BOMView = ({ open, bomData, onClose }) => {
               </Text>
               <Text strong style={{ fontSize: 14 }}>
                 {isMatrix
-                  ? (line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—')
-                  : (line.consumptionPerGarment != null ? Number(line.consumptionPerGarment).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '—')
+                  ? (line.totalQty ? formatNumber(line.totalQty, 2) : '\u2014')
+                  : (line.consumptionPerGarment != null ? Number(line.consumptionPerGarment).toLocaleString(undefined, { maximumFractionDigits: 4 }) : '\u2014')
                 }
                 {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
               </Text>
@@ -204,15 +210,15 @@ const BOMView = ({ open, bomData, onClose }) => {
             <div>
               <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Total Qty</Text>
               <Text strong style={{ fontSize: 14, color: 'var(--primary-color, #6366f1)' }}>
-                {line.totalQty ? Number(line.totalQty).toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
+                {line.totalQty ? formatNumber(line.totalQty, 2) : '\u2014'}
                 {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
               </Text>
             </div>
             {purchaseQty != null && (
               <div>
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
-                <Text strong style={{ fontSize: 14, color: '#10b981' }}>
-                  {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
+                  {formatNumber(purchaseQty, 2)}
                   {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
                 </Text>
               </div>
@@ -234,132 +240,122 @@ const BOMView = ({ open, bomData, onClose }) => {
               </div>
             )}
           </div>
-        </Card>
+        </div>
     );
     if (!wrap) return card;
     return <Col xs={24} md={12} key={line.id || idx}>{card}</Col>;
   };
 
   return (
-    <Modal
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Text strong style={{ fontSize: 18 }}>{orderNo || 'BOM'}</Text>
-          <Tag color={statusConfig.color} icon={statusConfig.icon} style={{ borderRadius: 20, fontSize: 12 }}>
-            {getStatusLabel(status)}
-          </Tag>
+    <ViewDialog
+      open={open}
+      onClose={onClose}
+      width={1000}
+      loading={loading}
+      hero={{
+        title: orderNo || 'BOM',
+        status: (
+          <StatusTag
+            status={status}
+            config={BOM_STATUS_CONFIG}
+            getLabel={getStatusLabel}
+          />
+        ),
+        subtitle: [styleName, buyerName].filter(Boolean).join(' \u2022 '),
+        highlight: orderQty ? { label: 'Order Qty', value: orderQty.toLocaleString() } : undefined,
+      }}
+      footer={
+        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+          <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
       }
-      open={open}
-      onCancel={onClose}
-      width={1000}
-      centered
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '20px 24px' } }}
-      footer={<Button onClick={onClose}>Close</Button>}
     >
-      {loading ? (
-        <div style={{ padding: '8px 0' }}>
-          <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Col xs={12} sm={8} md={4} key={i}>
-                <Skeleton.Input active size="small" style={{ width: '100%', height: 48 }} block />
-              </Col>
-            ))}
-          </Row>
-          <Skeleton active paragraph={{ rows: 8 }} />
-        </div>
-      ) : (
-        <>
-          {/* General Info Cards */}
-          <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-            {[
-              { label: 'Style', value: styleName },
-              { label: 'Garment', value: garmentName },
-              { label: 'Buyer', value: buyerName },
-              { label: 'Material', value: material },
-              { label: 'Season', value: season },
-              { label: 'Order Qty', value: orderQty ? orderQty.toLocaleString() : '-', highlight: true },
-            ].map((item) => (
-              <Col xs={12} sm={8} md={4} key={item.label}>
-                <div style={{
-                  padding: '8px 12px', borderRadius: 8,
-                  background: 'var(--bg-secondary, #f6f8fa)',
-                  border: '1px solid var(--border-color, #e8e8e8)',
-                  height: '100%',
-                }}>
-                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{item.label}</Text>
-                  <Text strong style={{ fontSize: 13, color: item.highlight ? 'var(--primary-color, #6366f1)' : undefined }}>
-                    {item.value || '-'}
-                  </Text>
-                </div>
-              </Col>
-            ))}
-          </Row>
+      <StatusSteps
+        statusFlow={BOM_STATUS_FLOW}
+        currentStatus={status}
+        statusConfig={BOM_STATUS_CONFIG}
+        getLabel={getStatusLabel}
+        size="small"
+        style={{ marginBottom: 20 }}
+      />
+      <DraftWatermark status={status}>
+        {/* General Info */}
+        <DetailCard title="General Information" style={{ marginBottom: 20 }}>
+          <DetailCard.Field label="Style" value={styleName} span={4} />
+          <DetailCard.Field label="Garment" value={garmentName} span={4} />
+          <DetailCard.Field label="Buyer" value={buyerName} span={4} />
+          <DetailCard.Field label="Material" value={material} span={4} />
+          <DetailCard.Field label="Season" value={season} span={4} />
+          <DetailCard.Field
+            label="Order Qty"
+            value={orderQty ? orderQty.toLocaleString() : undefined}
+            span={4}
+          />
+        </DetailCard>
 
-          {remarks && (
-            <div style={{
-              marginBottom: 20, padding: '8px 14px', borderRadius: 8,
-              background: 'var(--bg-secondary, #f6f8fa)',
-              border: '1px solid var(--border-color, #e8e8e8)',
-              fontSize: 12,
-            }}>
-              <Text type="secondary" style={{ fontSize: 10 }}>Remarks: </Text>
-              <Text>{remarks}</Text>
-            </div>
-          )}
+        {remarks && (
+          <div style={{
+            marginBottom: 20, padding: '8px 14px', borderRadius: 'var(--radius-sm, 8px)',
+            background: 'var(--bg-secondary, #f6f8fa)',
+            border: '1px solid var(--border-color, #e8e8e8)',
+            fontSize: 12,
+          }}>
+            <Text type="secondary" style={{ fontSize: 10 }}>Remarks: </Text>
+            <Text>{remarks}</Text>
+          </div>
+        )}
 
-          {/* Side by side when exactly 1 fabric + 1 trim */}
-          {fabricLines.length === 1 && trimLines.length === 1 ? (
-            <Row gutter={[12, 12]}>
-              <Col xs={24} md={12}>
+        {/* Side by side when exactly 1 fabric + 1 trim */}
+        {fabricLines.length === 1 && trimLines.length === 1 ? (
+          <Row gutter={[12, 12]}>
+            <Col xs={24} md={12}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <ScissorOutlined style={{ color: 'var(--primary-color, #6366f1)' }} />
+                <Text strong style={{ fontSize: 14 }}>Fabric</Text>
+              </div>
+              {renderLineCard(fabricLines[0], 'fab-0', false)}
+            </Col>
+            <Col xs={24} md={12}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <AppstoreOutlined style={{ color: 'var(--color-success, #10b981)' }} />
+                <Text strong style={{ fontSize: 14 }}>Trims</Text>
+              </div>
+              {renderLineCard(trimLines[0], 'trim-0', false)}
+            </Col>
+          </Row>
+        ) : (
+          <>
+            {/* Fabric Lines */}
+            {fabricLines.length > 0 && (
+              <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                   <ScissorOutlined style={{ color: 'var(--primary-color, #6366f1)' }} />
                   <Text strong style={{ fontSize: 14 }}>Fabric</Text>
+                  <Tag style={{ margin: 0, fontSize: 10 }}>{fabricLines.length}</Tag>
                 </div>
-                {renderLineCard(fabricLines[0], 'fab-0', false)}
-              </Col>
-              <Col xs={24} md={12}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <AppstoreOutlined style={{ color: '#10b981' }} />
-                  <Text strong style={{ fontSize: 14 }}>Trims</Text>
-                </div>
-                {renderLineCard(trimLines[0], 'trim-0', false)}
-              </Col>
-            </Row>
-          ) : (
-            <>
-              {/* Fabric Lines */}
-              {fabricLines.length > 0 && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                    <ScissorOutlined style={{ color: 'var(--primary-color, #6366f1)' }} />
-                    <Text strong style={{ fontSize: 14 }}>Fabric</Text>
-                    <Tag style={{ margin: 0, fontSize: 10 }}>{fabricLines.length}</Tag>
-                  </div>
-                  <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
-                    {fabricLines.map((line, idx) => renderLineCard(line, `fab-${idx}`))}
-                  </Row>
-                </>
-              )}
+                <Row gutter={[12, 12]} style={{ marginBottom: 20 }}>
+                  {fabricLines.map((line, idx) => renderLineCard(line, `fab-${idx}`))}
+                </Row>
+              </>
+            )}
 
-              {/* Trim Lines */}
-              {trimLines.length > 0 && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                    <AppstoreOutlined style={{ color: '#10b981' }} />
-                    <Text strong style={{ fontSize: 14 }}>Trims</Text>
-                    <Tag style={{ margin: 0, fontSize: 10 }}>{trimLines.length}</Tag>
-                  </div>
-                  <Row gutter={[12, 12]}>
-                    {trimLines.map((line, idx) => renderLineCard(line, `trim-${idx}`))}
-                  </Row>
-                </>
-              )}
-            </>
-          )}
-        </>
-      )}
-    </Modal>
+            {/* Trim Lines */}
+            {trimLines.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <AppstoreOutlined style={{ color: 'var(--color-success, #10b981)' }} />
+                  <Text strong style={{ fontSize: 14 }}>Trims</Text>
+                  <Tag style={{ margin: 0, fontSize: 10 }}>{trimLines.length}</Tag>
+                </div>
+                <Row gutter={[12, 12]}>
+                  {trimLines.map((line, idx) => renderLineCard(line, `trim-${idx}`))}
+                </Row>
+              </>
+            )}
+          </>
+        )}
+      </DraftWatermark>
+    </ViewDialog>
   );
 };
 

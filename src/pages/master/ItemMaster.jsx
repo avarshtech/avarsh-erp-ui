@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Card, Table, Button, Input, Select, Tag, Space, Modal, Form, Row, Col,
-  Spin, message, Tooltip, Divider, Badge, Checkbox, Typography, Empty,
+  Spin, message, Divider, Badge, Checkbox, Typography, Empty,
   Drawer, Descriptions, Alert, Skeleton,
 } from 'antd';
 import {
@@ -9,6 +9,8 @@ import {
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
   ClearOutlined, AppstoreOutlined, FileImageOutlined, LoadingOutlined,
 } from '@ant-design/icons';
+import { ActionButton } from '../../components/buttons';
+import EmptyState from '../../components/EmptyState';
 import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -1430,26 +1432,10 @@ const ItemMaster = () => {
             render: (_, record) => (
               <Space size="small">
                 {canView && (
-                  <Tooltip title="View">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EyeOutlined />}
-                      onClick={() => handleView(record)}
-                      style={{ color: '#1890ff' }}
-                    />
-                  </Tooltip>
+                  <ActionButton action="view" onClick={() => handleView(record)} />
                 )}
                 {canUpdate && (
-                  <Tooltip title="Edit">
-                    <Button
-                      type="text"
-                      size="small"
-                      icon={<EditOutlined />}
-                      onClick={() => handleEdit(record)}
-                      style={{ color: '#52c41a' }}
-                    />
-                  </Tooltip>
+                  <ActionButton action="edit" onClick={() => handleEdit(record)} />
                 )}
               </Space>
             ),
@@ -1480,7 +1466,7 @@ const ItemMaster = () => {
               <AppstoreOutlined />
               <span style={{ fontSize: 16, fontWeight: 600 }}>Item Master</span>
             </Space>
-            <div style={{ fontSize: 12, color: '#888' }}>Purchase Order</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Purchase Order</div>
           </div>
         }
         extra={
@@ -1567,13 +1553,12 @@ const ItemMaster = () => {
           size="small"
           locale={{
             emptyText: (
-              <Empty description="No items found">
-                {canAdd && (
-                  <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
-                    Add Item
-                  </Button>
-                )}
-              </Empty>
+              <EmptyState
+                title="No items found"
+                description="Add your first item to get started"
+                actionLabel={canAdd ? 'Add Item' : undefined}
+                onAction={canAdd ? handleAdd : undefined}
+              />
             ),
           }}
         />
@@ -1894,9 +1879,9 @@ const ItemMaster = () => {
                         fontSize: 14,
                         border:
                           duplicateVariantIndex === originalIndex
-                              ? '2px solid #ff4d4f'
+                              ? '2px solid var(--error-color)'
                               : activeVariantIndex === originalIndex
-                              ? '2px solid #1890ff'
+                              ? '2px solid var(--primary-color)'
                               : '1px solid var(--border-color)',
                       }}
                       onClick={() => {
@@ -2009,7 +1994,7 @@ const ItemMaster = () => {
                         {
                           title: '#',
                           width: 50,
-                          render: (_, __, idx) => <Badge count={idx + 1} style={{ backgroundColor: '#1890ff' }} />,
+                          render: (_, __, idx) => <Badge count={idx + 1} style={{ backgroundColor: 'var(--primary-color)' }} />,
                         },
                         ...formAttributes.map((attr) => {
                           const attrNameLower = (attr.attributeName || '').toLowerCase();

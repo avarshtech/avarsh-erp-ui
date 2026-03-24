@@ -8,14 +8,12 @@ import {
   Typography,
   Alert,
   Collapse,
-  Card,
   Row,
   Col,
   Divider,
   Empty,
   Badge,
   Input,
-  Spin,
   message,
 } from 'antd';
 import {
@@ -24,6 +22,7 @@ import {
   ShoppingCartOutlined,
   CloseCircleOutlined,
 } from '@ant-design/icons';
+import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
 import orderInputIllustration from '../../assets/images/order-input-illustration.svg';
@@ -236,7 +235,7 @@ const BomLineSelectionDrawer = ({
           alignItems: 'center',
           gap: 10,
           padding: '8px 12px',
-          borderBottom: '1px solid #f0f0f0',
+          borderBottom: '1px solid var(--border-color, #f0f0f0)',
           opacity: isLocked ? 0.5 : 1,
           background: isSelected && !isLocked ? 'rgba(22, 119, 255, 0.04)' : 'transparent',
         }}
@@ -305,7 +304,7 @@ const BomLineSelectionDrawer = ({
         <Space>
           <div style={{ width: 4, height: 16, borderRadius: 2, background: color }} />
           <Text strong>{label}</Text>
-          <Badge count={lines.length} style={{ background: '#e6f4ff', color: '#1677ff', fontSize: 11 }} />
+          <Badge count={lines.length} style={{ background: 'var(--primary-bg, #e6f4ff)', color: 'var(--primary-color)', fontSize: 11 }} />
         </Space>
         {selectableLines.length > 0 && (
           <Checkbox
@@ -363,15 +362,14 @@ const BomLineSelectionDrawer = ({
       styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button
-            type="primary"
+          <ActionButton action="close" text="Cancel" onClick={onClose} />
+          <ActionButton
+            action="save"
+            text={`Add ${selectedCount} Line${selectedCount !== 1 ? 's' : ''} to PO`}
             icon={<CheckOutlined />}
             onClick={handleConfirm}
             disabled={selectedCount === 0}
-          >
-            Add {selectedCount} Line{selectedCount !== 1 ? 's' : ''} to PO
-          </Button>
+          />
         </div>
       }
     >
@@ -438,7 +436,7 @@ const BomLineSelectionDrawer = ({
                   </Col>
                   <Col flex="none">
                     <CloseCircleOutlined
-                      style={{ fontSize: 16, color: '#ff4d4f', cursor: 'pointer' }}
+                      style={{ fontSize: 16, color: 'var(--error-color)', cursor: 'pointer' }}
                       onClick={() => handleRemoveOrder(order.orderNo)}
                     />
                   </Col>
@@ -503,7 +501,7 @@ const BomLineSelectionDrawer = ({
                 ghost
                 size="small"
                 items={orderItems}
-                style={{ background: '#fafafa', borderRadius: 8 }}
+                style={{ background: 'var(--bg-secondary, #fafafa)', borderRadius: 8 }}
               />
             </div>
             {collapseItems.length > 1 && <Divider style={{ margin: '4px 0' }} />}

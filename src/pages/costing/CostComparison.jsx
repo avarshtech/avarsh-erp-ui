@@ -7,13 +7,10 @@ import {
   Row,
   Col,
   Space,
-  Table,
-  Tag,
   message,
   Empty,
 } from 'antd';
 import {
-  ArrowLeftOutlined,
   SwapOutlined,
   ClearOutlined,
 } from '@ant-design/icons';
@@ -23,20 +20,15 @@ import {
   getCostSheetById,
 } from '../../services/costingService';
 import {
-  COSTING_STATUS,
   getStatusLabel,
   formatCurrency,
 } from '../../utils/costingConstants';
-import { getCurrencySymbol } from '../../utils/orderConstants';
 import { useTheme } from '../../context/ThemeContext';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import { COSTING_STATUS_CONFIG } from '../../utils/statusConfig';
 
 const { Text, Title } = Typography;
-
-const STATUS_COLORS = {
-  [COSTING_STATUS.DRAFT]: 'default',
-  [COSTING_STATUS.FINAL]: 'blue',
-  [COSTING_STATUS.APPROVED]: 'green',
-};
 
 const CostComparison = () => {
   const navigate = useNavigate();
@@ -131,9 +123,11 @@ const CostComparison = () => {
     switch (field.type) {
       case 'status':
         return (
-          <Tag color={STATUS_COLORS[val]} style={{ borderRadius: 20 }}>
-            {getStatusLabel(val)}
-          </Tag>
+          <StatusTag
+            status={val}
+            config={COSTING_STATUS_CONFIG}
+            getLabel={getStatusLabel}
+          />
         );
       case 'currency':
         return formatCurrency(val, sheet.currency);
@@ -150,12 +144,7 @@ const CostComparison = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <Space>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/costing/list')} />
-          <h1>Cost Comparison</h1>
-        </Space>
-      </div>
+      <PageHeader title="Cost Comparison" backPath="/costing/list" />
 
       <Card style={{ marginBottom: 24 }}>
         <Row gutter={16} align="middle">

@@ -13,7 +13,6 @@ import {
   Typography,
   Upload,
   Collapse,
-  Popconfirm,
   Tooltip,
   Tag,
   Divider,
@@ -27,11 +26,6 @@ import {
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
-  DeleteOutlined,
-  CopyOutlined,
-  SaveOutlined,
-  SendOutlined,
-  ArrowLeftOutlined,
   CalculatorOutlined,
   InboxOutlined,
   InfoCircleOutlined,
@@ -39,9 +33,10 @@ import {
   BarChartOutlined,
   CloudUploadOutlined,
   WhatsAppOutlined,
-  ImportOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { ActionButton, SectionAddButton } from '../../components/buttons';
+import PageHeader from '../../components/PageHeader';
 import { useNavigate, useParams } from 'react-router-dom';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import dayjs from 'dayjs';
@@ -152,6 +147,7 @@ const CostingForm = () => {
   const [importedTrimOptions, setImportedTrimOptions] = useState([]);
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
 
   // Quick Add modal state
   const [quickAddProcessOpen, setQuickAddProcessOpen] = useState(false);
@@ -214,6 +210,7 @@ const CostingForm = () => {
         // Fetch categories to find Fabric, Local Trims, Imported Trims
         const catRes = await getAllCategories();
         const categories = catRes.data || catRes || [];
+        setCategoryOptions(categories.filter((c) => c.isActive !== false).map((c) => ({ value: c.name, label: c.name })));
 
         const fabricCat = categories.find((c) => c.name === 'Fabric');
         const localTrimCat = categories.find((c) => c.name?.toLowerCase().includes('local trim'));
@@ -1289,7 +1286,7 @@ const CostingForm = () => {
 
   const categoryIcons = {
     TECHPACK: <FileTextOutlined style={{ color: '#6366f1' }} />,
-    MEASUREMENT_CHART: <BarChartOutlined style={{ color: '#0ea5e9' }} />,
+    MEASUREMENT_CHART: <BarChartOutlined style={{ color: 'var(--info-color)' }} />,
     OTHER: <CloudUploadOutlined style={{ color: '#10b981' }} />,
   };
 
@@ -1390,7 +1387,7 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 120,
+      width: 180,
       render: (val, record) => (
         <Select
           mode="multiple"
@@ -1400,14 +1397,14 @@ const CostingForm = () => {
           onChange={(arr) => updateFabricRow(record.key, 'sizes', arr.join(', '))}
           size="small"
           style={{ width: '100%' }}
-          maxTagCount="responsive"
+          maxTagCount={1}
         />
       ),
     },
     {
       title: 'Fabric Name',
       dataIndex: 'itemId',
-      width: 160,
+      width: 240,
       render: (val, record) => (
         <Select
           value={record.itemId || undefined}
@@ -1483,7 +1480,7 @@ const CostingForm = () => {
               onClick={() => openConsumptionModal(record.key, record)}
               size="small"
               type="text"
-              style={{ color: '#faad14', flexShrink: 0 }}
+              style={{ color: 'var(--warning-color)', flexShrink: 0 }}
             />
           </Tooltip>
         </div>
@@ -1566,12 +1563,8 @@ const CostingForm = () => {
       width: 80,
       render: (_, record) => (
         <Space size={0}>
-          <Tooltip title="Duplicate row">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateFabricRow(record.key)} />
-          </Tooltip>
-          <Popconfirm title="Remove this fabric row?" onConfirm={() => deleteFabricRow(record.key)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          <ActionButton action="duplicate" onClick={() => duplicateFabricRow(record.key)} />
+          <ActionButton action="delete" onClick={() => deleteFabricRow(record.key)} />
         </Space>
       ),
     },
@@ -1582,7 +1575,7 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 120,
+      width: 180,
       render: (val, record) => (
         <Select
           mode="multiple"
@@ -1592,7 +1585,7 @@ const CostingForm = () => {
           onChange={(arr) => updateLocalTrim(record.key, 'sizes', arr.join(', '))}
           size="small"
           style={{ width: '100%' }}
-          maxTagCount="responsive"
+          maxTagCount={1}
         />
       ),
     },
@@ -1660,12 +1653,8 @@ const CostingForm = () => {
       width: 80,
       render: (_, record) => (
         <Space size={0}>
-          <Tooltip title="Duplicate row">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateLocalTrim(record.key)} />
-          </Tooltip>
-          <Popconfirm title="Remove this item?" onConfirm={() => deleteLocalTrim(record.key)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          <ActionButton action="duplicate" onClick={() => duplicateLocalTrim(record.key)} />
+          <ActionButton action="delete" onClick={() => deleteLocalTrim(record.key)} />
         </Space>
       ),
     },
@@ -1676,7 +1665,7 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 120,
+      width: 180,
       render: (val, record) => (
         <Select
           mode="multiple"
@@ -1686,7 +1675,7 @@ const CostingForm = () => {
           onChange={(arr) => updateImportedTrim(record.key, 'sizes', arr.join(', '))}
           size="small"
           style={{ width: '100%' }}
-          maxTagCount="responsive"
+          maxTagCount={1}
         />
       ),
     },
@@ -1754,12 +1743,8 @@ const CostingForm = () => {
       width: 80,
       render: (_, record) => (
         <Space size={0}>
-          <Tooltip title="Duplicate row">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateImportedTrim(record.key)} />
-          </Tooltip>
-          <Popconfirm title="Remove this item?" onConfirm={() => deleteImportedTrim(record.key)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          <ActionButton action="duplicate" onClick={() => duplicateImportedTrim(record.key)} />
+          <ActionButton action="delete" onClick={() => deleteImportedTrim(record.key)} />
         </Space>
       ),
     },
@@ -1787,7 +1772,7 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 120,
+      width: 180,
       render: (val, record) => (
         <Select
           mode="multiple"
@@ -1797,7 +1782,7 @@ const CostingForm = () => {
           onChange={(arr) => updateManufacturingRow(record.key, 'sizes', arr.join(', '))}
           size="small"
           style={{ width: '100%' }}
-          maxTagCount="responsive"
+          maxTagCount={1}
         />
       ),
     },
@@ -1854,12 +1839,8 @@ const CostingForm = () => {
       width: 80,
       render: (_, record) => (
         <Space size={0}>
-          <Tooltip title="Duplicate row">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateManufacturingRow(record.key)} />
-          </Tooltip>
-          <Popconfirm title="Remove this process?" onConfirm={() => deleteManufacturingRow(record.key)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          <ActionButton action="duplicate" onClick={() => duplicateManufacturingRow(record.key)} />
+          <ActionButton action="delete" onClick={() => deleteManufacturingRow(record.key)} />
         </Space>
       ),
     },
@@ -1870,7 +1851,7 @@ const CostingForm = () => {
     {
       title: 'Sizes',
       dataIndex: 'sizes',
-      width: 120,
+      width: 180,
       render: (val, record) => (
         <Select
           mode="multiple"
@@ -1880,7 +1861,7 @@ const CostingForm = () => {
           onChange={(arr) => updateOverheadRow(record.key, 'sizes', arr.join(', '))}
           size="small"
           style={{ width: '100%' }}
-          maxTagCount="responsive"
+          maxTagCount={1}
         />
       ),
     },
@@ -1937,12 +1918,8 @@ const CostingForm = () => {
       width: 80,
       render: (_, record) => (
         <Space size={0}>
-          <Tooltip title="Duplicate row">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => duplicateOverheadRow(record.key)} />
-          </Tooltip>
-          <Popconfirm title="Remove this item?" onConfirm={() => deleteOverheadRow(record.key)}>
-            <Button type="text" size="small" icon={<DeleteOutlined />} danger />
-          </Popconfirm>
+          <ActionButton action="duplicate" onClick={() => duplicateOverheadRow(record.key)} />
+          <ActionButton action="delete" onClick={() => deleteOverheadRow(record.key)} />
         </Space>
       ),
     },
@@ -2163,13 +2140,13 @@ const CostingForm = () => {
       key: 'fabric',
       label: (
         <Space>
-          <Text strong style={{ fontSize: 15, color: '#0ea5e9' }}>
+          <Text strong style={{ fontSize: 15, color: 'var(--info-color)' }}>
             Section B — Fabric Cost Breakup
           </Text>
           <Tag color="blue">{formatCurrency(totalFabricCost, currency)}</Tag>
         </Space>
       ),
-      style: sectionHeaderStyle('#0ea5e9'),
+      style: sectionHeaderStyle('var(--info-color)'),
       children: (
         <>
           <Table
@@ -2178,7 +2155,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 1400 }}
+            scroll={{ x: 1540 }}
             locale={{ emptyText: 'No fabrics added. Click + Add Fabric to begin.' }}
             summary={() =>
               fabricRows.length > 0 ? (
@@ -2198,14 +2175,12 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button
-            className="btn-section-add btn-fabric"
-            icon={<PlusOutlined />}
+          <SectionAddButton
+            text="Add Fabric"
+            color="var(--info-color)"
             onClick={addFabricRow}
             style={{ marginTop: 12 }}
-          >
-            Add Fabric
-          </Button>
+          />
         </>
       ),
     },
@@ -2231,7 +2206,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 900 }}
+            scroll={{ x: 960 }}
             locale={{ emptyText: 'No local accessories added.' }}
             summary={() =>
               localTrims.length > 0 ? (
@@ -2249,9 +2224,12 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button className="btn-section-add btn-trims" icon={<PlusOutlined />} onClick={addLocalTrim} style={{ marginTop: 8 }}>
-            Add Local Item
-          </Button>
+          <SectionAddButton
+            text="Add Local Item"
+            color="#8b5cf6"
+            onClick={addLocalTrim}
+            style={{ marginTop: 8 }}
+          />
 
           <Divider style={{ margin: '16px 0' }} />
 
@@ -2264,7 +2242,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 900 }}
+            scroll={{ x: 960 }}
             locale={{ emptyText: 'No imported accessories added.' }}
             summary={() =>
               importedTrims.length > 0 ? (
@@ -2282,9 +2260,12 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button className="btn-section-add btn-trims" icon={<PlusOutlined />} onClick={addImportedTrim} style={{ marginTop: 8 }}>
-            Add Imported Item
-          </Button>
+          <SectionAddButton
+            text="Add Imported Item"
+            color="#8b5cf6"
+            onClick={addImportedTrim}
+            style={{ marginTop: 8 }}
+          />
 
           <Card
             size="small"
@@ -2319,7 +2300,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 700 }}
+            scroll={{ x: 760 }}
             locale={{ emptyText: 'No manufacturing costs added.' }}
             summary={() =>
               manufacturingRows.length > 0 ? (
@@ -2339,9 +2320,12 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button className="btn-section-add btn-manufacturing" icon={<PlusOutlined />} onClick={addManufacturingRow} style={{ marginTop: 12 }}>
-            Add Process
-          </Button>
+          <SectionAddButton
+            text="Add Process"
+            color="#f59e0b"
+            onClick={addManufacturingRow}
+            style={{ marginTop: 12 }}
+          />
         </>
       ),
     },
@@ -2364,7 +2348,7 @@ const CostingForm = () => {
             pagination={false}
             size="small"
             rowKey="key"
-            scroll={{ x: 700 }}
+            scroll={{ x: 760 }}
             locale={{ emptyText: 'No overhead costs added.' }}
             summary={() =>
               overheadRows.length > 0 ? (
@@ -2384,9 +2368,12 @@ const CostingForm = () => {
               ) : null
             }
           />
-          <Button className="btn-section-add btn-overhead" icon={<PlusOutlined />} onClick={addOverheadRow} style={{ marginTop: 12 }}>
-            Add Overhead
-          </Button>
+          <SectionAddButton
+            text="Add Overhead"
+            color="#ef4444"
+            onClick={addOverheadRow}
+            style={{ marginTop: 12 }}
+          />
         </>
       ),
     },
@@ -2414,7 +2401,7 @@ const CostingForm = () => {
                 value={totalFabricCost}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: '#0ea5e9' }}
+                valueStyle={{ fontSize: 16, color: 'var(--info-color)' }}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -2701,50 +2688,42 @@ const CostingForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        <Space>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/costing/list')}
-          />
-          <h1>{isEdit ? 'Edit Cost Sheet' : 'Create Cost Sheet'}</h1>
-          {isEdit && costingId && (
+      <PageHeader
+        title={isEdit ? 'Edit Cost Sheet' : 'Create Cost Sheet'}
+        backPath="/costing/list"
+        subtitle={isEdit && savedDate ? savedDate.format('DD-MMM-YYYY') : undefined}
+        status={
+          isEdit && costingId ? (
             <Tag color="blue" style={{ fontSize: 13, padding: '2px 10px' }}>
               {costingId}
             </Tag>
-          )}
-          {isEdit && savedDate && (
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              {savedDate.format('DD-MMM-YYYY')}
-            </Text>
-          )}
-        </Space>
-        <div className="header-actions">
-          <Button
-            icon={<ImportOutlined />}
+          ) : undefined
+        }
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      >
+        <Space>
+          <ActionButton
+            action="upload"
+            text="Import from Techpack"
             onClick={() => setTechpackModalOpen(true)}
-          >
-            Import from Techpack
-          </Button>
-          <Button
-            icon={<SaveOutlined />}
+          />
+          <ActionButton
+            action="save"
+            variant="draft"
+            text="Save as Draft"
             onClick={handleSaveDraft}
             loading={savingDraft}
             disabled={submitting}
-          >
-            Save as Draft
-          </Button>
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
+          />
+          <ActionButton
+            action="save"
+            text="Submit"
             onClick={handleSubmit}
             loading={submitting}
             disabled={savingDraft}
-          >
-            Submit
-          </Button>
-        </div>
-      </div>
+          />
+        </Space>
+      </PageHeader>
 
       <Form
         form={form}
@@ -2799,7 +2778,7 @@ const CostingForm = () => {
         <Form form={quickAddProcessForm} layout="vertical" onFinish={async (values) => {
           setQuickAddProcessLoading(true);
           try {
-            const created = await createProcess({ ...values, category: 'Manufacturing', isActive: true });
+            const created = await createProcess({ ...values, isActive: true });
             setManufacturingProcesses((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
             if (pendingMfgRowKey) {
               updateManufacturingRow(pendingMfgRowKey, {
@@ -2819,6 +2798,14 @@ const CostingForm = () => {
         }}>
           <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
             <Input placeholder="e.g. Cutting, Sewing, Washing" maxLength={200} />
+          </Form.Item>
+          <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]} initialValue="Manufacturing">
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Select category"
+              options={categoryOptions}
+            />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">
             <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />

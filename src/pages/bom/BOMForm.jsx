@@ -13,30 +13,22 @@ import {
   message,
   Spin,
   Skeleton,
-  Popconfirm,
   AutoComplete,
   Tooltip,
   Modal,
   Row,
   Col,
-  Radio,
-  Popover,
   ConfigProvider,
   Segmented,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
-  PlusOutlined,
   DeleteOutlined,
-  SaveOutlined,
-  ArrowLeftOutlined,
-  SendOutlined,
   LoadingOutlined,
   UploadOutlined,
   EditOutlined,
   CheckCircleOutlined,
   WarningOutlined,
-  InfoCircleOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -60,10 +52,13 @@ import {
   buildOrderQtyGrid,
   calcMatrixTotal,
 } from '../../utils/bomConstants';
-import { calculateConsumption } from '../../services/costingService';
 import ProcessAllowanceModal from './ProcessAllowanceModal';
 import ConsumptionMatrixDialog from './ConsumptionMatrixDialog';
 import ConsumptionCalcModal from '../costing/ConsumptionCalcModal';
+
+import { ActionButton, DeleteConfirm, SectionAddButton } from '../../components/buttons';
+import { FormSection } from '../../components/form';
+import PageHeader from '../../components/PageHeader';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -1560,7 +1555,7 @@ const BOMForm = () => {
         fixed: 'left',
         align: 'center',
         render: (_, record, idx) => record.isPoGenerated
-          ? <Tooltip title="PO placed — this line cannot be modified"><span style={{ color: '#faad14' }}>🔒</span></Tooltip>
+          ? <Tooltip title="PO placed — this line cannot be modified"><span style={{ color: 'var(--warning-color)' }}>🔒</span></Tooltip>
           : idx + 1,
       },
       // 2. Category
@@ -1751,7 +1746,7 @@ const BOMForm = () => {
                         {variants.length > 1 && (
                           <Tooltip title="Change variant">
                             <EditOutlined
-                              style={{ fontSize: 11, color: '#1677ff', cursor: 'pointer' }}
+                              style={{ fontSize: 11, color: 'var(--primary-color)', cursor: 'pointer' }}
                               onClick={() => { setVariantEditLineKey(record.key); handleVariantSelect(record.key, null); }}
                             />
                           </Tooltip>
@@ -1761,7 +1756,7 @@ const BOMForm = () => {
                         </div>
                       </div>
                       {isFabricColorMissing(record) && (
-                        <Text type="warning" style={{ fontSize: 10, color: '#faad14', lineHeight: 1.3 }}>
+                        <Text type="warning" style={{ fontSize: 10, color: 'var(--warning-color)', lineHeight: 1.3 }}>
                           <WarningOutlined style={{ marginRight: 3 }} />
                           Color not found in order
                         </Text>
@@ -1807,7 +1802,7 @@ const BOMForm = () => {
                 {variants.length > 1 && (
                   <Tooltip title="Change variant">
                     <EditOutlined
-                      style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer', flexShrink: 0 }}
+                      style={{ fontSize: 13, color: 'var(--primary-color)', cursor: 'pointer', flexShrink: 0 }}
                       onClick={() => {
                         setVariantEditLineKey(record.key);
                         handleVariantSelect(record.key, null);
@@ -1824,7 +1819,7 @@ const BOMForm = () => {
                 </div>
               </div>
               {record.colorInvalid && (
-                <Text type="warning" style={{ fontSize: 10, color: '#faad14', lineHeight: 1.3 }}>
+                <Text type="warning" style={{ fontSize: 10, color: 'var(--warning-color)', lineHeight: 1.3 }}>
                   <WarningOutlined style={{ marginRight: 3 }} />
                   Color not found in order
                 </Text>
@@ -1856,7 +1851,7 @@ const BOMForm = () => {
                 </Text>
                 <Tooltip title="Edit consumption matrix">
                   <EditOutlined
-                    style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer' }}
+                    style={{ fontSize: 13, color: 'var(--primary-color)', cursor: 'pointer' }}
                     onClick={() => setMatrixDialogLineKey(record.key)}
                   />
                 </Tooltip>
@@ -1891,7 +1886,7 @@ const BOMForm = () => {
                       onClick={() => openConsumptionModal(record.key, record)}
                       size="small"
                       type="text"
-                      style={{ color: '#faad14', flexShrink: 0 }}
+                      style={{ color: 'var(--warning-color)', flexShrink: 0 }}
                     />
                   </Tooltip>
                 )}
@@ -1916,7 +1911,7 @@ const BOMForm = () => {
                         {...numericInputProps}
                       />
                       <Tooltip title="Color not in order — enter base quantity">
-                        <WarningOutlined style={{ fontSize: 13, color: '#faad14', flexShrink: 0 }} />
+                        <WarningOutlined style={{ fontSize: 13, color: 'var(--warning-color)', flexShrink: 0 }} />
                       </Tooltip>
                     </div>
                   );
@@ -1993,7 +1988,7 @@ const BOMForm = () => {
             {(record.processAllowances?.length > 0) && (
               <Tooltip title="Edit allowances">
                 <EditOutlined
-                  style={{ fontSize: 13, color: '#1677ff', cursor: 'pointer', flexShrink: 0 }}
+                  style={{ fontSize: 13, color: 'var(--primary-color)', cursor: 'pointer', flexShrink: 0 }}
                   onClick={() => editAllowanceDialog(record.key)}
                 />
               </Tooltip>
@@ -2083,7 +2078,7 @@ const BOMForm = () => {
                 ) : (
                   <Tooltip title={isStaged ? 'Remove staged CAD' : 'Remove CAD'}>
                     <DeleteOutlined
-                      style={{ fontSize: 12, color: '#ff4d4f', cursor: 'pointer' }}
+                      style={{ fontSize: 12, color: 'var(--error-color, #ff4d4f)', cursor: 'pointer' }}
                       onClick={async () => {
                         if (record._cadFileId) {
                           try { await deleteFile(record._cadFileId); } catch { /* ignore */ }
@@ -2148,16 +2143,15 @@ const BOMForm = () => {
         fixed: 'right',
         align: 'center',
         render: (_, record) => record.isPoGenerated ? (
-            <Tooltip title="PO placed — cannot delete"><Button type="text" size="small" icon={<DeleteOutlined />} disabled /></Tooltip>
+            <Tooltip title="PO placed — cannot delete"><ActionButton action="delete" size="small" disabled /></Tooltip>
         ) : (
-            <Popconfirm
-              title="Remove this line?"
+            <DeleteConfirm
+              title="Remove line"
+              recordLabel={record.itemName || 'this line'}
               onConfirm={() => removeLine(record.key)}
-              okText="Yes"
-              cancelText="No"
             >
-              <Button type="text" danger size="small" icon={<DeleteOutlined />} />
-            </Popconfirm>
+              <ActionButton action="delete" size="small" />
+            </DeleteConfirm>
         ),
       },
     ];
@@ -2173,16 +2167,12 @@ const BOMForm = () => {
   if (loading && isEdit) {
     return (
       <div className="animate-fade-in-up">
-        <div className="page-header" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-          <Space align="center">
-            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
-            <Skeleton.Input active style={{ width: 160 }} />
-          </Space>
+        <PageHeader title="" backPath="/bom/list" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
           <Space>
             <Skeleton.Button active style={{ width: 100 }} />
             <Skeleton.Button active style={{ width: 120 }} />
           </Space>
-        </div>
+        </PageHeader>
         <Card style={{ marginBottom: 24 }}>
           <Skeleton.Input active style={{ width: 160, marginBottom: 16 }} />
           <Row gutter={[24, 16]}>
@@ -2206,52 +2196,35 @@ const BOMForm = () => {
   return (
     <div className="animate-fade-in-up">
       {/* ── Header (sticky) ─────────────────────────────────────── */}
-      <div
-        className="page-header"
+      <PageHeader
+        title={isEdit ? 'Edit BOM' : 'Create BOM'}
+        backPath="/bom/list"
+        status={orderNo ? <Tag color="blue" style={{ fontSize: 13 }}>{orderNo}</Tag> : undefined}
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
-        <Space align="center">
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/bom/list')}
-          />
-          <Title level={4} style={{ margin: 0 }}>
-            {isEdit ? 'Edit BOM' : 'Create BOM'}
-          </Title>
-          {orderNo && (
-            <Tag color="blue" style={{ fontSize: 13 }}>
-              {orderNo}
-            </Tag>
-          )}
-        </Space>
-        <div className="header-actions">
-          {canSave && (
-            <>
-              <Button
-                icon={<SaveOutlined />}
-                loading={savingDraft}
-                onClick={handleSaveDraft}
-              >
-                Save Draft
-              </Button>
-              <Button
-                type="primary"
-                icon={<SendOutlined />}
-                loading={submitting}
-                onClick={handleSubmit}
-              >
-                Create BOM
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
+        {canSave && (
+          <>
+            <ActionButton
+              action="save"
+              variant="draft"
+              text="Save Draft"
+              loading={savingDraft}
+              onClick={handleSaveDraft}
+            />
+            <ActionButton
+              action="save"
+              text="Create BOM"
+              loading={submitting}
+              onClick={handleSubmit}
+            />
+          </>
+        )}
+      </PageHeader>
 
       {/* ── Section A: General Info ─────────────────────────────── */}
       <Card style={{ marginBottom: 24 }} loading={loading && !bomFromState}>
-        <Title level={5} style={{ marginBottom: 16 }}>
-          General Information
-        </Title>
+        <FormSection title="General Information">
+        </FormSection>
         <Row gutter={[24, 16]}>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
@@ -2328,12 +2301,12 @@ const BOMForm = () => {
                       <Col key={idx} xs={24} sm={12} md={8}>
                         <Card
                           size="small"
-                          style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid #1677ff' }}
+                          style={{ borderRadius: 8, background: 'var(--bg-tertiary, #fafafa)', borderLeft: '3px solid var(--primary-color)' }}
                           styles={{ body: { padding: '10px 14px' } }}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <Text strong style={{ fontSize: 13 }}>{line.buyerPoNo}</Text>
-                            <Text strong style={{ fontSize: 15, color: '#1677ff' }}>{line.lineQty.toLocaleString()}</Text>
+                            <Text strong style={{ fontSize: 15, color: 'var(--primary-color)' }}>{line.lineQty.toLocaleString()}</Text>
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                             {line.colors.map((c, ci) => (
@@ -2367,14 +2340,12 @@ const BOMForm = () => {
           </Space>
         }
         extra={
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
+          <SectionAddButton
+            text="Add Line"
             onClick={addLine}
             disabled={!canSave || !orderId}
-          >
-            Add Line
-          </Button>
+            block={false}
+          />
         }
       >
         <div style={!orderId ? { opacity: 0.4, pointerEvents: 'none' } : undefined}>
@@ -2432,7 +2403,7 @@ const BOMForm = () => {
           }
           .variant-col-resize-handle:hover,
           .variant-col-resize-handle:active {
-            border-right: 2px solid #1677ff;
+            border-right: 2px solid var(--primary-color);
           }
           .bom-line-po-locked > td {
             opacity: 0.6;
@@ -2448,21 +2419,22 @@ const BOMForm = () => {
 
       {/* ── Section C: Summary ─────────────────────────────────── */}
       <Card style={{ marginBottom: 24 }}>
-        <Title level={5} style={{ marginBottom: 16 }}>Summary</Title>
+        <FormSection title="Summary">
+        </FormSection>
         <Row gutter={[16, 16]}>
           {[
-            { title: 'Total Lines', value: summary.total, color: '#1677ff', span: { xs: 12, sm: 8, md: 4 } },
+            { title: 'Total Lines', value: summary.total, color: 'var(--primary-color)', span: { xs: 12, sm: 8, md: 4 } },
             { title: 'Fabric', value: summary.fabricLines, color: '#6366f1', span: { xs: 12, sm: 8, md: 4 } },
             { title: 'Trims', value: summary.trimLines, color: '#10b981', span: { xs: 12, sm: 8, md: 4 } },
             {
               title: 'Completed',
               value: summary.completedLines,
-              color: summary.completedLines === summary.total && summary.total > 0 ? '#10b981' : '#faad14',
+              color: summary.completedLines === summary.total && summary.total > 0 ? '#10b981' : 'var(--warning-color)',
               extra: `/ ${summary.total}`,
               icon: summary.completedLines === summary.total && summary.total > 0 ? 'check' : 'warn',
               span: { xs: 12, sm: 8, md: 5 },
             },
-            { title: 'Total Purchase Qty', value: summary.totalPurchaseQty, color: '#1677ff', precision: 2, span: { xs: 24, sm: 16, md: 7 } },
+            { title: 'Total Purchase Qty', value: summary.totalPurchaseQty, color: 'var(--primary-color)', precision: 2, span: { xs: 24, sm: 16, md: 7 } },
           ].map((card) => (
             <Col key={card.title} {...card.span}>
               <Card size="small" style={{ borderRadius: 8, textAlign: 'center', borderLeft: `3px solid ${card.color}` }} styles={{ body: { padding: '12px 16px' } }}>
@@ -2589,13 +2561,13 @@ const BOMForm = () => {
               key={opt.buyerPoNo}
               size="small"
               hoverable
-              style={{ cursor: 'pointer', borderLeft: '3px solid #1677ff' }}
+              style={{ cursor: 'pointer', borderLeft: '3px solid var(--primary-color)' }}
               styles={{ body: { padding: '10px 14px' } }}
               onClick={() => handleBuyerPoPick(opt.buyerPoNo)}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text strong>{opt.buyerPoNo}</Text>
-                <Text strong style={{ color: '#1677ff', fontSize: 16 }}>{opt.qty.toLocaleString()} pcs</Text>
+                <Text strong style={{ color: 'var(--primary-color)', fontSize: 16 }}>{opt.qty.toLocaleString()} pcs</Text>
               </div>
             </Card>
           ))}
@@ -2697,8 +2669,8 @@ const BOMForm = () => {
               <div style={{ marginBottom: 12, padding: '8px 12px', background: 'var(--bg-tertiary, #fafafa)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Text strong style={{ fontSize: 12 }}>Selected Variant:</Text>
                 <Text style={{ fontSize: 12 }}>{line.itemCode} - {line.itemName}</Text>
-                {varColor && <Tag style={{ fontSize: 11, margin: 0, background: 'rgba(22,119,255,0.1)', color: '#1677ff', border: '1px solid rgba(22,119,255,0.25)' }}>Color: {varColor}</Tag>}
-                {varSize && <Tag style={{ fontSize: 11, margin: 0, background: 'rgba(114,46,209,0.1)', color: '#722ed1', border: '1px solid rgba(114,46,209,0.25)' }}>Size: {varSize}</Tag>}
+                {varColor && <Tag style={{ fontSize: 11, margin: 0, background: 'color-mix(in srgb, var(--primary-color) 10%, transparent)', color: 'var(--primary-color)', border: '1px solid color-mix(in srgb, var(--primary-color) 25%, transparent)' }}>Color: {varColor}</Tag>}
+                {varSize && <Tag style={{ fontSize: 11, margin: 0, background: 'color-mix(in srgb, var(--btn-duplicate-color) 10%, transparent)', color: 'var(--btn-duplicate-color)', border: '1px solid color-mix(in srgb, var(--btn-duplicate-color) 25%, transparent)' }}>Size: {varSize}</Tag>}
               </div>
 
               {/* Buyer PO selection — shown first when Buyer PO basis */}
@@ -2767,7 +2739,7 @@ const BOMForm = () => {
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-color, #f5f5f5)', whiteSpace: 'nowrap' }}>
                                     {displayLines.length > 1 && <Text type="secondary" style={{ fontSize: 10 }}>{ol.buyerPoNo} / </Text>}
                                     <Text strong={isColorMatch} style={{ fontSize: 11 }}>{cr.name}</Text>
-                                    {isColorMatch && <Tag style={{ fontSize: 9, margin: '0 0 0 4px', lineHeight: '14px', padding: '0 4px', background: 'var(--oq-color-row-strong)', color: 'var(--primary-color, #1677ff)', border: '1px solid var(--oq-total-cell)' }}>color</Tag>}
+                                    {isColorMatch && <Tag style={{ fontSize: 9, margin: '0 0 0 4px', lineHeight: '14px', padding: '0 4px', background: 'var(--oq-color-row-strong)', color: 'var(--primary-color)', border: '1px solid var(--oq-total-cell)' }}>color</Tag>}
                                   </td>
                                   {sizes.map((s) => {
                                     const val = cr.quantities?.[s] || 0;
@@ -2811,7 +2783,7 @@ const BOMForm = () => {
                           hoverable={!noMatch}
                           style={{
                             cursor: noMatch ? 'not-allowed' : 'pointer',
-                            borderLeft: isSelected ? '3px solid #1677ff' : '3px solid transparent',
+                            borderLeft: isSelected ? '3px solid var(--primary-color)' : '3px solid transparent',
                             background: isSelected ? 'rgba(22,119,255,0.08)' : noMatch ? 'rgba(0,0,0,0.02)' : undefined,
                             opacity: noMatch ? 0.5 : 1,
                           }}
@@ -2824,8 +2796,8 @@ const BOMForm = () => {
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              {isSelected && <span style={{ color: '#1677ff', fontSize: 14, fontWeight: 700 }}>✓</span>}
-                              <Text strong={isSelected} style={{ fontSize: 12, color: isSelected ? '#1677ff' : noMatch ? 'var(--text-muted)' : undefined }}>{opt.label}</Text>
+                              {isSelected && <span style={{ color: 'var(--primary-color)', fontSize: 14, fontWeight: 700 }}>&#10003;</span>}
+                              <Text strong={isSelected} style={{ fontSize: 12, color: isSelected ? 'var(--primary-color)' : noMatch ? 'var(--text-muted)' : undefined }}>{opt.label}</Text>
                             </div>
                             <Tag color={noMatch ? 'default' : 'blue'} style={{ fontSize: 12, margin: 0 }}>
                               {noMatch ? 'No match' : `${qty.toLocaleString()} pcs`}

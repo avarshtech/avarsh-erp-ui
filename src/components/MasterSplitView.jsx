@@ -1,5 +1,4 @@
-import React from 'react';
-import { Row, Col, Card, Button, Table, Typography, Empty, Space, Input, Drawer } from 'antd';
+import { Row, Col, Card, Button, Table, Typography, Input, Drawer } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 import useResponsive from '../hooks/useResponsive';

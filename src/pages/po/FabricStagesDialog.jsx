@@ -262,7 +262,7 @@ const FabricStagesDialog = ({
                   }}
                 >
                   {isComplete ? (
-                    <CheckCircleOutlined style={{ fontSize: 18, color: '#52c41a' }} />
+                    <CheckCircleOutlined style={{ fontSize: 18, color: 'var(--success-color)' }} />
                   ) : (
                     <div
                       style={{
@@ -305,7 +305,7 @@ const FabricStagesDialog = ({
                   />
                   <Button
                     type="text"
-                    icon={<DeleteOutlined style={{ color: '#ff4d4f' }} />}
+                    icon={<DeleteOutlined style={{ color: 'var(--error-color)' }} />}
                     size="small"
                     onClick={() => removeStage(stage.key)}
                   />

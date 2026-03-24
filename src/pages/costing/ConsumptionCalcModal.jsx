@@ -178,7 +178,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
       afterClose={handleAfterClose}
       title={
         <Space>
-          <ThunderboltOutlined style={{ color: '#faad14' }} />
+          <ThunderboltOutlined style={{ color: 'var(--warning-color)' }} />
           AI Fabric Consumption Calculator
         </Space>
       }
@@ -220,11 +220,11 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 style={{ padding: '16px 8px' }}
               >
                 <FileImageOutlined
-                  style={{ fontSize: 36, color: measurementFile ? '#52c41a' : '#1677ff' }}
+                  style={{ fontSize: 36, color: measurementFile ? 'var(--success-color)' : 'var(--primary-color)' }}
                 />
                 <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
                   {measurementFile
-                    ? <Text style={{ color: '#52c41a' }}>✓ {measurementFile.name}</Text>
+                    ? <Text style={{ color: 'var(--success-color)' }}>✓ {measurementFile.name}</Text>
                     : 'Click or drag size spec chart here'
                   }
                 </p>
@@ -248,11 +248,11 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
                 style={{ padding: '16px 8px' }}
               >
                 <FileTextOutlined
-                  style={{ fontSize: 36, color: techpackFile ? '#52c41a' : '#8c8c8c' }}
+                  style={{ fontSize: 36, color: techpackFile ? 'var(--success-color)' : '#8c8c8c' }}
                 />
                 <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
                   {techpackFile
-                    ? <Text style={{ color: '#52c41a' }}>✓ {techpackFile.name}</Text>
+                    ? <Text style={{ color: 'var(--success-color)' }}>✓ {techpackFile.name}</Text>
                     : 'Click or drag techpack PDF'
                   }
                 </p>
@@ -329,7 +329,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           {partsData.length > 0 && (
             <details style={{ marginBottom: 12 }}>
               <summary
-                style={{ cursor: 'pointer', fontSize: 12, color: '#1677ff', userSelect: 'none' }}
+                style={{ cursor: 'pointer', fontSize: 12, color: 'var(--primary-color)', userSelect: 'none' }}
               >
                 Panel breakdown — {partsData.length} parts
                 {result.sizes?.length > 6

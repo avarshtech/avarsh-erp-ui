@@ -2,61 +2,28 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   Card,
-  Button,
   Space,
-  Input,
-  Tag,
-  Select,
   Typography,
   message,
-  Row,
-  Col,
-  Tooltip,
-  Popconfirm,
-  DatePicker,
 } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  CheckCircleOutlined,
-  FileTextOutlined,
-  ClockCircleOutlined,
-  UndoOutlined,
-  ReloadOutlined,
-  StopOutlined,
-  ExclamationCircleOutlined,
-} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { searchOrders, deleteOrder } from '../../services/orderService';
 import { hasPermission } from '../../utils/permissions';
-import { ORDER_STATUS, getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES, getCurrencySymbol } from '../../utils/orderConstants';
+import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import RecordLink from '../../components/RecordLink';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import EmptyState from '../../components/EmptyState';
+import { formatDate } from '../../utils/formatters';
+import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getTablePagination } from '../../utils/paginationConfig';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 import OrderView from './OrderView';
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
-
-// Format currency — pure function, defined outside component to avoid recreation
-const formatCurrency = (amount, currency) => {
-  if (amount === null || amount === undefined) return `${getCurrencySymbol(currency)} 0.00`;
-  return `${getCurrencySymbol(currency)} ${Number(amount).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-};
-
-// Status config mapping
-const STATUS_CONFIG = {
-  [ORDER_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined /> },
-  [ORDER_STATUS.CONFIRMED]: { color: 'green', icon: <CheckCircleOutlined /> },
-  [ORDER_STATUS.REFERRED_BACK]: { color: 'orange', icon: <UndoOutlined /> },
-  [ORDER_STATUS.IN_PRODUCTION]: { color: 'blue', icon: <ClockCircleOutlined /> },
-  [ORDER_STATUS.COMPLETED]: { color: 'cyan', icon: <CheckCircleOutlined /> },
-  [ORDER_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined /> },
-};
 
 const OrderList = () => {
   const navigate = useNavigate();
@@ -68,8 +35,7 @@ const OrderList = () => {
     pageSize: 10,
     total: 0,
   });
-  const [searchText, setSearchText] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [orderDateRange, setOrderDateRange] = useState(null);
   const [sortField, setSortField] = useState('id');
@@ -119,12 +85,6 @@ const OrderList = () => {
     },
     [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderDateRange]
   );
-
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchText), 400);
-    return () => clearTimeout(timer);
-  }, [searchText]);
 
   // Re-fetch on filter change
   useEffect(() => {
@@ -176,13 +136,7 @@ const OrderList = () => {
       width: 150,
       sorter: true,
       render: (text, record) => (
-        <Text
-          strong
-          style={{ color: 'var(--primary-color)', cursor: 'pointer' }}
-          onClick={() => handleView(record)}
-        >
-          {text}
-        </Text>
+        <RecordLink text={text} onClick={() => handleView(record)} />
       ),
     },
     {
@@ -191,7 +145,7 @@ const OrderList = () => {
       key: 'orderDate',
       width: 120,
       sorter: true,
-      render: (date) => (date ? dayjs(date).format('DD-MMM-YYYY') : '-'),
+      render: (date) => formatDate(date),
     },
     {
       title: 'Buyer',
@@ -225,9 +179,7 @@ const OrderList = () => {
       align: 'right',
       sorter: true,
       render: (amount, record) => (
-        <Text strong style={{ color: 'var(--success-color)' }}>
-          {formatCurrency(amount, record.currency)}
-        </Text>
+        <CurrencyDisplay amount={amount} currency={record.currency} />
       ),
     },
     {
@@ -235,18 +187,9 @@ const OrderList = () => {
       dataIndex: 'status',
       key: 'status',
       width: 160,
-      render: (status) => {
-        const config = STATUS_CONFIG[status] || {};
-        return (
-          <Tag
-            color={config.color || 'default'}
-            icon={config.icon}
-            style={{ borderRadius: 20 }}
-          >
-            {getStatusLabel(status)}
-          </Tag>
-        );
-      },
+      render: (status) => (
+        <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />
+      ),
     },
     {
       title: 'Actions',
@@ -256,110 +199,87 @@ const OrderList = () => {
       render: (_, record) => (
         <Space size="small">
           {canView && (
-            <Tooltip title="View">
-              <Button
-                type="text"
-                size="small"
-                icon={<EyeOutlined />}
-                onClick={() => handleView(record)}
-                style={{ color: '#1890ff' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="view"
+              size="small"
+              onClick={() => handleView(record)}
+            />
           )}
           {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
-            <Tooltip title="Edit">
-              <Button
-                type="text"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
-                style={{ color: '#52c41a' }}
-              />
-            </Tooltip>
+            <ActionButton
+              action="edit"
+              size="small"
+              onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
+            />
           )}
           {DELETABLE_STATUSES.includes(record.status) && canDelete && (
-            <Popconfirm
+            <DeleteConfirm
               title="Delete Order"
-              description={`Are you sure you want to delete "${record.orderNo}"?`}
+              recordLabel={record.orderNo}
               onConfirm={() => handleDelete(record)}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ danger: true, loading: deletingId === record.id }}
-              icon={<ExclamationCircleOutlined style={{ color: '#ff4d4f' }} />}
+              loading={deletingId === record.id}
             >
-              <Tooltip title="Delete">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DeleteOutlined />}
-                  danger
-                />
-              </Tooltip>
-            </Popconfirm>
+              <ActionButton
+                action="delete"
+                size="small"
+              />
+            </DeleteConfirm>
           )}
         </Space>
       ),
     },
   ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
 
+  // Status filter options
+  const statusOptions = useMemo(() =>
+    Object.keys(ORDER_STATUS_CONFIG).map((s) => ({
+      label: getStatusLabel(s),
+      value: s,
+    })),
+    []
+  );
+
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Order Management</h1>
-        <div className="header-actions">
-          {canAdd && (
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate('/orders/new')}
-            >
-              New Order
-            </Button>
-          )}
-        </div>
-      </div>
+      <PageHeader title="Order Management">
+        {canAdd && (
+          <ActionButton
+            action="create"
+            text="New Order"
+            onClick={() => navigate('/orders/new')}
+          />
+        )}
+      </PageHeader>
 
       <Card>
-        <Row gutter={[16, 16]} style={{ marginBottom: 16 }} align="middle">
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <Input
-              placeholder="Search order no, buyer, style..."
-              prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-            />
-          </Col>
-          <Col xs={12} sm={8} md={4} lg={3}>
-            <Select
-              placeholder="Status"
-              style={{ width: '100%' }}
-              allowClear
-              value={statusFilter}
-              onChange={setStatusFilter}
-              options={Object.keys(STATUS_CONFIG).map((s) => ({
-                label: getStatusLabel(s),
-                value: s,
-              }))}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6} lg={5}>
-            <RangePicker
-              style={{ width: '100%' }}
-              placeholder={['Order From', 'Order To']}
-              value={orderDateRange}
-              onChange={setOrderDateRange}
-            />
-          </Col>
-          <Col>
-            <Tooltip title="Refresh">
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => fetchData(pagination.current, pagination.pageSize)}
-              />
-            </Tooltip>
-          </Col>
-        </Row>
+        <SearchFilterBar
+          searchText={searchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchPlaceholder="Search order no, buyer, style..."
+          filters={[
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
+                placeholder: 'Status',
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: statusOptions,
+              },
+            },
+            {
+              type: 'rangePicker',
+              span: { xs: 24, sm: 12, md: 6, lg: 5 },
+              props: {
+                placeholder: ['Order From', 'Order To'],
+                value: orderDateRange,
+                onChange: setOrderDateRange,
+              },
+            },
+          ]}
+          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          style={{ marginBottom: 16 }}
+        />
 
         <Table
           columns={columns}
@@ -368,12 +288,14 @@ const OrderList = () => {
           rowKey="id"
           scroll={{ x: 1200 }}
           onChange={handleTableChange}
-          pagination={{
-            ...pagination,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} orders`,
+          pagination={getTablePagination(pagination, 'orders')}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="No orders found"
+                description="Try adjusting your search or filters"
+              />
+            ),
           }}
         />
       </Card>
