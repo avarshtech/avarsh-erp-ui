@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Form,
   Input,
@@ -22,6 +22,7 @@ import {
   Statistic,
   Skeleton,
   Modal,
+  Image,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -62,6 +63,7 @@ import {
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE_MB,
   ATTACHMENT_CATEGORIES,
+  SEASON_CODES,
   calcFabricNetCost,
   calcTrimPrice,
   calcTotalMakingPrice,
@@ -74,6 +76,7 @@ import {
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { getBuyers } from '../../services/buyerService';
 import { getStylesByBuyerId } from '../../services/styleService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/processService';
@@ -95,6 +98,10 @@ const CostingForm = () => {
   const { isDarkMode } = useTheme();
   const isEdit = Boolean(id);
 
+
+  // Watch Section A fields for display
+  const watchedSeasonCode = Form.useWatch('seasonCode', form);
+  const watchedSeasonYear = Form.useWatch('seasonYear', form);
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -122,6 +129,17 @@ const CostingForm = () => {
   const [fileList, setFileList] = useState({ TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] });
   const [usdToInrRate, setUsdToInrRate] = useState(83.80);
   const [styleId, setStyleId] = useState(null);
+
+  // Style image (view-only)
+  const [styleImageUrl, setStyleImageUrl] = useState(null);
+  const [styleImageLoading, setStyleImageLoading] = useState(false);
+  const imageLoadIdRef = useRef(0);
+
+  // Season code → label map
+  const seasonLabelMap = useMemo(
+    () => Object.fromEntries(SEASON_CODES.map((s) => [s.value, s.label])),
+    [],
+  );
 
   // API-fetched dropdown options
   const [buyerOptions, setBuyerOptions] = useState([]);
@@ -436,6 +454,9 @@ const CostingForm = () => {
         actualRate: cs.actualRate,
         sizes: cs.sizes,
       });
+
+      // Load style image for edit mode
+      if (cs.styleId) loadStyleImage(cs.styleId);
     } catch {
       message.error('Failed to load cost sheet');
       navigate('/costing/list');
@@ -556,6 +577,11 @@ const CostingForm = () => {
     form.setFieldsValue({ styleNo: undefined, garmentName: '', seasonCode: undefined, seasonYear: undefined });
     setStyleId(null);
     setStyleOptions([]);
+    // Clear style image
+    setStyleImageUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
 
     if (!buyerId) return;
 
@@ -582,7 +608,46 @@ const CostingForm = () => {
         seasonYear: style.seasonYear || undefined,
       });
     }
+    loadStyleImage(selectedStyleId);
   };
+
+  // ==================== STYLE IMAGE LOADER ====================
+
+  const loadStyleImage = async (selectedStyleId) => {
+    const loadId = ++imageLoadIdRef.current;
+    setStyleImageUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (!selectedStyleId) {
+      setStyleImageLoading(false);
+      return;
+    }
+    setStyleImageLoading(true);
+    try {
+      const files = await getFilesByEntity('STYLE', selectedStyleId);
+      if (loadId !== imageLoadIdRef.current) return;
+      const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+      if (!img) return;
+      const blob = await downloadFileAsBlob(img.fileId);
+      if (loadId !== imageLoadIdRef.current) return;
+      setStyleImageUrl(URL.createObjectURL(blob));
+    } catch {
+      // Image not found or failed to load — non-critical
+    } finally {
+      if (loadId === imageLoadIdRef.current) setStyleImageLoading(false);
+    }
+  };
+
+  // Cleanup style image blob URL on unmount
+  useEffect(() => {
+    return () => {
+      setStyleImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   // ==================== TECHPACK IMPORT HANDLER ====================
 
@@ -606,7 +671,10 @@ const CostingForm = () => {
       sizes:        result.sizes?.length ? result.sizes : undefined,
       ...(result.matchedStyleId && { styleNo: result.matchedStyleId }),
     });
-    if (result.matchedStyleId) setStyleId(result.matchedStyleId);
+    if (result.matchedStyleId) {
+      setStyleId(result.matchedStyleId);
+      loadStyleImage(result.matchedStyleId);
+    }
 
     // 3. Map fabric rows
     if (result.fabricRows?.length) {
@@ -1892,7 +1960,11 @@ const CostingForm = () => {
       ),
       style: sectionHeaderStyle('#6366f1'),
       children: (
-        <Row gutter={16}>
+        <>
+        <div style={{ display: 'flex', gap: 16 }}>
+          {/* Form fields */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Row gutter={16}>
               {isEdit && (
                 <Col xs={12} md={8}>
                   <Form.Item label="Costing ID">
@@ -1927,30 +1999,29 @@ const CostingForm = () => {
               </Col>
               <Col xs={12} md={8}>
                 <Form.Item label="Garment Name" name="garmentName" rules={[{ required: true, message: 'Required' }]}>
-                  <Input placeholder="Auto-filled from style" readOnly />
+                  <Input placeholder="Auto-filled from style" disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
                 </Form.Item>
               </Col>
+              {/* Hidden fields to preserve raw values for buildPayload */}
+              <Form.Item name="seasonCode" hidden noStyle><Input /></Form.Item>
+              <Form.Item name="seasonYear" hidden noStyle><Input /></Form.Item>
               <Col xs={12} md={6}>
-                <Form.Item label="Season" name="seasonCode">
-                  <Select
-                    placeholder="Season"
-                    allowClear
-                    options={[
-                      { value: 'SS', label: 'Spring/Summer' },
-                      { value: 'AW', label: 'Autumn/Winter' },
-                    ]}
+                <Form.Item label="Season">
+                  <Input
+                    value={seasonLabelMap[watchedSeasonCode] || ''}
+                    placeholder="Auto-filled from style"
+                    disabled
+                    style={{ backgroundColor: 'var(--bg-tertiary)' }}
                   />
                 </Form.Item>
               </Col>
               <Col xs={12} md={6}>
-                <Form.Item label="Year" name="seasonYear">
-                  <Select
-                    placeholder="Year"
-                    allowClear
-                    options={Array.from({ length: 7 }, (_, i) => {
-                      const yr = new Date().getFullYear() - 1 + i;
-                      return { value: String(yr), label: String(yr) };
-                    })}
+                <Form.Item label="Year">
+                  <Input
+                    value={watchedSeasonYear || ''}
+                    placeholder="Auto-filled from style"
+                    disabled
+                    style={{ backgroundColor: 'var(--bg-tertiary)' }}
                   />
                 </Form.Item>
               </Col>
@@ -1997,6 +2068,51 @@ const CostingForm = () => {
                   />
                 </Form.Item>
               </Col>
+            </Row>
+          </div>
+          {/* Style Image — fixed sidebar (view-only) */}
+          {styleId && (
+            <div style={{
+              flexShrink: 0,
+              width: 130,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              paddingTop: 4,
+            }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>Style Image</Typography.Text>
+              {styleImageLoading ? (
+                <Skeleton.Image active style={{ width: 110, height: 110 }} />
+              ) : styleImageUrl ? (
+                <Image
+                  src={styleImageUrl}
+                  alt="Style"
+                  width={110}
+                  height={110}
+                  style={{
+                    objectFit: 'cover',
+                    borderRadius: 8,
+                    border: `1px solid ${isDarkMode ? '#333' : '#e5e7eb'}`,
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: 8,
+                  border: '1px dashed var(--border-color, #d9d9d9)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--bg-tertiary)',
+                }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>No image</Typography.Text>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <Row gutter={16}>
               <Col xs={24}>
                 <Form.Item label={<Text strong style={{ fontSize: 15, color: '#6366f1' }}>Attachments</Text>} style={{ marginBottom: 0 }}>
                   <div style={{ display: 'flex', flexDirection: 'row', gap: 16 }}>
@@ -2040,6 +2156,7 @@ const CostingForm = () => {
                 </Form.Item>
               </Col>
             </Row>
+        </>
       ),
     },
     {
