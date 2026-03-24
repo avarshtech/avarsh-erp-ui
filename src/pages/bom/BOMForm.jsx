@@ -261,6 +261,7 @@ const BOMForm = () => {
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
+  const [bomStatus, setBomStatus] = useState(null);
 
   // ── Section A: General Info ──────────────────────────────────────
   const [orderNoInput, setOrderNoInput] = useState('');
@@ -372,6 +373,7 @@ const BOMForm = () => {
         const bom = bomFromState?.lines?.length > 0 ? bomFromState : await getBomById(id);
 
         // Set header fields from BOM
+        setBomStatus(bom.status || null);
         setEntityVersion(bom.version);
         setOrderId(bom.orderId);
         setOrderNo(bom.orderNo || '');
@@ -1391,9 +1393,13 @@ const BOMForm = () => {
       // ── Variant selection ──
       // Required for: fabric (always), SIMPLE trims, SIZE_WISE trims
       // Not required for: VARIANT_PER_SIZE trims (variants mapped per size in matrix)
-      if (cMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+      if (fabric) {
         if (!l.variantId && (l.availableVariants || []).length > 1) {
-          errors.push(`Line ${n}: Variant selection is required.`);
+          errors.push(`Line ${n}: Variant selection is required for fabric.`);
+        }
+      } else if (cMode === CONSUMPTION_MODE.SIMPLE || cMode === CONSUMPTION_MODE.SIZE_WISE) {
+        if (!l.variantId && (l.availableVariants || []).length > 1) {
+          errors.push(`Line ${n}: Variant selection is required for ${cMode === CONSUMPTION_MODE.SIMPLE ? 'Simple' : 'Size-wise'} consumption mode.`);
         }
       }
 
@@ -1486,9 +1492,13 @@ const BOMForm = () => {
   };
 
   const handleSaveDraft = async () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     const { valid, errors } = validateBom('draft');
     if (!valid) {
-      message.warning(errors[0]);
+      errors.forEach((e) => message.warning(e));
       return;
     }
 
@@ -1516,9 +1526,13 @@ const BOMForm = () => {
   };
 
   const handleSubmit = async () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     const { valid, errors } = validateBom('submit');
     if (!valid) {
-      message.warning(errors[0]);
+      errors.forEach((e) => message.warning(e));
       return;
     }
 
@@ -1539,7 +1553,7 @@ const BOMForm = () => {
       clearDirty();
       navigate('/bom/list');
     } catch {
-      message.error('Failed to create BOM');
+      message.error(isEdit ? 'Failed to update BOM' : 'Failed to create BOM');
     } finally {
       setSubmitting(false);
     }
@@ -2204,16 +2218,18 @@ const BOMForm = () => {
       >
         {canSave && (
           <>
+            {!(isEdit && bomStatus === BOM_STATUS.CREATED) && (
+              <ActionButton
+                action="save"
+                variant="draft"
+                text="Save Draft"
+                loading={savingDraft}
+                onClick={handleSaveDraft}
+              />
+            )}
             <ActionButton
               action="save"
-              variant="draft"
-              text="Save Draft"
-              loading={savingDraft}
-              onClick={handleSaveDraft}
-            />
-            <ActionButton
-              action="save"
-              text="Create BOM"
+              text={isEdit ? 'Update BOM' : 'Create BOM'}
               loading={submitting}
               onClick={handleSubmit}
             />
@@ -2549,6 +2565,7 @@ const BOMForm = () => {
         afterClose={() => setPendingProcessData(null)}
         footer={null}
         width={400}
+        centered
         destroyOnClose
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
@@ -2581,6 +2598,7 @@ const BOMForm = () => {
         onCancel={() => setMatchByModalOpen(false)}
         footer={null}
         width={560}
+        centered
         destroyOnClose
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >

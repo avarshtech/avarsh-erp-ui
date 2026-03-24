@@ -295,6 +295,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       onCancel={onCancel}
       okText="Save Components"
       width={640}
+      centered
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
@@ -707,6 +708,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
       onOk={handleSave}
       confirmLoading={saving}
       okText="Create & Use"
+      centered
       destroyOnClose
       afterClose={() => {
         setPresetName('');
@@ -1672,6 +1674,10 @@ const OrderForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const handleSaveDraft = async () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     const errors = validateForm(false);
     if (errors.length > 0) {
       errors.forEach((e) => message.error(e));
@@ -1702,6 +1708,10 @@ const OrderForm = () => {
   };
 
   const handleSubmitOrder = () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     const errors = validateForm(true);
     if (errors.length > 0) {
       errors.forEach((e) => message.error(e));

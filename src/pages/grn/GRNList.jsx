@@ -107,7 +107,7 @@ const GRNList = () => {
         />
       </Card>
 
-      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal(prev => ({ ...prev, open: false }))} afterClose={() => setViewModal({ open: false, record: null })} footer={[<ActionButton key="close" action="close" text="Close" onClick={() => setViewModal(prev => ({ ...prev, open: false }))} />]} width={500} styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}>
+      <Modal title={`GRN Details - ${viewModal.record?.grnNumber}`} open={viewModal.open} onCancel={() => setViewModal(prev => ({ ...prev, open: false }))} afterClose={() => setViewModal({ open: false, record: null })} footer={[<ActionButton key="close" action="close" text="Close" onClick={() => setViewModal(prev => ({ ...prev, open: false }))} />]} width={500} centered styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}>
         {viewModal.record && (
           <Row gutter={[16, 16]} style={{ padding: 16 }}>
             <Col span={12}><Text type="secondary">GRN Date:</Text><br /><Text strong>{viewModal.record.grnDate}</Text></Col>

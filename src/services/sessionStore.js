@@ -95,40 +95,40 @@ export const setOrgInfo = (org) => { _orgInfo = org; };
 /** @returns {object|null} */
 export const getOrgInfo = () => _orgInfo;
 
-// ── Session Active Flag (sessionStorage — non-sensitive boolean) ────────────
+// ── Session Active Flag (localStorage — survives PWA restart) ───────────────
 
 export const setSessionActiveFlag = () => {
-  sessionStorage.setItem('sessionActive', 'true');
+  localStorage.setItem('sessionActive', 'true');
 };
 
 export const hasSessionActiveFlag = () => {
-  return sessionStorage.getItem('sessionActive') === 'true';
+  return localStorage.getItem('sessionActive') === 'true';
 };
 
 export const clearSessionActiveFlag = () => {
-  sessionStorage.removeItem('sessionActive');
+  localStorage.removeItem('sessionActive');
 };
 
-// ── User Display Cache (sessionStorage — token field stripped) ───────────────
+// ── User Display Cache (localStorage — survives PWA restart) ─────────────────
 
 /**
- * Cache user display info (name, role, permissions) in sessionStorage.
+ * Cache user display info (name, role, permissions) in localStorage.
  * The `token` field is explicitly removed before writing.
  * @param {object} user
  */
 export const cacheUserDisplay = (user) => {
   if (!user) return;
   const { token, ...displayData } = user;
-  sessionStorage.setItem('currentUser', JSON.stringify(displayData));
+  localStorage.setItem('currentUser', JSON.stringify(displayData));
 };
 
 /**
- * Read the cached user display object from sessionStorage.
+ * Read the cached user display object from localStorage.
  * @returns {object|null}
  */
 export const getCachedUserDisplay = () => {
   try {
-    const raw = sessionStorage.getItem('currentUser');
+    const raw = localStorage.getItem('currentUser');
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -176,10 +176,12 @@ export const clearAll = () => {
   _orgInfo = null;
   _tokenExp = null;
 
+  localStorage.removeItem('currentUser');
+  localStorage.removeItem('sessionActive');
+
+  // Legacy key cleanup (from previous implementations)
   sessionStorage.removeItem('currentUser');
   sessionStorage.removeItem('sessionActive');
-
-  // Legacy key cleanup (from previous sessionStorage-based implementation)
   sessionStorage.removeItem('authToken');
   sessionStorage.removeItem('refreshToken');
   sessionStorage.removeItem('organisationInfo');

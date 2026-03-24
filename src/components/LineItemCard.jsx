@@ -16,23 +16,14 @@ const LineItemCard = React.memo(({
   ...restProps
 }) => (
   <div
-    className={className}
+    className={`view-line-item-card${className ? ` ${className}` : ''}`}
     style={{
       border: '1px solid var(--border-color)',
       borderRadius: 'var(--radius-md)',
       padding: '16px 20px',
       background: 'var(--card-bg)',
-      transition: 'box-shadow 0.2s, border-color 0.2s',
       cursor: 'default',
       ...style,
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-      e.currentTarget.style.borderColor = 'var(--primary-color)';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.boxShadow = 'none';
-      e.currentTarget.style.borderColor = 'var(--border-color)';
     }}
     {...restProps}
   >

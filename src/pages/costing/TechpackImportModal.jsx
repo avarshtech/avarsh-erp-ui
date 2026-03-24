@@ -166,6 +166,7 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
       afterClose={() => form.resetFields()}
       title={<Space><PlusOutlined /> Quick Create Item</Space>}
       width={540}
+      centered
       onOk={handleSave}
       okText="Create Item"
       okButtonProps={{ loading: saving }}
@@ -481,6 +482,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
         afterClose={handleAfterClose}
         title={<Space><ImportOutlined /> Import from Techpack PDF</Space>}
         width={880}
+        centered
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
         footer={
           step === 'review' ? (

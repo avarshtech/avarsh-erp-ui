@@ -183,6 +183,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
         </Space>
       }
       width={780}
+      centered
       styles={{ body: { maxHeight: '72vh', overflowY: 'auto', overflowX: 'hidden', padding: '20px 24px' } }}
       footer={
         step === 'result' ? (

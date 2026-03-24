@@ -510,6 +510,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
       afterClose={handleAfterClose}
       footer={null}
       width={1400}
+      centered
       destroyOnClose
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 24px' } }}
     >

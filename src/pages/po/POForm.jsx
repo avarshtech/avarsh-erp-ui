@@ -199,6 +199,7 @@ const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
       onCancel={() => onSelect(null, null)}
       width={600}
       footer={null}
+      centered
       closable={false}
       maskClosable={false}
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
@@ -1375,10 +1376,14 @@ const POForm = () => {
 
   // Save as Draft
   const handleSaveDraft = async () => {
+    if (isEditMode && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     // For draft, validate all fields
     const errors = validateForm(false);
     if (errors.length > 0) {
-      message.error(errors[0], 5);
+      errors.forEach((e) => message.error(e, 5));
       focusFirstErrorField(errors[0]);
       return;
     }
@@ -1471,9 +1476,13 @@ const POForm = () => {
 
   // Submit for Approval — with resubmit change detection
   const handleSubmitClick = async () => {
+    if (isEditMode && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
     const errors = validateForm(true);
     if (errors.length > 0) {
-      message.error(errors[0], 5);
+      errors.forEach((e) => message.error(e, 5));
       focusFirstErrorField(errors[0]);
       return;
     }

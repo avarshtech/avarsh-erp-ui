@@ -145,11 +145,25 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
     return () => { cancelled = true; };
   }, [open, orderData]);
 
+  // Handle pending action from push notification deep link
+  const status = orderData?.status;
+  const isReferBackPending = status === ORDER_STATUS.REFER_BACK_REQUESTED;
+  const isCancelPending    = status === ORDER_STATUS.CANCEL_REQUESTED;
+  const isPendingApproval  = isReferBackPending || isCancelPending;
+
+  useEffect(() => {
+    if (!pendingAction || !orderData) return;
+    if (pendingAction === 'approve' && isPendingApproval && canApproveOrderAction()) {
+      handleApprove();
+    } else if (pendingAction === 'reject' && isPendingApproval && canRejectOrderAction()) {
+      handleReject();
+    }
+  }, [orderData, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!orderData) return null;
 
   const {
     orderNo,
-    status,
     costingId,
     buyerName,
     orderDate,
@@ -175,21 +189,6 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
   // Edit is only available once refer back is APPROVED (status = REFERRED_BACK), not while pending
   const canEdit = status === ORDER_STATUS.REFERRED_BACK && hasPermission('orders', 'update');
-
-  // Pending-approval statuses
-  const isReferBackPending = status === ORDER_STATUS.REFER_BACK_REQUESTED;
-  const isCancelPending    = status === ORDER_STATUS.CANCEL_REQUESTED;
-  const isPendingApproval  = isReferBackPending || isCancelPending;
-
-  // Handle pending action from push notification deep link
-  useEffect(() => {
-    if (!pendingAction || !orderData) return;
-    if (pendingAction === 'approve' && isPendingApproval && canApproveOrderAction()) {
-      handleApprove();
-    } else if (pendingAction === 'reject' && isPendingApproval && canRejectOrderAction()) {
-      handleReject();
-    }
-  }, [orderData, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmtCurrency = (amount) => {
     if (amount === null || amount === undefined) return `${currSymbol} 0.00`;

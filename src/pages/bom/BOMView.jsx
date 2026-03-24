@@ -128,6 +128,7 @@ const BOMView = ({ open, bomData, onClose }) => {
 
     const card = (
         <div
+          className="view-line-item-card"
           style={{
             borderRadius: 'var(--radius-md, 10px)',
             height: '100%',
@@ -137,6 +138,7 @@ const BOMView = ({ open, bomData, onClose }) => {
             borderLeftColor: fabric ? 'var(--primary-color, #6366f1)' : 'var(--color-success, #10b981)',
             background: 'var(--card-bg)',
             padding: '16px 20px',
+            cursor: 'default',
           }}
         >
           {/* Header: Item name + code + category */}

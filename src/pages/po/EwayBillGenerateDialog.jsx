@@ -149,6 +149,7 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
       open={open}
       onCancel={onClose}
       width={900}
+      centered
       destroyOnHidden
       afterClose={handleAfterClose}
       footer={[

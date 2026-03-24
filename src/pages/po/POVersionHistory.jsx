@@ -122,7 +122,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
       onCancel={onClose}
       width={1100}
       footer={null}
-      style={{ top: 24 }}
+      centered
       styles={{ body: { maxHeight: '75vh', overflowY: 'auto', padding: 0 } }}
       destroyOnHidden
     >

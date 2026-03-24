@@ -219,7 +219,7 @@ export const ThemeProvider = ({ children }) => {
     // Sync PWA theme-color meta tag with current theme
     const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (metaThemeColor) {
-      metaThemeColor.setAttribute('content', theme === THEMES.DARK ? '#0f172a' : '#6366f1');
+      metaThemeColor.setAttribute('content', theme === THEMES.DARK ? '#0f172a' : '#ffffff');
     }
   }, [theme]);
 

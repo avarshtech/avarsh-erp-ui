@@ -323,6 +323,7 @@ const UserManagement = () => {
         onCancel={handleModalClose}
         afterClose={handleModalAfterClose}
         width={MODAL_WIDTHS.MEDIUM}
+        centered
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
         footer={
           <div style={{ textAlign: 'right' }}>
@@ -357,6 +358,7 @@ const UserManagement = () => {
         onCancel={() => setResetPwdModalVisible(false)}
         afterClose={() => resetPwdForm.resetFields()}
         width={MODAL_WIDTHS.SMALL}
+        centered
         destroyOnHidden
         footer={
           <div style={{ textAlign: 'right' }}>

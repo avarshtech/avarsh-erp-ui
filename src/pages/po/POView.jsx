@@ -964,7 +964,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         open={open}
         onCancel={onClose}
         width={1200}
-        style={{ top: 20 }}
+        centered
         closable
         className="po-view-modal"
         styles={{
@@ -1331,6 +1331,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         afterClose={() => { setActionReason(''); setRejectionCategory(null); }}
         footer={null}
         destroyOnHidden
+        centered
         width={520}
         styles={{ body: { padding: 0 } }}
       >

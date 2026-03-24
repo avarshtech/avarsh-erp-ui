@@ -1220,20 +1220,23 @@ textarea.ant-input:active {
 }
 
 /* ============================================================
-   PO VIEW DIALOG — Line Item Cards & Close Button
+   VIEW DIALOG — Line Item Cards & Close Button
    ============================================================ */
 
-/* Line item card hover effect */
+/* Line item card hover effect — shared across PO, BOM, Orders */
+.view-line-item-card,
 .po-line-item-card {
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
 }
 
+.view-line-item-card:hover,
 .po-line-item-card:hover {
   border-color: var(--primary-color) !important;
   box-shadow: 0 4px 16px rgba(99, 102, 241, 0.10);
   transform: translateY(-1px);
 }
 
+[data-theme="dark"] .view-line-item-card:hover,
 [data-theme="dark"] .po-line-item-card:hover {
   box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18);
 }

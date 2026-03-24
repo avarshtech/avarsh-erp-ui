@@ -801,7 +801,7 @@ const RoleAccess = () => {
         onCancel={handleModalClose}
         afterClose={handleModalAfterClose}
         width={MODAL_WIDTHS.LARGE}
-        style={{ top: 20 }}
+        centered
         styles={{
           body: { maxHeight: "70vh", overflowY: "auto", paddingBottom: 0 },
         }}

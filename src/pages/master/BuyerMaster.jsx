@@ -778,6 +778,7 @@ const BuyerMaster = () => {
           title={editingLocation ? 'Edit Shipping Location' : 'Add Shipping Location'}
           open={locationModalVisible}
           onCancel={() => setLocationModalVisible(false)}
+          centered
           afterClose={() => {
             locationForm.resetFields();
             setEditingLocation(null);

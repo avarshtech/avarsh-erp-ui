@@ -1141,9 +1141,25 @@ const CostingForm = () => {
   };
 
   const handleSaveDraft = async () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
+    // For draft, validate but allow save even with warnings for optional fields
+    let values;
     try {
-      const values = await form.validateFields().catch(() => form.getFieldsValue());
-      setSavingDraft(true);
+      values = await form.validateFields();
+    } catch (errInfo) {
+      // Show validation warnings but allow draft save to proceed
+      const errorFields = errInfo?.errorFields || [];
+      if (errorFields.length > 0) {
+        errorFields.forEach((f) => f.errors?.forEach((e) => message.warning(e)));
+      }
+      values = form.getFieldsValue();
+    }
+
+    setSavingDraft(true);
+    try {
       const payload = buildPayload(values, COSTING_STATUS.DRAFT);
       let saved;
       if (isEdit) {
@@ -1172,9 +1188,25 @@ const CostingForm = () => {
   };
 
   const handleSubmit = async () => {
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
+    let values;
     try {
-      const values = await form.validateFields();
-      setSubmitting(true);
+      values = await form.validateFields();
+    } catch (errInfo) {
+      const errorFields = errInfo?.errorFields || [];
+      if (errorFields.length > 0) {
+        errorFields.forEach((f) => f.errors?.forEach((e) => message.error(e)));
+      } else {
+        message.error('Please fill all required fields');
+      }
+      return;
+    }
+
+    setSubmitting(true);
+    try {
       const payload = buildPayload(values, COSTING_STATUS.FINAL);
       let saved;
       if (isEdit) {
@@ -1196,7 +1228,7 @@ const CostingForm = () => {
       clearDirty();
       navigate('/costing/list');
     } catch {
-      message.error('Please fill all required fields');
+      message.error('Failed to submit cost sheet');
     } finally {
       setSubmitting(false);
     }
@@ -2772,6 +2804,7 @@ const CostingForm = () => {
         onOk={() => quickAddProcessForm.submit()}
         confirmLoading={quickAddProcessLoading}
         okText="Create"
+        centered
         destroyOnClose
         width={420}
       >
@@ -2821,6 +2854,7 @@ const CostingForm = () => {
         onOk={() => quickAddOverheadForm.submit()}
         confirmLoading={quickAddOverheadLoading}
         okText="Create"
+        centered
         destroyOnClose
         width={420}
       >

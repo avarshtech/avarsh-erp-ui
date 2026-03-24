@@ -118,6 +118,7 @@ const FabricStagesDialog = ({
       open={open}
       onCancel={onClose}
       width={640}
+      centered
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
