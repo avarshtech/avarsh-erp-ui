@@ -212,9 +212,15 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_STORAGE_KEY, theme);
-    
+
     // Update body background for smooth transition
     document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+
+    // Sync PWA theme-color meta tag with current theme
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+    if (metaThemeColor) {
+      metaThemeColor.setAttribute('content', theme === THEMES.DARK ? '#0f172a' : '#6366f1');
+    }
   }, [theme]);
 
   // Listen for system theme changes

@@ -58,7 +58,7 @@ const tdStyle = {
   whiteSpace: 'nowrap',
 };
 
-const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
+const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) => {
   const navigate = useNavigate();
 
   // Refer-back request state
@@ -180,6 +180,16 @@ const OrderView = ({ open, orderData, onClose, onStatusChange }) => {
   const isReferBackPending = status === ORDER_STATUS.REFER_BACK_REQUESTED;
   const isCancelPending    = status === ORDER_STATUS.CANCEL_REQUESTED;
   const isPendingApproval  = isReferBackPending || isCancelPending;
+
+  // Handle pending action from push notification deep link
+  useEffect(() => {
+    if (!pendingAction || !orderData) return;
+    if (pendingAction === 'approve' && isPendingApproval && canApproveOrderAction()) {
+      handleApprove();
+    } else if (pendingAction === 'reject' && isPendingApproval && canRejectOrderAction()) {
+      handleReject();
+    }
+  }, [orderData, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fmtCurrency = (amount) => {
     if (amount === null || amount === undefined) return `${currSymbol} 0.00`;

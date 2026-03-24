@@ -6,8 +6,8 @@ import {
   Typography,
   message,
 } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import { searchOrders, deleteOrder } from '../../services/orderService';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { searchOrders, deleteOrder, getOrderById } from '../../services/orderService';
 import { hasPermission } from '../../utils/permissions';
 import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
@@ -44,6 +44,27 @@ const OrderList = () => {
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Handle deep link from push notification (?viewId=X&action=approve)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    const action = searchParams.get('action');
+    if (viewId) {
+      if (action) setPendingAction(action);
+      searchParams.delete('viewId');
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+      // OrderView needs the full order object — fetch by ID
+      getOrderById(parseInt(viewId))
+        .then((orderData) => {
+          setViewingOrder(orderData);
+          setViewModalVisible(true);
+        })
+        .catch(() => message.error('Failed to load order'));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Permissions
   const canView = hasPermission('orders', 'view');
@@ -304,9 +325,11 @@ const OrderList = () => {
       <OrderView
         open={viewModalVisible}
         orderData={viewingOrder}
+        pendingAction={pendingAction}
         onClose={() => {
           setViewModalVisible(false);
           setViewingOrder(null);
+          setPendingAction(null);
         }}
         onStatusChange={handleStatusActionComplete}
       />

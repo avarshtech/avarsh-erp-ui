@@ -103,7 +103,7 @@ const REJECTION_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
-const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
+const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefresh }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -320,6 +320,15 @@ const POView = ({ open, onClose, poData, onStatusChange, onRefresh }) => {
   ];
 
   const availableActions = po ? statusActions.filter((a) => a.fromStatus.includes(po.status) && a.canPerform()) : [];
+
+  // Handle pending action from push notification deep link
+  useEffect(() => {
+    if (!pendingAction || !po || actionLoading) return;
+    const action = availableActions.find((a) => a.key === pendingAction);
+    if (action) {
+      handleStatusAction(action);
+    }
+  }, [po, pendingAction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStatusAction = (action) => {
     if (action.requiresReason) {

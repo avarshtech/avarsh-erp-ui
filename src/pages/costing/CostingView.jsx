@@ -14,7 +14,7 @@ import {
   Skeleton,
   message,
 } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   getCostSheetById,
@@ -54,6 +54,19 @@ const CostingView = () => {
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
   const canApprove = hasPermission('costing-approval', 'approve');
+
+  // Handle deep link from push notification (?action=approve)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action && data && !loading) {
+      if (action === 'approve' && data.status === COSTING_STATUS.FINAL && canApprove) {
+        handleApprove();
+      }
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [data, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     loadData();

@@ -37,6 +37,9 @@ import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
+import OfflineBanner from "../components/OfflineBanner";
+import NotificationCenter from "../components/NotificationCenter";
+import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
 
@@ -168,6 +171,7 @@ const MainLayoutInner = () => {
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
   const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
+  const { isOffline } = useNetworkStatus();
 
   // Close drawer on route change
   useEffect(() => {
@@ -378,7 +382,8 @@ const MainLayoutInner = () => {
 
   return (
     <SessionExpiryGuard>
-      <Layout style={{ minHeight: "100vh" }}>
+      <OfflineBanner />
+      <Layout style={{ minHeight: "100vh", paddingTop: isOffline ? 40 : 0 }}>
         {/* Desktop: Fixed Sider */}
         {!isMobileOrTablet && (
           <Sider
@@ -500,16 +505,19 @@ const MainLayoutInner = () => {
             style={{
               padding: headerPadding,
               background: 'var(--header-bg)',
+              backdropFilter: 'var(--header-backdrop)',
+              WebkitBackdropFilter: 'var(--header-backdrop)',
+              borderBottom: 'var(--header-border-bottom)',
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               boxShadow: 'var(--header-shadow)',
               position: "sticky",
-              top: 0,
+              top: isOffline ? 40 : 0,
               zIndex: 99,
               height: isMobile ? 56 : 64,
               lineHeight: isMobile ? '56px' : '64px',
-              transition: "background-color var(--transition-normal), box-shadow var(--transition-normal)",
+              transition: "all var(--transition-normal)",
             }}
           >
             <Space size={isMobile ? 8 : 16}>
@@ -571,65 +579,74 @@ const MainLayoutInner = () => {
                 />
               )}
             </Space>
-            <Space size={isMobile ? 8 : 20}>
-              <SessionTimer />
+            <Space size={isMobile ? 6 : 12} align="center">
+              {!isMobile && <SessionTimer />}
+              {!isMobile && <div className="toolbar-divider" />}
+
+              {/* Notification Bell */}
+              <NotificationCenter />
+
+              {/* Theme Toggle */}
               <Tooltip title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
                 <button
                   onClick={toggleTheme}
-                  className="theme-toggle-btn"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: isMobile ? 36 : 40,
-                    height: isMobile ? 36 : 40,
-                    borderRadius: 10,
-                    background: 'var(--bg-tertiary)',
-                    border: '1px solid var(--border-color)',
-                    cursor: 'pointer',
-                    transition: 'all var(--transition-normal)',
-                    color: isDarkMode ? '#fbbf24' : '#3d6091',
-                  }}
+                  className="toolbar-icon-btn"
+                  style={{ color: isDarkMode ? '#fbbf24' : '#3d6091' }}
                 >
                   {isDarkMode ? (
-                    <SunOutlined style={{ fontSize: isMobile ? 16 : 18 }} />
+                    <SunOutlined style={{ fontSize: 18 }} />
                   ) : (
-                    <MoonOutlined style={{ fontSize: isMobile ? 16 : 18 }} />
+                    <MoonOutlined style={{ fontSize: 18 }} />
                   )}
                 </button>
               </Tooltip>
+
+              <div className="toolbar-divider" />
+
+              {/* User Avatar & Dropdown */}
               <Dropdown
                 menu={{
                   items: userMenuItems,
                   onClick: handleUserMenuClick,
-                  style: {
-                    minWidth: 220,
-                    padding: '8px',
-                  }
+                  style: { minWidth: 220, padding: '8px' },
                 }}
                 trigger={["click"]}
                 placement="bottomRight"
                 styles={{
                   root: {
-                    boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)'
-                  }
+                    boxShadow: '0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+                  },
                 }}
               >
                 <Space
+                  className="user-avatar-section"
                   style={{
                     cursor: "pointer",
-                    padding: isMobile ? '4px 6px' : '6px 12px',
-                    transition: 'all 0.2s ease',
+                    padding: isMobile ? '4px 6px' : '6px 10px',
                   }}
                 >
                   <Avatar
                     size={isMobile ? 32 : 36}
                     style={{
                       background: 'var(--gradient-primary)',
-                      fontSize: isMobile ? 14 : 16,
+                      fontSize: isMobile ? 13 : 14,
+                      fontWeight: 600,
                     }}
-                    icon={<UserOutlined />}
-                  />
+                  >
+                    {currentUser?.name
+                      ? currentUser.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+                      : <UserOutlined />}
+                  </Avatar>
+                  {!isMobileOrTablet && (
+                    <div style={{ lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {currentUser?.name || 'User'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        {currentUser?.roleName || 'User'}
+                      </div>
+                    </div>
+                  )}
                 </Space>
               </Dropdown>
             </Space>

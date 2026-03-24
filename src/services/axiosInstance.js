@@ -21,6 +21,20 @@ const axiosInstance = axios.create({
 let isRefreshing = false;
 let refreshSubscribers = [];
 
+// Request interceptor: block mutations when offline
+axiosInstance.interceptors.request.use(
+  (config) => {
+    if (!navigator.onLine && ['post', 'put', 'delete', 'patch'].includes(config.method)) {
+      const error = new Error('You are offline. This action requires an internet connection.');
+      error.isOfflineError = true;
+      message.warning('You are offline. This action requires an internet connection.');
+      return Promise.reject(error);
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 // Request interceptor to add auth token from in-memory store
 axiosInstance.interceptors.request.use(
   (config) => {

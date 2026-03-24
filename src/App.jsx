@@ -6,6 +6,8 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
+import UpdatePrompt from './components/UpdatePrompt';
+import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionRoute from './components/PermissionRoute';
 import Login from './pages/auth/Login';
@@ -70,6 +72,7 @@ const ThemedApp = () => {
     <ConfigProvider theme={antThemeConfig}>
       <AntdApp>
       <ConflictDialog />
+      <UpdatePrompt />
       <StoreProvider>
         <BrowserRouter>
           <Routes>
@@ -81,6 +84,7 @@ const ThemedApp = () => {
               path="/"
               element={
               <ProtectedRoute>
+                <NotificationPermissionPrompt />
                 <MainLayout />
               </ProtectedRoute>
             }

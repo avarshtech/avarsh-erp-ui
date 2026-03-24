@@ -22,6 +22,7 @@ import {
 } from '@ant-design/icons';
 import { getCurrentUser } from '../services/authService';
 import { getUserById, changePassword } from '../services/userService';
+import NotificationPreferences from '../components/NotificationPreferences';
 
 const { Title, Text } = Typography;
 
@@ -302,6 +303,11 @@ const Profile = () => {
             </Col>
           </Row>
         </Card>
+      </Col>
+
+      {/* Notification Preferences */}
+      <Col span={24}>
+        <NotificationPreferences />
       </Col>
     </Row>
   );

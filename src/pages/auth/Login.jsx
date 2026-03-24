@@ -8,6 +8,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { getFirstAccessibleRoute } from '../../utils/permissions';
 import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
 import avarshLogoLight from '../../assets/images/avarsh-logo-light.png';
+import PwaInstallPrompt from '../../components/PwaInstallPrompt';
 
 const { Title, Text, Link } = Typography;
 
@@ -107,6 +108,9 @@ const Login = () => {
       overflow: 'hidden',
     }}>
       {contextHolder}
+
+      {/* PWA install prompt for mobile/tablet users */}
+      <PwaInstallPrompt />
 
       {/* Decorative circles */}
       <div style={{

@@ -7,7 +7,7 @@ import {
   message,
   Space,
 } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchPurchaseOrders,
   deletePurchaseOrder,
@@ -53,6 +53,22 @@ const POList = () => {
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingPO, setViewingPO] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  // Handle deep link from push notification (?viewId=X&action=approve)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    const action = searchParams.get('action');
+    if (viewId) {
+      setViewingPO({ id: parseInt(viewId) });
+      setViewModalVisible(true);
+      if (action) setPendingAction(action);
+      searchParams.delete('viewId');
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // History modal state
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -363,9 +379,11 @@ const POList = () => {
       <POView
         open={viewModalVisible}
         poData={viewingPO}
+        pendingAction={pendingAction}
         onClose={() => {
           setViewModalVisible(false);
           setViewingPO(null);
+          setPendingAction(null);
         }}
         onStatusChange={handleStatusActionComplete}
         onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
