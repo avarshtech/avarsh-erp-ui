@@ -113,6 +113,41 @@ export const deletePurchaseOrder = async (id) => {
   return response.data;
 };
 
+// ==================== PO ACTIONS (Reject / Refer Back / Cancel) ====================
+
+/**
+ * Reject a purchase order
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { reason, category?, version? }
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const rejectPurchaseOrder = async (id, data) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/reject`, data);
+  return response.data;
+};
+
+/**
+ * Refer back a purchase order for revision
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { reason, version? }
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const referBackPurchaseOrder = async (id, data) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/refer-back`, data);
+  return response.data;
+};
+
+/**
+ * Cancel a purchase order
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { reason, version? }
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const cancelPurchaseOrder = async (id, data) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/cancel`, data);
+  return response.data;
+};
+
 // ==================== ACTIVITY LOG ====================
 
 /**

@@ -115,6 +115,7 @@ const CostingForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
+  const [loadedStatus, setLoadedStatus] = useState(null);
   const [costingId, setCostingId] = useState('');
   const [savedDate, setSavedDate] = useState(null);
   const [currency, setCurrency] = useState('INR');
@@ -356,6 +357,7 @@ const CostingForm = () => {
     try {
       const cs = await getCostSheetById(id);
       setEntityVersion(cs.version);
+      setLoadedStatus(cs.status || null);
       setCostingId(cs.costingId);
       setStyleId(cs.styleId || null);
       setCurrency(cs.currency);
@@ -1188,7 +1190,7 @@ const CostingForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (isEdit && !isDirty) {
+    if (isEdit && !isDirty && loadedStatus !== COSTING_STATUS.DRAFT) {
       message.warning('No changes detected.');
       return;
     }

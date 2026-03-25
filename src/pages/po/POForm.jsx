@@ -1476,7 +1476,7 @@ const POForm = () => {
 
   // Submit for Approval — with resubmit change detection
   const handleSubmitClick = async () => {
-    if (isEditMode && !isDirty) {
+    if (isEditMode && !isDirty && originalPO?.status !== PO_STATUS.DRAFT) {
       message.warning('No changes detected.');
       return;
     }

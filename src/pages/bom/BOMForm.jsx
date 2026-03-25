@@ -21,7 +21,7 @@ import {
   ConfigProvider,
   Segmented,
 } from 'antd';
-import { numericInputProps } from '../../utils/inputHelpers';
+import { numericInputProps, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
   DeleteOutlined,
   LoadingOutlined,
@@ -102,6 +102,12 @@ const createEmptyLine = () => ({
 
 /** Check if a BOM line's category is Fabric */
 const isFabricCategory = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
+
+/** Check if a BOM line's category is Trims */
+const isTrimCategory = (line) => (line?.categoryName || '').toLowerCase().includes('trim');
+
+/** Check if a BOM line's category is applicable for BOM (only Fabric & Trims) */
+const isBomApplicableCategory = (line) => isFabricCategory(line) || isTrimCategory(line);
 
 /** Auto-format order number: user types after "SG/" prefix, auto-inserts - and / */
 const formatOrderNo = (raw, prev = '') => {
@@ -686,8 +692,13 @@ const BOMForm = () => {
     (lineKey, categoryId) => {
       const doChange = () => {
         const cat = metaData.find((c) => c.id === categoryId);
+        const catName = cat?.name || '';
+        const tempLine = { categoryName: catName };
+        if (catName && !isBomApplicableCategory(tempLine)) {
+          message.warning('Only Fabric and Trims categories are applicable for BOM.');
+        }
         updateLineMulti(lineKey, {
-          categoryId, categoryName: cat?.name || '',
+          categoryId, categoryName: catName,
           subCategoryId: null, subCategoryName: '',
           itemTypeId: null, itemTypeName: '',
           ...resetItemFields,
@@ -971,7 +982,7 @@ const BOMForm = () => {
   const openAllowanceDialog = useCallback(
     (lineKey, line, allSelectedProcesses) => {
       const cMode = line?.consumptionMode || 'SIMPLE';
-      const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 
       let base;
       if (isMatrixMode) {
@@ -1010,7 +1021,7 @@ const BOMForm = () => {
       if (!line) return;
 
       const cMode = line.consumptionMode || 'SIMPLE';
-      const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 
       let base;
       if (isMatrixMode) {
@@ -1165,7 +1176,7 @@ const BOMForm = () => {
   const computeTotalQty = useCallback(
     (line) => {
       // Matrix modes for trims
-      if (!isFabricCategory(line) && (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE)) {
+      if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
         return computeMatrixTotalQty(line);
       }
       // SIMPLE mode (trims and fabric)
@@ -1214,7 +1225,7 @@ const BOMForm = () => {
     const completedLines = lines.filter((l) => {
       if (!l.categoryId || !l.itemId || !l.processes?.length) return false;
       const cMode = l.consumptionMode || 'SIMPLE';
-      const isMatrix = !isFabricCategory(l) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      const isMatrix = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
       if (isMatrix) {
         if (!l.consumptionMatrix || Object.keys(l.consumptionMatrix).length === 0) return false;
       } else {
@@ -1228,7 +1239,7 @@ const BOMForm = () => {
       const allowances = l.processAllowances || [];
       if (!allowances.length) return sum + tq;
       const cMode = l.consumptionMode || 'SIMPLE';
-      const isMatrixMode = !isFabricCategory(l) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
       if (isMatrixMode && l.consumptionMatrix) {
         const oqg = buildOrderQtyGrid(orderLineSummary);
         let total = 0;
@@ -1305,7 +1316,7 @@ const BOMForm = () => {
         const allowances = rest.processAllowances || [];
         if (!allowances.length) return tq;
         const cMode = line.consumptionMode || 'SIMPLE';
-        const isMatrixMode = !isFabricCategory(line) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+        const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
         if (isMatrixMode && line.consumptionMatrix) {
           const oqg = buildOrderQtyGrid(orderLineSummary);
           let total = 0;
@@ -1380,10 +1391,14 @@ const BOMForm = () => {
       const n = idx + 1;
       const fabric = isFabricCategory(l);
       const cMode = l.consumptionMode || 'SIMPLE';
-      const isMatrixMode = !fabric && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 
       // ── Basic fields (draft + submit) ──
       if (!l.categoryId) errors.push(`Line ${n}: Category is required.`);
+      // Validate category is applicable for BOM (Fabric or Trims only)
+      if (l.categoryId && !isBomApplicableCategory(l)) {
+        errors.push(`Line ${n}: Only Fabric and Trims categories are applicable for BOM.`);
+      }
       if (!l.subCategoryId) errors.push(`Line ${n}: Sub Category is required.`);
       if (!l.itemTypeId) errors.push(`Line ${n}: Item Type is required.`);
       if (!l.itemId) errors.push(`Line ${n}: Item is required.`);
@@ -1391,13 +1406,9 @@ const BOMForm = () => {
       if (!l.partsName || (Array.isArray(l.partsName) && l.partsName.length === 0)) errors.push(`Line ${n}: Parts Name is required.`);
 
       // ── Variant selection ──
-      // Required for: fabric (always), SIMPLE trims, SIZE_WISE trims
-      // Not required for: VARIANT_PER_SIZE trims (variants mapped per size in matrix)
-      if (fabric) {
-        if (!l.variantId && (l.availableVariants || []).length > 1) {
-          errors.push(`Line ${n}: Variant selection is required for fabric.`);
-        }
-      } else if (cMode === CONSUMPTION_MODE.SIMPLE || cMode === CONSUMPTION_MODE.SIZE_WISE) {
+      // Required for: SIMPLE and SIZE_WISE modes (both fabric & trims)
+      // Not required for: VARIANT_PER_SIZE (variants mapped per size in matrix)
+      if (cMode === CONSUMPTION_MODE.SIMPLE || cMode === CONSUMPTION_MODE.SIZE_WISE) {
         if (!l.variantId && (l.availableVariants || []).length > 1) {
           errors.push(`Line ${n}: Variant selection is required for ${cMode === CONSUMPTION_MODE.SIMPLE ? 'Simple' : 'Size-wise'} consumption mode.`);
         }
@@ -1526,7 +1537,7 @@ const BOMForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (isEdit && !isDirty) {
+    if (isEdit && !isDirty && bomStatus !== BOM_STATUS.DRAFT) {
       message.warning('No changes detected.');
       return;
     }
@@ -1569,7 +1580,7 @@ const BOMForm = () => {
         fixed: 'left',
         align: 'center',
         render: (_, record, idx) => record.isPoGenerated
-          ? <Tooltip title="PO placed — this line cannot be modified"><span style={{ color: 'var(--warning-color)' }}>🔒</span></Tooltip>
+          ? <Tooltip title="PO placed — this line cannot be modified"><span style={{ color: 'var(--warning-color)', cursor: 'pointer' }}>🔒</span></Tooltip>
           : idx + 1,
       },
       // 2. Category
@@ -1597,17 +1608,21 @@ const BOMForm = () => {
         width: 160,
         render: (value, record) => {
           const opts = getSubCategoriesForCategory(record.categoryId);
+          const notApplicable = record.categoryId && !isBomApplicableCategory(record);
           return (
-            <Select
-              placeholder="Sub Category"
-              style={{ width: '100%' }}
-              size="small"
-              value={value || undefined}
-              onChange={(v) => handleSubCategoryChange(record.key, v, record.categoryId)}
-              options={opts.map((sc) => ({ value: sc.id, label: sc.name }))}
-              showSearch={{ optionFilterProp: 'label' }}
-              disabled={!record.categoryId}
-            />
+            <Tooltip title={notApplicable ? 'Only Fabric and Trims categories are applicable for BOM' : undefined}>
+              <Select
+                placeholder={notApplicable ? 'N/A' : 'Sub Category'}
+                style={{ width: '100%' }}
+                size="small"
+                value={value || undefined}
+                onChange={(v) => handleSubCategoryChange(record.key, v, record.categoryId)}
+                options={opts.map((sc) => ({ value: sc.id, label: sc.name }))}
+                showSearch={{ optionFilterProp: 'label' }}
+                disabled={!record.categoryId || notApplicable}
+                status={notApplicable ? 'error' : undefined}
+              />
+            </Tooltip>
           );
         },
       },
@@ -1696,8 +1711,8 @@ const BOMForm = () => {
           const fabric = isFabricCategory(record);
           const variants = record.availableVariants || [];
 
-          // ── TRIMS: show consumption mode toggle + optional variant dropdown ──
-          if (!fabric && record.itemId) {
+          // ── FABRIC & TRIMS: show consumption mode toggle + optional variant dropdown ──
+          if (record.itemId) {
             const cMode = record.consumptionMode || 'SIMPLE';
             const showVariantDropdown = cMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE;
             return (
@@ -1707,15 +1722,19 @@ const BOMForm = () => {
                     cMode === CONSUMPTION_MODE.SIMPLE
                       ? 'Single consumption value for all sizes. Select a variant to specify the SKU.'
                       : cMode === CONSUMPTION_MODE.SIZE_WISE
-                      ? 'Consumption varies by garment size (e.g., more thread for larger sizes). Same variant, different quantities per size.'
-                      : 'Different trim variant for each garment size (e.g., shorter zipper for S, longer for XL). Map variants per size in the matrix.'
+                      ? `Consumption varies by garment size (e.g., more ${fabric ? 'fabric' : 'thread'} for larger sizes). Same variant, different quantities per size.`
+                      : `Different ${fabric ? 'fabric' : 'trim'} variant for each garment size. Map variants per size in the matrix.`
                   }
                   placement="bottom"
                 >
                   <Segmented
                     size="small"
                     value={cMode}
-                    options={CONSUMPTION_MODE_OPTIONS}
+                    options={CONSUMPTION_MODE_OPTIONS.map((opt) =>
+                      opt.value === CONSUMPTION_MODE.VARIANT_PER_SIZE && variants.length <= 1
+                        ? { ...opt, disabled: true }
+                        : opt
+                    )}
                     className="bom-consumption-mode-toggle"
                     block={false}
                     onChange={(v) => {
@@ -1726,12 +1745,19 @@ const BOMForm = () => {
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = updates.consumptionMatrix || null;
                         updates.variantMapping = updates.variantMapping || {};
+                        updates.colorInvalid = false;
+                        updates.overrideBaseQty = null;
                       } else if (v === CONSUMPTION_MODE.SIZE_WISE) {
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = record.consumptionMatrix || null;
                       } else {
                         updates.consumptionMatrix = null;
                         updates.variantMapping = null;
+                      }
+                      // Restore single variant when switching back from VARIANT_PER_SIZE
+                      if (v !== CONSUMPTION_MODE.VARIANT_PER_SIZE && !record.variantId && variants.length === 1) {
+                        updates.variantId = variants[0].id;
+                        updates.variants = sortAttrs(variants[0].attributes || {});
                       }
                       updateLineMulti(record.key, updates);
                     }}
@@ -1745,6 +1771,13 @@ const BOMForm = () => {
                     value={record.variantId || undefined}
                     onChange={(v) => handleVariantSelect(record.key, v)}
                     showSearch={{ optionFilterProp: 'label' }}
+                    open={variantEditLineKey === record.key || undefined}
+                    ref={(node) => {
+                      if (variantEditLineKey === record.key && node) {
+                        setTimeout(() => { node.focus(); }, 50);
+                      }
+                    }}
+                    onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                     options={variants.map((v) => {
                       const entries = Object.entries(v.attributes || {});
                       entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
@@ -1782,32 +1815,7 @@ const BOMForm = () => {
             );
           }
 
-          // ── FABRIC: variant selection (unchanged) ──
-          if (variants.length > 1 && !record.variantId) {
-            const shouldAutoOpen = variantEditLineKey === record.key;
-            return (
-              <Select
-                placeholder="Select variant"
-                style={{ width: '100%', minWidth: 180 }}
-                size="small"
-                value={record.variantId || undefined}
-                onChange={(v) => { setVariantEditLineKey(null); handleVariantSelect(record.key, v); }}
-                showSearch={{ optionFilterProp: 'label' }}
-                open={shouldAutoOpen || undefined}
-                ref={(node) => {
-                  if (shouldAutoOpen && node) {
-                    setTimeout(() => { node.focus(); }, 50);
-                  }
-                }}
-                onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
-                options={variants.map((v) => {
-                  const entries = Object.entries(v.attributes || {});
-                  entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
-                  return { value: v.id, label: entries.map(([k, val]) => `${k}: ${val}`).join(' | ') };
-                })}
-              />
-            );
-          }
+          // ── No item selected yet: show dash ──
           const tags = variantsToTags(record.variants);
           if (tags.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           return (
@@ -1851,7 +1859,7 @@ const BOMForm = () => {
         render: (value, record) => {
           const fabric = isFabricCategory(record);
           const cMode = record.consumptionMode || 'SIMPLE';
-          const isMatrix = !fabric && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+          const isMatrix = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
           const consumptionUom = record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() : '';
 
           if (isMatrix) {
@@ -1873,8 +1881,7 @@ const BOMForm = () => {
             );
           }
 
-          // Fabric: InputNumber + AI button + base qty below
-          // SIMPLE trims: InputNumber only
+          // SIMPLE mode: InputNumber + AI button (fabric) + base qty below
           const showOverrideInput = fabric && record.variantId && isFabricColorMissing(record);
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: showOverrideInput ? 4 : 6 }}>
@@ -2036,7 +2043,7 @@ const BOMForm = () => {
           if (allowances.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
 
           const cMode = record.consumptionMode || 'SIMPLE';
-          const isMatrixMode = !isFabricCategory(record) && (cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE);
+          const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 
           let purchaseQty;
           if (isMatrixMode && record.consumptionMatrix) {
@@ -2249,8 +2256,10 @@ const BOMForm = () => {
             </div>
             <Input
               placeholder="SG/25-26/1001"
+              inputMode="numeric"
               value={orderNoInput || (isEdit ? '' : 'SG/')}
               onChange={(e) => !isEdit && setOrderNoInput(formatOrderNo(e.target.value, orderNoInput))}
+              onKeyDown={!isEdit ? (e) => formattedIdKeyDown(e, 'SG/') : undefined}
               onBlur={!isEdit ? handleOrderNoBlur : undefined}
               onPressEnter={!isEdit ? (e) => { e.target.blur(); } : undefined}
               suffix={orderLoading ? <LoadingOutlined spin /> : null}

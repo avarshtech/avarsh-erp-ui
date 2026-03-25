@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Switch, Typography, Spin, Space, message, Divider } from 'antd';
+import { Card, Switch, Typography, Skeleton, Space, message, Divider } from 'antd';
 import {
   BellOutlined,
   ShoppingOutlined,
@@ -157,9 +157,20 @@ const NotificationPreferences = () => {
         title={<span><BellOutlined style={{ marginRight: 8 }} />Notification Preferences</span>}
         style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)' }}
       >
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-          <Spin />
-        </div>
+        <Skeleton.Input active size="small" style={{ width: 200, marginBottom: 16 }} />
+        <Divider style={{ margin: '12px 0' }} />
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: i < 5 ? '1px solid var(--border-color)' : 'none' }}>
+            <Space size={12}>
+              <Skeleton.Avatar active shape="square" size={36} style={{ borderRadius: 8 }} />
+              <div>
+                <Skeleton.Input active size="small" style={{ width: 140, height: 16, marginBottom: 4 }} />
+                <Skeleton.Input active size="small" style={{ width: 200, height: 12 }} />
+              </div>
+            </Space>
+            <Skeleton.Button active size="small" style={{ width: 44, minWidth: 44, height: 22, borderRadius: 11 }} />
+          </div>
+        ))}
       </Card>
     );
   }

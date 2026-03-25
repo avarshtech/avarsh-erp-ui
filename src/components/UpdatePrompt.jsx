@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { Button, Space, App as AntdApp } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { SyncOutlined } from '@ant-design/icons';
 import useServiceWorker from '../hooks/useServiceWorker';
 
 const UpdatePrompt = () => {
-  const { needRefresh, offlineReady, updateApp, dismissUpdate, dismissOfflineReady } = useServiceWorker();
+  const { needRefresh, offlineReady, updating, updateApp, dismissUpdate, dismissOfflineReady } = useServiceWorker();
   const { notification } = AntdApp.useApp();
 
   useEffect(() => {
@@ -22,8 +22,8 @@ const UpdatePrompt = () => {
     if (needRefresh) {
       notification.info({
         key: 'pwa-update',
-        message: 'Update Available',
-        description: 'A new version of Avarsh ERP is available.',
+        message: 'Update Ready',
+        description: 'A new version of Avarsh ERP is ready. Restart to apply the update.',
         duration: 0,
         btn: (
           <Space>
@@ -36,15 +36,21 @@ const UpdatePrompt = () => {
             >
               Later
             </Button>
-            <Button type="primary" size="small" icon={<ReloadOutlined />} onClick={updateApp}>
-              Update Now
+            <Button
+              type="primary"
+              size="small"
+              icon={<SyncOutlined spin={updating} />}
+              loading={updating}
+              onClick={updateApp}
+            >
+              Restart Now
             </Button>
           </Space>
         ),
         onClose: dismissUpdate,
       });
     }
-  }, [needRefresh, notification, updateApp, dismissUpdate]);
+  }, [needRefresh, notification, updateApp, dismissUpdate, updating]);
 
   return null;
 };

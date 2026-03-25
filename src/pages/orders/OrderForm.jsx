@@ -23,7 +23,7 @@ import {
   Upload,
   Alert,
 } from 'antd';
-import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
+import { numericInputProps, integerInputProps, getZeroClearHandlers, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
   PlusOutlined,
   DeleteOutlined,
@@ -553,10 +553,12 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                         min={0}
                         step={0.01}
                         precision={2}
-                        value={sizePrices[s] || 0}
+                        placeholder="0.00"
+                        value={sizePrices[s]}
                         onChange={(v) => handleSizePriceChange(s, v)}
                         style={{ width: '100%' }}
                         {...numericInputProps}
+                        {...getZeroClearHandlers(sizePrices[s], (v) => handleSizePriceChange(s, v))}
                       />
                     )}
                   </td>
@@ -591,10 +593,12 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                           size="small"
                           min={0}
                           step={1}
-                          value={row.quantities?.[s] || 0}
+                          placeholder="0"
+                          value={row.quantities?.[s]}
                           onChange={(v) => handleQtyChange(row.key, s, v)}
                           style={{ width: '100%' }}
                           {...integerInputProps}
+                          {...getZeroClearHandlers(row.quantities?.[s], (v) => handleQtyChange(row.key, s, v))}
                         />
                       )}
                     </td>
@@ -1476,7 +1480,7 @@ const OrderForm = () => {
     setCostingLoading(true);
     try {
       const costing = await getCostSheetByCostingId(val);
-      if (costing.status?.toUpperCase() !== 'FINAL') {
+      if (costing.status?.toUpperCase() !== 'APPROVED') {
         message.error('Costing is not approved. Only approved costings can be used for order creation.');
         setCostingLoading(false);
         return;
@@ -1708,7 +1712,7 @@ const OrderForm = () => {
   };
 
   const handleSubmitOrder = () => {
-    if (isEdit && !isDirty) {
+    if (isEdit && !isDirty && orderStatus !== ORDER_STATUS.DRAFT) {
       message.warning('No changes detected.');
       return;
     }
@@ -1738,7 +1742,7 @@ const OrderForm = () => {
           if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
           // Upload staged garment images for new lines
           await processLineImages(savedOrder);
-          await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED);
+          await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED, null, savedOrder.version);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
           clearDirty();
@@ -1915,6 +1919,8 @@ const OrderForm = () => {
               >
                 <Input
                   placeholder="CST/25-26/1001"
+                  inputMode="numeric"
+                  onKeyDown={(e) => formattedIdKeyDown(e, 'CST/')}
                   onBlur={handleCostingIdBlur}
                   onPressEnter={(e) => { e.target.blur(); }}
                   suffix={costingLoading ? <LoadingOutlined spin /> : null}
