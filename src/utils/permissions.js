@@ -12,7 +12,7 @@
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
  *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "costing":          { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "costing-approval": { "access": true, "operations": { "approve": true } },
+ *   "costing-approval": { "access": true, "operations": { "approve": true, "revise": true } },
  *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "supplier-info":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "master-data":      { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
@@ -199,7 +199,7 @@ export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reje
 export const PO_APPROVAL_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
 // Costing Approval operations
-export const COSTING_APPROVAL_OPERATIONS = ['approve'];
+export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 
 // Dashboard only has view
 export const DASHBOARD_OPERATIONS = ['view'];
@@ -431,6 +431,9 @@ export const canPerformApprovalActions = () =>
 
 export const canApproveCostSheet = () =>
   hasModuleAccess('costing') && hasPermission('costing-approval', 'approve');
+
+export const canReviseCostSheet = () =>
+  hasModuleAccess('costing') && hasPermission('costing-approval', 'revise');
 
 // ─── FIRST ACCESSIBLE ROUTE ──────────────────────────────────────────────────
 

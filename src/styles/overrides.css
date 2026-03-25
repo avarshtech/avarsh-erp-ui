@@ -1165,6 +1165,11 @@ textarea.ant-input:active {
   color: #fff !important;
 }
 
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-disabled,
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-disabled .ant-segmented-item-label {
+  color: #4a5568 !important;
+}
+
 /* ============================================================
    PO TYPE TOGGLE
    Segmented control in PO supplier card for PO type selection

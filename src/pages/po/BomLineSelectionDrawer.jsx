@@ -26,6 +26,7 @@ import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/pantoneService';
 import orderInputIllustration from '../../assets/images/order-input-illustration.svg';
+import { formattedIdKeyDown } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 
@@ -386,8 +387,10 @@ const BomLineSelectionDrawer = ({
               <Col span={14}>
                 <Input
                   placeholder="SG/25-26/1001"
+                  inputMode="numeric"
                   value={orderNoInput || 'SG/'}
                   onChange={(e) => setOrderNoInput(formatOrderNo(e.target.value, orderNoInput))}
+                  onKeyDown={(e) => formattedIdKeyDown(e, 'SG/')}
                   onPressEnter={handleLoadBom}
                   disabled={bomLoading}
                 />

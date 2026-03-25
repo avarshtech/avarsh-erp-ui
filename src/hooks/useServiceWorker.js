@@ -4,6 +4,7 @@ import { registerServiceWorker, applyUpdate } from '../utils/swRegistration';
 const useServiceWorker = () => {
   const [needRefresh, setNeedRefresh] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     registerServiceWorker(
@@ -13,6 +14,7 @@ const useServiceWorker = () => {
   }, []);
 
   const updateApp = useCallback(() => {
+    setUpdating(true);
     applyUpdate();
   }, []);
 
@@ -27,6 +29,7 @@ const useServiceWorker = () => {
   return {
     needRefresh,
     offlineReady,
+    updating,
     updateApp,
     dismissUpdate,
     dismissOfflineReady,

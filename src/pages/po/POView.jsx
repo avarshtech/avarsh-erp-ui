@@ -56,6 +56,9 @@ import {
   createActivity,
   cancelEwayBill,
   updateStageCompletion,
+  rejectPurchaseOrder,
+  referBackPurchaseOrder,
+  cancelPurchaseOrder,
 } from '../../services/purchaseOrderService';
 import { updateBomLinePoStatus } from '../../services/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -349,17 +352,30 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
     if (!po) return;
     setActionLoading(true);
     try {
-      const updatedLineItems = (po.lineItems || []).map((li) => ({ ...li, status: action.lineItemStatus || li.status }));
-      await updatePurchaseOrder(po.id, { ...po, status: action.toStatus, lineItems: updatedLineItems, version: po.version });
-      const currentUser = getCurrentUser();
-      const name = currentUser?.name || '';
-      const commentData = { type: 'status_change', action: action.key, actionLabel: action.label, from: po.status, to: action.toStatus, by: name, ...(reason ? { reason } : {}) };
-      if (action.key === 'reject' && rejectionCategory) {
-        const catLabel = REJECTION_CATEGORIES.find((c) => c.value === rejectionCategory)?.label;
-        commentData.rejectionCategory = rejectionCategory;
-        commentData.rejectionCategoryLabel = catLabel || rejectionCategory;
+      // Use dedicated endpoints for reject/refer_back/cancel; generic save for approve
+      if (action.key === 'reject' || action.key === 'refer_back' || action.key === 'cancel') {
+        const actionData = {
+          reason,
+          version: po.version,
+          ...(action.key === 'reject' && rejectionCategory ? { category: rejectionCategory } : {}),
+        };
+        if (action.key === 'reject') {
+          await rejectPurchaseOrder(po.id, actionData);
+        } else if (action.key === 'refer_back') {
+          await referBackPurchaseOrder(po.id, actionData);
+        } else {
+          await cancelPurchaseOrder(po.id, actionData);
+        }
+        // Activity log + notification handled server-side
+      } else {
+        // Approve / other flows — keep existing generic save + client-side activity
+        const updatedLineItems = (po.lineItems || []).map((li) => ({ ...li, status: action.lineItemStatus || li.status }));
+        await updatePurchaseOrder(po.id, { ...po, status: action.toStatus, lineItems: updatedLineItems, version: po.version });
+        const currentUser = getCurrentUser();
+        const name = currentUser?.name || '';
+        const commentData = { type: 'status_change', action: action.key, actionLabel: action.label, from: po.status, to: action.toStatus, by: name, ...(reason ? { reason } : {}) };
+        await createActivity(po.id, { comment: JSON.stringify(commentData), status: action.toStatus, isSystemGenerated: true, name });
       }
-      await createActivity(po.id, { comment: JSON.stringify(commentData), status: action.toStatus, isSystemGenerated: true, name });
 
       // Unlock BOM lines on reject/cancel/referback
       if (po.poType && po.poType !== 'General') {

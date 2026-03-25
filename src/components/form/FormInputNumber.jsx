@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { InputNumber } from 'antd';
-import { numericInputProps } from '../../utils/inputHelpers';
+import { numericInputProps, getZeroClearHandlers } from '../../utils/inputHelpers';
 import { getCurrencySymbol } from '../../utils/formatters';
 
 const FormInputNumber = ({
@@ -9,6 +9,10 @@ const FormInputNumber = ({
   uom,
   className,
   style,
+  value,
+  onChange,
+  onFocus: onFocusProp,
+  onBlur: onBlurProp,
   ...restProps
 }) => {
   const mergedStyle = useMemo(() => ({ width: '100%', ...style }), [style]);
@@ -31,6 +35,21 @@ const FormInputNumber = ({
     return props;
   }, [variant, currency, uom]);
 
+  const zeroClear = useMemo(
+    () => getZeroClearHandlers(value, onChange),
+    [value, onChange],
+  );
+
+  const handleFocus = useCallback((e) => {
+    zeroClear.onFocus();
+    onFocusProp?.(e);
+  }, [zeroClear, onFocusProp]);
+
+  const handleBlur = useCallback((e) => {
+    zeroClear.onBlur();
+    onBlurProp?.(e);
+  }, [zeroClear, onBlurProp]);
+
   return (
     <InputNumber
       controls={false}
@@ -39,7 +58,11 @@ const FormInputNumber = ({
       className={className}
       style={mergedStyle}
       {...variantProps}
+      value={value}
+      onChange={onChange}
       {...restProps}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
     />
   );
 };

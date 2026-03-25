@@ -12,8 +12,13 @@ import {
   Descriptions,
   Statistic,
   Skeleton,
+  Modal,
+  Input,
+  Button,
+  Tooltip,
   message,
 } from 'antd';
+import { RollbackOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
@@ -29,7 +34,7 @@ import {
   calcFinalPriceUsd,
 } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
-import { hasPermission } from '../../utils/permissions';
+import { hasPermission, canReviseCostSheet } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import { ActionButton } from '../../components/buttons';
@@ -50,10 +55,14 @@ const CostingView = () => {
   const [duplicating, setDuplicating] = useState(false);
   const [approving, setApproving] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [reviseModalOpen, setReviseModalOpen] = useState(false);
+  const [reviseReason, setReviseReason] = useState('');
+  const [revising, setRevising] = useState(false);
 
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
   const canApprove = hasPermission('costing-approval', 'approve');
+  const canRevise = canReviseCostSheet();
 
   // Handle deep link from push notification (?action=approve)
   const [searchParams, setSearchParams] = useSearchParams();
@@ -101,13 +110,35 @@ const CostingView = () => {
   const handleApprove = async () => {
     setApproving(true);
     try {
-      await updateCostSheet(id, { ...data, status: COSTING_STATUS.APPROVED, version: data.version });
+      // Send header fields (required by DTO validation) but omit detail rows
+      // so backend's isDataChanged() returns false for status-only transitions
+      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
+      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.APPROVED, version: data.version });
       message.success('Cost sheet approved');
       loadData();
     } catch {
       message.error('Failed to approve cost sheet');
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleRevise = async () => {
+    if (reviseReason.trim().length < 50) {
+      message.warning('Please provide a reason (min 50 characters)');
+      return;
+    }
+    setRevising(true);
+    try {
+      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
+      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.DRAFT, version: data.version });
+      message.success('Cost sheet reverted to draft for revision');
+      setReviseModalOpen(false);
+      loadData();
+    } catch {
+      message.error('Failed to revise cost sheet');
+    } finally {
+      setRevising(false);
     }
   };
 
@@ -538,6 +569,13 @@ const CostingView = () => {
           {data.status === COSTING_STATUS.FINAL && canApprove && (
             <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
           )}
+          {data.status === COSTING_STATUS.FINAL && canRevise && (
+            <ActionButton
+              action="refer-back"
+              text="Revise"
+              onClick={() => { setReviseReason(''); setReviseModalOpen(true); }}
+            />
+          )}
         </Space>
       </PageHeader>
 
@@ -556,6 +594,121 @@ const CostingView = () => {
         items={collapseItems}
       />
       </DraftWatermark>
+
+      {/* Revise Reason Modal — matches PO refer-back dialog */}
+      <Modal
+        title={null}
+        open={reviseModalOpen}
+        onCancel={() => setReviseModalOpen(false)}
+        afterClose={() => setReviseReason('')}
+        footer={null}
+        destroyOnHidden
+        centered
+        width={520}
+        styles={{ body: { padding: 0 } }}
+      >
+        {(() => {
+          const MIN_CHARS = 50;
+          const charCount = reviseReason.trim().length;
+          const charsRemaining = MIN_CHARS - charCount;
+          const canSubmit = charCount >= MIN_CHARS;
+
+          return (
+            <div>
+              {/* Header Banner */}
+              <div style={{
+                padding: '24px 28px 20px',
+                background: 'color-mix(in srgb, var(--warning-color) 8%, transparent)',
+                borderBottom: '2px solid var(--warning-color)',
+                borderRadius: '8px 8px 0 0',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                  <div style={{ color: 'var(--warning-color)', flexShrink: 0, marginTop: 2 }}>
+                    <RollbackOutlined style={{ fontSize: 28 }} />
+                  </div>
+                  <div>
+                    <Title level={4} style={{ margin: '0 0 4px', color: 'var(--warning-color)' }}>Revise Cost Sheet</Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>
+                      This cost sheet will be reverted to Draft for revision. The creator will be notified.
+                    </Text>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cost Sheet Info + Flow */}
+              <div style={{ padding: '16px 28px 0' }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '10px 16px', borderRadius: 8,
+                  background: 'color-mix(in srgb, var(--primary-color) 5%, transparent)',
+                  border: '1px solid var(--border-color, #f0f0f0)',
+                  marginBottom: 20,
+                }}>
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Cost Sheet</Text>
+                    <Text strong style={{ fontSize: 14 }}>{data?.costingId}</Text>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Status Flow</Text>
+                    <Text style={{ fontSize: 12, color: 'var(--warning-color)', fontWeight: 600 }}>Final → Draft (Revision)</Text>
+                  </div>
+                </div>
+
+                {/* Revision Reason */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <Text strong style={{ fontSize: 13 }}>
+                      Revision Reason <span style={{ color: 'var(--error-color)' }}>*</span>
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      Min {MIN_CHARS} characters
+                    </Text>
+                  </div>
+                  <Input.TextArea
+                    rows={4}
+                    placeholder="Describe what changes or corrections are needed. Be specific about pricing, materials, or other concerns that need revision..."
+                    value={reviseReason}
+                    onChange={(e) => setReviseReason(e.target.value)}
+                    maxLength={500}
+                    showCount
+                    style={{ fontSize: 13 }}
+                    status={charCount > 0 && charCount < MIN_CHARS ? 'warning' : undefined}
+                  />
+                  {charCount > 0 && charCount < MIN_CHARS && (
+                    <Text type="warning" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                      {charsRemaining} more character{charsRemaining !== 1 ? 's' : ''} required
+                    </Text>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div style={{
+                padding: '16px 28px 20px',
+                display: 'flex', justifyContent: 'flex-end', gap: 10,
+                borderTop: '1px solid var(--border-color, #f0f0f0)',
+                marginTop: 12,
+              }}>
+                <Button onClick={() => setReviseModalOpen(false)} style={{ minWidth: 80 }}>
+                  Go Back
+                </Button>
+                <Tooltip title={!canSubmit ? `Enter at least ${MIN_CHARS} characters` : ''}>
+                  <Button
+                    type="primary"
+                    icon={<RollbackOutlined />}
+                    loading={revising}
+                    disabled={!canSubmit}
+                    onClick={handleRevise}
+                    style={{ minWidth: 120, backgroundColor: 'var(--warning-color)', borderColor: 'var(--warning-color)' }}
+                  >
+                    Revise
+                  </Button>
+                </Tooltip>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
   );
 };
