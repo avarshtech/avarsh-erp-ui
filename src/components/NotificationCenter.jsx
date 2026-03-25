@@ -48,13 +48,14 @@ const NotificationCenter = () => {
   useEffect(() => {
     const handler = (event) => {
       if (event.data?.type === 'PUSH_RECEIVED') {
-        fetchCount();
+        // Increment count locally — no API call needed since the push IS the new notification
+        setUnreadCount((prev) => prev + 1);
         if (open) loadNotifications();
       }
     };
     navigator.serviceWorker?.addEventListener('message', handler);
     return () => navigator.serviceWorker?.removeEventListener('message', handler);
-  }, [fetchCount, open]);
+  }, [open]);
 
   // Fetch notifications when panel opens
   useEffect(() => {
