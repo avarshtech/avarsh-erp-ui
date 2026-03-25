@@ -30,6 +30,7 @@ import {
   ClockCircleOutlined,
   MenuOutlined,
   CloseOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
@@ -265,6 +266,17 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/reports",
+      icon: <BarChartOutlined />,
+      label: "Reports",
+      moduleId: "reports",
+      children: [
+        { key: "/reports/list", label: "All Reports" },
+        { key: "/reports/ai-chat", label: "AI Assistant" },
+        { key: "/reports/saved", label: "Saved Reports" },
+      ],
+    },
+    {
       key: "/master",
       icon: <DatabaseOutlined />,
       label: "Master Data",
@@ -363,6 +375,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
     if (path.startsWith("/grn")) return ["/grn"];
     if (path.startsWith("/costing")) return ["/costing"];
+    if (path.startsWith("/reports")) return ["/reports"];
     if (path.startsWith("/admin")) return ["/admin"];
     return [];
   };

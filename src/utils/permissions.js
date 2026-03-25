@@ -88,6 +88,12 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'costing',
   },
+  REPORTS: {
+    id: 'reports',
+    name: 'Reports',
+    path: '/reports',
+    group: 'transactions',
+  },
   BUYERS: {
     id: 'buyer-info',
     name: 'Buyers',
@@ -222,6 +228,7 @@ export const PERMISSION_GROUPS = [
       { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
+      { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
     ],
   },
   {
@@ -272,6 +279,7 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')       return DASHBOARD_OPERATIONS;
+  if (moduleId === 'reports')         return ['view'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
@@ -439,6 +447,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
+    { route: '/reports/list', moduleId: 'reports' },
     { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master'] },
     { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
   ];

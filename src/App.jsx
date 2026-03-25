@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp, Spin } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
@@ -29,6 +29,12 @@ import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
 import MasterDashboard from './pages/master/MasterDashboard';
 import Profile from './pages/Profile';
+
+// Lazy-loaded report pages
+const ReportListPage = lazy(() => import('./pages/reports/ReportListPage'));
+const ReportBuilderPage = lazy(() => import('./pages/reports/ReportBuilderPage'));
+const SavedReportsPage = lazy(() => import('./pages/reports/SavedReportsPage'));
+const AiChatPage = lazy(() => import('./pages/reports/AiChatPage'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -120,6 +126,11 @@ const ThemedApp = () => {
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}
             <Route path="profile" element={<Profile />} />
+            {/* Reports (lazy-loaded) */}
+            <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
+            <Route path="reports/builder/:id" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportBuilderPage /></Suspense></PermissionRoute>} />
+            <Route path="reports/saved" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><SavedReportsPage /></Suspense></PermissionRoute>} />
+            <Route path="reports/ai-chat" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><AiChatPage /></Suspense></PermissionRoute>} />
           </Route>
 
           {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}
