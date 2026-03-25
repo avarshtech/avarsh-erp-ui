@@ -32,7 +32,7 @@ const SavedReportsPage = () => {
 
   const handleOpen = useCallback(
     (record) => {
-      navigate(`/reports/builder/${record.reportDefinitionId}?saved=${record.id}`);
+      navigate(`/reports/builder/${record.reportDefId}?saved=${record.id}`);
     },
     [navigate]
   );
@@ -41,7 +41,7 @@ const SavedReportsPage = () => {
     (record) => {
       modal.confirm({
         title: 'Delete Saved Report',
-        content: `Are you sure you want to delete "${record.name}"? This cannot be undone.`,
+        content: `Are you sure you want to delete "${record.savedName}"? This cannot be undone.`,
         okText: 'Delete',
         okButtonProps: { danger: true },
         onOk: async () => {
@@ -65,14 +65,14 @@ const SavedReportsPage = () => {
     () => [
       {
         title: 'Report Name',
-        dataIndex: 'name',
-        key: 'name',
+        dataIndex: 'savedName',
+        key: 'savedName',
         ellipsis: true,
       },
       {
         title: 'Report Type',
-        dataIndex: 'reportDefinitionName',
-        key: 'reportDefinitionName',
+        dataIndex: 'reportName',
+        key: 'reportName',
         ellipsis: true,
       },
       {

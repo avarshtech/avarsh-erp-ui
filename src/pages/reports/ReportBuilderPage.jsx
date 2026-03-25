@@ -58,7 +58,7 @@ const ReportBuilderPage = () => {
           const saved = allSaved?.find((s) => String(s.id) === savedId);
           if (saved && !cancelled) {
             if (saved.selectedFields?.length) setSelectedFields(saved.selectedFields);
-            if (saved.filters) setFilterValues(saved.filters);
+            if (saved.appliedFilters) setFilterValues(saved.appliedFilters);
             if (saved.sortConfig) setSortConfig(saved.sortConfig);
           }
         }
