@@ -85,8 +85,8 @@ const UserManagement = () => {
       user.username?.toLowerCase().includes(searchText.toLowerCase());
     const matchesStatus =
       statusFilter === 'all' ||
-      (statusFilter === 'active' && user.active !== false) ||
-      (statusFilter === 'inactive' && user.active === false);
+      (statusFilter === 'active' && user.isActive !== false) ||
+      (statusFilter === 'inactive' && user.isActive === false);
     return matchesSearch && matchesStatus;
   });
 
@@ -99,7 +99,7 @@ const UserManagement = () => {
         email: user.email,
         phone: user.phone || '',
         roleId: user.roleId || user.role?.id,
-        isActive: user.isActive ?? user.active ?? true,
+        isActive: user.isActive ?? true,
       };
       form.setFieldsValue(editValues);
       initialFormValuesRef.current = { ...editValues };
@@ -251,11 +251,11 @@ const UserManagement = () => {
       },
     },
     {
-      title: 'Status', dataIndex: 'active', key: 'status', align: 'center',
-      render: (active) => <StatusBadge status={active !== false ? 'active' : 'inactive'} />,
+      title: 'Status', dataIndex: 'isActive', key: 'status', align: 'center',
+      render: (isActive) => <StatusBadge status={isActive !== false ? 'active' : 'inactive'} />,
     },
     {
-      title: 'Last Login', dataIndex: 'lastLogin', key: 'lastLogin',
+      title: 'Last Login', dataIndex: 'lastLoginAt', key: 'lastLoginAt',
       render: (date) => date ? formatDate(date, 'DD MMM YYYY HH:mm') : 'Never',
     },
     {
@@ -392,7 +392,8 @@ const UserManagement = () => {
             <div style={{ marginBottom: 16 }}><Text type="secondary">Email</Text><div><MailOutlined /> {selectedUser.email}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Phone</Text><div><PhoneOutlined /> {selectedUser.phone || 'Not provided'}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Role</Text><div><Tag color="blue">{typeof selectedUser.role === 'object' ? selectedUser.role?.name : selectedUser.role || selectedUser.roleName}</Tag></div></div>
-            <div style={{ marginBottom: 16 }}><Text type="secondary">Status</Text><div><StatusBadge status={selectedUser.active !== false ? 'active' : 'inactive'} /></div></div>
+            <div style={{ marginBottom: 16 }}><Text type="secondary">Status</Text><div><StatusBadge status={selectedUser.isActive !== false ? 'active' : 'inactive'} /></div></div>
+            <div style={{ marginBottom: 16 }}><Text type="secondary">Last Login</Text><div>{selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt, 'DD MMM YYYY HH:mm') : 'Never'}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Created</Text><div>{formatDate(selectedUser.createdAt, 'DD MMM YYYY HH:mm')}</div></div>
             <Divider />
             <Space direction="vertical" style={{ width: '100%' }}>
