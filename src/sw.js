@@ -4,6 +4,43 @@ import { NetworkFirst } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
+// ─── Skip Waiting (required for injectManifest strategy) ───
+// When the user clicks "Restart Now", registerSW sends this message
+// to the waiting SW so it activates and the page reloads.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// ─── Update Notification (system notification bar on mobile/tablet) ───
+// When a new SW version installs and no app window is visible (backgrounded/closed),
+// show a native notification so the user knows an update is available.
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const hasVisibleClient = clients.some((c) => c.visibilityState === 'visible');
+      // Only show system notification if app is not in foreground
+      // (foreground updates are handled by the in-app UpdatePrompt)
+      if (!hasVisibleClient && self.registration.active) {
+        return self.registration.showNotification('Update Available', {
+          body: 'A new version of Avarsh ERP is available. Tap to update.',
+          icon: '/icons/icon-192x192.png',
+          badge: '/icons/icon-96x96.png',
+          tag: 'pwa-update',
+          renotify: true,
+          data: { type: 'PWA_UPDATE' },
+          actions: [
+            { action: 'update', title: 'Update Now' },
+            { action: 'dismiss', title: 'Later' },
+          ],
+          vibrate: [200, 100, 200],
+        });
+      }
+    })
+  );
+});
+
 // ─── Precache & Route (auto-injected by vite-plugin-pwa) ───
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
@@ -48,68 +85,153 @@ registerRoute(navigationRoute);
 
 // ─── Push Notification Handling ───
 
+// Notification type → action buttons (matches in-app NotificationPanel exactly)
 const NOTIFICATION_ACTIONS = {
   PO_APPROVAL_REQUEST: [
-    { action: 'approve', title: 'Approve', icon: '/icons/action-approve.png' },
-    { action: 'refer_back', title: 'Refer Back', icon: '/icons/action-refer-back.png' },
+    { action: 'approve', title: '\u2705 Approve', icon: '/icons/action-approve.png' },
+    { action: 'refer_back', title: '\u21A9\uFE0F Refer Back', icon: '/icons/action-refer-back.png' },
   ],
   ORDER_REFER_BACK_REQUEST: [
-    { action: 'approve', title: 'Approve', icon: '/icons/action-approve.png' },
-    { action: 'reject', title: 'Reject', icon: '/icons/action-reject.png' },
+    { action: 'approve', title: '\u2705 Approve', icon: '/icons/action-approve.png' },
+    { action: 'reject', title: '\u274C Reject', icon: '/icons/action-reject.png' },
   ],
   ORDER_CANCEL_REQUEST: [
-    { action: 'approve', title: 'Approve', icon: '/icons/action-approve.png' },
-    { action: 'reject', title: 'Reject', icon: '/icons/action-reject.png' },
+    { action: 'approve', title: '\u2705 Approve Cancel', icon: '/icons/action-approve.png' },
+    { action: 'reject', title: '\u274C Reject Cancel', icon: '/icons/action-reject.png' },
   ],
   COSTING_APPROVAL_REQUEST: [
-    { action: 'approve', title: 'Approve', icon: '/icons/action-approve.png' },
-    { action: 'revise', title: 'Revise', icon: '/icons/action-revise.png' },
+    { action: 'approve', title: '\u2705 Approve', icon: '/icons/action-approve.png' },
+    { action: 'revise', title: '\u270F\uFE0F Revise', icon: '/icons/action-revise.png' },
+  ],
+  // Non-approval types: single "View" action
+  ORDER_STATUS: [
+    { action: 'view', title: '\uD83D\uDCC4 View Order', icon: '/icons/action-view.png' },
+  ],
+  PO_UPDATE: [
+    { action: 'view', title: '\uD83D\uDCC4 View PO', icon: '/icons/action-view.png' },
+  ],
+  COSTING_UPDATE: [
+    { action: 'view', title: '\uD83D\uDCC4 View Costing', icon: '/icons/action-view.png' },
+  ],
+  BOM_UPDATE: [
+    { action: 'view', title: '\uD83D\uDCC4 View BOM', icon: '/icons/action-view.png' },
+  ],
+  GRN_UPDATE: [
+    { action: 'view', title: '\uD83D\uDCC4 View GRN', icon: '/icons/action-view.png' },
   ],
   DEFAULT: [
-    { action: 'view', title: 'View', icon: '/icons/action-view.png' },
-    { action: 'dismiss', title: 'Dismiss', icon: '/icons/action-dismiss.png' },
+    { action: 'view', title: '\uD83D\uDCC4 View', icon: '/icons/action-view.png' },
   ],
 };
 
+// Notification type → category label for grouped display
+const NOTIFICATION_CATEGORY = {
+  PO_APPROVAL_REQUEST: 'Purchase Order',
+  PO_UPDATE: 'Purchase Order',
+  ORDER_STATUS: 'Order',
+  ORDER_REFER_BACK_REQUEST: 'Order',
+  ORDER_CANCEL_REQUEST: 'Order',
+  COSTING_APPROVAL_REQUEST: 'Costing',
+  COSTING_UPDATE: 'Costing',
+  BOM_UPDATE: 'BOM',
+  GRN_UPDATE: 'GRN',
+  GENERAL_ALERT: 'Alert',
+};
+
+// Vibration patterns by urgency
+const VIBRATE_URGENT = [200, 100, 200, 100, 200]; // Approval requests
+const VIBRATE_NORMAL = [200, 100, 200];            // Status updates
+const VIBRATE_SILENT = [];                         // General alerts
+
+function getVibrationPattern(type) {
+  if (type?.includes('REQUEST')) return VIBRATE_URGENT;
+  if (type?.includes('UPDATE') || type === 'ORDER_STATUS') return VIBRATE_NORMAL;
+  return VIBRATE_SILENT;
+}
+
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? {};
-  const actions = NOTIFICATION_ACTIONS[data.type] || NOTIFICATION_ACTIONS.DEFAULT;
-  const isApprovalRequest = data.type?.includes('REQUEST');
+  const notifType = data.type || 'GENERAL_ALERT';
+  const actions = NOTIFICATION_ACTIONS[notifType] || NOTIFICATION_ACTIONS.DEFAULT;
+  const isApprovalRequest = notifType.includes('REQUEST');
+  const category = NOTIFICATION_CATEGORY[notifType] || 'Avarsh ERP';
+
+  // Build a professional, structured title
+  // Approval requests: "PO Approval Required" / Status updates: "Order Update"
+  const title = data.title || `${category} Notification`;
+
+  // Group notifications by entity type to avoid flooding the notification bar
+  // e.g., multiple PO updates collapse into the latest one
+  const tag = data.tag || `erp-${notifType}-${data.entityId || data.notificationId || 'general'}`;
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Avarsh ERP', {
-      body: data.body,
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/icon-96x96.png',
-      tag: data.tag || `erp-${data.notificationId || 'notification'}`,
-      data: {
-        url: data.actionUrl || '/',
-        notificationId: data.notificationId,
-        entityType: data.entityType,
-        entityId: data.entityId,
-        type: data.type,
-      },
-      actions,
-      requireInteraction: isApprovalRequest,
-      vibrate: [200, 100, 200],
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const hasVisibleClient = clients.some((c) => c.visibilityState === 'visible');
+
+      // If app is in foreground, forward to the client for in-app handling
+      // and skip the system notification to avoid duplicates
+      if (hasVisibleClient) {
+        clients.forEach((client) => {
+          if (client.visibilityState === 'visible') {
+            client.postMessage({
+              type: 'PUSH_RECEIVED',
+              payload: data,
+            });
+          }
+        });
+        return;
+      }
+
+      // App is backgrounded or closed — show rich system notification
+      return self.registration.showNotification(title, {
+        body: data.body,
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-96x96.png',
+        tag,
+        renotify: true,
+        timestamp: data.timestamp ? new Date(data.timestamp).getTime() : Date.now(),
+        data: {
+          url: data.actionUrl || '/',
+          notificationId: data.notificationId,
+          entityType: data.entityType,
+          entityId: data.entityId,
+          type: notifType,
+        },
+        actions,
+        requireInteraction: isApprovalRequest,
+        vibrate: getVibrationPattern(notifType),
+        silent: notifType === 'GENERAL_ALERT',
+      });
     })
   );
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const { url, notificationId } = event.notification.data || {};
+  const { url, notificationId, type } = event.notification.data || {};
   const action = event.action;
 
-  // Dismiss — just mark as read
-  if (action === 'dismiss') {
-    if (notificationId) {
-      fetch(`/api/v1/notifications/${notificationId}/read`, { method: 'PATCH' }).catch(() => {});
-    }
+  // PWA Update notification — skip waiting and open/focus the app
+  if (type === 'PWA_UPDATE') {
+    if (action === 'dismiss') return;
+    event.waitUntil(
+      self.skipWaiting().then(() => openOrFocusWindow('/'))
+    );
     return;
   }
 
-  // Actionable buttons — open page with ?action= param
+  // Mark as read when any action or body click happens
+  if (notificationId) {
+    fetch(`/api/v1/notifications/${notificationId}/read`, { method: 'PATCH' }).catch(() => {});
+  }
+
+  // No action button clicked (just tapped the notification body) — open/view
+  if (!action || action === 'view') {
+    event.waitUntil(openOrFocusWindow(url || '/'));
+    return;
+  }
+
+  // Actionable buttons — open page with ?action= param (same as in-app panel)
   if (['approve', 'reject', 'refer_back', 'revise'].includes(action)) {
     const separator = url?.includes('?') ? '&' : '?';
     const targetUrl = `${url}${separator}action=${action}`;
@@ -117,7 +239,7 @@ self.addEventListener('notificationclick', (event) => {
     return;
   }
 
-  // Default: view action or body click
+  // Fallback — open the action URL
   event.waitUntil(openOrFocusWindow(url || '/'));
 });
 

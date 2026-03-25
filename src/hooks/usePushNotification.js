@@ -26,7 +26,13 @@ const usePushNotification = () => {
       // Check existing subscription
       navigator.serviceWorker.ready.then((registration) => {
         registration.pushManager.getSubscription().then((sub) => {
-          setIsSubscribed(!!sub);
+          if (sub) {
+            setIsSubscribed(true);
+          } else if (Notification.permission === 'granted') {
+            // Permission already granted (e.g., PWA reinstall or cleared subscription)
+            // Auto-subscribe without prompting
+            subscribe().catch(() => {});
+          }
         });
       });
     }

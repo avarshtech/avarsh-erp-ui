@@ -43,9 +43,19 @@ const UpdatePrompt = () => {
             <Button
               type="primary"
               size="small"
-              icon={<SyncOutlined spin={updating} />}
-              loading={updating}
-              onClick={updateApp}
+              onClick={() => {
+                // Update the notification to show loading state before triggering reload
+                notification.info({
+                  key: 'pwa-update',
+                  message: 'Updating...',
+                  description: 'Applying update and restarting the app.',
+                  duration: 0,
+                  icon: <SyncOutlined spin style={{ color: '#1677ff' }} />,
+                  btn: null,
+                  closable: false,
+                });
+                updateApp();
+              }}
             >
               Restart Now
             </Button>
@@ -54,7 +64,7 @@ const UpdatePrompt = () => {
         onClose: dismissUpdate,
       });
     }
-  }, [needRefresh, notification, updateApp, dismissUpdate, updating]);
+  }, [needRefresh, isPwa, notification, updateApp, dismissUpdate]);
 
   return null;
 };

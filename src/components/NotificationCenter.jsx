@@ -13,10 +13,9 @@ import {
   deleteNotification,
   deleteAllRead,
 } from '../services/notificationService';
+import { getAccessToken } from '../services/sessionStore';
 
 const { Text } = Typography;
-
-const POLL_INTERVAL = 60000; // 60 seconds
 
 const NotificationCenter = () => {
   const navigate = useNavigate();
@@ -29,21 +28,33 @@ const NotificationCenter = () => {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('All');
 
-  // Fetch unread count periodically
+  // Fetch unread count periodically (only when authenticated)
+  const fetchCount = useCallback(async () => {
+    if (!getAccessToken()) return; // Skip if logged out
+    try {
+      const data = await getUnreadCount();
+      setUnreadCount(typeof data === 'number' ? data : data.count || 0);
+    } catch {
+      // Silently fail — API might not be ready yet
+    }
+  }, []);
+
   useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const data = await getUnreadCount();
-        setUnreadCount(typeof data === 'number' ? data : data.count || 0);
-      } catch {
-        // Silently fail — API might not be ready yet
+    fetchCount();
+  }, [fetchCount]);
+
+  // Listen for push notifications received while app is in foreground
+  // (SW forwards them via postMessage instead of showing a system notification)
+  useEffect(() => {
+    const handler = (event) => {
+      if (event.data?.type === 'PUSH_RECEIVED') {
+        fetchCount();
+        if (open) loadNotifications();
       }
     };
-
-    fetchCount();
-    const interval = setInterval(fetchCount, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, []);
+    navigator.serviceWorker?.addEventListener('message', handler);
+    return () => navigator.serviceWorker?.removeEventListener('message', handler);
+  }, [fetchCount, open]);
 
   // Fetch notifications when panel opens
   useEffect(() => {
