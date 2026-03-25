@@ -158,6 +158,7 @@ const NotificationCenter = () => {
       {/* Filter tabs */}
       <div style={{ padding: '8px 16px' }}>
         <Segmented
+          className="notification-panel-tabs"
           value={filter}
           onChange={setFilter}
           options={['All', 'Unread', 'Approvals']}

@@ -324,7 +324,7 @@ const UserManagement = () => {
         afterClose={handleModalAfterClose}
         width={MODAL_WIDTHS.MEDIUM}
         centered
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
         footer={
           <div style={{ textAlign: 'right' }}>
             <Space>

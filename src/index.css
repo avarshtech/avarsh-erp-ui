@@ -1933,6 +1933,49 @@ th.ant-descriptions-item-label {
   font-size: 13px;
 }
 
+/* Notification panel tabs — styled for both themes */
+.notification-panel-tabs.ant-segmented {
+  background: #e8eaed !important;
+  border-radius: 8px !important;
+  padding: 3px !important;
+}
+
+.notification-panel-tabs .ant-segmented-item {
+  color: #6b7280 !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+
+.notification-panel-tabs .ant-segmented-item:hover {
+  color: #374151 !important;
+}
+
+.notification-panel-tabs .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+.notification-panel-tabs .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.notification-panel-tabs .ant-segmented-thumb {
+  background: var(--primary-color) !important;
+  border-radius: 6px !important;
+}
+
+[data-theme="dark"] .notification-panel-tabs.ant-segmented {
+  background: #1f2937 !important;
+}
+
+[data-theme="dark"] .notification-panel-tabs .ant-segmented-item {
+  color: #9ca3af !important;
+}
+
+[data-theme="dark"] .notification-panel-tabs .ant-segmented-item:hover {
+  color: #d1d5db !important;
+}
+
 /* ═══════════════════════════════════════════════════
    PWA: Install Prompt (Login Page)
    ═══════════════════════════════════════════════════ */

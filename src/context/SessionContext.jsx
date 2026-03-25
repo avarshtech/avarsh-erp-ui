@@ -2,17 +2,23 @@ import { createContext, useContext, useState, useEffect, useRef, useCallback, us
 import { getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/authService';
 import { getCurrentUser } from '../utils/permissions';
 import useIdleTimeout from '../hooks/useIdleTimeout';
+import useIsPwa from '../hooks/useIsPwa';
 
 const SessionContext = createContext(null);
 
 const WARNING_THRESHOLD_SECONDS = 120;
 const CHECK_INTERVAL_MS = 15000;
+// PWA: refresh token every 10 minutes to keep session alive indefinitely
+const PWA_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
 export const SessionProvider = ({ children }) => {
+  const isPwa = useIsPwa();
+
   // ── Idle timeout (reads config from JWT claims cached in currentUser) ──
+  // In PWA mode, idle timeout is disabled — use a very large value so the hook never fires
   const user = getCurrentUser();
-  const idleTimeoutMs = (user?.idleTimeoutMinutes || 30) * 60 * 1000;
-  const idleWarningSeconds = user?.idleWarningSeconds || 120;
+  const idleTimeoutMs = isPwa ? Number.MAX_SAFE_INTEGER : (user?.idleTimeoutMinutes || 30) * 60 * 1000;
+  const idleWarningSeconds = isPwa ? 0 : (user?.idleWarningSeconds || 120);
   const {
     isIdle: isIdleExpired,
     isWarning: isIdleWarning,
@@ -132,6 +138,20 @@ export const SessionProvider = ({ children }) => {
       clearCountdown();
     };
   }, [checkSession, clearCountdown]);
+
+  // ── PWA: Proactive periodic refresh to keep session alive (no idle logout) ──
+  useEffect(() => {
+    if (!isPwa) return;
+
+    const refreshInterval = setInterval(() => {
+      // Silently refresh the token in the background to extend the session
+      refreshSessionService().then((success) => {
+        if (success) resetWarningState();
+      });
+    }, PWA_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(refreshInterval);
+  }, [isPwa, resetWarningState]);
 
   const dismissWarningModal = useCallback(() => {
     setShowWarningModal(false);

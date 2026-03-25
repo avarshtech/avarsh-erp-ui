@@ -59,6 +59,7 @@ import {
   MAX_FILE_SIZE_MB,
   ATTACHMENT_CATEGORIES,
   SEASON_CODES,
+  SEASON_YEARS,
   calcFabricNetCost,
   calcTrimPrice,
   calcTotalMakingPrice,
@@ -70,7 +71,8 @@ import {
 } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { getBuyers } from '../../services/buyerService';
-import { getStylesByBuyerId } from '../../services/styleService';
+import { getStylesByBuyerId, saveStyle } from '../../services/styleService';
+import { uploadFile } from '../../services/fileService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
@@ -80,6 +82,7 @@ import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import KnitsConsumptionModal from './KnitsConsumptionModal';
+import FileUpload from '../../components/FileUpload';
 import TechpackImportModal from './TechpackImportModal';
 import ConsumptionCalcModal from './ConsumptionCalcModal';
 
@@ -159,6 +162,12 @@ const CostingForm = () => {
   const [quickAddOverheadLoading, setQuickAddOverheadLoading] = useState(false);
   const [quickAddOverheadForm] = Form.useForm();
   const [pendingOvhRowKey, setPendingOvhRowKey] = useState(null);
+  const [quickAddStyleOpen, setQuickAddStyleOpen] = useState(false);
+  const [quickAddStyleLoading, setQuickAddStyleLoading] = useState(false);
+  const [quickAddStyleForm] = Form.useForm();
+  const [quickAddStyleImage, setQuickAddStyleImage] = useState(null);        // staged File
+  const [quickAddStyleImageUrl, setQuickAddStyleImageUrl] = useState(null);  // blob preview
+  const canAddStyle = hasPermission('style-master', 'add');
   const canAddProcess = hasPermission('process-master', 'add');
   const canAddOverhead = hasPermission('overhead-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
@@ -2005,6 +2014,24 @@ const CostingForm = () => {
                     loading={stylesLoading}
                     disabled={!form.getFieldValue('buyerId')}
                     onChange={handleStyleChange}
+                    dropdownRender={canAddStyle && form.getFieldValue('buyerId') ? (menu) => (
+                      <>
+                        {menu}
+                        <Divider style={{ margin: '4px 0' }} />
+                        <Button
+                          type="link"
+                          icon={<PlusOutlined />}
+                          style={{ width: '100%', textAlign: 'left', padding: '4px 12px' }}
+                          onClick={() => {
+                            quickAddStyleForm.resetFields();
+                            quickAddStyleForm.setFieldsValue({ buyerId: form.getFieldValue('buyerId') });
+                            setQuickAddStyleOpen(true);
+                          }}
+                        >
+                          Add New Style
+                        </Button>
+                      </>
+                    ) : undefined}
                   />
                 </Form.Item>
               </Col>
@@ -2887,6 +2914,149 @@ const CostingForm = () => {
           <Form.Item name="defaultCost" label="Default Cost">
             <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 15.00" style={{ width: '100%' }} {...numericInputProps} />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Quick Add Style Modal */}
+      <Modal
+        title="Add New Style"
+        open={quickAddStyleOpen}
+        onCancel={() => {
+          setQuickAddStyleOpen(false);
+          quickAddStyleForm.resetFields();
+          if (quickAddStyleImageUrl) URL.revokeObjectURL(quickAddStyleImageUrl);
+          setQuickAddStyleImage(null);
+          setQuickAddStyleImageUrl(null);
+        }}
+        onOk={() => quickAddStyleForm.submit()}
+        confirmLoading={quickAddStyleLoading}
+        okText="Create"
+        centered
+        destroyOnClose
+        width={520}
+        afterClose={() => {
+          quickAddStyleForm.resetFields();
+          if (quickAddStyleImageUrl) URL.revokeObjectURL(quickAddStyleImageUrl);
+          setQuickAddStyleImage(null);
+          setQuickAddStyleImageUrl(null);
+        }}
+      >
+        <Form form={quickAddStyleForm} layout="vertical" onFinish={async (values) => {
+          setQuickAddStyleLoading(true);
+          try {
+            const created = await saveStyle({ ...values, isActive: true });
+            // Upload staged image if any
+            if (quickAddStyleImage && created?.id) {
+              try {
+                await uploadFile(quickAddStyleImage, {
+                  module: 'STYLE',
+                  entity: 'STYLE',
+                  entityId: created.id,
+                  fileCategory: 'IMAGE',
+                });
+              } catch {
+                message.warning('Style created, but image upload failed. You can re-upload from Style Master.');
+              }
+            }
+            // Add to dropdown options
+            setStyleOptions((prev) => [...prev, { value: created.id, label: created.styleNo, style: created }]);
+            // Auto-select the new style
+            form.setFieldsValue({
+              styleNo: created.id,
+              garmentName: created.garmentName || '',
+              seasonCode: created.seasonCode || undefined,
+              seasonYear: created.seasonYear || undefined,
+            });
+            setStyleId(created.id);
+            // Load the style image into the Section A placeholder
+            loadStyleImage(created.id);
+            message.success(`Style "${created.styleNo}" created`);
+            setQuickAddStyleOpen(false);
+            quickAddStyleForm.resetFields();
+            if (quickAddStyleImageUrl) URL.revokeObjectURL(quickAddStyleImageUrl);
+            setQuickAddStyleImage(null);
+            setQuickAddStyleImageUrl(null);
+            setIsDirty(true);
+          } catch {
+            message.error('Failed to create style');
+          } finally {
+            setQuickAddStyleLoading(false);
+          }
+        }}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="styleNo" label="Style No" rules={[{ required: true, message: 'Please enter Style No' }]}>
+                <Input placeholder="e.g. STY-001" maxLength={50} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="garmentName" label="Garment Name" rules={[{ required: true, message: 'Please enter Garment Name' }]}>
+                <Input placeholder="e.g. Polo T-Shirt" maxLength={150} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="buyerId" label="Buyer" rules={[{ required: true, message: 'Buyer is required' }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Select buyer"
+                  options={buyerOptions}
+                  disabled
+                />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="seasonCode" label="Season">
+                <Select placeholder="Season" allowClear options={SEASON_CODES} />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item name="seasonYear" label="Year">
+                <Select placeholder="Year" allowClear options={SEASON_YEARS} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item name="description" label="Fabric Description">
+            <Input.TextArea rows={2} placeholder="Fabric description (optional)" maxLength={500} />
+          </Form.Item>
+          <div style={{
+            padding: 12,
+            borderRadius: 8,
+            border: '1px solid var(--border-color, #e5e7eb)',
+            background: 'var(--bg-secondary, #f8fafc)',
+          }}>
+            <Typography.Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8, display: 'block' }}>
+              Style Image
+            </Typography.Text>
+            <FileUpload
+              accept="image/png,image/jpeg,image/jpg"
+              maxSizeMB={10}
+              previewUrl={quickAddStyleImageUrl}
+              fileName={quickAddStyleImage?.name || null}
+              fileType={quickAddStyleImage?.type || null}
+              fileSize={quickAddStyleImage?.size || null}
+              onSelect={(file) => {
+                if (quickAddStyleImageUrl) URL.revokeObjectURL(quickAddStyleImageUrl);
+                setQuickAddStyleImage(file);
+                setQuickAddStyleImageUrl(URL.createObjectURL(file));
+              }}
+              onRemove={() => {
+                if (quickAddStyleImageUrl) URL.revokeObjectURL(quickAddStyleImageUrl);
+                setQuickAddStyleImage(null);
+                setQuickAddStyleImageUrl(null);
+              }}
+              compact
+              placeholder="Click or drag to upload style image"
+              hint="PNG, JPG up to 10 MB"
+            />
+            {quickAddStyleImage && (
+              <Typography.Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
+                Will upload on create
+              </Typography.Text>
+            )}
+          </div>
         </Form>
       </Modal>
     </div>

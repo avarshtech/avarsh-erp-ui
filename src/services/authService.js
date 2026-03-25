@@ -16,6 +16,13 @@ import {
   executeTokenRefresh,
 } from './sessionStore';
 
+// ── PWA Detection ───────────────────────────────────────────────────────────
+
+const isPwaMode = () =>
+  window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+const getPwaHeaders = () => (isPwaMode() ? { 'X-Client-Mode': 'pwa' } : {});
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
@@ -84,7 +91,9 @@ const buildUserSession = (token, fallbackUser = null) => {
  */
 export const authenticateUser = async (username, password) => {
   try {
-    const response = await axiosInstance.post('/auth/login', { username, password });
+    const response = await axiosInstance.post('/auth/login', { username, password }, {
+      headers: getPwaHeaders(),
+    });
 
     const { data, status } = response;
     if (status !== 200) {
@@ -221,7 +230,7 @@ export const refreshSession = async () => {
       axios.post(
         `${axiosInstance.defaults.baseURL}/auth/refresh`,
         null,
-        { withCredentials: true }
+        { withCredentials: true, headers: getPwaHeaders() }
       ).then((r) => r.data?.token || null)
     );
 

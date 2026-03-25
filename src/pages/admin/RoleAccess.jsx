@@ -37,6 +37,8 @@ import {
   validatePermissions,
   normalizePermissionsForSave,
   PERMISSION_GROUPS,
+  getCurrentUser,
+  setCurrentUser,
 } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
@@ -138,7 +140,7 @@ const RoleAccess = () => {
       const formVals = {
         name: role.name,
         description: role.description,
-        active: role.active !== false,
+        active: role.status !== 'INACTIVE',
       };
       form.setFieldsValue(formVals);
       initialFormValuesRef.current = { ...formVals };
@@ -379,7 +381,9 @@ const RoleAccess = () => {
       const normalizedPermissions = normalizePermissionsForSave(permissions);
 
       const roleData = {
-        ...values,
+        name: values.name,
+        description: values.description,
+        status: values.active !== false ? 'ACTIVE' : 'INACTIVE',
         permissions: normalizedPermissions,
       };
 
@@ -497,11 +501,11 @@ const RoleAccess = () => {
     },
     {
       title: 'Status',
-      dataIndex: 'active',
+      dataIndex: 'status',
       key: 'status',
       align: 'center',
       width: 100,
-      render: (active) => <StatusBadge status={active !== false ? 'active' : 'inactive'} />,
+      render: (status) => <StatusBadge status={status !== 'INACTIVE' ? 'active' : 'inactive'} />,
     },
     {
       title: 'Created',

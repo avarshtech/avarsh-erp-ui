@@ -45,7 +45,7 @@ export const createRole = async (roleData) => {
  * @returns {Promise<Object>} Response with updated role
  */
 export const updateRole = async (roleId, roleData) => {
-  const response = await axiosInstance.post(ENDPOINTS.ROLES, { ...roleData, id: roleId });
+  const response = await axiosInstance.put(`${ENDPOINTS.ROLES}/${roleId}`, roleData);
   return response.data;
 };
 
