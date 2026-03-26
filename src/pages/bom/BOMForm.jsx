@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
+  App,
   Input,
   Select,
   InputNumber,
@@ -10,7 +11,6 @@ import {
   Upload,
   Space,
   Typography,
-  message,
   Spin,
   Skeleton,
   AutoComplete,
@@ -251,6 +251,7 @@ const BomItemSearch = ({ value, onSelect, onClear, disabled, categoryId, subCate
 // ==================== COMPONENT ====================
 
 const BOMForm = () => {
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
@@ -665,7 +666,7 @@ const BOMForm = () => {
   /** Wrap a hierarchy change with confirmation if the line already has data */
   const confirmIfHasData = useCallback((lineKey, doChange) => {
     if (lineHasData(lineKey)) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Change will clear entered data',
         content: 'Consumption, Parts, Process and Allowance data for this line will be lost. Continue?',
         okText: 'Yes, change',

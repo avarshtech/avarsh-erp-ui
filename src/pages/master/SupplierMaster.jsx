@@ -11,7 +11,7 @@ import {
   Row,
   Col,
   Checkbox,
-  message,
+  App,
   Typography,
   Drawer,
   Descriptions,
@@ -46,6 +46,7 @@ const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const SWIFT_REGEX = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 
 const SupplierMaster = () => {
+  const { message, modal } = App.useApp();
   // Store context
   const {
     suppliers: storeSuppliers,
@@ -296,7 +297,7 @@ const SupplierMaster = () => {
 
   const handleSupplierModalClose = () => {
     if (supplierUnsaved) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved changes',
         content: 'You have unsaved changes. Discard and close?',
         okText: 'Discard',

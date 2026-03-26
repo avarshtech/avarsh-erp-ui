@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import { memo, Fragment, useMemo } from 'react';
 import { Modal, Typography, Skeleton, Space } from 'antd';
 
 const { Title, Text } = Typography;
 
-const ViewDialog = React.memo(({
+const ViewDialog = memo(({
   open,
   onClose,
   width = 1200,
@@ -44,7 +44,7 @@ const ViewDialog = React.memo(({
             {hero.tags?.length > 0 && (
               <Space size={4} wrap>
                 {hero.tags.map((tag, i) => (
-                  <React.Fragment key={i}>{tag}</React.Fragment>
+                  <Fragment key={i}>{tag}</Fragment>
                 ))}
               </Space>
             )}

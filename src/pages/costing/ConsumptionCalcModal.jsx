@@ -13,8 +13,8 @@
  */
 import { useState } from 'react';
 import {
-  Modal, Upload, Button, Spin, Alert, Tag, Table, Typography,
-  Space, Row, Col, Divider, message, Statistic, Tooltip,
+  App, Modal, Upload, Button, Spin, Alert, Tag, Table, Typography,
+  Space, Row, Col, Divider, Statistic, Tooltip,
 } from 'antd';
 import {
   ThunderboltOutlined, FileImageOutlined, FileTextOutlined,
@@ -26,6 +26,7 @@ const { Dragger } = Upload;
 const { Text, Paragraph } = Typography;
 
 export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKnitsCalc, fabricRow }) {
+  const { message } = App.useApp();
   const [step, setStep]               = useState('upload');
   const [loading, setLoading]         = useState(false);
   const [result, setResult]           = useState(null);

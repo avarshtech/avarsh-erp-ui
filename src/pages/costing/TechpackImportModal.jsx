@@ -12,8 +12,8 @@
  */
 import { useState, useEffect } from 'react';
 import {
-  Modal, Upload, Button, Spin, Alert, Tag, Select, Divider,
-  Row, Col, Typography, Space, Table, message, Form, Input, Card,
+  App, Modal, Upload, Button, Spin, Alert, Tag, Select, Divider,
+  Row, Col, Typography, Space, Table, Form, Input, Card,
 } from 'antd';
 import {
   CheckCircleFilled, WarningFilled, FileTextOutlined,
@@ -294,6 +294,7 @@ function RowsSection({ title, rows, overrides, onOverride, onCreateItem }) {
 // ── Main Modal ────────────────────────────────────────────────────────────────
 
 export default function TechpackImportModal({ open, onClose, onApply }) {
+  const { message } = App.useApp();
   const [step, setStep]       = useState('upload');
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(null);

@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  App,
   Table,
   Card,
   Space,
   Tag,
   Typography,
-  message,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { searchBoms, deleteBom } from '../../services/bomService';
@@ -27,6 +27,7 @@ import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 const { Text } = Typography;
 
 const BOMList = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);

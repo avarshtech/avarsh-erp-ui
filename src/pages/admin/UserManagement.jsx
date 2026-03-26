@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Card, Table, Space, Input, Tag, Modal, Form, Select, message,
+  App, Card, Table, Space, Input, Tag, Modal, Form, Select,
   Avatar, Typography, Row, Col, Drawer, Divider, Switch,
 } from 'antd';
 import {
@@ -23,6 +23,7 @@ import { MODAL_WIDTHS } from '../../utils/uiConstants';
 const { Text } = Typography;
 
 const UserManagement = () => {
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
@@ -166,7 +167,7 @@ const UserManagement = () => {
 
   const handleModalClose = () => {
     if (formDirty) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved Changes',
         icon: <ExclamationCircleOutlined />,
         content: 'You have unsaved changes. Are you sure you want to discard them?',

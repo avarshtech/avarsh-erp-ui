@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Table, Empty } from 'antd';
 import dayjs from 'dayjs';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
@@ -25,7 +25,7 @@ const formatCellValue = (value, fieldType) => {
   }
 };
 
-const ReportResultsTable = React.memo(function ReportResultsTable({
+const ReportResultsTable = memo(function ReportResultsTable({
   columns = [],
   data = [],
   loading = false,

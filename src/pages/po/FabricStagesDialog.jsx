@@ -9,7 +9,7 @@ import {
   Tag,
   Empty,
   Divider,
-  message,
+  App,
 } from 'antd';
 import {
   PlusOutlined,
@@ -36,6 +36,7 @@ const FabricStagesDialog = ({
   itemCode,
   variantAttributes,
 }) => {
+  const { message } = App.useApp();
   const [stages, setStages] = useState([]);
 
   useEffect(() => {

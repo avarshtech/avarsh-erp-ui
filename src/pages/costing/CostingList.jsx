@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  App,
   Table,
   Card,
   Space,
   Typography,
-  message,
   Tooltip,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +41,7 @@ import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 const { Text } = Typography;
 
 const CostingList = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);

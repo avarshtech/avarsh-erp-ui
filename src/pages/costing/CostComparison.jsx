@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  App,
   Card,
   Button,
   Select,
@@ -7,7 +8,6 @@ import {
   Row,
   Col,
   Space,
-  message,
   Empty,
 } from 'antd';
 import {
@@ -31,6 +31,7 @@ import { COSTING_STATUS_CONFIG } from '../../utils/statusConfig';
 const { Text, Title } = Typography;
 
 const CostComparison = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
   const [allSheets, setAllSheets] = useState([]);

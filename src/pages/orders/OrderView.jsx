@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import {
+  App,
   Card,
   Typography,
   Space,
   Table,
   Input,
-  message,
   Alert,
   Popconfirm,
   Spin,
@@ -59,6 +59,7 @@ const tdStyle = {
 };
 
 const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
 
   // Refer-back request state

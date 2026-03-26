@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography, Row, Col, Divider, Select, Alert, Segmented } from 'antd';
+import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Row, Col, Divider, Select, Alert, Segmented } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined, DollarOutlined, PercentageOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
 
@@ -13,6 +13,7 @@ import { useStore } from '../../context/StoreContext';
 const MODULE_ID = 'process-master';
 
 const ProcessMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { categories } = useStore();
 
   const categoryOptions = useMemo(() =>
@@ -149,7 +150,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
 
   const handleDelete = () => {
     if (!canDelete) { message.warning('You do not have permission to delete processes'); return; }
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Process',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this process? This action cannot be undone.',

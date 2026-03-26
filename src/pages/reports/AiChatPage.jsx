@@ -1,8 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Card, Input, Button, Spin, Tag, Space, Typography, App } from 'antd';
-import { SendOutlined, RobotOutlined, UserOutlined } from '@ant-design/icons';
+import { Card, Input, Button, Spin, Tag, Space, Typography, Segmented, App } from 'antd';
+import {
+  SendOutlined, RobotOutlined, UserOutlined,
+  ShoppingCartOutlined, ShoppingOutlined, DollarOutlined,
+  SkinOutlined, FileTextOutlined,
+} from '@ant-design/icons';
+import { useNavigate, useLocation } from 'react-router-dom';
+import PageHeader from '../../components/PageHeader';
+import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import AiResultsDisplay from './components/AiResultsDisplay';
 import { aiChat } from '../../services/reportService';
+import { REPORT_NAV_OPTIONS } from '../../utils/reportConstants';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -13,6 +21,14 @@ const STARTER_SUGGESTIONS = [
   'List all overdue purchase orders',
   'Show order count by status for last quarter',
   'What are the most purchased fabric types?',
+];
+
+const TOPIC_CATEGORIES = [
+  { icon: <ShoppingCartOutlined />, label: 'Orders', color: 'var(--primary-color)' },
+  { icon: <ShoppingOutlined />, label: 'Purchase Orders', color: '#722ed1' },
+  { icon: <DollarOutlined />, label: 'Costing', color: 'var(--success-color)' },
+  { icon: <SkinOutlined />, label: 'Styles', color: '#eb2f96' },
+  { icon: <FileTextOutlined />, label: 'BOM', color: '#2f54eb' },
 ];
 
 const MessageBubble = ({ role, content, response, onSuggestionClick }) => {
@@ -55,6 +71,8 @@ const MessageBubble = ({ role, content, response, onSuggestionClick }) => {
 
 const AiChatPage = () => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [history, setHistory] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
@@ -107,8 +125,27 @@ const AiChatPage = () => {
     sendMessage(suggestion);
   }, [sendMessage]);
 
+  const handleNavChange = useCallback(
+    (value) => {
+      if (value !== location.pathname) navigate(value);
+    },
+    [navigate, location.pathname],
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 120px)' }}>
+      {/* Header with segmented navigation */}
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader title="Reports">
+          <Segmented
+            options={REPORT_NAV_OPTIONS}
+            value={location.pathname}
+            onChange={handleNavChange}
+          />
+        </PageHeader>
+        <ReportsBreadcrumb items={['AI Assistant']} />
+      </div>
+
       <Card
         title={
           <Space>
@@ -137,12 +174,45 @@ const AiChatPage = () => {
           }}
         >
           {history.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', paddingTop: 40 }}>
+            <div style={{ textAlign: 'center', paddingTop: 32 }}>
               <RobotOutlined style={{ fontSize: 48, color: 'var(--text-muted)', marginBottom: 16 }} />
               <Text type="secondary" style={{ display: 'block', marginBottom: 20, fontSize: 15 }}>
                 Ask me anything about your ERP data. I can generate reports, answer questions, and
                 help you find insights.
               </Text>
+
+              {/* Topic category icons */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
+                {TOPIC_CATEGORIES.map((cat) => (
+                  <div
+                    key={cat.label}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 'var(--radius-md)',
+                        background: `color-mix(in srgb, ${cat.color} 8%, transparent)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 18,
+                        color: cat.color,
+                      }}
+                    >
+                      {cat.icon}
+                    </div>
+                    <Text type="secondary" style={{ fontSize: 11 }}>{cat.label}</Text>
+                  </div>
+                ))}
+              </div>
+
               <Space size={[8, 8]} wrap style={{ justifyContent: 'center' }}>
                 {STARTER_SUGGESTIONS.map((s, i) => (
                   <Tag

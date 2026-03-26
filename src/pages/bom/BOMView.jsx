@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  Tag, Typography, Button, Tooltip, message, Row, Col,
+  App, Tag, Typography, Button, Tooltip, Row, Col,
 } from 'antd';
 import {
   AppstoreOutlined, ScissorOutlined, DownloadOutlined,
@@ -36,6 +36,7 @@ const processToLabel = (proc) => {
 const isFabricLine = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
 
 const BOMView = ({ open, bomData, onClose }) => {
+  const { message } = App.useApp();
   const [fullBom, setFullBom] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cadFileNames, setCadFileNames] = useState({}); // { lineId: filename }

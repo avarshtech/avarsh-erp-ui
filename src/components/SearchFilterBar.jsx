@@ -1,4 +1,4 @@
-import React from 'react';
+import { memo } from 'react';
 import { Row, Col, Input, Select, DatePicker, Button, Tooltip } from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DATE_FORMAT } from '../utils/uiConstants';
@@ -54,7 +54,7 @@ const renderFilter = (filter, index) => {
   );
 };
 
-const SearchFilterBar = React.memo(function SearchFilterBar({
+const SearchFilterBar = memo(function SearchFilterBar({
   searchText,
   onSearchChange,
   searchPlaceholder = 'Search...',

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, message, Tag, Switch, Modal, Typography } from 'antd';
+import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
 
@@ -12,6 +12,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 const MODULE_ID = 'overhead-master';
 
 const OverheadMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -118,7 +119,7 @@ const OverheadMaster = ({ onDirtyChange }) => {
 
   const handleDelete = () => {
     if (!canDelete) { message.warning('You do not have permission to delete overheads'); return; }
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Overhead',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this overhead? This action cannot be undone.',

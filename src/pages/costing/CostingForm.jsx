@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
+  App,
   Form,
   Input,
   InputNumber,
@@ -17,7 +18,6 @@ import {
   Tag,
   Divider,
   Checkbox,
-  message,
   Statistic,
   Skeleton,
   Modal,
@@ -90,6 +90,7 @@ const { Text } = Typography;
 const { Dragger } = Upload;
 
 const CostingForm = () => {
+  const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [form] = Form.useForm();

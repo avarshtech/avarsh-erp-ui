@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Switch, Modal, Row, Col, Typography } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Select, Switch, Row, Col, Typography } from 'antd';
 const { Text } = Typography;
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
@@ -14,6 +14,7 @@ import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 const MODULE_ID = 'style-master';
 
 const StyleMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { styles, buyers, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -291,7 +292,7 @@ const StyleMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Style',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this style? This action cannot be undone.',

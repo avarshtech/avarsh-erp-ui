@@ -12,7 +12,7 @@ import {
   Table,
   Space,
   Typography,
-  message,
+  App,
   Popconfirm,
   Divider,
   Spin,
@@ -284,6 +284,7 @@ const POForm = () => {
   const { id } = useParams();
   const prevIdRef = useRef(id);
   const [form] = Form.useForm();
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -838,7 +839,7 @@ const POForm = () => {
   const handlePoTypeChange = useCallback((newType) => {
     const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
     if (hasData) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Change PO Type',
         content: 'Changing PO type will clear all line items. Continue?',
         okText: 'Yes, Change',
@@ -863,7 +864,7 @@ const POForm = () => {
   const handleProcessPoToggle = useCallback((checked) => {
     const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
     if (hasData) {
-      Modal.confirm({
+      modal.confirm({
         title: checked ? 'Switch to Process PO' : 'Switch to Standard PO',
         content: 'This will clear all line items. Continue?',
         okText: 'Yes, Switch',
@@ -1503,7 +1504,7 @@ const POForm = () => {
       setChangeCheckLoading(false);
 
       if (!changed) {
-        Modal.confirm({
+        modal.confirm({
           title: 'No Changes Detected',
           icon: <ExclamationCircleOutlined />,
           content: 'No changes were made since the last submission. Are you sure you want to re-submit without changes?',
@@ -1516,7 +1517,7 @@ const POForm = () => {
     }
 
     // Confirm before submit
-    Modal.confirm({
+    modal.confirm({
       title: 'Submit for Approval',
       icon: <SendOutlined style={{ color: 'var(--primary-color)' }} />,
       content: 'Are you sure you want to submit this purchase order for approval?',
@@ -1596,7 +1597,7 @@ const POForm = () => {
   // Unsaved changes warning
   const handleGoBack = () => {
     if (isDirty) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved Changes',
         icon: <ExclamationCircleOutlined />,
         content: 'You have unsaved changes. Are you sure you want to leave?',

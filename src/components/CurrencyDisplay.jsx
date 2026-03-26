@@ -1,10 +1,10 @@
-import React from 'react';
+import { memo } from 'react';
 import { Typography } from 'antd';
 import { formatCurrency } from '../utils/formatters';
 
 const { Text } = Typography;
 
-const CurrencyDisplay = React.memo(function CurrencyDisplay({
+const CurrencyDisplay = memo(function CurrencyDisplay({
   amount,
   currency = 'INR',
   strong = true,

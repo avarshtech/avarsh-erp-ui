@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  App,
   Card,
   Row,
   Col,
@@ -11,7 +12,6 @@ import {
   Tag,
   Spin,
   Skeleton,
-  message,
 } from 'antd';
 import {
   UserOutlined,
@@ -27,6 +27,7 @@ import NotificationPreferences from '../components/NotificationPreferences';
 const { Title, Text } = Typography;
 
 const Profile = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [userData, setUserData] = useState(null);

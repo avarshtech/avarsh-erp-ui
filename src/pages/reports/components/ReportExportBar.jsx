@@ -1,32 +1,33 @@
-import React from 'react';
-import { Button, Space } from 'antd';
+import { memo, useMemo } from 'react';
+import { Dropdown, Button } from 'antd';
 import { DownloadOutlined, FileExcelOutlined, FilePdfOutlined } from '@ant-design/icons';
 
-const ReportExportBar = React.memo(function ReportExportBar({ onExport, loading = false }) {
+const ReportExportBar = memo(function ReportExportBar({ onExport, loading = false }) {
+  const menuItems = useMemo(() => [
+    {
+      key: 'CSV',
+      label: 'Export as CSV',
+      icon: <DownloadOutlined />,
+    },
+    {
+      key: 'PDF',
+      label: 'Export as PDF',
+      icon: <FilePdfOutlined />,
+    },
+  ], []);
+
   return (
-    <Space>
-      <Button
-        icon={<DownloadOutlined />}
-        onClick={() => onExport('CSV')}
-        loading={loading}
-      >
-        CSV
-      </Button>
-      <Button
-        icon={<FileExcelOutlined />}
-        onClick={() => onExport('EXCEL')}
-        loading={loading}
-      >
-        Excel
-      </Button>
-      <Button
-        icon={<FilePdfOutlined />}
-        onClick={() => onExport('PDF')}
-        loading={loading}
-      >
-        PDF
-      </Button>
-    </Space>
+    <Dropdown.Button
+      icon={<DownloadOutlined />}
+      loading={loading}
+      onClick={() => onExport('EXCEL')}
+      menu={{
+        items: menuItems,
+        onClick: ({ key }) => onExport(key),
+      }}
+    >
+      <FileExcelOutlined /> Excel
+    </Dropdown.Button>
   );
 });
 

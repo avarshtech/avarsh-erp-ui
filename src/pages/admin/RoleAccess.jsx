@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
+  App,
   Card,
   Table,
   Space,
@@ -7,7 +8,6 @@ import {
   Tag,
   Modal,
   Form,
-  message,
   Typography,
   Row,
   Col,
@@ -82,6 +82,7 @@ const OP_COLORS = {
 };
 
 const RoleAccess = () => {
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [roles, setRoles] = useState([]);
   const [searchText, setSearchText] = useState('');
@@ -412,7 +413,7 @@ const RoleAccess = () => {
   // Close modal with unsaved changes check
   const handleModalClose = () => {
     if (formDirty) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved Changes',
         icon: <ExclamationCircleOutlined />,
         content: 'You have unsaved changes. Are you sure you want to discard them?',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Table, Card, Space, Input, DatePicker, Select, Typography, Modal, message, Row, Col } from 'antd';
+import { App, Table, Card, Space, Input, DatePicker, Select, Typography, Modal, Row, Col } from 'antd';
 import { FilterOutlined, ExportOutlined, SearchOutlined, CheckCircleOutlined, InboxOutlined, TruckOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { hasPermission } from '../../utils/permissions';
@@ -26,6 +26,7 @@ const GRN_LIST_STATUS_CONFIG = {
 };
 
 const GRNList = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading] = useState(false);
   const [searchText, setSearchText] = useState('');

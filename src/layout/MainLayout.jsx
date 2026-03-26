@@ -8,7 +8,7 @@ import {
   Input,
   Tooltip,
   Drawer,
-  message,
+  App,
 } from "antd";
 import {
   DashboardOutlined,
@@ -165,6 +165,7 @@ const SidebarVersion = () => (
 );
 
 const MainLayoutInner = () => {
+  const { message } = App.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);

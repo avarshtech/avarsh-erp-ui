@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Switch, Modal, Typography } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Switch, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -11,6 +11,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 const MODULE_ID = 'parts-master';
 
 const PartsMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -110,7 +111,7 @@ const PartsMaster = ({ onDirtyChange }) => {
 
   const handleDelete = () => {
     if (!canDelete) { message.warning('You do not have permission to delete parts'); return; }
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Part',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this part? This action cannot be undone.',

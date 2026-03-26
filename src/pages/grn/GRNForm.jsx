@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Select, DatePicker, InputNumber, Card, Row, Col, Table, Typography, message, Descriptions, Tag, Alert } from 'antd';
+import { App, Form, Input, Select, DatePicker, InputNumber, Card, Row, Col, Table, Typography, Descriptions, Tag, Alert } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -11,6 +11,7 @@ const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const GRNForm = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const { id } = useParams();
   const [form] = Form.useForm();

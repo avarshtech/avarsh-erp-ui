@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, InputNumber, Modal } from 'antd';
+import { Form, Input, Button, Space, App, Tag, InputNumber } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { integerInputProps } from '../../utils/inputHelpers';
 import { useStore } from '../../context/StoreContext';
@@ -11,6 +11,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 const MODULE_ID = 'master-data';
 
 const UomMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { uoms, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -126,7 +127,7 @@ const UomMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete UOM',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this UOM? This action cannot be undone.',

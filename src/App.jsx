@@ -76,7 +76,7 @@ const ThemedApp = () => {
 
   return (
     <ConfigProvider theme={antThemeConfig}>
-      <AntdApp>
+      <AntdApp message={{ maxCount: 3, top: 60, duration: 5 }}>
       <ConflictDialog />
       <UpdatePrompt />
       <StoreProvider>

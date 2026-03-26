@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { memo, useState } from 'react';
 import { Drawer, Form, Input, Button, Typography, Space, App } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import { saveReport } from '../../../services/reportService';
 
 const { Text } = Typography;
 
-const SaveReportDrawer = React.memo(function SaveReportDrawer({
+const SaveReportDrawer = memo(function SaveReportDrawer({
   open,
   onClose,
   reportDefId,

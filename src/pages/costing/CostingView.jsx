@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
+  App,
   Card,
   Row,
   Col,
@@ -16,7 +17,6 @@ import {
   Input,
   Button,
   Tooltip,
-  message,
 } from 'antd';
 import { RollbackOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -40,13 +40,13 @@ import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
-import DraftWatermark from '../../components/DraftWatermark';
 import StatusSteps from '../../components/StatusSteps';
 import { COSTING_STATUS_CONFIG, COSTING_STATUS_FLOW } from '../../utils/statusConfig';
 
 const { Text, Title } = Typography;
 
 const CostingView = () => {
+  const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const { isDarkMode } = useTheme();
@@ -588,12 +588,10 @@ const CostingView = () => {
         style={{ marginBottom: 16 }}
       />
 
-      <DraftWatermark status={data.status} draftStatuses={['Draft']}>
       <Collapse
         defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
         items={collapseItems}
       />
-      </DraftWatermark>
 
       {/* Revise Reason Modal — matches PO refer-back dialog */}
       <Modal

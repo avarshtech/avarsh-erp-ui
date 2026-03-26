@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Modal } from 'antd';
+import { App } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 
 /**
@@ -16,6 +16,7 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
  * @param {boolean} isDirty — whether the current form has unsaved changes
  */
 const useUnsavedChanges = (isDirty) => {
+  const { modal } = App.useApp();
   const isDirtyRef = useRef(false);
   const clearDirtyRef = useRef(() => {});
 
@@ -31,7 +32,7 @@ const useUnsavedChanges = (isDirty) => {
     const suppressRef = { current: false };
 
     const confirmAndNavigate = (args, originalFn) => {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved Changes',
         icon: <ExclamationCircleOutlined />,
         content:

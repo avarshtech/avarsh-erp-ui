@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Popover } from 'antd';
 
-const InfoPopover = React.memo(function InfoPopover({
+const InfoPopover = memo(function InfoPopover({
   title,
   content,
   trigger = 'hover',

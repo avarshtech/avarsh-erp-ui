@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, DatePicker, Select, Input, InputNumber, Space, Button, Typography } from 'antd';
+import { Card, DatePicker, Select, Input, InputNumber, Space, Button, Typography, Badge } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getFilterOptions } from '../../../services/reportService';
@@ -159,11 +159,22 @@ const ReportFilterBar = React.memo(function ReportFilterBar({
     }
   };
 
+  const activeFilterCount = Object.values(values).filter(
+    (v) => v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0),
+  ).length;
+
   if (!filters.length) return null;
 
   return (
     <Card
-      title="Filters"
+      title={
+        <Space size={8}>
+          <span>Filters</span>
+          {activeFilterCount > 0 && (
+            <Badge count={activeFilterCount} size="small" color="var(--primary-color)" />
+          )}
+        </Space>
+      }
       size="small"
       extra={
         <Button type="link" icon={<ClearOutlined />} onClick={onClear} size="small">

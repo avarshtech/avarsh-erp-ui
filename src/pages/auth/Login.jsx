@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Form, Input, Button, Typography, Checkbox, message, Spin } from 'antd';
+import { Form, Input, Button, Typography, Checkbox, Spin, App } from 'antd';
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { authenticateUser, isAuthenticated, initializeSession } from '../../services/authService';
@@ -19,7 +19,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const { isDarkMode } = useTheme();
-  const [messageApi, contextHolder] = message.useMessage();
+  const { message: messageApi } = App.useApp();
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -107,8 +107,6 @@ const Login = () => {
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {contextHolder}
-
       {/* PWA install prompt for mobile/tablet users */}
       <PwaInstallPrompt />
 

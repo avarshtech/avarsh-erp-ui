@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Typography, Collapse, Table, Tag, Space } from 'antd';
 import { CodeOutlined } from '@ant-design/icons';
 
 const { Paragraph } = Typography;
 
-const AiResultsDisplay = React.memo(function AiResultsDisplay({ response, onSuggestionClick }) {
+const AiResultsDisplay = memo(function AiResultsDisplay({ response, onSuggestionClick }) {
   const dataColumns = useMemo(() => {
     if (!response?.data?.length) return [];
     return Object.keys(response.data[0]).map((key) => ({

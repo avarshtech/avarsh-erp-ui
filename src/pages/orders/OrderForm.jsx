@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
+  App,
   Form,
   Input,
   Select,
@@ -11,7 +12,6 @@ import {
   Col,
   Space,
   Typography,
-  message,
   Collapse,
   Tag,
   Modal,
@@ -831,6 +831,7 @@ const createEmptyLine = () => ({
 // ==================== ORDER FORM ====================
 
 const OrderForm = () => {
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -1721,7 +1722,7 @@ const OrderForm = () => {
       errors.forEach((e) => message.error(e));
       return;
     }
-    Modal.confirm({
+    modal.confirm({
       title: isReferredBack ? 'Resubmit Order' : 'Submit Order',
       content: isReferredBack
         ? 'Are you sure you want to resubmit this order? It will be confirmed again.'

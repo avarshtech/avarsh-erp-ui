@@ -339,7 +339,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       setActionReason('');
       setRejectionCategory(null);
     } else {
-      Modal.confirm({
+      modal.confirm({
         title: `${action.label} Purchase Order`, icon: <ExclamationCircleOutlined />,
         content: `Are you sure you want to ${action.label.toLowerCase()} this purchase order?`,
         okText: action.label, okButtonProps: { danger: action.danger },

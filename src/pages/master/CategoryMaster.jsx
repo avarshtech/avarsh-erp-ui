@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Modal } from 'antd';
+import { Form, Input, Button, Space, App } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createCategory, updateCategory, deleteCategory } from '../../services/masterDataService';
@@ -10,6 +10,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 const MODULE_ID = 'master-data';
 
 const CategoryMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { categories, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -127,7 +128,7 @@ const CategoryMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Category',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this category? This action cannot be undone.',

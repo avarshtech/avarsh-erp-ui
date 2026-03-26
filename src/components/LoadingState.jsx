@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Skeleton, Spin, Card, Row, Col } from 'antd';
 
-const LoadingState = React.memo(function LoadingState({
+const LoadingState = memo(function LoadingState({
   variant = 'skeleton',
   rows = 4,
   tip,
