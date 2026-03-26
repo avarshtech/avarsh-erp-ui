@@ -33,6 +33,13 @@ const ViewDialog = memo(({
           gap: 24,
         }}
       >
+        {/* Image (optional) */}
+        {hero.image && (
+          <div style={{ flexShrink: 0 }}>
+            {hero.image}
+          </div>
+        )}
+
         {/* Left side */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Title + Status + Tags row */}

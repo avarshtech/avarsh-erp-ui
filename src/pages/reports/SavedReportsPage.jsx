@@ -8,7 +8,8 @@ import EmptyState from '../../components/EmptyState';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import { getSavedReports, deleteSavedReport } from '../../services/reportService';
 import { formatDate } from '../../utils/formatters';
-import { REPORT_NAV_OPTIONS, getModuleColor } from '../../utils/reportConstants';
+import { getFilteredReportNavOptions, getModuleColor } from '../../utils/reportConstants';
+import { hasModuleAccess } from '../../utils/permissions';
 
 const SavedReportsPage = () => {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ const SavedReportsPage = () => {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const navOptions = useMemo(() => getFilteredReportNavOptions(hasModuleAccess), []);
   const [search, setSearch] = useState('');
   const [moduleFilter, setModuleFilter] = useState(null);
 
@@ -164,7 +166,7 @@ const SavedReportsPage = () => {
     return (
       <div>
         <PageHeader title="Reports">
-          <Segmented options={REPORT_NAV_OPTIONS} value="/reports/saved" disabled />
+          <Segmented options={navOptions} value="/reports/saved" disabled />
         </PageHeader>
         <ReportsBreadcrumb items={['Saved Reports']} />
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -185,7 +187,7 @@ const SavedReportsPage = () => {
     <div>
       <PageHeader title="Reports">
         <Segmented
-          options={REPORT_NAV_OPTIONS}
+          options={navOptions}
           value={location.pathname}
           onChange={handleNavChange}
         />

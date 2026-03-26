@@ -134,6 +134,7 @@ const ACTION_CONFIG = {
     iconType: 'default',
     textType: 'default',
     danger: false,
+    styled: true,
   },
   ai: {
     icon: <ThunderboltOutlined />,

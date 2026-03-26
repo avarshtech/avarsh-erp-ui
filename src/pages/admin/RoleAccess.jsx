@@ -230,6 +230,13 @@ const RoleAccess = () => {
         }
       }
 
+      // Enforce ai-assistant → reports link
+      if (moduleId === 'reports' && !updated['reports'].access) {
+        if (updated['ai-assistant']) {
+          updated['ai-assistant'] = { access: false, operations: { view: false } };
+        }
+      }
+
       return updated;
     });
     // Recalculate dirty after permission change
@@ -280,6 +287,11 @@ const RoleAccess = () => {
         };
       }
 
+      // Enforce ai-assistant → reports link on uncheck
+      if (moduleId === 'reports' && !checked) {
+        updated['ai-assistant'] = { access: false, operations: { view: false } };
+      }
+
       return updated;
     });
     setPermissions((latest) => {
@@ -295,7 +307,7 @@ const RoleAccess = () => {
       const updated = JSON.parse(JSON.stringify(prev));
       group.modules.forEach((mod) => {
         // For linked approval modules, enforce parent access when unchecking the group
-        const linkedParent = { 'po-approval': 'purchase-orders', 'order-actions': 'orders', 'costing-approval': 'costing' };
+        const linkedParent = { 'po-approval': 'purchase-orders', 'order-actions': 'orders', 'costing-approval': 'costing', 'ai-assistant': 'reports' };
         if (!checked && linkedParent[mod.id] && !updated[linkedParent[mod.id]]?.access) {
           const ops = getOperationsForModule(mod.id);
           updated[mod.id] = {
@@ -453,11 +465,13 @@ const RoleAccess = () => {
       title: 'Role Name',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left',
+      width: 200,
       render: (name, record) => (
         <Space>
           <SafetyOutlined style={{ color: 'var(--primary-color)' }} />
           <div>
-            <Text strong>{name}</Text>
+            <Text strong style={{ whiteSpace: 'nowrap' }}>{name}</Text>
             {record.isSystem && (
               <Tag color="orange" style={{ marginLeft: 8 }}>System</Tag>
             )}
@@ -469,6 +483,7 @@ const RoleAccess = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
+      width: 200,
       ellipsis: true,
       render: (desc) => <Text type="secondary">{desc || '-'}</Text>,
     },
@@ -477,7 +492,7 @@ const RoleAccess = () => {
       dataIndex: 'userCount',
       key: 'userCount',
       align: 'center',
-      width: 100,
+      width: 80,
       render: (count) => (
         <Badge
           count={count || 0}
@@ -490,7 +505,7 @@ const RoleAccess = () => {
       title: 'Permissions',
       key: 'permissions',
       align: 'center',
-      width: 130,
+      width: 140,
       render: (_, record) => {
         const count = countPermissions(record);
         return (
@@ -505,7 +520,7 @@ const RoleAccess = () => {
       dataIndex: 'status',
       key: 'status',
       align: 'center',
-      width: 100,
+      width: 90,
       render: (status) => <StatusBadge status={status !== 'INACTIVE' ? 'active' : 'inactive'} />,
     },
     {
@@ -519,7 +534,8 @@ const RoleAccess = () => {
       title: 'Actions',
       key: 'actions',
       align: 'center',
-      width: 120,
+      width: 100,
+      fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <PermissionGuard module="roles" operation="update">
@@ -558,21 +574,26 @@ const RoleAccess = () => {
     const isPOApproval      = mod.id === 'po-approval';
     const isOrderActions    = mod.id === 'order-actions';
     const isCostingApproval = mod.id === 'costing-approval';
+    const isAiAssistant     = mod.id === 'ai-assistant';
     const poHasAccess      = permissions['purchase-orders']?.access;
     const ordersHasAccess  = permissions['orders']?.access;
     const costingHasAccess = permissions['costing']?.access;
+    const reportsHasAccess = permissions['reports']?.access;
     const isLinkedDisabled =
       (isPOApproval      && !poHasAccess)      ||
       (isOrderActions    && !ordersHasAccess)  ||
-      (isCostingApproval && !costingHasAccess);
+      (isCostingApproval && !costingHasAccess) ||
+      (isAiAssistant     && !reportsHasAccess);
 
     return (
       <div
         key={mod.id}
         style={{
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
-          padding: '10px 16px',
+          padding: '10px 12px',
+          gap: '6px 12px',
           borderBottom: '1px solid var(--border-color, #f0f0f0)',
           background: isLinkedDisabled ? 'var(--bg-tertiary, #fafafa)' : 'transparent',
           opacity: isLinkedDisabled ? 0.5 : 1,
@@ -580,7 +601,7 @@ const RoleAccess = () => {
         }}
       >
         {/* Module name + select all checkbox */}
-        <div style={{ flex: '0 0 260px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ flex: '0 1 220px', minWidth: 140, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Checkbox
             checked={isAllSelectedForModule(mod.id)}
             indeterminate={isSomeSelectedForModule(mod.id)}
@@ -615,10 +636,15 @@ const RoleAccess = () => {
               <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
+          {isAiAssistant && (
+            <Tooltip title="Requires Reports & Analytics access to be enabled">
+              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
+            </Tooltip>
+          )}
         </div>
 
         {/* Operation checkboxes */}
-        <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 200px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {ops.map((op) => (
             <div
               key={op}
@@ -626,12 +652,12 @@ const RoleAccess = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 4,
-                padding: '3px 10px',
+                padding: '3px 8px',
                 borderRadius: 6,
                 border: `1px solid ${permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '40' : 'var(--border-color, #e2e8f0)'}`,
                 background: permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '10' : 'transparent',
                 transition: 'all 0.2s',
-                minWidth: 90,
+                minWidth: 80,
               }}
             >
               <Checkbox
@@ -661,7 +687,7 @@ const RoleAccess = () => {
     const collapseItems = PERMISSION_GROUPS.map((group) => ({
       key: group.key,
       label: (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', width: '100%' }}>
           <Checkbox
             checked={isAllSelectedForGroup(group)}
             indeterminate={isSomeSelectedForGroup(group)}
@@ -671,17 +697,17 @@ const RoleAccess = () => {
             }}
             onClick={(e) => e.stopPropagation()}
           />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', minWidth: 0 }}>
             {GROUP_ICONS[group.icon] || <SettingOutlined />}
             <Text strong style={{ fontSize: 14 }}>{group.label}</Text>
+            {group.description && (
+              <Tooltip title={group.description}>
+                <InfoCircleOutlined style={{ color: 'var(--text-muted, #94a3b8)', fontSize: 12 }} />
+              </Tooltip>
+            )}
           </span>
-          {group.description && (
-            <Tooltip title={group.description}>
-              <InfoCircleOutlined style={{ color: 'var(--text-muted, #94a3b8)', fontSize: 12 }} />
-            </Tooltip>
-          )}
           <Tag
-            style={{ marginLeft: 'auto', marginRight: 8 }}
+            style={{ marginLeft: 'auto', marginRight: 0, flexShrink: 0 }}
             color={group.modules.every((m) => isAllSelectedForModule(m.id)) ? 'green' : 'default'}
           >
             {group.modules.filter((m) => permissions[m.id]?.access).length}/{group.modules.length} active
@@ -697,7 +723,7 @@ const RoleAccess = () => {
 
     return (
       <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <div>
             <h4 style={{ margin: 0 }}>Permission Matrix</h4>
             <Text type="secondary" style={{ fontSize: 12 }}>
@@ -771,8 +797,8 @@ const RoleAccess = () => {
         </PageHeader>
 
         {/* Filters */}
-        <Row gutter={16} style={{ marginBottom: 16 }}>
-          <Col xs={24} sm={12} md={8}>
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }} align="middle">
+          <Col xs={20} sm={12} md={8}>
             <Input
               placeholder="Search by role name or description..."
               prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
@@ -781,8 +807,8 @@ const RoleAccess = () => {
               allowClear
             />
           </Col>
-          <Col>
-            <ActionButton action="refresh" tooltip="Refresh" onClick={fetchRoles} />
+          <Col xs={4} sm={4} md={2} style={{ display: 'flex' }}>
+            <ActionButton action="refresh" tooltip="Refresh" size="middle" onClick={fetchRoles} />
           </Col>
         </Row>
 
@@ -792,6 +818,7 @@ const RoleAccess = () => {
           dataSource={filteredRoles}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 950 }}
           pagination={getTablePagination(undefined, 'roles')}
           locale={{
             emptyText: <EmptyState description="No roles found" />,
@@ -836,7 +863,7 @@ const RoleAccess = () => {
           style={{ width: "99%" }}
         >
           <Row gutter={16}>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="name"
                 label="Role Name"
@@ -868,7 +895,7 @@ const RoleAccess = () => {
                 />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}>
               <Form.Item name="active" label="Status" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
               </Form.Item>

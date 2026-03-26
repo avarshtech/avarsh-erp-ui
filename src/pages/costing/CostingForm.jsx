@@ -2143,9 +2143,10 @@ const CostingForm = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  textAlign: 'center',
                   background: 'var(--bg-tertiary)',
                 }}>
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>No image</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 11, lineHeight: 1.3 }}>No style<br />image</Typography.Text>
                 </div>
               )}
             </div>

@@ -182,20 +182,60 @@ const buildOrderHtml = (order, org) => {
   const sc           = statusColors(order.status);
   const currSym      = sym(currency);
 
-  // Assortment — one row per order line
-  const assortRows = (order.orderLines || []).map((line, i) => {
-    const qty   = line.lineQty   || 0;
-    const value = line.lineTotal || 0;
-    return `
-    <tr class="${i % 2 === 0 ? 'ar-a' : 'ar-b'}">
-      <td class="a-c" style="color:#64748b;">${i + 1}</td>
-      <td class="a-po">${line.buyerPoNo || '—'}</td>
-      <td class="a-dest">${line.destination || '—'}</td>
-      <td class="a-r">${qty.toLocaleString()}</td>
-      <td class="a-r">${qty > 0 ? fmtMoney(value / qty, currency) : '—'}</td>
-      <td class="a-r a-val">${fmtMoney(value, currency)}</td>
-    </tr>`;
-  }).join('');
+  // Assortment — grouped by color (case-insensitive, Pantone-aware)
+  const getPantoneKey = (s) => {
+    const fashion = s.match(/(\d{2}-\d{3,4})/);
+    if (fashion) return fashion[1];
+    const graphics = s.match(/(?:pantone|pms)\s+(\d{2,5})/i);
+    return graphics ? `PMS-${graphics[1]}` : null;
+  };
+  const getColorKey = (name) => {
+    const p = getPantoneKey(name.trim());
+    return p || name.trim().toLowerCase();
+  };
+  const formatColorName = (name) =>
+    name.trim().split(/\s+/).map((w) => {
+      if (/^(TCX|TPX|TPG|TC|PMS|PANTONE)$/i.test(w)) return w.toUpperCase();
+      if (/\d/.test(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+
+  const colorMap = new Map();
+  (order.orderLines || []).forEach((line) => {
+    const buyerPoNo = line.buyerPoNo || '—';
+    const destination = line.destination || '—';
+    (line.colorRows || []).forEach((cr) => {
+      const raw = cr.colorName || 'Unspecified';
+      const key = getColorKey(raw);
+      if (!colorMap.has(key)) {
+        colorMap.set(key, { displayName: formatColorName(raw), poLines: [], totalQty: 0, totalValue: 0 });
+      }
+      const g = colorMap.get(key);
+      g.poLines.push({ buyerPoNo, destination });
+      g.totalQty += (cr.total || 0);
+      g.totalValue += (cr.rowValue || 0);
+    });
+  });
+  let assortRows = '';
+  let groupIdx = 0;
+  for (const [, group] of colorMap) {
+    const cls = groupIdx % 2 === 0 ? 'ar-a' : 'ar-b';
+    const avgPrice = group.totalQty > 0 ? group.totalValue / group.totalQty : 0;
+    group.poLines.forEach((po, idx) => {
+      assortRows += `<tr class="${cls}">`;
+      if (idx === 0) {
+        assortRows += `<td class="a-c" style="font-weight:700;vertical-align:middle;background:#f0f5ff;color:#1d39c4;" rowspan="${group.poLines.length}">${group.displayName}</td>`;
+      }
+      assortRows += `<td class="a-c"><span style="font-weight:600;font-family:monospace;font-size:7.5px;">${po.buyerPoNo}</span> <span style="color:#94a3b8;">/</span> <span style="color:#475569;">${po.destination}</span></td>`;
+      if (idx === 0) {
+        assortRows += `<td class="a-c" style="vertical-align:middle;font-weight:600;" rowspan="${group.poLines.length}">${group.totalQty.toLocaleString()}</td>`;
+        assortRows += `<td class="a-c" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(avgPrice, currency)}</td>`;
+        assortRows += `<td class="a-c a-val" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(group.totalValue, currency)}</td>`;
+      }
+      assortRows += `</tr>`;
+    });
+    groupIdx++;
+  }
 
   return `<!DOCTYPE html>
 <html>
@@ -568,21 +608,20 @@ const buildOrderHtml = (order, org) => {
       <table class="assort-tbl">
         <thead>
           <tr>
-            <th class="a-c" style="width:28px;">#</th>
-            <th style="width:90px;text-align:left;">Buyer PO No</th>
-            <th style="text-align:left;">Destination</th>
-            <th class="a-r" style="width:80px;">Total Qty</th>
-            <th class="a-r" style="width:80px;">Avg Price</th>
-            <th class="a-r" style="width:90px;">Total Value</th>
+            <th class="a-c" style="width:100px;">Color</th>
+            <th class="a-c">Buyer PO No / Destination</th>
+            <th class="a-c" style="width:80px;">Total Qty</th>
+            <th class="a-c" style="width:80px;">Avg Price</th>
+            <th class="a-c" style="width:90px;">Total Value</th>
           </tr>
         </thead>
-        <tbody>${assortRows || `<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:8px;font-style:italic;">No lines</td></tr>`}</tbody>
+        <tbody>${assortRows || `<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:8px;font-style:italic;">No lines</td></tr>`}</tbody>
         <tfoot>
           <tr>
-            <td colspan="3"><strong>Grand Total</strong></td>
-            <td class="a-r"><strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong></td>
-            <td class="a-r"></td>
-            <td class="a-r"><strong>${fmtMoney(order.totalOrderValue || 0, currency)}</strong></td>
+            <td colspan="2"><strong>Grand Total</strong></td>
+            <td class="a-c"><strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong></td>
+            <td class="a-c"></td>
+            <td class="a-c"><strong>${fmtMoney(order.totalOrderValue || 0, currency)}</strong></td>
           </tr>
         </tfoot>
       </table>

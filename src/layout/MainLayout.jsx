@@ -272,9 +272,9 @@ const MainLayoutInner = () => {
       label: "Reports",
       moduleId: "reports",
       children: [
-        { key: "/reports/list", label: "All Reports" },
-        { key: "/reports/ai-chat", label: "AI Assistant" },
-        { key: "/reports/saved", label: "Saved Reports" },
+        { key: "/reports/list", label: "All Reports", moduleId: "reports" },
+        { key: "/reports/ai-chat", label: "AI Assistant", moduleId: "ai-assistant" },
+        { key: "/reports/saved", label: "Saved Reports", moduleId: "reports" },
       ],
     },
     {

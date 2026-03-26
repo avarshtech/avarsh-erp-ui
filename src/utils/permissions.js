@@ -24,7 +24,8 @@
  *   "parts-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
+ *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "ai-assistant":     { "access": true, "operations": { "view": true } }
  * }
  */
 
@@ -173,6 +174,13 @@ export const MODULES = {
     path: '/admin/roles',
     group: 'admin',
   },
+  AI_ASSISTANT: {
+    id: 'ai-assistant',
+    name: 'AI Assistant',
+    path: '/reports/ai-chat',
+    group: 'transactions',
+    linkedTo: 'reports',
+  },
 };
 
 // ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
@@ -229,6 +237,7 @@ export const PERMISSION_GROUPS = [
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
       { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
+      { id: 'ai-assistant', name: 'AI Assistant', operations: ['view'], linkedTo: 'reports', path: '/reports/ai-chat' },
     ],
   },
   {
@@ -280,6 +289,7 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')       return DASHBOARD_OPERATIONS;
   if (moduleId === 'reports')         return ['view'];
+  if (moduleId === 'ai-assistant')   return ['view'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
@@ -534,6 +544,14 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized['costing-approval'] = {
       access: false,
       operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+    };
+  }
+
+  // Enforce ai-assistant → reports link
+  if (!normalized['reports']?.access) {
+    normalized['ai-assistant'] = {
+      access: false,
+      operations: { view: false },
     };
   }
 

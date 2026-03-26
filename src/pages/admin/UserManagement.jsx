@@ -240,25 +240,25 @@ const UserManagement = () => {
 
   const columns = [
     {
-      title: 'User', key: 'user',
+      title: 'User', key: 'user', fixed: 'left', width: 200,
       render: (_, record) => (
         <Space>
           <Avatar style={{ background: 'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%)' }} icon={<UserOutlined />}>
             {record.name?.charAt(0)?.toUpperCase()}
           </Avatar>
           <div>
-            <Text strong style={{ display: 'block' }}>{record.name}</Text>
+            <Text strong style={{ display: 'block', whiteSpace: 'nowrap' }}>{record.name}</Text>
             <Text type="secondary" style={{ fontSize: 12 }}>@{record.username}</Text>
           </div>
         </Space>
       ),
     },
     {
-      title: 'Email', dataIndex: 'email', key: 'email',
+      title: 'Email', dataIndex: 'email', key: 'email', width: 220, ellipsis: true,
       render: (email) => <Space><MailOutlined style={{ color: 'var(--text-muted)' }} /><Text>{email}</Text></Space>,
     },
     {
-      title: 'Role', dataIndex: 'role', key: 'role',
+      title: 'Role', dataIndex: 'role', key: 'role', width: 130,
       render: (role, record) => {
         const roleName = typeof role === 'object' ? role?.name : (role || record.roleName);
         const colorMap = { admin: 'purple', manager: 'blue', supervisor: 'cyan', approver: 'green', user: 'default' };
@@ -266,15 +266,15 @@ const UserManagement = () => {
       },
     },
     {
-      title: 'Status', dataIndex: 'isActive', key: 'status', align: 'center',
+      title: 'Status', dataIndex: 'isActive', key: 'status', align: 'center', width: 90,
       render: (isActive) => <StatusBadge status={isActive !== false ? 'active' : 'inactive'} />,
     },
     {
-      title: 'Last Login', dataIndex: 'lastLoginAt', key: 'lastLoginAt',
+      title: 'Last Login', dataIndex: 'lastLoginAt', key: 'lastLoginAt', width: 200,
       render: (date) => date ? formatDate(date, 'DD MMM YYYY HH:mm') : 'Never',
     },
     {
-      title: 'Actions', key: 'actions', align: 'center', width: 180,
+      title: 'Actions', key: 'actions', align: 'center', width: 150, fixed: 'right',
       render: (_, record) => (
         <Space size="small">
           <ActionButton action="view" size="small" onClick={() => viewUserDetails(record)} />
@@ -314,16 +314,19 @@ const UserManagement = () => {
             <ActionButton action="create" text="Add User" onClick={() => openModal()} />
           </PermissionGuard>
         </PageHeader>
-        <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Row gutter={[12, 12]} style={{ marginBottom: 16 }} align="middle">
           <Col xs={24} sm={12} md={8}><Input placeholder="Search by name, username, or email..." prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear /></Col>
-          <Col xs={24} sm={8} md={4}><Select style={{ width: '100%' }} value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} /></Col>
-          <Col><ActionButton action="refresh" tooltip="Refresh" onClick={fetchUsers} /></Col>
+          <Col xs={24} sm={12} md={6} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Select style={{ flex: 1 }} value={statusFilter} onChange={setStatusFilter} options={[{ value: 'all', label: 'All Status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]} />
+            <ActionButton action="refresh" tooltip="Refresh" size="middle" onClick={fetchUsers} />
+          </Col>
         </Row>
         <Table
           columns={columns}
           dataSource={filteredUsers}
           rowKey="id"
           loading={loading}
+          scroll={{ x: 1000 }}
           pagination={getTablePagination(undefined, 'users')}
           locale={{
             emptyText: <EmptyState description="No users found" />,
@@ -351,8 +354,8 @@ const UserManagement = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={handleValuesChange} initialValues={{ isActive: true }}>
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="name" label="Full Name" rules={[{ required: true, message: 'Please enter full name' }]}><Input placeholder="Enter full name" /></Form.Item></Col>
-            <Col span={12}>
+            <Col xs={24} sm={12}><Form.Item name="name" label="Full Name" rules={[{ required: true, message: 'Please enter full name' }]}><Input placeholder="Enter full name" /></Form.Item></Col>
+            <Col xs={24} sm={12}>
               <Form.Item
                 name="username"
                 label="Username"
@@ -375,13 +378,13 @@ const UserManagement = () => {
             </Col>
           </Row>
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="email" label="Email" rules={[{ required: true, message: 'Please enter email' }, { type: 'email', message: 'Please enter a valid email' }]}><Input placeholder="Enter email address" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="phone" label="Phone"><Input placeholder="Enter phone number" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="email" label="Email" rules={[{ required: true, message: 'Please enter email' }, { type: 'email', message: 'Please enter a valid email' }]}><Input placeholder="Enter email address" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="phone" label="Phone"><Input placeholder="Enter phone number" /></Form.Item></Col>
           </Row>
           {!editingUser && (<Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter password' }, { min: 6, message: 'Password must be at least 6 characters' }]}><Input.Password placeholder="Enter password" /></Form.Item>)}
           <Row gutter={16}>
-            <Col span={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
-            <Col span={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
+            <Col xs={24} sm={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
           </Row>
         </Form>
       </Modal>

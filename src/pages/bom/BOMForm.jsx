@@ -20,6 +20,7 @@ import {
   Col,
   ConfigProvider,
   Segmented,
+  Image,
 } from 'antd';
 import { numericInputProps, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
@@ -276,6 +277,9 @@ const BOMForm = () => {
   const [orderId, setOrderId] = useState(null);
   const [orderNo, setOrderNo] = useState('');
   const [selectedStyleId, setSelectedStyleId] = useState(null);
+  const [styleImageUrl, setStyleImageUrl] = useState(null);
+  const [styleImageLoading, setStyleImageLoading] = useState(false);
+  const imageLoadIdRef = useRef(0);
   const [styleNo, setStyleNo] = useState('');
   const [garmentName, setGarmentName] = useState('');
   const [material, setMaterial] = useState('');
@@ -385,6 +389,7 @@ const BOMForm = () => {
         setOrderNo(bom.orderNo || '');
         setOrderNoInput(bom.orderNo || '');
         setSelectedStyleId(bom.styleId);
+        if (bom.styleId) loadStyleImage(bom.styleId);
         setStyleNo(bom.styleName || '');
         setGarmentName(bom.garmentName || '');
         setMaterial(bom.material || '');
@@ -581,6 +586,7 @@ const BOMForm = () => {
       setColors(allColors);
       setOrderLineSummary(lineSummary);
       setSelectedStyleId(resolvedStyleId);
+      loadStyleImage(resolvedStyleId);
       setGarmentName(resolvedGarmentName);
       setIsDirty(true);
     } catch {
@@ -595,10 +601,40 @@ const BOMForm = () => {
       setOrderLineSummary([]);
       setOrderQty(null);
       setSelectedStyleId(null);
+      loadStyleImage(null);
     } finally {
       setOrderLoading(false);
     }
   };
+
+  // ==================== STYLE IMAGE LOADER ====================
+
+  const loadStyleImage = async (sId) => {
+    const loadId = ++imageLoadIdRef.current;
+    setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    if (!sId) { setStyleImageLoading(false); return; }
+    setStyleImageLoading(true);
+    try {
+      const files = await getFilesByEntity('STYLE', sId);
+      if (loadId !== imageLoadIdRef.current) return;
+      const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+      if (!img) return;
+      const blob = await downloadFileAsBlob(img.fileId);
+      if (loadId !== imageLoadIdRef.current) return;
+      setStyleImageUrl(URL.createObjectURL(blob));
+    } catch {
+      // Non-critical
+    } finally {
+      if (loadId === imageLoadIdRef.current) setStyleImageLoading(false);
+    }
+  };
+
+  // Cleanup style image blob URL on unmount
+  useEffect(() => {
+    return () => {
+      setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    };
+  }, []);
 
   // ==================== LINE UPDATE HELPERS ====================
 
@@ -1903,22 +1939,39 @@ const BOMForm = () => {
                 const color = getVariantAttr(record, 'color');
                 const { qty } = getColorQty(record);
 
-                // Color not in order — show compact base qty input
+                // Color not in order — show dropdown with grouped order color quantities
                 if (isFabricColorMissing(record)) {
+                  // Build grouped color options from all order lines
+                  const colorQtyMap = {};
+                  orderLineSummary.forEach((ol) => {
+                    ol.colors.forEach((c) => {
+                      if (c.name && c.qty > 0) {
+                        const key = c.name.trim();
+                        colorQtyMap[key] = (colorQtyMap[key] || 0) + c.qty;
+                      }
+                    });
+                  });
+                  const colorOptions = Object.entries(colorQtyMap).map(([name, total]) => ({
+                    value: total,
+                    label: `${name} — ${total.toLocaleString()}`,
+                  }));
+                  const currentOverride = record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null);
+                  // Find matching option for current value (handle duplicate qty values)
+                  const hasMatch = currentOverride != null && colorOptions.some((o) => o.value === currentOverride);
+
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <InputNumber
-                        min={0}
+                      <Select
                         size="small"
                         style={{ flex: 1, minWidth: 0 }}
-                        placeholder="Base qty"
-                        controls={false}
-                        value={record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null)}
+                        placeholder="Pick base qty"
+                        value={hasMatch ? currentOverride : undefined}
                         onChange={(v) => updateLine(record.key, 'overrideBaseQty', v || null)}
+                        options={colorOptions}
                         status="warning"
-                        {...numericInputProps}
+                        popupMatchSelectWidth={false}
                       />
-                      <Tooltip title="Color not in order — enter base quantity">
+                      <Tooltip title="Color not in order — pick base quantity from order">
                         <WarningOutlined style={{ fontSize: 13, color: 'var(--warning-color)', flexShrink: 0 }} />
                       </Tooltip>
                     </div>
@@ -1926,20 +1979,10 @@ const BOMForm = () => {
                 }
 
                 if (!qty) return null;
-                const label = `${color || 'All'}: ${qty.toLocaleString()}`;
                 return (
-                  <Tooltip title={label}>
-                    <Tag
-                      style={{
-                        fontSize: 10, margin: 0, padding: '1px 6px',
-                        maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        display: 'block',
-                      }}
-                      color="processing"
-                    >
-                      {label}
-                    </Tag>
-                  </Tooltip>
+                  <Text style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.3, display: 'block', textAlign: 'center' }}>
+                    Base Qty ({color || 'All'}) — {qty.toLocaleString()}
+                  </Text>
                 );
               })()}
             </div>
@@ -2235,6 +2278,8 @@ const BOMForm = () => {
       <Card style={{ marginBottom: 24 }} loading={loading && !bomFromState}>
         <FormSection title="General Information">
         </FormSection>
+        <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
         <Row gutter={[24, 16]}>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
@@ -2338,6 +2383,50 @@ const BOMForm = () => {
             </Row>
           </Col>
         </Row>
+        </div>
+        {/* Style Image — sidebar */}
+        {selectedStyleId && (
+          <div style={{
+            flexShrink: 0,
+            width: 130,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            paddingTop: 4,
+          }}>
+            <Text type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>Style Image</Text>
+            {styleImageLoading ? (
+              <Skeleton.Image active style={{ width: 110, height: 110 }} />
+            ) : styleImageUrl ? (
+              <Image
+                src={styleImageUrl}
+                alt="Style"
+                width={110}
+                height={110}
+                style={{
+                  objectFit: 'cover',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-color, #e5e7eb)',
+                }}
+              />
+            ) : (
+              <div style={{
+                width: 110,
+                height: 110,
+                borderRadius: 8,
+                border: '1px dashed var(--border-color, #d9d9d9)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                background: 'var(--bg-tertiary)',
+              }}>
+                <Text type="secondary" style={{ fontSize: 11, lineHeight: 1.3 }}>No style<br />image</Text>
+              </div>
+            )}
+          </div>
+        )}
+        </div>
       </Card>
 
       {/* ── Section B: BOM Line Items ──────────────────────────── */}

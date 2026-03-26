@@ -66,10 +66,14 @@ export const MODULE_GROUPS = [
 
 /** Segmented control options for cross-page navigation */
 export const REPORT_NAV_OPTIONS = [
-  { label: 'All Reports', value: '/reports/list' },
-  { label: 'Saved', value: '/reports/saved' },
-  { label: 'AI Assistant', value: '/reports/ai-chat' },
+  { label: 'All Reports', value: '/reports/list', module: 'reports' },
+  { label: 'Saved', value: '/reports/saved', module: 'reports' },
+  { label: 'AI Assistant', value: '/reports/ai-chat', module: 'ai-assistant' },
 ];
+
+/** Filter nav options based on user's module access */
+export const getFilteredReportNavOptions = (hasAccessFn) =>
+  REPORT_NAV_OPTIONS.filter((opt) => !opt.module || hasAccessFn(opt.module));
 
 export const getModuleColor = (module) => MODULE_COLORS[module] || 'default';
 

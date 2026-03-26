@@ -5,10 +5,12 @@ import {
   Typography,
   Space,
   Table,
+  Tag,
   Input,
   Alert,
   Popconfirm,
-  Spin,
+  Image,
+  Skeleton,
 } from 'antd';
 import {
   CalendarOutlined,
@@ -36,7 +38,6 @@ import StatusTag from '../../components/StatusTag';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';
-import ImagePreview from '../../components/ImagePreview';
 import StatusSteps from '../../components/StatusSteps';
 import DraftWatermark from '../../components/DraftWatermark';
 import { formatCurrency, formatDate } from '../../utils/formatters';
@@ -73,8 +74,9 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
   const [actionLoading, setActionLoading] = useState(false);
   const [printLoading, setPrintLoading] = useState(false);
 
-  // Garment images per order line: { [lineId]: { loading, previewUrl } }
-  const [lineImages, setLineImages] = useState({});
+  // Style image
+  const [styleImageUrl, setStyleImageUrl] = useState(null);
+  const [styleImageLoading, setStyleImageLoading] = useState(false);
 
   const referBackTextareaRef = useRef(null);
   const cancelTextareaRef = useRef(null);
@@ -98,53 +100,36 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
       setReferBackReason('');
       setShowCancelInput(false);
       setCancelReason('');
-      // Clean up blob URLs for line images
-      Object.values(lineImages).forEach((img) => {
-        if (img.previewUrl) URL.revokeObjectURL(img.previewUrl);
-      });
-      setLineImages({});
+      setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setStyleImageLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  // Load garment images for order lines when modal opens
+  // Load style image when dialog opens
   useEffect(() => {
-    if (!open || !orderData?.orderLines?.length) return;
+    if (!open || !orderData?.styleId) return;
     let cancelled = false;
+    setStyleImageLoading(true);
 
-    const loadImages = async () => {
-      const linesWithIds = orderData.orderLines.filter((l) => l.id);
-      if (linesWithIds.length === 0) return;
+    (async () => {
+      try {
+        const files = await getFilesByEntity('STYLE', orderData.styleId);
+        if (cancelled) return;
+        const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+        if (!img) return;
+        const blob = await downloadFileAsBlob(img.fileId);
+        if (cancelled) return;
+        setStyleImageUrl(URL.createObjectURL(blob));
+      } catch {
+        // Non-critical
+      } finally {
+        if (!cancelled) setStyleImageLoading(false);
+      }
+    })();
 
-      // Mark lines as loading
-      const loadingState = {};
-      linesWithIds.forEach((l) => { loadingState[l.id] = { loading: true, previewUrl: null }; });
-      setLineImages(loadingState);
-
-      await Promise.all(
-        linesWithIds.map(async (l) => {
-          try {
-            const files = await getFilesByEntity('ORDER_LINE', l.id);
-            const imageFile = (files || []).find((f) =>
-              ['IMAGE', 'PHOTO'].includes(f.fileCategory),
-            );
-            if (!imageFile || cancelled) return;
-            const blob = await downloadFileAsBlob(imageFile.fileId);
-            if (cancelled) return;
-            const previewUrl = URL.createObjectURL(blob);
-            setLineImages((prev) => ({ ...prev, [l.id]: { loading: false, previewUrl } }));
-          } catch {
-            if (!cancelled) {
-              setLineImages((prev) => ({ ...prev, [l.id]: { loading: false, previewUrl: null } }));
-            }
-          }
-        }),
-      );
-    };
-
-    loadImages();
     return () => { cancelled = true; };
-  }, [open, orderData]);
+  }, [open, orderData?.styleId]);
 
   // Handle pending action from push notification deep link
   const status = orderData?.status;
@@ -168,6 +153,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
     costingId,
     buyerName,
     orderDate,
+    styleId,
     styleNo,
     garmentType,
     season,
@@ -199,15 +185,59 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
     })}`;
   };
 
-  // ── Assortment summary — one row per order line ───────────────────────────────
-  const assortmentSummary = orderLines.map((line, idx) => ({
-    key: line.key || line.id || idx,
-    buyerPoNo: line.buyerPoNo || '—',
-    destination: line.destination || 'Unspecified',
-    colorRows: line.colorRows || [],
-    lineQty: line.lineQty || 0,
-    lineTotal: line.lineTotal || 0,
-  }));
+  // ── Assortment summary — grouped by color (case-insensitive, Pantone-aware) ──
+  const assortmentSummary = (() => {
+    const getPantoneKey = (s) => {
+      const fashion = s.match(/(\d{2}-\d{3,4})/);
+      if (fashion) return fashion[1];
+      const graphics = s.match(/(?:pantone|pms)\s+(\d{2,5})/i);
+      return graphics ? `PMS-${graphics[1]}` : null;
+    };
+    const getColorKey = (name) => {
+      const p = getPantoneKey(name.trim());
+      return p || name.trim().toLowerCase();
+    };
+    const formatColorName = (name) =>
+      name.trim().split(/\s+/).map((w) => {
+        if (/^(TCX|TPX|TPG|TC|PMS|PANTONE)$/i.test(w)) return w.toUpperCase();
+        if (/\d/.test(w)) return w.toUpperCase();
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }).join(' ');
+
+    const colorMap = new Map();
+    orderLines.forEach((line) => {
+      const buyerPoNo = line.buyerPoNo || '—';
+      const destination = line.destination || 'Unspecified';
+      (line.colorRows || []).forEach((cr) => {
+        const raw = cr.colorName || 'Unspecified';
+        const key = getColorKey(raw);
+        if (!colorMap.has(key)) {
+          colorMap.set(key, { displayName: formatColorName(raw), poLines: [], totalQty: 0, totalValue: 0 });
+        }
+        const g = colorMap.get(key);
+        g.poLines.push({ buyerPoNo, destination });
+        g.totalQty += (cr.total || 0);
+        g.totalValue += (cr.rowValue || 0);
+      });
+    });
+    const rows = [];
+    for (const [, group] of colorMap) {
+      const avgPrice = group.totalQty > 0 ? group.totalValue / group.totalQty : 0;
+      group.poLines.forEach((po, i) => {
+        rows.push({
+          key: `${group.displayName}_${i}`,
+          colorName: group.displayName,
+          buyerPoNo: po.buyerPoNo,
+          destination: po.destination,
+          totalQty: group.totalQty,
+          avgPrice,
+          totalValue: group.totalValue,
+          _rowSpan: i === 0 ? group.poLines.length : 0,
+        });
+      });
+    }
+    return rows;
+  })();
 
   // ── Action handlers ──────────────────────────────────────────────────────────
 
@@ -457,11 +487,38 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
   );
 
   // ── Hero header for ViewDialog ─────────────────────────────────────────────
+  const styleImageElement = styleImageLoading ? (
+    <Skeleton.Image active style={{ width: 72, height: 72 }} />
+  ) : styleImageUrl ? (
+    <Image
+      src={styleImageUrl}
+      alt="Style"
+      width={72}
+      height={72}
+      style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-color, #e5e7eb)' }}
+    />
+  ) : (
+    <div style={{
+      width: 72,
+      height: 72,
+      borderRadius: 8,
+      border: '1px dashed var(--border-color, #d9d9d9)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      background: 'var(--bg-tertiary)',
+    }}>
+      <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.3 }}>No style<br />image</Text>
+    </div>
+  );
+
   const heroConfig = {
     title: orderNo,
     status: <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />,
     subtitle: buyerName,
     subtitleIcon: <ShoppingOutlined />,
+    image: styleImageElement,
     meta: [
       { icon: <CalendarOutlined />, text: formatDate(orderDate) },
       ...(styleNo ? [{ text: `Style: ${styleNo}` }] : []),
@@ -673,62 +730,62 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
               rowKey="key"
               pagination={false}
               size="small"
+              bordered
               columns={[
                 {
-                  title: 'Buyer PO No',
-                  dataIndex: 'buyerPoNo',
-                  key: 'buyerPoNo',
-                  width: 130,
-                  render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
+                  title: 'Color',
+                  dataIndex: 'colorName',
+                  key: 'colorName',
+                  width: 180,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => (
+                    <Tag color="blue" style={{ fontWeight: 600, margin: 0, fontSize: 12, padding: '2px 10px' }}>
+                      {v}
+                    </Tag>
+                  ),
                 },
                 {
-                  title: 'Destination',
-                  dataIndex: 'destination',
-                  key: 'destination',
-                  ellipsis: true,
-                  render: (t) => <Text style={{ fontSize: 12 }}>{t}</Text>,
-                },
-                {
-                  title: 'Color / Print',
-                  dataIndex: 'colorRows',
-                  key: 'colorRows',
-                  render: (rows) =>
-                    rows.length === 0 ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
-                        {rows.map((c, i) => (
-                          <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                            {c.colorName || '—'}
-                            <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
-                          </Text>
-                        ))}
-                      </div>
-                    ),
+                  title: 'Buyer PO No / Destination',
+                  key: 'poDestination',
+                  align: 'center',
+                  render: (_, record) => (
+                    <Space size={4}>
+                      <Text strong style={{ fontSize: 12, fontFamily: 'monospace' }}>{record.buyerPoNo}</Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>/</Text>
+                      <Text style={{ fontSize: 12, color: '#475569' }}>{record.destination}</Text>
+                    </Space>
+                  ),
                 },
                 {
                   title: 'Total Qty',
-                  dataIndex: 'lineQty',
-                  key: 'lineQty',
-                  width: 90,
-                  align: 'right',
-                  render: (v) => <Text strong>{v.toLocaleString()}</Text>,
+                  dataIndex: 'totalQty',
+                  key: 'totalQty',
+                  width: 100,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
                 },
                 {
                   title: 'Avg Price',
+                  dataIndex: 'avgPrice',
                   key: 'avgPrice',
-                  width: 100,
-                  align: 'right',
-                  render: (_, r) => `${currSymbol} ${(r.lineQty > 0 ? r.lineTotal / r.lineQty : 0).toFixed(2)}`,
+                  width: 110,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => (
+                    <Text style={{ fontSize: 12 }}>{`${currSymbol} ${v.toFixed(2)}`}</Text>
+                  ),
                 },
                 {
                   title: 'Total Value',
-                  dataIndex: 'lineTotal',
-                  key: 'lineTotal',
-                  width: 120,
-                  align: 'right',
+                  dataIndex: 'totalValue',
+                  key: 'totalValue',
+                  width: 130,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
                   render: (v) => (
-                    <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
+                    <Text strong style={{ color: 'var(--success-color, #10b981)', fontSize: 13 }}>
                       {fmtCurrency(v)}
                     </Text>
                   ),
@@ -743,25 +800,10 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           Order Lines ({orderLines.length})
         </Title>
         {orderLines.map((line, idx) => {
-          const lineImg = line.id ? lineImages[line.id] : null;
-          const imageElement = lineImg ? (
-            lineImg.loading ? (
-              <Spin size="small" />
-            ) : lineImg.previewUrl ? (
-              <ImagePreview
-                src={lineImg.previewUrl}
-                alt="Garment"
-                size={64}
-                previewSize={240}
-              />
-            ) : null
-          ) : null;
-
           return (
             <LineItemCard
               key={line.key || idx}
               index={idx + 1}
-              image={imageElement}
               title={line.buyerPoNo ? `PO: ${line.buyerPoNo}` : undefined}
               subtitle={line.destination || undefined}
               amount={fmtCurrency(line.lineTotal)}

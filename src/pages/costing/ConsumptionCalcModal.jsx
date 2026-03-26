@@ -22,7 +22,6 @@ import {
 } from '@ant-design/icons';
 import { calculateConsumption } from '../../services/costingService';
 
-const { Dragger } = Upload;
 const { Text, Paragraph } = Typography;
 
 export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKnitsCalc, fabricRow }) {
@@ -205,70 +204,98 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
       {/* ── Step 1: Upload ──────────────────────────────────────────── */}
       {step === 'upload' && (
         <Spin spinning={loading} tip="AI is reading measurements and calculating consumption…">
-          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+          {fabricRow && (
+            <Alert
+              type="info" showIcon style={{ marginBottom: 16 }}
+              message={
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                  <Text strong style={{ fontSize: 13 }}>Fabric row:</Text>
+                  <Text style={{ fontSize: 13 }}>{fabricRow.fabricType || fabricRow.description || '—'}</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>·</Text>
+                  <Tag color={fabricRow.classification ? 'blue' : 'default'} style={{ margin: 0, fontSize: 11 }}>
+                    {fabricRow.classification || 'Classification unknown'}
+                  </Tag>
+                </span>
+              }
+            />
+          )}
+          <Row gutter={16} style={{ marginBottom: 16 }}>
             {/* Measurement chart — required */}
-            <div style={{ flex: 3, minWidth: 0 }}>
-              <Text strong>
+            <Col span={12}>
+              <Text strong style={{ fontSize: 13 }}>
                 Size Spec / Measurement Chart <Text type="danger">*</Text>
               </Text>
               <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 6 }}>
                 The table of sizes with body measurements — PNG, JPG or PDF
               </Text>
-              <Dragger
+              <Upload
                 accept=".pdf,.png,.jpg,.jpeg,.webp"
                 multiple={false}
                 beforeUpload={(f) => { setMeasurementFile(f); return false; }}
                 showUploadList={false}
-                style={{ padding: '16px 8px' }}
+                style={{ display: 'block' }}
               >
-                <FileImageOutlined
-                  style={{ fontSize: 36, color: measurementFile ? 'var(--success-color)' : 'var(--primary-color)' }}
-                />
-                <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
-                  {measurementFile
-                    ? <Text style={{ color: 'var(--success-color)' }}>✓ {measurementFile.name}</Text>
-                    : 'Click or drag size spec chart here'
-                  }
-                </p>
-                <p style={{ fontSize: 11, color: '#8c8c8c', margin: 0 }}>
-                  PNG / JPG / PDF accepted
-                </p>
-              </Dragger>
-            </div>
+                <div style={{
+                  border: '1px dashed var(--border-color, #d9d9d9)',
+                  borderRadius: 8,
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: 'var(--bg-secondary, #fafafa)',
+                  transition: 'border-color 0.2s',
+                }}>
+                  <FileImageOutlined
+                    style={{ fontSize: 26, color: measurementFile ? 'var(--success-color)' : 'var(--primary-color)' }}
+                  />
+                  <p style={{ fontSize: 12, margin: '6px 0 2px' }}>
+                    {measurementFile
+                      ? <Text style={{ color: 'var(--success-color)' }}>✓ {measurementFile.name}</Text>
+                      : 'Click or drag size spec chart here'
+                    }
+                  </p>
+                  <p style={{ fontSize: 11, color: '#8c8c8c', margin: 0 }}>
+                    PNG / JPG / PDF accepted
+                  </p>
+                </div>
+              </Upload>
+            </Col>
 
             {/* Techpack — optional */}
-            <div style={{ flex: 2, minWidth: 0 }}>
-              <Text strong>Techpack PDF <Text type="secondary">(optional)</Text></Text>
+            <Col span={12}>
+              <Text strong style={{ fontSize: 13 }}>Techpack PDF <Text type="secondary">(optional)</Text></Text>
               <Text type="secondary" style={{ display: 'block', fontSize: 11, marginBottom: 6 }}>
                 GSM, Woven/Knits classification, panel info
               </Text>
-              <Dragger
+              <Upload
                 accept=".pdf"
                 multiple={false}
                 beforeUpload={(f) => { setTechpackFile(f); return false; }}
                 showUploadList={false}
-                style={{ padding: '16px 8px' }}
+                style={{ display: 'block' }}
               >
-                <FileTextOutlined
-                  style={{ fontSize: 36, color: techpackFile ? 'var(--success-color)' : '#8c8c8c' }}
-                />
-                <p style={{ fontSize: 12, margin: '8px 0 4px' }}>
-                  {techpackFile
-                    ? <Text style={{ color: 'var(--success-color)' }}>✓ {techpackFile.name}</Text>
-                    : 'Click or drag techpack PDF'
-                  }
-                </p>
-                <p style={{ fontSize: 11, color: '#8c8c8c', margin: 0 }}>PDF only</p>
-              </Dragger>
-            </div>
-          </div>
-
-          {fabricRow && (
-            <Alert
-              type="info" showIcon style={{ marginBottom: 16 }}
-              message={`Fabric row: ${fabricRow.fabricType || fabricRow.description || '—'} · ${fabricRow.classification || 'classification unknown'}`}
-            />
-          )}
+                <div style={{
+                  border: '1px dashed var(--border-color, #d9d9d9)',
+                  borderRadius: 8,
+                  padding: '24px 16px',
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  background: 'var(--bg-secondary, #fafafa)',
+                  transition: 'border-color 0.2s',
+                }}>
+                  <FileTextOutlined
+                    style={{ fontSize: 26, color: techpackFile ? 'var(--success-color)' : '#8c8c8c' }}
+                  />
+                  <p style={{ fontSize: 12, margin: '6px 0 2px' }}>
+                    {techpackFile
+                      ? <Text style={{ color: 'var(--success-color)' }}>✓ {techpackFile.name}</Text>
+                      : 'Click or drag techpack PDF'
+                    }
+                  </p>
+                  <p style={{ fontSize: 11, color: '#8c8c8c', margin: 0 }}>PDF only</p>
+                </div>
+              </Upload>
+            </Col>
+          </Row>
 
           <Button
             type="primary" block icon={<ThunderboltOutlined />}

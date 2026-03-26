@@ -16,7 +16,8 @@ import ReportModuleNav from './components/ReportModuleNav';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import useResponsive from '../../hooks/useResponsive';
 import { getReportDefinitions, getSavedReports } from '../../services/reportService';
-import { REPORT_NAV_OPTIONS, getModuleColor } from '../../utils/reportConstants';
+import { getFilteredReportNavOptions, getModuleColor } from '../../utils/reportConstants';
+import { hasModuleAccess } from '../../utils/permissions';
 
 const ReportListPage = () => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ const ReportListPage = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedModule, setSelectedModule] = useState(null);
+  const navOptions = useMemo(() => getFilteredReportNavOptions(hasModuleAccess), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,7 +122,7 @@ const ReportListPage = () => {
       <div className="animate-fade-in-up">
         <PageHeader title="Reports" subtitle="Explore and generate reports across all modules">
           <Segmented
-            options={REPORT_NAV_OPTIONS}
+            options={navOptions}
             value="/reports/list"
             disabled
           />
@@ -166,7 +168,7 @@ const ReportListPage = () => {
       <div style={{ flexShrink: 0 }}>
         <PageHeader title="Reports" subtitle="Explore and generate reports across all modules">
           <Segmented
-            options={REPORT_NAV_OPTIONS}
+            options={navOptions}
             value={location.pathname}
             onChange={handleNavChange}
           />
@@ -271,7 +273,7 @@ const ReportListPage = () => {
           )}
 
           {/* Scrollable content */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingRight: 4 }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', paddingRight: 4 }}>
             {/* Saved Reports quick access — show when "All" is selected */}
             {selectedModule === null && savedReports.length > 0 && (
               <Card

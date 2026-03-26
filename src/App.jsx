@@ -132,7 +132,7 @@ const ThemedApp = () => {
             <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
             <Route path="reports/builder/:id" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportBuilderPage /></Suspense></PermissionRoute>} />
             <Route path="reports/saved" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><SavedReportsPage /></Suspense></PermissionRoute>} />
-            <Route path="reports/ai-chat" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><AiChatPage /></Suspense></PermissionRoute>} />
+            <Route path="reports/ai-chat" element={<PermissionRoute module="ai-assistant"><Suspense fallback={<Spin />}><AiChatPage /></Suspense></PermissionRoute>} />
           </Route>
 
           {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}

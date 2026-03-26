@@ -13,7 +13,8 @@ import PageHeader from '../../components/PageHeader';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import AiResultsDisplay from './components/AiResultsDisplay';
 import { aiChat } from '../../services/reportService';
-import { REPORT_NAV_OPTIONS } from '../../utils/reportConstants';
+import { getFilteredReportNavOptions } from '../../utils/reportConstants';
+import { hasModuleAccess } from '../../utils/permissions';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -260,6 +261,7 @@ const AiChatPage = () => {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const chatEndRef = useRef(null);
+  const navOptions = useMemo(() => getFilteredReportNavOptions(hasModuleAccess), []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -327,7 +329,7 @@ const AiChatPage = () => {
       <div style={{ flexShrink: 0 }}>
         <PageHeader title="Reports">
           <Segmented
-            options={REPORT_NAV_OPTIONS}
+            options={navOptions}
             value={location.pathname}
             onChange={handleNavChange}
           />
