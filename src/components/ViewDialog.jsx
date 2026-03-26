@@ -62,7 +62,7 @@ const ViewDialog = memo(({
           {hero.meta?.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginTop: 4 }}>
               {hero.meta.map((item, i) => (
-                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)' }}>
+                <span key={item.text ?? i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)' }}>
                   {item.icon && <span style={{ display: 'flex', fontSize: 13 }}>{item.icon}</span>}
                   <span>{item.text}</span>
                 </span>

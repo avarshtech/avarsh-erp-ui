@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Fragment, useState, useEffect, useMemo, useCallback } from 'react';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
   Modal, InputNumber, Select, Button, Typography, Tooltip, Card, Row, Col, Space, Segmented,
@@ -222,7 +222,7 @@ const ConsumptionMatrixDialog = ({
               let colorReqTotal = 0;
               let colorOrdTotal = 0;
               return (
-                <React.Fragment key={color}>
+                <Fragment key={color}>
                   <tr>
                     <td style={{
                       padding: '6px 10px 2px', borderBottom: 'none',
@@ -292,7 +292,7 @@ const ConsumptionMatrixDialog = ({
                       {colorReqTotal ? colorReqTotal.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}
                     </td>
                   </tr>
-                </React.Fragment>
+                </Fragment>
               );
             })}
             <tr style={{ background: 'var(--bg-secondary, #f6f8fa)' }}>

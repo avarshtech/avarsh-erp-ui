@@ -1,9 +1,9 @@
-import React from 'react';
+import { memo } from 'react';
 import { Button } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
-const PageHeader = React.memo(function PageHeader({
+const PageHeader = memo(function PageHeader({
   title,
   subtitle,
   backPath,

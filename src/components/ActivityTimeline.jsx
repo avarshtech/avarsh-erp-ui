@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Timeline, Input, Button, Empty } from 'antd';
 import { SettingOutlined, UserOutlined, SendOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -10,7 +10,7 @@ const TYPE_CONFIG = {
   user: { color: 'green', icon: <UserOutlined /> },
 };
 
-const DefaultActivityContent = React.memo(({ activity }) => (
+const DefaultActivityContent = memo(({ activity }) => (
   <div>
     <div style={{ fontSize: 13 }}>
       <strong>{activity.user}</strong>{' '}
@@ -29,7 +29,7 @@ const DefaultActivityContent = React.memo(({ activity }) => (
 
 DefaultActivityContent.displayName = 'DefaultActivityContent';
 
-const ActivityTimeline = React.memo(({
+const ActivityTimeline = memo(({
   activities = [],
   maxHeight = 320,
   renderComment,

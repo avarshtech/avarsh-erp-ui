@@ -38,7 +38,6 @@ import { hasPermission } from '../../utils/permissions';
 import { createBom, updateBom, getBomById } from '../../services/bomService';
 import { getActiveProcesses } from '../../services/processService';
 import { getOrderByOrderNo } from '../../services/orderService';
-import { getStyleById } from '../../services/styleService';
 import { searchItems, getItemMetaData, getItemsByIds } from '../../services/itemService';
 import { getActiveParts } from '../../services/partsService';
 import { uploadFile, deleteFile, downloadFileAsBlob, getFilesByEntity } from '../../services/fileService';
@@ -568,22 +567,9 @@ const BOMForm = () => {
         };
       });
 
-      // Fetch style to get garmentName and styleId — wait before rendering
-      let resolvedGarmentName = '';
-      let resolvedStyleId = null;
-      if (order.costingId) {
-        try {
-          const { getCostSheetByCostingId } = await import('../../services/costingService');
-          const costing = await getCostSheetByCostingId(order.costingId);
-          if (costing.styleId) {
-            resolvedStyleId = costing.styleId;
-            const style = await getStyleById(costing.styleId);
-            resolvedGarmentName = style.garmentName || '';
-          }
-        } catch {
-          // Costing/style lookup failed — fields remain empty
-        }
-      }
+      // Use styleId and garmentName directly from order response
+      const resolvedStyleId = order.styleId || null;
+      const resolvedGarmentName = order.garmentName || '';
 
       // Set all state at once — single render
       setOrderId(order.id);

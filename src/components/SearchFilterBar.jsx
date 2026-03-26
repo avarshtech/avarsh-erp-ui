@@ -5,7 +5,7 @@ import { DATE_FORMAT } from '../utils/uiConstants';
 
 const { RangePicker } = DatePicker;
 
-const renderFilter = (filter, index) => {
+const renderFilter = (filter, key) => {
   const { type, props: filterProps = {}, span = {} } = filter;
 
   const colSpan = {
@@ -48,7 +48,7 @@ const renderFilter = (filter, index) => {
   }
 
   return (
-    <Col key={index} {...colSpan}>
+    <Col key={key} {...colSpan}>
       {content}
     </Col>
   );
@@ -84,7 +84,7 @@ const SearchFilterBar = memo(function SearchFilterBar({
         />
       </Col>
 
-      {filters.map((filter, index) => renderFilter(filter, index))}
+      {filters.map((filter, index) => renderFilter(filter, filter.key ?? filter.type ?? index))}
 
       {extra && <Col>{extra}</Col>}
 

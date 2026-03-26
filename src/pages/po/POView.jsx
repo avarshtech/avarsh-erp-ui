@@ -47,6 +47,8 @@ import {
   FileProtectOutlined,
   NumberOutlined,
   UndoOutlined,
+  PlusOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -56,6 +58,8 @@ import {
   createActivity,
   cancelEwayBill,
   updateStageCompletion,
+  addStagesToLineItem,
+  reorderStages,
   rejectPurchaseOrder,
   referBackPurchaseOrder,
   cancelPurchaseOrder,
@@ -79,9 +83,88 @@ import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import POVersionHistory from './POVersionHistory';
+import FabricStagesDialog from './FabricStagesDialog';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
+
+/**
+ * Small modal for marking a stage complete — replaces the Popover approach
+ * which had focus/event conflicts with the parent PO View Modal.
+ * Using a Modal-inside-Modal is the Ant Design recommended pattern when
+ * the overlay needs interactive form inputs.
+ */
+const StageCompleteModal = ({ open, onCancel, poDate, deliveryDate, isUpdating, onComplete, message }) => {
+  const [date, setDate] = useState(null);
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (open) {
+      setDate(null);
+      setNotes('');
+    }
+  }, [open]);
+
+  return (
+    <Modal
+      title="Mark Stage Complete"
+      open={open}
+      onCancel={onCancel}
+      width={360}
+      centered
+      destroyOnClose
+      footer={
+        <Button
+          type="primary"
+          block
+          loading={isUpdating}
+          icon={<CheckCircleOutlined />}
+          onClick={() => {
+            if (!date) {
+              message.warning('Please select the actual completion date');
+              return;
+            }
+            onComplete(date.format('YYYY-MM-DD'), notes);
+          }}
+        >
+          Mark Complete
+        </Button>
+      }
+    >
+      <div style={{ marginBottom: 12 }}>
+        <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+          Actual Completion Date <span style={{ color: 'var(--error-color)' }}>*</span>
+        </Text>
+        <DatePicker
+          format="DD-MMM-YYYY"
+          style={{ width: '100%' }}
+          value={date}
+          getPopupContainer={(trigger) => trigger.parentElement}
+          disabledDate={(current) => {
+            if (!current) return false;
+            const poStart = poDate ? dayjs(poDate).startOf('day') : null;
+            const poEnd = deliveryDate ? dayjs(deliveryDate).endOf('day') : null;
+            if (poStart && current.isBefore(poStart, 'day')) return true;
+            if (poEnd && current.isAfter(poEnd, 'day')) return true;
+            return false;
+          }}
+          onChange={setDate}
+        />
+      </div>
+      <div>
+        <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>Notes / Comments</Text>
+        <TextArea
+          placeholder="Add notes (optional)"
+          rows={3}
+          maxLength={500}
+          style={{ fontSize: 12 }}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      </div>
+    </Modal>
+  );
+};
 
 // Status config — keys are DB enum values (kept for activity rendering and hero header bg/text)
 const STATUS_CONFIG = {
@@ -128,6 +211,8 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   const [ewayBillCancelLoading, setEwayBillCancelLoading] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [stageUpdating, setStageUpdating] = useState(null); // 'lineItemId-stageIndex'
+  const [addStagesDialog, setAddStagesDialog] = useState({ open: false, lineItem: null });
+  const [completeStageModal, setCompleteStageModal] = useState({ open: false, lineItemId: null, stageIndex: null });
 
   useEffect(() => {
     if (open && poData?.id) {
@@ -411,7 +496,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
     po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
     po?.status === PO_STATUS.IN_PROGRESS;
 
-  const handleStageCompletion = useCallback(async (lineItemId, stageIndex, completed, actualDate) => {
+  const handleStageCompletion = useCallback(async (lineItemId, stageIndex, completed, actualDate, notes) => {
     const key = `${lineItemId}-${stageIndex}`;
     setStageUpdating(key);
     try {
@@ -420,6 +505,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         stageIndex,
         completed,
         actualCompletionDate: actualDate || null,
+        notes: notes || null,
       });
 
       // Find stage name and item name for the activity log
@@ -468,6 +554,64 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       setStageUpdating(null);
     }
   }, [message, po]);
+
+  // ========================
+  // Add Stages to line item
+  // ========================
+  const handleAddStages = useCallback(async (newStages, fullReorderedList) => {
+    const lineItem = addStagesDialog.lineItem;
+    if (!lineItem || !newStages || newStages.length === 0) return;
+    setStageUpdating(`adding-${lineItem.id}`);
+    try {
+      let result;
+      if (fullReorderedList) {
+        // User reordered stages — send the full list to replace all stages
+        const cleanedList = fullReorderedList.map(({ _isExisting, ...rest }) => rest);
+        result = await reorderStages(lineItem.id, cleanedList);
+      } else {
+        result = await addStagesToLineItem(lineItem.id, newStages);
+      }
+      setPo((prev) => {
+        if (!prev) return prev;
+        const updatedLineItems = (prev.lineItems || []).map((li) =>
+          li.id === lineItem.id ? { ...li, processingStages: result.processingStages } : li
+        );
+        return { ...prev, lineItems: updatedLineItems };
+      });
+
+      const currentUser = getCurrentUser();
+      const userName = currentUser?.name || '';
+      const activityComment = JSON.stringify({
+        type: 'stages_added',
+        itemLabel: lineItem.itemName || lineItem.processName || lineItem.itemCode || 'Item',
+        count: newStages.length,
+        stageNames: newStages.map((s) => s.stageName).join(', '),
+        by: userName,
+      });
+      const actRes = await createActivity(po.id, {
+        comment: activityComment,
+        status: po.status ?? null,
+        isSystemGenerated: false,
+        name: userName,
+      });
+      setNotes((prev) => [...prev, {
+        id: actRes.id,
+        text: actRes.comment || activityComment,
+        isSystemGenerated: false,
+        status: actRes.status ?? null,
+        timestamp: actRes.createdAt || new Date().toISOString(),
+        user: actRes.userName || actRes.name || userName,
+        edited: false,
+      }]);
+
+      message.success(`${newStages.length} stage(s) added successfully`);
+    } catch {
+      message.error('Failed to add stages');
+    } finally {
+      setStageUpdating(null);
+      setAddStagesDialog({ open: false, lineItem: null });
+    }
+  }, [message, po, addStagesDialog.lineItem]);
 
   // ========================
   // E-way Bill
@@ -786,6 +930,19 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                   return null;
                 })()}
               </div>
+              {canUpdateStages && hasPermission('purchase-orders', 'update') && (
+                <Button
+                  type="dashed"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  loading={stageUpdating === `adding-${record.id}`}
+                  className="stage-btn-add"
+                  style={{ fontSize: 11 }}
+                  onClick={() => setAddStagesDialog({ open: true, lineItem: record })}
+                >
+                  Add Stage
+                </Button>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sortedStages.map((stage, sIdx) => {
@@ -860,59 +1017,25 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                             okText="Revert"
                             cancelText="Cancel"
                           >
-                            <Tooltip title="Revert completion">
-                              <Button
-                                type="text" size="small" loading={isUpdating}
-                                icon={<UndoOutlined style={{ fontSize: 13 }} />}
-                                style={{ color: 'var(--text-secondary)' }}
-                              />
-                            </Tooltip>
+                            <Button
+                              type="text" size="small" loading={isUpdating}
+                              icon={<UndoOutlined style={{ fontSize: 12 }} />}
+                              className="stage-btn-revert"
+                              style={{ fontSize: 11 }}
+                            >
+                              Revert
+                            </Button>
                           </Popconfirm>
                         ) : (
-                          <Popover
-                            trigger="click"
-                            placement="bottomRight"
-                            overlayInnerStyle={{ padding: 12 }}
-                            content={
-                              <div style={{ width: 220 }}>
-                                <Text strong style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>Actual Completion Date</Text>
-                                <DatePicker
-                                  format="DD-MMM-YYYY"
-                                  style={{ width: '100%', marginBottom: 10 }}
-                                  defaultValue={dayjs()}
-                                  id={`stage-date-${record.id}-${stage._origIndex}`}
-                                  onChange={(date) => {
-                                    // Store the selected date in a data attribute
-                                    const el = document.getElementById(`stage-btn-${record.id}-${stage._origIndex}`);
-                                    if (el) el.dataset.selectedDate = date ? date.format('YYYY-MM-DD') : '';
-                                  }}
-                                />
-                                <Button
-                                  type="primary"
-                                  size="small"
-                                  block
-                                  id={`stage-btn-${record.id}-${stage._origIndex}`}
-                                  data-selected-date={dayjs().format('YYYY-MM-DD')}
-                                  loading={isUpdating}
-                                  icon={<CheckCircleOutlined />}
-                                  onClick={(e) => {
-                                    const dateVal = e.currentTarget.dataset.selectedDate || dayjs().format('YYYY-MM-DD');
-                                    handleStageCompletion(record.id, stage._origIndex, true, dateVal);
-                                  }}
-                                >
-                                  Mark Complete
-                                </Button>
-                              </div>
-                            }
+                          <Button
+                            type="text" size="small" loading={isUpdating}
+                            icon={<CheckCircleOutlined style={{ fontSize: 12 }} />}
+                            className="stage-btn-complete"
+                            style={{ fontSize: 11 }}
+                            onClick={() => setCompleteStageModal({ open: true, lineItemId: record.id, stageIndex: stage._origIndex })}
                           >
-                            <Tooltip title="Mark as complete">
-                              <Button
-                                type="text" size="small" loading={isUpdating}
-                                icon={<CheckCircleOutlined style={{ fontSize: 14 }} />}
-                                style={{ color: 'var(--primary-color)' }}
-                              />
-                            </Tooltip>
-                          </Popover>
+                            Mark Complete
+                          </Button>
                         )
                       )}
                     </div>
@@ -958,15 +1081,44 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                         </Text>
                       </div>
                     )}
+
+                    {/* Row 4: Notes */}
+                    {isCompleted && stage.notes && (
+                      <div style={{
+                        marginTop: 6, paddingLeft: 24, display: 'flex', alignItems: 'flex-start', gap: 4,
+                      }}>
+                        <MessageOutlined style={{ fontSize: 10, color: 'var(--text-secondary)', marginTop: 2 }} />
+                        <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic', wordBreak: 'break-word' }}>
+                          {stage.notes}
+                        </Text>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
         )}
+
+        {/* Add Stage button for line items without stages */}
+        {sortedStages.length === 0 && canUpdateStages && hasPermission('purchase-orders', 'update') && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed var(--border-color, #e8e8e8)' }}>
+            <Button
+              type="dashed"
+              size="small"
+              icon={<PlusOutlined />}
+              loading={stageUpdating === `adding-${record.id}`}
+              onClick={() => setAddStagesDialog({ open: true, lineItem: record })}
+              className="stage-btn-add"
+              style={{ fontSize: 12 }}
+            >
+              Add Processing Stages
+            </Button>
+          </div>
+        )}
       </div>
     );
-  }, [po, hasIgst, showStatusColumn, lineItemImages, canUpdateStages, stageUpdating, handleStageCompletion]);
+  }, [po, hasIgst, showStatusColumn, lineItemImages, canUpdateStages, stageUpdating, handleStageCompletion, addStagesDialog]);
 
   // ========================
   // Render
@@ -1516,6 +1668,41 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         onClose={() => setHistoryOpen(false)}
         poId={po?.id}
         poNumber={po?.poNumber || po?.poNo}
+      />
+
+      {/* Add Stages Dialog — append-only mode for view dialog */}
+      <FabricStagesDialog
+        open={addStagesDialog.open}
+        onClose={() => setAddStagesDialog({ open: false, lineItem: null })}
+        onSave={(newStages, fullReorderedList) => {
+          if (newStages && newStages.length > 0) {
+            handleAddStages(newStages, fullReorderedList);
+          } else {
+            setAddStagesDialog({ open: false, lineItem: null });
+          }
+        }}
+        stages={[]}
+        existingStages={addStagesDialog.lineItem?.processingStages || []}
+        appendOnly
+        poDate={po?.poDate}
+        deliveryDate={po?.deliveryDate}
+        itemName={addStagesDialog.lineItem?.itemName || addStagesDialog.lineItem?.processName || ''}
+        itemCode={addStagesDialog.lineItem?.itemCode || ''}
+        variantAttributes={addStagesDialog.lineItem?.variantAttributes}
+      />
+
+      {/* Mark Stage Complete Modal */}
+      <StageCompleteModal
+        open={completeStageModal.open}
+        onCancel={() => setCompleteStageModal({ open: false, lineItemId: null, stageIndex: null })}
+        poDate={po?.poDate}
+        deliveryDate={po?.deliveryDate}
+        isUpdating={!!stageUpdating}
+        message={message}
+        onComplete={(dateVal, notesVal) => {
+          handleStageCompletion(completeStageModal.lineItemId, completeStageModal.stageIndex, true, dateVal, notesVal);
+          setCompleteStageModal({ open: false, lineItemId: null, stageIndex: null });
+        }}
       />
     </>
   );

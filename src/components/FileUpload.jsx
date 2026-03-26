@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { Button, Typography, Space, Spin, Tooltip, App } from 'antd';
 import {
   CloudUploadOutlined,

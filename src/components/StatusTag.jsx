@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Tag } from 'antd';
 
-const StatusTag = React.memo(function StatusTag({
+const StatusTag = memo(function StatusTag({
   status,
   config,
   getLabel,

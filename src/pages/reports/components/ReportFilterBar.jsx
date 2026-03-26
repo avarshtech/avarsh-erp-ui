@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { memo, useState, useEffect, useCallback } from 'react';
 import { Card, DatePicker, Select, Input, InputNumber, Space, Button, Typography, Badge } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -14,7 +14,7 @@ const FilterLabel = ({ filter }) => (
   </Text>
 );
 
-const DropdownFilter = React.memo(function DropdownFilter({
+const DropdownFilter = memo(function DropdownFilter({
   filter,
   value,
   onChange,
@@ -64,7 +64,7 @@ const DropdownFilter = React.memo(function DropdownFilter({
   );
 });
 
-const ReportFilterBar = React.memo(function ReportFilterBar({
+const ReportFilterBar = memo(function ReportFilterBar({
   filters = [],
   values = {},
   onChange,

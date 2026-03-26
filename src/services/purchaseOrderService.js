@@ -209,13 +209,41 @@ export const getPoLatestVersion = async (poId) => {
 
 /**
  * Update a processing stage's completion status
- * @param {Object} data - { lineItemId, stageIndex, completed, actualCompletionDate }
+ * @param {Object} data - { lineItemId, stageIndex, completed, actualCompletionDate, notes }
  * @returns {Promise<Object>} Updated line item DTO
  */
 export const updateStageCompletion = async (data) => {
   const response = await axiosInstance.put(
     `${ENDPOINTS.PURCHASE_ORDERS}/line-items/stage-completion`,
     data
+  );
+  return response.data;
+};
+
+/**
+ * Append new processing stages to a PO line item
+ * @param {number} lineItemId - Line item ID
+ * @param {Array} stages - Array of { stageName, completionDate } objects
+ * @returns {Promise<Object>} Updated line item DTO
+ */
+export const addStagesToLineItem = async (lineItemId, stages) => {
+  const response = await axiosInstance.put(
+    `${ENDPOINTS.PURCHASE_ORDERS}/line-items/${lineItemId}/stages`,
+    stages
+  );
+  return response.data;
+};
+
+/**
+ * Replace all processing stages on a PO line item (reorder after drag-drop)
+ * @param {number} lineItemId - Line item ID
+ * @param {Array} stages - Full ordered array of stage objects
+ * @returns {Promise<Object>} Updated line item DTO
+ */
+export const reorderStages = async (lineItemId, stages) => {
+  const response = await axiosInstance.put(
+    `${ENDPOINTS.PURCHASE_ORDERS}/line-items/${lineItemId}/stages/reorder`,
+    stages
   );
   return response.data;
 };
@@ -250,6 +278,8 @@ export default {
   getPoVersionHistory,
   getPoLatestVersion,
   updateStageCompletion,
+  addStagesToLineItem,
+  reorderStages,
   generateEwayBill,
   cancelEwayBill,
   rejectEwayBill,

@@ -224,7 +224,7 @@ const ReportBuilderPage = () => {
               <Space>
                 <SettingOutlined />
                 <span>Report Configuration</span>
-                <Tag color="blue" style={{ fontSize: 13, marginLeft: 4 }}>
+                <Tag color="blue" style={{ fontSize: 14, padding: '2px 10px', marginLeft: 4, fontWeight: 500 }}>
                   {selectedFields.length} columns
                 </Tag>
               </Space>

@@ -1,11 +1,11 @@
-import React, { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { Button, Progress, Empty } from 'antd';
 import { UploadOutlined, DownloadOutlined } from '@ant-design/icons';
 import { getFileTypeConfig } from '../utils/uiConstants';
 import { formatFileSize } from '../utils/formatters';
 import ActionButton from './buttons/ActionButton';
 
-const FileCard = React.memo(({ file, onDownload, onDelete, canDelete }) => {
+const FileCard = memo(({ file, onDownload, onDelete, canDelete }) => {
   const typeConfig = getFileTypeConfig(file.fileName);
 
   const handleDownload = useCallback(() => {
@@ -84,7 +84,7 @@ const FileCard = React.memo(({ file, onDownload, onDelete, canDelete }) => {
 
 FileCard.displayName = 'FileCard';
 
-const FilePreviewGrid = React.memo(({
+const FilePreviewGrid = memo(({
   files = [],
   onDownload,
   onDelete,

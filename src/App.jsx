@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
+import GlobalMessageEmitter from './components/GlobalMessageEmitter';
 import UpdatePrompt from './components/UpdatePrompt';
 import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -78,6 +79,7 @@ const ThemedApp = () => {
     <ConfigProvider theme={antThemeConfig}>
       <AntdApp message={{ maxCount: 3, top: 60, duration: 5 }}>
       <ConflictDialog />
+      <GlobalMessageEmitter />
       <UpdatePrompt />
       <StoreProvider>
         <BrowserRouter>

@@ -285,9 +285,9 @@ const ReportListPage = () => {
                       key={sr.id}
                       color="processing"
                       style={{ cursor: 'pointer', padding: '4px 12px', fontSize: 13, flexShrink: 0 }}
-                      onClick={() => navigate(`/reports/builder/${sr.reportDefinitionId}?saved=${sr.id}`)}
+                      onClick={() => navigate(`/reports/builder/${sr.reportDefId}?saved=${sr.id}`)}
                     >
-                      {sr.name}
+                      {sr.savedName || sr.name || 'Untitled'}
                     </Tag>
                   ))}
                 </div>

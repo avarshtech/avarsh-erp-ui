@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Modal,
   Button,
@@ -10,12 +10,15 @@ import {
   Empty,
   Divider,
   App,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
   DeleteOutlined,
   ExperimentOutlined,
   CheckCircleOutlined,
+  LockOutlined,
+  HolderOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -24,12 +27,18 @@ const { Text, Title } = Typography;
 /**
  * Dialog for managing fabric processing stages on a PO line item.
  * Each stage has a name and target completion date within PO date → Delivery date range.
+ *
+ * In appendOnly mode (opened from PO View), existing stages are shown as locked/disabled
+ * and new stages can be added and dragged into any position among the combined list.
+ * On save, only the final ordered list of new stages (with their target positions) is returned.
  */
 const FabricStagesDialog = ({
   open,
   onClose,
   onSave,
   stages: initialStages,
+  existingStages: existingStagesProp,
+  appendOnly,
   poDate,
   deliveryDate,
   itemName,
@@ -39,9 +48,27 @@ const FabricStagesDialog = ({
   const { message } = App.useApp();
   const [stages, setStages] = useState([]);
 
+  // In appendOnly mode we maintain a combined list of existing (locked) + new (editable) items
+  // Each item has: { key, stageName, completionDate, isExisting, isCompleted? }
+  const [combinedList, setCombinedList] = useState([]);
+
+  const existingStages = existingStagesProp || [];
+
   useEffect(() => {
     if (open) {
-      if (initialStages && initialStages.length > 0) {
+      if (appendOnly) {
+        // Build combined list from existing stages only (new stages start empty)
+        setCombinedList(
+          existingStages.map((s, i) => ({
+            key: `existing_${i}`,
+            stageName: s.stageName || '',
+            completionDate: s.completionDate ? dayjs(s.completionDate) : null,
+            isExisting: true,
+            isCompleted: !!s.isCompleted,
+          }))
+        );
+        setStages([]);
+      } else if (initialStages && initialStages.length > 0) {
         setStages(
           initialStages.map((s, i) => ({
             key: `${Date.now()}_${i}`,
@@ -68,71 +95,268 @@ const FabricStagesDialog = ({
     [minDate, maxDate]
   );
 
+  // ── Drag & Drop (native HTML5, same pattern as ProcessAllowanceModal) ──
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+
+  const handleDragStart = useCallback((idx) => {
+    dragItem.current = idx;
+  }, []);
+
+  const handleDragEnter = useCallback((idx) => {
+    dragOverItem.current = idx;
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    if (
+      dragItem.current === null ||
+      dragOverItem.current === null ||
+      dragItem.current === dragOverItem.current
+    ) {
+      dragItem.current = null;
+      dragOverItem.current = null;
+      return;
+    }
+    if (appendOnly) {
+      setCombinedList((prev) => {
+        const updated = [...prev];
+        const [dragged] = updated.splice(dragItem.current, 1);
+        updated.splice(dragOverItem.current, 0, dragged);
+        return updated;
+      });
+    } else {
+      setStages((prev) => {
+        const updated = [...prev];
+        const [dragged] = updated.splice(dragItem.current, 1);
+        updated.splice(dragOverItem.current, 0, dragged);
+        return updated;
+      });
+    }
+    dragItem.current = null;
+    dragOverItem.current = null;
+  }, [appendOnly]);
+
+  // ── Stage CRUD (non-appendOnly mode) ──
   const addStage = () => {
-    setStages((prev) => [
-      ...prev,
-      { key: `${Date.now()}_${Math.random()}`, stageName: '', completionDate: null },
-    ]);
+    if (appendOnly) {
+      const newItem = {
+        key: `new_${Date.now()}_${Math.random()}`,
+        stageName: '',
+        completionDate: null,
+        isExisting: false,
+      };
+      setCombinedList((prev) => [...prev, newItem]);
+    } else {
+      setStages((prev) => [
+        ...prev,
+        { key: `${Date.now()}_${Math.random()}`, stageName: '', completionDate: null },
+      ]);
+    }
   };
 
   const removeStage = (key) => {
-    setStages((prev) => prev.filter((s) => s.key !== key));
+    if (appendOnly) {
+      setCombinedList((prev) => prev.filter((s) => s.key !== key));
+    } else {
+      setStages((prev) => prev.filter((s) => s.key !== key));
+    }
   };
 
   const updateStage = (key, field, value) => {
-    setStages((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
+    if (appendOnly) {
+      setCombinedList((prev) =>
+        prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
+      );
+    } else {
+      setStages((prev) =>
+        prev.map((s) => (s.key === key ? { ...s, [field]: value } : s))
+      );
+    }
+  };
+
+  // ── Save ──
+  const handleSave = () => {
+    if (appendOnly) {
+      const newItems = combinedList.filter((s) => !s.isExisting);
+      if (newItems.length > 0) {
+        const emptyNames = newItems.filter((s) => !s.stageName?.trim());
+        if (emptyNames.length > 0) {
+          message.warning('Please fill in all stage names or remove empty stages');
+          return;
+        }
+        const missingDates = newItems.filter((s) => s.stageName?.trim() && !s.completionDate);
+        if (missingDates.length > 0) {
+          message.warning('Please set completion dates for all stages');
+          return;
+        }
+      }
+      // Return the full reordered list: existing stages with their original data + new stages
+      // The caller (POView) will use this to determine the new order
+      const orderedResult = combinedList.map((item) => {
+        if (item.isExisting) {
+          // Find original existing stage data
+          const origIdx = existingStages.findIndex(
+            (es) => es.stageName === item.stageName && (
+              (!es.completionDate && !item.completionDate) ||
+              (es.completionDate && item.completionDate && dayjs(es.completionDate).isSame(item.completionDate, 'day'))
+            )
+          );
+          return origIdx >= 0 ? { ...existingStages[origIdx], _isExisting: true } : null;
+        }
+        return {
+          stageName: item.stageName.trim(),
+          completionDate: item.completionDate ? item.completionDate.format('YYYY-MM-DD') : null,
+          _isExisting: false,
+        };
+      }).filter(Boolean);
+
+      // Extract only new stages for the addStages API, but pass the full ordered list
+      const newOnly = orderedResult.filter((s) => !s._isExisting).map(({ _isExisting, ...rest }) => rest);
+      if (newOnly.length === 0) {
+        onSave(null);
+      } else {
+        // Pass full reordered list so caller can rebuild the stages array in correct order
+        onSave(newOnly, orderedResult);
+      }
+      onClose();
+    } else {
+      if (stages.length > 0) {
+        const emptyStages = stages.filter((s) => !s.stageName || !s.stageName.trim());
+        if (emptyStages.length > 0) {
+          message.warning('Please fill in all stage names or remove empty stages');
+          return;
+        }
+        const missingDates = stages.filter((s) => s.stageName?.trim() && !s.completionDate);
+        if (missingDates.length > 0) {
+          message.warning('Please set completion dates for all stages');
+          return;
+        }
+      }
+      const validStages = stages
+        .filter((s) => s.stageName && s.stageName.trim())
+        .map((s) => ({
+          stageName: s.stageName.trim(),
+          completionDate: s.completionDate ? s.completionDate.format('YYYY-MM-DD') : null,
+        }));
+      onSave(validStages.length > 0 ? validStages : null);
+      onClose();
+    }
+  };
+
+  // ── Computed counts ──
+  const activeList = appendOnly ? combinedList.filter((s) => !s.isExisting) : stages;
+  const stageCount = activeList.filter((s) => s.stageName?.trim()).length;
+  const completedCount = activeList.filter((s) => s.stageName?.trim() && s.completionDate).length;
+  const hadInitialStages = initialStages && initialStages.length > 0;
+  const newCount = appendOnly ? combinedList.filter((s) => !s.isExisting).length : 0;
+  const isSaveDisabled = appendOnly ? newCount === 0 : (stages.length === 0 && !hadInitialStages);
+
+  // ── Render a single stage row ──
+  const renderStageRow = (item, idx, isDraggable) => {
+    const isComplete = item.isExisting
+      ? !!item.isCompleted
+      : !!(item.stageName?.trim() && item.completionDate);
+    const isLocked = !!item.isExisting;
+
+    return (
+      <div
+        key={item.key}
+        draggable={isDraggable && !isLocked}
+        onDragStart={isDraggable && !isLocked ? () => handleDragStart(idx) : undefined}
+        onDragEnter={isDraggable ? () => handleDragEnter(idx) : undefined}
+        onDragEnd={isDraggable && !isLocked ? handleDragEnd : undefined}
+        onDragOver={isDraggable ? (e) => e.preventDefault() : undefined}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginBottom: 10,
+          padding: '8px 10px',
+          borderRadius: 8,
+          border: `1px solid ${isLocked ? 'var(--border-color, #e8e8e8)' : 'var(--primary-color)'}`,
+          background: isLocked
+            ? 'color-mix(in srgb, var(--border-color, #e8e8e8) 15%, transparent)'
+            : 'color-mix(in srgb, var(--primary-color) 4%, transparent)',
+          opacity: isLocked ? 0.65 : 1,
+          cursor: isDraggable && !isLocked ? 'grab' : 'default',
+          transition: 'box-shadow 0.2s, border-color 0.2s',
+        }}
+        onMouseDown={isDraggable && !isLocked ? (e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'; } : undefined}
+        onMouseUp={isDraggable && !isLocked ? (e) => { e.currentTarget.style.boxShadow = 'none'; } : undefined}
+        onMouseLeave={isDraggable && !isLocked ? (e) => { e.currentTarget.style.boxShadow = 'none'; } : undefined}
+      >
+        {/* Drag handle or lock icon */}
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, width: 20 }}>
+          {isLocked ? (
+            <LockOutlined style={{ fontSize: 12, color: '#bfbfbf' }} />
+          ) : isDraggable ? (
+            <HolderOutlined style={{ fontSize: 12, color: 'var(--text-muted, #bfbfbf)' }} />
+          ) : isComplete ? (
+            <CheckCircleOutlined style={{ fontSize: 16, color: 'var(--success-color)' }} />
+          ) : (
+            <div style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #d9d9d9' }} />
+          )}
+        </div>
+
+        {/* Index */}
+        <Tag
+          color={isLocked ? 'default' : 'blue'}
+          style={{ minWidth: 24, textAlign: 'center', flexShrink: 0, fontSize: 11, fontWeight: 600, margin: 0 }}
+        >
+          {idx + 1}
+        </Tag>
+
+        {/* Inputs */}
+        <div style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Input
+            style={{ flex: 1, minWidth: 180 }}
+            placeholder="Stage name (e.g. Dyeing, Printing)"
+            value={item.stageName}
+            onChange={isLocked ? undefined : (e) => updateStage(item.key, 'stageName', e.target.value)}
+            disabled={isLocked}
+          />
+          <DatePicker
+            style={{ width: 150 }}
+            placeholder="Target date"
+            value={item.completionDate}
+            onChange={isLocked ? undefined : (date) => updateStage(item.key, 'completionDate', date)}
+            disabledDate={isLocked ? undefined : disabledDate}
+            format="DD MMM YYYY"
+            disabled={isLocked}
+          />
+          {!isLocked && (
+            <Button
+              type="text"
+              icon={<DeleteOutlined style={{ color: 'var(--error-color)' }} />}
+              size="small"
+              onClick={() => removeStage(item.key)}
+            />
+          )}
+        </div>
+      </div>
     );
   };
-
-  const handleSave = () => {
-    if (stages.length > 0) {
-      const emptyStages = stages.filter((s) => !s.stageName || !s.stageName.trim());
-      if (emptyStages.length > 0) {
-        message.warning('Please fill in all stage names or remove empty stages');
-        return;
-      }
-      const missingDates = stages.filter((s) => s.stageName?.trim() && !s.completionDate);
-      if (missingDates.length > 0) {
-        message.warning('Please set completion dates for all stages');
-        return;
-      }
-    }
-    const validStages = stages
-      .filter((s) => s.stageName && s.stageName.trim())
-      .map((s) => ({
-        stageName: s.stageName.trim(),
-        completionDate: s.completionDate ? s.completionDate.format('YYYY-MM-DD') : null,
-      }));
-    onSave(validStages.length > 0 ? validStages : null);
-    onClose();
-  };
-
-  const stageCount = stages.filter((s) => s.stageName?.trim()).length;
-  const completedCount = stages.filter((s) => s.stageName?.trim() && s.completionDate).length;
-  const hadInitialStages = initialStages && initialStages.length > 0;
-  const isSaveDisabled = stages.length === 0 && !hadInitialStages;
 
   return (
     <Modal
       title={null}
       open={open}
       onCancel={onClose}
-      width={640}
+      width={680}
       centered
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             {stageCount > 0 && (
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {completedCount}/{stageCount} stages with dates
+                {completedCount}/{stageCount} new stages with dates
               </Text>
             )}
           </div>
           <Space>
             <Button onClick={onClose}>Cancel</Button>
             <Button type="primary" onClick={handleSave} disabled={isSaveDisabled}>
-              Save Stages
+              {appendOnly ? 'Add Stages' : 'Save Stages'}
             </Button>
           </Space>
         </div>
@@ -160,7 +384,9 @@ const FabricStagesDialog = ({
               Fabric Processing Stages
             </Title>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Define processing milestones between PO date and delivery
+              {appendOnly
+                ? 'Add new stages and drag to reorder their position'
+                : 'Define processing milestones between PO date and delivery'}
             </Text>
           </div>
         </div>
@@ -224,8 +450,43 @@ const FabricStagesDialog = ({
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* Stages list */}
-      {stages.length === 0 ? (
+      {/* Drag hint for append-only mode */}
+      {appendOnly && combinedList.some((s) => !s.isExisting) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10,
+          padding: '6px 10px', borderRadius: 6,
+          background: 'color-mix(in srgb, var(--primary-color) 6%, transparent)',
+          fontSize: 11, color: 'var(--text-secondary)',
+        }}>
+          <HolderOutlined style={{ fontSize: 12 }} />
+          <Text type="secondary" style={{ fontSize: 11 }}>
+            Drag new stages (blue border) to reorder them between existing stages
+          </Text>
+        </div>
+      )}
+
+      {/* Combined list (appendOnly) or standalone list */}
+      {appendOnly ? (
+        <div style={{ maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+          {combinedList.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                <span>
+                  No stages yet.
+                  <br />
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    Add new stages below.
+                  </Text>
+                </span>
+              }
+              style={{ margin: '16px 0' }}
+            />
+          ) : (
+            combinedList.map((item, idx) => renderStageRow(item, idx, true))
+          )}
+        </div>
+      ) : stages.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
           description={
@@ -241,80 +502,7 @@ const FabricStagesDialog = ({
         />
       ) : (
         <div style={{ maxHeight: 340, overflowY: 'auto', paddingRight: 4 }}>
-          {stages.map((stage, idx) => {
-            const isComplete = stage.stageName?.trim() && stage.completionDate;
-            return (
-              <div
-                key={stage.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  marginBottom: 12,
-                }}
-              >
-                {/* Step indicator */}
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    flexShrink: 0,
-                    width: 24,
-                  }}
-                >
-                  {isComplete ? (
-                    <CheckCircleOutlined style={{ fontSize: 18, color: 'var(--success-color)' }} />
-                  ) : (
-                    <div
-                      style={{
-                        width: 10,
-                        height: 10,
-                        borderRadius: '50%',
-                        border: '2px solid #d9d9d9',
-                        background: 'transparent',
-                      }}
-                    />
-                  )}
-                </div>
-                <Tag
-                  color="default"
-                  style={{
-                    minWidth: 24,
-                    textAlign: 'center',
-                    flexShrink: 0,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    margin: 0,
-                  }}
-                >
-                  {idx + 1}
-                </Tag>
-                <div style={{ flex: 1, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <Input
-                    style={{ flex: 1, minWidth: 200 }}
-                    placeholder="Stage name (e.g. Dyeing, Printing)"
-                    value={stage.stageName}
-                    onChange={(e) => updateStage(stage.key, 'stageName', e.target.value)}
-                  />
-                  <DatePicker
-                    style={{ width: 160 }}
-                    placeholder="Target date"
-                    value={stage.completionDate}
-                    onChange={(date) => updateStage(stage.key, 'completionDate', date)}
-                    disabledDate={disabledDate}
-                    format="DD MMM YYYY"
-                  />
-                  <Button
-                    type="text"
-                    icon={<DeleteOutlined style={{ color: 'var(--error-color)' }} />}
-                    size="small"
-                    onClick={() => removeStage(stage.key)}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {stages.map((stage, idx) => renderStageRow(stage, idx, stages.length > 1))}
         </div>
       )}
 

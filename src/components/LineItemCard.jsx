@@ -93,7 +93,7 @@ const LineItemCard = memo(({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
         {pills.map((pill, i) => (
           <span
-            key={i}
+            key={pill.label ?? i}
             style={{
               padding: '4px 10px',
               borderRadius: 6,

@@ -865,6 +865,10 @@ const OrderForm = () => {
   // Size presets data
   const [sizePresetsList, setSizePresetsList] = useState([]);
 
+  // Style reference (from costing lookup)
+  const [resolvedStyleId, setResolvedStyleId] = useState(null);
+  const [resolvedGarmentName, setResolvedGarmentName] = useState('');
+
   // Component dialog
   const [componentModalVisible, setComponentModalVisible] = useState(false);
   const [formComponents, setFormComponents] = useState([]);
@@ -936,6 +940,8 @@ const OrderForm = () => {
   const populateForm = useCallback((order) => {
     setExistingOrder(order);
     setEntityVersion(order.version);
+    setResolvedStyleId(order.styleId || null);
+    setResolvedGarmentName(order.garmentName || '');
     form.setFieldsValue({
       costingId: order.costingId,
       buyerId: order.buyerId,
@@ -1493,6 +1499,9 @@ const OrderForm = () => {
         season: costing.season || '',
         currency: costing.quoteCurrency || costing.currency || '',
       };
+      // Store styleId and garmentName for order payload
+      setResolvedStyleId(costing.styleId || null);
+      setResolvedGarmentName(costing.garmentName || '');
       // Fetch fabric description from style master
       if (costing.styleId) {
         try {
@@ -1641,7 +1650,9 @@ const OrderForm = () => {
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
       orderDate: orderDate.format('YYYY-MM-DD'),
+      styleId: resolvedStyleId,
       styleNo: values.styleNo,
+      garmentName: resolvedGarmentName,
       garmentType: values.garmentType,
       season: values.season,
       fabricDescription: values.fabricDescription,

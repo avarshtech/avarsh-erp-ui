@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { message } from 'antd';
 // Import directly from sessionStore (not authService) to avoid circular dependencies
 import { getAccessToken, setAccessToken, clearAll, executeTokenRefresh } from './sessionStore';
+import { emitMessage } from '../components/GlobalMessageEmitter';
 import { emitConflict } from '../components/ConflictDialog';
 
 /**
@@ -27,7 +27,7 @@ axiosInstance.interceptors.request.use(
     if (!navigator.onLine && ['post', 'put', 'delete', 'patch'].includes(config.method)) {
       const error = new Error('You are offline. This action requires an internet connection.');
       error.isOfflineError = true;
-      message.warning('You are offline. This action requires an internet connection.');
+      emitMessage('warning', 'You are offline. This action requires an internet connection.');
       return Promise.reject(error);
     }
     return config;
@@ -186,7 +186,7 @@ axiosInstance.interceptors.response.use(
 
     // Show error toast for non-401 errors
     if (!error.response || error.response.status !== 401) {
-      message.error(errorMessage);
+      emitMessage('error', errorMessage);
     }
 
     return Promise.reject(error);

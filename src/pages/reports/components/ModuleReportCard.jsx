@@ -70,9 +70,11 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
         <span style={{ fontWeight: 600, fontSize: 15 }}>{report.displayName}</span>
       </div>
 
-      <Tag color={color} style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-        {report.module?.replace(/_/g, ' ')}
-      </Tag>
+      {report.module && (
+        <Tag color={color} style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
+          {report.module.replace(/_/g, ' ')}
+        </Tag>
+      )}
 
       <Paragraph
         type="secondary"

@@ -38,6 +38,7 @@ const UserManagement = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const initialFormValuesRef = useRef(null);
+  const usernameManuallyEditedRef = useRef(false);
 
   // Admin password reset modal state
   const [resetPwdModalVisible, setResetPwdModalVisible] = useState(false);
@@ -109,8 +110,15 @@ const UserManagement = () => {
       initialFormValuesRef.current = null;
     }
     setFormDirty(false);
+    usernameManuallyEditedRef.current = false;
     setModalVisible(true);
   };
+
+  const sanitizeUsername = (value) =>
+    value.toLowerCase().replace(/[^a-z0-9_.]/g, '');
+
+  const generateUsername = (fullName) =>
+    sanitizeUsername(fullName.trim().replace(/\s+/g, ''));
 
   // Check if form values have changed from initial for edit mode
   const checkFormChanged = () => {
@@ -125,8 +133,13 @@ const UserManagement = () => {
     });
   };
 
-  const handleValuesChange = () => {
+  const handleValuesChange = (changedValues) => {
     if (!editingUser) {
+      // Auto-generate username from name when in add mode
+      if ('name' in changedValues && !usernameManuallyEditedRef.current) {
+        const generated = generateUsername(changedValues.name || '');
+        form.setFieldValue('username', generated);
+      }
       setFormDirty(true);
       return;
     }
@@ -185,6 +198,7 @@ const UserManagement = () => {
     form.resetFields();
     setFormDirty(false);
     initialFormValuesRef.current = null;
+    usernameManuallyEditedRef.current = false;
   };
 
   const handleDelete = async (userId) => {
@@ -338,7 +352,27 @@ const UserManagement = () => {
         <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={handleValuesChange} initialValues={{ isActive: true }}>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="name" label="Full Name" rules={[{ required: true, message: 'Please enter full name' }]}><Input placeholder="Enter full name" /></Form.Item></Col>
-            <Col span={12}><Form.Item name="username" label="Username" rules={[{ required: true, message: 'Please enter username' }, { min: 3, message: 'Username must be at least 3 characters' }]}><Input placeholder="Enter username" /></Form.Item></Col>
+            <Col span={12}>
+              <Form.Item
+                name="username"
+                label="Username"
+                rules={[
+                  { required: true, message: 'Please enter username' },
+                  { min: 3, message: 'Username must be at least 3 characters' },
+                  { pattern: /^[a-z0-9_.]+$/, message: 'Only lowercase letters, numbers, underscores and dots allowed' },
+                ]}
+              >
+                <Input
+                  placeholder="Enter username"
+                  onChange={(e) => {
+                    const sanitized = sanitizeUsername(e.target.value);
+                    form.setFieldValue('username', sanitized);
+                    if (!editingUser) usernameManuallyEditedRef.current = sanitized.length > 0;
+                    handleValuesChange({ username: sanitized });
+                  }}
+                />
+              </Form.Item>
+            </Col>
           </Row>
           <Row gutter={16}>
             <Col span={12}><Form.Item name="email" label="Email" rules={[{ required: true, message: 'Please enter email' }, { type: 'email', message: 'Please enter a valid email' }]}><Input placeholder="Enter email address" /></Form.Item></Col>

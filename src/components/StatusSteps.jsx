@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Steps } from 'antd';
 
 const ERROR_STATUSES = ['CANCELLED', 'REJECTED', 'Cancelled', 'Rejected'];
 
-const StatusSteps = React.memo(function StatusSteps({
+const StatusSteps = memo(function StatusSteps({
   statusFlow = [],
   currentStatus,
   statusConfig = {},

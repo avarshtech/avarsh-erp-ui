@@ -366,6 +366,8 @@ const MainLayoutInner = () => {
 
   const getSelectedKeys = () => {
     const path = location.pathname;
+    // Map /reports/builder/:id to "All Reports" menu item
+    if (path.startsWith('/reports/builder')) return ['/reports/list'];
     return [path];
   };
 

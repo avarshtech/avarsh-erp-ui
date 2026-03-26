@@ -1293,6 +1293,49 @@ textarea.ant-input:active {
   padding-top: 0 !important;
 }
 
+/* Stage action buttons — hover effects for light & dark mode */
+.stage-btn-complete {
+  color: var(--primary-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
+  color: var(--primary-color) !important;
+}
+
+.stage-btn-revert {
+  color: var(--text-secondary) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 10%, transparent) !important;
+  color: var(--error-color) !important;
+}
+
+.stage-btn-add {
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 12%, transparent) !important;
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+}
+
+[data-theme="dark"] .stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 20%, transparent) !important;
+}
+
 /* ============================================================
    RESPONSIVE OVERRIDES
    ============================================================ */
