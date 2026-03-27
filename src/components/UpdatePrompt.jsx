@@ -1,16 +1,14 @@
 import { useEffect } from 'react';
 import { Button, Space, App as AntdApp } from 'antd';
-import { SyncOutlined } from '@ant-design/icons';
 import useServiceWorker from '../hooks/useServiceWorker';
 import useIsPwa from '../hooks/useIsPwa';
 
 const UpdatePrompt = () => {
-  const { needRefresh, offlineReady, updating, updateApp, dismissUpdate, dismissOfflineReady } = useServiceWorker();
+  const { needRefresh, offlineReady, updateApp, dismissUpdate, dismissOfflineReady } = useServiceWorker();
   const { notification } = AntdApp.useApp();
   const { isPwa } = useIsPwa();
 
-  // "Offline ready" shows on all platforms — useful for mobile/tablet web users
-  // who see the PWA install prompt and need to know offline mode is available
+  // "Offline ready" shows on all platforms
   useEffect(() => {
     if (offlineReady) {
       notification.success({
@@ -44,16 +42,8 @@ const UpdatePrompt = () => {
               type="primary"
               size="small"
               onClick={() => {
-                // Update the notification to show loading state before triggering reload
-                notification.info({
-                  key: 'pwa-update',
-                  message: 'Updating...',
-                  description: 'Applying update and restarting the app.',
-                  duration: 0,
-                  icon: <SyncOutlined spin style={{ color: '#1677ff' }} />,
-                  btn: null,
-                  closable: false,
-                });
+                notification.destroy('pwa-update');
+                // UpdateOverlay takes over from here — full-screen experience
                 updateApp();
               }}
             >

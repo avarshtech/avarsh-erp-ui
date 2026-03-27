@@ -10,7 +10,10 @@
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
- *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "inventory":        { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "inventory-qc":     { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
+ *   "inventory-issue":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
+ *   "inventory-adjustment": { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
  *   "costing":          { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "costing-approval": { "access": true, "operations": { "approve": true, "revise": true } },
  *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
@@ -70,11 +73,32 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
-  GRN: {
-    id: 'grn',
-    name: 'Goods Received',
-    path: '/grn',
+  INVENTORY: {
+    id: 'inventory',
+    name: 'Inventory Management',
+    path: '/inventory',
     group: 'transactions',
+  },
+  INVENTORY_QC: {
+    id: 'inventory-qc',
+    name: 'Quality Control',
+    path: '/inventory/qc',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  INVENTORY_ISSUE: {
+    id: 'inventory-issue',
+    name: 'Material Issue',
+    path: '/inventory/issue',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  INVENTORY_ADJUSTMENT: {
+    id: 'inventory-adjustment',
+    name: 'Stock Adjustment',
+    path: '/inventory/adjustment',
+    group: 'transactions',
+    linkedTo: 'inventory',
   },
   COSTING: {
     id: 'costing',
@@ -233,7 +257,10 @@ export const PERMISSION_GROUPS = [
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
+      { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
+      { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
+      { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
+      { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
       { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
@@ -287,9 +314,12 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
-  if (moduleId === 'dashboard')       return DASHBOARD_OPERATIONS;
-  if (moduleId === 'reports')         return ['view'];
-  if (moduleId === 'ai-assistant')   return ['view'];
+  if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
+  if (moduleId === 'reports')              return ['view'];
+  if (moduleId === 'ai-assistant')        return ['view'];
+  if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
+  if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
+  if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;

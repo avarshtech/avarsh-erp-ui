@@ -16,6 +16,7 @@ import {
   FileTextOutlined,
   ShoppingOutlined,
   InboxOutlined,
+  AppstoreOutlined,
   DollarOutlined,
   SettingOutlined,
   UserOutlined,
@@ -323,13 +324,17 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/grn",
-      icon: <InboxOutlined />,
-      label: "Goods Received",
-      moduleId: "grn",
+      key: "/inventory",
+      icon: <AppstoreOutlined />,
+      label: "Inventory",
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment"],
       children: [
-        { key: "/grn/list", label: "GRN List" },
-        { key: "/grn/new", label: "New GRN" },
+        { key: "/inventory/dashboard", label: "Dashboard" },
+        { key: "/inventory/grn/list", label: "GRN List" },
+        { key: "/inventory/qc", label: "Quality Control" },
+        { key: "/inventory/stock", label: "Stock" },
+        { key: "/inventory/issue", label: "Material Issue" },
+        { key: "/inventory/adjustment", label: "Stock Adjustment" },
       ],
     },
     {
@@ -434,6 +439,13 @@ const MainLayoutInner = () => {
     const path = location.pathname;
     // Map /reports/builder/:id to "All Reports" menu item
     if (path.startsWith('/reports/builder')) return ['/reports/list'];
+    if (path.startsWith('/inventory/qc')) return ['/inventory/qc'];
+    if (path.startsWith('/inventory/fabric-stock') || path.startsWith('/inventory/stock')) return ['/inventory/stock'];
+    if (path.startsWith('/inventory/accessories-stock')) return ['/inventory/stock'];
+    if (path.startsWith('/inventory/issue')) return ['/inventory/issue'];
+    if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
+    if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
+    if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     return [path];
   };
 
@@ -442,7 +454,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
-    if (path.startsWith("/grn")) return ["/grn"];
+    if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];
     if (path.startsWith("/admin")) return ["/admin"];
