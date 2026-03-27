@@ -256,10 +256,15 @@ Use these skills during development by invoking the corresponding slash command:
 
 | Skill | Command | When to Use |
 |-------|---------|-------------|
+| **ERP Dev** | `/erp-dev` | **Primary agent** — Full-stack development across UI + API repos. Auto plan mode for features (5+ files). Auto-executes builds/tests. Auto-pulls missing skills from skills.sh. Use for any task spanning both repos. |
 | **Garment ERP** | `/garment-erp` | Full-stack garment ERP development — covers Tech Pack → BOM → Costing → Order → T&A → Production → Shipment. Trigger for any garment domain work: styles, tech packs, BOM, costing, T&A calendar, cut plan, sewing line, production tracking, buyer/supplier management, fabric/trim inventory, size-color matrix, compliance, shipment/packing list. |
 | **Develop** | `/develop` | ERP development workflow with pre-verification, Ant Design prop checks, state management validation, and post-implementation review. |
 | **Implement** | `/implement` | Research files first, verify AntD props, check cross-references, then implement after confirmation. |
 | **Review** | `/review` | Code review for ERP — checks Ant Design compliance, state management, performance, API integration, tech debt, and UX consistency. |
+
+### ERP Dev Agent — Skills Auto-Pull
+
+The `/erp-dev` agent automatically pulls missing skills from [skills.sh](https://skills.sh/) when a task requires capabilities not available locally (e.g., Playwright testing, Docker, CI/CD, i18n, PDF generation). The agent notifies in chat when a skill is pulled.
 
 ### Garment ERP Skill Reference Files
 

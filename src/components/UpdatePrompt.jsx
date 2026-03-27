@@ -7,7 +7,7 @@ import useIsPwa from '../hooks/useIsPwa';
 const UpdatePrompt = () => {
   const { needRefresh, offlineReady, updating, updateApp, dismissUpdate, dismissOfflineReady } = useServiceWorker();
   const { notification } = AntdApp.useApp();
-  const isPwa = useIsPwa();
+  const { isPwa } = useIsPwa();
 
   // "Offline ready" shows on all platforms — useful for mobile/tablet web users
   // who see the PWA install prompt and need to know offline mode is available

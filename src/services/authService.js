@@ -19,7 +19,9 @@ import {
 // ── PWA Detection ───────────────────────────────────────────────────────────
 
 const isPwaMode = () =>
-  window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  window.matchMedia('(display-mode: standalone)').matches
+  || window.matchMedia('(display-mode: window-controls-overlay)').matches
+  || navigator.standalone === true;
 
 const getPwaHeaders = () => (isPwaMode() ? { 'X-Client-Mode': 'pwa' } : {});
 

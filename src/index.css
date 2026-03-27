@@ -2212,3 +2212,207 @@ th.ant-descriptions-item-label {
   font-weight: 700;
   flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════════════════
+   Accessibility: Skip-to-Content Link
+   ═══════════════════════════════════════════════════ */
+
+.skip-to-content {
+  position: fixed;
+  top: -100%;
+  left: 16px;
+  z-index: 10000;
+  padding: 8px 16px;
+  background: var(--primary-color, #6366f1);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 0 0 8px 8px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip-to-content:focus {
+  top: 0;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════
+   Accessibility: Focus-Visible Ring (keyboard only)
+   Shows a visible ring when navigating with Tab key.
+   The :focus-visible pseudo-class fires only on keyboard,
+   not on mouse clicks.
+   ═══════════════════════════════════════════════════ */
+
+.toolbar-icon-btn:focus-visible,
+.user-avatar-section:focus-visible,
+.ant-btn:focus-visible,
+.ant-menu-item:focus-visible,
+.ant-input:focus-visible,
+.ant-input-affix-wrapper:focus-visible,
+.ant-select-selector:focus-visible,
+.ant-picker:focus-visible,
+.ant-input-number:focus-visible,
+.ant-checkbox-input:focus-visible + .ant-checkbox-inner,
+.ant-radio-input:focus-visible + .ant-radio-inner,
+.ant-switch:focus-visible,
+.ant-tabs-tab:focus-visible {
+  outline: 2px solid var(--primary-color, #6366f1) !important;
+  outline-offset: 2px !important;
+}
+
+/* ═══════════════════════════════════════════════════
+   Pull-to-Refresh Prevention (ALL modes, touch devices)
+   Applied globally for mobile/tablet — prevents accidental
+   page refresh when scrolling up in forms, tables, etc.
+   ═══════════════════════════════════════════════════ */
+
+@media (pointer: coarse) {
+  html, body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   PWA: Window Controls Overlay (Desktop Standalone)
+   Removes browser toolbar — only OS close/min/max buttons remain.
+   The header becomes the draggable titlebar.
+   ═══════════════════════════════════════════════════ */
+
+/* Make the header act as a draggable titlebar in WCO mode */
+.wco-titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* All interactive elements inside the titlebar must be non-draggable */
+.wco-titlebar button,
+.wco-titlebar input,
+.wco-titlebar a,
+.wco-titlebar .ant-dropdown-trigger,
+.wco-titlebar .ant-space,
+.wco-titlebar .toolbar-icon-btn,
+.wco-titlebar .user-avatar-section,
+.wco-titlebar .ant-input-affix-wrapper,
+.wco-titlebar .ant-badge {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* ── WCO Auto-Hide Header ──
+   Header auto-hides after inactivity, reveals on hover near top edge.
+   Smooth slide animation with a thin accent line visible when hidden. */
+.wco-header-visible {
+  transform: translateY(0);
+  opacity: 1;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+
+.wco-header-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease 0.1s;
+}
+
+/* Re-enable pointer events when hovering the header zone (even when hidden) */
+.wco-header-hidden:hover {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  transition: transform 0.25s cubic-bezier(0, 0, 0.2, 1), opacity 0.15s ease;
+}
+
+/* When WCO is active, add safe padding on the right so controls don't overlap header items.
+   env(titlebar-area-width) gives the usable width excluding OS controls.
+   We use a fallback calc for the right padding. */
+@media (display-mode: window-controls-overlay) {
+  /* Ensure body starts below the titlebar area */
+  html {
+    --wco-titlebar-height: env(titlebar-area-height, 33px);
+  }
+
+  /* Sidebar: push down to leave room for the WCO titlebar on top */
+  .ant-layout-sider {
+    top: 0 !important;
+  }
+
+  /* Header right padding to avoid overlap with OS window controls */
+  .ant-layout-header.wco-titlebar {
+    padding-right: calc(100% - env(titlebar-area-width, 100%) + 16px) !important;
+  }
+
+  /* Content flows up when header hides — smooth transition */
+  .ant-layout-content {
+    transition: margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   PWA: Standalone Mode — General Fixes
+   Applied when running as installed PWA (both mobile & desktop)
+   ═══════════════════════════════════════════════════ */
+
+@media (display-mode: standalone), (display-mode: window-controls-overlay) {
+  /* Prevent overscroll bounce on iOS */
+  html, body {
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Safe area insets for notched devices (iOS) */
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Disable text selection on UI chrome (menus, toolbar) — feels more native */
+  .ant-layout-header,
+  .ant-layout-sider,
+  .ant-menu {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Content area should still be selectable */
+  .ant-layout-content {
+    -webkit-user-select: auto;
+    user-select: auto;
+  }
+
+  /* Disable pull-to-refresh on mobile PWA (prevents accidental refreshes) */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Responsive: Mobile (< 576px) PWA Fixes
+   ═══════════════════════════════════════════════════ */
+
+@media (max-width: 575px) and (display-mode: standalone) {
+  /* Tighter spacing in standalone mobile */
+  .ant-layout-content {
+    margin: 8px !important;
+  }
+
+  /* Full-width cards on small screens */
+  .ant-card {
+    border-radius: 8px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Responsive: Tablet (576px – 992px) PWA Fixes
+   ═══════════════════════════════════════════════════ */
+
+@media (min-width: 576px) and (max-width: 991px) and (display-mode: standalone) {
+  /* Optimize table layout for tablet */
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
