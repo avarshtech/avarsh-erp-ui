@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Watermark } from 'antd';
 
-const DraftWatermark = React.memo(function DraftWatermark({
+const DraftWatermark = memo(function DraftWatermark({
   status,
   draftStatuses = ['DRAFT'],
   watermarkText,

@@ -33,18 +33,17 @@
    Remove double outline/glow - single border color only
    ============================================================ */
 
-/* Base: Remove ALL browser outlines and box-shadows on focus for ALL inputs */
-*:focus,
-*:focus-visible,
-*:focus-within {
+/* Base: Remove browser outlines on mouse focus for ALL inputs.
+   :focus-visible (keyboard Tab) is preserved — index.css adds a visible ring.
+   Only suppress outline on mouse clicks (:focus without :focus-visible). */
+*:focus:not(:focus-visible) {
   outline: none !important;
 }
 
 /* Input fields - all states */
 .ant-input,
 .ant-input:hover,
-.ant-input:focus,
-.ant-input:focus-visible,
+.ant-input:focus:not(:focus-visible),
 .ant-input:focus-within,
 .ant-input:active,
 .ant-input-focused,
@@ -54,7 +53,6 @@
 }
 
 .ant-input:focus,
-.ant-input:focus-visible,
 .ant-input:focus-within,
 .ant-input:active,
 .ant-input-focused {
@@ -64,8 +62,7 @@
 /* Input Number - all states */
 .ant-input-number,
 .ant-input-number:hover,
-.ant-input-number:focus,
-.ant-input-number:focus-visible,
+.ant-input-number:focus:not(:focus-visible),
 .ant-input-number:focus-within,
 .ant-input-number:active,
 .ant-input-number-focused,
@@ -75,7 +72,6 @@
 }
 
 .ant-input-number:focus,
-.ant-input-number:focus-visible,
 .ant-input-number:focus-within,
 .ant-input-number:active,
 .ant-input-number-focused {
@@ -85,8 +81,7 @@
 /* Input Affix Wrapper (search, password, etc.) - all states */
 .ant-input-affix-wrapper,
 .ant-input-affix-wrapper:hover,
-.ant-input-affix-wrapper:focus,
-.ant-input-affix-wrapper:focus-visible,
+.ant-input-affix-wrapper:focus:not(:focus-visible),
 .ant-input-affix-wrapper:focus-within,
 .ant-input-affix-wrapper:active,
 .ant-input-affix-wrapper-focused,
@@ -96,7 +91,6 @@
 }
 
 .ant-input-affix-wrapper:focus,
-.ant-input-affix-wrapper:focus-visible,
 .ant-input-affix-wrapper:focus-within,
 .ant-input-affix-wrapper:active,
 .ant-input-affix-wrapper-focused,
@@ -106,8 +100,7 @@
 
 /* Also target the inner input inside affix wrapper */
 .ant-input-affix-wrapper .ant-input,
-.ant-input-affix-wrapper .ant-input:focus,
-.ant-input-affix-wrapper .ant-input:focus-visible,
+.ant-input-affix-wrapper .ant-input:focus:not(:focus-visible),
 .ant-input-affix-wrapper .ant-input:active {
   box-shadow: none !important;
   outline: none !important;
@@ -117,8 +110,7 @@
 /* Select - all states */
 .ant-select-selector,
 .ant-select-selector:hover,
-.ant-select-selector:focus,
-.ant-select-selector:focus-visible,
+.ant-select-selector:focus:not(:focus-visible),
 .ant-select-selector:focus-within,
 .ant-select-selector:active,
 .ant-select-focused .ant-select-selector,
@@ -138,8 +130,7 @@
 /* DatePicker / TimePicker - all states */
 .ant-picker,
 .ant-picker:hover,
-.ant-picker:focus,
-.ant-picker:focus-visible,
+.ant-picker:focus:not(:focus-visible),
 .ant-picker:focus-within,
 .ant-picker:active,
 .ant-picker-focused,
@@ -149,7 +140,6 @@
 }
 
 .ant-picker:focus,
-.ant-picker:focus-visible,
 .ant-picker:focus-within,
 .ant-picker:active,
 .ant-picker-focused,
@@ -160,14 +150,12 @@
 /* TextArea - all states */
 .ant-input-textarea,
 .ant-input-textarea:hover,
-.ant-input-textarea:focus,
-.ant-input-textarea:focus-visible,
+.ant-input-textarea:focus:not(:focus-visible),
 .ant-input-textarea:focus-within,
 .ant-input-textarea:active,
 textarea.ant-input,
 textarea.ant-input:hover,
-textarea.ant-input:focus,
-textarea.ant-input:focus-visible,
+textarea.ant-input:focus:not(:focus-visible),
 textarea.ant-input:focus-within,
 textarea.ant-input:active {
   box-shadow: none !important;
@@ -175,30 +163,26 @@ textarea.ant-input:active {
 }
 
 textarea.ant-input:focus,
-textarea.ant-input:focus-visible,
 textarea.ant-input:focus-within,
 textarea.ant-input:active {
   border-color: var(--primary-color) !important;
 }
 
-/* Checkbox and Radio - no glow */
-.ant-checkbox-wrapper:focus,
+/* Checkbox and Radio - no glow on mouse, keyboard ring preserved */
+.ant-checkbox-wrapper:focus:not(:focus-visible),
 .ant-checkbox-wrapper:focus-within,
-.ant-checkbox:focus,
-.ant-checkbox-input:focus,
-.ant-checkbox-input:focus-visible,
-.ant-radio-wrapper:focus,
+.ant-checkbox:focus:not(:focus-visible),
+.ant-checkbox-input:focus:not(:focus-visible),
+.ant-radio-wrapper:focus:not(:focus-visible),
 .ant-radio-wrapper:focus-within,
-.ant-radio:focus,
-.ant-radio-input:focus,
-.ant-radio-input:focus-visible {
+.ant-radio:focus:not(:focus-visible),
+.ant-radio-input:focus:not(:focus-visible) {
   box-shadow: none !important;
   outline: none !important;
 }
 
-/* Button focus - keep subtle */
-.ant-btn:focus,
-.ant-btn:focus-visible,
+/* Button focus - no glow on mouse, keyboard ring preserved */
+.ant-btn:focus:not(:focus-visible),
 .ant-btn:active {
   box-shadow: none !important;
   outline: none !important;
@@ -1291,6 +1275,49 @@ textarea.ant-input:active {
 /* PO View modal body — scroll without overlapping close */
 .po-view-modal .ant-modal-body {
   padding-top: 0 !important;
+}
+
+/* Stage action buttons — hover effects for light & dark mode */
+.stage-btn-complete {
+  color: var(--primary-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
+  color: var(--primary-color) !important;
+}
+
+.stage-btn-revert {
+  color: var(--text-secondary) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 10%, transparent) !important;
+  color: var(--error-color) !important;
+}
+
+.stage-btn-add {
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 12%, transparent) !important;
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+}
+
+[data-theme="dark"] .stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 20%, transparent) !important;
 }
 
 /* ============================================================

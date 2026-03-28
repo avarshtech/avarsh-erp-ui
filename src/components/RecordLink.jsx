@@ -1,9 +1,9 @@
-import React from 'react';
+import { memo } from 'react';
 import { Typography } from 'antd';
 
 const { Text } = Typography;
 
-const RecordLink = React.memo(function RecordLink({
+const RecordLink = memo(function RecordLink({
   text,
   onClick,
   className,

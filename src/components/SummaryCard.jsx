@@ -1,6 +1,6 @@
-import React from 'react';
+import { memo } from 'react';
 
-const SummaryCard = React.memo(({
+const SummaryCard = memo(({
   items = [],
   total,
   className,
@@ -20,7 +20,7 @@ const SummaryCard = React.memo(({
   >
     {items.map((item, i) => (
       <div
-        key={i}
+        key={item.label || i}
         style={{
           display: 'flex',
           justifyContent: 'space-between',

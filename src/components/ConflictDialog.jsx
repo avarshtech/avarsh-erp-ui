@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import { Modal } from 'antd';
+import { App } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 
 /**
@@ -22,8 +22,9 @@ export const emitConflict = (detail) => {
 };
 
 const ConflictDialog = () => {
+  const { modal } = App.useApp();
   const handleConflict = useCallback(() => {
-    Modal.confirm({
+    modal.confirm({
       title: 'Data Conflict',
       icon: <ExclamationCircleOutlined />,
       content:
@@ -34,7 +35,7 @@ const ConflictDialog = () => {
       cancelText: 'Stay',
       onOk: () => window.location.reload(),
     });
-  }, []);
+  }, [modal]);
 
   useEffect(() => {
     listeners.add(handleConflict);

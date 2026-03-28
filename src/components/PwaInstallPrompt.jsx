@@ -34,8 +34,9 @@ const PwaInstallPrompt = () => {
     // Only show on mobile/tablet
     if (!isMobileOrTablet) return;
 
-    // Don't show if already installed (standalone mode)
+    // Don't show if already installed (standalone or WCO mode)
     if (window.matchMedia('(display-mode: standalone)').matches) return;
+    if (window.matchMedia('(display-mode: window-controls-overlay)').matches) return;
     if (window.navigator.standalone === true) return;
 
     // Don't show if dismissed recently

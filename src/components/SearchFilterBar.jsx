@@ -1,11 +1,11 @@
-import React from 'react';
+import { memo } from 'react';
 import { Row, Col, Input, Select, DatePicker, Button, Tooltip } from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { DATE_FORMAT } from '../utils/uiConstants';
 
 const { RangePicker } = DatePicker;
 
-const renderFilter = (filter, index) => {
+const renderFilter = (filter, key) => {
   const { type, props: filterProps = {}, span = {} } = filter;
 
   const colSpan = {
@@ -48,13 +48,13 @@ const renderFilter = (filter, index) => {
   }
 
   return (
-    <Col key={index} {...colSpan}>
+    <Col key={key} {...colSpan}>
       {content}
     </Col>
   );
 };
 
-const SearchFilterBar = React.memo(function SearchFilterBar({
+const SearchFilterBar = memo(function SearchFilterBar({
   searchText,
   onSearchChange,
   searchPlaceholder = 'Search...',
@@ -84,7 +84,7 @@ const SearchFilterBar = React.memo(function SearchFilterBar({
         />
       </Col>
 
-      {filters.map((filter, index) => renderFilter(filter, index))}
+      {filters.map((filter, index) => renderFilter(filter, filter.key ?? filter.type ?? index))}
 
       {extra && <Col>{extra}</Col>}
 

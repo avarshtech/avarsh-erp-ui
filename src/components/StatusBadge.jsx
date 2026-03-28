@@ -1,4 +1,4 @@
-import React from 'react';
+import { memo } from 'react';
 import { Badge } from 'antd';
 
 const STATUS_MAP = {
@@ -12,7 +12,7 @@ const capitalize = (str) => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
-const StatusBadge = React.memo(function StatusBadge({
+const StatusBadge = memo(function StatusBadge({
   status = 'active',
   text,
   className,

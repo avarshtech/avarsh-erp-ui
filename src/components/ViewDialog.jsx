@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import { memo, Fragment, useMemo } from 'react';
 import { Modal, Typography, Skeleton, Space } from 'antd';
 
 const { Title, Text } = Typography;
 
-const ViewDialog = React.memo(({
+const ViewDialog = memo(({
   open,
   onClose,
   width = 1200,
@@ -33,6 +33,13 @@ const ViewDialog = React.memo(({
           gap: 24,
         }}
       >
+        {/* Image (optional) */}
+        {hero.image && (
+          <div style={{ flexShrink: 0 }}>
+            {hero.image}
+          </div>
+        )}
+
         {/* Left side */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* Title + Status + Tags row */}
@@ -44,7 +51,7 @@ const ViewDialog = React.memo(({
             {hero.tags?.length > 0 && (
               <Space size={4} wrap>
                 {hero.tags.map((tag, i) => (
-                  <React.Fragment key={i}>{tag}</React.Fragment>
+                  <Fragment key={i}>{tag}</Fragment>
                 ))}
               </Space>
             )}
@@ -62,7 +69,7 @@ const ViewDialog = React.memo(({
           {hero.meta?.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginTop: 4 }}>
               {hero.meta.map((item, i) => (
-                <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)' }}>
+                <span key={item.text ?? i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text-muted)' }}>
                   {item.icon && <span style={{ display: 'flex', fontSize: 13 }}>{item.icon}</span>}
                   <span>{item.text}</span>
                 </span>

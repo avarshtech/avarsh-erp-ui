@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Modal } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createAttribute, updateAttribute, deleteAttribute } from '../../services/masterDataService';
@@ -20,6 +20,7 @@ const DATA_TYPES = [
 ];
 
 const VariantMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { attributes, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -142,7 +143,7 @@ const VariantMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Attribute',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this attribute? This action cannot be undone.',

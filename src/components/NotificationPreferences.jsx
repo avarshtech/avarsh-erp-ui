@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, Switch, Typography, Skeleton, Space, message, Divider } from 'antd';
+import { Card, Switch, Typography, Skeleton, Space, App, Divider } from 'antd';
 import {
   BellOutlined,
   ShoppingOutlined,
@@ -76,6 +76,7 @@ const NOTIFICATION_TYPES = [
 ];
 
 const NotificationPreferences = () => {
+  const { message } = App.useApp();
   const [preferences, setPreferences] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

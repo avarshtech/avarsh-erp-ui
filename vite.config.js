@@ -20,9 +20,11 @@ export default defineConfig({
         name: 'Avarsh ERP Dashboard',
         short_name: 'Avarsh ERP',
         description: 'Garments Manufacturing ERP - Orders, BOM, Costing, Purchase Orders',
+        id: '/',
         theme_color: '#ffffff',
         background_color: '#f8fafc',
         display: 'standalone',
+        display_override: ['window-controls-overlay', 'standalone'],
         orientation: 'any',
         scope: '/',
         start_url: '/',
@@ -37,6 +39,26 @@ export default defineConfig({
           { src: '/icons/icon-384x384.png', sizes: '384x384', type: 'image/png' },
           { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           { src: '/icons/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+        shortcuts: [
+          {
+            name: 'Orders',
+            short_name: 'Orders',
+            url: '/orders/list',
+            icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
+          },
+          {
+            name: 'New Cost Sheet',
+            short_name: 'Costing',
+            url: '/costing/new',
+            icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
+          },
+          {
+            name: 'Purchase Orders',
+            short_name: 'POs',
+            url: '/purchase-orders/list',
+            icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
+          },
         ],
       },
       devOptions: {

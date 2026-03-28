@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
-  Tag, Typography, Button, Tooltip, message, Row, Col,
+  App, Tag, Typography, Button, Tooltip, Row, Col, Image, Skeleton,
 } from 'antd';
 import {
   AppstoreOutlined, ScissorOutlined, DownloadOutlined,
@@ -36,9 +36,13 @@ const processToLabel = (proc) => {
 const isFabricLine = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
 
 const BOMView = ({ open, bomData, onClose }) => {
+  const { message } = App.useApp();
   const [fullBom, setFullBom] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cadFileNames, setCadFileNames] = useState({}); // { lineId: filename }
+  const [styleImageUrl, setStyleImageUrl] = useState(null);
+  const [styleImageLoading, setStyleImageLoading] = useState(false);
+  const imageLoadIdRef = useRef(0);
 
   useEffect(() => {
     if (!open || !bomData) { setFullBom(null); return; }
@@ -77,9 +81,41 @@ const BOMView = ({ open, bomData, onClose }) => {
     });
   }, [open, fullBom, bomData]);
 
+  // Load style image
+  useEffect(() => {
+    const sId = (fullBom || bomData)?.styleId;
+    if (!open || !sId) {
+      setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setStyleImageLoading(false);
+      return;
+    }
+    const loadId = ++imageLoadIdRef.current;
+    let cancelled = false;
+    setStyleImageLoading(true);
+    (async () => {
+      try {
+        const files = await getFilesByEntity('STYLE', sId);
+        if (cancelled || loadId !== imageLoadIdRef.current) return;
+        const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+        if (!img) return;
+        const blob = await downloadFileAsBlob(img.fileId);
+        if (cancelled || loadId !== imageLoadIdRef.current) return;
+        setStyleImageUrl(URL.createObjectURL(blob));
+      } catch {
+        // Non-critical
+      } finally {
+        if (!cancelled && loadId === imageLoadIdRef.current) setStyleImageLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+    };
+  }, [open, fullBom?.styleId, bomData?.styleId]);
+
   if (!bomData) return null;
   const bom = fullBom || bomData;
-  const { orderNo, status, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
+  const { orderNo, status, styleId, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
 
   const fabricLines = lines.filter(isFabricLine);
   const trimLines = lines.filter((l) => !isFabricLine(l));
@@ -264,6 +300,31 @@ const BOMView = ({ open, bomData, onClose }) => {
           />
         ),
         subtitle: [styleName, buyerName].filter(Boolean).join(' \u2022 '),
+        image: styleImageLoading ? (
+          <Skeleton.Image active style={{ width: 72, height: 72 }} />
+        ) : styleImageUrl ? (
+          <Image
+            src={styleImageUrl}
+            alt="Style"
+            width={72}
+            height={72}
+            style={{ objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-color, #e5e7eb)' }}
+          />
+        ) : (
+          <div style={{
+            width: 72,
+            height: 72,
+            borderRadius: 8,
+            border: '1px dashed var(--border-color, #d9d9d9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            background: 'var(--bg-tertiary)',
+          }}>
+            <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.3 }}>No style<br />image</Text>
+          </div>
+        ),
         highlight: orderQty ? { label: 'Order Qty', value: orderQty.toLocaleString() } : undefined,
       }}
       footer={

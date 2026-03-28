@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Card, Table, Button, Input, Select, Tag, Space, Modal, Form, Row, Col,
-  Spin, message, Divider, Badge, Checkbox, Typography, Empty,
+  Spin, App, Divider, Badge, Checkbox, Typography, Empty,
   Drawer, Descriptions, Alert, Skeleton,
 } from 'antd';
 import {
@@ -140,6 +140,7 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
 };
 
 const ItemMaster = () => {
+  const { message, modal } = App.useApp();
   // RBAC Permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -878,7 +879,7 @@ const ItemMaster = () => {
 
   const handleModalClose = () => {
     if (unsavedChanges) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved changes',
         content: 'You have unsaved changes. Discard and close?',
         okText: 'Discard',
@@ -1149,7 +1150,7 @@ const ItemMaster = () => {
     if (!item) return;
 
     if (nonItemNameChangesRef.current) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved changes',
         content: 'You have unsaved changes. Selecting a different item will discard them. Continue?',
         okText: 'Discard & Continue',

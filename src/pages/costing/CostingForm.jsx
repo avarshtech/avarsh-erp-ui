@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
+  App,
   Form,
   Input,
   InputNumber,
@@ -17,7 +18,6 @@ import {
   Tag,
   Divider,
   Checkbox,
-  message,
   Statistic,
   Skeleton,
   Modal,
@@ -90,6 +90,7 @@ const { Text } = Typography;
 const { Dragger } = Upload;
 
 const CostingForm = () => {
+  const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [form] = Form.useForm();
@@ -2142,9 +2143,10 @@ const CostingForm = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  textAlign: 'center',
                   background: 'var(--bg-tertiary)',
                 }}>
-                  <Typography.Text type="secondary" style={{ fontSize: 11 }}>No image</Typography.Text>
+                  <Typography.Text type="secondary" style={{ fontSize: 11, lineHeight: 1.3 }}>No style<br />image</Typography.Text>
                 </div>
               )}
             </div>

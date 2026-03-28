@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { Children, isValidElement, useMemo } from 'react';
 import { Row, Col, Collapse } from 'antd';
 import { FORM_GUTTER, FORM_COL_SPANS } from '../../utils/uiConstants';
 
@@ -40,8 +40,8 @@ const FormSection = ({
   const wrappedChildren = useMemo(() => {
     if (!columns || !children) return children;
 
-    return React.Children.map(children, (child) => {
-      if (!React.isValidElement(child)) return child;
+    return Children.map(children, (child) => {
+      if (!isValidElement(child)) return child;
       if (isColElement(child)) return child;
       return <Col {...colSpans}>{child}</Col>;
     });

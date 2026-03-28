@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Empty, Button } from 'antd';
 
-const EmptyState = React.memo(function EmptyState({
+const EmptyState = memo(function EmptyState({
   icon,
   title,
   description,

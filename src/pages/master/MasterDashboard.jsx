@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
-import { Breadcrumb, Skeleton, Button, Tooltip, message, Modal } from 'antd';
+import { useEffect, useCallback, useState, useMemo } from 'react';
+import { Breadcrumb, Skeleton, Button, Tooltip, App } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
@@ -281,6 +281,7 @@ const collapsedItemSelected = {
 };
 
 const MasterDashboard = () => {
+  const { message, modal } = App.useApp();
   const { isDarkMode } = useTheme();
   const {
     categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets,
@@ -310,7 +311,7 @@ const MasterDashboard = () => {
   const handleMenuSelect = (key) => {
     if (key === selectedKey) return;
     if (childIsDirty) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved Changes',
         icon: <ExclamationCircleOutlined />,
         content: 'You have unsaved changes that will be lost if you leave this page. Do you want to continue?',

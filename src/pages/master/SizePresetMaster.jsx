@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Button, Input, Select, Switch, Form, Space, Tag, Modal,
-  Typography, message, Tooltip,
+  Button, Input, Select, Switch, Form, Space, Tag, App,
+  Typography, Tooltip,
 } from 'antd';
 import {
   SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined,
@@ -210,6 +210,7 @@ const REGION_COLORS = {
 };
 
 const SizePresetMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { sizePresets, setData, addItem, updateItem, removeItem } = useStore();
 
   const [filteredData, setFilteredData]     = useState([]);
@@ -396,7 +397,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
 
   const handleDelete = () => {
     if (!canDelete) { message.warning('No permission to delete size presets'); return; }
-    Modal.confirm({
+    modal.confirm({
       title:   'Delete Size Preset',
       icon:    <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this preset? This action cannot be undone.',

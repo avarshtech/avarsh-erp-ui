@@ -222,6 +222,7 @@ const Dashboard = () => {
         <Col xs={24} lg={16}>
           <Card title="Recent Orders" extra={<a href="/orders/list">View All</a>}>
             <Table
+              rowKey="key"
               columns={orderColumns}
               dataSource={recentOrders}
               pagination={false}
@@ -271,6 +272,7 @@ const Dashboard = () => {
         <Col xs={24} lg={16}>
           <Card title="Pending Purchase Orders" extra={<a href="/purchase-orders/list">View All</a>}>
             <Table
+              rowKey="key"
               columns={poColumns}
               dataSource={pendingPOs}
               pagination={false}

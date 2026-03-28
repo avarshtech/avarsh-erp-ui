@@ -1,5 +1,5 @@
-import React, { useRef, useState, useCallback } from 'react';
-import { Button, Typography, Space, Spin, Tooltip, message } from 'antd';
+import { useRef, useState, useCallback } from 'react';
+import { Button, Typography, Space, Spin, Tooltip, App } from 'antd';
 import {
   CloudUploadOutlined,
   DeleteOutlined,
@@ -92,6 +92,7 @@ const FileUpload = ({
   placeholder = null,
   hint = null,
 }) => {
+  const { message } = App.useApp();
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
 

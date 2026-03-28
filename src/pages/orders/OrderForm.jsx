@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
+  App,
   Form,
   Input,
   Select,
@@ -11,7 +12,6 @@ import {
   Col,
   Space,
   Typography,
-  message,
   Collapse,
   Tag,
   Modal,
@@ -22,6 +22,7 @@ import {
   Skeleton,
   Upload,
   Alert,
+  Image,
 } from 'antd';
 import { numericInputProps, integerInputProps, getZeroClearHandlers, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
@@ -53,8 +54,7 @@ import { getCostSheetByCostingId, downloadAttachment } from '../../services/cost
 import { getAllSizePresets, createSizePreset } from '../../services/sizePresetService';
 import { extractOrderLine } from '../../services/aiService';
 import { getStyleById } from '../../services/styleService';
-import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
-import FileUpload from '../../components/FileUpload';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,
@@ -821,16 +821,12 @@ const createEmptyLine = () => ({
   ],
   lineQty: 0,
   lineTotal: 0,
-  // Garment image fields (underscore-prefixed, not sent to API)
-  _imageFile: null,         // locally selected File (new lines only)
-  _imagePreviewUrl: null,   // blob URL for display
-  _existingImage: null,     // server-side FileStorageDTO
-  _imageUploading: false,   // loading state during upload/delete
 });
 
 // ==================== ORDER FORM ====================
 
 const OrderForm = () => {
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams();
@@ -863,6 +859,15 @@ const OrderForm = () => {
 
   // Size presets data
   const [sizePresetsList, setSizePresetsList] = useState([]);
+
+  // Style reference (from costing lookup)
+  const [resolvedStyleId, setResolvedStyleId] = useState(null);
+  const [resolvedGarmentName, setResolvedGarmentName] = useState('');
+
+  // Style image (view-only)
+  const [styleImageUrl, setStyleImageUrl] = useState(null);
+  const [styleImageLoading, setStyleImageLoading] = useState(false);
+  const imageLoadIdRef = useRef(0);
 
   // Component dialog
   const [componentModalVisible, setComponentModalVisible] = useState(false);
@@ -935,6 +940,9 @@ const OrderForm = () => {
   const populateForm = useCallback((order) => {
     setExistingOrder(order);
     setEntityVersion(order.version);
+    setResolvedStyleId(order.styleId || null);
+    setResolvedGarmentName(order.garmentName || '');
+    if (order.styleId) loadStyleImage(order.styleId);
     form.setFieldsValue({
       costingId: order.costingId,
       buyerId: order.buyerId,
@@ -969,24 +977,14 @@ const OrderForm = () => {
       })),
       lineQty: l.lineQty || 0,
       lineTotal: l.lineTotal || 0,
-      _imageFile: null,
-      _imagePreviewUrl: null,
-      _existingImage: null,
-      _imageUploading: false,
     }));
     setOrderLines(lines.length > 0 ? lines : [createEmptyLine()]);
     setActiveKeys(lines.map((l) => l.key));
-    // Load existing garment images for lines that have IDs
-    loadLineImages(lines.filter((l) => l.lineId));
   }, [form]);
 
   // Reset form state when switching from edit to new order
   useEffect(() => {
     if (!id) {
-      // Clean up blob URLs from previous edit
-      orderLines.forEach((l) => {
-        if (l._imagePreviewUrl) URL.revokeObjectURL(l._imagePreviewUrl);
-      });
       form.resetFields();
       setExistingOrder(null);
       setEntityVersion(null);
@@ -996,6 +994,8 @@ const OrderForm = () => {
       setFormComponents([]);
       setIsDirty(false);
       setPageLoading(false);
+      setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      setStyleImageLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, form]);
@@ -1069,193 +1069,43 @@ const OrderForm = () => {
     setIsDirty(true);
   };
 
-  // ==================== LINE GARMENT IMAGE ====================
+  // ==================== STYLE IMAGE LOADER ====================
 
-  /** Load existing garment images for order lines that have backend IDs */
-  const loadLineImages = async (lines) => {
-    const linesWithIds = (lines || []).filter((l) => l.lineId);
-    if (linesWithIds.length === 0) return;
-
-    const results = await Promise.all(
-      linesWithIds.map(async (l) => {
-        try {
-          const files = await getFilesByEntity('ORDER_LINE', l.lineId);
-          const imageFile = (files || []).find((f) =>
-            ['IMAGE', 'PHOTO'].includes(f.fileCategory),
-          );
-          if (!imageFile) return null;
-          const blob = await downloadFileAsBlob(imageFile.fileId);
-          const previewUrl = URL.createObjectURL(blob);
-          return { lineId: l.lineId, imageFile, previewUrl };
-        } catch {
-          return null;
-        }
-      }),
-    );
-
-    setOrderLines((prev) =>
-      prev.map((l) => {
-        const result = results.find((r) => r?.lineId === l.lineId);
-        if (result) {
-          return { ...l, _existingImage: result.imageFile, _imagePreviewUrl: result.previewUrl };
-        }
-        return l;
-      }),
-    );
-  };
-
-  /** Handle garment image selection for a line */
-  const handleLineImageSelect = async (lineKey, file) => {
-    const line = orderLines.find((l) => l.key === lineKey);
-    if (!line) return;
-
-    // Revoke old preview URL if it was from a locally selected file
-    if (line._imagePreviewUrl && line._imageFile) {
-      URL.revokeObjectURL(line._imagePreviewUrl);
+  const loadStyleImage = async (selectedStyleId) => {
+    const loadId = ++imageLoadIdRef.current;
+    setStyleImageUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    if (!selectedStyleId) {
+      setStyleImageLoading(false);
+      return;
     }
-    const previewUrl = URL.createObjectURL(file);
-
-    if (line.lineId) {
-      // Existing line — upload immediately
-      setOrderLines((prev) =>
-        prev.map((l) =>
-          l.key === lineKey
-            ? { ...l, _imageFile: null, _imagePreviewUrl: previewUrl, _imageUploading: true }
-            : l,
-        ),
-      );
-      try {
-        // Delete old image if replacing
-        if (line._existingImage?.fileId) {
-          await deleteFile(line._existingImage.fileId).catch((err) =>
-            console.error('Failed to delete old line image:', err),
-          );
-        }
-        const result = await uploadFile(file, {
-          module: 'ORDER',
-          entity: 'ORDER_LINE',
-          entityId: line.lineId,
-          fileCategory: 'IMAGE',
-        });
-        const uploaded = result?.data || result;
-        setOrderLines((prev) =>
-          prev.map((l) =>
-            l.key === lineKey
-              ? { ...l, _existingImage: uploaded, _imageFile: null, _imagePreviewUrl: previewUrl, _imageUploading: false }
-              : l,
-          ),
-        );
-        message.success('Garment image uploaded');
-      } catch {
-        message.error('Image upload failed. Please try again.');
-        URL.revokeObjectURL(previewUrl);
-        setOrderLines((prev) =>
-          prev.map((l) =>
-            l.key === lineKey
-              ? { ...l, _imageFile: null, _imagePreviewUrl: line._existingImage ? line._imagePreviewUrl : null, _imageUploading: false }
-              : l,
-          ),
-        );
-      }
-    } else {
-      // New line — stage locally, upload after save
-      setOrderLines((prev) =>
-        prev.map((l) =>
-          l.key === lineKey
-            ? { ...l, _imageFile: file, _imagePreviewUrl: previewUrl }
-            : l,
-        ),
-      );
-      setIsDirty(true);
-      message.info('Image staged. It will be uploaded when the order is saved.');
+    setStyleImageLoading(true);
+    try {
+      const files = await getFilesByEntity('STYLE', selectedStyleId);
+      if (loadId !== imageLoadIdRef.current) return;
+      const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+      if (!img) return;
+      const blob = await downloadFileAsBlob(img.fileId);
+      if (loadId !== imageLoadIdRef.current) return;
+      setStyleImageUrl(URL.createObjectURL(blob));
+    } catch {
+      // Image not found or failed to load — non-critical
+    } finally {
+      if (loadId === imageLoadIdRef.current) setStyleImageLoading(false);
     }
   };
 
-  /** Handle garment image removal for a line */
-  const handleLineImageRemove = async (lineKey) => {
-    const line = orderLines.find((l) => l.key === lineKey);
-    if (!line) return;
-
-    if (line._imagePreviewUrl) URL.revokeObjectURL(line._imagePreviewUrl);
-
-    const hasExistingImage = !!line._existingImage?.fileId;
-
-    if (hasExistingImage && line.lineId) {
-      // Existing line with server image — delete immediately
-      setOrderLines((prev) =>
-        prev.map((l) =>
-          l.key === lineKey
-            ? { ...l, _imageFile: null, _imagePreviewUrl: null, _existingImage: null, _imageUploading: true }
-            : l,
-        ),
-      );
-      try {
-        await deleteFile(line._existingImage.fileId);
-        setOrderLines((prev) =>
-          prev.map((l) => (l.key === lineKey ? { ...l, _imageUploading: false } : l)),
-        );
-        message.success('Image removed');
-      } catch {
-        message.error('Failed to remove image. Please try again.');
-        setOrderLines((prev) =>
-          prev.map((l) =>
-            l.key === lineKey
-              ? { ...l, _existingImage: line._existingImage, _imageUploading: false }
-              : l,
-          ),
-        );
-      }
-    } else {
-      // New line or locally staged file — just clear locally
-      setOrderLines((prev) =>
-        prev.map((l) =>
-          l.key === lineKey
-            ? { ...l, _imageFile: null, _imagePreviewUrl: null }
-            : l,
-        ),
-      );
-      setIsDirty(true);
-    }
-  };
-
-  /** Upload staged images for newly created lines after order save */
-  const processLineImages = async (savedOrder) => {
-    if (!savedOrder?.orderLines?.length) return;
-
-    const fileOps = [];
-    let uploadFailures = 0;
-
-    for (let i = 0; i < orderLines.length; i++) {
-      const local = orderLines[i];
-      // Skip lines that already had an ID — their images were uploaded immediately
-      if (local.lineId) continue;
-      if (!local._imageFile) continue;
-
-      const savedLine = savedOrder.orderLines[i];
-      if (!savedLine?.id) continue;
-
-      fileOps.push(
-        uploadFile(local._imageFile, {
-          module: 'ORDER',
-          entity: 'ORDER_LINE',
-          entityId: savedLine.id,
-          fileCategory: 'IMAGE',
-        }).catch(() => {
-          uploadFailures++;
-        }),
-      );
-    }
-
-    if (fileOps.length > 0) {
-      await Promise.allSettled(fileOps);
-    }
-
-    if (uploadFailures > 0) {
-      message.warning(
-        `Order saved, but ${uploadFailures} image upload${uploadFailures > 1 ? 's' : ''} failed. You can re-upload by editing the order.`,
-      );
-    }
-  };
+  // Cleanup style image blob URL on unmount
+  useEffect(() => {
+    return () => {
+      setStyleImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   // ==================== AI EXTRACTION ====================
 
@@ -1456,18 +1306,59 @@ const OrderForm = () => {
     [orderLines]
   );
 
-  // Assortment summary — one row per order line
-  const assortmentSummary = useMemo(() =>
-    orderLines.map((line) => ({
-      key: line.key,
-      buyerPoNo: line.buyerPoNo || 'Unspecified',
-      destination: line.destination || 'Unspecified',
-      colorRows: line.colorRows || [],
-      totalQty: line.lineQty || 0,
-      totalValue: line.lineTotal || 0,
-      avgPrice: (line.lineQty || 0) > 0 ? (line.lineTotal || 0) / (line.lineQty || 0) : 0,
-    }))
-  , [orderLines]);
+  // Assortment summary — grouped by color (case-insensitive, Pantone-aware)
+  const assortmentSummary = useMemo(() => {
+    const getPantoneKey = (s) => {
+      const fashion = s.match(/(\d{2}-\d{3,4})/);
+      if (fashion) return fashion[1];
+      const graphics = s.match(/(?:pantone|pms)\s+(\d{2,5})/i);
+      return graphics ? `PMS-${graphics[1]}` : null;
+    };
+    const getColorKey = (name) => {
+      const p = getPantoneKey(name.trim());
+      return p || name.trim().toLowerCase();
+    };
+    const formatColorName = (name) =>
+      name.trim().split(/\s+/).map((w) => {
+        if (/^(TCX|TPX|TPG|TC|PMS|PANTONE)$/i.test(w)) return w.toUpperCase();
+        if (/\d/.test(w)) return w.toUpperCase();
+        return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      }).join(' ');
+
+    const colorMap = new Map();
+    orderLines.forEach((line) => {
+      const buyerPoNo = line.buyerPoNo || 'Unspecified';
+      const destination = line.destination || 'Unspecified';
+      (line.colorRows || []).forEach((cr) => {
+        const raw = cr.colorName || 'Unspecified';
+        const key = getColorKey(raw);
+        if (!colorMap.has(key)) {
+          colorMap.set(key, { displayName: formatColorName(raw), poLines: [], totalQty: 0, totalValue: 0 });
+        }
+        const g = colorMap.get(key);
+        g.poLines.push({ buyerPoNo, destination });
+        g.totalQty += (cr.total || 0);
+        g.totalValue += (cr.rowValue || 0);
+      });
+    });
+    const rows = [];
+    for (const [, group] of colorMap) {
+      const avgPrice = group.totalQty > 0 ? group.totalValue / group.totalQty : 0;
+      group.poLines.forEach((po, i) => {
+        rows.push({
+          key: `${group.displayName}_${i}`,
+          colorName: group.displayName,
+          buyerPoNo: po.buyerPoNo,
+          destination: po.destination,
+          totalQty: group.totalQty,
+          avgPrice,
+          totalValue: group.totalValue,
+          _rowSpan: i === 0 ? group.poLines.length : 0,
+        });
+      });
+    }
+    return rows;
+  }, [orderLines]);
 
   // ==================== COSTING ID LOOKUP ====================
 
@@ -1492,6 +1383,11 @@ const OrderForm = () => {
         season: costing.season || '',
         currency: costing.quoteCurrency || costing.currency || '',
       };
+      // Store styleId and garmentName for order payload
+      setResolvedStyleId(costing.styleId || null);
+      setResolvedGarmentName(costing.garmentName || '');
+      // Load style image
+      loadStyleImage(costing.styleId || null);
       // Fetch fabric description from style master
       if (costing.styleId) {
         try {
@@ -1531,6 +1427,7 @@ const OrderForm = () => {
         fabricDescription: '',
       });
       setCostingAttachments([]);
+      loadStyleImage(null);
     } finally {
       setCostingLoading(false);
     }
@@ -1640,7 +1537,9 @@ const OrderForm = () => {
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
       orderDate: orderDate.format('YYYY-MM-DD'),
+      styleId: resolvedStyleId,
       styleNo: values.styleNo,
+      garmentName: resolvedGarmentName,
       garmentType: values.garmentType,
       season: values.season,
       fabricDescription: values.fabricDescription,
@@ -1699,8 +1598,6 @@ const OrderForm = () => {
         message.success('Order saved as draft');
       }
       if (saved?.version != null) setEntityVersion(saved.version);
-      // Upload staged garment images for new lines
-      await processLineImages(saved);
       setIsDirty(false);
       clearDirty();
       navigate('/orders/list');
@@ -1721,7 +1618,7 @@ const OrderForm = () => {
       errors.forEach((e) => message.error(e));
       return;
     }
-    Modal.confirm({
+    modal.confirm({
       title: isReferredBack ? 'Resubmit Order' : 'Submit Order',
       content: isReferredBack
         ? 'Are you sure you want to resubmit this order? It will be confirmed again.'
@@ -1740,8 +1637,6 @@ const OrderForm = () => {
             savedOrder = await createOrder(data);
           }
           if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
-          // Upload staged garment images for new lines
-          await processLineImages(savedOrder);
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED, null, savedOrder.version);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
@@ -1906,6 +1801,8 @@ const OrderForm = () => {
       >
         {/* ==================== ORDER DETAILS ==================== */}
         <Card style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', gap: 16 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
           <Title level={5} style={{ marginBottom: 16 }}>Order Details</Title>
 
           {/* Row 1: Costing ID, Order No, Buyer, Style No, Garment Type, Season, Component */}
@@ -2102,6 +1999,51 @@ const OrderForm = () => {
             </Col>
           </Row>
 
+          </div>
+          {/* Style Image — fixed sidebar (view-only) */}
+          {resolvedStyleId && (
+            <div style={{
+              flexShrink: 0,
+              width: 130,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              paddingTop: 4,
+            }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>Style Image</Typography.Text>
+              {styleImageLoading ? (
+                <Skeleton.Image active style={{ width: 110, height: 110 }} />
+              ) : styleImageUrl ? (
+                <Image
+                  src={styleImageUrl}
+                  alt="Style"
+                  width={110}
+                  height={110}
+                  style={{
+                    objectFit: 'cover',
+                    borderRadius: 8,
+                    border: '1px solid var(--border-color, #e5e7eb)',
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: 8,
+                  border: '1px dashed var(--border-color, #d9d9d9)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  background: 'var(--bg-tertiary)',
+                }}>
+                  <Typography.Text type="secondary" style={{ fontSize: 11, lineHeight: 1.3 }}>No style<br />image</Typography.Text>
+                </div>
+              )}
+            </div>
+          )}
+          </div>
+
           {/* Order Summary */}
           <Row gutter={16} style={{ marginTop: 4 }}>
             <Col xs={12} sm={8} md={6} lg={4}>
@@ -2204,113 +2146,64 @@ const OrderForm = () => {
               ),
               children: (
                 <div>
-                  {/* ── Section 1: Line Details + Garment Image ── */}
-                  <Row gutter={20}>
-                    {/* Left: Form fields */}
-                    <Col xs={24} md={16}>
-                      <Row gutter={12}>
-                        <Col xs={24} sm={12}>
-                          <Form.Item
-                            label={<span>Buyer PO No <span style={{ color: 'var(--error-color)' }}>*</span></span>}
-                            style={{ marginBottom: 12 }}
-                          >
-                            <Input
-                              placeholder="Buyer PO Number"
-                              value={line.buyerPoNo}
-                              onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={12}>
-                          <Form.Item
-                            label={<span>Destination <span style={{ color: 'var(--error-color)' }}>*</span></span>}
-                            style={{ marginBottom: 12 }}
-                          >
-                            <Select
-                              placeholder={buyerDestinations.length > 0 ? 'Select destination' : 'Select a buyer first'}
-                              showSearch
-                              value={line.destination || undefined}
-                              options={buyerDestinations}
-                              disabled={buyerDestinations.length === 0}
-                              filterOption={(input, option) => option.label.toLowerCase().includes(input.toLowerCase())}
-                              onChange={(v) => handleLineChange(line.key, { destination: v })}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={12}>
-                          <Form.Item
-                            label={<span>Dispatch Date <span style={{ color: 'var(--error-color)' }}>*</span></span>}
-                            style={{ marginBottom: 12 }}
-                          >
-                            <DatePicker
-                              style={{ width: '100%' }}
-                              value={line.dispatchDate}
-                              disabledDate={(current) => current && current <= dayjs().endOf('day')}
-                              onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
-                            />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} sm={12}>
-                          <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
-                            <Input
-                              disabled
-                              style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
-                              prefix={<ClockCircleOutlined />}
-                              value={(() => {
-                                if (!line.dispatchDate) return '';
-                                const orderDate = form.getFieldValue('orderDate');
-                                const base = orderDate ? dayjs(orderDate) : dayjs();
-                                return `${dayjs(line.dispatchDate).diff(base, 'day')} days`;
-                              })()}
-                              placeholder="—"
-                            />
-                          </Form.Item>
-                        </Col>
-                      </Row>
-                    </Col>
-
-                    {/* Right: Garment Image */}
-                    <Col xs={24} md={8}>
-                      <div
-                        style={{
-                          padding: 12,
-                          borderRadius: 10,
-                          border: '1px solid var(--border-color, #e5e7eb)',
-                          background: 'var(--bg-secondary, #f8fafc)',
-                          height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                        }}
+                  {/* ── Section 1: Line Details ── */}
+                  <Row gutter={12}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={<span>Buyer PO No <span style={{ color: 'var(--error-color)' }}>*</span></span>}
+                        style={{ marginBottom: 12 }}
                       >
-                        <Text
-                          type="secondary"
-                          style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8, display: 'block' }}
-                        >
-                          Garment Image
-                        </Text>
-                        <div style={{ flex: 1 }}>
-                          <FileUpload
-                            accept="image/png,image/jpeg,image/jpg"
-                            maxSizeMB={10}
-                            previewUrl={line._imagePreviewUrl}
-                            fileName={line._existingImage?.originalFilename || line._imageFile?.name || null}
-                            fileType={line._existingImage?.fileType || line._imageFile?.type || null}
-                            fileSize={line._existingImage?.fileSizeBytes || line._imageFile?.size || null}
-                            onSelect={(file) => handleLineImageSelect(line.key, file)}
-                            onRemove={() => handleLineImageRemove(line.key)}
-                            disabled={line._imageUploading}
-                            loading={line._imageUploading}
-                            compact
-                            placeholder="Click or drag to upload"
-                            hint="PNG, JPG up to 10 MB"
-                          />
-                        </div>
-                        {!line.lineId && line._imageFile && (
-                          <Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
-                            Will upload on save
-                          </Text>
-                        )}
-                      </div>
+                        <Input
+                          placeholder="Buyer PO Number"
+                          value={line.buyerPoNo}
+                          onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={<span>Destination <span style={{ color: 'var(--error-color)' }}>*</span></span>}
+                        style={{ marginBottom: 12 }}
+                      >
+                        <Select
+                          placeholder={buyerDestinations.length > 0 ? 'Select destination' : 'Select a buyer first'}
+                          showSearch
+                          value={line.destination || undefined}
+                          options={buyerDestinations}
+                          disabled={buyerDestinations.length === 0}
+                          filterOption={(input, option) => option.label.toLowerCase().includes(input.toLowerCase())}
+                          onChange={(v) => handleLineChange(line.key, { destination: v })}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item
+                        label={<span>Dispatch Date <span style={{ color: 'var(--error-color)' }}>*</span></span>}
+                        style={{ marginBottom: 12 }}
+                      >
+                        <DatePicker
+                          style={{ width: '100%' }}
+                          value={line.dispatchDate}
+                          disabledDate={(current) => current && current <= dayjs().endOf('day')}
+                          onChange={(v) => handleLineChange(line.key, { dispatchDate: v })}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12}>
+                      <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
+                        <Input
+                          disabled
+                          style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
+                          prefix={<ClockCircleOutlined />}
+                          value={(() => {
+                            if (!line.dispatchDate) return '';
+                            const orderDate = form.getFieldValue('orderDate');
+                            const base = orderDate ? dayjs(orderDate) : dayjs();
+                            return `${dayjs(line.dispatchDate).diff(base, 'day')} days`;
+                          })()}
+                          placeholder="—"
+                        />
+                      </Form.Item>
                     </Col>
                   </Row>
 
@@ -2475,63 +2368,62 @@ const OrderForm = () => {
               rowKey="key"
               pagination={false}
               size="small"
+              bordered
               columns={[
                 {
-                  title: 'Buyer PO No',
-                  dataIndex: 'buyerPoNo',
-                  key: 'buyerPoNo',
-                  width: 140,
-                  render: (v) => <Text strong>{v}</Text>,
+                  title: 'Color',
+                  dataIndex: 'colorName',
+                  key: 'colorName',
+                  width: 180,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => (
+                    <Tag color="blue" style={{ fontWeight: 600, margin: 0, fontSize: 12, padding: '2px 10px' }}>
+                      {v}
+                    </Tag>
+                  ),
                 },
                 {
-                  title: 'Destination',
-                  dataIndex: 'destination',
-                  key: 'destination',
-                  ellipsis: true,
-                },
-                {
-                  title: 'Color / Print',
-                  dataIndex: 'colorRows',
-                  key: 'colorRows',
-                  render: (rows) =>
-                    !rows || rows.length === 0 ? (
-                      <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
-                    ) : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
-                        {rows.map((c, i) => (
-                          <Text key={i} style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
-                            {c.colorName || '—'}
-                            <Text type="secondary" style={{ fontSize: 11 }}> ({(c.total || 0).toLocaleString()})</Text>
-                          </Text>
-                        ))}
-                      </div>
-                    ),
+                  title: 'Buyer PO No / Destination',
+                  key: 'poDestination',
+                  align: 'center',
+                  render: (_, record) => (
+                    <Space size={4}>
+                      <Text strong style={{ fontSize: 12, fontFamily: 'monospace' }}>{record.buyerPoNo}</Text>
+                      <Text type="secondary" style={{ fontSize: 11 }}>/</Text>
+                      <Text style={{ fontSize: 12, color: '#475569' }}>{record.destination}</Text>
+                    </Space>
+                  ),
                 },
                 {
                   title: 'Total Qty',
                   dataIndex: 'totalQty',
                   key: 'totalQty',
                   width: 100,
-                  align: 'right',
-                  render: (v) => <Text strong>{v.toLocaleString()}</Text>,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
                 },
                 {
                   title: 'Avg Price',
                   dataIndex: 'avgPrice',
                   key: 'avgPrice',
                   width: 110,
-                  align: 'right',
-                  render: (v) =>
-                    `${getCurrencySymbol(formCurrency)} ${v.toFixed(2)}`,
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
+                  render: (v) => (
+                    <Text style={{ fontSize: 12 }}>{`${getCurrencySymbol(formCurrency)} ${v.toFixed(2)}`}</Text>
+                  ),
                 },
                 {
-                  title: 'Line Value',
+                  title: 'Total Value',
                   dataIndex: 'totalValue',
                   key: 'totalValue',
                   width: 140,
-                  align: 'right',
+                  align: 'center',
+                  onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
                   render: (v) => (
-                    <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
+                    <Text strong style={{ color: 'var(--success-color, #10b981)', fontSize: 13 }}>
                       {`${getCurrencySymbol(formCurrency)} ${v.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -2545,18 +2437,18 @@ const OrderForm = () => {
                   <Table.Summary.Row
                     style={{ background: 'var(--bg-secondary, #f8fafc)', fontWeight: 600 }}
                   >
-                    <Table.Summary.Cell index={0} colSpan={3}>
+                    <Table.Summary.Cell index={0} colSpan={2}>
                       <Text strong>Grand Total</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={3} align="right">
+                    <Table.Summary.Cell index={2} align="center">
                       <Text strong style={{ fontSize: 15 }}>
                         {totalOrderQty.toLocaleString()}
                       </Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={4} align="right">
+                    <Table.Summary.Cell index={3} align="center">
                       <Text type="secondary">—</Text>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={5} align="right">
+                    <Table.Summary.Cell index={4} align="center">
                       <Text
                         strong
                         style={{ color: 'var(--success-color, #10b981)', fontSize: 15 }}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Card, Row, Col, Typography, Table, Space, Tag, Input, message,
+  App, Card, Row, Col, Typography, Table, Space, Tag, Input,
   Avatar, DatePicker, Select, Tooltip,
 } from 'antd';
 import {
@@ -38,6 +38,7 @@ const ACTION_TYPE_CONFIG = {
 };
 
 const AdminDashboard = () => {
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);

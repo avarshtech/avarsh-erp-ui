@@ -15,6 +15,8 @@ const useServiceWorker = () => {
 
   const updateApp = useCallback(() => {
     setUpdating(true);
+    // Notify UpdateOverlay (separate component with its own state)
+    window.dispatchEvent(new Event('pwa-updating'));
     applyUpdate();
   }, []);
 

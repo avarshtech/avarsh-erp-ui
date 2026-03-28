@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Layout,
   Menu,
@@ -8,7 +8,7 @@ import {
   Input,
   Tooltip,
   Drawer,
-  message,
+  App,
 } from "antd";
 import {
   DashboardOutlined,
@@ -16,6 +16,7 @@ import {
   FileTextOutlined,
   ShoppingOutlined,
   InboxOutlined,
+  AppstoreOutlined,
   DollarOutlined,
   SettingOutlined,
   UserOutlined,
@@ -42,6 +43,9 @@ import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
+import useIsPwa from "../hooks/useIsPwa";
+import useFocusManagement from "../hooks/useFocusManagement";
+import useKeyboardShortcuts from "../hooks/useKeyboardShortcuts";
 import avarshLogoLight from "../assets/images/avarsh-logo-light.png";
 
 const { Header, Sider, Content } = Layout;
@@ -165,6 +169,7 @@ const SidebarVersion = () => (
 );
 
 const MainLayoutInner = () => {
+  const { message } = App.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -172,7 +177,70 @@ const MainLayoutInner = () => {
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
   const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
+  const { isWco } = useIsPwa();
   const { isOffline } = useNetworkStatus();
+
+  // Auto-focus first input on route change + global keyboard shortcuts
+  useFocusManagement();
+  useKeyboardShortcuts();
+
+  // ── WCO: Auto-hide header (desktop standalone only) ──
+  const [wcoHeaderVisible, setWcoHeaderVisible] = useState(true);
+  const wcoHideTimer = useRef(null);
+  const headerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isWco) return;
+
+    const HIDE_DELAY = 2500;
+    const TRIGGER_ZONE = 8; // px from top edge to reveal header
+
+    const scheduleHide = () => {
+      clearTimeout(wcoHideTimer.current);
+      wcoHideTimer.current = setTimeout(() => {
+        // Don't hide if header or its children have focus
+        if (headerRef.current?.contains(document.activeElement)) return;
+        setWcoHeaderVisible(false);
+      }, HIDE_DELAY);
+    };
+
+    const handleMouseMove = (e) => {
+      if (e.clientY <= TRIGGER_ZONE) {
+        setWcoHeaderVisible(true);
+        clearTimeout(wcoHideTimer.current);
+      } else if (e.clientY > 80) {
+        // Mouse is well below header — schedule hide
+        scheduleHide();
+      }
+    };
+
+    const handleFocusIn = (e) => {
+      if (headerRef.current?.contains(e.target)) {
+        setWcoHeaderVisible(true);
+        clearTimeout(wcoHideTimer.current);
+      }
+    };
+
+    const handleFocusOut = (e) => {
+      if (headerRef.current?.contains(e.target)) {
+        scheduleHide();
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    // Start the initial hide timer
+    scheduleHide();
+
+    return () => {
+      clearTimeout(wcoHideTimer.current);
+      window.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [isWco]);
 
   // Close drawer on route change
   useEffect(() => {
@@ -256,13 +324,17 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/grn",
-      icon: <InboxOutlined />,
-      label: "Goods Received",
-      moduleId: "grn",
+      key: "/inventory",
+      icon: <AppstoreOutlined />,
+      label: "Inventory",
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment"],
       children: [
-        { key: "/grn/list", label: "GRN List" },
-        { key: "/grn/new", label: "New GRN" },
+        { key: "/inventory/dashboard", label: "Dashboard" },
+        { key: "/inventory/grn/list", label: "GRN List" },
+        { key: "/inventory/qc", label: "Quality Control" },
+        { key: "/inventory/stock", label: "Stock" },
+        { key: "/inventory/issue", label: "Material Issue" },
+        { key: "/inventory/adjustment", label: "Stock Adjustment" },
       ],
     },
     {
@@ -271,9 +343,9 @@ const MainLayoutInner = () => {
       label: "Reports",
       moduleId: "reports",
       children: [
-        { key: "/reports/list", label: "All Reports" },
-        { key: "/reports/ai-chat", label: "AI Assistant" },
-        { key: "/reports/saved", label: "Saved Reports" },
+        { key: "/reports/list", label: "All Reports", moduleId: "reports" },
+        { key: "/reports/ai-chat", label: "AI Assistant", moduleId: "ai-assistant" },
+        { key: "/reports/saved", label: "Saved Reports", moduleId: "reports" },
       ],
     },
     {
@@ -366,6 +438,15 @@ const MainLayoutInner = () => {
 
   const getSelectedKeys = () => {
     const path = location.pathname;
+    // Map /reports/builder/:id to "All Reports" menu item
+    if (path.startsWith('/reports/builder')) return ['/reports/list'];
+    if (path.startsWith('/inventory/qc')) return ['/inventory/qc'];
+    if (path.startsWith('/inventory/fabric-stock') || path.startsWith('/inventory/stock')) return ['/inventory/stock'];
+    if (path.startsWith('/inventory/accessories-stock')) return ['/inventory/stock'];
+    if (path.startsWith('/inventory/issue')) return ['/inventory/issue'];
+    if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
+    if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
+    if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     return [path];
   };
 
@@ -374,7 +455,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
-    if (path.startsWith("/grn")) return ["/grn"];
+    if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];
     if (path.startsWith("/admin")) return ["/admin"];
@@ -397,10 +478,16 @@ const MainLayoutInner = () => {
   return (
     <SessionExpiryGuard>
       <OfflineBanner />
+      {/* Skip-to-content link for keyboard users */}
+      <a href="#main-content" className="skip-to-content">
+        Skip to content
+      </a>
       <Layout style={{ minHeight: "100vh", paddingTop: isOffline ? 40 : 0 }}>
         {/* Desktop: Fixed Sider */}
         {!isMobileOrTablet && (
           <Sider
+            role="navigation"
+            aria-label="Main navigation"
             trigger={null}
             collapsible
             collapsed={collapsed}
@@ -516,8 +603,16 @@ const MainLayoutInner = () => {
           }}
         >
           <Header
+            ref={headerRef}
+            className={[
+              isWco ? 'wco-titlebar' : '',
+              isWco ? (wcoHeaderVisible ? 'wco-header-visible' : 'wco-header-hidden') : '',
+            ].filter(Boolean).join(' ')}
+            role="banner"
             style={{
               padding: headerPadding,
+              // In WCO mode, add right padding to avoid overlapping OS window controls
+              ...(isWco && { paddingRight: 'env(titlebar-area-x, 24px)' }),
               background: 'var(--header-bg)',
               backdropFilter: 'var(--header-backdrop)',
               WebkitBackdropFilter: 'var(--header-backdrop)',
@@ -538,7 +633,11 @@ const MainLayoutInner = () => {
               {isMobileOrTablet ? (
                 /* Hamburger menu for mobile/tablet */
                 <span
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Open navigation menu"
                   onClick={() => setDrawerOpen(true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDrawerOpen(true); } }}
                   style={{
                     fontSize: 22,
                     cursor: "pointer",
@@ -554,7 +653,11 @@ const MainLayoutInner = () => {
                 /* Collapse toggle for desktop */
                 <Tooltip title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'} placement="right">
                   <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                     onClick={() => setCollapsed(!collapsed)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setCollapsed(!collapsed); } }}
                     style={{
                       fontSize: 20,
                       cursor: "pointer",
@@ -666,9 +769,13 @@ const MainLayoutInner = () => {
             </Space>
           </Header>
           <Content
+            id="main-content"
+            role="main"
+            tabIndex={-1}
             style={{
               margin: contentMargin,
               minHeight: `calc(100vh - ${isMobile ? 56 : 64}px - ${contentMargin * 2}px)`,
+              outline: 'none',
             }}
           >
             <Outlet />

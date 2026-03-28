@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { Modal, Typography, Button, Space, Progress, message } from 'antd';
+import { Modal, Typography, Button, Space, Progress, App } from 'antd';
 import {
   ClockCircleOutlined,
   WarningOutlined,
@@ -15,6 +15,7 @@ import { getCurrentUser } from '../utils/permissions';
 const { Text, Title } = Typography;
 
 const SessionExpiryGuard = ({ children }) => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const {
     remainingSeconds,

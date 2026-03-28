@@ -12,7 +12,7 @@ const CHECK_INTERVAL_MS = 15000;
 const PWA_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 
 export const SessionProvider = ({ children }) => {
-  const isPwa = useIsPwa();
+  const { isPwa } = useIsPwa();
 
   // ── Idle timeout (reads config from JWT claims cached in currentUser) ──
   // In PWA mode, idle timeout is disabled — use a very large value so the hook never fires

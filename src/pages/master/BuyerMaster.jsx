@@ -10,7 +10,7 @@ import {
   Form,
   Row,
   Col,
-  message,
+  App,
   Typography,
   Drawer,
   Descriptions,
@@ -53,6 +53,7 @@ const phoneOnly = (val) => val?.replace(/[^0-9+\-\s()]/g, '') || '';
 const nameWithSpecial = (val) => val?.replace(/[^a-zA-Z0-9\s.&',-]/g, '') || '';
 
 const BuyerMaster = () => {
+  const { message, modal } = App.useApp();
   // Store context
   const {
     buyers: storeBuyers,
@@ -270,7 +271,7 @@ const BuyerMaster = () => {
 
   const handleModalClose = () => {
     if (unsavedChanges) {
-      Modal.confirm({
+      modal.confirm({
         title: 'Unsaved changes',
         content: 'You have unsaved changes. Discard and close?',
         okText: 'Discard',

@@ -23,7 +23,10 @@
       "Bash(./gradlew clean:*)",
       "Bash(./gradlew compileJava --no-build-cache)",
       "Bash(./gradlew compileJava --rerun-tasks)",
-      "Bash(./gradlew flywayRepair)"
+      "Bash(./gradlew flywayRepair)",
+      "Bash(npm run build:*)",
+      "Bash(cd f:/Ranjith/project/RK/Repos/erp-purchase && ./mvnw compile:*)",
+      "Bash(npx skills:*)"
     ]
   }
 }

@@ -10,7 +10,10 @@
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
- *   "grn":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "inventory":        { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "inventory-qc":     { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
+ *   "inventory-issue":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
+ *   "inventory-adjustment": { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
  *   "costing":          { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "costing-approval": { "access": true, "operations": { "approve": true, "revise": true } },
  *   "buyer-info":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
@@ -25,7 +28,8 @@
  *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "approval-flows":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
+ *   "approval-flows":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "ai-assistant":     { "access": true, "operations": { "view": true } }
  * }
  */
 
@@ -70,11 +74,32 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
-  GRN: {
-    id: 'grn',
-    name: 'Goods Received',
-    path: '/grn',
+  INVENTORY: {
+    id: 'inventory',
+    name: 'Inventory Management',
+    path: '/inventory',
     group: 'transactions',
+  },
+  INVENTORY_QC: {
+    id: 'inventory-qc',
+    name: 'Quality Control',
+    path: '/inventory/qc',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  INVENTORY_ISSUE: {
+    id: 'inventory-issue',
+    name: 'Material Issue',
+    path: '/inventory/issue',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  INVENTORY_ADJUSTMENT: {
+    id: 'inventory-adjustment',
+    name: 'Stock Adjustment',
+    path: '/inventory/adjustment',
+    group: 'transactions',
+    linkedTo: 'inventory',
   },
   COSTING: {
     id: 'costing',
@@ -174,6 +199,13 @@ export const MODULES = {
     path: '/admin/roles',
     group: 'admin',
   },
+  AI_ASSISTANT: {
+    id: 'ai-assistant',
+    name: 'AI Assistant',
+    path: '/reports/ai-chat',
+    group: 'transactions',
+    linkedTo: 'reports',
+  },
   APPROVAL_FLOWS: {
     id: 'approval-flows',
     name: 'Approval Flows',
@@ -232,10 +264,14 @@ export const PERMISSION_GROUPS = [
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'grn', name: 'Goods Received (GRN)', operations: STANDARD_OPERATIONS, path: '/grn/list' },
+      { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
+      { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
+      { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
+      { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
       { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
+      { id: 'ai-assistant', name: 'AI Assistant', operations: ['view'], linkedTo: 'reports', path: '/reports/ai-chat' },
     ],
   },
   {
@@ -286,8 +322,12 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
-  if (moduleId === 'dashboard')       return DASHBOARD_OPERATIONS;
-  if (moduleId === 'reports')         return ['view'];
+  if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
+  if (moduleId === 'reports')              return ['view'];
+  if (moduleId === 'ai-assistant')        return ['view'];
+  if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
+  if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
+  if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
@@ -542,6 +582,14 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized['costing-approval'] = {
       access: false,
       operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+    };
+  }
+
+  // Enforce ai-assistant → reports link
+  if (!normalized['reports']?.access) {
+    normalized['ai-assistant'] = {
+      access: false,
+      operations: { view: false },
     };
   }
 

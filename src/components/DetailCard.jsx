@@ -1,7 +1,7 @@
-import React from 'react';
+import { memo } from 'react';
 import { Row, Col } from 'antd';
 
-const Field = React.memo(({
+const Field = memo(({
   label,
   value,
   icon,
@@ -37,7 +37,7 @@ const Field = React.memo(({
 
 Field.displayName = 'DetailCard.Field';
 
-const DetailCard = React.memo(({
+const DetailCard = memo(({
   title,
   icon,
   extra,

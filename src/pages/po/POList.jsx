@@ -4,7 +4,7 @@ import {
   Card,
   Tag,
   Typography,
-  message,
+  App,
   Space,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -32,6 +32,7 @@ const { Text } = Typography;
 
 const POList = () => {
   const navigate = useNavigate();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({

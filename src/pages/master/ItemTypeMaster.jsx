@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, message, Tag, Select, Modal } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import { createItemType, updateItemType, deleteItemType } from '../../services/masterDataService';
@@ -10,6 +10,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 const MODULE_ID = 'master-data';
 
 const ItemTypeMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const { itemTypes, subCategories, attributes, uoms, addItem, updateItem, removeItem } = useStore();
   const [filteredData, setFilteredData] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
@@ -131,7 +132,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Item Type',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this item type? This action cannot be undone.',

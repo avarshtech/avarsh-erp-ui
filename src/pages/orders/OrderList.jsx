@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  App,
   Table,
   Card,
   Space,
   Typography,
-  message,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchOrders, deleteOrder, getOrderById } from '../../services/orderService';
@@ -26,6 +26,7 @@ import OrderView from './OrderView';
 const { Text } = Typography;
 
 const OrderList = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);

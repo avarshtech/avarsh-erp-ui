@@ -13,28 +13,47 @@ self.addEventListener('message', (event) => {
   }
 });
 
-// ─── Update Notification (system notification bar on mobile/tablet) ───
-// When a new SW version installs and no app window is visible (backgrounded/closed),
-// show a native notification so the user knows an update is available.
-self.addEventListener('install', (event) => {
+// ─── Update Notification (system notification bar) ───
+// Fires when the NEW service worker activates (after install + skipWaiting or
+// after the old SW is replaced). This is the most reliable point to show
+// a system notification because:
+//   1. `activate` is allowed to call showNotification() in all browsers
+//   2. self.registration is fully set up at this point
+//   3. We can reliably check if this is an update (not first install)
+//
+// For first-ever install there's no previous SW, so no notification needed.
+// For updates when app is in foreground, the in-app UpdatePrompt handles it.
+self.addEventListener('activate', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       const hasVisibleClient = clients.some((c) => c.visibilityState === 'visible');
-      // Only show system notification if app is not in foreground
-      // (foreground updates are handled by the in-app UpdatePrompt)
-      if (!hasVisibleClient && self.registration.active) {
-        return self.registration.showNotification('Update Available', {
-          body: 'A new version of Avarsh ERP is available. Tap to update.',
+
+      // If app is in foreground, notify via postMessage so UpdatePrompt picks it up
+      if (hasVisibleClient) {
+        clients.forEach((client) => {
+          if (client.visibilityState === 'visible') {
+            client.postMessage({ type: 'SW_UPDATED' });
+          }
+        });
+        return;
+      }
+
+      // App is backgrounded or closed AND notification permission is granted
+      // → show system notification so user knows to come back
+      if (self.Notification && self.Notification.permission === 'granted') {
+        return self.registration.showNotification('Avarsh ERP Updated', {
+          body: 'A new version has been installed. Tap to open the latest version.',
           icon: '/icons/icon-192x192.png',
           badge: '/icons/icon-96x96.png',
           tag: 'pwa-update',
           renotify: true,
           data: { type: 'PWA_UPDATE' },
           actions: [
-            { action: 'update', title: 'Update Now' },
+            { action: 'update', title: 'Open App' },
             { action: 'dismiss', title: 'Later' },
           ],
           vibrate: [200, 100, 200],
+          requireInteraction: true,
         });
       }
     })

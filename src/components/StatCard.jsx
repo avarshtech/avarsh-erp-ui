@@ -1,8 +1,8 @@
-import React from 'react';
+import { memo } from 'react';
 import { Card, Statistic, Skeleton } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 
-const StatCard = React.memo(function StatCard({
+const StatCard = memo(function StatCard({
   title,
   value,
   prefix,

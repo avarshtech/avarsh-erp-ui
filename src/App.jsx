@@ -1,12 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider, App as AntdApp, Spin } from 'antd';
+import { ConfigProvider, App as AntdApp, Spin, Skeleton, Card } from 'antd';
 import { LoadingOutlined } from '@ant-design/icons';
 import { lazy, Suspense, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
+import GlobalMessageEmitter from './components/GlobalMessageEmitter';
 import UpdatePrompt from './components/UpdatePrompt';
+import UpdateOverlay from './components/UpdateOverlay';
 import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
 import ProtectedRoute from './components/ProtectedRoute';
 import PermissionRoute from './components/PermissionRoute';
@@ -18,8 +20,21 @@ import BOMList from './pages/bom/BOMList';
 import BOMForm from './pages/bom/BOMForm';
 import POList from './pages/po/POList';
 import POForm from './pages/po/POForm';
-import GRNList from './pages/grn/GRNList';
-import GRNForm from './pages/grn/GRNForm';
+// Inventory Module (lazy-loaded)
+const InventoryDashboard = lazy(() => import('./pages/inventory/dashboard/InventoryDashboard'));
+const GRNList = lazy(() => import('./pages/inventory/grn/GRNList'));
+const FabricGRNForm = lazy(() => import('./pages/inventory/grn/FabricGRNForm'));
+const AccessoriesGRNForm = lazy(() => import('./pages/inventory/grn/AccessoriesGRNForm'));
+const FabricQCInspection = lazy(() => import('./pages/inventory/qc/FabricQCInspection'));
+const TrimsQCInspection = lazy(() => import('./pages/inventory/qc/TrimsQCInspection'));
+const QualityControlPage = lazy(() => import('./pages/inventory/qc/QualityControlPage'));
+const StockRegisterPage = lazy(() => import('./pages/inventory/stock/StockRegisterPage'));
+const FabricShadeLotView = lazy(() => import('./pages/inventory/stock/FabricShadeLotView'));
+const MaterialIssuePage = lazy(() => import('./pages/inventory/issue/MaterialIssuePage'));
+const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueForm'));
+const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
+const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
+const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -67,6 +82,22 @@ const useModalScrollReset = () => {
   }, []);
 };
 
+const PageSkeleton = () => (
+  <div style={{ padding: '24px' }}>
+    <Skeleton.Input active size="large" style={{ width: 300, marginBottom: 24, height: 48, borderRadius: 12 }} />
+    <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+      {[1, 2, 3, 4].map((i) => (
+        <Card key={i} style={{ flex: 1, borderRadius: 12 }} styles={{ body: { padding: 20 } }}>
+          <Skeleton active paragraph={{ rows: 1 }} title={{ width: '60%' }} />
+        </Card>
+      ))}
+    </div>
+    <Card style={{ borderRadius: 12 }} styles={{ body: { padding: 24 } }}>
+      <Skeleton active paragraph={{ rows: 8 }} />
+    </Card>
+  </div>
+);
+
 // Set global Spin indicator to LoadingOutlined for all Spin components
 Spin.setDefaultIndicator(<LoadingOutlined style={{ fontSize: 24 }} spin />);
 
@@ -77,9 +108,11 @@ const ThemedApp = () => {
 
   return (
     <ConfigProvider theme={antThemeConfig}>
-      <AntdApp>
+      <AntdApp message={{ maxCount: 3, top: 60, duration: 5 }}>
       <ConflictDialog />
+      <GlobalMessageEmitter />
       <UpdatePrompt />
+      <UpdateOverlay />
       <StoreProvider>
         <BrowserRouter>
           <Routes>
@@ -109,10 +142,26 @@ const ThemedApp = () => {
             <Route path="purchase-orders/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
             <Route path="purchase-orders/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
             <Route path="purchase-orders/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><POForm /></PermissionRoute>} />
-            {/* GRN */}
-            <Route path="grn/list" element={<PermissionRoute module="grn"><GRNList /></PermissionRoute>} />
-            <Route path="grn/new" element={<PermissionRoute module="grn" operation="add"><GRNForm /></PermissionRoute>} />
-            <Route path="grn/edit/:id" element={<PermissionRoute module="grn" operation="update"><GRNForm /></PermissionRoute>} />
+            {/* Inventory */}
+            <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/fabric/new" element={<PermissionRoute module="inventory" operation="add"><Suspense fallback={<PageSkeleton />}><FabricGRNForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/fabric/edit/:id" element={<PermissionRoute module="inventory" operation="update"><Suspense fallback={<PageSkeleton />}><FabricGRNForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/accessories/new" element={<PermissionRoute module="inventory" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesGRNForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/accessories/edit/:id" element={<PermissionRoute module="inventory" operation="update"><Suspense fallback={<PageSkeleton />}><AccessoriesGRNForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/qc" element={<PermissionRoute module="inventory-qc"><Suspense fallback={<PageSkeleton />}><QualityControlPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/qc/fabric/new" element={<PermissionRoute module="inventory-qc" operation="add"><Suspense fallback={<PageSkeleton />}><FabricQCInspection /></Suspense></PermissionRoute>} />
+            <Route path="inventory/qc/fabric/:id" element={<PermissionRoute module="inventory-qc"><Suspense fallback={<PageSkeleton />}><FabricQCInspection /></Suspense></PermissionRoute>} />
+            <Route path="inventory/qc/trims/new" element={<PermissionRoute module="inventory-qc" operation="add"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
+            <Route path="inventory/qc/trims/:id" element={<PermissionRoute module="inventory-qc"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
+            <Route path="inventory/stock" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><StockRegisterPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/fabric-stock/shade-lots" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><FabricShadeLotView /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue" element={<PermissionRoute module="inventory-issue"><Suspense fallback={<PageSkeleton />}><MaterialIssuePage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue/fabric/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue/accessories/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/adjustment" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
             <Route path="costing/list" element={<PermissionRoute module="costing"><CostingList /></PermissionRoute>} />
             <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingForm /></PermissionRoute>} />
@@ -132,7 +181,7 @@ const ThemedApp = () => {
             <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
             <Route path="reports/builder/:id" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportBuilderPage /></Suspense></PermissionRoute>} />
             <Route path="reports/saved" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><SavedReportsPage /></Suspense></PermissionRoute>} />
-            <Route path="reports/ai-chat" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><AiChatPage /></Suspense></PermissionRoute>} />
+            <Route path="reports/ai-chat" element={<PermissionRoute module="ai-assistant"><Suspense fallback={<Spin />}><AiChatPage /></Suspense></PermissionRoute>} />
           </Route>
 
           {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}

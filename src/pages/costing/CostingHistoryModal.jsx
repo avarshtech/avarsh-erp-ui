@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import {
   Modal,
   Timeline,
@@ -366,7 +366,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
               <tbody>
                 {/* Modified rows */}
                 {modifiedRows.map((m) => (
-                  <React.Fragment key={m.key}>
+                  <Fragment key={m.key}>
                     <tr>
                       <td
                         colSpan={3}
@@ -395,7 +395,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
                         </td>
                       </tr>
                     ))}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
 
                 {/* Added rows */}

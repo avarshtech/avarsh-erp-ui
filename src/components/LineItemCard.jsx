@@ -1,6 +1,6 @@
-import React from 'react';
+import { memo, Fragment } from 'react';
 
-const LineItemCard = React.memo(({
+const LineItemCard = memo(({
   index,
   image,
   title,
@@ -71,7 +71,7 @@ const LineItemCard = React.memo(({
         {tags?.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {tags.map((tag, i) => (
-              <React.Fragment key={i}>{tag}</React.Fragment>
+              <Fragment key={i}>{tag}</Fragment>
             ))}
           </div>
         )}
@@ -93,7 +93,7 @@ const LineItemCard = React.memo(({
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
         {pills.map((pill, i) => (
           <span
-            key={i}
+            key={pill.label ?? i}
             style={{
               padding: '4px 10px',
               borderRadius: 6,

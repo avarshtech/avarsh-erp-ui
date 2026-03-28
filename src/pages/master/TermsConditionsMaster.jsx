@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Form, Input, Button, Space, message, Modal, Tag, Typography } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
 import {
@@ -18,6 +18,7 @@ const { Text } = Typography;
 const MODULE_ID = 'terms-conditions';
 
 const TermsConditionsMaster = ({ onDirtyChange }) => {
+  const { message, modal } = App.useApp();
   const {
     termsConditions,
     setData,
@@ -189,7 +190,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
       return;
     }
 
-    Modal.confirm({
+    modal.confirm({
       title: 'Delete Terms & Conditions',
       icon: <ExclamationCircleOutlined />,
       content: 'Are you sure you want to delete this entry? This action cannot be undone.',

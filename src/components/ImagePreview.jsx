@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import { memo, useState, useMemo, useCallback, isValidElement } from 'react';
 import { Popover, Spin } from 'antd';
 import { PictureOutlined } from '@ant-design/icons';
 
@@ -8,7 +8,7 @@ const SHAPE_STYLES = {
   square: { borderRadius: 'var(--radius-sm)' },
 };
 
-const ImagePreview = React.memo(({
+const ImagePreview = memo(({
   src,
   alt = '',
   size = 48,
@@ -82,7 +82,7 @@ const ImagePreview = React.memo(({
           gap: 2,
           color: 'var(--text-muted)',
         }}>
-          {React.isValidElement(fallbackIcon) ? fallbackIcon : <FallbackIcon style={{ fontSize: Math.max(size * 0.4, 14) }} />}
+          {isValidElement(fallbackIcon) ? fallbackIcon : <FallbackIcon style={{ fontSize: Math.max(size * 0.4, 14) }} />}
           {fallbackText && (
             <span style={{ fontSize: Math.max(size * 0.2, 8), lineHeight: 1, textAlign: 'center' }}>
               {fallbackText}

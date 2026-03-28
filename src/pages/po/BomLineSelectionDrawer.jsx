@@ -14,7 +14,7 @@ import {
   Empty,
   Badge,
   Input,
-  message,
+  App,
 } from 'antd';
 import {
   CheckOutlined,
@@ -99,6 +99,7 @@ const BomLineSelectionDrawer = ({
   existingBomLineIds = new Set(),
   onConfirm,
 }) => {
+  const { message } = App.useApp();
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [orderNoInput, setOrderNoInput] = useState('SG/');
 
