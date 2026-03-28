@@ -287,11 +287,12 @@ const MainLayoutInner = () => {
       key: "/admin",
       icon: <SettingOutlined />,
       label: "Admin",
-      moduleId: ["users", "roles"],
+      moduleId: ["users", "roles", "approval-flows"],
       children: [
         { key: "/admin/dashboard", label: "Dashboard" },
         { key: "/admin/users", label: "Users", moduleId: "users" },
         { key: "/admin/roles", label: "Role & Access", moduleId: "roles" },
+        { key: "/admin/approval-flows", label: "Approval Flows", moduleId: "approval-flows" },
       ],
     },
   ];

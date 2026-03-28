@@ -24,7 +24,8 @@
  *   "parts-master":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
- *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
+ *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "approval-flows":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } }
  * }
  */
 
@@ -173,6 +174,12 @@ export const MODULES = {
     path: '/admin/roles',
     group: 'admin',
   },
+  APPROVAL_FLOWS: {
+    id: 'approval-flows',
+    name: 'Approval Flows',
+    path: '/admin/approval-flows',
+    group: 'admin',
+  },
 };
 
 // ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
@@ -262,6 +269,7 @@ export const PERMISSION_GROUPS = [
     modules: [
       { id: 'users', name: 'User Management', operations: STANDARD_OPERATIONS, path: '/admin/users' },
       { id: 'roles', name: 'Role & Access', operations: STANDARD_OPERATIONS, path: '/admin/roles' },
+      { id: 'approval-flows', name: 'Approval Flows', operations: STANDARD_OPERATIONS, path: '/admin/approval-flows' },
     ],
   },
 ];

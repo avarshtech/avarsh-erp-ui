@@ -27,6 +27,7 @@ import CostComparison from './pages/costing/CostComparison';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
+import ApprovalFlowList from './pages/admin/ApprovalFlowList';
 import MasterDashboard from './pages/master/MasterDashboard';
 import Profile from './pages/Profile';
 
@@ -122,6 +123,7 @@ const ThemedApp = () => {
             <Route path="admin/dashboard" element={<AdminDashboard />} />
             <Route path="admin/users" element={<UserManagement />} />
             <Route path="admin/roles" element={<RoleAccess />} />
+            <Route path="admin/approval-flows" element={<ApprovalFlowList />} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}
