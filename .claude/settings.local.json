@@ -11,7 +11,19 @@
       "Bash(npx playwright install chromium)",
       "Bash(npx playwright test --project=setup --headed)",
       "Bash(npx playwright test:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(ls \"C:/github/Avarsh/erp-purchase/src/main/java/com/avarsh/erp/reporting/\"*.java)",
+      "Bash(ls \"C:/github/Avarsh/erp-purchase/src/main/resources/db/migration/V39\"* \"C:/github/Avarsh/erp-purchase/src/main/resources/db/migration/V40\"*)",
+      "Bash(git -C c:/github/Avarsh/avarsh-erp-ui diff HEAD -- src/App.jsx)",
+      "Bash(./gradlew compileJava)",
+      "Bash(find \"C:/github/Avarsh/erp-purchase/src/main/java/com/avarsh/erp/reporting/service\" -name \"*.java\" -exec basename {})",
+      "Bash(find \"C:/github/Avarsh/erp-purchase/src/main/java/com/avarsh/erp/reporting/controller\" -name \"*.java\" -exec basename {})",
+      "Bash(find \"C:/github/Avarsh/erp-purchase/src/main/java/com/avarsh/erp/reporting/util\" -name \"*.java\" -exec basename {})",
+      "Bash(find \"C:/github/Avarsh/erp-purchase/src/main/java/com/avarsh/erp/config\" -name \"*.java\" -exec basename {})",
+      "Bash(./gradlew clean:*)",
+      "Bash(./gradlew compileJava --no-build-cache)",
+      "Bash(./gradlew compileJava --rerun-tasks)",
+      "Bash(./gradlew flywayRepair)"
     ]
   }
 }
