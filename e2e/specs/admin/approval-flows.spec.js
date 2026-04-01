@@ -15,6 +15,8 @@ test.describe('Approval Flows — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Get all approval flows', async () => {
     const res = await api.get('/approval-flows');
     expect(res.status).toBe(200);

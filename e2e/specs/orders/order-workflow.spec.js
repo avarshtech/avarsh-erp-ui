@@ -15,6 +15,8 @@ test.describe('Order Workflow — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Create DRAFT → SUBMITTED → APPROVED lifecycle', async () => {
     // Step 1: Create DRAFT order
     const createRes = await api.post('/orders', {

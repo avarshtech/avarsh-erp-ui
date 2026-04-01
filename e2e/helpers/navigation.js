@@ -32,10 +32,25 @@ export async function navigateWithAuth(page, path, { username, password } = {}) 
   if (await loginField.isVisible().catch(() => false)) {
     await loginField.fill(username || E2E_USERNAME);
     await page.getByPlaceholder('Password').fill(password || E2E_PASSWORD);
-    await page.getByRole('button', { name: /Sign In/i }).click();
+
+    // Click Sign In and wait for auth API response
+    await Promise.all([
+      page.waitForResponse(
+        (resp) => resp.url().includes('/auth/login') && resp.request().method() === 'POST',
+        { timeout: 30000 }
+      ),
+      page.getByRole('button', { name: /Sign In/i }).click(),
+    ]);
+
+    // Wait for redirect away from login
+    await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 });
     await page.waitForLoadState('networkidle');
-    await page.goto(path);
-    await page.waitForLoadState('networkidle');
+
+    // Navigate to the intended page
+    if (!page.url().includes(path)) {
+      await page.goto(path);
+      await page.waitForLoadState('networkidle');
+    }
   }
 }
 
@@ -75,5 +90,55 @@ export async function goToListPage(page, path) {
 export async function ensureSessionActive(page) {
   await page.addInitScript(() => {
     sessionStorage.setItem('sessionActive', 'true');
+    // Suppress notification permission prompt during E2E tests
+    localStorage.setItem('avarsh-notif-prompt-dismissed', Date.now().toString());
   });
+}
+
+/**
+ * Dismiss any overlay modals (e.g., notification permission prompt) that may block UI interaction.
+ */
+async function dismissOverlayModals(page) {
+  // Dismiss "Stay Updated on Your ERP" notification prompt
+  const notNowBtn = page.getByRole('button', { name: /Not Now/i });
+  if (await notNowBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await notNowBtn.click();
+    await page.waitForTimeout(300);
+  }
+  // Dismiss any generic Ant Design modal
+  const modalCloseBtn = page.locator('.ant-modal-wrap:visible .ant-modal-close');
+  if (await modalCloseBtn.isVisible({ timeout: 500 }).catch(() => false)) {
+    await modalCloseBtn.click();
+    await page.waitForTimeout(300);
+  }
+}
+
+/**
+ * Navigate to master data page and select a specific entity from the sidebar.
+ * The master data page uses a split-view with a left sidebar nav.
+ * @param {import('@playwright/test').Page} page
+ * @param {string|RegExp} entityName - Text or regex to match in the sidebar (e.g., 'Buyers', /Item Types?/i)
+ */
+export async function goToMasterEntity(page, entityName) {
+  await navigateWithAuth(page, '/master');
+  // Wait for the sidebar navigation to render
+  await page.locator('.ant-layout-sider').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await waitForPageReady(page);
+
+  // Dismiss any overlay modals that may block interaction
+  await dismissOverlayModals(page);
+
+  // The master data page uses a custom left nav panel (not ant-layout-sider).
+  // Find and click the nav item by its label text.
+  const pattern = typeof entityName === 'string' ? new RegExp(entityName, 'i') : entityName;
+
+  // The nav items are inside the main content area (not the app sidebar).
+  // Use getByText scoped to the page content, clicking the first match.
+  const navItem = page.getByText(pattern, { exact: false }).first();
+  await navItem.waitFor({ state: 'visible', timeout: 10000 });
+  await navItem.click();
+
+  // Wait for the content area table to load
+  await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await page.waitForLoadState('networkidle').catch(() => {});
 }

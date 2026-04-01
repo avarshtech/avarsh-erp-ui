@@ -15,6 +15,8 @@ test.describe('User Management — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Get all users', async () => {
     const res = await api.get('/users');
     expect(res.status).toBe(200);

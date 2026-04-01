@@ -15,6 +15,8 @@ test.describe('Costing Workflow — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Create Draft → Final → Approved lifecycle', async () => {
     // Step 1: Create Draft
     const createRes = await api.post('/cost-sheets', {

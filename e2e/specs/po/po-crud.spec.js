@@ -15,6 +15,8 @@ test.describe('PO CRUD — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Search POs returns paginated results', async () => {
     const res = await api.get('/purchase-orders/search?page=0&size=10');
     expect(res.status).toBe(200);

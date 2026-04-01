@@ -6,7 +6,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { termsConditionsPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -21,9 +21,11 @@ test.describe.serial('Terms & Conditions — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/terms-conditions');
@@ -59,18 +61,13 @@ test.describe.serial('Terms & Conditions — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Terms.*Condition/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Terms & Conditions');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new terms & conditions via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Terms.*Condition/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Terms & Conditions');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Name', `E2E T&C ${Date.now()}`);
       // Description may be a rich text editor — attempt plain input fill first
@@ -91,10 +88,7 @@ test.describe.serial('Terms & Conditions — CRUD', () => {
     });
 
     test('Edit existing terms & conditions', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Terms.*Condition/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Terms & Conditions');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -106,10 +100,7 @@ test.describe.serial('Terms & Conditions — CRUD', () => {
     });
 
     test('Delete terms & conditions', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Terms.*Condition/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Terms & Conditions');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

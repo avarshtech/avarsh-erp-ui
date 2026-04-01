@@ -5,20 +5,23 @@
  * Used by both API-level tests and UI tests that need to seed/verify data.
  *
  * Usage:
- *   const api = new ApiClient(request);
- *   await api.login();
+ *   const api = await createAuthenticatedClient();
  *   const buyers = await api.get('/buyers');
  *   const created = await api.post('/buyers', { name: 'Test Buyer' });
+ *   // When done (in afterAll):
+ *   await api.dispose();
  */
 
+import { request as playwrightRequest } from '@playwright/test';
 import process from 'process';
 
 const API_BASE = process.env.E2E_API_URL || 'http://localhost:8088/api/v1';
 
 export class ApiClient {
-  constructor(request) {
-    this.request = request;
+  constructor(requestContext, ownsContext = false) {
+    this.request = requestContext;
     this.token = null;
+    this._ownsContext = ownsContext;
   }
 
   async login(username, password) {
@@ -81,13 +84,26 @@ export class ApiClient {
     });
     return { response, status: response.status() };
   }
+
+  /**
+   * Dispose the underlying request context if we created it ourselves.
+   * Call this in test.afterAll when using createAuthenticatedClient().
+   */
+  async dispose() {
+    if (this._ownsContext && this.request) {
+      await this.request.dispose();
+    }
+  }
 }
 
 /**
- * Create and authenticate an API client. Convenience for test.beforeAll.
+ * Create and authenticate an API client.
+ * Creates its own APIRequestContext (safe for beforeAll/test reuse).
+ * Remember to call api.dispose() in afterAll.
  */
-export async function createAuthenticatedClient(request, username, password) {
-  const api = new ApiClient(request);
+export async function createAuthenticatedClient(username, password) {
+  const context = await playwrightRequest.newContext();
+  const api = new ApiClient(context, true);
   await api.login(username, password);
   return api;
 }

@@ -23,6 +23,8 @@ test.describe('BOM Workflow — API Tests', () => {
     bomId = createRes.data.id;
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Change BOM status via PATCH', async () => {
     expect(bomId).toBeDefined();
 

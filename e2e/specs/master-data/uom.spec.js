@@ -6,7 +6,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { uomPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -21,9 +21,11 @@ test.describe.serial('Unit of Measure — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/unit-of-measures');
@@ -42,11 +44,11 @@ test.describe.serial('Unit of Measure — CRUD', () => {
 
     test('API — Update modifies record', async () => {
       test.skip(!createdId, 'No record created to update');
-      const { data: existing } = await api.get(`/unit-of-measures/${createdId}`);
-      const updated = { ...existing, decimalPrecision: 3 };
-      const { response, data } = await api.put(`/unit-of-measures/${createdId}`, updated);
+      const payload = uomPayload();
+      payload.name = `Updated UOM ${Date.now()}`;
+      const { response, data } = await api.put(`/unit-of-measures/${createdId}`, { ...payload, version: 0 });
       expect(response.ok()).toBeTruthy();
-      expect(data.decimalPrecision).toBe(3);
+      expect(data.name).toBe(payload.name);
     });
 
     test('API — Delete removes record', async () => {
@@ -59,18 +61,13 @@ test.describe.serial('Unit of Measure — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/UOM|Unit of Measure/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Unit of Measurement');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new UOM via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/UOM|Unit of Measure/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Unit of Measurement');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Name', `E2E UOM ${Date.now()}`);
       await antFormFill(page, 'Symbol', `u${Date.now() % 1000}`);
@@ -81,10 +78,7 @@ test.describe.serial('Unit of Measure — CRUD', () => {
     });
 
     test('Edit existing UOM', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/UOM|Unit of Measure/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Unit of Measurement');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -96,10 +90,7 @@ test.describe.serial('Unit of Measure — CRUD', () => {
     });
 
     test('Delete UOM', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/UOM|Unit of Measure/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Unit of Measurement');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

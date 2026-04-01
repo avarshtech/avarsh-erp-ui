@@ -15,6 +15,8 @@ test.describe('Role Management — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Get all roles', async () => {
     const res = await api.get('/roles');
     expect(res.status).toBe(200);

@@ -8,7 +8,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToListPage, goToMasterEntity } from '../../helpers/navigation.js';
 import { buyerPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -23,9 +23,11 @@ test.describe.serial('Buyer — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/buyers');
@@ -44,11 +46,10 @@ test.describe.serial('Buyer — CRUD', () => {
 
     test('API — Update modifies record', async () => {
       test.skip(!createdId, 'No record created to update');
-      const { response: getResp, data: existing } = await api.get(`/buyers/${createdId}`);
-      expect(getResp.ok()).toBeTruthy();
-
+      const { data: existing } = await api.get(`/buyers/${createdId}`);
       const updated = { ...existing, contactPerson: 'Updated Contact' };
-      const { response, data } = await api.put(`/buyers/${createdId}`, updated);
+      // Buyer uses POST for both create and update
+      const { response, data } = await api.post('/buyers', updated);
       expect(response.ok()).toBeTruthy();
       expect(data.contactPerson).toBe('Updated Contact');
     });
@@ -63,19 +64,13 @@ test.describe.serial('Buyer — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      // Click Buyer card on the master dashboard
-      await page.getByText(/Buyer/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Buyers');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new buyer via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Buyer/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Buyers');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Name', `E2E Buyer ${Date.now()}`);
       await antFormFill(page, 'Contact Person', 'E2E UI Contact');
@@ -87,10 +82,7 @@ test.describe.serial('Buyer — CRUD', () => {
     });
 
     test('Edit existing buyer', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Buyer/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Buyers');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -102,10 +94,7 @@ test.describe.serial('Buyer — CRUD', () => {
     });
 
     test('Delete buyer', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Buyer/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Buyers');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

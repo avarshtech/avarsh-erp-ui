@@ -7,7 +7,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { stylePayload, buyerPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -23,11 +23,13 @@ test.describe.serial('Style — CRUD', () => {
     let buyerId;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
       const { data: buyer } = await api.post('/buyers', buyerPayload());
       buyerId = buyer.id;
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/styles');
@@ -54,18 +56,13 @@ test.describe.serial('Style — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Style/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Styles');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new style via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Style/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Styles');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Style No', `E2E-${Date.now()}`);
       await antFormFill(page, 'Garment Name', 'E2E Test Garment');
@@ -79,10 +76,7 @@ test.describe.serial('Style — CRUD', () => {
     });
 
     test('Edit existing style', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Style/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Styles');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -94,10 +88,7 @@ test.describe.serial('Style — CRUD', () => {
     });
 
     test('Delete style', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Style/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Styles');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

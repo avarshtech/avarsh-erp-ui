@@ -7,7 +7,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { itemPayload, categoryPayload, subCategoryPayload, uomPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -22,19 +22,25 @@ test.describe.serial('Item — CRUD', () => {
     let api;
     let categoryId;
     let subCategoryId;
+    let itemTypeId;
     let uomId;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
       // Create prerequisite data
       const { data: cat } = await api.post('/categories', categoryPayload());
       categoryId = cat.id;
       const { data: subCat } = await api.post('/sub-categories', subCategoryPayload(categoryId));
       subCategoryId = subCat.id;
+      // Create item type under the sub-category
+      const { data: itemTypeData } = await api.post('/item-types', { name: `E2E ItemType ${Date.now()}`, subCategoryId: subCat.id });
+      itemTypeId = itemTypeData.id;
       const { data: uom } = await api.post('/unit-of-measures', uomPayload());
       uomId = uom.id;
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/items');
@@ -46,6 +52,7 @@ test.describe.serial('Item — CRUD', () => {
       const payload = itemPayload({
         categoryId,
         subCategoryId,
+        itemTypeId,
         uomId,
       });
       const { response, data } = await api.post('/items', payload);
@@ -81,18 +88,13 @@ test.describe.serial('Item — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/^Item$/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Items');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new item via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/^Item$/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Items');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Item Code', `E2E-${Date.now()}`);
       await antFormFill(page, 'Item Name', `E2E Item ${Date.now()}`);
@@ -106,10 +108,7 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Edit existing item', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/^Item$/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Items');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -121,10 +120,7 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Delete item', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/^Item$/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Items');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

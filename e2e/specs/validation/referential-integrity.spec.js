@@ -14,6 +14,8 @@ test.describe('Referential Integrity — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Category with SubCategories — DELETE returns 409', async () => {
     // Category ID 1 should have subcategories in seeded data
     const res = await api.delete('/categories/1');

@@ -7,7 +7,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { processPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -22,9 +22,11 @@ test.describe.serial('Process — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/processes');
@@ -66,18 +68,13 @@ test.describe.serial('Process — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Process/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Processes');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new process via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Process/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Processes');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Process Name', `E2E Process ${Date.now()}`);
       await antFormFill(page, 'Description', 'Created by E2E UI test');
@@ -88,10 +85,7 @@ test.describe.serial('Process — CRUD', () => {
     });
 
     test('Edit existing process', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Process/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Processes');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -103,10 +97,7 @@ test.describe.serial('Process — CRUD', () => {
     });
 
     test('Delete process', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Process/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Processes');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

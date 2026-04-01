@@ -33,6 +33,8 @@ test.describe('PO Workflow — API Tests', () => {
     poId = createRes.data.id;
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Submit → Approve PO', async () => {
     expect(poId).toBeDefined();
 

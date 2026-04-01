@@ -7,7 +7,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { sizePresetPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -22,9 +22,11 @@ test.describe.serial('Size Preset — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/size-presets');
@@ -60,18 +62,13 @@ test.describe.serial('Size Preset — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Size Preset/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Size Presets');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new size preset via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Size Preset/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Size Presets');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Name', `E2E Preset ${Date.now()}`);
       await antFormFill(page, 'Category', 'General');
@@ -82,10 +79,7 @@ test.describe.serial('Size Preset — CRUD', () => {
     });
 
     test('Edit existing size preset', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Size Preset/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Size Presets');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -97,10 +91,7 @@ test.describe.serial('Size Preset — CRUD', () => {
     });
 
     test('Delete size preset', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Size Preset/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Size Presets');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');

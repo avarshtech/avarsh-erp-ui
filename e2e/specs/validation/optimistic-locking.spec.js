@@ -14,6 +14,8 @@ test.describe('Optimistic Locking — API Tests', () => {
     api = await createAuthenticatedClient();
   });
 
+  test.afterAll(async () => { await api.dispose(); });
+
   test('Buyer — stale version update returns 409', async () => {
     // Get buyer
     const { data: buyer } = await api.get('/buyers/1');

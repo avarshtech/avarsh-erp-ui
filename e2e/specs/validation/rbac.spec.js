@@ -15,6 +15,8 @@ test.describe('RBAC — API Tests (Restricted User)', () => {
     viewerApi = await createAuthenticatedClient('e2e-viewer', 'admin123');
   });
 
+  test.afterAll(async () => { await viewerApi.dispose(); });
+
   test('POST /orders returns 403 (no add permission)', async () => {
     const res = await viewerApi.post('/orders', {
       buyerId: 1,

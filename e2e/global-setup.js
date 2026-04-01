@@ -13,8 +13,8 @@ import process from 'process';
 const authFile = './e2e/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
-  const username = process.env['E2E_USERNAME'] || 's';
-  const password = process.env['E2E_PASSWORD'] || 'a';
+  const username = process.env['E2E_USERNAME'] || 'superadmin';
+  const password = process.env['E2E_PASSWORD'] || 'admin123';
 
   // Listen for console errors to help debug login failures
   const consoleErrors = [];

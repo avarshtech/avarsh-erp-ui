@@ -6,7 +6,7 @@ import {
   antPopconfirmYes,
   antMessageContains,
 } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive } from '../../helpers/navigation.js';
+import { navigateWithAuth, ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import { categoryPayload } from '../../helpers/test-data.js';
 
 const MASTER_URL = '/master';
@@ -21,9 +21,11 @@ test.describe.serial('Category — CRUD', () => {
     let api;
     let createdId;
 
-    test.beforeAll(async ({ request }) => {
-      api = await createAuthenticatedClient(request);
+    test.beforeAll(async () => {
+      api = await createAuthenticatedClient();
     });
+
+    test.afterAll(async () => { await api.dispose(); });
 
     test('API — List returns data', async () => {
       const { response, data } = await api.get('/categories');
@@ -42,9 +44,9 @@ test.describe.serial('Category — CRUD', () => {
 
     test('API — Update modifies record', async () => {
       test.skip(!createdId, 'No record created to update');
-      const { data: existing } = await api.get(`/categories/${createdId}`);
-      const updated = { ...existing, description: 'Updated by E2E' };
-      const { response, data } = await api.put(`/categories/${createdId}`, updated);
+      const payload = categoryPayload();
+      payload.description = 'Updated by E2E';
+      const { response, data } = await api.put(`/categories/${createdId}`, { ...payload, version: 0 });
       expect(response.ok()).toBeTruthy();
       expect(data.description).toBe('Updated by E2E');
     });
@@ -59,18 +61,13 @@ test.describe.serial('Category — CRUD', () => {
   // ─── UI Operations ──────────────────────────────────────────────────
   test.describe('UI Operations', () => {
     test('List page loads with data', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Category/i).first().click();
-      await antTableWaitForData(page);
+      await goToMasterEntity(page, 'Categories');
       const rowCount = await page.locator('.ant-table-row').count();
       expect(rowCount).toBeGreaterThanOrEqual(0);
     });
 
     test('Create new category via form', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Category/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Categories');
       await page.getByRole('button', { name: /Add|New|Create/i }).first().click();
       await antFormFill(page, 'Name', `E2E Category ${Date.now()}`);
       await antFormFill(page, 'Description', 'Created by E2E UI test');
@@ -80,10 +77,7 @@ test.describe.serial('Category — CRUD', () => {
     });
 
     test('Edit existing category', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Category/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Categories');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to edit');
@@ -95,10 +89,7 @@ test.describe.serial('Category — CRUD', () => {
     });
 
     test('Delete category', async ({ page }) => {
-      await navigateWithAuth(page, MASTER_URL);
-      await page.getByText(/Category/i).first().click();
-      await antTableWaitForData(page);
-
+      await goToMasterEntity(page, 'Categories');
       const rows = page.locator('.ant-table-row');
       const rowCount = await rows.count();
       test.skip(rowCount === 0, 'No data to delete');
