@@ -1851,7 +1851,6 @@ const ItemMaster = () => {
                 }}
               >
                 <div
-                  className="master-form-header"
                   style={{
                     display: 'flex',
                     justifyContent: 'space-between',

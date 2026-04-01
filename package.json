@@ -12,7 +12,15 @@
     "preview": "vite preview",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
-    "test:e2e:headed": "npx playwright test --headed"
+    "test:e2e:headed": "E2E_HEADED=true npx playwright test --headed",
+    "test:e2e:master": "npx playwright test --project=master-data",
+    "test:e2e:costing": "npx playwright test --project=costing",
+    "test:e2e:orders": "npx playwright test --project=orders",
+    "test:e2e:bom": "npx playwright test --project=bom",
+    "test:e2e:po": "npx playwright test --project=po",
+    "test:e2e:admin": "npx playwright test --project=admin",
+    "test:e2e:validation": "npx playwright test --project=validation",
+    "test:e2e:legacy": "npx playwright test --project=legacy"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
