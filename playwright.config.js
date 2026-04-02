@@ -105,6 +105,20 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
+
+    // ── Full Business Flow (Costing → Order → BOM → PO) ─────
+    // Single browser window, handles its own login, no setup dependency
+    {
+      name: 'full-flow',
+      testMatch: /full-flow\.spec\.js/,
+      timeout: 480000,              // 8 minutes for the full flow
+      use: {
+        browserName: 'chromium',
+        headless: false,
+        launchOptions: { slowMo: 800 },
+        video: 'on',
+      },
+    },
   ],
   // No webServer — start `npm run dev` manually before running tests.
   // For pipeline execution, use scripts/run-e2e.sh or scripts/run-e2e.ps1.

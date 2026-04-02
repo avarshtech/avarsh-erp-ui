@@ -28,3 +28,5 @@ e2e/.auth/
 e2e-report/
 test-results/
 playwright-report/
+
+.claude/settings.local.json
