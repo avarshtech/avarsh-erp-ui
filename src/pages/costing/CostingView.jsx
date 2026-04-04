@@ -37,6 +37,7 @@ import { getCurrencySymbol } from '../../utils/orderConstants';
 import { hasPermission, canReviseCostSheet } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
+import CostingPdfPreviewModal from './CostingPdfPreviewModal';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
@@ -58,6 +59,10 @@ const CostingView = () => {
   const [reviseModalOpen, setReviseModalOpen] = useState(false);
   const [reviseReason, setReviseReason] = useState('');
   const [revising, setRevising] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
@@ -139,6 +144,26 @@ const CostingView = () => {
       message.error('Failed to revise cost sheet');
     } finally {
       setRevising(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (rejectReason.trim().length < 10) {
+      message.warning('Please provide a rejection reason (min 10 characters)');
+      return;
+    }
+    setRejecting(true);
+    try {
+      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
+      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.REJECTED, rejectionReason: rejectReason, version: data.version });
+      message.success('Cost sheet rejected');
+      setRejectModalOpen(false);
+      setRejectReason('');
+      loadData();
+    } catch {
+      message.error('Failed to reject cost sheet');
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -247,6 +272,7 @@ const CostingView = () => {
     { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 110, align: 'center' },
     { title: 'Vendor', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
     { title: 'Allowance %', dataIndex: 'allowancePct', width: 100, align: 'center', render: (v) => `${v || 0}%` },
+    { title: 'Wastage %', dataIndex: 'wastagePct', width: 100, align: 'center', render: (v) => `${v || 0}%` },
     { title: 'Net Cost', dataIndex: 'netCost', width: 120, align: 'center', render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>{formatCurrency(v, data.currency)}</Text> },
   ];
 
@@ -276,6 +302,7 @@ const CostingView = () => {
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
     { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Process', dataIndex: 'process', width: 200, align: 'center' },
+    { title: 'Vendor', dataIndex: 'vendorName', width: 160, align: 'center', ellipsis: true },
     { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v) => formatCurrency(v, data.currency) },
     { title: 'Comments', dataIndex: 'comments', align: 'center' },
   ];
@@ -308,11 +335,19 @@ const CostingView = () => {
           <Descriptions.Item label="Style #">{data.styleNo}</Descriptions.Item>
           <Descriptions.Item label="Garment Name">{data.garmentName}</Descriptions.Item>
           <Descriptions.Item label="Season">{data.season || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Costing Type"><Tag color="blue">{data.costingType || 'FOB'}</Tag></Descriptions.Item>
+          <Descriptions.Item label="Pricing Unit">{data.pricingUnit === 'DOZEN' ? 'Per Dozen' : 'Per Piece'}</Descriptions.Item>
           <Descriptions.Item label="Costing Currency">{data.currency}</Descriptions.Item>
           <Descriptions.Item label="Quote Currency">{data.quoteCurrency}</Descriptions.Item>
           <Descriptions.Item label="Actual Rate">{data.actualRate}</Descriptions.Item>
           <Descriptions.Item label="Today's Rate">{data.todaysRate}</Descriptions.Item>
           <Descriptions.Item label="Sizes">{(data.sizes || []).join(', ') || '-'}</Descriptions.Item>
+          {data.scenarioName && (
+            <Descriptions.Item label="Scenario"><Tag color="purple">{data.scenarioName}</Tag></Descriptions.Item>
+          )}
+          {data.rejectionReason && (
+            <Descriptions.Item label="Rejection Reason" span={3}><Text type="danger">{data.rejectionReason}</Text></Descriptions.Item>
+          )}
         </Descriptions>
       ),
     },
@@ -478,9 +513,9 @@ const CostingView = () => {
           <Row gutter={[16, 16]} align="middle">
             <Col xs={12} md={6}>
               <Card size="small" style={{ textAlign: 'center', borderColor: '#6366f1' }}>
-                <Text style={{ color: '#6366f1', fontSize: 12, display: 'block' }}>Total Price (INR)</Text>
+                <Text style={{ color: '#6366f1', fontSize: 12, display: 'block' }}>Total Price ({data.currency})</Text>
                 <Text style={{ color: '#6366f1', fontSize: 26, fontWeight: 800, display: 'block' }}>
-                  {getCurrencySymbol('INR')} {data.totalPrice?.toFixed(2)}
+                  {getCurrencySymbol(data.currency)} {data.totalPrice?.toFixed(2)}
                 </Text>
               </Card>
             </Col>
@@ -565,9 +600,13 @@ const CostingView = () => {
           {canAdd && (
             <ActionButton action="duplicate" text="Duplicate" onClick={handleDuplicate} loading={duplicating} />
           )}
-          <ActionButton action="print" text="Print / PDF" onClick={handlePrint} loading={printing} />
+          <ActionButton action="print" text="Preview / PDF" onClick={() => setPdfPreviewOpen(true)} />
+          <ActionButton action="print" text="Direct Print" onClick={handlePrint} loading={printing} />
           {data.status === COSTING_STATUS.FINAL && canApprove && (
             <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
+          )}
+          {data.status === COSTING_STATUS.FINAL && canApprove && (
+            <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
           )}
           {data.status === COSTING_STATUS.FINAL && canRevise && (
             <ActionButton
@@ -706,6 +745,38 @@ const CostingView = () => {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* PDF Preview Modal */}
+      <CostingPdfPreviewModal
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        costSheetData={data}
+      />
+
+      {/* Reject Modal */}
+      <Modal
+        title="Reject Cost Sheet"
+        open={rejectModalOpen}
+        onCancel={() => { setRejectModalOpen(false); setRejectReason(''); }}
+        onOk={handleReject}
+        okText="Reject"
+        okType="danger"
+        confirmLoading={rejecting}
+        centered
+        width={480}
+      >
+        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+          Please provide a reason for rejecting this cost sheet.
+        </Text>
+        <Input.TextArea
+          rows={3}
+          placeholder="Reason for rejection..."
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          maxLength={1000}
+          showCount
+        />
       </Modal>
     </div>
   );

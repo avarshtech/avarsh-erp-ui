@@ -101,10 +101,12 @@ const CostComparison = () => {
   const comparisonFields = [
     { label: 'Costing ID', key: 'costingId', type: 'text' },
     { label: 'Status', key: 'status', type: 'status' },
+    { label: 'Costing Type', key: 'costingType', type: 'text' },
     { label: 'Buyer', key: 'buyerName', type: 'text' },
     { label: 'Style #', key: 'styleNo', type: 'text' },
     { label: 'Garment Name', key: 'garmentName', type: 'text' },
     { label: 'Season', key: 'season', type: 'text' },
+    { label: 'Pricing Unit', key: 'pricingUnit', type: 'text' },
     { label: 'Currency', key: 'currency', type: 'text' },
     { label: 'Quote Currency', key: 'quoteCurrency', type: 'text' },
     { label: 'Actual Rate', key: 'actualRate', type: 'number' },

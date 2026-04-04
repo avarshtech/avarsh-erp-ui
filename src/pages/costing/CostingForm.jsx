@@ -22,6 +22,9 @@ import {
   Skeleton,
   Modal,
   Image,
+  Segmented,
+  Alert,
+  Progress,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -55,6 +58,8 @@ import {
   COSTING_STATUS,
   FABRIC_CLASSIFICATIONS,
   CURRENCIES,
+  COSTING_TYPES,
+  PRICING_UNITS,
   ALLOWED_FILE_TYPES,
   MAX_FILE_SIZE_MB,
   ATTACHMENT_CATEGORIES,
@@ -77,7 +82,7 @@ import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService
 import { searchItems } from '../../services/itemService';
 import { getAllCategories } from '../../services/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/processService';
-import { getActiveOverheads, createOverhead } from '../../services/overheadService';
+import { getSuppliers } from '../../services/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
@@ -85,6 +90,11 @@ import KnitsConsumptionModal from './KnitsConsumptionModal';
 import FileUpload from '../../components/FileUpload';
 import TechpackImportModal from './TechpackImportModal';
 import ConsumptionCalcModal from './ConsumptionCalcModal';
+import WovenConsumptionModal from './WovenConsumptionModal';
+import BomImportModal from './BomImportModal';
+import CostingPdfPreviewModal from './CostingPdfPreviewModal';
+import CostingTemplateModal from './CostingTemplateModal';
+import BuyerPriceTrendModal from './BuyerPriceTrendModal';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
@@ -129,6 +139,12 @@ const CostingForm = () => {
   const [fileList, setFileList] = useState({ TECHPACK: [], MEASUREMENT_CHART: [], OTHER: [] });
   const [usdToInrRate, setUsdToInrRate] = useState(83.80);
   const [styleId, setStyleId] = useState(null);
+  const [costingType, setCostingType] = useState('FOB');
+  const [pricingUnit, setPricingUnit] = useState('PIECE');
+  const [fabricNotes, setFabricNotes] = useState('');
+  const [trimsNotes, setTrimsNotes] = useState('');
+  const [manufacturingNotes, setManufacturingNotes] = useState('');
+  const [overheadNotes, setOverheadNotes] = useState('');
 
   // Style image (view-only)
   const [styleImageUrl, setStyleImageUrl] = useState(null);
@@ -152,6 +168,7 @@ const CostingForm = () => {
   const [importedTrimOptions, setImportedTrimOptions] = useState([]);
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
+  const [supplierOptions, setSupplierOptions] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);
 
   // Quick Add modal state
@@ -170,7 +187,7 @@ const CostingForm = () => {
   const [quickAddStyleImageUrl, setQuickAddStyleImageUrl] = useState(null);  // blob preview
   const canAddStyle = hasPermission('style-master', 'add');
   const canAddProcess = hasPermission('process-master', 'add');
-  const canAddOverhead = hasPermission('overhead-master', 'add');
+  const canAddOverhead = hasPermission('process-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
@@ -202,6 +219,16 @@ const CostingForm = () => {
   const [consumptionModalOpen, setConsumptionModalOpen] = useState(false);
   const [consumptionRowKey, setConsumptionRowKey]       = useState(null);
   const [consumptionFabricRow, setConsumptionFabricRow] = useState(null);
+  const [wovenModalOpen, setWovenModalOpen]             = useState(false);
+  const [wovenRowKey, setWovenRowKey]                   = useState(null);
+  const [bomImportOpen, setBomImportOpen]               = useState(false);
+  const [pdfPreviewOpen, setPdfPreviewOpen]             = useState(false);
+  const [pdfPreviewData, setPdfPreviewData]             = useState(null);
+  const [templateModalOpen, setTemplateModalOpen]       = useState(false);
+  const [templateModalMode, setTemplateModalMode]       = useState('load');
+  const [priceTrendOpen, setPriceTrendOpen]             = useState(false);
+  const [scenarioName, setScenarioName]                 = useState('');
+  const [scenarioGroupId, setScenarioGroupId]           = useState(null);
 
   // Past PO suggestions
   const [poSuggestions, setPOSuggestions] = useState([]);
@@ -276,10 +303,11 @@ const CostingForm = () => {
           }
         }
 
-        // Fetch processes (Manufacturing) and overheads from their dedicated masters
-        const [mfgResult, ovhResult] = await Promise.allSettled([
+        // Fetch processes (Manufacturing), processes (Overheads), and suppliers
+        const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
           getActiveProcesses('Manufacturing'),
-          getActiveOverheads(),
+          getActiveProcesses('Overheads'),
+          getSuppliers(),
         ]);
         if (mfgResult.status === 'fulfilled') {
           const procs = Array.isArray(mfgResult.value) ? mfgResult.value : mfgResult.value?.data || [];
@@ -287,7 +315,11 @@ const CostingForm = () => {
         }
         if (ovhResult.status === 'fulfilled') {
           const ovhs = Array.isArray(ovhResult.value) ? ovhResult.value : ovhResult.value?.data || [];
-          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.overheadName, defaultCost: o.defaultCost || 0 })));
+          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.processName, defaultCost: o.defaultCost || 0 })));
+        }
+        if (suppResult.status === 'fulfilled') {
+          const supps = Array.isArray(suppResult.value) ? suppResult.value : suppResult.value?.data || [];
+          setSupplierOptions(supps.filter((s) => s.isActive !== false).map((s) => ({ value: s.id, label: s.name })));
         }
       } catch {
         // Fallback to empty arrays — dropdowns will be empty
@@ -324,6 +356,14 @@ const CostingForm = () => {
       setTargetPrice('');
       setPerSizeOverrides({});
       setSyncPercentages(true);
+      setCostingType('FOB');
+      setPricingUnit('PIECE');
+      setFabricNotes('');
+      setTrimsNotes('');
+      setManufacturingNotes('');
+      setOverheadNotes('');
+      setScenarioName('');
+      setScenarioGroupId(null);
       setIsDirty(false);
     }
   }, [id]);
@@ -389,6 +429,14 @@ const CostingForm = () => {
       setAgentCommissionPct(cs.agentCommissionPct || 0);
       setProfitPct(cs.profitPct || 0);
       setTargetPrice(cs.targetPrice || '');
+      setCostingType(cs.costingType || 'FOB');
+      setPricingUnit(cs.pricingUnit || 'PIECE');
+      setFabricNotes(cs.fabricNotes || '');
+      setTrimsNotes(cs.trimsNotes || '');
+      setManufacturingNotes(cs.manufacturingNotes || '');
+      setOverheadNotes(cs.overheadNotes || '');
+      setScenarioName(cs.scenarioName || '');
+      setScenarioGroupId(cs.scenarioGroupId || null);
       // Load categorized attachments from file storage API
       if (cs.id) {
         getAttachments(cs.id).then((attachments) => {
@@ -502,8 +550,9 @@ const CostingForm = () => {
   }, [overheadRows]);
 
   const totalMakingPrice = useMemo(() => {
-    return calcTotalMakingPrice(totalFabricCost, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost);
-  }, [totalFabricCost, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost]);
+    const fabricForCalc = costingType === 'CMT' ? 0 : totalFabricCost;
+    return calcTotalMakingPrice(fabricForCalc, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost);
+  }, [totalFabricCost, totalAccessoriesCost, totalManufacturingCost, totalMarkupCost, costingType]);
 
   const totalOverheadCharges = useMemo(() => {
     return calcTotalOverheadCharges(agentCommissionPct, profitPct, totalMakingPrice);
@@ -773,7 +822,7 @@ const CostingForm = () => {
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = { ...r, [field]: value };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
         return updated;
       })
     );
@@ -973,7 +1022,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, overheadId: null, description: '', cost: '', comments: '', sizes: '' },
+      { key: `o_${Date.now()}`, processId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1009,7 +1058,7 @@ const CostingForm = () => {
         if (r.key !== knitsRowKey) return r;
         const finalConsumption = Math.round(totalConsumption * 10000) / 10000;
         const updated = { ...r, consumption: finalConsumption, knitsParts: parts };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
         return updated;
       })
     );
@@ -1037,7 +1086,7 @@ const CostingForm = () => {
             sizes:       size,
             consumption: c,
             uom:         source.uom || result.uom,
-            netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct),
+            netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct, source.wastagePct),
           };
         });
         return [...prev.filter((r) => r.key !== consumptionRowKey), ...newRows];
@@ -1047,7 +1096,7 @@ const CostingForm = () => {
         prev.map((r) => {
           if (r.key !== consumptionRowKey) return r;
           const updated = { ...r, consumption: result.consumption, uom: r.uom || result.uom };
-          updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct);
+          updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
           return updated;
         })
       );
@@ -1130,6 +1179,14 @@ const CostingForm = () => {
       agentCommissionPct,
       profitPct,
       targetPrice,
+      costingType,
+      pricingUnit,
+      fabricNotes,
+      trimsNotes,
+      manufacturingNotes,
+      overheadNotes,
+      scenarioName,
+      scenarioGroupId,
       totalFabricCost,
       totalLocalTrimsCost,
       totalImportedTrimsCostUsd,
@@ -1282,6 +1339,14 @@ const CostingForm = () => {
         agentCommissionPct,
         profitPct,
         targetPrice,
+        costingType,
+        pricingUnit,
+        fabricNotes,
+        trimsNotes,
+        manufacturingNotes,
+        overheadNotes,
+        scenarioName,
+        scenarioGroupId,
         totalFabricCost,
         totalLocalTrimsCost,
         totalImportedTrimsCostUsd,
@@ -1593,6 +1658,24 @@ const CostingForm = () => {
       ),
     },
     {
+      title: 'Wastage %',
+      dataIndex: 'wastagePct',
+      width: 100,
+      render: (val, record) => (
+        <InputNumber
+          value={val}
+          min={0}
+          max={100}
+          controls={false}
+          placeholder="%"
+          onChange={(v) => updateFabricRow(record.key, 'wastagePct', v)}
+          size="small"
+          style={{ width: '100%' }}
+          {...numericInputProps}
+        />
+      ),
+    },
+    {
       title: `Net Cost (${getCurrencySymbol(currency)})`,
       dataIndex: 'netCost',
       width: 120,
@@ -1604,9 +1687,14 @@ const CostingForm = () => {
     },
     {
       title: '',
-      width: 80,
+      width: 110,
       render: (_, record) => (
         <Space size={0}>
+          {record.classification === 'Woven' && (
+            <Tooltip title="Woven Consumption Calculator">
+              <Button type="text" size="small" icon={<CalculatorOutlined />} onClick={() => { setWovenRowKey(record.key); setWovenModalOpen(true); }} />
+            </Tooltip>
+          )}
           <ActionButton action="duplicate" onClick={() => duplicateFabricRow(record.key)} />
           <ActionButton action="delete" onClick={() => deleteFabricRow(record.key)} />
         </Space>
@@ -1806,8 +1894,8 @@ const CostingForm = () => {
   const effectiveOvhOptions = useMemo(() => {
     const apiIds = new Set(overheadItems.map((o) => o.value));
     const extras = overheadRows
-      .filter((r) => r.overheadId && !apiIds.has(r.overheadId))
-      .map((r) => ({ value: r.overheadId, label: r.description || `Overhead #${r.overheadId}` }));
+      .filter((r) => r.processId && !apiIds.has(r.processId))
+      .map((r) => ({ value: r.processId, label: r.description || `Overhead #${r.processId}` }));
     return [...overheadItems, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
   }, [overheadItems, overheadRows]);
 
@@ -1864,6 +1952,24 @@ const CostingForm = () => {
       ),
     },
     {
+      title: 'Vendor',
+      dataIndex: 'vendorId',
+      width: 170,
+      render: (val, record) => (
+        <Select
+          value={record.vendorId || undefined}
+          style={{ width: '100%' }}
+          options={supplierOptions}
+          showSearch
+          optionFilterProp="label"
+          placeholder="Vendor"
+          allowClear
+          onChange={(v, opt) => updateManufacturingRow(record.key, { vendorId: v || null, vendorName: opt?.label || '' })}
+          size="small"
+        />
+      ),
+    },
+    {
       title: `Cost (${getCurrencySymbol(currency)})`,
       dataIndex: 'cost',
       width: 130,
@@ -1911,20 +2017,20 @@ const CostingForm = () => {
     },
     {
       title: 'Description',
-      dataIndex: 'overheadId',
+      dataIndex: 'processId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={record.overheadId || undefined}
+          value={record.processId || undefined}
           style={{ width: '100%' }}
           options={effectiveOvhOptions}
           showSearch
           optionFilterProp="label"
-          placeholder="Select category"
+          placeholder="Select overhead"
           onChange={(v, opt) => {
             const defaultCost = opt.defaultCost || 0;
             updateOverheadRow(record.key, {
-              overheadId: v,
+              processId: v,
               description: opt.label,
               ...(defaultCost > 0 && !record.cost ? { cost: defaultCost } : {}),
             });
@@ -1994,7 +2100,7 @@ const CostingForm = () => {
                 </Col>
               )}
               <Col xs={24} md={8}>
-                <Form.Item label="Buyer" name="buyerId" rules={[{ required: true, message: 'Buyer is required' }]}>
+                <Form.Item label={<Space>Buyer {form.getFieldValue('buyerId') && <Tooltip title="Buyer Price Trend"><Button type="link" size="small" icon={<BarChartOutlined />} style={{ padding: 0, height: 'auto' }} onClick={() => setPriceTrendOpen(true)} /></Tooltip>}</Space>} name="buyerId" rules={[{ required: true, message: 'Buyer is required' }]}>
                   <Select
                     showSearch
                     optionFilterProp="label"
@@ -2065,6 +2171,25 @@ const CostingForm = () => {
                 </Form.Item>
               </Col>
               <Col xs={12} md={6}>
+                <Form.Item label="Costing Type">
+                  <Select
+                    value={costingType}
+                    options={COSTING_TYPES}
+                    onChange={(v) => { setCostingType(v); setIsDirty(true); }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
+                <Form.Item label="Pricing Unit">
+                  <Segmented
+                    value={pricingUnit}
+                    options={PRICING_UNITS}
+                    onChange={(v) => { setPricingUnit(v); setIsDirty(true); }}
+                    block
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={12} md={6}>
                 <Form.Item label="Costing Currency" name="currency" rules={[{ required: true }]}>
                   <Select
                     options={CURRENCIES}
@@ -2098,12 +2223,22 @@ const CostingForm = () => {
                   <InputNumber value={todaysRate} disabled style={{ width: '100%', height: 40 }} />
                 </Form.Item>
               </Col>
-              <Col xs={24}>
+              <Col xs={16}>
                 <Form.Item label="Sizes" name="sizes">
                   <Select
                     mode="tags"
                     placeholder="Enter sizes (e.g. S, M, L, XL)"
                     style={{ width: '100%' }}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={8}>
+                <Form.Item label="Scenario Name">
+                  <Input
+                    value={scenarioName}
+                    onChange={(e) => { setScenarioName(e.target.value); setIsDirty(true); }}
+                    placeholder="e.g. Option A — Cotton Body"
+                    maxLength={100}
                   />
                 </Form.Item>
               </Col>
@@ -2212,6 +2347,9 @@ const CostingForm = () => {
       style: sectionHeaderStyle('var(--info-color)'),
       children: (
         <>
+          {costingType === 'CMT' && (
+            <Alert type="info" showIcon message="CMT Mode: Fabric cost is excluded from the total price — fabric is supplied by buyer." style={{ marginBottom: 12 }} />
+          )}
           <Table
             dataSource={fabricRows}
             columns={fabricColumns}
@@ -2242,6 +2380,14 @@ const CostingForm = () => {
             text="Add Fabric"
             color="var(--info-color)"
             onClick={addFabricRow}
+            style={{ marginTop: 12 }}
+          />
+          <Input.TextArea
+            value={fabricNotes}
+            onChange={(e) => { setFabricNotes(e.target.value); setIsDirty(true); }}
+            placeholder="Fabric section notes / remarks..."
+            maxLength={1000}
+            autoSize={{ minRows: 1, maxRows: 3 }}
             style={{ marginTop: 12 }}
           />
         </>
@@ -2341,6 +2487,14 @@ const CostingForm = () => {
               (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {actualRate} rate)
             </Text>
           </Card>
+          <Input.TextArea
+            value={trimsNotes}
+            onChange={(e) => { setTrimsNotes(e.target.value); setIsDirty(true); }}
+            placeholder="Trims section notes / remarks..."
+            maxLength={1000}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            style={{ marginTop: 12 }}
+          />
         </>
       ),
     },
@@ -2389,6 +2543,14 @@ const CostingForm = () => {
             onClick={addManufacturingRow}
             style={{ marginTop: 12 }}
           />
+          <Input.TextArea
+            value={manufacturingNotes}
+            onChange={(e) => { setManufacturingNotes(e.target.value); setIsDirty(true); }}
+            placeholder="Manufacturing section notes / remarks..."
+            maxLength={1000}
+            autoSize={{ minRows: 1, maxRows: 3 }}
+            style={{ marginTop: 12 }}
+          />
         </>
       ),
     },
@@ -2435,6 +2597,14 @@ const CostingForm = () => {
             text="Add Overhead"
             color="#ef4444"
             onClick={addOverheadRow}
+            style={{ marginTop: 12 }}
+          />
+          <Input.TextArea
+            value={overheadNotes}
+            onChange={(e) => { setOverheadNotes(e.target.value); setIsDirty(true); }}
+            placeholder="Overhead section notes / remarks..."
+            maxLength={1000}
+            autoSize={{ minRows: 1, maxRows: 3 }}
             style={{ marginTop: 12 }}
           />
         </>
@@ -2495,6 +2665,30 @@ const CostingForm = () => {
               />
             </Col>
           </Row>
+
+          {/* Cost % Breakdown Bar */}
+          {totalMakingPrice > 0 && (
+            <div style={{ margin: '16px 0 8px' }}>
+              <Text type="secondary" style={{ fontSize: 12, marginBottom: 6, display: 'block' }}>Cost Composition</Text>
+              <div style={{ display: 'flex', height: 22, borderRadius: 6, overflow: 'hidden', fontSize: 11, fontWeight: 600, color: '#fff' }}>
+                {[
+                  { val: costingType === 'CMT' ? 0 : totalFabricCost, color: '#3b82f6', label: 'Fabric' },
+                  { val: totalAccessoriesCost, color: '#8b5cf6', label: 'Trims' },
+                  { val: totalManufacturingCost, color: '#f59e0b', label: 'Mfg' },
+                  { val: totalMarkupCost, color: '#ef4444', label: 'Overhead' },
+                ].filter((s) => s.val > 0).map((s) => {
+                  const pct = ((s.val / totalMakingPrice) * 100).toFixed(1);
+                  return (
+                    <Tooltip key={s.label} title={`${s.label}: ${formatCurrency(s.val, currency)} (${pct}%)`}>
+                      <div style={{ width: `${pct}%`, background: s.color, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: pct > 8 ? undefined : 0, transition: 'width 0.3s' }}>
+                        {parseFloat(pct) > 12 ? `${s.label} ${pct}%` : parseFloat(pct) > 6 ? `${pct}%` : ''}
+                      </div>
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <Divider style={{ margin: '16px 0' }} />
 
@@ -2599,6 +2793,17 @@ const CostingForm = () => {
               </Card>
             </Col>
           </Row>
+
+          {/* Per-Dozen / Per-Piece conversion */}
+          {pricingUnit === 'DOZEN' && totalPrice > 0 && (
+            <div style={{ marginTop: 12, padding: '8px 16px', borderRadius: 8, background: isDarkMode ? 'rgba(99, 102, 241, 0.06)' : 'rgba(99, 102, 241, 0.03)', border: '1px dashed var(--border-color)' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Per-Piece Equivalent: </Text>
+              <Text strong style={{ fontSize: 14 }}>{getCurrencySymbol(currency)} {(totalPrice / 12).toFixed(2)}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}> | </Text>
+              <Text strong style={{ fontSize: 14, color: '#3b82f6' }}>$ {(finalPriceUsd / 12).toFixed(2)}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}> per piece (÷12)</Text>
+            </div>
+          )}
 
           {/* Per-Size Breakdown */}
           {perSizeSummaries.length > 0 && (
@@ -2765,11 +2970,20 @@ const CostingForm = () => {
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
         <Space>
+          {styleId && (
+            <ActionButton
+              action="upload"
+              text="Import from BOM"
+              onClick={() => setBomImportOpen(true)}
+            />
+          )}
           <ActionButton
             action="upload"
             text="Import from Techpack"
             onClick={() => setTechpackModalOpen(true)}
           />
+          <Button onClick={() => { setTemplateModalMode('load'); setTemplateModalOpen(true); }}>Load Template</Button>
+          <Button onClick={() => { setTemplateModalMode('save'); setTemplateModalOpen(true); }}>Save as Template</Button>
           <ActionButton
             action="save"
             variant="draft"
@@ -2825,6 +3039,69 @@ const CostingForm = () => {
         onApply={handleConsumptionApply}
         onOpenKnitsCalc={handleOpenKnitsCalcFromAI}
         fabricRow={consumptionFabricRow}
+      />
+
+      {/* Woven Consumption Calculator Modal */}
+      <WovenConsumptionModal
+        open={wovenModalOpen}
+        onCancel={() => setWovenModalOpen(false)}
+        onApply={(consumption) => {
+          if (wovenRowKey) {
+            updateFabricRow(wovenRowKey, 'consumption', consumption);
+          }
+          setWovenModalOpen(false);
+        }}
+      />
+
+      {/* BOM Import Modal */}
+      <BomImportModal
+        open={bomImportOpen}
+        onClose={() => setBomImportOpen(false)}
+        styleId={styleId}
+        onApply={({ fabricRows: fr, localTrims: lt, importedTrims: it }) => {
+          if (fr?.length) setFabricRows((prev) => [...prev, ...fr]);
+          if (lt?.length) setLocalTrims((prev) => [...prev, ...lt]);
+          if (it?.length) setImportedTrims((prev) => [...prev, ...it]);
+          setIsDirty(true);
+          message.success('BOM data imported successfully');
+        }}
+      />
+
+      {/* PDF Preview Modal */}
+      <CostingPdfPreviewModal
+        open={pdfPreviewOpen}
+        onClose={() => setPdfPreviewOpen(false)}
+        costSheetData={pdfPreviewData}
+      />
+
+      {/* Costing Template Modal */}
+      <CostingTemplateModal
+        open={templateModalOpen}
+        onClose={() => setTemplateModalOpen(false)}
+        mode={templateModalMode}
+        currentData={{
+          fabricRows,
+          localTrims,
+          importedTrims,
+          manufacturingRows,
+          overheadRows,
+        }}
+        onApply={(templateData) => {
+          if (templateData.fabricRows?.length) setFabricRows(templateData.fabricRows.map((r, i) => ({ ...r, key: `tf_${Date.now()}_${i}` })));
+          if (templateData.localTrims?.length) setLocalTrims(templateData.localTrims.map((r, i) => ({ ...r, key: `tlt_${Date.now()}_${i}` })));
+          if (templateData.importedTrims?.length) setImportedTrims(templateData.importedTrims.map((r, i) => ({ ...r, key: `tit_${Date.now()}_${i}` })));
+          if (templateData.manufacturingRows?.length) setManufacturingRows(templateData.manufacturingRows.map((r, i) => ({ ...r, key: `tm_${Date.now()}_${i}` })));
+          if (templateData.overheadRows?.length) setOverheadRows(templateData.overheadRows.map((r, i) => ({ ...r, key: `to_${Date.now()}_${i}` })));
+          setIsDirty(true);
+        }}
+      />
+
+      {/* Buyer Price Trend Modal */}
+      <BuyerPriceTrendModal
+        open={priceTrendOpen}
+        onClose={() => setPriceTrendOpen(false)}
+        buyerId={form.getFieldValue('buyerId')}
+        buyerName={buyerOptions.find((b) => b.value === form.getFieldValue('buyerId'))?.label}
       />
 
       {/* Quick Add Process Modal */}
@@ -2892,16 +3169,16 @@ const CostingForm = () => {
         <Form form={quickAddOverheadForm} layout="vertical" onFinish={async (values) => {
           setQuickAddOverheadLoading(true);
           try {
-            const created = await createOverhead({ ...values, isActive: true });
-            setOverheadItems((prev) => [...prev, { value: created.id, label: created.overheadName, defaultCost: created.defaultCost || 0 }]);
+            const created = await createProcess({ processName: values.processName, defaultCost: values.defaultCost, category: 'Overheads', isActive: true });
+            setOverheadItems((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
             if (pendingOvhRowKey) {
               updateOverheadRow(pendingOvhRowKey, {
-                overheadId: created.id,
-                description: created.overheadName,
+                processId: created.id,
+                description: created.processName,
                 ...(values.defaultCost > 0 ? { cost: values.defaultCost } : {}),
               });
             }
-            message.success(`Overhead "${created.overheadName}" created`);
+            message.success(`Overhead "${created.processName}" created`);
             setQuickAddOverheadOpen(false);
             quickAddOverheadForm.resetFields();
           } catch {
@@ -2910,7 +3187,7 @@ const CostingForm = () => {
             setQuickAddOverheadLoading(false);
           }
         }}>
-          <Form.Item name="overheadName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
+          <Form.Item name="processName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
             <Input placeholder="e.g. Testing Fees, Freight, Commission" maxLength={200} />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">

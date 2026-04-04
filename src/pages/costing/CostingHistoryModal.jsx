@@ -56,7 +56,7 @@ const SUMMARY_FIELDS = [
   { key: 'agentCommissionPct', label: 'Agent Commission %', type: 'percent' },
   { key: 'profitPct', label: 'Profit %', type: 'percent' },
   { key: 'totalOverheadCharges', label: 'Overhead Charges', type: 'currency' },
-  { key: 'totalPrice', label: 'Total Price (INR)', type: 'currency', highlight: true },
+  { key: 'totalPrice', label: 'Total Price', type: 'currency', highlight: true },
   { key: 'finalPrice', label: 'Final Price', type: 'quoteCurrency', highlight: true },
   { key: 'finalPriceUsd', label: 'Final Price (USD)', type: 'currency_usd', highlight: true },
 ];
@@ -485,7 +485,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
             <Statistic title="Overhead" value={snap.totalOverheadCharges || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#64748b' }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Total Price (INR)" value={snap.totalPrice || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }} />
+            <Statistic title="Total Price" value={snap.totalPrice || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }} />
           </Col>
           <Col xs={12} md={4}>
             <Statistic title="Final Price (USD)" value={snap.finalPriceUsd || snap.finalPrice || 0} prefix="$" precision={2} valueStyle={{ fontSize: 15, fontWeight: 700, color: '#3b82f6' }} />

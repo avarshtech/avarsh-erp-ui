@@ -810,4 +810,5 @@ export const generateCostingPdf = async (costSheetData, options = {}) => {
   }
 };
 
-export default { generateCostingPdf };
+export { buildCostingHtml };
+export default { generateCostingPdf, buildCostingHtml };

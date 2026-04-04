@@ -282,6 +282,21 @@ const CostingList = () => {
       render: (val) => val || '-',
     },
     {
+      title: 'Type',
+      dataIndex: 'costingType',
+      key: 'costingType',
+      width: 70,
+      render: (val) => val || 'FOB',
+    },
+    {
+      title: 'Scenario',
+      dataIndex: 'scenarioName',
+      key: 'scenarioName',
+      width: 140,
+      ellipsis: true,
+      render: (val) => val || '-',
+    },
+    {
       title: 'Total Price',
       dataIndex: 'totalPrice',
       key: 'totalPrice',

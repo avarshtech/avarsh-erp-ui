@@ -310,3 +310,47 @@ export const sendWhatsAppNotification = async (phoneNumber, templateName, langua
   });
   return response.data;
 };
+
+// ==================== SCENARIOS ====================
+
+export const getScenarios = async (costSheetId) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/${costSheetId}/scenarios`);
+  return response.data ?? [];
+};
+
+// ==================== TEMPLATES ====================
+
+export const getTemplates = async () => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/templates`);
+  return response.data ?? [];
+};
+
+export const getTemplateById = async (id) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/templates/${id}`);
+  return response.data;
+};
+
+export const saveTemplate = async (data) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/templates`, data);
+  return response.data;
+};
+
+export const deleteTemplate = async (id) => {
+  await axiosInstance.delete(`${ENDPOINTS.COST_SHEETS}/templates/${id}`);
+};
+
+// ==================== BOM IMPORT ====================
+
+export const getBomsByStyleId = async (styleId) => {
+  const response = await axiosInstance.get(`/boms/by-style/${styleId}`);
+  return response.data ?? [];
+};
+
+// ==================== BUYER PRICE TREND ====================
+
+export const getBuyerPriceTrend = async (buyerId) => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/buyer-price-trend`, {
+    params: { buyerId },
+  });
+  return response.data ?? [];
+};

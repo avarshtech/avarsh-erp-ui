@@ -17,12 +17,14 @@ export const COSTING_STATUS = {
   DRAFT: 'Draft',
   FINAL: 'Final',
   APPROVED: 'Approved',
+  REJECTED: 'Rejected',
 };
 
 export const STATUS_LABELS = {
   [COSTING_STATUS.DRAFT]: 'Draft',
   [COSTING_STATUS.FINAL]: 'Final',
   [COSTING_STATUS.APPROVED]: 'Approved',
+  [COSTING_STATUS.REJECTED]: 'Rejected',
 };
 
 export const getStatusLabel = (status) => {
@@ -32,24 +34,46 @@ export const getStatusLabel = (status) => {
 
 export const STATUS_TRANSITIONS = {
   [COSTING_STATUS.DRAFT]: [COSTING_STATUS.FINAL],
-  [COSTING_STATUS.FINAL]: [COSTING_STATUS.APPROVED, COSTING_STATUS.DRAFT],
+  [COSTING_STATUS.FINAL]: [COSTING_STATUS.APPROVED, COSTING_STATUS.DRAFT, COSTING_STATUS.REJECTED],
   [COSTING_STATUS.APPROVED]: [],
+  [COSTING_STATUS.REJECTED]: [COSTING_STATUS.DRAFT],
 };
 
-export const EDITABLE_STATUSES = [COSTING_STATUS.DRAFT];
-export const DELETABLE_STATUSES = [COSTING_STATUS.DRAFT];
+export const EDITABLE_STATUSES = [COSTING_STATUS.DRAFT, COSTING_STATUS.REJECTED];
+export const DELETABLE_STATUSES = [COSTING_STATUS.DRAFT, COSTING_STATUS.REJECTED];
 
 export const STATUS_COLORS = {
   [COSTING_STATUS.DRAFT]: 'default',
   [COSTING_STATUS.FINAL]: 'blue',
   [COSTING_STATUS.APPROVED]: 'green',
+  [COSTING_STATUS.REJECTED]: 'red',
 };
+
+// ==================== COSTING TYPES ====================
+
+export const COSTING_TYPES = [
+  { value: 'FOB', label: 'FOB (Free On Board)' },
+  { value: 'CMT', label: 'CMT (Cut-Make-Trim)' },
+  { value: 'CIF', label: 'CIF (Cost Insurance Freight)' },
+];
+
+// ==================== PRICING UNITS ====================
+
+export const PRICING_UNITS = [
+  { value: 'PIECE', label: 'Per Piece' },
+  { value: 'DOZEN', label: 'Per Dozen' },
+];
 
 // ==================== SEASONS ====================
 
 export const SEASON_CODES = [
   { value: 'SS', label: 'Spring/Summer' },
   { value: 'AW', label: 'Autumn/Winter' },
+  { value: 'RS', label: 'Resort' },
+  { value: 'PF', label: 'Pre-Fall' },
+  { value: 'HO', label: 'Holiday' },
+  { value: 'CR', label: 'Cruise' },
+  { value: 'CA', label: 'Capsule' },
 ];
 
 export const SEASON_YEARS = Array.from({ length: 7 }, (_, i) => {
@@ -85,6 +109,12 @@ export const FABRIC_TYPES = [
   { value: 'Tencel', label: 'Tencel' },
   { value: 'Silk', label: 'Silk' },
   { value: 'Denim', label: 'Denim' },
+  { value: 'Modal', label: 'Modal' },
+  { value: 'Bamboo', label: 'Bamboo' },
+  { value: 'Recycled Polyester', label: 'Recycled Polyester' },
+  { value: 'Organic Cotton', label: 'Organic Cotton' },
+  { value: 'CVC (Chief Value Cotton)', label: 'CVC (Chief Value Cotton)' },
+  { value: 'TC Blend', label: 'TC Blend' },
 ];
 
 // ==================== TRIMS / ACCESSORIES ====================
@@ -197,13 +227,14 @@ export const generateCostingId = () => {
 
 /**
  * Calculate fabric net cost per row
- * Net Cost = Consumption × Fabric Price × (1 + Allowance%)
+ * Net Cost = Consumption × Fabric Price × (1 + Allowance%) × (1 + Wastage%)
  */
-export const calcFabricNetCost = (consumption, fabricPrice, allowancePct = 0) => {
+export const calcFabricNetCost = (consumption, fabricPrice, allowancePct = 0, wastagePct = 0) => {
   const c = Number(consumption) || 0;
   const p = Number(fabricPrice) || 0;
   const a = Number(allowancePct) || 0;
-  return c * p * (1 + a / 100);
+  const w = Number(wastagePct) || 0;
+  return c * p * (1 + a / 100) * (1 + w / 100);
 };
 
 /**
