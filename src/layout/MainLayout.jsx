@@ -32,6 +32,7 @@ import {
   MenuOutlined,
   CloseOutlined,
   BarChartOutlined,
+  ScissorOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
@@ -321,6 +322,16 @@ const MainLayoutInner = () => {
       children: [
         { key: "/purchase-orders/list", label: "PO List" },
         { key: "/purchase-orders/new", label: "New PO" },
+      ],
+    },
+    {
+      key: "/work-orders",
+      icon: <ScissorOutlined />,
+      label: "Work Orders",
+      moduleId: "work-orders",
+      children: [
+        { key: "/work-orders/list", label: "WO List" },
+        { key: "/work-orders/new", label: "New Work Order" },
       ],
     },
     {
