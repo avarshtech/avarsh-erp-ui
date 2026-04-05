@@ -74,18 +74,11 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
-  WORK_ORDERS: {
-    id: 'work-orders',
-    name: 'Work Orders',
-    path: '/work-orders',
+  PRODUCTION_PO: {
+    id: 'production-po',
+    name: 'Production PO',
+    path: '/production-po',
     group: 'transactions',
-  },
-  WORK_ORDER_APPROVAL: {
-    id: 'work-order-approval',
-    name: 'Work Order Approval',
-    path: '/work-orders',
-    group: 'transactions',
-    linkedTo: 'work-orders',
   },
   INVENTORY: {
     id: 'inventory',
@@ -277,8 +270,7 @@ export const PERMISSION_GROUPS = [
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'work-orders', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/work-orders/list' },
-      { id: 'work-order-approval', name: 'Work Order Approval', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'work-orders', path: '(within Work Orders)' },
+      { id: 'production-po', name: 'Production PO', operations: STANDARD_OPERATIONS, path: '/production-po/list' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
@@ -337,7 +329,6 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
-  if (moduleId === 'work-order-approval') return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
   if (moduleId === 'reports')              return ['view'];
   if (moduleId === 'ai-assistant')        return ['view'];
@@ -491,17 +482,6 @@ export const canPerformApprovalActions = () =>
   hasModuleAccess('purchase-orders') &&
   (canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO());
 
-// ─── WORK ORDER APPROVAL HELPERS (linked to Work Orders access) ─────────────
-
-export const canApproveWorkOrder = () =>
-  hasModuleAccess('work-orders') && hasPermission('work-order-approval', 'approve');
-
-export const canRejectWorkOrder = () =>
-  hasModuleAccess('work-orders') && hasPermission('work-order-approval', 'reject');
-
-export const canCancelWorkOrder = () =>
-  hasModuleAccess('work-orders') && hasPermission('work-order-approval', 'cancel');
-
 // ─── COSTING APPROVAL HELPERS (linked to Costing access) ────────────────────
 
 export const canApproveCostSheet = () =>
@@ -523,7 +503,6 @@ export const getFirstAccessibleRoute = () => {
     { route: '/orders/list', moduleId: 'orders' },
     { route: '/bom/list', moduleId: 'bom' },
     { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
-    { route: '/work-orders/list', moduleId: 'work-orders' },
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
     { route: '/reports/list', moduleId: 'reports' },
@@ -602,14 +581,6 @@ export const normalizePermissionsForSave = (permissions) => {
         acc[op] = false;
         return acc;
       }, {}),
-    };
-  }
-
-  // Enforce work-order-approval → work-orders link
-  if (!normalized['work-orders']?.access) {
-    normalized['work-order-approval'] = {
-      access: false,
-      operations: PO_APPROVAL_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
     };
   }
 

@@ -552,7 +552,7 @@ const POForm = () => {
         }
       }
 
-      // Restore PO type and Process PO flag
+      // Restore PO type, Process PO flag, and production process details
       setPoType(data.poType || PO_TYPE.GENERAL);
       setIsProcessPo(data.isProcessPo || false);
 
@@ -2447,11 +2447,11 @@ const POForm = () => {
             columns={isProcessPo ? processLineColumns : lineColumns}
             dataSource={lineItems}
             pagination={false}
-            scroll={{ x: isProcessPo ? 1200 : 2000 }}
-            size="middle"
-            rowKey="key"
-            className="centered-header-table"
-          />
+              scroll={{ x: isProcessPo ? 1200 : 2000 }}
+              size="middle"
+              rowKey="key"
+              className="centered-header-table"
+            />
         </Card>
 
         {/* Order Summary */}

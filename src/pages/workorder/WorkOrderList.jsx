@@ -51,7 +51,8 @@ const WorkOrderList = () => {
   const canAdd = hasPermission('work-orders', 'add');
   const canUpdate = hasPermission('work-orders', 'update');
   const canDelete = hasPermission('work-orders', 'delete');
-  const canApprove = hasPermission('work-order-approval', 'approve');
+  // Approval handled via centralized Approval Flows module
+  const canApprove = false;
 
   // Fetch data
   const fetchData = useCallback(

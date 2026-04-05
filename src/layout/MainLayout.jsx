@@ -32,7 +32,6 @@ import {
   MenuOutlined,
   CloseOutlined,
   BarChartOutlined,
-  ScissorOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
@@ -325,13 +324,13 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/work-orders",
-      icon: <ScissorOutlined />,
-      label: "Work Orders",
-      moduleId: "work-orders",
+      key: "/production-po",
+      icon: <AppstoreOutlined />,
+      label: "Production PO",
+      moduleId: "production-po",
       children: [
-        { key: "/work-orders/list", label: "WO List" },
-        { key: "/work-orders/new", label: "New Work Order" },
+        { key: "/production-po/list", label: "PPO List" },
+        { key: "/production-po/new", label: "New PPO" },
       ],
     },
     {

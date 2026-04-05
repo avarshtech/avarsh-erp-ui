@@ -31,6 +31,7 @@ import {
   changeWorkOrderStatus,
 } from '../../services/workOrderService';
 import { searchOrders } from '../../services/orderService';
+import { getApprovedCuttingPOsByOrder } from '../../services/cuttingPoService';
 import {
   WORK_ORDER_STATUS,
   EDITABLE_STATUSES,
@@ -59,6 +60,7 @@ const WorkOrderForm = () => {
   const [orderOptions, setOrderOptions] = useState([]);
   const [orderSearching, setOrderSearching] = useState(false);
   const [sizeColorItems, setSizeColorItems] = useState([]);
+  const [cuttingPoOptions, setCuttingPoOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('general');
 
   const { setHasChanges } = useUnsavedChanges();
@@ -72,6 +74,7 @@ const WorkOrderForm = () => {
           setWorkOrder(data);
           form.setFieldsValue({
             orderId: data.orderId,
+            cuttingPoId: data.cuttingPoId,
             styleNo: data.styleNo,
             bomId: data.bomId,
             sewingLine: data.sewingLine,
@@ -98,6 +101,12 @@ const WorkOrderForm = () => {
               styleNo: data.styleNo,
               styleId: data.styleId,
             }]);
+            // Load approved Cutting POs for this order
+            getApprovedCuttingPOsByOrder(data.orderId)
+              .then((cpos) => setCuttingPoOptions(cpos.map((c) => ({
+                value: c.id, label: c.cuttingPoNo,
+              }))))
+              .catch(() => {});
           }
         })
         .catch(() => message.error('Failed to load work order'))
@@ -130,14 +139,21 @@ const WorkOrderForm = () => {
     }
   }, []);
 
-  // On order selection — auto-populate fields
+  // On order selection — auto-populate fields and load CPOs
   const handleOrderSelect = useCallback((orderId) => {
     const order = orderOptions.find((o) => o.value === orderId);
     if (order) {
       form.setFieldsValue({
         styleNo: order.styleNo,
         totalOrderQty: order.totalOrderQty,
+        cuttingPoId: undefined,
       });
+      // Load approved Cutting POs for dropdown
+      getApprovedCuttingPOsByOrder(orderId)
+        .then((cpos) => setCuttingPoOptions(cpos.map((c) => ({
+          value: c.id, label: c.cuttingPoNo,
+        }))))
+        .catch(() => setCuttingPoOptions([]));
       // Build size-color items from order lines
       const items = [];
       (order.orderLines || []).forEach((line) => {
@@ -276,6 +292,7 @@ const WorkOrderForm = () => {
 
     return {
       orderId: values.orderId,
+      cuttingPoId: values.cuttingPoId,
       styleId: selectedOrder?.styleId || workOrder?.styleId,
       styleNo: values.styleNo || selectedOrder?.styleNo,
       bomId: values.bomId,
@@ -395,6 +412,16 @@ const WorkOrderForm = () => {
                 options={orderOptions}
                 placeholder="Search order no..."
                 disabled={!isEditable}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={8}>
+            <Form.Item name="cuttingPoId" label="Cutting PO">
+              <Select
+                options={cuttingPoOptions}
+                placeholder={cuttingPoOptions.length === 0 ? 'No approved CPOs' : 'Select Cutting PO'}
+                allowClear
+                disabled={!isEditable || cuttingPoOptions.length === 0}
               />
             </Form.Item>
           </Col>

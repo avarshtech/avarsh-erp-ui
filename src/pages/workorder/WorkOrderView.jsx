@@ -27,7 +27,8 @@ const WorkOrderView = ({ open, record, onClose, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
 
-  const canApprove = hasPermission('work-order-approval', 'approve');
+  // Approval handled via centralized Approval Flows module
+  const canApprove = false;
 
   useEffect(() => {
     if (open && record?.id) {
@@ -148,6 +149,7 @@ const WorkOrderView = ({ open, record, onClose, onStatusChange }) => {
               <Text strong>{data.workOrderNo}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="Order No">{data.orderNo || '-'}</Descriptions.Item>
+            <Descriptions.Item label="Cutting PO">{data.cuttingPoNo || '-'}</Descriptions.Item>
             <Descriptions.Item label="Buyer">{data.buyerName || '-'}</Descriptions.Item>
             <Descriptions.Item label="Style No">{data.styleNo || '-'}</Descriptions.Item>
             <Descriptions.Item label="Processing Unit">
