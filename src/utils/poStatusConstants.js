@@ -89,39 +89,6 @@ export const PO_TYPE_OPTIONS = [
   { value: PO_TYPE.COMBINED, label: 'Combined' },
 ];
 
-// ==================== PROCESS TYPE (PRODUCTION PROCESS POs) ====================
-export const PROCESS_TYPE = {
-  CUTTING: 'CUTTING',
-  SEWING: 'SEWING',
-  DYING: 'DYING',
-  PRINTING: 'PRINTING',
-  WASHING: 'WASHING',
-  FINISHING: 'FINISHING',
-};
-
-export const PROCESS_TYPE_OPTIONS = [
-  { value: PROCESS_TYPE.CUTTING,   label: 'Cutting' },
-  { value: PROCESS_TYPE.SEWING,    label: 'Sewing' },
-  { value: PROCESS_TYPE.DYING,     label: 'Dying' },
-  { value: PROCESS_TYPE.PRINTING,  label: 'Printing' },
-  { value: PROCESS_TYPE.WASHING,   label: 'Washing' },
-  { value: PROCESS_TYPE.FINISHING,  label: 'Finishing' },
-];
-
-export const PROCESS_TYPE_LABELS = {
-  [PROCESS_TYPE.CUTTING]:   'Cutting',
-  [PROCESS_TYPE.SEWING]:    'Sewing',
-  [PROCESS_TYPE.DYING]:     'Dying',
-  [PROCESS_TYPE.PRINTING]:  'Printing',
-  [PROCESS_TYPE.WASHING]:   'Washing',
-  [PROCESS_TYPE.FINISHING]:  'Finishing',
-};
-
-export const PROCESSING_UNIT_TYPE_OPTIONS = [
-  { value: 'UNIT',   label: 'In-house Unit' },
-  { value: 'VENDOR', label: 'External Vendor' },
-];
-
 // ==================== E-WAY BILL ====================
 export const EWAY_BILL_STATUS = {
   ACTIVE: 'ACTIVE',

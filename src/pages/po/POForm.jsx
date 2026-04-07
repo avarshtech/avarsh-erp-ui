@@ -23,7 +23,6 @@ import {
   AutoComplete,
   Segmented,
   Popover,
-  Switch,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -336,7 +335,6 @@ const POForm = () => {
 
   // BOM-PO Integration state
   const [poType, setPoType] = useState(PO_TYPE.GENERAL);
-  const [isProcessPo, setIsProcessPo] = useState(false);
   const [bomOrders, setBomOrders] = useState([]);
   const [bomLoading, setBomLoading] = useState(false);
   const [bomDrawerOpen, setBomDrawerOpen] = useState(false);
@@ -376,19 +374,6 @@ const POForm = () => {
     };
   }
 
-  function createEmptyProcessLineItem() {
-    return {
-      key: String(Date.now()) + Math.random(),
-      processName: '',
-      description: '',
-      hsnCode: '',
-      qty: '',
-      unitPrice: '',
-      gstPercent: 0,
-      amount: 0,
-    };
-  }
-
   // Load master data on mount
   useEffect(() => {
     loadMasterData();
@@ -411,7 +396,6 @@ const POForm = () => {
       setVariantModalState({ show: false, pendingItem: null, pendingLineKey: null, isChange: false, currentVariantId: null });
       setItemsWithVariants({});
       setPoType(PO_TYPE.GENERAL);
-      setIsProcessPo(false);
       setBomOrders([]);
       setBomDrawerOpen(false);
       setIsDirty(false);
@@ -552,9 +536,8 @@ const POForm = () => {
         }
       }
 
-      // Restore PO type, Process PO flag, and production process details
+      // Restore PO type
       setPoType(data.poType || PO_TYPE.GENERAL);
-      setIsProcessPo(data.isProcessPo || false);
 
       if (data.orderReferences && data.orderReferences.length > 0) {
         // Fetch BOM data for each order reference
@@ -585,7 +568,6 @@ const POForm = () => {
         itemId: item.itemId || '',
         itemCode: item.itemCode || '',
         itemName: item.itemName || '',
-        processName: item.processName || '',
         description: item.description || '',
         qty: String(item.quantity || item.qty || ''),
         uom: item.uomSymbol || item.uom || '',
@@ -823,7 +805,7 @@ const POForm = () => {
   };
 
   const addLineItem = () => {
-    setLineItems((prev) => [...prev, isProcessPo ? createEmptyProcessLineItem() : createEmptyLineItem()]);
+    setLineItems((prev) => [...prev, createEmptyLineItem()]);
   };
 
   const removeLineItem = (key) => {
@@ -837,7 +819,7 @@ const POForm = () => {
 
   // PO Type change handler
   const handlePoTypeChange = useCallback((newType) => {
-    const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
+    const hasData = lineItems.length > 1 || (lineItems.length === 1 && lineItems[0].itemId);
     if (hasData) {
       modal.confirm({
         title: 'Change PO Type',
@@ -846,7 +828,6 @@ const POForm = () => {
         cancelText: 'Cancel',
         onOk: () => {
           setPoType(newType);
-          if (newType !== PO_TYPE.GENERAL) setIsProcessPo(false);
           setBomOrders([]);
           setLineItems([createEmptyLineItem()]);
           setIsDirty(true);
@@ -854,30 +835,8 @@ const POForm = () => {
       });
     } else {
       setPoType(newType);
-      if (newType !== PO_TYPE.GENERAL) setIsProcessPo(false);
       setBomOrders([]);
       setLineItems([createEmptyLineItem()]);
-    }
-  }, [lineItems]);
-
-  // Process PO toggle handler
-  const handleProcessPoToggle = useCallback((checked) => {
-    const hasData = lineItems.length > 1 || (lineItems.length === 1 && (lineItems[0].itemId || lineItems[0].processName));
-    if (hasData) {
-      modal.confirm({
-        title: checked ? 'Switch to Process PO' : 'Switch to Standard PO',
-        content: 'This will clear all line items. Continue?',
-        okText: 'Yes, Switch',
-        cancelText: 'Cancel',
-        onOk: () => {
-          setIsProcessPo(checked);
-          setLineItems([checked ? createEmptyProcessLineItem() : createEmptyLineItem()]);
-          setIsDirty(true);
-        },
-      });
-    } else {
-      setIsProcessPo(checked);
-      setLineItems([checked ? createEmptyProcessLineItem() : createEmptyLineItem()]);
     }
   }, [lineItems]);
 
@@ -1139,41 +1098,7 @@ const POForm = () => {
     // Line items validation
     const isBomPo = poType === PO_TYPE.REGULAR || poType === PO_TYPE.COMBINED;
 
-    if (isProcessPo) {
-      // Process PO validation
-      const validItems = lineItems.filter((item) => item.processName?.trim());
-      if (validItems.length === 0) {
-        errors.push('At least one line item with a process name is required');
-      }
-
-      lineItems.forEach((item, idx) => {
-        const lineNum = idx + 1;
-        if (!item.processName?.trim()) {
-          if (lineItems.length > 1 || validItems.length > 0) {
-            errors.push(`Line item ${lineNum}: Process Name is required`);
-          }
-          return;
-        }
-        const qty = parseFloat(item.qty);
-        const unitPrice = parseFloat(item.unitPrice);
-
-        if (!item.description || !item.description.trim()) {
-          errors.push(`Line item ${lineNum}: Description is required`);
-        }
-        if (item.qty === '' || isNaN(qty) || qty < 1) {
-          errors.push(`Line item ${lineNum}: Quantity must be at least 1`);
-        }
-        if (isSubmit) {
-          if (item.unitPrice === '' || isNaN(unitPrice) || unitPrice <= 0) {
-            errors.push(`Line item ${lineNum}: Unit Price must be greater than 0`);
-          }
-        } else {
-          if (item.unitPrice !== '' && !isNaN(unitPrice) && unitPrice < 0) {
-            errors.push(`Line item ${lineNum}: Unit Price cannot be negative`);
-          }
-        }
-      });
-    } else {
+    {
       // Standard PO validation
       const validItems = lineItems.filter((item) => item.itemId);
       if (validItems.length === 0) {
@@ -1218,7 +1143,7 @@ const POForm = () => {
         }
       });
 
-      // Duplicate check — only for General non-process PO
+      // Duplicate check — only for General PO
       if (poType === PO_TYPE.GENERAL) {
         const seen = [];
         const validItems2 = lineItems.filter((item) => item.itemId);
@@ -1287,9 +1212,7 @@ const POForm = () => {
       (t) => t.id === values.termsConditionId
     );
 
-    const validItems = isProcessPo
-      ? lineItems.filter((item) => item.processName?.trim())
-      : lineItems.filter((item) => item.itemId);
+    const validItems = lineItems.filter((item) => item.itemId);
     const isIgst = supplier?.igstApplicable || false;
 
     // Determine line item status based on PO status
@@ -1303,7 +1226,6 @@ const POForm = () => {
     return {
       version: entityVersion,
       poType: poType,
-      isProcessPo: isProcessPo,
       orderReferences: poType !== PO_TYPE.GENERAL ? bomOrders.map(o => ({ orderId: o.orderId, orderNo: o.orderNo, bomId: o.bomId, styleId: o.styleId, styleName: o.styleName, season: o.season })) : null,
       supplierId: values.supplierId,
       supplierName: supplier?.name || '',
@@ -1346,14 +1268,13 @@ const POForm = () => {
         const taxValue = parseFloat((cgstValue + sgstValue + igstValue).toFixed(2));
 
         return {
-          itemId: isProcessPo ? null : item.itemId,
-          itemCode: isProcessPo ? null : item.itemCode,
-          itemName: isProcessPo ? null : item.itemName,
-          processName: isProcessPo ? item.processName : null,
+          itemId: item.itemId,
+          itemCode: item.itemCode,
+          itemName: item.itemName,
           description: item.description,
           quantity: qty,
-          uomId: isProcessPo ? null : item.uomId,
-          uomName: isProcessPo ? null : item.uom,
+          uomId: item.uomId,
+          uomName: item.uom,
           unitPrice,
           cgst: isIgst ? null : cgst,
           sgst: isIgst ? null : sgst,
@@ -1363,12 +1284,12 @@ const POForm = () => {
           igstValue: isIgst ? igstValue : null,
           taxValue,
           totalAmount: item.amount,
-          variantId: isProcessPo ? null : item.variantId,
-          variantAttributes: isProcessPo ? null : item.variantAttributes,
+          variantId: item.variantId,
+          variantAttributes: item.variantAttributes,
           hsnCode: item.hsnCode || null,
-          categoryName: isProcessPo ? null : (item.categoryName || null),
-          processingStages: isProcessPo ? null : (item.processingStages || null),
-          bomLineSources: isProcessPo ? null : (item.bomLineSources || null),
+          categoryName: item.categoryName || null,
+          processingStages: item.processingStages || null,
+          bomLineSources: item.bomLineSources || null,
           status: lineItemStatus,
         };
       }),
@@ -1463,7 +1384,7 @@ const POForm = () => {
       for (let i = 0; i < currentLines.length; i++) {
         const cl = currentLines[i];
         const sl = snapshotLines[i];
-        const lineFields = ['itemId', 'variantId', 'quantity', 'unitPrice', 'description', 'processName'];
+        const lineFields = ['itemId', 'variantId', 'quantity', 'unitPrice', 'description'];
         for (const f of lineFields) {
           if (String(cl[f] ?? '') !== String(sl[f] ?? '')) return true;
         }
@@ -1956,167 +1877,6 @@ const POForm = () => {
     },
   ];
 
-  // Process PO columns — simplified: Process Name, Description, Qty, Unit Price, GST, Tax, Amount, Delete
-  const processLineColumns = [
-    {
-      title: '#',
-      width: 45,
-      align: 'center',
-      render: (_, __, index) => index + 1,
-    },
-    {
-      title: 'Process Name',
-      dataIndex: 'processName',
-      width: 220,
-      render: (_, record) => (
-        <Input
-          placeholder="e.g. Dyeing, Printing, Washing"
-          value={record.processName}
-          onChange={(e) => handleLineItemChange(record.key, 'processName', e.target.value)}
-          disabled={!selectedSupplier || submitting || savingDraft}
-        />
-      ),
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      width: 200,
-      render: (_, record) => (
-        <Input
-          placeholder="Description"
-          value={record.description}
-          onChange={(e) => handleLineItemChange(record.key, 'description', e.target.value)}
-          disabled={!selectedSupplier || submitting || savingDraft}
-        />
-      ),
-    },
-    {
-      title: 'HSN Code',
-      dataIndex: 'hsnCode',
-      width: 130,
-      render: (_, record) => (
-        <Input
-          placeholder="e.g. 9988"
-          value={record.hsnCode}
-          onChange={(e) => handleLineItemChange(record.key, 'hsnCode', e.target.value)}
-          disabled={!selectedSupplier || submitting || savingDraft}
-          maxLength={8}
-        />
-      ),
-    },
-    {
-      title: 'Qty',
-      dataIndex: 'qty',
-      width: 100,
-      render: (_, record) => (
-        <InputNumber
-          min={0}
-          style={{ width: '100%' }}
-          value={record.qty !== '' ? Number(record.qty) : null}
-          onChange={(v) => handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')}
-          disabled={!selectedSupplier || submitting || savingDraft}
-          {...numericInputProps}
-        />
-      ),
-    },
-    {
-      title: 'Unit Price (₹)',
-      dataIndex: 'unitPrice',
-      width: 120,
-      render: (_, record) => (
-        <InputNumber
-          min={0}
-          style={{ width: '100%' }}
-          value={record.unitPrice !== '' ? Number(record.unitPrice) : null}
-          onChange={(v) => handleLineItemChange(record.key, 'unitPrice', v !== null ? v : '')}
-          disabled={!selectedSupplier || submitting || savingDraft}
-          {...numericInputProps}
-        />
-      ),
-    },
-    {
-      title: 'GST %',
-      dataIndex: 'gstPercent',
-      width: 90,
-      render: (value, record) => (
-        <Select
-          style={{ width: '100%' }}
-          value={value}
-          onChange={(v) => handleLineItemChange(record.key, 'gstPercent', v)}
-          options={TAX_OPTIONS}
-          disabled={!selectedSupplier || submitting || savingDraft || !record.processName}
-        />
-      ),
-    },
-    ...(isIgstApplicable
-      ? [
-          {
-            title: 'IGST',
-            width: 100,
-            align: 'center',
-            render: (_, record) => {
-              const qty = parseFloat(record.qty) || 0;
-              const price = parseFloat(record.unitPrice) || 0;
-              const gst = parseFloat(record.gstPercent) || 0;
-              return <Text type="secondary">{((qty * price * gst) / 100).toFixed(2)}</Text>;
-            },
-          },
-        ]
-      : [
-          {
-            title: 'SGST',
-            width: 90,
-            align: 'center',
-            render: (_, record) => {
-              const qty = parseFloat(record.qty) || 0;
-              const price = parseFloat(record.unitPrice) || 0;
-              const gst = parseFloat(record.gstPercent) || 0;
-              return <Text type="secondary">{((qty * price * (gst / 2)) / 100).toFixed(2)}</Text>;
-            },
-          },
-          {
-            title: 'CGST',
-            width: 90,
-            align: 'center',
-            render: (_, record) => {
-              const qty = parseFloat(record.qty) || 0;
-              const price = parseFloat(record.unitPrice) || 0;
-              const gst = parseFloat(record.gstPercent) || 0;
-              return <Text type="secondary">{((qty * price * (gst / 2)) / 100).toFixed(2)}</Text>;
-            },
-          },
-        ]),
-    {
-      title: 'Amount (₹)',
-      width: 120,
-      align: 'right',
-      render: (_, record) => (
-        <Text strong style={{ color: 'var(--success-color, #52c41a)' }}>
-          {(record.amount || 0).toFixed(2)}
-        </Text>
-      ),
-    },
-    {
-      title: '',
-      width: 50,
-      render: (_, record) => (
-        <Popconfirm
-          title="Remove this line item?"
-          onConfirm={() => removeLineItem(record.key)}
-          disabled={lineItems.length === 1}
-        >
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            size="small"
-            disabled={lineItems.length === 1 || submitting || savingDraft}
-          />
-        </Popconfirm>
-      ),
-    },
-  ];
-
   if (pageLoading) {
     return (
       <div className="animate-fade-in-up">
@@ -2306,18 +2066,6 @@ const POForm = () => {
                   disabled={submitting || savingDraft}
                 />
               </div>
-              {poType === PO_TYPE.GENERAL && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 10px', borderRadius: 6, background: isProcessPo ? 'var(--bg-tertiary, #f0f0ff)' : 'transparent', border: isProcessPo ? '1px solid var(--border-color, #d9d9d9)' : '1px solid transparent' }}>
-                  <Switch
-                    size="small"
-                    checked={isProcessPo}
-                    onChange={handleProcessPoToggle}
-                    disabled={submitting || savingDraft}
-                  />
-                  <Text style={{ fontSize: 12 }}>Process PO</Text>
-                  {isProcessPo && <Tag color="purple" style={{ margin: 0, fontSize: 11 }}>Outsourced Processing</Tag>}
-                </div>
-              )}
               <Title level={5} style={{ marginBottom: 16 }}>
                 Supplier Information
               </Title>
@@ -2430,7 +2178,7 @@ const POForm = () => {
                 onClick={addLineItem}
                 disabled={!selectedSupplier || submitting || savingDraft}
               >
-                {isProcessPo ? 'Add Process' : 'Add Item'}
+                Add Item
               </Button>
             ) : (
               <Button
@@ -2444,14 +2192,14 @@ const POForm = () => {
             )}
           </div>
           <Table
-            columns={isProcessPo ? processLineColumns : lineColumns}
+            columns={lineColumns}
             dataSource={lineItems}
             pagination={false}
-              scroll={{ x: isProcessPo ? 1200 : 2000 }}
-              size="middle"
-              rowKey="key"
-              className="centered-header-table"
-            />
+            scroll={{ x: 2000 }}
+            size="middle"
+            rowKey="key"
+            className="centered-header-table"
+          />
         </Card>
 
         {/* Order Summary */}

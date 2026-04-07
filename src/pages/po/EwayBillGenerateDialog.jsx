@@ -52,9 +52,9 @@ const EwayBillGenerateDialog = ({ open, onClose, onSuccess, poData }) => {
         render: (_, __, index) => index + 1,
       },
       {
-        title: 'Process Name',
-        dataIndex: 'processName',
-        key: 'processName',
+        title: 'Item',
+        dataIndex: 'itemName',
+        key: 'itemName',
         width: 160,
       },
       {

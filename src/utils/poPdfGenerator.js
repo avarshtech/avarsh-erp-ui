@@ -192,7 +192,6 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   const watermarkText = companyName;
 
   const poType = po.poType || 'General';
-  const isProcessPo = po.isProcessPo || false;
 
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';
@@ -279,24 +278,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       gstColumnsHtml = `<td class="num">${halfPercent}%</td><td class="num">${halfPercent}%</td><td class="num">${formatCurrency(halfAmt)}</td><td class="num">${formatCurrency(halfAmt)}</td>`;
     }
 
-    if (isProcessPo) {
-      lineItemsHtml += `
-        <tr>
-          <td class="center">${idx + 1}</td>
-          <td class="desc-cell">
-            <div class="desc-content"><strong>${item.processName || '-'}</strong></div>
-          </td>
-          <td class="desc-cell">
-            <div class="desc-content">${item.description || '-'}</div>
-          </td>
-          <td class="num">${formatCurrency(price)}</td>
-          <td class="center nowrap">${qty}</td>
-          <td class="num">${formatCurrency(base)}</td>
-          ${gstColumnsHtml}
-          <td class="num total-col">${formatCurrency(totalWithTax)}</td>
-        </tr>`;
-    } else {
-      lineItemsHtml += `
+    lineItemsHtml += `
         <tr>
           <td class="center">${idx + 1}</td>
           <td class="desc-cell">
@@ -315,7 +297,6 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
           ${gstColumnsHtml}
           <td class="num total-col">${formatCurrency(totalWithTax)}</td>
         </tr>`;
-    }
   });
 
   // Build total qty summary
@@ -664,7 +645,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         </div>
       </div>
       <div class="po-badge">
-        <div class="po-label">${isProcessPo ? 'Process Purchase Order' : 'Purchase Order'}</div>
+        <div class="po-label">Purchase Order</div>
         <div class="po-number">${poNumber}</div>
         <div class="po-status">${getStatusLabel(po.status)}</div>
       </div>
@@ -703,7 +684,7 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       </div>
       <div class="po-detail-item">
         <div class="label">PO Type</div>
-        <div class="value">${isProcessPo ? 'Process PO' : poType}</div>
+        <div class="value">${poType}</div>
       </div>
       <div class="po-detail-item">
         <div class="label">Delivery Date</div>
@@ -716,25 +697,16 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
     </div>
     ${orderRefsHtml}
     <div class="items-section">
-      <div class="section-title">${isProcessPo ? 'Process Items' : 'Order Items'}</div>
+      <div class="section-title">Order Items</div>
       <table class="items-table">
         <thead>
           <tr>
-            ${isProcessPo ? `
-            <th style="width:22px;">SN</th>
-            <th class="desc-col">Process Name</th>
-            <th class="desc-col" style="width:120px;">Description</th>
-            <th style="width:50px;">Rate</th>
-            <th style="width:55px;">Qty</th>
-            <th style="width:65px;">Base Value</th>
-            ` : `
             <th style="width:22px;">SN</th>
             <th class="desc-col">Description / Color</th>
             <th style="width:60px;">HSN</th>
             <th style="width:50px;">Rate</th>
             <th style="width:55px;">Qty</th>
             <th style="width:65px;">Base Value</th>
-            `}
             ${gst.isIgst ? `
             <th style="width:35px;">IGST%</th>
             <th style="width:55px;">IGST</th>

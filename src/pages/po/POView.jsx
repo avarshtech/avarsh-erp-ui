@@ -511,7 +511,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       // Find stage name and item name for the activity log
       const lineItem = (po?.lineItems || []).find((li) => li.id === lineItemId);
       const stageName = lineItem?.processingStages?.[stageIndex]?.stageName || `Stage ${stageIndex + 1}`;
-      const itemLabel = lineItem?.itemName || lineItem?.processName || lineItem?.itemCode || 'Item';
+      const itemLabel = lineItem?.itemName || lineItem?.itemCode || 'Item';
 
       setPo((prev) => {
         if (!prev) return prev;
@@ -583,7 +583,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       const userName = currentUser?.name || '';
       const activityComment = JSON.stringify({
         type: 'stages_added',
-        itemLabel: lineItem.itemName || lineItem.processName || lineItem.itemCode || 'Item',
+        itemLabel: lineItem.itemName || lineItem.itemCode || 'Item',
         count: newStages.length,
         stageNames: newStages.map((s) => s.stageName).join(', '),
         by: userName,
@@ -795,7 +795,6 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   // ========================
   const renderLineItemCard = useCallback((record, index) => {
     const imgUrl = record.variantId ? lineItemImages[record.variantId] : null;
-    const isProcess = po?.isProcessPo;
     const stages = record.processingStages || [];
     const sortedStages = stages.length > 0
       ? stages.map((s, i) => ({ ...s, _origIndex: i })).sort((a, b) => {
@@ -849,9 +848,9 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
             {/* Item name, code, variant attrs */}
             <div style={{ minWidth: 0, flex: 1 }}>
               <Text strong style={{ fontSize: 14, display: 'block', lineHeight: 1.3 }}>
-                {isProcess ? (record.processName || '-') : (record.itemName || 'Unknown Item')}
+                {record.itemName || 'Unknown Item'}
               </Text>
-              {!isProcess && record.itemCode && (
+              {record.itemCode && (
                 <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.itemCode}</Text>
               )}
               {record.description && (
@@ -893,7 +892,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: 'color-mix(in srgb, var(--primary-color) 6%, transparent)', fontSize: 12 }}>
             <Text type="secondary" style={{ fontSize: 11 }}>Qty:</Text>
             <Text strong style={{ fontSize: 13 }}>{record.quantity || record.qty || 0}</Text>
-            {!isProcess && (record.uomName || record.uomSymbol || record.uom) && (
+            {(record.uomName || record.uomSymbol || record.uom) && (
               <Text type="secondary" style={{ fontSize: 11 }}>{record.uomName || record.uomSymbol || record.uom}</Text>
             )}
           </div>
@@ -904,7 +903,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: 'color-mix(in srgb, var(--primary-color) 6%, transparent)', fontSize: 12 }}>
             <Text type="secondary" style={{ fontSize: 11 }}>{gstLabel}</Text>
           </div>
-          {!isProcess && record.hsnCode && (
+          {record.hsnCode && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 6, background: 'color-mix(in srgb, var(--primary-color) 6%, transparent)', fontSize: 12 }}>
               <Text type="secondary" style={{ fontSize: 11 }}>HSN:</Text>
               <Text style={{ fontSize: 12, fontFamily: 'monospace' }}>{record.hsnCode}</Text>
@@ -1189,7 +1188,6 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                     <Title level={3} style={{ margin: 0, letterSpacing: '-0.02em' }}>{po.poNumber || po.poNo}</Title>
                     <StatusTag status={po.status} config={PO_STATUS_CONFIG} getLabel={getStatusLabel} style={{ fontSize: 13, padding: '3px 14px' }} />
-                    {po?.isProcessPo && <Tag color="purple" icon={<ExperimentOutlined />} style={{ borderRadius: 20, fontSize: 12 }}>Process PO</Tag>}
                     {po?.poType && po.poType !== 'General' && <Tag color="purple" style={{ borderRadius: 20, fontSize: 12 }}>{po.poType} PO</Tag>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
@@ -1363,7 +1361,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
               </div>
 
               {/* E-way Bill */}
-              {po?.isProcessPo && po?.ewayBillNo && (
+              {po?.ewayBillNo && (
                 <Card size="small" style={{ marginBottom: 20, borderRadius: 12 }} styles={{ body: { padding: '14px 20px' } }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                     <FileTextOutlined style={{ color: 'var(--primary-color)' }} />
@@ -1686,7 +1684,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         appendOnly
         poDate={po?.poDate}
         deliveryDate={po?.deliveryDate}
-        itemName={addStagesDialog.lineItem?.itemName || addStagesDialog.lineItem?.processName || ''}
+        itemName={addStagesDialog.lineItem?.itemName || ''}
         itemCode={addStagesDialog.lineItem?.itemCode || ''}
         variantAttributes={addStagesDialog.lineItem?.variantAttributes}
       />

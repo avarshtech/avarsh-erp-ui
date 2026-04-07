@@ -71,7 +71,7 @@ const POVersionHistory = ({ open, onClose, poId, poNumber }) => {
       width: 200,
       render: (_, r) => (
         <div>
-          <Text strong style={{ fontSize: 13 }}>{r.processName || r.itemName || '-'}</Text>
+          <Text strong style={{ fontSize: 13 }}>{r.itemName || '-'}</Text>
           {r.itemCode && <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>{r.itemCode}</Text>}
         </div>
       ),
