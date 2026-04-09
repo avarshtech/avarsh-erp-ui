@@ -334,6 +334,16 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/work-orders",
+      icon: <FileTextOutlined />,
+      label: "Work Orders",
+      moduleId: "work-orders",
+      children: [
+        { key: "/work-orders/list", label: "Work Order List" },
+        { key: "/work-orders/new", label: "New Work Order" },
+      ],
+    },
+    {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",

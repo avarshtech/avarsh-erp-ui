@@ -80,6 +80,12 @@ export const MODULES = {
     path: '/production-po',
     group: 'transactions',
   },
+  WORK_ORDERS: {
+    id: 'work-orders',
+    name: 'Work Orders',
+    path: '/work-orders',
+    group: 'transactions',
+  },
   INVENTORY: {
     id: 'inventory',
     name: 'Inventory Management',
@@ -271,6 +277,7 @@ export const PERMISSION_GROUPS = [
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
       { id: 'production-po', name: 'Production PO', operations: STANDARD_OPERATIONS, path: '/production-po/list' },
+      { id: 'work-orders', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/work-orders/list' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },

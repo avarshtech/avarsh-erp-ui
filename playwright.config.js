@@ -88,6 +88,24 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      name: 'production-po',
+      testDir: './e2e/specs/production-po',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      name: 'work-orders',
+      testDir: './e2e/specs/work-orders',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'admin',
       testDir: './e2e/specs/admin',
       use: {

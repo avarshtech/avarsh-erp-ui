@@ -63,7 +63,8 @@ const WorkOrderForm = () => {
   const [cuttingPoOptions, setCuttingPoOptions] = useState([]);
   const [activeTab, setActiveTab] = useState('general');
 
-  const { setHasChanges } = useUnsavedChanges();
+  const [isDirty, setHasChanges] = useState(false);
+  const { clearDirty } = useUnsavedChanges(isDirty);
 
   // Load existing work order for edit
   useEffect(() => {
@@ -338,6 +339,8 @@ const WorkOrderForm = () => {
       } else {
         const result = await createWorkOrder(payload);
         message.success(`Work Order ${result.workOrderNo} created`);
+        setHasChanges(false);
+        clearDirty();
         navigate(`/work-orders/edit/${result.id}`, { replace: true });
         return;
       }
@@ -375,13 +378,14 @@ const WorkOrderForm = () => {
       await changeWorkOrderStatus(savedId, { status: WORK_ORDER_STATUS.PENDING_APPROVAL });
       message.success('Work Order submitted for approval');
       setHasChanges(false);
+      clearDirty();
       navigate('/work-orders/list');
     } catch {
       message.error('Failed to submit work order');
     } finally {
       setSubmitting(false);
     }
-  }, [form, buildPayload, isEdit, id, navigate, setHasChanges]);
+  }, [form, buildPayload, isEdit, id, navigate, setHasChanges, clearDirty]);
 
   if (loading) {
     return (
