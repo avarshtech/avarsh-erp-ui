@@ -8,6 +8,7 @@ import {
   UndoOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import PageHeader from '../../../components/PageHeader';
@@ -16,9 +17,9 @@ import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { GRN_STATUS } from '../../../utils/inventoryConstants';
-import { getGRNList } from '../../../services/inventoryService';
+import { getGRNList, deleteDraftGRN } from '../../../services/inventoryService';
 import getGRNListColumns from './GRNListColumns';
-import GRNViewDrawer from './GRNViewDrawer';
+import GRNViewModal from './GRNViewModal';
 
 const { RangePicker } = DatePicker;
 
@@ -65,13 +66,29 @@ const GRNList = () => {
 
   const handleEdit = useCallback(
     (record) => {
-      const prefix = record.type === 'Fabric' ? '/inventory/grn/fabric' : '/inventory/grn/accessories';
+      const prefix = record.type === 'Fabric' ? '/inventory/grn/fabric/edit' : '/inventory/grn/accessories/edit';
       navigate(`${prefix}/${record.id}`);
     },
     [navigate],
   );
 
-  const columns = useMemo(() => getGRNListColumns({ onView: handleView, onEdit: handleEdit }), [handleView, handleEdit]);
+  const handleDelete = useCallback(
+    async (record) => {
+      try {
+        await deleteDraftGRN(record.id, record.type);
+        message.success(`${record.grnNumber} deleted`);
+        loadData();
+      } catch (e) {
+        message.error(e.message || 'Failed to delete GRN');
+      }
+    },
+    [message, loadData],
+  );
+
+  const columns = useMemo(
+    () => getGRNListColumns({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete }),
+    [handleView, handleEdit, handleDelete],
+  );
 
   const stats = useMemo(() => {
     const pendingQC = data.filter((g) => g.status === GRN_STATUS.QC_PENDING).length;
@@ -81,7 +98,7 @@ const GRNList = () => {
   }, [data]);
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up inv-page">
       <PageHeader title="Goods Received Notes" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         <PermissionGuard module="inventory" operation="add">
           <ActionButton action="create" text="New Fabric GRN" onClick={() => navigate('/inventory/grn/fabric/new')} />
@@ -122,7 +139,7 @@ const GRNList = () => {
         />
       </Card>
 
-      <GRNViewDrawer
+      <GRNViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer((prev) => ({ ...prev, open: false }))}
         grn={viewDrawer.grn}

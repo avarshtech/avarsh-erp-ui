@@ -5,8 +5,10 @@ import {
   ExperimentOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import StatCard from '../../../components/StatCard';
@@ -17,24 +19,38 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getTrimsQCList } from '../../../services/inventoryService';
+import { getTrimsQCList, deleteTrimsQCDraft } from '../../../services/inventoryService';
 import { formatDate } from '../../../utils/formatters';
-import dayjs from 'dayjs';
+import QCViewModal from './QCViewModal';
+
+// Statuses whose records are still editable by the creator.
+const EDITABLE_STATUSES = new Set([
+  QC_STATUS.DRAFT,
+  QC_STATUS.REJECTED,
+  QC_STATUS.REFERRED_BACK,
+]);
 
 const { RangePicker } = DatePicker;
-import QCViewDrawer from './QCViewDrawer';
 
 const STATUS_OPTIONS = [
-  { label: 'Passed', value: QC_STATUS.PASSED },
-  { label: 'Failed', value: QC_STATUS.FAILED },
-  { label: 'Conditional', value: QC_STATUS.CONDITIONAL },
-  { label: 'Pending', value: QC_STATUS.PENDING },
+  { label: 'Draft', value: QC_STATUS.DRAFT },
+  { label: 'Pending Approval', value: QC_STATUS.PENDING_APPROVAL },
   { label: 'Approved', value: QC_STATUS.APPROVED },
   { label: 'Rejected', value: QC_STATUS.REJECTED },
+  { label: 'Refer Back Pending', value: QC_STATUS.REFERRED_BACK_PENDING },
+  { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
 ];
 
+/**
+ * Accessories QC list — column set mirrors Fabric QC (D2 decision, further refined).
+ *
+ * Only the high-signal columns live in the table; all the detail fields
+ * (buyer, style, DC #, qty ordered, qty received, stock status) are available
+ * via the View / Edit modes. Keeps the list mobile-friendly and visually
+ * consistent with the Fabric QC list.
+ */
 const TrimsQCList = ({ embedded = false }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
@@ -50,15 +66,37 @@ const TrimsQCList = ({ embedded = false }) => {
       const res = await getTrimsQCList();
       setData(res.content || []);
     } catch {
-      message.error('Failed to load trims QC list');
+      message.error('Failed to load accessories QC list');
     } finally {
       setLoading(false);
     }
   }, [message]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const handleDelete = useCallback((record) => {
+    modal.confirm({
+      title: 'Delete QC inspection?',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <span>
+          This will permanently delete <strong>{record.qcNumber}</strong>. Only draft QCs can be deleted; this action cannot be undone.
+        </span>
+      ),
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await deleteTrimsQCDraft(record.id);
+          message.success(`${record.qcNumber} deleted`);
+          loadData();
+        } catch (err) {
+          message.error(err?.message || 'Failed to delete QC');
+        }
+      },
+    });
+  }, [modal, message, loadData]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const filteredData = useMemo(() => {
     let result = data;
@@ -66,61 +104,81 @@ const TrimsQCList = ({ embedded = false }) => {
     if (searchText) {
       const s = searchText.toLowerCase();
       result = result.filter(
-        (r) => r.qcNumber.toLowerCase().includes(s) || r.grnNumber.toLowerCase().includes(s) || r.itemDescription.toLowerCase().includes(s),
+        (r) =>
+          r.qcNumber?.toLowerCase().includes(s) ||
+          r.grnNumber?.toLowerCase().includes(s) ||
+          r.itemDescription?.toLowerCase().includes(s) ||
+          r.category?.toLowerCase().includes(s),
       );
     }
     if (dateRange?.[0] && dateRange?.[1]) {
       result = result.filter((r) => {
-        const dt = dayjs(r.inspectionDate);
+        const raw = r.inspectionDate || r.date;
+        if (!raw) return false;
+        const dt = dayjs(raw);
         return dt.isAfter(dateRange[0].startOf('day')) && dt.isBefore(dateRange[1].endOf('day'));
       });
     }
     return result;
   }, [data, statusFilter, searchText, dateRange]);
 
+  // Stats reflect the currently filtered rows (search / status / date range).
+  // When the API phase lands the backend will return both the page AND the
+  // matching aggregate counts for the filter set; this memo becomes a passthrough.
   const stats = useMemo(() => {
-    const passed = data.filter((r) => r.overallResult === 'Pass').length;
-    const failed = data.filter((r) => r.overallResult === 'Fail').length;
-    return { total: data.length, passed, failed };
-  }, [data]);
+    const approved = filteredData.filter((r) => r.status === QC_STATUS.APPROVED).length;
+    const rejected = filteredData.filter((r) => r.status === QC_STATUS.REJECTED).length;
+    return { total: filteredData.length, approved, rejected };
+  }, [filteredData]);
 
   const columns = useMemo(
     () => [
-      { title: 'QC Number', dataIndex: 'qcNumber', key: 'qcNumber', width: 150, render: (text, record) => <RecordLink text={text} onClick={() => setViewDrawer({ open: true, record })} /> },
+      { title: 'QC Number', dataIndex: 'qcNumber', key: 'qcNumber', width: 160, render: (text, record) => <RecordLink text={text} onClick={() => setViewDrawer({ open: true, record })} /> },
       { title: 'GRN Number', dataIndex: 'grnNumber', key: 'grnNumber', width: 160 },
-      { title: 'Category', dataIndex: 'category', key: 'category', width: 110 },
-      { title: 'Item', dataIndex: 'itemDescription', key: 'itemDescription', width: 220, ellipsis: true },
-      { title: 'AQL Level', dataIndex: 'aqlLevel', key: 'aqlLevel', width: 90, align: 'center' },
-      { title: 'Sample Size', dataIndex: 'sampleSize', key: 'sampleSize', width: 100, align: 'center' },
-      { title: 'Defects', dataIndex: 'defectsFound', key: 'defectsFound', width: 80, align: 'center' },
-      { title: 'Result', dataIndex: 'overallResult', key: 'overallResult', width: 140, render: (val) => { const color = val === 'Pass' ? 'green' : val === 'Fail' ? 'red' : val === 'Pending' ? 'default' : 'orange'; return <StatusTag status={val} config={{ [val]: { color } }} />; } },
-      { title: 'Inspector', dataIndex: 'inspector', key: 'inspector', width: 140 },
-      { title: 'Date', dataIndex: 'inspectionDate', key: 'inspectionDate', width: 120, render: (val) => formatDate(val) },
-      { title: 'Approval', dataIndex: 'approvalStatus', key: 'approvalStatus', width: 130, render: (val) => <StatusTag status={val} config={QC_STATUS_CONFIG} getLabel={getInventoryStatusLabel} size="small" /> },
+      { title: 'Item Description', dataIndex: 'itemDescription', key: 'itemDescription', width: 240, ellipsis: true },
+      { title: 'Category', dataIndex: 'category', key: 'category', width: 140 },
+      { title: 'Inspector', dataIndex: 'inspector', key: 'inspector', width: 150 },
+      { title: 'Date', dataIndex: 'inspectionDate', key: 'inspectionDate', width: 130, render: (val, r) => formatDate(val || r.date) },
       {
-        title: 'Actions', key: 'actions', width: 100, fixed: 'right', align: 'center',
-        render: (_, record) => (
-          <Space size={4}>
-            <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
-            <ActionButton action="edit" onClick={() => navigate(`/inventory/qc/trims/${record.id}`)} />
-          </Space>
-        ),
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        width: 160,
+        render: (val) => <StatusTag status={val} config={QC_STATUS_CONFIG} getLabel={getInventoryStatusLabel} size="small" />,
+      },
+      {
+        title: 'Actions', key: 'actions', width: 140, fixed: 'right', align: 'center',
+        render: (_, record) => {
+          const canEdit = EDITABLE_STATUSES.has(record.status);
+          const canDelete = record.status === QC_STATUS.DRAFT;
+          return (
+            <Space size={4}>
+              <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
+              {canEdit && (
+                <ActionButton action="edit" onClick={() => navigate(`/inventory/qc/trims/${record.id}`)} />
+              )}
+              {canDelete && (
+                <ActionButton action="delete" onClick={() => handleDelete(record)} />
+              )}
+            </Space>
+          );
+        },
       },
     ],
-    [navigate, setViewDrawer],
+    [navigate, handleDelete],
   );
 
   const content = (
     <>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}><StatCard title="Total Inspections" value={stats.total} color="var(--primary-color)" icon={<ExperimentOutlined />} /></Col>
-        <Col xs={24} sm={8}><StatCard title="Passed" value={stats.passed} color="var(--success-color)" icon={<CheckCircleOutlined />} /></Col>
-        <Col xs={24} sm={8}><StatCard title="Failed" value={stats.failed} color="var(--error-color)" icon={<CloseCircleOutlined />} /></Col>
+        <Col xs={24} sm={8}><StatCard title="Approved" value={stats.approved} color="var(--success-color)" icon={<CheckCircleOutlined />} /></Col>
+        <Col xs={24} sm={8}><StatCard title="Rejected" value={stats.rejected} color="var(--error-color)" icon={<CloseCircleOutlined />} /></Col>
       </Row>
 
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
-          <Input placeholder="Search QC / GRN / Item..." prefix={<SearchOutlined />} style={{ width: 260 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
+          <Input placeholder="Search QC / GRN / Item / Category..." prefix={<SearchOutlined />} style={{ width: 300 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
           <Select placeholder="Status" style={{ width: 180 }} allowClear options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
           <RangePicker style={{ width: 280 }} value={dateRange} onChange={setDateRange} />
         </Space>
@@ -129,12 +187,12 @@ const TrimsQCList = ({ embedded = false }) => {
           columns={columns}
           dataSource={filteredData}
           loading={loading}
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1240 }}
           pagination={getTablePagination({ pageSize: 10 }, 'inspections')}
-          locale={{ emptyText: <EmptyState title="No trims QC inspections found" description="Create a new inspection to get started" /> }}
+          locale={{ emptyText: <EmptyState title="No accessories QC inspections found" description="Create a new inspection to get started" /> }}
         />
       </Card>
-      <QCViewDrawer
+      <QCViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer({ open: false, record: null })}
         record={viewDrawer.record}
@@ -146,10 +204,10 @@ const TrimsQCList = ({ embedded = false }) => {
   if (embedded) return content;
 
   return (
-    <div className="animate-fade-in-up">
-      <PageHeader title="Trims Quality Control">
+    <div className="animate-fade-in-up inv-page">
+      <PageHeader title="Accessories Quality Control">
         <PermissionGuard module="inventory" operation="add">
-          <ActionButton action="create" text="New Inspection" onClick={() => navigate('/inventory/qc/trims/new')} />
+          <ActionButton action="create" text="New Accessories Inspection" onClick={() => navigate('/inventory/qc/trims/new')} />
         </PermissionGuard>
       </PageHeader>
       {content}

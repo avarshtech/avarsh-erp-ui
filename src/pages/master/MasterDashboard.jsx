@@ -25,6 +25,8 @@ import SizePresetMaster from './SizePresetMaster';
 import ProcessMaster from './ProcessMaster';
 import PartsMaster from './PartsMaster';
 import OverheadMaster from './OverheadMaster';
+import DefectTypeMaster from './DefectTypeMaster';
+import TrimsQCCriteriaMaster from './TrimsQCCriteriaMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
@@ -46,6 +48,7 @@ const GROUP_ACCENT = {
   style: 'var(--success-color)',
   commercial: 'var(--warning-color)',
   manufacturing: 'var(--error-color)',
+  quality: 'var(--primary-color)',
 };
 
 // Static navigation config — add new master data entries here
@@ -212,6 +215,30 @@ const NAV_GROUPS = [
         Component: PartsMaster,
         loadingKey: null,
         description: 'Garment part names for BOM line items',
+      },
+    ],
+  },
+  {
+    groupKey: 'quality',
+    label: 'Quality Control',
+    items: [
+      {
+        key: 'defect-type',
+        label: 'Defect Types',
+        icon: <ExperimentOutlined />,
+        moduleId: 'inventory-qc',
+        Component: DefectTypeMaster,
+        loadingKey: null,
+        description: 'Defect types for fabric QC inspection',
+      },
+      {
+        key: 'trims-qc-criteria',
+        label: 'Trims QC Criteria',
+        icon: <FileProtectOutlined />,
+        moduleId: 'inventory-qc',
+        Component: TrimsQCCriteriaMaster,
+        loadingKey: null,
+        description: 'Criteria checking master for trims QC inspection',
       },
     ],
   },

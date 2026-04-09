@@ -1,80 +1,68 @@
 import { useMemo } from 'react';
-import { Table, Input, InputNumber, Select, Button, Typography } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { numericInputProps } from '../../../utils/inputHelpers';
-import { INVENTORY_UOMS } from '../../../utils/inventoryConstants';
-import { formatNumber } from '../../../utils/formatters';
+import { Table, Input, InputNumber, Typography, Empty } from 'antd';
 
 const { Text } = Typography;
 
-const AccessoriesGRNCartonTable = ({ cartons = [], onCartonChange, onAddCarton, onRemoveCarton }) => {
+const ReadOnlyText = ({ value }) => <Text style={{ fontSize: 13 }}>{value ?? '—'}</Text>;
+
+const AccessoriesGRNCartonTable = ({ cartons = [], onCartonChange, readOnly = false }) => {
   const columns = useMemo(
     () => [
+      { title: '#', key: 'idx', align: 'center', width: 50, render: (_, __, i) => i + 1 },
       {
-        title: 'Carton #', dataIndex: 'cartonNumber', key: 'cartonNumber', width: 90,
-        render: (_, __, i) => <Text strong>{`C${String(i + 1).padStart(3, '0')}`}</Text>,
+        title: 'Carton #',
+        dataIndex: 'cartonNumber',
+        align: 'center',
+        width: 130,
+        render: (val, _, i) => (
+          <Input
+            size="small"
+            value={val}
+            placeholder="e.g. C001"
+            disabled={readOnly}
+            status={!val ? 'warning' : ''}
+            onChange={(e) => onCartonChange?.(i, 'cartonNumber', e.target.value)}
+          />
+        ),
       },
+      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 150, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Description', dataIndex: 'itemDescription', align: 'center', ellipsis: true, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Color', dataIndex: 'color', align: 'center', width: 100, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Size', dataIndex: 'size', align: 'center', width: 80, render: (v) => <ReadOnlyText value={v} /> },
       {
-        title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140,
-        render: (val, _, i) => <Input value={val} onChange={(e) => onCartonChange(i, 'itemCode', e.target.value)} placeholder="Item code" />,
-      },
-      {
-        title: 'Description', dataIndex: 'itemDescription', key: 'itemDescription', width: 180,
-        render: (val, _, i) => <Input value={val} onChange={(e) => onCartonChange(i, 'itemDescription', e.target.value)} placeholder="Item description" />,
-      },
-      {
-        title: 'Color', dataIndex: 'color', key: 'color', width: 100,
-        render: (val, _, i) => <Input value={val} onChange={(e) => onCartonChange(i, 'color', e.target.value)} placeholder="Color" />,
-      },
-      {
-        title: 'Size', dataIndex: 'size', key: 'size', width: 80,
-        render: (val, _, i) => <Input value={val} onChange={(e) => onCartonChange(i, 'size', e.target.value)} placeholder="Size" />,
-      },
-      {
-        title: 'Quantity', dataIndex: 'quantity', key: 'quantity', width: 100,
-        render: (val, _, i) => <InputNumber value={val} onChange={(v) => onCartonChange(i, 'quantity', v)} style={{ width: '100%' }} min={0} {...numericInputProps} />,
-      },
-      {
-        title: 'UOM', dataIndex: 'uom', key: 'uom', width: 100,
-        render: (val, _, i) => <Select value={val} onChange={(v) => onCartonChange(i, 'uom', v)} style={{ width: '100%' }} options={INVENTORY_UOMS} placeholder="UOM" />,
-      },
-      {
-        title: 'Batch/Lot', dataIndex: 'batchNo', key: 'batchNo', width: 120,
-        render: (val, _, i) => <Input value={val} onChange={(e) => onCartonChange(i, 'batchNo', e.target.value)} placeholder="Batch" />,
-      },
-      {
-        title: '', key: 'actions', width: 50, align: 'center',
-        render: (_, __, i) => <Button type="text" danger icon={<DeleteOutlined />} onClick={() => onRemoveCarton(i)} size="small" />,
+        title: 'Quantity',
+        dataIndex: 'quantity',
+        align: 'center',
+        width: 170,
+        render: (val, _, i) => (
+          <InputNumber
+            size="small"
+            min={0}
+            value={val}
+            placeholder="Qty"
+            controls={false}
+            addonAfter={cartons[i]?.uom || ''}
+            style={{ width: '100%' }}
+            disabled={readOnly}
+            status={!val ? 'warning' : ''}
+            onChange={(v) => onCartonChange?.(i, 'quantity', v)}
+          />
+        ),
       },
     ],
-    [onCartonChange, onRemoveCarton],
+    [onCartonChange, readOnly, cartons],
   );
 
-  const totalQty = useMemo(() => cartons.reduce((sum, c) => sum + (c.quantity || 0), 0), [cartons]);
-
   return (
-    <>
-      <Table
-        rowKey={(_, i) => i}
-        columns={columns}
-        dataSource={cartons}
-        pagination={false}
-        scroll={{ x: 1100 }}
-        size="small"
-        summary={() => (
-          <Table.Summary fixed>
-            <Table.Summary.Row style={{ background: 'var(--bg-secondary)' }}>
-              <Table.Summary.Cell index={0} colSpan={5}><Text strong>Total: {cartons.length} carton(s)</Text></Table.Summary.Cell>
-              <Table.Summary.Cell index={1}><Text strong>{formatNumber(totalQty)}</Text></Table.Summary.Cell>
-              <Table.Summary.Cell index={2} colSpan={4} />
-            </Table.Summary.Row>
-          </Table.Summary>
-        )}
-      />
-      <Button type="dashed" icon={<PlusOutlined />} onClick={onAddCarton} style={{ width: '100%', marginTop: 12 }}>
-        Add Carton
-      </Button>
-    </>
+    <Table
+      rowKey={(c, i) => `${c.poLineItemId}-${i}`}
+      columns={columns}
+      dataSource={cartons}
+      pagination={false}
+      scroll={{ x: 820 }}
+      size="small"
+      locale={{ emptyText: <Empty description="Select PO line items above to populate cartons." /> }}
+    />
   );
 };
 

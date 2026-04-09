@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Space, Input, Select, DatePicker, Row, Col } from 'antd';
+import { App, Table, Card, Space, Input, Select, DatePicker, Row, Col, Modal } from 'antd';
 import {
   SearchOutlined,
   ExperimentOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -18,30 +19,37 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getFabricQCList } from '../../../services/inventoryService';
+import { getFabricQCList, deleteFabricQCDraft } from '../../../services/inventoryService';
 import { formatDate } from '../../../utils/formatters';
-import QCViewDrawer from './QCViewDrawer';
+import QCViewModal from './QCViewModal';
+
+// Statuses whose records are still editable by the creator.
+const EDITABLE_STATUSES = new Set([
+  QC_STATUS.DRAFT,
+  QC_STATUS.REJECTED,
+  QC_STATUS.REFERRED_BACK,
+]);
 
 const { RangePicker } = DatePicker;
 
 const STATUS_OPTIONS = [
-  { label: 'Passed', value: QC_STATUS.PASSED },
-  { label: 'Failed', value: QC_STATUS.FAILED },
-  { label: 'Conditional', value: QC_STATUS.CONDITIONAL },
+  { label: 'Draft', value: QC_STATUS.DRAFT },
   { label: 'Pending Approval', value: QC_STATUS.PENDING_APPROVAL },
-  { label: 'In Progress', value: QC_STATUS.IN_PROGRESS },
   { label: 'Approved', value: QC_STATUS.APPROVED },
   { label: 'Rejected', value: QC_STATUS.REJECTED },
+  { label: 'Refer Back Pending', value: QC_STATUS.REFERRED_BACK_PENDING },
+  { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
 ];
 
 const FabricQCList = ({ embedded = false }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(undefined);
+  const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
@@ -56,6 +64,30 @@ const FabricQCList = ({ embedded = false }) => {
     }
   }, [message]);
 
+  const handleDelete = useCallback((record) => {
+    modal.confirm({
+      title: 'Delete QC inspection?',
+      icon: <ExclamationCircleOutlined />,
+      content: (
+        <span>
+          This will permanently delete <strong>{record.qcNumber}</strong>. Only draft QCs can be deleted; this action cannot be undone.
+        </span>
+      ),
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await deleteFabricQCDraft(record.id);
+          message.success(`${record.qcNumber} deleted`);
+          loadData();
+        } catch (err) {
+          message.error(err?.message || 'Failed to delete QC');
+        }
+      },
+    });
+  }, [modal, message, loadData]);
+
   useEffect(() => {
     loadData();
   }, [loadData]);
@@ -69,14 +101,27 @@ const FabricQCList = ({ embedded = false }) => {
         (r) => r.qcNumber.toLowerCase().includes(s) || r.grnNumber.toLowerCase().includes(s) || r.fabricDescription.toLowerCase().includes(s),
       );
     }
+    if (dateRange?.[0] && dateRange?.[1]) {
+      const from = dateRange[0].startOf('day');
+      const to = dateRange[1].endOf('day');
+      result = result.filter((r) => {
+        if (!r.inspectionDate) return false;
+        const dt = dayjs(r.inspectionDate);
+        return dt.isAfter(from) && dt.isBefore(to);
+      });
+    }
     return result;
-  }, [data, statusFilter, searchText]);
+  }, [data, statusFilter, searchText, dateRange]);
 
+  // Stats reflect the CURRENTLY FILTERED rows so filter/search changes update the
+  // counts live. When the API phase lands, the same filter params (search, status,
+  // date range) should be POSTed to the backend which returns both the page + a
+  // matching aggregate block — the memo below becomes a pass-through of that block.
   const stats = useMemo(() => {
-    const passed = data.filter((r) => r.overallResult === 'Pass').length;
-    const failed = data.filter((r) => r.overallResult === 'Fail').length;
-    return { total: data.length, passed, failed };
-  }, [data]);
+    const passed = filteredData.filter((r) => r.overallResult === 'Pass').length;
+    const failed = filteredData.filter((r) => r.overallResult === 'Fail').length;
+    return { total: filteredData.length, passed, failed };
+  }, [filteredData]);
 
   const columns = useMemo(
     () => [
@@ -84,22 +129,35 @@ const FabricQCList = ({ embedded = false }) => {
       { title: 'GRN Number', dataIndex: 'grnNumber', key: 'grnNumber', width: 160 },
       { title: 'Fabric Description', dataIndex: 'fabricDescription', key: 'fabricDescription', width: 220, ellipsis: true },
       { title: 'Roll Count', dataIndex: 'rollCount', key: 'rollCount', width: 100, align: 'center' },
-      { title: 'Defect Points', dataIndex: 'totalDefectPoints', key: 'totalDefectPoints', width: 120, align: 'center' },
-      { title: 'Result', dataIndex: 'overallResult', key: 'overallResult', width: 140, render: (val) => { const color = val === 'Pass' ? 'green' : val === 'Fail' ? 'red' : 'orange'; return <StatusTag status={val} config={{ [val]: { color } }} />; } },
       { title: 'Inspector', dataIndex: 'inspector', key: 'inspector', width: 150 },
       { title: 'Date', dataIndex: 'inspectionDate', key: 'inspectionDate', width: 130, render: (val) => formatDate(val) },
-      { title: 'Approval', dataIndex: 'approvalStatus', key: 'approvalStatus', width: 140, render: (val) => <StatusTag status={val} config={QC_STATUS_CONFIG} getLabel={getInventoryStatusLabel} size="small" /> },
       {
-        title: 'Actions', key: 'actions', width: 100, fixed: 'right', align: 'center',
-        render: (_, record) => (
-          <Space size={4}>
-            <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
-            <ActionButton action="edit" onClick={() => navigate(`/inventory/qc/fabric/${record.id}`)} />
-          </Space>
-        ),
+        title: 'Status',
+        dataIndex: 'status',
+        key: 'status',
+        width: 160,
+        render: (val) => <StatusTag status={val} config={QC_STATUS_CONFIG} getLabel={getInventoryStatusLabel} size="small" />,
+      },
+      {
+        title: 'Actions', key: 'actions', width: 140, fixed: 'right', align: 'center',
+        render: (_, record) => {
+          const canEdit = EDITABLE_STATUSES.has(record.status);
+          const canDelete = record.status === QC_STATUS.DRAFT;
+          return (
+            <Space size={4}>
+              <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
+              {canEdit && (
+                <ActionButton action="edit" onClick={() => navigate(`/inventory/qc/fabric/${record.id}`)} />
+              )}
+              {canDelete && (
+                <ActionButton action="delete" onClick={() => handleDelete(record)} />
+              )}
+            </Space>
+          );
+        },
       },
     ],
-    [navigate, setViewDrawer],
+    [navigate, handleDelete],
   );
 
   const content = (
@@ -114,19 +172,19 @@ const FabricQCList = ({ embedded = false }) => {
         <Space wrap style={{ marginBottom: 16 }}>
           <Input placeholder="Search QC / GRN / Fabric..." prefix={<SearchOutlined />} style={{ width: 260 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
           <Select placeholder="Status" style={{ width: 180 }} allowClear options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
-          <RangePicker style={{ width: 280 }} />
+          <RangePicker style={{ width: 280 }} value={dateRange} onChange={setDateRange} />
         </Space>
         <Table
           rowKey="id"
           columns={columns}
           dataSource={filteredData}
           loading={loading}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1160 }}
           pagination={getTablePagination({ pageSize: 10 }, 'inspections')}
           locale={{ emptyText: <EmptyState title="No fabric QC inspections found" description="Create a new inspection to get started" /> }}
         />
       </Card>
-      <QCViewDrawer
+      <QCViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer({ open: false, record: null })}
         record={viewDrawer.record}
@@ -138,7 +196,7 @@ const FabricQCList = ({ embedded = false }) => {
   if (embedded) return content;
 
   return (
-    <div className="animate-fade-in-up">
+    <div className="animate-fade-in-up inv-page">
       <PageHeader title="Fabric Quality Control">
         <PermissionGuard module="inventory" operation="add">
           <ActionButton action="create" text="New Inspection" onClick={() => navigate('/inventory/qc/fabric/new')} />

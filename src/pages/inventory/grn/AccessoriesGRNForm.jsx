@@ -1,18 +1,34 @@
-import { useState, useCallback, useEffect } from 'react';
-import { App, Form, Input, Select, DatePicker, Card, Row, Col, Typography } from 'antd';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { App, Form, Input, Select, DatePicker, Card, Row, Col, Typography, Space, Tag, Skeleton } from 'antd';
+import { SaveOutlined, SendOutlined, FileSearchOutlined, InboxOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
-import { getPurchaseOrdersForGRN, getAccessoriesGRN } from '../../../services/inventoryService';
+import FileUpload from '../../../components/FileUpload';
+import {
+  getPurchaseOrdersForGRN,
+  getAccessoriesGRN,
+  saveTrimsGRNDraft,
+  submitTrimsGRN,
+  getItemVariantsBulk,
+  getPurchaseOrderByIdAnyStatus,
+  enrichPOWithReceipts,
+} from '../../../services/inventoryService';
+import { validateTrimsGRN } from '../../../utils/grnValidation';
+import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
+import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import POLineItemPicker from './POLineItemPicker';
 import AccessoriesGRNItemTable from './AccessoriesGRNItemTable';
 import AccessoriesGRNCartonTable from './AccessoriesGRNCartonTable';
 import AccessoriesGRNSummaryPanel from './AccessoriesGRNSummaryPanel';
 
 const { Title } = Typography;
 const { TextArea } = Input;
+
+const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
 const AccessoriesGRNForm = () => {
   const { message } = App.useApp();
@@ -21,140 +37,457 @@ const AccessoriesGRNForm = () => {
   const [form] = Form.useForm();
   const isEdit = Boolean(id);
 
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [submittingForm, setSubmittingForm] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [selectedPO, setSelectedPO] = useState(null);
+  const [selectedLineItemIds, setSelectedLineItemIds] = useState([]);
   const [items, setItems] = useState([]);
   const [cartons, setCartons] = useState([]);
+  const [dcImage, setDcImage] = useState({ file: null, previewUrl: null });
+  const [grnRecord, setGrnRecord] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const { clearDirty } = useUnsavedChanges(isDirty);
 
+  // Editable when the GRN is a fresh Draft or has been Reversed (reopened for edits).
+  // QC_PENDING and CLOSED are read-only — only the Reverse action (on QC_PENDING)
+  // can reopen it via the approval-actions bar.
+  const readOnly =
+    grnRecord && grnRecord.status !== GRN_STATUS.DRAFT && grnRecord.status !== GRN_STATUS.REVERSED;
+  const isReferredBack = grnRecord?.status === GRN_STATUS.REVERSED;
+
+  // Trims POs only
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => p.poNumber.startsWith('PO-ACC'))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.poNumber || '').includes('ACC'))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
   useEffect(() => {
-    if (isEdit) {
-      getAccessoriesGRN(id)
-        .then((grn) => {
-          if (grn) {
-            form.setFieldsValue({
-              poNumber: grn.poId,
-              grnDate: dayjs(grn.grnDate),
-              challanNo: grn.challanNo,
-              invoiceDate: grn.invoiceDate ? dayjs(grn.invoiceDate) : undefined,
-              vehicleNumber: grn.vehicleNumber,
-              remarks: grn.remarks,
-            });
-            setItems(grn.items || []);
-            setCartons(grn.cartons || []);
-            setSelectedPO({ poNumber: grn.poNumber, supplier: grn.supplier, poDate: grn.grnDate, items: grn.items });
-          }
-        })
-        .catch(() => message.error('Failed to load GRN'));
-    }
+    if (!isEdit) return;
+    let cancelled = false;
+    setEditLoading(true);
+    (async () => {
+      try {
+        const grn = await getAccessoriesGRN(id);
+        if (!grn || cancelled) return;
+        const fullPO = await getPurchaseOrderByIdAnyStatus(grn.poId);
+        if (cancelled) return;
+
+        setGrnRecord(grn);
+        const enriched = fullPO ? await enrichPOWithReceipts(fullPO, grn.id) : null;
+        if (cancelled) return;
+        setSelectedPO(enriched || { id: grn.poId, poNumber: grn.poNumber, supplier: grn.supplier, buyerName: grn.buyerName, styleNumber: grn.styleNumber, items: [] });
+
+        // lineItems may be either an array of ids or an array of objects — handle both
+        const lineIds = (grn.lineItems || []).map((li) => (typeof li === 'number' ? li : li.poLineItemId || li.id));
+        // Fall back to items[].poLineItemId if no explicit lineItems array
+        const fallbackIds = (grn.items || []).map((it) => it.poLineItemId).filter(Boolean);
+        setSelectedLineItemIds(lineIds.length ? lineIds : fallbackIds);
+
+        setItems(grn.items || []);
+        setCartons(grn.cartons || []);
+
+        form.setFieldsValue({
+          poId: grn.poId,
+          challanNo: grn.challanNo,
+          invoiceDate: grn.invoiceDate ? dayjs(grn.invoiceDate) : null,
+          deliveryChallanDate: grn.deliveryChallanDate ? dayjs(grn.deliveryChallanDate) : null,
+          vehicleNumber: grn.vehicleNumber,
+          transporter: grn.transporter,
+          remarks: grn.remarks,
+        });
+      } catch {
+        if (!cancelled) message.error('Failed to load GRN');
+      } finally {
+        if (!cancelled) setEditLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [id, isEdit, form, message]);
 
-  const handlePOChange = useCallback(
-    (poId) => {
-      const po = purchaseOrders.find((p) => p.id === poId);
-      setSelectedPO(po || null);
-      if (po) {
-        setItems(po.items.map((item) => ({
-          ...item, alreadyReceived: item.receivedQty || 0, balance: item.pendingQty, receivingQty: 0,
-        })));
-        setCartons([]);
-      }
-      setIsDirty(true);
-    },
-    [purchaseOrders],
-  );
+  const handlePOChange = useCallback(async (poId) => {
+    const po = purchaseOrders.find((p) => p.id === poId);
+    const enriched = po ? await enrichPOWithReceipts(po, grnRecord?.id) : null;
+    setSelectedPO(enriched);
+    setSelectedLineItemIds([]);
+    setItems([]);
+    setCartons([]);
+    setIsDirty(true);
+  }, [purchaseOrders, grnRecord?.id]);
 
-  const handleItemChange = useCallback((index, field, value) => {
-    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+  // Merge items + cartons when selection changes — preserving user-entered Receiving Qty,
+  // Carton #, and Quantity for line items that remain selected.
+  useEffect(() => {
+    if (!selectedPO) return;
+
+    setItems((prevItems) => {
+      const kept = prevItems.filter((it) => selectedLineItemIds.includes(it.poLineItemId));
+      const existingIds = new Set(prevItems.map((it) => it.poLineItemId));
+      const newIds = selectedLineItemIds.filter((id) => !existingIds.has(id));
+      if (newIds.length === 0 && kept.length === prevItems.length) return prevItems;
+      const newVariantIds = newIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
+      const newVariants = getItemVariantsBulk(newVariantIds);
+      const freshItems = newIds.map((id, idx) => {
+        const li = (selectedPO.items || []).find((i) => i.id === id);
+        const v = newVariants[idx];
+        return {
+          poLineItemId: id,
+          variantId: li?.variantId,
+          itemCode: li?.itemCode,
+          description: li?.description,
+          color: v?.color || '—',
+          size: v?.size || '—',
+          poQty: li?.orderedQty,
+          alreadyReceived: li?.receivedQty,
+          balance: li?.pendingQty,
+          receivingQty: 0,
+          uom: v?.primaryUom || li?.uom,
+          rate: li?.rate,
+        };
+      });
+      const byId = new Map();
+      [...kept, ...freshItems].forEach((it) => byId.set(it.poLineItemId, it));
+      return selectedLineItemIds.map((id) => byId.get(id)).filter(Boolean);
+    });
+
+    setCartons((prevCartons) => {
+      const kept = prevCartons.filter((c) => selectedLineItemIds.includes(c.poLineItemId));
+      const existingLineItemIds = new Set(prevCartons.map((c) => c.poLineItemId));
+      const newLineIds = selectedLineItemIds.filter((id) => !existingLineItemIds.has(id));
+      if (newLineIds.length === 0 && kept.length === prevCartons.length) return prevCartons;
+      const newVariantIds = newLineIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
+      const newVariants = getItemVariantsBulk(newVariantIds);
+      const freshCartons = newLineIds.map((id, idx) => {
+        const li = (selectedPO.items || []).find((i) => i.id === id);
+        const v = newVariants[idx];
+        return {
+          poLineItemId: id,
+          cartonNumber: '',
+          itemCode: li?.itemCode,
+          itemDescription: li?.description,
+          color: v?.color || '—',
+          size: v?.size || '—',
+          quantity: 0,
+          uom: v?.secondaryUom || v?.primaryUom || li?.uom,
+        };
+      });
+      // Preserve multiple cartons per line item (for edit mode)
+      const result = [];
+      selectedLineItemIds.forEach((id) => {
+        const keptForLine = kept.filter((c) => c.poLineItemId === id);
+        if (keptForLine.length > 0) result.push(...keptForLine);
+        else {
+          const fresh = freshCartons.find((c) => c.poLineItemId === id);
+          if (fresh) result.push(fresh);
+        }
+      });
+      return result;
+    });
+  }, [selectedPO, selectedLineItemIds]);
+
+  const handleItemChange = useCallback((idx, field, value) => {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)));
     setIsDirty(true);
   }, []);
 
-  const handleCartonChange = useCallback((index, field, value) => {
-    setCartons((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
+  const handleCartonChange = useCallback((idx, field, value) => {
+    setCartons((prev) => prev.map((c, i) => (i === idx ? { ...c, [field]: value } : c)));
     setIsDirty(true);
   }, []);
 
-  const handleAddCarton = useCallback(() => {
-    setCartons((prev) => [...prev, { itemCode: '', itemDescription: '', color: '', size: '', quantity: 0, uom: 'pcs', batchNo: '' }]);
-    setIsDirty(true);
-  }, []);
+  const buildPayload = () => {
+    const values = form.getFieldsValue();
+    return {
+      id: grnRecord?.id,
+      grnNumber: grnRecord?.grnNumber,
+      type: 'Accessories',
+      poId: selectedPO?.id,
+      poNumber: selectedPO?.poNumber,
+      supplier: selectedPO?.supplier,
+      buyerName: selectedPO?.buyerName,
+      styleNumber: selectedPO?.styleNumber,
+      grnDate: grnRecord?.grnDate || dayjs().format('YYYY-MM-DD'),
+      challanNo: values.challanNo,
+      invoiceDate: values.invoiceDate ? dayjs(values.invoiceDate).format('YYYY-MM-DD') : null,
+      deliveryChallanDate: values.deliveryChallanDate ? dayjs(values.deliveryChallanDate).format('YYYY-MM-DD') : null,
+      vehicleNumber: values.vehicleNumber,
+      transporter: values.transporter,
+      remarks: values.remarks,
+      lineItems: selectedLineItemIds,
+      items,
+      cartons,
+      version: grnRecord?.version,
+      dcImageName: dcImage.file?.name || grnRecord?.dcImageName,
+    };
+  };
 
-  const handleRemoveCarton = useCallback((index) => {
-    setCartons((prev) => prev.filter((_, i) => i !== index));
-    setIsDirty(true);
-  }, []);
+  const handleSaveDraft = async () => {
+    if (savingDraft || submittingForm) return;
+    if (isEdit && !isDirty) {
+      message.warning('No changes detected.');
+      return;
+    }
+    const payload = buildPayload();
+    const errors = validateTrimsGRN(payload, false, { po: selectedPO });
+    if (errors.length) { errors.slice(0, 3).forEach((e) => message.error(e)); return; }
+    setSavingDraft(true);
+    try {
+      await saveTrimsGRNDraft(payload);
+      message.success('Draft saved');
+      clearDirty();
+      navigate('/inventory/grn/list');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to save draft');
+      setSavingDraft(false);
+    }
+  };
 
-  const handleSubmit = useCallback(
-    (status) => {
-      form.validateFields().then((values) => {
-        const payload = { ...values, type: 'Accessories', status, items, cartons };
-        message.success(`Accessories GRN ${status === 'Draft' ? 'saved as draft' : 'submitted'} successfully`);
-        clearDirty();
-        navigate('/inventory/grn');
-      }).catch(() => message.warning('Please fill all required fields'));
-    },
-    [form, items, cartons, message, navigate, clearDirty],
-  );
+  const handleSubmit = async () => {
+    if (savingDraft || submittingForm) return;
+    const payload = buildPayload();
+    const errors = validateTrimsGRN(payload, true, { po: selectedPO });
+    if (errors.length) { errors.slice(0, 5).forEach((e) => message.error(e)); return; }
+    setSubmittingForm(true);
+    try {
+      await submitTrimsGRN(payload);
+      message.success('GRN submitted');
+      clearDirty();
+      navigate('/inventory/grn/list');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to submit GRN');
+      setSubmittingForm(false);
+    }
+  };
 
-  const poOptions = purchaseOrders.map((po) => ({ label: `${po.poNumber} - ${po.supplier}`, value: po.id }));
+  const poOptions = purchaseOrders.map((po) => ({ label: `${po.poNumber} — ${po.supplier}`, value: po.id }));
 
   return (
-    <div className="animate-fade-in-up">
-      <PageHeader title={isEdit ? 'Edit Accessories GRN' : 'New Accessories GRN'} backPath="/inventory/grn/list" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        {hasPermission('inventory', 'add') && (
-          <>
-            <ActionButton action="save" variant="draft" text="Save as Draft" onClick={() => handleSubmit('Draft')} />
-            <ActionButton action="save" text="Submit GRN" onClick={() => handleSubmit('Submitted')} />
-          </>
-        )}
+    <div className="animate-fade-in-up inv-page">
+      <PageHeader
+        title={
+          isEdit ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, lineHeight: 1, flexWrap: 'wrap' }}>
+              <span>Edit Accessories GRN</span>
+              {grnRecord?.grnNumber && (
+                <Tag
+                  color="purple"
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    padding: '4px 12px',
+                    borderRadius: 999,
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    margin: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  {grnRecord.grnNumber}
+                </Tag>
+              )}
+              {grnRecord?.status && (
+                <StatusTag
+                  status={grnRecord.status}
+                  config={GRN_STATUS_CONFIG}
+                  getLabel={getInventoryStatusLabel}
+                />
+              )}
+            </span>
+          ) : (
+            'New Accessories GRN'
+          )
+        }
+        backPath="/inventory/grn/list"
+        style={{ position: 'sticky', top: 64, zIndex: 10 }}
+      >
+        <Space wrap>
+          {!readOnly && !isReferredBack && (
+            <ActionButton action="save" variant="draft" text="Save Draft" icon={<SaveOutlined />} onClick={handleSaveDraft} loading={savingDraft} />
+          )}
+          {!readOnly && (
+            <ActionButton action="save" text="Submit" icon={<SendOutlined />} onClick={handleSubmit} loading={submittingForm} />
+          )}
+        </Space>
       </PageHeader>
 
-      <Form form={form} layout="vertical" initialValues={{ grnDate: dayjs() }} onValuesChange={() => setIsDirty(true)}>
+      {editLoading ? (
+        <div style={{ padding: 24 }}>
+          <Card style={{ marginBottom: 24, borderRadius: 12 }}>
+            <Skeleton active title={{ width: '40%' }} paragraph={{ rows: 4 }} />
+          </Card>
+          <Card style={{ marginBottom: 24, borderRadius: 12 }}>
+            <Skeleton active paragraph={{ rows: 3 }} />
+          </Card>
+          <Card style={{ borderRadius: 12 }}>
+            <Skeleton active paragraph={{ rows: 6 }} />
+          </Card>
+        </div>
+      ) : (
+      <Form form={form} layout="vertical" onValuesChange={() => setIsDirty(true)}>
         <Row gutter={24} align="stretch" style={{ marginBottom: 24 }}>
           <Col xs={24} lg={16}>
-            <Card style={{ height: '100%' }}>
-              <Title level={5} style={{ marginBottom: 24 }}>GRN Details</Title>
-              <Row gutter={24}>
-                <Col xs={24} md={12}><Form.Item name="poNumber" label="Purchase Order" rules={[{ required: true, message: 'Select a PO' }]}><Select placeholder="Select PO" options={poOptions} onChange={handlePOChange} showSearch optionFilterProp="label" /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name="grnDate" label="GRN Date" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+            <Card style={{ height: '100%', borderLeft: '3px solid var(--primary-color)' }} title={<Space><FileSearchOutlined /><span>GRN Details</span></Space>}>
+              {isEdit && (
+                <Row gutter={16}>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="GRN #">
+                      <Input value={grnRecord?.grnNumber || ''} disabled />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Form.Item label="GRN Date">
+                      <DatePicker
+                        style={{ width: '100%' }}
+                        value={grnRecord?.grnDate ? dayjs(grnRecord.grnDate) : null}
+                        disabled
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              )}
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item name="poId" label="Purchase Order" rules={[{ required: true, message: 'Select a PO' }]}>
+                    <Select placeholder="Select PO" options={poOptions} onChange={handlePOChange} showSearch optionFilterProp="label" disabled={readOnly} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="challanNo"
+                    label="Challan / Invoice Number"
+                    required
+                    rules={[
+                      { required: true, message: 'Challan / Invoice Number is required' },
+                      { pattern: CHALLAN_REGEX, message: 'Letters, digits, hyphen and slash only' },
+                    ]}
+                  >
+                    <Input placeholder="e.g. INV-2026/0123" disabled={readOnly} />
+                  </Form.Item>
+                </Col>
               </Row>
-              <Row gutter={24}>
-                <Col xs={24} md={12}><Form.Item name="challanNo" label="Challan / Invoice Number" rules={[{ required: true }]}><Input placeholder="Enter challan or invoice number" /></Form.Item></Col>
-                <Col xs={24} md={12}><Form.Item name="invoiceDate" label="Invoice Date"><DatePicker style={{ width: '100%' }} /></Form.Item></Col>
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="invoiceDate"
+                    label="Invoice Date"
+                    required
+                    rules={[{ required: true, message: 'Invoice Date is required' }]}
+                  >
+                    <DatePicker
+                      style={{ width: '100%' }}
+                      disabled={readOnly || !selectedPO}
+                      disabledDate={(d) => {
+                        if (!d) return false;
+                        if (d.isAfter(dayjs(), 'day')) return true;
+                        if (selectedPO?.createdDate && d.isBefore(dayjs(selectedPO.createdDate).startOf('day'))) return true;
+                        if (selectedPO?.expectedDeliveryDate && d.isAfter(dayjs(selectedPO.expectedDeliveryDate).endOf('day'))) return true;
+                        return false;
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="deliveryChallanDate"
+                    label="Delivery Challan Date"
+                    required
+                    rules={[{ required: true, message: 'Delivery Challan Date is required' }]}
+                  >
+                    <DatePicker
+                      style={{ width: '100%' }}
+                      disabled={readOnly || !selectedPO}
+                      disabledDate={(d) => {
+                        if (!d) return false;
+                        if (d.isAfter(dayjs(), 'day')) return true;
+                        if (selectedPO?.createdDate && d.isBefore(dayjs(selectedPO.createdDate).startOf('day'))) return true;
+                        if (selectedPO?.expectedDeliveryDate && d.isAfter(dayjs(selectedPO.expectedDeliveryDate).endOf('day'))) return true;
+                        return false;
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
               </Row>
-              <Row gutter={24}>
-                <Col xs={24} md={12}><Form.Item name="vehicleNumber" label="Vehicle Number"><Input placeholder="e.g., MH-12-QW-3344" /></Form.Item></Col>
+              <Row gutter={16}>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="vehicleNumber"
+                    label="Vehicle Number"
+                    required
+                    rules={[{ required: true, message: 'Vehicle Number is required' }]}
+                  >
+                    <Input placeholder="e.g. MH-12-QW-3344" disabled={readOnly} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="transporter"
+                    label="Transporter"
+                    required
+                    rules={[{ required: true, message: 'Transporter is required' }]}
+                  >
+                    <Input placeholder="Transporter name" disabled={readOnly} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={16}>
+                <Col xs={24}>
+                  <Form.Item label="Upload Delivery Challan">
+                    <FileUpload
+                      accept="image/jpeg,image/png,image/webp"
+                      maxSizeMB={5}
+                      previewUrl={dcImage.previewUrl}
+                      fileName={dcImage.file?.name}
+                      compact
+                      placeholder="Upload DC image"
+                      disabled={readOnly}
+                      onSelect={(file) => {
+                        if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
+                        setDcImage({ file, previewUrl: URL.createObjectURL(file) });
+                      }}
+                      onRemove={() => {
+                        if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
+                        setDcImage({ file: null, previewUrl: null });
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
               </Row>
             </Card>
           </Col>
-
           <Col xs={24} lg={8}>
-            <AccessoriesGRNSummaryPanel selectedPO={selectedPO} items={items} cartons={cartons} />
+            <AccessoriesGRNSummaryPanel selectedPO={selectedPO} items={items} cartons={cartons} createdBy={grnRecord?.createdByName} />
           </Col>
         </Row>
 
-        <Card style={{ marginBottom: 24 }}>
-          <Title level={5} style={{ marginBottom: 16 }}>Items</Title>
-          <AccessoriesGRNItemTable items={items} onItemChange={handleItemChange} />
+        {selectedPO && (
+          <POLineItemPicker
+            category="Trims"
+            poLineItems={selectedPO.items || []}
+            selectedIds={selectedLineItemIds}
+            onSelectionChange={setSelectedLineItemIds}
+            readOnly={readOnly}
+          />
+        )}
+
+        <Card title={<Space><InboxOutlined /><span>Item Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
+          <AccessoriesGRNItemTable items={items} onItemChange={handleItemChange} readOnly={readOnly} />
         </Card>
 
-        <Card style={{ marginBottom: 24 }}>
-          <Title level={5} style={{ marginBottom: 16 }}>Carton Details</Title>
-          <AccessoriesGRNCartonTable cartons={cartons} onCartonChange={handleCartonChange} onAddCarton={handleAddCarton} onRemoveCarton={handleRemoveCarton} />
+        <Card title={<Space><InboxOutlined /><span>Carton Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
+          <AccessoriesGRNCartonTable cartons={cartons} onCartonChange={handleCartonChange} readOnly={readOnly} />
         </Card>
 
-        <Card>
+        <Card size="small">
           <Title level={5} style={{ marginBottom: 16 }}>Remarks</Title>
-          <Form.Item name="remarks" noStyle><TextArea rows={3} placeholder="Quality remarks or special notes" /></Form.Item>
+          <Form.Item name="remarks" noStyle>
+            <TextArea rows={3} placeholder="Quality remarks or special notes" disabled={readOnly} />
+          </Form.Item>
         </Card>
       </Form>
+      )}
     </div>
   );
 };

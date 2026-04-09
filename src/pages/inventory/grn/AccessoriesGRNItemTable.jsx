@@ -1,64 +1,65 @@
 import { useMemo } from 'react';
-import { Table, InputNumber, Typography } from 'antd';
+import { Table, InputNumber, Typography, Empty } from 'antd';
 import { numericInputProps } from '../../../utils/inputHelpers';
 import { formatNumber } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
-const AccessoriesGRNItemTable = ({ items = [], onItemChange }) => {
+const ReadOnlyText = ({ value }) => <Text style={{ fontSize: 13 }}>{value ?? '—'}</Text>;
+
+const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false }) => {
   const columns = useMemo(
     () => [
-      { title: '#', width: 45, key: 'index', render: (_, __, i) => i + 1 },
-      { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140 },
-      { title: 'Description', dataIndex: 'description', key: 'description', width: 200, ellipsis: true },
-      { title: 'Color', dataIndex: 'color', key: 'color', width: 90 },
-      { title: 'Size', dataIndex: 'size', key: 'size', width: 80 },
-      { title: 'PO Qty', dataIndex: 'poQty', key: 'poQty', width: 90, align: 'center', render: (v) => formatNumber(v) },
-      { title: 'Already Recd', dataIndex: 'alreadyReceived', key: 'alreadyReceived', width: 100, align: 'center', render: (v) => formatNumber(v) },
-      { title: 'Balance', dataIndex: 'balance', key: 'balance', width: 90, align: 'center', render: (v) => <Text style={{ color: 'var(--primary-color)' }}>{formatNumber(v)}</Text> },
+      { title: '#', key: 'idx', align: 'center', width: 50, render: (_, __, i) => i + 1 },
+      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 150, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Color', dataIndex: 'color', align: 'center', width: 100, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Size', dataIndex: 'size', align: 'center', width: 80, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'PO Qty', dataIndex: 'poQty', align: 'center', width: 100, render: (v) => <ReadOnlyText value={formatNumber(v)} /> },
+      { title: 'Received Qty', dataIndex: 'alreadyReceived', align: 'center', width: 120, render: (v) => <ReadOnlyText value={formatNumber(v)} /> },
+      { title: 'Balance', dataIndex: 'balance', align: 'center', width: 100, render: (v) => <Text strong style={{ color: 'var(--primary-color)' }}>{formatNumber(v)}</Text> },
       {
-        title: 'Receiving Qty', dataIndex: 'receivingQty', key: 'receivingQty', width: 120,
-        render: (val, record, i) => (
-          <InputNumber value={val} onChange={(v) => onItemChange(i, 'receivingQty', v)} style={{ width: '100%' }} min={0} max={record.balance} {...numericInputProps} />
+        title: 'Receiving Qty',
+        dataIndex: 'receivingQty',
+        align: 'center',
+        width: 130,
+        render: (val, _, i) => (
+          <InputNumber
+            size="small"
+            min={0}
+            max={items[i]?.balance}
+            value={val}
+            placeholder="Qty"
+            style={{ width: '100%' }}
+            disabled={readOnly}
+            status={!val ? 'warning' : ''}
+            onChange={(v) => onItemChange?.(i, 'receivingQty', v)}
+            {...numericInputProps}
+          />
         ),
       },
-      { title: 'UOM', dataIndex: 'uom', key: 'uom', width: 70 },
-      { title: 'Rate', dataIndex: 'rate', key: 'rate', width: 80, align: 'right', render: (v) => formatNumber(v, 2) },
+      { title: 'UOM', dataIndex: 'uom', align: 'center', width: 80, render: (v) => <ReadOnlyText value={v} /> },
+      { title: 'Rate', dataIndex: 'rate', align: 'center', width: 100, render: (v) => <ReadOnlyText value={formatNumber(v, 2)} /> },
       {
-        title: 'Amount', key: 'amount', width: 110, align: 'right',
-        render: (_, record) => {
-          const amt = (record.receivingQty || 0) * (record.rate || 0);
-          return <Text strong style={{ color: 'var(--success-color)' }}>{formatNumber(amt, 2)}</Text>;
-        },
+        title: 'Amount',
+        key: 'amount',
+        align: 'center',
+        width: 110,
+        render: (_, r) => <ReadOnlyText value={formatNumber((Number(r.receivingQty) || 0) * (Number(r.rate) || 0), 2)} />,
       },
     ],
-    [onItemChange],
+    [onItemChange, readOnly, items],
   );
-
-  const totals = useMemo(() => {
-    const totalRecQty = items.reduce((sum, item) => sum + (item.receivingQty || 0), 0);
-    const totalAmount = items.reduce((sum, item) => sum + (item.receivingQty || 0) * (item.rate || 0), 0);
-    return { totalRecQty, totalAmount };
-  }, [items]);
 
   return (
     <Table
-      rowKey="id"
+      rowKey={(r, i) => `${r.poLineItemId}-${i}`}
       columns={columns}
       dataSource={items}
       pagination={false}
-      scroll={{ x: 1200 }}
+      scroll={{ x: 1280 }}
       size="small"
-      summary={() => (
-        <Table.Summary fixed>
-          <Table.Summary.Row style={{ background: 'var(--bg-secondary)' }}>
-            <Table.Summary.Cell index={0} colSpan={8}><Text strong>Totals</Text></Table.Summary.Cell>
-            <Table.Summary.Cell index={1} align="center"><Text strong>{formatNumber(totals.totalRecQty)}</Text></Table.Summary.Cell>
-            <Table.Summary.Cell index={2} colSpan={2} />
-            <Table.Summary.Cell index={3} align="right"><Text strong style={{ color: 'var(--success-color)' }}>{formatNumber(totals.totalAmount, 2)}</Text></Table.Summary.Cell>
-          </Table.Summary.Row>
-        </Table.Summary>
-      )}
+      locale={{ emptyText: <Empty description="Select PO line items above to populate items." /> }}
     />
   );
 };

@@ -7,6 +7,7 @@ import { StoreProvider } from './context/StoreContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
 import GlobalMessageEmitter from './components/GlobalMessageEmitter';
+import ScrollToTop from './components/ScrollToTop';
 import UpdatePrompt from './components/UpdatePrompt';
 import UpdateOverlay from './components/UpdateOverlay';
 import NotificationPermissionPrompt from './components/NotificationPermissionPrompt';
@@ -118,6 +119,7 @@ const ThemedApp = () => {
       <UpdateOverlay />
       <StoreProvider>
         <BrowserRouter>
+          <ScrollToTop />
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<Login />} />
