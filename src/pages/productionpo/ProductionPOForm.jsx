@@ -34,7 +34,8 @@ const ProductionPOForm = () => {
     }))
   );
   const [activeTab, setActiveTab] = useState('general');
-  const { setHasChanges } = useUnsavedChanges();
+  const [isDirty, setHasChanges] = useState(false);
+  const { clearDirty } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
     if (isEdit) {
@@ -130,7 +131,7 @@ const ProductionPOForm = () => {
     try {
       const payload = buildPayload();
       if (isEdit) { await updateProductionPO(id, payload); message.success('Production PO updated'); }
-      else { const res = await createProductionPO(payload); message.success(`${res.ppoNumber} created`); navigate(`/production-po/edit/${res.id}`, { replace: true }); return; }
+      else { const res = await createProductionPO(payload); message.success(`${res.ppoNumber} created`); setHasChanges(false); clearDirty(); navigate(`/production-po/edit/${res.id}`, { replace: true }); return; }
       setHasChanges(false);
       const updated = await getProductionPOById(id);
       setPpo(updated); setSizeColorItems(updated.sizeColorItems || []); if (updated.stages) setStages(updated.stages);
@@ -138,9 +139,9 @@ const ProductionPOForm = () => {
   }, [form, buildPayload, isEdit, id, navigate, setHasChanges]);
 
   const handleStart = useCallback(async () => {
-    try { await handleSave(); await changeProductionPOStatus(id, { status: PPO_STATUS.IN_PROGRESS }); message.success('Production started'); navigate('/production-po/list'); }
+    try { await handleSave(); await changeProductionPOStatus(id, { status: PPO_STATUS.IN_PROGRESS }); message.success('Production started'); setHasChanges(false); clearDirty(); navigate('/production-po/list'); }
     catch { message.error('Failed to start'); }
-  }, [handleSave, id, navigate]);
+  }, [handleSave, id, navigate, clearDirty]);
 
   if (loading) return <div style={{ padding: 24 }}><Skeleton active paragraph={{ rows: 10 }} /></div>;
 
