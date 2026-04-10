@@ -1,0 +1,48 @@
+import axiosInstance from './axiosInstance';
+
+const BASE_URL = '/hr/bonus';
+
+/**
+ * Process bonus calculation for a factory/period.
+ * POST /api/v1/hr/bonus/process
+ */
+export const processBonus = async (data) => {
+  const response = await axiosInstance.post(`${BASE_URL}/process`, data);
+  return response.data;
+};
+
+/**
+ * Approve a bonus run.
+ * POST /api/v1/hr/bonus/{id}/approve
+ */
+export const approveBonus = async (id) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${id}/approve`);
+  return response.data;
+};
+
+/**
+ * Get all bonus runs.
+ * GET /api/v1/hr/bonus
+ */
+export const getAllBonusRuns = async () => {
+  const response = await axiosInstance.get(BASE_URL);
+  return response.data;
+};
+
+/**
+ * Get a single bonus run by ID.
+ * GET /api/v1/hr/bonus/{id}
+ */
+export const getBonusRunById = async (id) => {
+  const response = await axiosInstance.get(`${BASE_URL}/${id}`);
+  return response.data;
+};
+
+/**
+ * Get bonus records for a run.
+ * GET /api/v1/hr/bonus/{id}/records
+ */
+export const getBonusRecords = async (runId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/${runId}/records`);
+  return response.data;
+};

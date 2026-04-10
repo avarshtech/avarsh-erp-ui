@@ -224,6 +224,61 @@ export const MODULES = {
     path: '/admin/approval-flows',
     group: 'admin',
   },
+  // ── HR & Payroll ──
+  HR_MASTERS: {
+    id: 'hr-masters',
+    name: 'HR Masters',
+    path: '/hr/masters',
+    group: 'hr',
+  },
+  HR_EMPLOYEES: {
+    id: 'hr-employees',
+    name: 'Employees',
+    path: '/hr/employees',
+    group: 'hr',
+  },
+  HR_ATTENDANCE: {
+    id: 'hr-attendance',
+    name: 'Attendance',
+    path: '/hr/attendance',
+    group: 'hr',
+  },
+  HR_LEAVE: {
+    id: 'hr-leave',
+    name: 'Leave Management',
+    path: '/hr/leaves',
+    group: 'hr',
+  },
+  HR_PAYROLL: {
+    id: 'hr-payroll',
+    name: 'Payroll',
+    path: '/hr/payroll',
+    group: 'hr',
+  },
+  HR_LOANS: {
+    id: 'hr-loans',
+    name: 'Loans & Advances',
+    path: '/hr/loans',
+    group: 'hr',
+  },
+  HR_BONUS: {
+    id: 'hr-bonus',
+    name: 'Bonus',
+    path: '/hr/bonus',
+    group: 'hr',
+  },
+  HR_STATUTORY: {
+    id: 'hr-statutory',
+    name: 'Statutory',
+    path: '/hr/statutory',
+    group: 'hr',
+  },
+  HR_FNF: {
+    id: 'hr-fnf',
+    name: 'F&F Settlement',
+    path: '/hr/fnf',
+    group: 'hr',
+  },
 };
 
 // ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
