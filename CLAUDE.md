@@ -250,25 +250,27 @@ Before writing ANY code, verify:
 
 ---
 
-## Custom Skills (Slash Commands)
+## Skill (Single Unified Agent)
 
-Use these skills during development by invoking the corresponding slash command:
+All development tasks use one skill: `/erp-dev`
 
-| Skill | Command | When to Use |
-|-------|---------|-------------|
-| **ERP Dev** | `/erp-dev` | **Primary agent** — Full-stack development across UI + API repos. Auto plan mode for features (5+ files). Auto-executes builds/tests. Auto-pulls missing skills from skills.sh. Use for any task spanning both repos. |
-| **Garment ERP** | `/garment-erp` | Full-stack garment ERP development — covers Tech Pack → BOM → Costing → Order → T&A → Production → Shipment. Trigger for any garment domain work: styles, tech packs, BOM, costing, T&A calendar, cut plan, sewing line, production tracking, buyer/supplier management, fabric/trim inventory, size-color matrix, compliance, shipment/packing list. |
-| **Develop** | `/develop` | ERP development workflow with pre-verification, Ant Design prop checks, state management validation, and post-implementation review. |
-| **Implement** | `/implement` | Research files first, verify AntD props, check cross-references, then implement after confirmation. |
-| **Review** | `/review` | Code review for ERP — checks Ant Design compliance, state management, performance, API integration, tech debt, and UX consistency. |
+| Skill | Command | What It Covers |
+|-------|---------|----------------|
+| **ERP Dev** | `/erp-dev` | **The only skill needed.** Full-stack development across UI + API repos. Includes: plan mode, subagent-driven development, Karpathy coding discipline, frontend design quality, deprecated props/CSS verification, 7-dimension code review, garment domain knowledge, design patterns, security standards, and auto-pull from skills.sh. |
 
-### ERP Dev Agent — Skills Auto-Pull
+### Capabilities Integrated into `/erp-dev`
 
-The `/erp-dev` agent automatically pulls missing skills from [skills.sh](https://skills.sh/) when a task requires capabilities not available locally (e.g., Playwright testing, Docker, CI/CD, i18n, PDF generation). The agent notifies in chat when a skill is pulled.
+- Pre-verification + Ant Design prop checks + post-review (was `/develop`)
+- Research → verify → implement → verify workflow (was `/implement`)
+- Code review across 7 dimensions (was `/review`)
+- Garment domain knowledge + reference patterns (was `/garment-erp`)
+- Karpathy coding guidelines (simplicity, surgical changes, goal-driven execution)
+- Frontend design quality adapted for Ant Design ERP
+- Subagent-driven development with two-stage review (spec + quality)
+- Mandatory deprecated props & CSS verification gate
+- Auto-pulls missing skills from [skills.sh](https://skills.sh/) when needed
 
-### Garment ERP Skill Reference Files
-
-The `/garment-erp` skill includes detailed reference guides in `.claude/skills/garment-erp/references/`:
+### Reference Files (in `.claude/skills/erp-dev/references/`)
 
 | Reference File | Contents |
 |---------------|----------|
@@ -279,6 +281,10 @@ The `/garment-erp` skill includes detailed reference guides in `.claude/skills/g
 | `referential-integrity-patterns.md` | Delete protection, edit locking, FK handling |
 | `performance-patterns.md` | Caching, N+1 prevention, memoization, optimization |
 | `domain-algorithms.md` | BOM/Costing formulas, search algorithms, aggregation logic |
+| `api-contracts.md` | UI ↔ API field/endpoint mapping |
+| `implementer-prompt.md` | Subagent dispatch template for implementers |
+| `spec-reviewer-prompt.md` | Subagent dispatch template for spec compliance review |
+| `code-quality-reviewer-prompt.md` | Subagent dispatch template for code quality review |
 
 ### Garment Lifecycle (Module Dependencies)
 

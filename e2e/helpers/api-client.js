@@ -59,7 +59,9 @@ export class ApiClient {
       headers: this.headers(),
       data,
     });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    let resData = null;
+    try { resData = await response.json(); } catch { /* non-JSON response */ }
+    return { response, data: resData, status: response.status() };
   }
 
   async put(path, data) {

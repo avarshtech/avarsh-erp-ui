@@ -7,6 +7,7 @@
     "start": "vite",
     "dev": "vite",
     "dev-local": "vite --host --mode local",
+    "dev:e2e": "vite --mode e2e",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -22,7 +23,8 @@
     "test:e2e:work-orders": "npx playwright test --project=work-orders",
     "test:e2e:admin": "npx playwright test --project=admin",
     "test:e2e:validation": "npx playwright test --project=validation",
-    "test:e2e:legacy": "npx playwright test --project=legacy"
+    "test:e2e:legacy": "npx playwright test --project=legacy",
+    "test:e2e:grn-qc": "npx playwright test --project=grn-qc"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
