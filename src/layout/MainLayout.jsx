@@ -32,6 +32,7 @@ import {
   MenuOutlined,
   CloseOutlined,
   BarChartOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/authService";
@@ -358,6 +359,23 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/hr",
+      icon: <TeamOutlined />,
+      label: "HR & Payroll",
+      moduleId: ["hr-masters", "hr-employees", "hr-attendance", "hr-leave", "hr-payroll", "hr-loans", "hr-bonus", "hr-statutory", "hr-fnf"],
+      children: [
+        { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
+        { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
+        { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
+        { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
+        { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
+        { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
+        { key: "/hr/statutory/pt", label: "Statutory", moduleId: "hr-statutory" },
+        { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
+      ],
+    },
+    {
       key: "/reports",
       icon: <BarChartOutlined />,
       label: "Reports",
@@ -467,6 +485,13 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
+    if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
+    if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
+    if (path.startsWith('/hr/loans')) return ['/hr/loans'];
+    if (path.startsWith('/hr/bonus')) return ['/hr/bonus'];
+    if (path.startsWith('/hr/statutory')) return ['/hr/statutory/pt'];
+    if (path.startsWith('/hr/fnf')) return ['/hr/fnf'];
     return [path];
   };
 
@@ -478,6 +503,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];
+    if (path.startsWith("/hr")) return ["/hr"];
     if (path.startsWith("/admin")) return ["/admin"];
     return [];
   };

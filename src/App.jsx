@@ -57,6 +57,33 @@ const ReportListPage = lazy(() => import('./pages/reports/ReportListPage'));
 const ReportBuilderPage = lazy(() => import('./pages/reports/ReportBuilderPage'));
 const SavedReportsPage = lazy(() => import('./pages/reports/SavedReportsPage'));
 const AiChatPage = lazy(() => import('./pages/reports/AiChatPage'));
+// HR & Payroll (lazy-loaded)
+const HrDashboard = lazy(() => import('./pages/hr/HrDashboard'));
+const EmployeeList = lazy(() => import('./pages/hr/employee/EmployeeList'));
+const EmployeeForm = lazy(() => import('./pages/hr/employee/EmployeeForm'));
+const EmployeeView = lazy(() => import('./pages/hr/employee/EmployeeView'));
+// Attendance & Leave (lazy-loaded)
+const AttendanceCalendar = lazy(() => import('./pages/hr/attendance/AttendanceCalendar'));
+const AttendanceBulkEntry = lazy(() => import('./pages/hr/attendance/AttendanceBulkEntry'));
+const MissPunchList = lazy(() => import('./pages/hr/attendance/MissPunchList'));
+const GatePassList = lazy(() => import('./pages/hr/attendance/GatePassList'));
+const LeaveApplicationList = lazy(() => import('./pages/hr/leave/LeaveApplicationList'));
+const LeaveBalanceView = lazy(() => import('./pages/hr/leave/LeaveBalanceView'));
+// Payroll & Loans (lazy-loaded)
+const PayrollList = lazy(() => import('./pages/hr/payroll/PayrollList'));
+const PayrollWizard = lazy(() => import('./pages/hr/payroll/PayrollWizard'));
+const PayrollRunView = lazy(() => import('./pages/hr/payroll/PayrollRunView'));
+const SalarySlipView = lazy(() => import('./pages/hr/payroll/SalarySlipView'));
+const LoanList = lazy(() => import('./pages/hr/loan/LoanList'));
+const LoanView = lazy(() => import('./pages/hr/loan/LoanView'));
+// Bonus, Statutory, F&F (lazy-loaded)
+const BonusList = lazy(() => import('./pages/hr/bonus/BonusList'));
+const BonusWizard = lazy(() => import('./pages/hr/bonus/BonusWizard'));
+const PtReturnList = lazy(() => import('./pages/hr/statutory/PtReturnList'));
+const ElEncashmentList = lazy(() => import('./pages/hr/statutory/ElEncashmentList'));
+const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
+const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
+const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -191,6 +218,38 @@ const ThemedApp = () => {
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}
             <Route path="profile" element={<Profile />} />
+            {/* HR & Payroll */}
+            <Route path="hr/masters" element={<PermissionRoute module="hr-masters"><Suspense fallback={<PageSkeleton />}><HrDashboard /></Suspense></PermissionRoute>} />
+            <Route path="hr/employees" element={<PermissionRoute module="hr-employees"><Suspense fallback={<PageSkeleton />}><EmployeeList /></Suspense></PermissionRoute>} />
+            <Route path="hr/employees/new" element={<PermissionRoute module="hr-employees" operation="add"><Suspense fallback={<PageSkeleton />}><EmployeeForm /></Suspense></PermissionRoute>} />
+            <Route path="hr/employees/edit/:id" element={<PermissionRoute module="hr-employees" operation="update"><Suspense fallback={<PageSkeleton />}><EmployeeForm /></Suspense></PermissionRoute>} />
+            <Route path="hr/employees/:id" element={<PermissionRoute module="hr-employees"><Suspense fallback={<PageSkeleton />}><EmployeeView /></Suspense></PermissionRoute>} />
+            {/* Attendance */}
+            <Route path="hr/attendance/calendar" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><AttendanceCalendar /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/bulk" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceBulkEntry /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/miss-punch" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><MissPunchList /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/gate-pass" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><GatePassList /></Suspense></PermissionRoute>} />
+            {/* Leave */}
+            <Route path="hr/leaves" element={<PermissionRoute module="hr-leave"><Suspense fallback={<PageSkeleton />}><LeaveApplicationList /></Suspense></PermissionRoute>} />
+            <Route path="hr/leaves/balances" element={<PermissionRoute module="hr-leave"><Suspense fallback={<PageSkeleton />}><LeaveBalanceView /></Suspense></PermissionRoute>} />
+            {/* Payroll */}
+            <Route path="hr/payroll" element={<PermissionRoute module="hr-payroll"><Suspense fallback={<PageSkeleton />}><PayrollList /></Suspense></PermissionRoute>} />
+            <Route path="hr/payroll/new" element={<PermissionRoute module="hr-payroll" operation="add"><Suspense fallback={<PageSkeleton />}><PayrollWizard /></Suspense></PermissionRoute>} />
+            <Route path="hr/payroll/slip/:id" element={<PermissionRoute module="hr-payroll"><Suspense fallback={<PageSkeleton />}><SalarySlipView /></Suspense></PermissionRoute>} />
+            <Route path="hr/payroll/:id" element={<PermissionRoute module="hr-payroll"><Suspense fallback={<PageSkeleton />}><PayrollRunView /></Suspense></PermissionRoute>} />
+            {/* Loans */}
+            <Route path="hr/loans" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanList /></Suspense></PermissionRoute>} />
+            <Route path="hr/loans/:id" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanView /></Suspense></PermissionRoute>} />
+            {/* Bonus */}
+            <Route path="hr/bonus" element={<PermissionRoute module="hr-bonus"><Suspense fallback={<PageSkeleton />}><BonusList /></Suspense></PermissionRoute>} />
+            <Route path="hr/bonus/new" element={<PermissionRoute module="hr-bonus" operation="add"><Suspense fallback={<PageSkeleton />}><BonusWizard /></Suspense></PermissionRoute>} />
+            {/* Statutory */}
+            <Route path="hr/statutory/pt" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><PtReturnList /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/el" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ElEncashmentList /></Suspense></PermissionRoute>} />
+            {/* F&F Settlement */}
+            <Route path="hr/fnf" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfList /></Suspense></PermissionRoute>} />
+            <Route path="hr/fnf/new" element={<PermissionRoute module="hr-fnf" operation="add"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
+            <Route path="hr/fnf/:id" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfView /></Suspense></PermissionRoute>} />
             {/* Reports (lazy-loaded) */}
             <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
             <Route path="reports/builder/:id" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportBuilderPage /></Suspense></PermissionRoute>} />
