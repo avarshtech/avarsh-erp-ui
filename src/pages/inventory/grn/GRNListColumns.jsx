@@ -1,16 +1,23 @@
-import { Space, Tag } from 'antd';
+import { Space, Tag, Popconfirm } from 'antd';
 import dayjs from 'dayjs';
 import RecordLink from '../../../components/RecordLink';
 import { ActionButton } from '../../../components/buttons';
 import StatusTag from '../../../components/StatusTag';
 import CurrencyDisplay from '../../../components/CurrencyDisplay';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { formatNumber } from '../../../utils/formatters';
 
 const TYPE_COLORS = { Fabric: 'blue', Accessories: 'purple' };
 
-const getGRNListColumns = ({ onView, onEdit }) => [
+// Edit is allowed only for these statuses (matches the form-level edit gate).
+// DRAFT = still being created; REVERSED = previously submitted, reopened for edits.
+const EDITABLE_STATUSES = new Set([
+  GRN_STATUS.DRAFT,
+  GRN_STATUS.REVERSED,
+]);
+
+const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
   {
     title: 'GRN Number',
     dataIndex: 'grnNumber',
@@ -22,10 +29,11 @@ const getGRNListColumns = ({ onView, onEdit }) => [
     ),
   },
   {
-    title: 'Date',
+    title: 'GRN Date',
     dataIndex: 'grnDate',
     key: 'grnDate',
-    width: 110,
+    width: 120,
+    align: 'center',
     render: (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '-'),
     sorter: (a, b) => dayjs(a.grnDate).unix() - dayjs(b.grnDate).unix(),
   },
@@ -79,13 +87,30 @@ const getGRNListColumns = ({ onView, onEdit }) => [
     title: 'Actions',
     key: 'actions',
     fixed: 'right',
-    width: 100,
-    render: (_, record) => (
-      <Space size="small">
-        <ActionButton action="view" onClick={() => onView(record)} />
-        <ActionButton action="edit" onClick={() => onEdit(record)} />
-      </Space>
-    ),
+    width: 130,
+    align: 'center',
+    render: (_, record) => {
+      const isDraft = record.status === GRN_STATUS.DRAFT;
+      const canEdit = EDITABLE_STATUSES.has(record.status);
+      return (
+        <Space size="small">
+          <ActionButton action="view" onClick={() => onView(record)} />
+          {canEdit && <ActionButton action="edit" onClick={() => onEdit(record)} />}
+          {isDraft && (
+            <Popconfirm
+              title="Delete draft GRN"
+              description={`Are you sure you want to delete ${record.grnNumber}?`}
+              okText="Delete"
+              okType="danger"
+              cancelText="Cancel"
+              onConfirm={() => onDelete?.(record)}
+            >
+              <ActionButton action="delete" />
+            </Popconfirm>
+          )}
+        </Space>
+      );
+    },
   },
 ];
 

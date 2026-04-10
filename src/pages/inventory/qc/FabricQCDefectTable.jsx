@@ -1,103 +1,134 @@
 import { memo, useMemo } from 'react';
-import { Table, Select, Input, Tag, Badge, Space, Typography } from 'antd';
+import { Table, Select, Input, InputNumber, Badge, Space, Typography, Empty } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
-import { DEFECT_TYPES, DEFECT_SIZES } from '../../../utils/inventoryConstants';
-import { formatNumber } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
-const DEFECT_TYPE_OPTIONS = DEFECT_TYPES.map((t) => ({ label: t, value: t }));
-const DEFECT_SIZE_OPTIONS = DEFECT_SIZES.map((s) => ({ label: s.label, value: s.value }));
-
-const getPointsForSize = (sizeValue) => {
-  const found = DEFECT_SIZES.find((s) => s.value === sizeValue);
-  return found ? found.points : 0;
-};
-
-const getThresholdColor = (points) => {
-  if (points <= 28) return 'var(--success-color)';
-  if (points <= 40) return 'var(--warning-color)';
-  return 'var(--error-color)';
-};
-
-const getThresholdTag = (points) => {
-  if (points <= 28) return <Tag color="green">Pass</Tag>;
-  if (points <= 40) return <Tag color="orange">Conditional</Tag>;
-  return <Tag color="red">Fail</Tag>;
-};
-
 const FabricQCDefectTable = memo(function FabricQCDefectTable({
   defects = [],
+  rollOptions = [],
+  defectTypeOptions = [],
   onDefectChange,
   onAddDefect,
   onRemoveDefect,
-  totalPoints = 0,
-  pointsPer100SqYd = 0,
+  readOnly = false,
 }) {
+  const totalDefects = useMemo(() => defects.reduce((s, d) => s + (Number(d.count) || 0), 0), [defects]);
+
   const columns = useMemo(
     () => [
       {
-        title: 'Roll #', dataIndex: 'rollNumber', key: 'rollNumber', width: 110,
-        render: (val, _, idx) => (
-          <Input size="small" value={val} placeholder="e.g. R001" onChange={(e) => onDefectChange?.(idx, 'rollNumber', e.target.value)} />
-        ),
-      },
-      {
-        title: 'Defect Type', dataIndex: 'defectType', key: 'defectType', width: 160,
-        render: (val, _, idx) => (
-          <Select size="small" style={{ width: '100%' }} value={val} options={DEFECT_TYPE_OPTIONS} onChange={(v) => onDefectChange?.(idx, 'defectType', v)} />
-        ),
-      },
-      {
-        title: 'Defect Size', dataIndex: 'defectSize', key: 'defectSize', width: 160,
+        title: 'Roll #',
+        dataIndex: 'rollNumber',
+        key: 'rollNumber',
+        align: 'center',
+        width: 130,
         render: (val, _, idx) => (
           <Select
-            size="small" style={{ width: '100%' }} value={val} options={DEFECT_SIZE_OPTIONS}
-            onChange={(v) => {
-              onDefectChange?.(idx, 'defectSize', v);
-              onDefectChange?.(idx, 'points', getPointsForSize(v));
+            size="small"
+            style={{ width: '100%' }}
+            value={val || undefined}
+            placeholder="Select roll"
+            options={rollOptions}
+            disabled={readOnly}
+            onChange={(v) => onDefectChange?.(idx, 'rollNumber', v)}
+          />
+        ),
+      },
+      {
+        title: 'Defect Type',
+        dataIndex: 'defectTypeId',
+        key: 'defectTypeId',
+        align: 'center',
+        width: 180,
+        render: (val, _, idx) => (
+          <Select
+            size="small"
+            style={{ width: '100%' }}
+            value={val || undefined}
+            placeholder="Select defect type"
+            options={defectTypeOptions}
+            disabled={readOnly}
+            onChange={(v, opt) => {
+              onDefectChange?.(idx, 'defectTypeId', v);
+              onDefectChange?.(idx, 'defectTypeName', opt?.label || '');
             }}
           />
         ),
       },
-      { title: 'Points', dataIndex: 'points', key: 'points', width: 70, align: 'center', render: (val) => <Text strong>{val || 0}</Text> },
       {
-        title: 'Location', dataIndex: 'location', key: 'location', width: 140,
-        render: (val, _, idx) => <Input size="small" value={val} placeholder="Center / Selvage" onChange={(e) => onDefectChange?.(idx, 'location', e.target.value)} />,
+        title: 'Defects',
+        dataIndex: 'count',
+        key: 'count',
+        align: 'center',
+        width: 100,
+        render: (val, _, idx) => (
+          <InputNumber
+            size="small"
+            min={1}
+            precision={0}
+            value={val}
+            controls={false}
+            placeholder="Count"
+            style={{ width: '100%' }}
+            disabled={readOnly}
+            onChange={(v) => onDefectChange?.(idx, 'count', v)}
+          />
+        ),
       },
       {
-        title: 'Remarks', dataIndex: 'remarks', key: 'remarks', width: 160,
-        render: (val, _, idx) => <Input size="small" value={val} onChange={(e) => onDefectChange?.(idx, 'remarks', e.target.value)} />,
+        title: 'Remarks',
+        dataIndex: 'remarks',
+        key: 'remarks',
+        align: 'center',
+        render: (val, _, idx) => (
+          <Input
+            size="small"
+            value={val}
+            disabled={readOnly}
+            placeholder="Optional remarks"
+            onChange={(e) => onDefectChange?.(idx, 'remarks', e.target.value)}
+          />
+        ),
       },
       {
-        title: '', key: 'actions', width: 50, align: 'center',
-        render: (_, __, idx) => <ActionButton action="delete" onClick={() => onRemoveDefect?.(idx)} />,
+        title: '',
+        key: 'actions',
+        align: 'center',
+        width: 50,
+        render: (_, __, idx) => !readOnly && <ActionButton action="delete" onClick={() => onRemoveDefect?.(idx)} />,
       },
     ],
-    [onDefectChange, onRemoveDefect],
+    [onDefectChange, onRemoveDefect, rollOptions, defectTypeOptions, readOnly],
   );
 
   return (
     <>
-      <Table rowKey={(_, idx) => idx} columns={columns} dataSource={defects} pagination={false} scroll={{ x: 850 }} size="small" />
-      <div style={{ marginTop: 12, marginBottom: 16 }}>
-        <ActionButton action="create" text="Add Defect" icon={<PlusOutlined />} onClick={onAddDefect} />
-      </div>
-      <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
-        <Space size={8}>
-          <Text type="secondary">Total Defect Points:</Text>
-          <Badge count={totalPoints} showZero style={{ backgroundColor: getThresholdColor(pointsPer100SqYd) }} overflowCount={999} />
-        </Space>
-        <Space size={8}>
-          <Text type="secondary">Points / 100 sq yd:</Text>
-          <Text strong style={{ color: getThresholdColor(pointsPer100SqYd) }}>{formatNumber(pointsPer100SqYd, 1)}</Text>
-        </Space>
-        <Space size={8}>
-          <Text type="secondary">Threshold (per 100 sq yd):</Text>
-          {getThresholdTag(pointsPer100SqYd)}
-        </Space>
-      </div>
+      <Table
+        rowKey={(_, idx) => idx}
+        columns={columns}
+        dataSource={defects}
+        pagination={false}
+        scroll={{ x: 700 }}
+        size="small"
+        locale={{
+          emptyText: (
+            <Empty
+              description={rollOptions.length === 0 ? 'No rolls available — pick a PO line item first.' : 'No defects logged yet. Click "Add Defect" to record one.'}
+            />
+          ),
+        }}
+      />
+      {!readOnly && (
+        <div style={{ marginTop: 12, marginBottom: 16, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <ActionButton action="create" text="Add Defect" icon={<PlusOutlined />} onClick={onAddDefect} disabled={rollOptions.length === 0} />
+          <Space size={8}>
+            <Text type="secondary">Total defects logged:</Text>
+            <Badge count={totalDefects} showZero style={{ backgroundColor: 'var(--primary-color)' }} overflowCount={9999} />
+          </Space>
+        </div>
+      )}
     </>
   );
 });

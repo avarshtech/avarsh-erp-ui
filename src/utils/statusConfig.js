@@ -62,26 +62,25 @@ export const BOM_STATUS_CONFIG = {
 };
 
 // ==================== GRN STATUS CONFIG ====================
+// 5-state GRN lifecycle — every state is visually distinct.
 export const GRN_STATUS_CONFIG = {
-  [GRN_STATUS.DRAFT]:       { color: 'default',    icon: FileTextOutlined },
-  [GRN_STATUS.SUBMITTED]:   { color: 'processing', icon: SendOutlined },
-  [GRN_STATUS.CONFIRMED]:   { color: 'blue',       icon: CheckCircleOutlined },
-  [GRN_STATUS.QC_PENDING]:  { color: 'orange',     icon: ExperimentOutlined },
-  [GRN_STATUS.QC_COMPLETE]: { color: 'cyan',        icon: SafetyCertificateOutlined },
-  [GRN_STATUS.CLOSED]:      { color: 'green',      icon: CheckCircleOutlined },
-  [GRN_STATUS.REVERSED]:    { color: 'volcano',    icon: UndoOutlined },
+  [GRN_STATUS.DRAFT]:            { color: 'default',  icon: FileTextOutlined },
+  [GRN_STATUS.QC_PENDING]:       { color: 'geekblue', icon: ExperimentOutlined },
+  [GRN_STATUS.PENDING_REVERSAL]: { color: 'gold',     icon: ExclamationCircleOutlined },
+  [GRN_STATUS.REVERSED]:         { color: 'purple',   icon: UndoOutlined },
+  [GRN_STATUS.CLOSED]:           { color: 'green',    icon: CheckCircleOutlined },
 };
 
 // ==================== QC STATUS CONFIG ====================
+// 7-state QC lifecycle. Every state is visually distinct.
 export const QC_STATUS_CONFIG = {
-  [QC_STATUS.PENDING]:          { color: 'default',    icon: ClockCircleOutlined },
-  [QC_STATUS.IN_PROGRESS]:      { color: 'processing', icon: SyncOutlined },
-  [QC_STATUS.PASSED]:           { color: 'green',      icon: CheckCircleOutlined },
-  [QC_STATUS.FAILED]:           { color: 'red',        icon: CloseCircleOutlined },
-  [QC_STATUS.CONDITIONAL]:      { color: 'orange',     icon: ExclamationCircleOutlined },
-  [QC_STATUS.PENDING_APPROVAL]: { color: 'blue',       icon: AuditOutlined },
-  [QC_STATUS.APPROVED]:         { color: 'green',      icon: SafetyCertificateOutlined },
-  [QC_STATUS.REJECTED]:         { color: 'red',        icon: CloseCircleOutlined },
+  [QC_STATUS.DRAFT]:                  { color: 'default',    icon: FileTextOutlined },
+  [QC_STATUS.SUBMITTED]:              { color: 'processing', icon: SendOutlined },
+  [QC_STATUS.PENDING_APPROVAL]:       { color: 'geekblue',   icon: AuditOutlined },
+  [QC_STATUS.APPROVED]:               { color: 'green',      icon: SafetyCertificateOutlined },
+  [QC_STATUS.REJECTED]:               { color: 'red',        icon: CloseCircleOutlined },
+  [QC_STATUS.REFERRED_BACK_PENDING]:  { color: 'gold',       icon: ExclamationCircleOutlined },
+  [QC_STATUS.REFERRED_BACK]:          { color: 'purple',     icon: UndoOutlined },
 };
 
 // ==================== STOCK STATUS CONFIG ====================
@@ -117,8 +116,8 @@ export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLE
 export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Approved', 'Sent_To_Supplier', 'Partially_Received', 'Completed'];
 export const COSTING_STATUS_FLOW = ['Draft', 'Final', 'Approved', 'Rejected'];
 export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
-export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'Confirmed', 'QC_Pending', 'QC_Complete', 'Closed'];
-export const QC_STATUS_FLOW = ['Pending', 'In_Progress', 'Passed', 'Pending_Approval', 'Approved'];
+export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];
+export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved'];
 export const ISSUE_STATUS_FLOW = ['Draft', 'Approved', 'Issued', 'Closed'];
 
 // ==================== HELPER ====================

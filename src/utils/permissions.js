@@ -544,6 +544,38 @@ export const canPerformApprovalActions = () =>
   hasModuleAccess('purchase-orders') &&
   (canApprovePO() || canRejectPO() || canCancelPO() || canReferBackPO());
 
+// ─── GRN APPROVAL HELPERS (no approve/reject on GRN content; only on refer-back & reversal) ──
+
+export const canRequestGRNReferBack = () =>
+  hasModuleAccess('inventory');
+
+export const canApproveGRNReferBack = () =>
+  hasModuleAccess('inventory') && hasPermission('grn-approval', 'refer_back');
+
+export const canRequestGRNReversal = () =>
+  hasModuleAccess('inventory');
+
+export const canApproveGRNReversal = () =>
+  hasModuleAccess('inventory') && hasPermission('grn-reversal', 'approve');
+
+// ─── QC APPROVAL HELPERS ────────────────────────────────────────────────────
+// QC does not have a separate `qc-approval` sub-module (unlike PO / Orders /
+// Costing). All approve/reject/refer-back actions are gated by the `approve`
+// operation on the `inventory-qc` module itself, which is what the module
+// registry at the top of this file declares for QC.
+
+export const canApproveQC = () =>
+  hasModuleAccess('inventory-qc') && hasPermission('inventory-qc', 'approve');
+
+export const canRejectQC = () =>
+  hasModuleAccess('inventory-qc') && hasPermission('inventory-qc', 'approve');
+
+export const canRequestQCReferBack = () =>
+  hasModuleAccess('inventory-qc') && hasPermission('inventory-qc', 'approve');
+
+export const canApproveQCReferBack = () =>
+  hasModuleAccess('inventory-qc') && hasPermission('inventory-qc', 'approve');
+
 // ─── COSTING APPROVAL HELPERS (linked to Costing access) ────────────────────
 
 export const canApproveCostSheet = () =>
