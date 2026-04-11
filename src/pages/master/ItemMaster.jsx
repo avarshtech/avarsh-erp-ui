@@ -11,15 +11,15 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
-import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/itemService';
+import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/master/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
 import PantoneColorInput from '../../components/PantoneColorInput';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
-import { isPantoneCode } from '../../services/pantoneService';
+import { isPantoneCode } from '../../services/core/pantoneService';
 import FileUpload from '../../components/FileUpload';
-import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import dayjs from 'dayjs';
 
 import { useStore } from '../../context/StoreContext';

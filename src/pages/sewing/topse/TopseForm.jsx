@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createEndlineTopse, getEndlineTopseById, searchSewingPlans, getAllActiveLines,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { DEFECT_CATEGORIES, DHU_THRESHOLD } from '../../../utils/sewingConstants';
 import { formatPercentage } from '../../../utils/formatters';
 

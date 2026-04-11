@@ -6,7 +6,7 @@ import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 import { useStore } from '../../context/StoreContext';
-import { createPaymentTerms, updatePaymentTerms, deletePaymentTerms } from '../../services/paymentTermsService';
+import { createPaymentTerms, updatePaymentTerms, deletePaymentTerms } from '../../services/master/paymentTermsService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

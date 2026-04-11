@@ -63,11 +63,11 @@ import {
   rejectPurchaseOrder,
   referBackPurchaseOrder,
   cancelPurchaseOrder,
-} from '../../services/purchaseOrderService';
-import { updateBomLinePoStatus } from '../../services/bomService';
+} from '../../services/po/purchaseOrderService';
+import { updateBomLinePoStatus } from '../../services/bom/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
-import { isPantoneCode } from '../../services/pantoneService';
+import { isPantoneCode } from '../../services/core/pantoneService';
 import {
   canApprovePO,
   canRejectPO,
@@ -76,9 +76,9 @@ import {
   hasPermission,
   getCurrentUser,
 } from '../../utils/permissions';
-import { PO_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_CANCEL_REASONS } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_CANCEL_REASONS } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
-import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
@@ -170,14 +170,12 @@ const StageCompleteModal = ({ open, onCancel, poDate, deliveryDate, isUpdating, 
 const STATUS_CONFIG = {
   [PO_STATUS.DRAFT]: { color: 'default', icon: <FileTextOutlined />, bg: '#f5f5f5', text: '#8c8c8c' },
   [PO_STATUS.PENDING_APPROVAL]: { color: 'gold', icon: <ClockCircleOutlined />, bg: '#fffbe6', text: '#d48806' },
-  [PO_STATUS.APPROVED]: { color: 'blue', icon: <CheckCircleOutlined />, bg: '#e6f4ff', text: 'var(--primary-color)' },
-  [PO_STATUS.IN_PROGRESS]: { color: 'cyan', icon: <ClockCircleOutlined />, bg: '#e6fffb', text: '#13c2c2' },
+  [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined />, bg: '#fff0f6', text: '#eb2f96' },
+  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined />, bg: '#f9f0ff', text: 'var(--btn-duplicate-color)' },
   [PO_STATUS.COMPLETED]: { color: 'green', icon: <CheckCircleOutlined />, bg: '#f6ffed', text: 'var(--success-color)' },
   [PO_STATUS.REJECTED]: { color: 'red', icon: <CloseCircleOutlined />, bg: '#fff2f0', text: 'var(--error-color)' },
   [PO_STATUS.CANCELLED]: { color: 'volcano', icon: <StopOutlined />, bg: '#fff7e6', text: '#fa541c' },
   [PO_STATUS.REFERRED_BACK]: { color: 'orange', icon: <RollbackOutlined />, bg: '#fff7e6', text: 'var(--warning-color)' },
-  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'purple', icon: <InboxOutlined />, bg: '#f9f0ff', text: 'var(--btn-duplicate-color)' },
-  [PO_STATUS.SENT_TO_SUPPLIER]: { color: 'magenta', icon: <SendOutlined />, bg: '#fff0f6', text: '#eb2f96' },
 };
 
 const REJECTION_CATEGORIES = [
@@ -401,10 +399,10 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   // Status Actions
   // ========================
   const statusActions = [
-    { key: 'approve', label: 'Approve', icon: <CheckCircleOutlined />, color: 'var(--success-color)', type: 'primary', fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.SENT_TO_SUPPLIER, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canApprovePO, requiresReason: false },
-    { key: 'reject', label: 'Reject', icon: <CloseCircleOutlined />, color: 'var(--error-color)', type: 'default', danger: true, fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.REJECTED, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canRejectPO, requiresReason: true },
-    { key: 'cancel', label: 'Cancel', icon: <StopOutlined />, type: 'default', fromStatus: [PO_STATUS.PENDING_APPROVAL, PO_STATUS.DRAFT, PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.CANCELLED, lineItemStatus: PO_STATUS.CANCELLED, canPerform: canCancelPO, requiresReason: true },
-    { key: 'refer_back', label: 'Refer Back', icon: <RollbackOutlined />, color: 'var(--warning-color)', type: 'default', fromStatus: [PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.REFERRED_BACK, lineItemStatus: PO_STATUS.IN_PROGRESS, canPerform: canReferBackPO, requiresReason: true },
+    { key: 'approve', label: 'Approve', icon: <CheckCircleOutlined />, color: 'var(--success-color)', type: 'primary', fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.SENT_TO_SUPPLIER, lineItemStatus: LINE_ITEM_STATUS.IN_PROGRESS, canPerform: canApprovePO, requiresReason: false },
+    { key: 'reject', label: 'Reject', icon: <CloseCircleOutlined />, color: 'var(--error-color)', type: 'default', danger: true, fromStatus: [PO_STATUS.PENDING_APPROVAL], toStatus: PO_STATUS.REJECTED, lineItemStatus: LINE_ITEM_STATUS.IN_PROGRESS, canPerform: canRejectPO, requiresReason: true },
+    { key: 'cancel', label: 'Cancel', icon: <StopOutlined />, type: 'default', fromStatus: [PO_STATUS.PENDING_APPROVAL, PO_STATUS.DRAFT, PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.CANCELLED, lineItemStatus: LINE_ITEM_STATUS.CANCELLED, canPerform: canCancelPO, requiresReason: true },
+    { key: 'refer_back', label: 'Refer Back', icon: <RollbackOutlined />, color: 'var(--warning-color)', type: 'default', fromStatus: [PO_STATUS.SENT_TO_SUPPLIER], toStatus: PO_STATUS.REFERRED_BACK, lineItemStatus: LINE_ITEM_STATUS.IN_PROGRESS, canPerform: canReferBackPO, requiresReason: true },
   ];
 
   const availableActions = po ? statusActions.filter((a) => a.fromStatus.includes(po.status) && a.canPerform()) : [];
@@ -493,8 +491,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   // Stage Completion
   // ========================
   const canUpdateStages = po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
-    po?.status === PO_STATUS.PARTIALLY_RECEIVED ||
-    po?.status === PO_STATUS.IN_PROGRESS;
+    po?.status === PO_STATUS.PARTIALLY_RECEIVED;
 
   const handleStageCompletion = useCallback(async (lineItemId, stageIndex, completed, actualDate, notes) => {
     const key = `${lineItemId}-${stageIndex}`;

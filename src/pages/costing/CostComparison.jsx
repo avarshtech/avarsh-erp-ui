@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   getAllCostSheetSummaries,
   getCostSheetById,
-} from '../../services/costingService';
+} from '../../services/costing/costingService';
 import {
   getStatusLabel,
   formatCurrency,

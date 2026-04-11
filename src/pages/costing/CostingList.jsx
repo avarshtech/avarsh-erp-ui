@@ -14,7 +14,7 @@ import {
   deleteCostSheet,
   duplicateCostSheet,
   getCostSheetById,
-} from '../../services/costingService';
+} from '../../services/costing/costingService';
 import { hasPermission } from '../../utils/permissions';
 import {
   COSTING_STATUS,
@@ -24,7 +24,7 @@ import {
   SEASONS,
   formatCurrency,
 } from '../../utils/costingConstants';
-import { getBuyers } from '../../services/buyerService';
+import { getBuyers } from '../../services/master/buyerService';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
 import CostingHistoryModal from './CostingHistoryModal';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';

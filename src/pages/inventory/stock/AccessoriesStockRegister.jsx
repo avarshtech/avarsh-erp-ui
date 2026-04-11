@@ -11,7 +11,7 @@ import { ActionButton } from '../../../components/buttons';
 import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { getAccessoriesStock } from '../../../services/inventoryService';
+import { getAccessoriesStock } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import getAccessoriesStockColumns from './AccessoriesStockColumns';
 import SizeColorMatrix from './SizeColorMatrix';

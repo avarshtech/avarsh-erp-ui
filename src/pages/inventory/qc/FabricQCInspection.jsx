@@ -12,7 +12,7 @@ import {
   saveFabricQCDraft,
   submitFabricQC,
   getItemVariant,
-} from '../../../services/inventoryService';
+} from '../../../services/inventory/inventoryService';
 import { validateFabricQC } from '../../../utils/qcValidation';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';

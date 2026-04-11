@@ -6,8 +6,8 @@ import {
   AppstoreOutlined, ScissorOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { getStatusLabel, calcPurchaseQty } from '../../utils/bomConstants';
-import { getBomById } from '../../services/bomService';
-import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { getBomById } from '../../services/bom/bomService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';

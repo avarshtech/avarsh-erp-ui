@@ -3,7 +3,7 @@ import MasterSplitView from '../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
-import { createAttribute, updateAttribute, deleteAttribute } from '../../services/masterDataService';
+import { createAttribute, updateAttribute, deleteAttribute } from '../../services/master/masterDataService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

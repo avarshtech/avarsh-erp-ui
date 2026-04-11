@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { getAllFactories, createFactory, updateFactory, deleteFactory } from '../../../services/factoryService';
+import { getAllFactories, createFactory, updateFactory, deleteFactory } from '../../../services/master/factoryService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { INDIAN_STATES } from '../../../utils/hrConstants';

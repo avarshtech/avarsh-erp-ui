@@ -18,6 +18,8 @@ import { ActionButton } from '../../../components/buttons';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { formatNumber, formatDate } from '../../../utils/formatters';
+import { generateFabricQCPdf } from '../../../utils/fabricQCPdfGenerator';
+import { generateTrimsQCPdf } from '../../../utils/trimsQCPdfGenerator';
 import QCApprovalActions from './QCApprovalActions';
 
 const { Text, Title } = Typography;
@@ -61,6 +63,25 @@ const trimsCriteriaColumns = [
     render: (_, r) => r.ok ? <Tag color="green">OK</Tag> : r.notOk ? <Tag color="red">Not OK</Tag> : <Tag>—</Tag>,
   },
   { title: 'Remarks', dataIndex: 'remarks', align: 'center', ellipsis: true },
+];
+
+const trimsSizeColumns = [
+  { title: 'Size', dataIndex: 'size', align: 'center', width: 140 },
+  { title: 'Expected Qty', dataIndex: 'expectedQty', align: 'right', width: 140, render: (v) => formatNumber(v || 0) },
+  { title: 'Checked Qty', dataIndex: 'checkedQty', align: 'right', width: 140, render: (v) => formatNumber(v || 0) },
+  {
+    title: 'Match',
+    key: 'match',
+    align: 'center',
+    width: 120,
+    render: (_, r) => {
+      const exp = Number(r.expectedQty) || 0;
+      const chk = Number(r.checkedQty) || 0;
+      if (chk === 0 && exp === 0) return <Tag>—</Tag>;
+      if (chk === exp) return <Tag color="success">OK</Tag>;
+      return <Tag color="error">Short {Math.max(0, exp - chk)}</Tag>;
+    },
+  },
 ];
 
 const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) => {
@@ -124,7 +145,13 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px' }}>
           <Space size="middle">
-            <ActionButton action="print" text="Print Report" />
+            {qc && qc.status !== QC_STATUS.DRAFT && (
+              <ActionButton
+                action="print"
+                text="Print Report"
+                onClick={() => (isFabric ? generateFabricQCPdf(qc) : generateTrimsQCPdf(qc))}
+              />
+            )}
             <QCApprovalActions qc={qc} type={type} onUpdated={(updated) => setQc(updated)} />
           </Space>
           <ActionButton action="close" text="Close" onClick={onClose} />
@@ -408,6 +435,46 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                 }
               >
                 <Table rowKey="id" columns={trimsCriteriaColumns} dataSource={qc.criteriaRows || qc.criteriaChecks} pagination={false} size="small" />
+              </Card>
+            )}
+
+            {!isFabric && qc.sizeInspectionRows?.length > 0 && (
+              <Card
+                size="small"
+                style={{ marginBottom: 20, borderRadius: 12 }}
+                styles={{ body: { padding: '14px 20px' } }}
+                title={
+                  <Space>
+                    <AppstoreOutlined style={{ color: 'var(--primary-color)' }} />
+                    <Text strong style={{ fontSize: 14 }}>Size-wise Inspection</Text>
+                  </Space>
+                }
+              >
+                <Table
+                  rowKey={(r, i) => `${r.size || 'row'}-${i}`}
+                  columns={trimsSizeColumns}
+                  dataSource={qc.sizeInspectionRows}
+                  pagination={false}
+                  size="small"
+                  summary={(rows) => {
+                    const exp = rows.reduce((s, r) => s + (Number(r.expectedQty) || 0), 0);
+                    const chk = rows.reduce((s, r) => s + (Number(r.checkedQty) || 0), 0);
+                    return (
+                      <Table.Summary.Row>
+                        <Table.Summary.Cell index={0} align="right"><Text strong>Total</Text></Table.Summary.Cell>
+                        <Table.Summary.Cell index={1} align="right"><Text strong>{formatNumber(exp)}</Text></Table.Summary.Cell>
+                        <Table.Summary.Cell index={2} align="right"><Text strong>{formatNumber(chk)}</Text></Table.Summary.Cell>
+                        <Table.Summary.Cell index={3} align="center">
+                          {exp > 0 && chk === exp
+                            ? <Tag color="success">Matched</Tag>
+                            : chk < exp
+                            ? <Tag color="error">Short {exp - chk}</Tag>
+                            : <Tag>—</Tag>}
+                        </Table.Summary.Cell>
+                      </Table.Summary.Row>
+                    );
+                  }}
+                />
               </Card>
             )}
           </div>

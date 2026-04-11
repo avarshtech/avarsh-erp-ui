@@ -11,7 +11,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchPurchaseOrders,
   deletePurchaseOrder,
-} from '../../services/purchaseOrderService';
+} from '../../services/po/purchaseOrderService';
 import { hasPermission } from '../../utils/permissions';
 import { PO_STATUS, getStatusLabel } from '../../utils/poStatusConstants';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';

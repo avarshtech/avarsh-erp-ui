@@ -24,7 +24,7 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
-import { isPantoneCode } from '../../services/pantoneService';
+import { isPantoneCode } from '../../services/core/pantoneService';
 import orderInputIllustration from '../../assets/images/order-input-illustration.svg';
 import { formattedIdKeyDown } from '../../utils/inputHelpers';
 

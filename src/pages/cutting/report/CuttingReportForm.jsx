@@ -10,7 +10,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createCuttingReport, updateCuttingReport, getCuttingReportById,
   searchCutOrderPlans,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { CUT_REPORT_STATUS } from '../../../utils/cuttingConstants';
 
 const CUT_REPORT_EDITABLE = [CUT_REPORT_STATUS.DRAFT, CUT_REPORT_STATUS.IN_PROGRESS];

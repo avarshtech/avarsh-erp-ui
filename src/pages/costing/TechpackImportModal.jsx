@@ -19,10 +19,10 @@ import {
   CheckCircleFilled, WarningFilled, FileTextOutlined,
   ImportOutlined, PlusOutlined,
 } from '@ant-design/icons';
-import { extractTechpackForCosting } from '../../services/costingService';
-import { searchItems, getItemMetaData, createItem } from '../../services/itemService';
-import { createBuyer, getBuyers } from '../../services/buyerService';
-import { saveStyle } from '../../services/styleService';
+import { extractTechpackForCosting } from '../../services/costing/costingService';
+import { searchItems, getItemMetaData, createItem } from '../../services/master/itemService';
+import { createBuyer, getBuyers } from '../../services/master/buyerService';
+import { saveStyle } from '../../services/master/styleService';
 import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
 
 const { Dragger } = Upload;

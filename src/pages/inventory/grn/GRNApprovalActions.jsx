@@ -12,7 +12,7 @@ import {
   requestGRNReversal,
   approveGRNReversal,
   rejectGRNReversal,
-} from '../../../services/inventoryService';
+} from '../../../services/inventory/inventoryService';
 import {
   canRequestGRNReversal,
   canApproveGRNReversal,

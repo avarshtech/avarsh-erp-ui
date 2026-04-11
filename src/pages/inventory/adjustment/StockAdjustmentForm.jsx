@@ -6,7 +6,7 @@ import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { ADJUSTMENT_STATUS } from '../../../utils/inventoryConstants';
-import { getAdjustmentList } from '../../../services/inventoryService';
+import { getAdjustmentList } from '../../../services/inventory/inventoryService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import AdjustmentCountTable from './AdjustmentCountTable';
 import AdjustmentApprovalPanel from './AdjustmentApprovalPanel';

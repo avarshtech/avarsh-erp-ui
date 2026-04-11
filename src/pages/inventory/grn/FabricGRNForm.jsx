@@ -14,7 +14,9 @@ import {
   getItemVariantsBulk,
   getPurchaseOrderByIdAnyStatus,
   enrichPOWithReceipts,
-} from '../../../services/inventoryService';
+} from '../../../services/inventory/inventoryService';
+import { getFilesByEntity } from '../../../services/core/fileService';
+import { processGrnAttachments } from './grnAttachments';
 import { validateFabricGRN } from '../../../utils/grnValidation';
 import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
@@ -43,7 +45,13 @@ const FabricGRNForm = () => {
   const [selectedPO, setSelectedPO] = useState(null);
   const [selectedLineItemIds, setSelectedLineItemIds] = useState([]);
   const [rolls, setRolls] = useState([]);
-  const [dcImage, setDcImage] = useState({ file: null, previewUrl: null });
+  // File attachment state. Each slot tracks:
+  //   file         — newly-selected File pending upload (staged)
+  //   previewUrl   — object URL for the new file preview
+  //   existingFile — FileStorageDTO already persisted in GCS (populated on edit)
+  //   toDelete     — fileId queued for deletion on next save (user replaced or removed)
+  const [dcImage, setDcImage] = useState({ file: null, previewUrl: null, existingFile: null, toDelete: null });
+  const [supplierInvoice, setSupplierInvoice] = useState({ file: null, previewUrl: null, existingFile: null, toDelete: null });
   const [grnRecord, setGrnRecord] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const { clearDirty } = useUnsavedChanges(isDirty);
@@ -100,6 +108,20 @@ const FabricGRNForm = () => {
           transporter: grn.transporter,
           remarks: grn.remarks,
         });
+
+        // Populate attachment state from file storage so the user sees what's
+        // already uploaded and can replace / remove it. We only fetch metadata —
+        // previews are lazy-loaded on click via the view modal.
+        try {
+          const files = await getFilesByEntity('GRN', grn.id);
+          if (cancelled) return;
+          const dcFile = (files || []).find((f) => f.fileCategory === 'ATTACHMENT');
+          const invFile = (files || []).find((f) => f.fileCategory === 'INVOICE');
+          if (dcFile) setDcImage({ file: null, previewUrl: null, existingFile: dcFile, toDelete: null });
+          if (invFile) setSupplierInvoice({ file: null, previewUrl: null, existingFile: invFile, toDelete: null });
+        } catch (err) {
+          console.warn('Failed to load GRN attachments:', err);
+        }
       } catch {
         if (!cancelled) message.error('Failed to load GRN');
       } finally {
@@ -208,9 +230,16 @@ const FabricGRNForm = () => {
       }),
       rolls,
       version: grnRecord?.version,
-      dcImageName: dcImage.file?.name || grnRecord?.dcImageName,
+      // File attachments live in the global file storage (fil_file_storage).
+      // We surface `hasSupplierInvoice` here so the client-side validator can
+      // enforce the "supplier invoice mandatory on submit" rule without
+      // leaking a filename column onto the GRN record.
+      hasSupplierInvoice: Boolean(supplierInvoice.file || supplierInvoice.existingFile),
     };
   };
+
+  const processAttachments = (grnId) =>
+    processGrnAttachments({ grnId, dcImage, supplierInvoice, message });
 
   const handleSaveDraft = async () => {
     if (savingDraft || submittingForm) return;
@@ -224,7 +253,8 @@ const FabricGRNForm = () => {
     if (errors.length) { errors.slice(0, 3).forEach((e) => message.error(e)); return; }
     setSavingDraft(true);
     try {
-      await saveFabricGRNDraft(payload);
+      const saved = await saveFabricGRNDraft(payload);
+      await processAttachments(saved?.id || grnRecord?.id);
       message.success('Draft saved');
       clearDirty();
       navigate('/inventory/grn/list');
@@ -241,7 +271,8 @@ const FabricGRNForm = () => {
     if (errors.length) { errors.slice(0, 5).forEach((e) => message.error(e)); return; }
     setSubmittingForm(true);
     try {
-      await submitFabricGRN(payload);
+      const saved = await submitFabricGRN(payload);
+      await processAttachments(saved?.id || grnRecord?.id);
       message.success('GRN submitted');
       clearDirty();
       navigate('/inventory/grn/list');
@@ -423,23 +454,74 @@ const FabricGRNForm = () => {
                 </Col>
               </Row>
               <Row gutter={16}>
-                <Col xs={24}>
+                <Col xs={24} md={12}>
                   <Form.Item label="Upload Delivery Challan">
                     <FileUpload
-                      accept="image/jpeg,image/png,image/webp"
-                      maxSizeMB={5}
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      maxSizeMB={10}
                       previewUrl={dcImage.previewUrl}
-                      fileName={dcImage.file?.name}
+                      fileName={dcImage.file?.name || dcImage.existingFile?.originalFilename}
+                      fileType={dcImage.file?.type || dcImage.existingFile?.fileType}
                       compact
-                      placeholder="Upload DC image"
+                      placeholder="Upload DC image or PDF"
                       disabled={readOnly}
                       onSelect={(file) => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
-                        setDcImage({ file, previewUrl: URL.createObjectURL(file) });
+                        setDcImage((prev) => ({
+                          file,
+                          previewUrl: URL.createObjectURL(file),
+                          existingFile: null,
+                          // queue the previously-persisted file (if any) for deletion
+                          toDelete: prev.existingFile?.fileId || prev.toDelete,
+                        }));
+                        setIsDirty(true);
                       }}
                       onRemove={() => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
-                        setDcImage({ file: null, previewUrl: null });
+                        setDcImage((prev) => ({
+                          file: null,
+                          previewUrl: null,
+                          existingFile: null,
+                          toDelete: prev.existingFile?.fileId || prev.toDelete,
+                        }));
+                        setIsDirty(true);
+                      }}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    label={<span>Upload Supplier Invoice <span style={{ color: 'var(--error-color)' }}>*</span></span>}
+                    tooltip="Mandatory on submit. Image or PDF accepted."
+                  >
+                    <FileUpload
+                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                      maxSizeMB={10}
+                      previewUrl={supplierInvoice.previewUrl}
+                      fileName={supplierInvoice.file?.name || supplierInvoice.existingFile?.originalFilename}
+                      fileType={supplierInvoice.file?.type || supplierInvoice.existingFile?.fileType}
+                      compact
+                      placeholder="Upload invoice image or PDF"
+                      disabled={readOnly}
+                      onSelect={(file) => {
+                        if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
+                        setSupplierInvoice((prev) => ({
+                          file,
+                          previewUrl: URL.createObjectURL(file),
+                          existingFile: null,
+                          toDelete: prev.existingFile?.fileId || prev.toDelete,
+                        }));
+                        setIsDirty(true);
+                      }}
+                      onRemove={() => {
+                        if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
+                        setSupplierInvoice((prev) => ({
+                          file: null,
+                          previewUrl: null,
+                          existingFile: null,
+                          toDelete: prev.existingFile?.fileId || prev.toDelete,
+                        }));
+                        setIsDirty(true);
                       }}
                     />
                   </Form.Item>

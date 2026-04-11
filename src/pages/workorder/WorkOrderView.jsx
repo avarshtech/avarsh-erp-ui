@@ -15,7 +15,7 @@ import {
   getStatusColor,
   WORK_ORDER_STATUS,
 } from '../../utils/workOrderConstants';
-import { getWorkOrderById, changeWorkOrderStatus } from '../../services/workOrderService';
+import { getWorkOrderById, changeWorkOrderStatus } from '../../services/workorder/workOrderService';
 import { ActionButton } from '../../components/buttons';
 import { formatDate } from '../../utils/formatters';
 import { hasPermission } from '../../utils/permissions';

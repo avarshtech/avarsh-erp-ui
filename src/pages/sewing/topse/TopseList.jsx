@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchEndlineTopse } from '../../../services/sewingService';
+import { searchEndlineTopse } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { DHU_THRESHOLD } from '../../../utils/sewingConstants';
 import { ActionButton } from '../../../components/buttons';

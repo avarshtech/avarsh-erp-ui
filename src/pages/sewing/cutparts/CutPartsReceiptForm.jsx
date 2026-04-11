@@ -10,7 +10,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createCutPartsReceipt, getCutPartsReceiptById,
   searchSewingPlans,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 
 const QUALITY_OPTIONS = [
   { value: 'OK', label: 'OK' },

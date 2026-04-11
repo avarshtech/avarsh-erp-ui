@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import {
   createSewingLine, updateSewingLine, getSewingLineById,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { LINE_STATUS_OPTIONS } from '../../../utils/sewingConstants';
 
 const { TextArea } = Input;

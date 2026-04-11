@@ -4,7 +4,7 @@ import {
   Steps, InputNumber, Button, Card,
 } from 'antd';
 import { getPPOStatusLabel, getPPOStatusColor, PPO_STATUS, STAGE_TYPE_LABELS, STAGE_STATUS_COLORS, getStageStatusColor } from '../../utils/productionPoConstants';
-import { getProductionPOById, updateProductionStage, changeProductionPOStatus } from '../../services/productionPoService';
+import { getProductionPOById, updateProductionStage, changeProductionPOStatus } from '../../services/productionpo/productionPoService';
 import { ActionButton } from '../../components/buttons';
 import { formatDate } from '../../utils/formatters';
 

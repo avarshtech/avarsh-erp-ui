@@ -10,8 +10,8 @@ import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
   createCuttingPO, updateCuttingPO, getCuttingPOById, changeCuttingPOStatus,
-} from '../../services/cuttingPoService';
-import { searchOrders } from '../../services/orderService';
+} from '../../services/cuttingpo/cuttingPoService';
+import { searchOrders } from '../../services/orders/orderService';
 import {
   CUTTING_PO_STATUS, EDITABLE_STATUSES, getStatusLabel, getStatusColor,
 } from '../../utils/cuttingPoConstants';

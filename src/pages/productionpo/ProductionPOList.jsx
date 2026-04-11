@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Tag, Typography, Progress } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchProductionPOs, deleteProductionPO, changeProductionPOStatus } from '../../services/productionPoService';
+import { searchProductionPOs, deleteProductionPO, changeProductionPOStatus } from '../../services/productionpo/productionPoService';
 import { hasPermission } from '../../utils/permissions';
 import { getPPOStatusLabel, getPPOStatusColor, PPO_STATUS, PPO_STATUS_OPTIONS } from '../../utils/productionPoConstants';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';

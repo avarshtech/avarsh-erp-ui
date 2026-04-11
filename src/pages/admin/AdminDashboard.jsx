@@ -11,9 +11,9 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { getUsers } from '../../services/userService';
-import { getRoles } from '../../services/roleService';
-import { getActivityLogsByDateRange } from '../../services/activityLogService';
+import { getUsers } from '../../services/admin/userService';
+import { getRoles } from '../../services/admin/roleService';
+import { getActivityLogsByDateRange } from '../../services/core/activityLogService';
 import PageHeader from '../../components/PageHeader';
 import StatCard from '../../components/StatCard';
 import EmptyState from '../../components/EmptyState';

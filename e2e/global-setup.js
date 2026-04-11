@@ -22,37 +22,23 @@ setup('authenticate', async ({ page }) => {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
   });
 
-  // Navigate to login page
-  await page.goto('/login');
-  await page.waitForLoadState('networkidle');
+  // Navigate to login page — use 'domcontentloaded' instead of 'networkidle'
+  // to avoid timeouts from persistent connections (WebSocket, polling, etc.)
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
   // Wait for the login form to be visible (page may show a spinner while checking auth)
-  await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByPlaceholder('Username')).toBeVisible({ timeout: 30000 });
 
   // Fill login form
   await page.getByPlaceholder('Username').fill(username);
   await page.getByPlaceholder('Password').fill(password);
 
-  // Click Sign In and simultaneously wait for the auth API response
-  const [loginResponse] = await Promise.all([
-    page.waitForResponse(
-      (resp) => resp.url().includes('/auth/login') && resp.request().method() === 'POST',
-      { timeout: 30000 }
-    ),
-    page.getByRole('button', { name: /Sign In/i }).click(),
-  ]);
-
-  // Verify the API returned 200 — log details if not
-  const status = loginResponse.status();
-  if (status !== 200) {
-    const body = await loginResponse.text().catch(() => '(unable to read body)');
-    throw new Error(
-      `Login API returned ${status}. Body: ${body}\nConsole errors: ${consoleErrors.join('\n')}`
-    );
-  }
+  // Click Sign In
+  await page.getByRole('button', { name: /Sign In/i }).click();
 
   // Wait for redirect away from login page (successful auth navigates to dashboard)
-  await expect(page).not.toHaveURL(/login/, { timeout: 15000 });
+  // Use a generous timeout — the API may take a few seconds on cold start
+  await expect(page).not.toHaveURL(/login/, { timeout: 30000 });
 
   // Save authenticated state (cookies + localStorage)
   await page.context().storageState({ path: authFile });

@@ -47,14 +47,14 @@ import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
-import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orderService';
-import { getBuyers, getBuyerById } from '../../services/buyerService';
-import { getAllPaymentTerms } from '../../services/paymentTermsService';
-import { getCostSheetByCostingId, downloadAttachment } from '../../services/costingService';
-import { getAllSizePresets, createSizePreset } from '../../services/sizePresetService';
-import { extractOrderLine } from '../../services/aiService';
-import { getStyleById } from '../../services/styleService';
-import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orders/orderService';
+import { getBuyers, getBuyerById } from '../../services/master/buyerService';
+import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
+import { getCostSheetByCostingId, downloadAttachment } from '../../services/costing/costingService';
+import { getAllSizePresets, createSizePreset } from '../../services/master/sizePresetService';
+import { extractOrderLine } from '../../services/core/aiService';
+import { getStyleById } from '../../services/master/styleService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import {
   ORDER_STATUS,
   EDITABLE_STATUSES,

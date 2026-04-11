@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchLayAudits, deleteLayAudit } from '../../../services/cuttingService';
+import { searchLayAudits, deleteLayAudit } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   LAY_AUDIT_STATUS, getLayAuditLabel, getLayAuditColor,

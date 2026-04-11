@@ -7,7 +7,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import {
   createWastage, updateWastage, getWastageById, searchCutOrderPlans,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 
 const { TextArea } = Input;
 

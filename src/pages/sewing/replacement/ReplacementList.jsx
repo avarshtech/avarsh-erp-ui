@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchReplacements } from '../../../services/sewingService';
+import { searchReplacements } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { getReplacementLabel, getReplacementColor } from '../../../utils/sewingConstants';
 import { ActionButton } from '../../../components/buttons';

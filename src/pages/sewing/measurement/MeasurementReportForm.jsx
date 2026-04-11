@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createMeasurementReport, getMeasurementReportById, searchSewingPlans,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import {
   INSPECTION_STAGES,
   getMeasurementResultLabel, getMeasurementResultColor,

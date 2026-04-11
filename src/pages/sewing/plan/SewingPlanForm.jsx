@@ -10,9 +10,9 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createSewingPlan, updateSewingPlan, getSewingPlanById,
   getAllActiveLines, getSamByStyle, searchOperators,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { SEW_PLAN_EDITABLE, MACHINE_TYPES } from '../../../utils/sewingConstants';
-import { searchOrders } from '../../../services/orderService';
+import { searchOrders } from '../../../services/orders/orderService';
 import { formatNumber } from '../../../utils/formatters';
 
 const { TextArea } = Input;

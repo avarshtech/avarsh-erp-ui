@@ -8,8 +8,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import SizeColorMatrix from '../po/SizeColorMatrix';
-import { createProductionPO, updateProductionPO, getProductionPOById, changeProductionPOStatus } from '../../services/productionPoService';
-import { searchOrders } from '../../services/orderService';
+import { createProductionPO, updateProductionPO, getProductionPOById, changeProductionPOStatus } from '../../services/productionpo/productionPoService';
+import { searchOrders } from '../../services/orders/orderService';
 import { PPO_STATUS, getPPOStatusLabel, getPPOStatusColor, STAGE_TYPE_LABELS, OPTIONAL_STAGES, STAGE_STATUS_COLORS } from '../../utils/productionPoConstants';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 

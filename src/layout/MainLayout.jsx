@@ -37,7 +37,7 @@ import {
   ToolOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { getCurrentUser, logoutUser } from "../services/authService";
+import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";

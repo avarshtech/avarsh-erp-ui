@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createOperator, updateOperator, getOperatorById, getAllActiveLines,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 
 const { TextArea } = Input;
 

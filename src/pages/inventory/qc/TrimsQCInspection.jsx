@@ -18,11 +18,12 @@ import {
   getActiveTrimsQCCriteria,
   saveTrimsQCDraft,
   submitTrimsQC,
-} from '../../../services/inventoryService';
+} from '../../../services/inventory/inventoryService';
 import { validateTrimsQC } from '../../../utils/qcValidation';
 import { QC_STATUS } from '../../../utils/inventoryConstants';
 import { formatNumber } from '../../../utils/formatters';
 import TrimsQCCriteriaTable from './TrimsQCCriteriaTable';
+import TrimsQCSizeTable from './TrimsQCSizeTable';
 
 const getSampleSize = (lotSize) => {
   if (!lotSize || lotSize <= 0) return 0;
@@ -99,6 +100,7 @@ const TrimsQCInspection = () => {
   const [poLineItemId, setPoLineItemId] = useState(null);
   const [criteriaMaster, setCriteriaMaster] = useState([]);
   const [criteriaRows, setCriteriaRows] = useState([]);
+  const [sizeInspectionRows, setSizeInspectionRows] = useState([]);
   const [qcData, setQcData] = useState(null);
 
   const readOnly = !isNew && qcData?.status && qcData.status !== QC_STATUS.DRAFT && qcData.status !== QC_STATUS.REFERRED_BACK;
@@ -117,6 +119,7 @@ const TrimsQCInspection = () => {
       setSelectedGRN({ id: data.grnId, grnNumber: data.grnNumber });
       setPoLineItemId(data.poLineItemId);
       setCriteriaRows(data.criteriaRows || data.criteriaChecks || []);
+      setSizeInspectionRows(data.sizeInspectionRows || []);
       form.setFieldsValue({
         grnId: data.grnId,
         poLineItemId: data.poLineItemId,
@@ -143,6 +146,7 @@ const TrimsQCInspection = () => {
     setPoLineItemId(newPoLineItemId);
     if (isNew) {
       setCriteriaRows([]);
+      setSizeInspectionRows([]);
     }
     setIsDirty(true);
   }, [isNew]);
@@ -195,6 +199,46 @@ const TrimsQCInspection = () => {
   const qtyReceived = selectedLineItem?.receivingQty || 0;
   const qtyChecked = useMemo(() => getSampleSize(qtyReceived), [qtyReceived]);
 
+  // Auto-populate size rows from related GRN items when a PO line item is picked.
+  // We group all items that share the same base identity (itemCode / itemId) as
+  // the selected line — each size variant becomes one size row with its received
+  // qty as the expected qty. Inspector then enters checked qty per row.
+  useEffect(() => {
+    if (!isNew || !selectedLineItem || !selectedGRN) return;
+    const baseKey = selectedLineItem.itemCode || selectedLineItem.itemId;
+    if (!baseKey) return;
+    const relatedItems = lineItemSource.filter((li) => {
+      const k = li.itemCode || li.itemId;
+      return k === baseKey && li.size;
+    });
+    if (relatedItems.length === 0) {
+      // Fall back: if only the selected line has a size, seed a single row
+      if (selectedLineItem.size) {
+        setSizeInspectionRows([{ size: selectedLineItem.size, expectedQty: Number(selectedLineItem.receivingQty) || 0, checkedQty: 0 }]);
+      } else {
+        setSizeInspectionRows([]);
+      }
+      return;
+    }
+    // Group by size (sum receivingQty per size)
+    const bySize = new Map();
+    relatedItems.forEach((li) => {
+      const qty = Number(li.receivingQty) || 0;
+      bySize.set(li.size, (bySize.get(li.size) || 0) + qty);
+    });
+    const rows = Array.from(bySize.entries()).map(([size, qty]) => ({
+      size,
+      expectedQty: qty,
+      checkedQty: 0,
+    }));
+    setSizeInspectionRows(rows);
+  }, [isNew, selectedLineItem, selectedGRN, lineItemSource]);
+
+  const handleSizeRowsChange = useCallback((nextRows) => {
+    setSizeInspectionRows(nextRows);
+    setIsDirty(true);
+  }, []);
+
   const handleCriteriaChange = useCallback((idx, field, value) => {
     setCriteriaRows((prev) => prev.map((row, i) => {
       if (i !== idx) return row;
@@ -220,6 +264,7 @@ const TrimsQCInspection = () => {
       qtyReceived,
       qtyChecked,
       criteriaRows,
+      sizeInspectionRows,
     };
   };
 
@@ -388,6 +433,13 @@ const TrimsQCInspection = () => {
         selectedIds={criteriaRows.map((r) => r.id)}
         onSelectedIdsChange={handleSelectedCriteriaChange}
         onChange={handleCriteriaChange}
+        readOnly={readOnly}
+        lineItemSelected={Boolean(poLineItemId)}
+      />
+
+      <TrimsQCSizeTable
+        rows={sizeInspectionRows}
+        onChange={handleSizeRowsChange}
         readOnly={readOnly}
         lineItemSelected={Boolean(poLineItemId)}
       />

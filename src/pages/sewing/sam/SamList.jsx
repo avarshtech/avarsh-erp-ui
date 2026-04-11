@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchSamStandards, deleteSamStandard } from '../../../services/sewingService';
+import { searchSamStandards, deleteSamStandard } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { MACHINE_TYPES, SAM_SOURCE_OPTIONS } from '../../../utils/sewingConstants';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';

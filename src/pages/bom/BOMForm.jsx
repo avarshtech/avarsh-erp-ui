@@ -36,12 +36,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../utils/permissions';
-import { createBom, updateBom, getBomById } from '../../services/bomService';
-import { getActiveProcesses } from '../../services/processService';
-import { getOrderByOrderNo } from '../../services/orderService';
-import { searchItems, getItemMetaData, getItemsByIds } from '../../services/itemService';
-import { getActiveParts } from '../../services/partsService';
-import { uploadFile, deleteFile, downloadFileAsBlob, getFilesByEntity } from '../../services/fileService';
+import { createBom, updateBom, getBomById } from '../../services/bom/bomService';
+import { getActiveProcesses } from '../../services/master/processService';
+import { getOrderByOrderNo } from '../../services/orders/orderService';
+import { searchItems, getItemMetaData, getItemsByIds } from '../../services/master/itemService';
+import { getActiveParts } from '../../services/master/partsService';
+import { uploadFile, deleteFile, downloadFileAsBlob, getFilesByEntity } from '../../services/core/fileService';
 import {
   BOM_STATUS,
   QTY_CALC_BASIS,
@@ -1319,7 +1319,7 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
       ...rest,
       // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
       variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
@@ -1503,25 +1503,80 @@ const BOMForm = () => {
     return { valid: errors.length === 0, errors };
   };
 
-  // Upload any staged CAD files after BOM save (for new lines that didn't have an ID at upload time)
-  const uploadStagedCadFiles = async (savedBom) => {
-    if (!savedBom?.lines?.length) return;
-    for (const savedLine of savedBom.lines) {
-      // Match saved line back to local line by itemId + variantId (or index)
-      const localLine = lines.find((l) =>
-        !l.id && l._cadStagedFile && l.itemId === savedLine.itemId && l.variantId === savedLine.variantId,
-      );
-      if (!localLine || !localLine._cadStagedFile) continue;
-      try {
-        await uploadFile(localLine._cadStagedFile, {
-          module: 'BOM',
-          entity: 'BOM_LINE',
-          entityId: savedLine.id,
-          fileCategory: 'CAD_MARKER',
-        });
-      } catch {
-        message.warning(`Failed to upload CAD marker for line ${savedLine.itemCode || savedLine.itemId}`);
+  // Post-save CAD processor. Runs the three queued operations in this order:
+  //   1. Deletes — any `_cadToDelete` fileIds (queued when user replaced or
+  //      removed an existing line's CAD).
+  //   2. Existing-line uploads — lines that already had an id at save time and
+  //      now have a staged replacement file. Uploaded directly against line.id.
+  //   3. New-line uploads — lines that were new at save time (no local id)
+  //      matched positionally against `savedBom.lines`. The backend returns
+  //      lines in payload order, so we filter both sides to "new-in-this-save"
+  //      entries and pair by index. Positional match is required because
+  //      duplicate item+variant pairs (same fabric, different colors) would be
+  //      ambiguous under an itemId/variantId match.
+  //
+  // All operations run via Promise.allSettled so one failure doesn't block the
+  // rest; failures are reported with a single summary warning.
+  const uploadStagedCadFiles = async (savedBom, priorLineIds) => {
+    const ops = [];
+
+    // 1. Queued deletes — may exist on any line (existing or new), whenever
+    //    the user replaced or removed a previously-persisted CAD marker.
+    lines.forEach((l) => {
+      if (l._cadToDelete) {
+        ops.push(
+          deleteFile(l._cadToDelete).catch((e) => console.warn('Failed to delete old CAD file:', e)),
+        );
       }
+    });
+
+    // 2. Staged uploads for EXISTING lines (line.id is already known).
+    lines.forEach((l) => {
+      if (l.id && l._cadStagedFile) {
+        ops.push(
+          uploadFile(l._cadStagedFile, {
+            module: 'BOM',
+            entity: 'BOM_LINE',
+            entityId: l.id,
+            fileCategory: 'CAD_MARKER',
+          }).catch((e) => {
+            console.error('CAD upload failed for existing line:', e);
+            throw new Error(`CAD upload failed for line ${l.itemCode || l.itemId}`);
+          }),
+        );
+      }
+    });
+
+    // 3. Staged uploads for NEW lines (positional match against savedBom.lines).
+    const stagedNewLines = lines.filter((l) => !l.id && !l.isPoGenerated && l._cadStagedFile);
+    if (stagedNewLines.length > 0) {
+      const newSavedLines = (savedBom?.lines || []).filter((sl) => sl.id && !priorLineIds.has(sl.id));
+      if (newSavedLines.length !== stagedNewLines.length) {
+        message.warning('CAD uploads for new lines skipped: saved BOM lines did not align with local state. Edit the BOM to retry.');
+      } else {
+        for (let i = 0; i < stagedNewLines.length; i += 1) {
+          const localLine = stagedNewLines[i];
+          const savedLine = newSavedLines[i];
+          ops.push(
+            uploadFile(localLine._cadStagedFile, {
+              module: 'BOM',
+              entity: 'BOM_LINE',
+              entityId: savedLine.id,
+              fileCategory: 'CAD_MARKER',
+            }).catch((e) => {
+              console.error('CAD upload failed for new line:', e);
+              throw new Error(`CAD upload failed for line ${savedLine.itemCode || savedLine.itemId}`);
+            }),
+          );
+        }
+      }
+    }
+
+    if (ops.length === 0) return;
+    const results = await Promise.allSettled(ops);
+    const failures = results.filter((r) => r.status === 'rejected').length;
+    if (failures > 0) {
+      message.warning(`BOM saved, but ${failures} CAD file operation${failures > 1 ? 's' : ''} failed. Edit the BOM to retry.`);
     }
   };
 
@@ -1539,6 +1594,7 @@ const BOMForm = () => {
     setSavingDraft(true);
     try {
       const payload = buildPayload(BOM_STATUS.DRAFT);
+      const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
       if (isEdit) {
         saved = await updateBom(id, payload);
@@ -1547,7 +1603,7 @@ const BOMForm = () => {
         saved = await createBom(payload);
         message.success('BOM created as draft');
       }
-      await uploadStagedCadFiles(saved);
+      await uploadStagedCadFiles(saved, priorLineIds);
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       clearDirty();
@@ -1573,6 +1629,7 @@ const BOMForm = () => {
     setSubmitting(true);
     try {
       const payload = buildPayload(BOM_STATUS.CREATED);
+      const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
       if (isEdit) {
         saved = await updateBom(id, payload);
@@ -1581,7 +1638,7 @@ const BOMForm = () => {
         saved = await createBom(payload);
         message.success('BOM created successfully');
       }
-      await uploadStagedCadFiles(saved);
+      await uploadStagedCadFiles(saved, priorLineIds);
       if (saved?.version != null) setEntityVersion(saved.version);
       setIsDirty(false);
       clearDirty();
@@ -2124,21 +2181,25 @@ const BOMForm = () => {
                 <Tooltip title={record._cadFileName || (isStaged ? 'CAD staged' : 'CAD uploaded')}>
                   <CheckCircleOutlined style={{ fontSize: 20, color: isStaged ? 'var(--primary-color, #6366f1)' : '#10b981', minWidth: 20 }} />
                 </Tooltip>
-                {record._cadUploading ? (
-                  <Spin size="small" />
-                ) : (
-                  <Tooltip title={isStaged ? 'Remove staged CAD' : 'Remove CAD'}>
-                    <DeleteOutlined
-                      style={{ fontSize: 12, color: 'var(--error-color, #ff4d4f)', cursor: 'pointer' }}
-                      onClick={async () => {
-                        if (record._cadFileId) {
-                          try { await deleteFile(record._cadFileId); } catch { /* ignore */ }
-                        }
-                        updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileId: null, _cadFileName: null, _cadStagedFile: null });
-                      }}
-                    />
-                  </Tooltip>
-                )}
+                <Tooltip title={isStaged ? 'Remove staged CAD' : 'Remove CAD'}>
+                  <DeleteOutlined
+                    style={{ fontSize: 12, color: 'var(--error-color, #ff4d4f)', cursor: 'pointer' }}
+                    onClick={() => {
+                      // Queue the persisted file (if any) for deletion on save.
+                      // If a new file was staged but not yet saved, just drop
+                      // it — no server-side implications. Preserves any
+                      // pre-existing `_cadToDelete` that may have been queued
+                      // during a replace-then-remove sequence.
+                      updateLineMulti(record.key, {
+                        cadPreviewUrl: null,
+                        _cadFileId: null,
+                        _cadFileName: null,
+                        _cadStagedFile: null,
+                        _cadToDelete: record._cadFileId || record._cadToDelete || null,
+                      });
+                    }}
+                  />
+                </Tooltip>
               </div>
             );
           }
@@ -2147,41 +2208,32 @@ const BOMForm = () => {
             <Upload
               maxCount={1}
               showUploadList={false}
-              disabled={isDisabled || record._cadUploading}
-              beforeUpload={async (file) => {
+              disabled={isDisabled}
+              beforeUpload={(file) => {
                 const isImage = file.type?.startsWith('image/');
                 const previewUrl = isImage ? URL.createObjectURL(file) : null;
 
-                if (record.id) {
-                  // Existing saved line — upload immediately with line ID
-                  updateLineMulti(record.key, { cadPreviewUrl: previewUrl, _cadFileName: file.name, _cadUploading: true, _cadStagedFile: null });
-                  try {
-                    const result = await uploadFile(file, {
-                      module: 'BOM',
-                      entity: 'BOM_LINE',
-                      entityId: record.id,
-                      fileCategory: 'CAD_MARKER',
-                    });
-                    const uploaded = result?.data || result;
-                    updateLineMulti(record.key, { _cadFileId: uploaded.fileId, _cadUploading: false });
-                    message.success('CAD marker uploaded');
-                  } catch {
-                    message.error('Failed to upload CAD marker');
-                    updateLineMulti(record.key, { cadPreviewUrl: null, _cadFileName: null, _cadUploading: false });
-                  }
-                } else {
-                  // New unsaved line — stage file locally, upload after BOM save
-                  updateLineMulti(record.key, { cadPreviewUrl: previewUrl, _cadFileName: file.name, _cadStagedFile: file, _cadUploading: false });
-                  message.info('CAD marker staged. It will be uploaded after the BOM line is saved.');
-                }
+                // Always stage — both new and existing lines. If this line
+                // already had a persisted CAD, queue it for deletion so a
+                // failed upload on save doesn't orphan the slot. New-line
+                // `toDelete` carry-over (from a previous pick-then-pick on the
+                // same unsaved line) is preserved.
+                updateLineMulti(record.key, {
+                  cadPreviewUrl: previewUrl,
+                  _cadFileName: file.name,
+                  _cadStagedFile: file,
+                  _cadFileId: null,
+                  _cadToDelete: record._cadFileId || record._cadToDelete || null,
+                });
+                message.info('CAD marker staged. It will be uploaded when you save the BOM.');
                 return false;
               }}
             >
               <Button
                 size="small"
                 type="text"
-                icon={record._cadUploading ? <LoadingOutlined spin /> : <UploadOutlined />}
-                disabled={isDisabled || record._cadUploading}
+                icon={<UploadOutlined />}
+                disabled={isDisabled}
               />
             </Upload>
           );

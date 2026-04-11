@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { App, Card, Row, Col, Progress, Typography } from 'antd';
 import PageHeader from '../../../components/PageHeader';
 import StatCard from '../../../components/StatCard';
-import { getDashboardStats } from '../../../services/inventoryService';
+import { getDashboardStats } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import DashboardKPICards from './DashboardKPICards';
 import DashboardAlerts from './DashboardAlerts';

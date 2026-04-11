@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchIncentives } from '../../../services/sewingService';
+import { searchIncentives } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { INCENTIVE_STATUS } from '../../../utils/sewingConstants';
 import { ActionButton } from '../../../components/buttons';

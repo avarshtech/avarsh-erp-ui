@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Result } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords } from '../../../services/payrollService';
-import { getActiveFactories } from '../../../services/factoryService';
+import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords } from '../../../services/hr/payrollService';
+import { getActiveFactories } from '../../../services/master/factoryService';
 import PageHeader from '../../../components/PageHeader';
 
 const MONTH_OPTIONS = [

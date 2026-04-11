@@ -32,7 +32,7 @@ import {
   updateSupplier,
   deleteSupplier,
   getLocationByPincode,
-} from '../../services/supplierService';
+} from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
 

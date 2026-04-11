@@ -1,9 +1,9 @@
 import dayjs from 'dayjs';
-import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/organisationService';
-import { getTermsConditionsById } from '../services/termsConditionsService';
-import { getSupplierById } from '../services/supplierService';
+import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/admin/organisationService';
+import { getTermsConditionsById } from '../services/master/termsConditionsService';
+import { getSupplierById } from '../services/master/supplierService';
 import { getStateName } from './indianStates';
-import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/pantoneService';
+import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/core/pantoneService';
 import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 /**
@@ -85,12 +85,10 @@ const getStatusLabel = (status) => {
   const labels = {
     'Draft': 'Draft',
     'Pending_Approval': 'To be Approved',
-    'Approved': 'Approved',
     'Rejected': 'Rejected',
     'Cancelled': 'Cancelled',
     'Referred_Back': 'Referred Back',
     'Sent_To_Supplier': 'Approved',
-    'InProgress': 'In Progress',
     'Partially_Received': 'Partially Received',
     'Completed': 'Completed',
   };

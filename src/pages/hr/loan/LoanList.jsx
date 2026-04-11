@@ -3,7 +3,7 @@ import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm } from 'an
 import { PlusOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getAllLoans, closeLoan, cancelLoan } from '../../../services/loanService';
+import { getAllLoans, closeLoan, cancelLoan } from '../../../services/hr/loanService';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';

@@ -28,13 +28,13 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
-import { getRoles } from '../../services/roleService';
-import { getUsers } from '../../services/userService';
+import { getRoles } from '../../services/admin/roleService';
+import { getUsers } from '../../services/admin/userService';
 import {
   createApprovalFlow,
   updateApprovalFlow,
   getApprovalFlowById,
-} from '../../services/approvalFlowService';
+} from '../../services/core/approvalFlowService';
 import {
   ENTITY_TYPES,
   APPROVER_TYPES,

@@ -4,7 +4,7 @@ import {
   ScissorOutlined, FileTextOutlined, AppstoreOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { getCuttingDashboard } from '../../../services/cuttingService';
+import { getCuttingDashboard } from '../../../services/cutting/cuttingService';
 import PageHeader from '../../../components/PageHeader';
 import { getCutPlanStatusLabel, getCutPlanStatusColor, getCutReportLabel, getCutReportColor } from '../../../utils/cuttingConstants';
 

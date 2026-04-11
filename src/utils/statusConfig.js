@@ -8,7 +8,6 @@ import {
   ExclamationCircleOutlined,
   CloseCircleOutlined,
   InboxOutlined,
-  SyncOutlined,
   SafetyCertificateOutlined,
   ExperimentOutlined,
   WarningOutlined,
@@ -45,13 +44,11 @@ export const COSTING_STATUS_CONFIG = {
 export const PO_STATUS_CONFIG = {
   [PO_STATUS.DRAFT]:              { color: 'default',    icon: FileTextOutlined },
   [PO_STATUS.PENDING_APPROVAL]:   { color: 'processing', icon: ClockCircleOutlined },
-  [PO_STATUS.APPROVED]:           { color: 'green',      icon: CheckCircleOutlined },
   [PO_STATUS.REJECTED]:           { color: 'red',        icon: CloseCircleOutlined },
-  [PO_STATUS.IN_PROGRESS]:        { color: 'blue',       icon: SyncOutlined },
   [PO_STATUS.CANCELLED]:          { color: 'volcano',    icon: StopOutlined },
   [PO_STATUS.REFERRED_BACK]:      { color: 'orange',     icon: UndoOutlined },
-  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'geekblue',   icon: InboxOutlined },
   [PO_STATUS.SENT_TO_SUPPLIER]:   { color: 'cyan',       icon: SendOutlined },
+  [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'geekblue',   icon: InboxOutlined },
   [PO_STATUS.COMPLETED]:          { color: 'green',      icon: CheckCircleOutlined },
 };
 
@@ -113,7 +110,7 @@ export const ADJUSTMENT_STATUS_CONFIG = {
 
 // ==================== STATUS FLOW (for StatusSteps) ====================
 export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLETED'];
-export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Approved', 'Sent_To_Supplier', 'Partially_Received', 'Completed'];
+export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Sent_To_Supplier', 'Partially_Received', 'Completed'];
 export const COSTING_STATUS_FLOW = ['Draft', 'Final', 'Approved', 'Rejected'];
 export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
 export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag, Button } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { searchRelaxations } from '../../../services/cuttingService';
+import { searchRelaxations } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   RELAXATION_STATUS,

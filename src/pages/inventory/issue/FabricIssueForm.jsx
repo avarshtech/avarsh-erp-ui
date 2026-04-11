@@ -5,7 +5,7 @@ import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
-import { getProductionOrders, getFabricStock } from '../../../services/inventoryService';
+import { getProductionOrders, getFabricStock } from '../../../services/inventory/inventoryService';
 import { STOCK_STATUS } from '../../../utils/inventoryConstants';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import FabricIssueRollPicker from './FabricIssueRollPicker';

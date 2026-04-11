@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { App, Modal, Table, Tag, Typography, Space, Empty, Spin, Input, Button, Popconfirm } from 'antd';
 import { SaveOutlined, DeleteOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import { getTemplates, saveTemplate, deleteTemplate } from '../../services/costingService';
+import { getTemplates, saveTemplate, deleteTemplate } from '../../services/costing/costingService';
 
 const { Text } = Typography;
 

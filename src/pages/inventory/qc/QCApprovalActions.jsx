@@ -20,7 +20,7 @@ import {
   approveTrimsQCReferBack,
   rejectTrimsQCReferBack,
   closeGRNOnQCApproval,
-} from '../../../services/inventoryService';
+} from '../../../services/inventory/inventoryService';
 import {
   canApproveQC,
   canRejectQC,

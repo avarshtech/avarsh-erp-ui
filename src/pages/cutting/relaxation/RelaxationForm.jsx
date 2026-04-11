@@ -12,7 +12,7 @@ import {
   completeRelaxation,
   getRelaxationById,
   searchFabricReceipts,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { FABRIC_TYPES } from '../../../utils/cuttingConstants';
 
 const { TextArea } = Input;

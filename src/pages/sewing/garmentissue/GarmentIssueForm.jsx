@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createGarmentIssue, getGarmentIssueById, searchSewingPlans,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 
 const GarmentIssueForm = () => {
   const { message } = App.useApp();

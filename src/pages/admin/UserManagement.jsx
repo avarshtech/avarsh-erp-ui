@@ -8,9 +8,9 @@ import {
   MailOutlined, PhoneOutlined, KeyOutlined,
   ExclamationCircleOutlined, LockOutlined,
 } from '@ant-design/icons';
-import { getUsers, createUser, updateUser, deleteUser } from '../../services/userService';
-import { adminResetPassword, getCurrentUser } from '../../services/authService';
-import { getRoles } from '../../services/roleService';
+import { getUsers, createUser, updateUser, deleteUser } from '../../services/admin/userService';
+import { adminResetPassword, getCurrentUser } from '../../services/auth/authService';
+import { getRoles } from '../../services/admin/roleService';
 import PermissionGuard from '../../components/PermissionGuard';
 import { isAdminRole } from '../../utils/permissions';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';

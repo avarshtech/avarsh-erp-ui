@@ -10,7 +10,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createLayAudit, updateLayAudit, getLayAuditById,
   searchCutOrderPlans, searchMarkers,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { LAY_AUDIT_STATUS } from '../../../utils/cuttingConstants';
 
 const LAY_AUDIT_EDITABLE = [LAY_AUDIT_STATUS.DRAFT];

@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { getAllDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../../services/hrMasterService';
-import { getActiveFactories } from '../../../services/factoryService';
+import { getAllDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../../services/master/hrMasterService';
+import { getActiveFactories } from '../../../services/master/factoryService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 

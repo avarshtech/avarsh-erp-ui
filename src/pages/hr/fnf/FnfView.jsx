@@ -3,7 +3,7 @@ import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space } 
 import { PrinterOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getFnfById, approveFnf, settleFnf } from '../../../services/fnfService';
+import { getFnfById, approveFnf, settleFnf } from '../../../services/hr/fnfService';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 

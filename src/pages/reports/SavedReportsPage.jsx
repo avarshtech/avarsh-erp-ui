@@ -6,7 +6,7 @@ import PageHeader from '../../components/PageHeader';
 import StatCard from '../../components/StatCard';
 import EmptyState from '../../components/EmptyState';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
-import { getSavedReports, deleteSavedReport } from '../../services/reportService';
+import { getSavedReports, deleteSavedReport } from '../../services/core/reportService';
 import { formatDate } from '../../utils/formatters';
 import { getFilteredReportNavOptions, getModuleColor } from '../../utils/reportConstants';
 import { hasModuleAccess } from '../../utils/permissions';

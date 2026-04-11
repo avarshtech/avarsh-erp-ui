@@ -15,7 +15,7 @@ import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { STOCK_STATUS, STOCK_STATUS_LABELS } from '../../../utils/inventoryConstants';
-import { getFabricStock } from '../../../services/inventoryService';
+import { getFabricStock } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import getFabricStockColumns from './FabricStockColumns';
 

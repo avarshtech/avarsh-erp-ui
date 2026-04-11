@@ -20,7 +20,7 @@ import {
   SwapOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getPoVersionHistory } from '../../services/purchaseOrderService';
+import { getPoVersionHistory } from '../../services/po/purchaseOrderService';
 import StatusTag from '../../components/StatusTag';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getStatusLabel } from '../../utils/poStatusConstants';

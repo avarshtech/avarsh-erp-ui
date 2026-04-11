@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createIncentive, getIncentiveById, approveIncentive, getAllActiveLines,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { INCENTIVE_STATUS } from '../../../utils/sewingConstants';
 import { formatPercentage, formatCurrency } from '../../../utils/formatters';
 

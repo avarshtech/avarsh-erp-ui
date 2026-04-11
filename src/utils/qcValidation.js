@@ -119,6 +119,21 @@ export const validateTrimsQC = (data, isSubmit = false, ctx = {}) => {
       if (!c.ok && !c.notOk) errors.push(`Criterion "${c.criteria}": mark as OK or Not OK`);
       if (c.notOk && !c.remarks?.trim()) errors.push(`Criterion "${c.criteria}": remarks required when Not OK`);
     });
+
+    // Size-wise inspection — at least one row; every row needs a size + non-zero checked qty
+    const sizeRows = data.sizeInspectionRows || [];
+    if (sizeRows.length === 0) {
+      errors.push('Add at least one size row in Size-wise Inspection');
+    } else {
+      sizeRows.forEach((r, i) => {
+        if (!r.size || !String(r.size).trim()) {
+          errors.push(`Size row ${i + 1}: Size is required`);
+        }
+        if (r.checkedQty == null || Number(r.checkedQty) < 0) {
+          errors.push(`Size row ${i + 1}: Checked Qty must be a non-negative number`);
+        }
+      });
+    }
   }
 
   return errors;

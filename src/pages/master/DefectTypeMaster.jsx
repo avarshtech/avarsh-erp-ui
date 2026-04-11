@@ -7,7 +7,7 @@ import {
   createDefectType,
   updateDefectType,
   deleteDefectType,
-} from '../../services/defectTypeService';
+} from '../../services/master/defectTypeService';
 
 const DefectTypeMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();

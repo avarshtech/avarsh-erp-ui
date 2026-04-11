@@ -13,7 +13,7 @@ import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { ISSUE_STATUS, ISSUE_STATUS_LABELS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { ISSUE_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getAccessoriesIssueList } from '../../../services/inventoryService';
+import { getAccessoriesIssueList } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import IssueViewDrawer from './IssueViewDrawer';
 

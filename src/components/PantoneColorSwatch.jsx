@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Popover, Spin } from 'antd';
-import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/pantoneService';
+import { getPantoneSwatchUrl, isPantoneCode, extractPantoneCode } from '../services/core/pantoneService';
 
 /**
  * PantoneColorSwatch - Renders a Pantone color swatch thumbnail

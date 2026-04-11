@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchCutOrderPlans, deleteCutOrderPlan, changeCutOrderPlanStatus } from '../../../services/cuttingService';
+import { searchCutOrderPlans, deleteCutOrderPlan, changeCutOrderPlanStatus } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   getCutPlanStatusLabel, getCutPlanStatusColor,

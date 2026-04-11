@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { App, Drawer, Form, InputNumber, DatePicker, Button, Space, Descriptions } from 'antd';
 import dayjs from 'dayjs';
-import { createSalaryStructure, updateSalaryStructure } from '../../../services/salaryStructureService';
+import { createSalaryStructure, updateSalaryStructure } from '../../../services/hr/salaryStructureService';
 
 const SALARY_FIELDS = ['basic', 'da', 'hra', 'conveyance', 'washingAllowance', 'otherAllowance'];
 

@@ -29,9 +29,9 @@ import {
   updateWorkOrder,
   getWorkOrderById,
   changeWorkOrderStatus,
-} from '../../services/workOrderService';
-import { searchOrders } from '../../services/orderService';
-import { getApprovedCuttingPOsByOrder } from '../../services/cuttingPoService';
+} from '../../services/workorder/workOrderService';
+import { searchOrders } from '../../services/orders/orderService';
+import { getApprovedCuttingPOsByOrder } from '../../services/cuttingpo/cuttingPoService';
 import {
   WORK_ORDER_STATUS,
   EDITABLE_STATUSES,

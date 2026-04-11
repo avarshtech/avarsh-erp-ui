@@ -8,7 +8,7 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchBoms, deleteBom } from '../../services/bomService';
+import { searchBoms, deleteBom } from '../../services/bom/bomService';
 import { BOM_STATUS, getStatusLabel, EDITABLE_STATUSES } from '../../utils/bomConstants';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';

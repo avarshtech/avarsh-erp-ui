@@ -3,7 +3,7 @@ import { App, Input, Row, Col, Spin } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
 import EmptyState from '../../../components/EmptyState';
-import { getFabricStock } from '../../../services/inventoryService';
+import { getFabricStock } from '../../../services/inventory/inventoryService';
 import ShadeLotGroupCard from './ShadeLotGroupCard';
 
 const FabricShadeLotView = () => {

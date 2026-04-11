@@ -42,20 +42,20 @@ import {
   createPurchaseOrder,
   updatePurchaseOrder,
   createActivity,
-} from '../../services/purchaseOrderService';
-import { getAllTermsConditions } from '../../services/termsConditionsService';
-import { getSuppliers } from '../../services/supplierService';
-import { autocompleteItems, getItemsByIds } from '../../services/itemService';
+} from '../../services/po/purchaseOrderService';
+import { getAllTermsConditions } from '../../services/master/termsConditionsService';
+import { getSuppliers } from '../../services/master/supplierService';
+import { autocompleteItems, getItemsByIds } from '../../services/master/itemService';
 import { useStore } from '../../context/StoreContext';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
-import { generateEwayBill } from '../../services/purchaseOrderService';
-import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bomService';
+import { generateEwayBill } from '../../services/po/purchaseOrderService';
+import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
-import { isPantoneCode } from '../../services/pantoneService';
-import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { isPantoneCode } from '../../services/core/pantoneService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 
 const { Title, Text } = Typography;
@@ -1363,7 +1363,7 @@ const POForm = () => {
   const hasChangesFromLastVersion = async () => {
     if (!isEditMode || !id) return true; // new PO always has "changes"
     try {
-      const { getPoLatestVersion } = await import('../../services/purchaseOrderService');
+      const { getPoLatestVersion } = await import('../../services/po/purchaseOrderService');
       const latest = await getPoLatestVersion(id);
       if (!latest?.snapshot) return true; // no previous version, treat as changed
 

@@ -12,7 +12,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import AiResultsDisplay from './components/AiResultsDisplay';
-import { aiChat } from '../../services/reportService';
+import { aiChat } from '../../services/core/reportService';
 import { getFilteredReportNavOptions } from '../../utils/reportConstants';
 import { hasModuleAccess } from '../../utils/permissions';
 

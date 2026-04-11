@@ -4,7 +4,7 @@ import { Form, Input, Button, Space, App, Tag, InputNumber } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { integerInputProps } from '../../utils/inputHelpers';
 import { useStore } from '../../context/StoreContext';
-import { createUOM, updateUOM, deleteUOM } from '../../services/masterDataService';
+import { createUOM, updateUOM, deleteUOM } from '../../services/master/masterDataService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

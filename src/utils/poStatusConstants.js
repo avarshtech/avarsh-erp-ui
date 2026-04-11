@@ -6,25 +6,23 @@
  * Display labels replace underscores with spaces.
  *
  * PO Status Flow:
- *  Draft → Pending_Approval → Approved (alias Sent_To_Supplier) → Completed
+ *  Draft → Pending_Approval → Sent_To_Supplier → Partially_Received → Completed
  *                           ↘ Rejected
  *                           ↘ Cancelled
  *                           ↘ Referred_Back → (edit & resubmit)
- *  Sent_To_Supplier → Partially_Received (when some line items completed)
- *  Partially_Received → Completed (when all line items completed)
+ *
+ * Line items have a distinct lifecycle — see LINE_ITEM_STATUS below.
  */
 
 // ==================== PO STATUS ENUM VALUES ====================
 export const PO_STATUS = {
   DRAFT: 'Draft',
   PENDING_APPROVAL: 'Pending_Approval',
-  APPROVED: 'Approved',
   REJECTED: 'Rejected',
-  IN_PROGRESS: 'InProgress',
   CANCELLED: 'Cancelled',
   REFERRED_BACK: 'Referred_Back',
-  PARTIALLY_RECEIVED: 'Partially_Received',
   SENT_TO_SUPPLIER: 'Sent_To_Supplier',
+  PARTIALLY_RECEIVED: 'Partially_Received',
   COMPLETED: 'Completed',
 };
 
@@ -41,13 +39,11 @@ export const LINE_ITEM_STATUS = {
 export const STATUS_LABELS = {
   [PO_STATUS.DRAFT]: 'Draft',
   [PO_STATUS.PENDING_APPROVAL]: 'Pending Approval',
-  [PO_STATUS.APPROVED]: 'Approved',
   [PO_STATUS.REJECTED]: 'Rejected',
-  [PO_STATUS.IN_PROGRESS]: 'In Progress',
   [PO_STATUS.CANCELLED]: 'Cancelled',
   [PO_STATUS.REFERRED_BACK]: 'Referred Back',
-  [PO_STATUS.PARTIALLY_RECEIVED]: 'Partially Received',
   [PO_STATUS.SENT_TO_SUPPLIER]: 'Sent To Supplier',
+  [PO_STATUS.PARTIALLY_RECEIVED]: 'Partially Received',
   [PO_STATUS.COMPLETED]: 'Completed',
 };
 

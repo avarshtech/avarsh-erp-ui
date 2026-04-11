@@ -12,7 +12,7 @@ import {
   updateFabricReceipt,
   getFabricReceiptById,
   searchCutOrderPlans,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import {
   FABRIC_RECEIPT_STATUS,
   FABRIC_TYPES,
