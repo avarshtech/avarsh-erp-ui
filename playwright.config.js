@@ -145,6 +145,28 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    // ── Cutting Module ───────────────────────────────────────
+    {
+      name: 'cutting',
+      testDir: './e2e/specs/cutting',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
+    // ── Sewing Module ────────────────────────────────────────
+    {
+      name: 'sewing',
+      testDir: './e2e/specs/sewing',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
     // ── Full Business Flow (Costing → Order → BOM → PO) ─────
     // Single browser window, handles its own login, no setup dependency
     {

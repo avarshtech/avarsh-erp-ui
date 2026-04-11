@@ -85,6 +85,63 @@ const ElEncashmentList = lazy(() => import('./pages/hr/statutory/ElEncashmentLis
 const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
+// Cutting Production (lazy-loaded)
+const CutOrderPlanList = lazy(() => import('./pages/cutting/orderplan/CutOrderPlanList'));
+const CutOrderPlanForm = lazy(() => import('./pages/cutting/orderplan/CutOrderPlanForm'));
+const FabricReceiptList = lazy(() => import('./pages/cutting/fabricreceipt/FabricReceiptList'));
+const FabricReceiptForm = lazy(() => import('./pages/cutting/fabricreceipt/FabricReceiptForm'));
+const RelaxationList = lazy(() => import('./pages/cutting/relaxation/RelaxationList'));
+const RelaxationForm = lazy(() => import('./pages/cutting/relaxation/RelaxationForm'));
+const MarkerList = lazy(() => import('./pages/cutting/marker/MarkerList'));
+const MarkerForm = lazy(() => import('./pages/cutting/marker/MarkerForm'));
+const LayAuditList = lazy(() => import('./pages/cutting/layaudit/LayAuditList'));
+const LayAuditForm = lazy(() => import('./pages/cutting/layaudit/LayAuditForm'));
+const TmbCheckList = lazy(() => import('./pages/cutting/tmbcheck/TmbCheckList'));
+const TmbCheckForm = lazy(() => import('./pages/cutting/tmbcheck/TmbCheckForm'));
+const CuttingReportList = lazy(() => import('./pages/cutting/report/CuttingReportList'));
+const CuttingReportForm = lazy(() => import('./pages/cutting/report/CuttingReportForm'));
+const BundlingList = lazy(() => import('./pages/cutting/bundling/BundlingList'));
+const BundlingForm = lazy(() => import('./pages/cutting/bundling/BundlingForm'));
+const BundleIssueList = lazy(() => import('./pages/cutting/bundleissue/BundleIssueList'));
+const BundleIssueForm = lazy(() => import('./pages/cutting/bundleissue/BundleIssueForm'));
+const PanelIssueList = lazy(() => import('./pages/cutting/panelissue/PanelIssueList'));
+const PanelIssueForm = lazy(() => import('./pages/cutting/panelissue/PanelIssueForm'));
+const PanelCheckList = lazy(() => import('./pages/cutting/panelcheck/PanelCheckList'));
+const PanelCheckForm = lazy(() => import('./pages/cutting/panelcheck/PanelCheckForm'));
+const ProcessReturnList = lazy(() => import('./pages/cutting/processreturn/ProcessReturnList'));
+const ProcessReturnForm = lazy(() => import('./pages/cutting/processreturn/ProcessReturnForm'));
+const ReCuttingList = lazy(() => import('./pages/cutting/recutting/ReCuttingList'));
+const ReCuttingForm = lazy(() => import('./pages/cutting/recutting/ReCuttingForm'));
+const WastageList = lazy(() => import('./pages/cutting/wastage/WastageList'));
+const WastageForm = lazy(() => import('./pages/cutting/wastage/WastageForm'));
+const CuttingDashboard = lazy(() => import('./pages/cutting/dashboard/CuttingDashboard'));
+// Sewing Production (lazy-loaded)
+const SewingLineList = lazy(() => import('./pages/sewing/linemaster/SewingLineList'));
+const SewingLineForm = lazy(() => import('./pages/sewing/linemaster/SewingLineForm'));
+const OperatorList = lazy(() => import('./pages/sewing/operator/OperatorList'));
+const OperatorForm = lazy(() => import('./pages/sewing/operator/OperatorForm'));
+const SamList = lazy(() => import('./pages/sewing/sam/SamList'));
+const SamForm = lazy(() => import('./pages/sewing/sam/SamForm'));
+const SewingPlanList = lazy(() => import('./pages/sewing/plan/SewingPlanList'));
+const SewingPlanForm = lazy(() => import('./pages/sewing/plan/SewingPlanForm'));
+const CutPartsReceiptList = lazy(() => import('./pages/sewing/cutparts/CutPartsReceiptList'));
+const CutPartsReceiptForm = lazy(() => import('./pages/sewing/cutparts/CutPartsReceiptForm'));
+const HourlyProductionPage = lazy(() => import('./pages/sewing/hourly/HourlyProductionPage'));
+const GarmentIssueList = lazy(() => import('./pages/sewing/garmentissue/GarmentIssueList'));
+const GarmentIssueForm = lazy(() => import('./pages/sewing/garmentissue/GarmentIssueForm'));
+const TrimVerificationList = lazy(() => import('./pages/sewing/trim/TrimVerificationList'));
+const TrimVerificationForm = lazy(() => import('./pages/sewing/trim/TrimVerificationForm'));
+const MeasurementReportList = lazy(() => import('./pages/sewing/measurement/MeasurementReportList'));
+const MeasurementReportForm = lazy(() => import('./pages/sewing/measurement/MeasurementReportForm'));
+const TopseList = lazy(() => import('./pages/sewing/topse/TopseList'));
+const TopseForm = lazy(() => import('./pages/sewing/topse/TopseForm'));
+const ReplacementList = lazy(() => import('./pages/sewing/replacement/ReplacementList'));
+const ReplacementForm = lazy(() => import('./pages/sewing/replacement/ReplacementForm'));
+const SkillMatrixPage = lazy(() => import('./pages/sewing/skills/SkillMatrixPage'));
+const IncentiveList = lazy(() => import('./pages/sewing/incentive/IncentiveList'));
+const IncentiveForm = lazy(() => import('./pages/sewing/incentive/IncentiveForm'));
+const SewingDashboard = lazy(() => import('./pages/sewing/dashboard/SewingDashboard'));
+const QualityDashboard = lazy(() => import('./pages/sewing/dashboard/QualityDashboard'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -185,6 +242,76 @@ const ThemedApp = () => {
             <Route path="work-orders/list" element={<PermissionRoute module="work-orders"><Suspense fallback={<PageSkeleton />}><WorkOrderList /></Suspense></PermissionRoute>} />
             <Route path="work-orders/new" element={<PermissionRoute module="work-orders" operation="add"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
             <Route path="work-orders/edit/:id" element={<PermissionRoute module="work-orders" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
+            {/* Cutting Production */}
+            <Route path="cutting/dashboard" element={<PermissionRoute module="cutting-dashboard"><Suspense fallback={<PageSkeleton />}><CuttingDashboard /></Suspense></PermissionRoute>} />
+            <Route path="cutting/order-plan/list" element={<PermissionRoute module="cut-order-plan"><Suspense fallback={<PageSkeleton />}><CutOrderPlanList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/order-plan/new" element={<PermissionRoute module="cut-order-plan" operation="add"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/order-plan/edit/:id" element={<PermissionRoute module="cut-order-plan" operation="update"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/fabric-receipt/list" element={<PermissionRoute module="fabric-receipt"><Suspense fallback={<PageSkeleton />}><FabricReceiptList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/fabric-receipt/new" element={<PermissionRoute module="fabric-receipt" operation="add"><Suspense fallback={<PageSkeleton />}><FabricReceiptForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/fabric-receipt/edit/:id" element={<PermissionRoute module="fabric-receipt" operation="update"><Suspense fallback={<PageSkeleton />}><FabricReceiptForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/relaxation/list" element={<PermissionRoute module="fabric-relaxation"><Suspense fallback={<PageSkeleton />}><RelaxationList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/relaxation/new" element={<PermissionRoute module="fabric-relaxation" operation="add"><Suspense fallback={<PageSkeleton />}><RelaxationForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/relaxation/edit/:id" element={<PermissionRoute module="fabric-relaxation" operation="update"><Suspense fallback={<PageSkeleton />}><RelaxationForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/marker/list" element={<PermissionRoute module="marker-planning"><Suspense fallback={<PageSkeleton />}><MarkerList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/marker/new" element={<PermissionRoute module="marker-planning" operation="add"><Suspense fallback={<PageSkeleton />}><MarkerForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/marker/edit/:id" element={<PermissionRoute module="marker-planning" operation="update"><Suspense fallback={<PageSkeleton />}><MarkerForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/lay-audit/list" element={<PermissionRoute module="lay-audit"><Suspense fallback={<PageSkeleton />}><LayAuditList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/lay-audit/new" element={<PermissionRoute module="lay-audit" operation="add"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/lay-audit/edit/:id" element={<PermissionRoute module="lay-audit" operation="update"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/tmb-check/list" element={<PermissionRoute module="tmb-check"><Suspense fallback={<PageSkeleton />}><TmbCheckList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/tmb-check/new" element={<PermissionRoute module="tmb-check" operation="add"><Suspense fallback={<PageSkeleton />}><TmbCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/tmb-check/edit/:id" element={<PermissionRoute module="tmb-check" operation="update"><Suspense fallback={<PageSkeleton />}><TmbCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/report/list" element={<PermissionRoute module="cutting-report"><Suspense fallback={<PageSkeleton />}><CuttingReportList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/report/new" element={<PermissionRoute module="cutting-report" operation="add"><Suspense fallback={<PageSkeleton />}><CuttingReportForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/report/edit/:id" element={<PermissionRoute module="cutting-report" operation="update"><Suspense fallback={<PageSkeleton />}><CuttingReportForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/bundling/list" element={<PermissionRoute module="cut-bundling"><Suspense fallback={<PageSkeleton />}><BundlingList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/bundling/new" element={<PermissionRoute module="cut-bundling" operation="add"><Suspense fallback={<PageSkeleton />}><BundlingForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/bundling/edit/:id" element={<PermissionRoute module="cut-bundling" operation="update"><Suspense fallback={<PageSkeleton />}><BundlingForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/bundle-issue/list" element={<PermissionRoute module="bundle-issue"><Suspense fallback={<PageSkeleton />}><BundleIssueList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/bundle-issue/new" element={<PermissionRoute module="bundle-issue" operation="add"><Suspense fallback={<PageSkeleton />}><BundleIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/panel-issue/list" element={<PermissionRoute module="panel-issue"><Suspense fallback={<PageSkeleton />}><PanelIssueList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/panel-issue/new" element={<PermissionRoute module="panel-issue" operation="add"><Suspense fallback={<PageSkeleton />}><PanelIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/panel-check/list" element={<PermissionRoute module="panel-check"><Suspense fallback={<PageSkeleton />}><PanelCheckList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/panel-check/new" element={<PermissionRoute module="panel-check" operation="add"><Suspense fallback={<PageSkeleton />}><PanelCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/process-return/list" element={<PermissionRoute module="process-return"><Suspense fallback={<PageSkeleton />}><ProcessReturnList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/process-return/new" element={<PermissionRoute module="process-return" operation="add"><Suspense fallback={<PageSkeleton />}><ProcessReturnForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/recutting/list" element={<PermissionRoute module="recutting"><Suspense fallback={<PageSkeleton />}><ReCuttingList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/recutting/new" element={<PermissionRoute module="recutting" operation="add"><Suspense fallback={<PageSkeleton />}><ReCuttingForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/wastage/list" element={<PermissionRoute module="wastage-reconciliation"><Suspense fallback={<PageSkeleton />}><WastageList /></Suspense></PermissionRoute>} />
+            <Route path="cutting/wastage/new" element={<PermissionRoute module="wastage-reconciliation" operation="add"><Suspense fallback={<PageSkeleton />}><WastageForm /></Suspense></PermissionRoute>} />
+            <Route path="cutting/wastage/edit/:id" element={<PermissionRoute module="wastage-reconciliation" operation="update"><Suspense fallback={<PageSkeleton />}><WastageForm /></Suspense></PermissionRoute>} />
+            {/* Sewing Production */}
+            <Route path="sewing/dashboard" element={<PermissionRoute module="sewing-dashboard"><Suspense fallback={<PageSkeleton />}><SewingDashboard /></Suspense></PermissionRoute>} />
+            <Route path="sewing/quality-dashboard" element={<PermissionRoute module="sewing-quality-dashboard"><Suspense fallback={<PageSkeleton />}><QualityDashboard /></Suspense></PermissionRoute>} />
+            <Route path="sewing/lines/list" element={<PermissionRoute module="sewing-line-master"><Suspense fallback={<PageSkeleton />}><SewingLineList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/lines/new" element={<PermissionRoute module="sewing-line-master" operation="add"><Suspense fallback={<PageSkeleton />}><SewingLineForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/lines/edit/:id" element={<PermissionRoute module="sewing-line-master" operation="update"><Suspense fallback={<PageSkeleton />}><SewingLineForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/operators/list" element={<PermissionRoute module="sewing-operators"><Suspense fallback={<PageSkeleton />}><OperatorList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/operators/new" element={<PermissionRoute module="sewing-operators" operation="add"><Suspense fallback={<PageSkeleton />}><OperatorForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/operators/edit/:id" element={<PermissionRoute module="sewing-operators" operation="update"><Suspense fallback={<PageSkeleton />}><OperatorForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/sam/list" element={<PermissionRoute module="sam-management"><Suspense fallback={<PageSkeleton />}><SamList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/sam/new" element={<PermissionRoute module="sam-management" operation="add"><Suspense fallback={<PageSkeleton />}><SamForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/sam/edit/:id" element={<PermissionRoute module="sam-management" operation="update"><Suspense fallback={<PageSkeleton />}><SamForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/plan/list" element={<PermissionRoute module="sewing-plan"><Suspense fallback={<PageSkeleton />}><SewingPlanList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/plan/new" element={<PermissionRoute module="sewing-plan" operation="add"><Suspense fallback={<PageSkeleton />}><SewingPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/plan/edit/:id" element={<PermissionRoute module="sewing-plan" operation="update"><Suspense fallback={<PageSkeleton />}><SewingPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/cut-parts-receipt/list" element={<PermissionRoute module="cut-parts-receipt"><Suspense fallback={<PageSkeleton />}><CutPartsReceiptList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/cut-parts-receipt/new" element={<PermissionRoute module="cut-parts-receipt" operation="add"><Suspense fallback={<PageSkeleton />}><CutPartsReceiptForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/hourly/list" element={<PermissionRoute module="hourly-production"><Suspense fallback={<PageSkeleton />}><HourlyProductionPage /></Suspense></PermissionRoute>} />
+            <Route path="sewing/garment-issue/list" element={<PermissionRoute module="garment-issue"><Suspense fallback={<PageSkeleton />}><GarmentIssueList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/garment-issue/new" element={<PermissionRoute module="garment-issue" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/trim-verification/list" element={<PermissionRoute module="trim-verification"><Suspense fallback={<PageSkeleton />}><TrimVerificationList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/trim-verification/new" element={<PermissionRoute module="trim-verification" operation="add"><Suspense fallback={<PageSkeleton />}><TrimVerificationForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/measurement/list" element={<PermissionRoute module="measurement-report"><Suspense fallback={<PageSkeleton />}><MeasurementReportList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/measurement/new" element={<PermissionRoute module="measurement-report" operation="add"><Suspense fallback={<PageSkeleton />}><MeasurementReportForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/topse/list" element={<PermissionRoute module="endline-topse"><Suspense fallback={<PageSkeleton />}><TopseList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/topse/new" element={<PermissionRoute module="endline-topse" operation="add"><Suspense fallback={<PageSkeleton />}><TopseForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/replacement/list" element={<PermissionRoute module="cut-parts-replacement"><Suspense fallback={<PageSkeleton />}><ReplacementList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/replacement/new" element={<PermissionRoute module="cut-parts-replacement" operation="add"><Suspense fallback={<PageSkeleton />}><ReplacementForm /></Suspense></PermissionRoute>} />
+            <Route path="sewing/skills" element={<PermissionRoute module="operator-skill-matrix"><Suspense fallback={<PageSkeleton />}><SkillMatrixPage /></Suspense></PermissionRoute>} />
+            <Route path="sewing/incentive/list" element={<PermissionRoute module="incentive-calc"><Suspense fallback={<PageSkeleton />}><IncentiveList /></Suspense></PermissionRoute>} />
+            <Route path="sewing/incentive/new" element={<PermissionRoute module="incentive-calc" operation="add"><Suspense fallback={<PageSkeleton />}><IncentiveForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
