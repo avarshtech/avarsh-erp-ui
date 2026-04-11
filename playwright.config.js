@@ -133,6 +133,18 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    // ── GRN & QC Test Suite ─────────────────────────────────
+    {
+      name: 'grn-qc',
+      testDir: './e2e/specs/grn-qc',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
     // ── Full Business Flow (Costing → Order → BOM → PO) ─────
     // Single browser window, handles its own login, no setup dependency
     {
