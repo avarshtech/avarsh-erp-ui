@@ -128,12 +128,59 @@ Never write raw selectors for Ant Design components. Always use the helpers from
 ### Selector Strategy (Priority Order)
 
 1. **Role selectors** — `page.getByRole('button', { name: /Save/i })` (preferred)
-2. **Text selectors** — `page.getByText('Draft')` for labels and content
-3. **Placeholder** — `page.getByPlaceholder('Search...')` for inputs
-4. **Ant Design class** — `.ant-table-row`, `.ant-tag`, `.ant-form-item` (when semantic selectors aren't possible)
-5. **Test IDs** — `page.getByTestId('xyz')` (only if already in the component)
+2. **ID selectors for Ant Design Selects** — `page.locator('#fieldName')` (most reliable for form Select/combobox fields, avoids asterisk-in-label issues)
+3. **`getByTitle(text, { exact: true })`** — For dropdown option selection (prevents "Male" matching "Female")
+4. **`getByRole('heading', { name: ... })`** — For page titles (avoids matching breadcrumb text)
+5. **Text selectors** — `page.getByText('Draft')` for labels and content
+6. **Placeholder** — `page.getByPlaceholder('Search...')` for inputs
+7. **Ant Design class** — `.ant-table-row`, `.ant-tag`, `.ant-form-item` (when semantic selectors aren't possible)
+8. **Test IDs** — `page.getByTestId('xyz')` (only if already in the component)
 
 Never use fragile CSS selectors like `.ant-btn:nth-child(3)` — they break when layout changes.
+
+### Critical Ant Design Select Gotchas
+
+1. **Required field labels include asterisks** — The accessible name of a required Select becomes `"* Department"`, not `"Department"`. Using `getByRole('combobox', { name: /Department/ })` may fail. Instead, use the input element's `#id` attribute (e.g., `page.locator('#departmentId')`).
+
+2. **Option text matching** — `filter({ hasText: 'Male' })` matches both "Male" and "Fe**male**". Always use `getByTitle('Male', { exact: true })` for dropdown options.
+
+3. **Page title vs breadcrumb** — `getByText('HR Management')` matches both the page heading and breadcrumb. Always use `getByRole('heading', { name: 'HR Management' })`.
+
+4. **Reliable Select helper pattern:**
+```javascript
+async function pickSelectById(page, idSelector, optionTitle) {
+  await page.locator(idSelector).click();
+  const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+  await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+  if (optionTitle) {
+    await dropdown.getByTitle(optionTitle, { exact: true }).click();
+  } else {
+    await dropdown.locator('.ant-select-item-option').first().click();
+  }
+  await dropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+}
+```
+
+### Seeding Master Data
+
+When tests depend on master data (departments, factories, designations, etc.), use the `ApiClient` from `e2e/helpers/api-client.js` in `test.beforeAll` to seed data via API:
+
+```javascript
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+
+let api;
+test.beforeAll(async () => {
+  api = await createAuthenticatedClient();
+  // Check if data exists, create if missing
+  const resp = await api.get('/factories/active');
+  if (!resp.data?.length) {
+    await api.post('/factories', { factoryCode: 'E2E-FAC', factoryName: 'E2E Factory', isActive: true });
+  }
+});
+test.afterAll(async () => { await api?.dispose(); });
+```
+
+This ensures dropdowns always have options, regardless of database state.
 
 ### API Response Assertions
 
@@ -191,31 +238,24 @@ The `E2E_HEADED` env var is already wired in `playwright.config.js` to disable h
 
 ### Video Recording
 
-Videos are automatically recorded. To ensure video is always on, the skill overrides with:
+Videos are configured in `playwright.config.js` (`video: 'retain-on-failure'`). The `--video` flag is NOT a valid Playwright CLI option — do NOT pass it on the command line.
 
-```bash
-E2E_HEADED=1 npx playwright test {spec-path} \
-  --headed \
-  --reporter=list \
-  --video=on
-```
+To record video on all runs (not just failures), the `full-flow` project already has `video: 'on'`. For other projects, videos are automatically saved on failure to `test-results/` directory.
 
-Videos are saved to:
-- `test-results/` directory (Playwright default, organized by test name)
-- Viewable in the HTML report: `npx playwright show-report e2e-report`
-
-After a test run, inform the user where videos are stored and how to view them.
+After a test run, inform the user where videos are stored and how to view them:
+- **HTML report:** `npx playwright show-report e2e-report`
+- **Test results:** `test-results/{test-name}/video.webm`
 
 ### Running All Tests
 
 ```bash
-E2E_HEADED=1 npx playwright test --headed --reporter=list --video=on
+E2E_HEADED=1 npx playwright test --headed --reporter=list
 ```
 
 ### Running a Specific Module
 
 ```bash
-E2E_HEADED=1 npx playwright test e2e/specs/{module}/ --headed --reporter=list --video=on
+E2E_HEADED=1 npx playwright test e2e/specs/{module}/ --headed --project={project-name} --reporter=list
 ```
 
 ### Viewing Results

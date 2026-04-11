@@ -106,6 +106,15 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      name: 'hr',
+      testDir: './e2e/specs/hr',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'admin',
       testDir: './e2e/specs/admin',
       use: {
