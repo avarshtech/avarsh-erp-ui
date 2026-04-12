@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Button } from 'antd';
-import { ArrowLeftOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 
 const PageHeader = memo(function PageHeader({
@@ -8,11 +8,13 @@ const PageHeader = memo(function PageHeader({
   subtitle,
   backPath,
   onBack,
+  onAdd,
+  addLabel,
+  extra,
   status,
   children,
   className,
   style,
-  ...restProps
 }) {
   const navigate = useNavigate();
 
@@ -30,7 +32,6 @@ const PageHeader = memo(function PageHeader({
     <div
       className={`page-header${className ? ` ${className}` : ''}`}
       style={style}
-      {...restProps}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {showBack && (
@@ -53,7 +54,15 @@ const PageHeader = memo(function PageHeader({
           )}
         </div>
       </div>
-      {children && <div className="header-actions">{children}</div>}
+      <div className="header-actions">
+        {onAdd && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
+            {addLabel || 'Add New'}
+          </Button>
+        )}
+        {extra}
+        {children}
+      </div>
     </div>
   );
 });

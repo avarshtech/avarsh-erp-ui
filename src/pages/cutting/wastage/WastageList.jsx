@@ -94,10 +94,10 @@ const WastageList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/wastage/edit/${record.id}`)} />
           {canUpdate && record.status === 'DRAFT' && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/wastage/edit/${record.id}`)} />
           )}
-          <ActionButton action="view" onClick={() => navigate(`/cutting/wastage/edit/${record.id}`)} tooltip="View" />
         </span>
       ),
     },

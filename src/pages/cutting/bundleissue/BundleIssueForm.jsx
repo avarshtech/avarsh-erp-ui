@@ -55,7 +55,7 @@ const BundleIssueForm = () => {
     if (!search || search.length < 2) return;
     setPlanSearching(true);
     try {
-      const res = await searchCutOrderPlans({ search, status: 'APPROVED', page: 0, size: 20 });
+      const res = await searchCutOrderPlans({ search, page: 0, size: 20 });
       setPlanOptions((res.content || []).map((p) => ({
         value: p.id,
         label: `${p.planNo} — ${p.styleNo || ''} — ${p.color || ''}`,

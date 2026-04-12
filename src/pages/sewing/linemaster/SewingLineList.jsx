@@ -103,6 +103,7 @@ const SewingLineList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/sewing/lines/edit/${record.id}`)} />
           {canUpdate && (
             <ActionButton action="edit" onClick={() => navigate(`/sewing/lines/edit/${record.id}`)} />
           )}

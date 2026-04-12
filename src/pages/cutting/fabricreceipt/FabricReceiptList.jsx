@@ -136,6 +136,7 @@ const FabricReceiptList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/fabric-receipt/edit/${record.id}`)} />
           {canUpdate && record.status === FABRIC_RECEIPT_STATUS.PENDING && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/fabric-receipt/edit/${record.id}`)} />
           )}

@@ -136,6 +136,7 @@ const SamList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/sewing/sam/edit/${record.id}`)} />
           {canUpdate && (
             <ActionButton action="edit" onClick={() => navigate(`/sewing/sam/edit/${record.id}`)} />
           )}

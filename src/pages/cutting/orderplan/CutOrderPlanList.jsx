@@ -123,6 +123,7 @@ const CutOrderPlanList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/order-plan/edit/${record.id}`)} />
           {canUpdate && CUT_PLAN_EDITABLE.includes(record.status) && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/order-plan/edit/${record.id}`)} />
           )}

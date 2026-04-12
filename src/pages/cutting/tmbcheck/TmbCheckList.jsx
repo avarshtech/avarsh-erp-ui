@@ -107,6 +107,7 @@ const TmbCheckList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/tmb-check/edit/${record.id}`)} />
           {canUpdate && record.overallResult === TMB_RESULT.PENDING && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/tmb-check/edit/${record.id}`)} />
           )}
