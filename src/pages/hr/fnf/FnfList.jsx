@@ -3,7 +3,7 @@ import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getAllFnfSettlements } from '../../../services/fnfService';
+import { getAllFnfSettlements } from '../../../services/hr/fnfService';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';

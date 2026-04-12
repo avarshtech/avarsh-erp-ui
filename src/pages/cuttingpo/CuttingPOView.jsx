@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Drawer, Descriptions, Table, Tag, Space, Typography, Divider, Skeleton, App } from 'antd';
 import { getStatusLabel, getStatusColor, CUTTING_PO_STATUS } from '../../utils/cuttingPoConstants';
-import { getCuttingPOById, changeCuttingPOStatus } from '../../services/cuttingPoService';
+import { getCuttingPOById, changeCuttingPOStatus } from '../../services/cuttingpo/cuttingPoService';
 import { ActionButton } from '../../components/buttons';
 import { formatDate } from '../../utils/formatters';
 import { hasPermission } from '../../utils/permissions';

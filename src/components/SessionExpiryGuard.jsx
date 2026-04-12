@@ -8,7 +8,7 @@ import {
   CoffeeOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { logoutUser } from '../services/authService';
+import { logoutUser } from '../services/auth/authService';
 import { useSession } from '../context/SessionContext';
 import { getCurrentUser } from '../utils/permissions';
 

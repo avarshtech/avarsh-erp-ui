@@ -18,8 +18,8 @@ import {
 } from '@ant-design/icons';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
-import { changeOrderStatus } from '../../services/orderService';
-import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { changeOrderStatus } from '../../services/orders/orderService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import {
   hasPermission,
   canSubmitOrder,

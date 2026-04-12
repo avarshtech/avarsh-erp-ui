@@ -4,7 +4,7 @@ import { Form, Input, Button, Space, App, Tag, Switch, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
-import { getAllParts, createPart, updatePart, deletePart } from '../../services/partsService';
+import { getAllParts, createPart, updatePart, deletePart } from '../../services/master/partsService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

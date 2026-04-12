@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchCuttingPOs, deleteCuttingPO, changeCuttingPOStatus } from '../../services/cuttingPoService';
+import { searchCuttingPOs, deleteCuttingPO, changeCuttingPOStatus } from '../../services/cuttingpo/cuttingPoService';
 import { hasPermission } from '../../utils/permissions';
 import {
   getStatusLabel,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getVapidPublicKey, subscribePush, unsubscribePush } from '../services/notificationService';
+import { getVapidPublicKey, subscribePush, unsubscribePush } from '../services/core/notificationService';
 
 /**
  * Convert a base64 VAPID key to Uint8Array for the Push API

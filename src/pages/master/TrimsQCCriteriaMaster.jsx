@@ -7,7 +7,7 @@ import {
   createTrimsQCCriterion,
   updateTrimsQCCriterion,
   deleteTrimsQCCriterion,
-} from '../../services/trimsQCCriteriaService';
+} from '../../services/master/trimsQCCriteriaService';
 
 const TrimsQCCriteriaMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();

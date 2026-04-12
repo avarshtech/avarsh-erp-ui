@@ -15,7 +15,7 @@ import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { ADJUSTMENT_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { ADJUSTMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getAdjustmentList } from '../../../services/inventoryService';
+import { getAdjustmentList } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import AdjustmentViewDrawer from './AdjustmentViewDrawer';
 

@@ -6,7 +6,7 @@ import { InboxOutlined } from '@ant-design/icons';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
-import { getProductionOrders, getAccessoriesStock } from '../../../services/inventoryService';
+import { getProductionOrders, getAccessoriesStock } from '../../../services/inventory/inventoryService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import AccessoriesIssueItemTable from './AccessoriesIssueItemTable';
 

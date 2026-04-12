@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/organisationService';
+import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/admin/organisationService';
 import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 /**

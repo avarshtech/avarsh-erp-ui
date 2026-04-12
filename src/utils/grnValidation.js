@@ -71,6 +71,21 @@ const baseHeaderValidations = ({ data, po, errors }) => {
   }
 };
 
+/**
+ * Supplier Invoice upload check. Mandatory on Submit, optional on Draft.
+ *
+ * The file lives in the global file storage (fil_file_storage), not on the
+ * GRN entity. The caller passes `hasSupplierInvoice` computed from the form
+ * state: `true` when either a file is staged for upload OR an existingFile
+ * is already linked to this GRN's id.
+ */
+const validateSupplierInvoice = ({ data, errors, isSubmit }) => {
+  if (!isSubmit) return;
+  if (!data.hasSupplierInvoice) {
+    errors.push('Supplier Invoice upload is required on submit');
+  }
+};
+
 const validateRollRows = ({ rolls, errors, isSubmit }) => {
   if (rolls.length === 0) {
     if (isSubmit) errors.push('At least one roll is required');
@@ -127,6 +142,7 @@ export const validateFabricGRN = (data, isSubmit = false, ctx = {}) => {
   const { po = null } = ctx;
 
   baseHeaderValidations({ data, po, errors });
+  validateSupplierInvoice({ data, errors, isSubmit });
 
   const rolls = data.rolls || (data.lineItems || []).flatMap((li) => li.rolls || []);
   validateRollRows({ rolls, errors, isSubmit });
@@ -143,6 +159,7 @@ export const validateTrimsGRN = (data, isSubmit = false, ctx = {}) => {
   const { po = null } = ctx;
 
   baseHeaderValidations({ data, po, errors });
+  validateSupplierInvoice({ data, errors, isSubmit });
 
   // Items: receiving qty checks
   (data.items || []).forEach((item, i) => {

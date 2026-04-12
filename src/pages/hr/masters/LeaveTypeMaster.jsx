@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { getAllLeaveTypes, createLeaveType, updateLeaveType, deleteLeaveType } from '../../../services/hrMasterService';
+import { getAllLeaveTypes, createLeaveType, updateLeaveType, deleteLeaveType } from '../../../services/master/hrMasterService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { LEAVE_ACCRUAL_TYPES, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';

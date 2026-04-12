@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Card, Select, Table, Button, Spin } from 'antd';
 import { SaveOutlined } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
-import { getAllActiveLines, getOperatorSkills, updateOperatorSkills } from '../../../services/sewingService';
+import { getAllActiveLines, getOperatorSkills, updateOperatorSkills } from '../../../services/sewing/sewingService';
 import { SKILL_GRADES } from '../../../utils/sewingConstants';
 import EmptyState from '../../../components/EmptyState';
 

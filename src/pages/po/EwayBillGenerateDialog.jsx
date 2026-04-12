@@ -14,7 +14,7 @@ import {
   App,
 } from 'antd';
 import { integerInputProps } from '../../utils/inputHelpers';
-import { generateEwayBill } from '../../services/purchaseOrderService';
+import { generateEwayBill } from '../../services/po/purchaseOrderService';
 
 const { Title } = Typography;
 

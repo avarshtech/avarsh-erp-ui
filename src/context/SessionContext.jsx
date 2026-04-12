@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/authService';
+import { getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/auth/authService';
 import { getCurrentUser } from '../utils/permissions';
 import useIdleTimeout from '../hooks/useIdleTimeout';
 import useIsPwa from '../hooks/useIsPwa';

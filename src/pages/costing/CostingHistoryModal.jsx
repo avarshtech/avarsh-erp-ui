@@ -22,7 +22,7 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getCostSheetHistory } from '../../services/costingService';
+import { getCostSheetHistory } from '../../services/costing/costingService';
 import { formatCurrency } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { useTheme } from '../../context/ThemeContext';

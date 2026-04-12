@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Space, Tabs, Input } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getLeavesByStatus, approveLeave, rejectLeave } from '../../../services/leaveService';
+import { getLeavesByStatus, approveLeave, rejectLeave } from '../../../services/hr/leaveService';
 import { hasPermission } from '../../../utils/permissions';
 import { LEAVE_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -23,7 +23,7 @@ const LeaveApplicationList = () => {
 
   // Load leave types for the drawer
   useEffect(() => {
-    import('../../../services/hrMasterService').then((mod) => {
+    import('../../../services/master/hrMasterService').then((mod) => {
       if (mod.getActiveLeaveTypes) {
         mod.getActiveLeaveTypes().then(setLeaveTypes).catch(() => {});
       }

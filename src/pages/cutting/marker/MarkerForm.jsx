@@ -8,8 +8,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import {
   createMarker, updateMarker, getMarkerById, searchMarkers,
-} from '../../../services/cuttingService';
-import { searchCutOrderPlans } from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
+import { searchCutOrderPlans } from '../../../services/cutting/cuttingService';
 import { MARKER_STATUS } from '../../../utils/cuttingConstants';
 
 const { TextArea } = Input;

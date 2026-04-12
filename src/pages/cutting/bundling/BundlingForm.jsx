@@ -8,7 +8,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createBundling, getBundlingById, generateBundles,
   searchCutOrderPlans, searchCuttingReports,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { BUNDLE_SIZE_OPTIONS, getBundleStatusLabel, getBundleStatusColor } from '../../../utils/cuttingConstants';
 
 const { TextArea } = Input;

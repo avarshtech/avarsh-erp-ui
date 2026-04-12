@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Spin } from 'antd';
-import { isAuthenticated, initializeSession } from '../services/authService';
-import { hasSessionActiveFlag } from '../services/sessionStore';
+import { isAuthenticated, initializeSession } from '../services/auth/authService';
+import { hasSessionActiveFlag } from '../services/auth/sessionStore';
 
 /**
  * Protected Route wrapper component.

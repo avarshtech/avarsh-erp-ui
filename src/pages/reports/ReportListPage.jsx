@@ -15,7 +15,7 @@ import ModuleReportCard from './components/ModuleReportCard';
 import ReportModuleNav from './components/ReportModuleNav';
 import ReportsBreadcrumb from './components/ReportsBreadcrumb';
 import useResponsive from '../../hooks/useResponsive';
-import { getReportDefinitions, getSavedReports } from '../../services/reportService';
+import { getReportDefinitions, getSavedReports } from '../../services/core/reportService';
 import { getFilteredReportNavOptions, getModuleColor } from '../../utils/reportConstants';
 import { hasModuleAccess } from '../../utils/permissions';
 

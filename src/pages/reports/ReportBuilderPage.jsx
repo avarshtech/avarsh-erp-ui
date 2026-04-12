@@ -14,7 +14,7 @@ import {
   executeReport,
   exportReport,
   getSavedReports,
-} from '../../services/reportService';
+} from '../../services/core/reportService';
 import { getModuleColor } from '../../utils/reportConstants';
 
 const ReportBuilderPage = () => {

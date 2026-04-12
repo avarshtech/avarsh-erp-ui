@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { App, Card, Row, Col, Table, Statistic, Spin } from 'antd';
 import PageHeader from '../../../components/PageHeader';
-import { getSewingQualityDashboard } from '../../../services/sewingService';
+import { getSewingQualityDashboard } from '../../../services/sewing/sewingService';
 import { DHU_THRESHOLD } from '../../../utils/sewingConstants';
 import { formatPercentage } from '../../../utils/formatters';
 import EmptyState from '../../../components/EmptyState';

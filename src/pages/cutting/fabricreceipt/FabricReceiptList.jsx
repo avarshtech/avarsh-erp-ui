@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   searchFabricReceipts,
   deleteFabricReceipt,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   FABRIC_RECEIPT_STATUS,

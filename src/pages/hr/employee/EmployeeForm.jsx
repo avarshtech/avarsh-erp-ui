@@ -6,10 +6,10 @@ import {
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/employeeService';
-import { getActiveDepartments, getActiveDesignations, getActiveShifts } from '../../../services/hrMasterService';
-import { getActiveFactories } from '../../../services/factoryService';
-import { searchEmployees } from '../../../services/employeeService';
+import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/hr/employeeService';
+import { getActiveDepartments, getActiveDesignations, getActiveShifts } from '../../../services/master/hrMasterService';
+import { getActiveFactories } from '../../../services/master/factoryService';
+import { searchEmployees } from '../../../services/hr/employeeService';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
   BLOOD_GROUPS, PAYMENT_MODES, DOCUMENT_TYPES, RELATIONSHIP_TYPES,

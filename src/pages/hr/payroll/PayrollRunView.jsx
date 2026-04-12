@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Card, Row, Col, Statistic, Button } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPayrollRunById, getPayrollRecords } from '../../../services/payrollService';
+import { getPayrollRunById, getPayrollRecords } from '../../../services/hr/payrollService';
 import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 

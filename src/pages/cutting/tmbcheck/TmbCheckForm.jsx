@@ -10,7 +10,7 @@ import PageHeader from '../../../components/PageHeader';
 import {
   createTmbCheck, updateTmbCheck, getTmbCheckById,
   searchLayAudits,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import {
   TMB_RESULT, PANEL_NAMES, TMB_COMMENTS, TMB_CORRECTIVE_ACTIONS,
 } from '../../../utils/cuttingConstants';

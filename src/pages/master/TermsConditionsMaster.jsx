@@ -7,7 +7,7 @@ import {
   createTermsConditions,
   updateTermsConditions,
   deleteTermsConditions,
-} from '../../services/termsConditionsService';
+} from '../../services/master/termsConditionsService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import RichTextEditor from '../../components/RichTextEditor';

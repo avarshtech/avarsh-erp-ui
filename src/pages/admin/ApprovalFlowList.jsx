@@ -20,7 +20,7 @@ import {
   getApprovalFlows,
   deleteApprovalFlow,
   toggleFlowActive,
-} from '../../services/approvalFlowService';
+} from '../../services/core/approvalFlowService';
 import { ENTITY_TYPES, ENTITY_TYPE_COLORS } from '../../utils/approvalFlowConstants';
 import PermissionGuard from '../../components/PermissionGuard';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';

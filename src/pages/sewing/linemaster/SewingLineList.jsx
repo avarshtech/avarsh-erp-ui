@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchSewingLines, deleteSewingLine } from '../../../services/sewingService';
+import { searchSewingLines, deleteSewingLine } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { getLineStatusLabel, getLineStatusColor, LINE_STATUS_OPTIONS } from '../../../utils/sewingConstants';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';

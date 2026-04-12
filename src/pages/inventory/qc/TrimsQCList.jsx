@@ -19,7 +19,7 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getTrimsQCList, deleteTrimsQCDraft } from '../../../services/inventoryService';
+import { getTrimsQCList, deleteTrimsQCDraft } from '../../../services/inventory/inventoryService';
 import { formatDate } from '../../../utils/formatters';
 import QCViewModal from './QCViewModal';
 
@@ -55,6 +55,7 @@ const TrimsQCList = ({ embedded = false }) => {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [apiStats, setApiStats] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [dateRange, setDateRange] = useState(null);
@@ -63,14 +64,20 @@ const TrimsQCList = ({ embedded = false }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getTrimsQCList();
+      const res = await getTrimsQCList({
+        search: searchText || undefined,
+        status: statusFilter || undefined,
+        dateStart: dateRange?.[0] ? dateRange[0].format('YYYY-MM-DD') : undefined,
+        dateEnd: dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined,
+      });
       setData(res.content || []);
+      setApiStats(res.stats || null);
     } catch {
       message.error('Failed to load accessories QC list');
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [message, searchText, statusFilter, dateRange]);
 
   const handleDelete = useCallback((record) => {
     modal.confirm({
@@ -122,14 +129,21 @@ const TrimsQCList = ({ embedded = false }) => {
     return result;
   }, [data, statusFilter, searchText, dateRange]);
 
-  // Stats reflect the currently filtered rows (search / status / date range).
-  // When the API phase lands the backend will return both the page AND the
-  // matching aggregate counts for the filter set; this memo becomes a passthrough.
+  // Stats come from the paginated API response — server-side FY aggregates
+  // that reflect the current filter set. Falls back to counting the currently
+  // loaded rows until the first response arrives.
   const stats = useMemo(() => {
+    if (apiStats) {
+      return {
+        total: apiStats.totalInspections || 0,
+        approved: apiStats.approved || 0,
+        rejected: apiStats.rejected || 0,
+      };
+    }
     const approved = filteredData.filter((r) => r.status === QC_STATUS.APPROVED).length;
     const rejected = filteredData.filter((r) => r.status === QC_STATUS.REJECTED).length;
     return { total: filteredData.length, approved, rejected };
-  }, [filteredData]);
+  }, [apiStats, filteredData]);
 
   const columns = useMemo(
     () => [

@@ -25,7 +25,7 @@ import {
   getCostSheetById,
   duplicateCostSheet,
   updateCostSheet,
-} from '../../services/costingService';
+} from '../../services/costing/costingService';
 import {
   COSTING_STATUS,
   EDITABLE_STATUSES,

@@ -7,7 +7,7 @@ import {
   Typography,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { searchOrders, deleteOrder, getOrderById } from '../../services/orderService';
+import { searchOrders, deleteOrder, getOrderById } from '../../services/orders/orderService';
 import { hasPermission } from '../../utils/permissions';
 import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';

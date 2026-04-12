@@ -8,7 +8,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import {
   createSamStandard, updateSamStandard, getSamStandardById,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { MACHINE_TYPES, SAM_SOURCE_OPTIONS } from '../../../utils/sewingConstants';
 
 const { TextArea } = Input;

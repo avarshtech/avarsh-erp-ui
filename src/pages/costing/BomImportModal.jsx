@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { App, Modal, Table, Tag, Typography, Space, Empty, Spin, Alert } from 'antd';
 import { ImportOutlined } from '@ant-design/icons';
-import { getBomsByStyleId } from '../../services/costingService';
+import { getBomsByStyleId } from '../../services/costing/costingService';
 
 const { Text } = Typography;
 

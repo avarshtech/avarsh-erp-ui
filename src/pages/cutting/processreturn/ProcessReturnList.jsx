@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchProcessReturns } from '../../../services/cuttingService';
+import { searchProcessReturns } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';

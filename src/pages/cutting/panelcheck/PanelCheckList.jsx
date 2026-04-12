@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchPanelChecks } from '../../../services/cuttingService';
+import { searchPanelChecks } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import { getPanelCheckLabel, getPanelCheckColor } from '../../../utils/cuttingConstants';
 import { ActionButton } from '../../../components/buttons';

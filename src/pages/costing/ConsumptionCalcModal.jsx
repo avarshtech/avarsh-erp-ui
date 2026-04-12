@@ -20,7 +20,7 @@ import {
   ThunderboltOutlined, FileImageOutlined, FileTextOutlined,
   CheckCircleOutlined, CalculatorOutlined,
 } from '@ant-design/icons';
-import { calculateConsumption } from '../../services/costingService';
+import { calculateConsumption } from '../../services/costing/costingService';
 
 const { Text, Paragraph } = Typography;
 

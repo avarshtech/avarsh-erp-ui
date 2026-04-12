@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchWorkOrders, deleteWorkOrder, changeWorkOrderStatus } from '../../services/workOrderService';
+import { searchWorkOrders, deleteWorkOrder, changeWorkOrderStatus } from '../../services/workorder/workOrderService';
 import { hasPermission } from '../../utils/permissions';
 import {
   getStatusLabel,

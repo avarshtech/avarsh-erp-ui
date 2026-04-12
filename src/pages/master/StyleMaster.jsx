@@ -4,8 +4,8 @@ import { Form, Input, Button, Space, App, Tag, Select, Switch, Row, Col, Typogra
 const { Text } = Typography;
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { useStore } from '../../context/StoreContext';
-import { saveStyle, deleteStyle } from '../../services/styleService';
-import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
+import { saveStyle, deleteStyle } from '../../services/master/styleService';
+import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import FileUpload from '../../components/FileUpload';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';

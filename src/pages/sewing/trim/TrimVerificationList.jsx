@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchTrimVerifications } from '../../../services/sewingService';
+import { searchTrimVerifications } from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import { getTrimStatusLabel, getTrimStatusColor } from '../../../utils/sewingConstants';
 import { ActionButton } from '../../../components/buttons';

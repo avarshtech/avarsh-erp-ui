@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchBundleIssues } from '../../../services/cuttingService';
+import { searchBundleIssues } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import { getBundleIssueLabel, getBundleIssueColor } from '../../../utils/cuttingConstants';
 import { ActionButton } from '../../../components/buttons';

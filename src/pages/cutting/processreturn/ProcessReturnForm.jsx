@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createProcessReturn, getProcessReturnById, searchPanelIssues,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 
 const { TextArea } = Input;
 

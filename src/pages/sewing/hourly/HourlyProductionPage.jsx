@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import {
   searchSewingPlans, searchHourlyProduction, getHourlyProductionById,
   createHourlyProduction, updateHourlyEntries,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import PageHeader from '../../../components/PageHeader';
 import EmptyState from '../../../components/EmptyState';
 import {

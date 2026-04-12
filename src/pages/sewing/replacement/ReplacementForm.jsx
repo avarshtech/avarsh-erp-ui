@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createReplacement, getReplacementById, searchSewingPlans,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import {
   REPLACEMENT_REASONS,
   getReplacementLabel, getReplacementColor,

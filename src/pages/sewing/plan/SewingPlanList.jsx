@@ -3,7 +3,7 @@ import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import {
   searchSewingPlans, deleteSewingPlan, changeSewingPlanStatus,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   getSewPlanLabel, getSewPlanColor,

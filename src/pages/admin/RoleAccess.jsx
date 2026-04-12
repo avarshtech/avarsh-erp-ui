@@ -30,7 +30,7 @@ import {
   LinkOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
-import { getRoles, createRole, updateRole, deleteRole } from '../../services/roleService';
+import { getRoles, createRole, updateRole, deleteRole } from '../../services/admin/roleService';
 import {
   getEmptyPermissions,
   getOperationsForModule,

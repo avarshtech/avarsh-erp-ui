@@ -2,8 +2,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { App, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Spin, Descriptions, Tag } from 'antd';
 import { CalculatorOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { calculateFnf, approveFnf } from '../../../services/fnfService';
-import { searchEmployees } from '../../../services/employeeService';
+import { calculateFnf, approveFnf } from '../../../services/hr/fnfService';
+import { searchEmployees } from '../../../services/hr/employeeService';
 import { SEPARATION_REASONS, FNF_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 

@@ -8,7 +8,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createPanelIssue, getPanelIssueById, searchCutOrderPlans,
-} from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
 import { EXTERNAL_PROCESSES, PANEL_NAMES } from '../../../utils/cuttingConstants';
 
 const { TextArea } = Input;

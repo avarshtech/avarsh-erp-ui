@@ -9,8 +9,8 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createCutOrderPlan, updateCutOrderPlan, getCutOrderPlanById,
-} from '../../../services/cuttingService';
-import { searchCuttingPOs } from '../../../services/cuttingPoService';
+} from '../../../services/cutting/cuttingService';
+import { searchCuttingPOs } from '../../../services/cuttingpo/cuttingPoService';
 import { CUT_PLAN_EDITABLE } from '../../../utils/cuttingConstants';
 
 const { TextArea } = Input;

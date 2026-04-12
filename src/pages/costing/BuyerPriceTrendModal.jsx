@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { App, Modal, Typography, Row, Col, Statistic, Table, Tag, Empty, Spin, Tooltip } from 'antd';
 import { BarChartOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getBuyerPriceTrend } from '../../services/costingService';
+import { getBuyerPriceTrend } from '../../services/costing/costingService';
 
 const { Text } = Typography;
 

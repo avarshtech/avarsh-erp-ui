@@ -5,7 +5,7 @@ import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined 
 import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
-import { getAllOverheads, createOverhead, updateOverhead, deleteOverhead } from '../../services/overheadService';
+import { getAllOverheads, createOverhead, updateOverhead, deleteOverhead } from '../../services/master/overheadService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

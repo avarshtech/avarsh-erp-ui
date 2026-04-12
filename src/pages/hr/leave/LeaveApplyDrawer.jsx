@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Drawer, Form, Select, DatePicker, Switch, Input, Space, Button, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { applyLeave, getLeaveBalances } from '../../../services/leaveService';
-import { searchEmployees } from '../../../services/employeeService';
+import { applyLeave, getLeaveBalances } from '../../../services/hr/leaveService';
+import { searchEmployees } from '../../../services/hr/employeeService';
 import { HALF_DAY_TYPE } from '../../../utils/hrConstants';
 
 const { Text } = Typography;

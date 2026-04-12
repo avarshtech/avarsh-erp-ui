@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Select, Row, Col, Spin } from 'antd';
 import dayjs from 'dayjs';
-import { getLeaveBalances } from '../../../services/leaveService';
-import { searchEmployees } from '../../../services/employeeService';
-import { getActiveFactories } from '../../../services/factoryService';
-import { getActiveDepartmentsByFactory } from '../../../services/hrMasterService';
+import { getLeaveBalances } from '../../../services/hr/leaveService';
+import { searchEmployees } from '../../../services/hr/employeeService';
+import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {

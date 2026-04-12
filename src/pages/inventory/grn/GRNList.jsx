@@ -17,7 +17,7 @@ import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { GRN_STATUS } from '../../../utils/inventoryConstants';
-import { getGRNList, deleteDraftGRN } from '../../../services/inventoryService';
+import { getGRNList, deleteDraftGRN } from '../../../services/inventory/inventoryService';
 import getGRNListColumns from './GRNListColumns';
 import GRNViewModal from './GRNViewModal';
 
@@ -39,22 +39,31 @@ const GRNList = () => {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [apiStats, setApiStats] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [typeFilter, setTypeFilter] = useState(undefined);
   const [statusFilter, setStatusFilter] = useState(undefined);
+  const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, grn: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getGRNList({ search: searchText, type: typeFilter, status: statusFilter });
+      const res = await getGRNList({
+        search: searchText || undefined,
+        type: typeFilter || undefined,
+        status: statusFilter || undefined,
+        dateStart: dateRange?.[0] ? dateRange[0].format('YYYY-MM-DD') : undefined,
+        dateEnd: dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined,
+      });
       setData(res.content || []);
+      setApiStats(res.stats || null);
     } catch {
       message.error('Failed to load GRN list');
     } finally {
       setLoading(false);
     }
-  }, [searchText, typeFilter, statusFilter, message]);
+  }, [searchText, typeFilter, statusFilter, dateRange, message]);
 
   useEffect(() => {
     loadData();
@@ -90,12 +99,24 @@ const GRNList = () => {
     [handleView, handleEdit, handleDelete],
   );
 
+  // Stats come from the paginated API response (computed server-side across
+  // the full financial year). If the API hasn't returned them yet (first load
+  // in flight, or older backend), we fall back to local counts over the
+  // currently-loaded page so the cards never go blank.
   const stats = useMemo(() => {
+    if (apiStats) {
+      return {
+        total: apiStats.totalGrns || 0,
+        pendingQC: apiStats.pendingQc || 0,
+        totalAmount: Number(apiStats.monthValue || 0),
+        reversed: apiStats.reversed || 0,
+      };
+    }
     const pendingQC = data.filter((g) => g.status === GRN_STATUS.QC_PENDING).length;
     const reversed = data.filter((g) => g.status === GRN_STATUS.REVERSED).length;
     const totalAmount = data.reduce((sum, g) => sum + (g.totalAmount || 0), 0);
     return { total: data.length, pendingQC, totalAmount, reversed };
-  }, [data]);
+  }, [data, apiStats]);
 
   return (
     <div className="animate-fade-in-up inv-page">
@@ -126,7 +147,7 @@ const GRNList = () => {
           <Input placeholder="Search GRN..." prefix={<SearchOutlined />} style={{ width: 250 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
           <Select placeholder="Type" style={{ width: 150 }} allowClear options={TYPE_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
           <Select placeholder="Status" style={{ width: 160 }} allowClear options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
-          <RangePicker style={{ width: 280 }} />
+          <RangePicker style={{ width: 280 }} value={dateRange} onChange={setDateRange} />
         </Space>
         <Table
           rowKey="id"

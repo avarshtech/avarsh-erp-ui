@@ -5,7 +5,7 @@ import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined,
 import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
-import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/processService';
+import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/master/processService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { useStore } from '../../context/StoreContext';

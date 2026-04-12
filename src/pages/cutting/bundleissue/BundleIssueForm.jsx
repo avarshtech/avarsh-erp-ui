@@ -8,8 +8,8 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createBundleIssue, getBundleIssueById, getAvailableBundles,
-} from '../../../services/cuttingService';
-import { searchCutOrderPlans } from '../../../services/cuttingService';
+} from '../../../services/cutting/cuttingService';
+import { searchCutOrderPlans } from '../../../services/cutting/cuttingService';
 
 const { TextArea } = Input;
 

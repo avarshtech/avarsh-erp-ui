@@ -36,10 +36,10 @@ import {
   getAllItemTypes,
   getAllAttributes,
   getAllUOMs,
-} from '../../services/masterDataService';
-import { getStyles } from '../../services/styleService';
-import { getAllPaymentTerms } from '../../services/paymentTermsService';
-import { getAllSizePresets } from '../../services/sizePresetService';
+} from '../../services/master/masterDataService';
+import { getStyles } from '../../services/master/styleService';
+import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
+import { getAllSizePresets } from '../../services/master/sizePresetService';
 
 // Group accent colors for left border on group headers
 const GROUP_ACCENT = {

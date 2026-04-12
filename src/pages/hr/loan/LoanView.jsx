@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Descriptions, Table, Tag, Card, Spin } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getLoanById } from '../../../services/loanService';
+import { getLoanById } from '../../../services/hr/loanService';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 

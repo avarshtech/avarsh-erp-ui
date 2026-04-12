@@ -2,7 +2,7 @@ import { memo, useState, useEffect, useCallback } from 'react';
 import { Card, DatePicker, Select, Input, InputNumber, Space, Button, Typography, Badge } from 'antd';
 import { ClearOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getFilterOptions } from '../../../services/reportService';
+import { getFilterOptions } from '../../../services/core/reportService';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;

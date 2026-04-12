@@ -33,11 +33,11 @@ import {
   createBuyer,
   updateBuyer,
   deleteBuyer,
-} from '../../services/buyerService';
+} from '../../services/master/buyerService';
 import { hasPermission } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
 import { COUNTRIES, getCountryISO2 } from '../../utils/countries';
-import { lookupPostalCode } from '../../services/locationService';
+import { lookupPostalCode } from '../../services/master/locationService';
 
 const { Text, Title } = Typography;
 

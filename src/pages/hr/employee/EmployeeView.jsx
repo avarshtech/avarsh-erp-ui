@@ -5,8 +5,8 @@ import {
 import { EditOutlined, DownOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getEmployeeById, changeEmployeeStatus } from '../../../services/employeeService';
-import { getSalaryStructuresByEmployee } from '../../../services/salaryStructureService';
+import { getEmployeeById, changeEmployeeStatus } from '../../../services/hr/employeeService';
+import { getSalaryStructuresByEmployee } from '../../../services/hr/salaryStructureService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,

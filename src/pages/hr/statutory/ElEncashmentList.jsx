@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, InputNumber } from 'antd';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
-import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/statutoryService';
-import { getActiveFactories } from '../../../services/factoryService';
+import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
+import { getActiveFactories } from '../../../services/master/factoryService';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';

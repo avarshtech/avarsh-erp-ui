@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Drawer, Form, Select, DatePicker, InputNumber, Input, Button, Space } from 'antd';
 import dayjs from 'dayjs';
-import { createLoan } from '../../../services/loanService';
-import { searchEmployees } from '../../../services/employeeService';
+import { createLoan } from '../../../services/hr/loanService';
+import { searchEmployees } from '../../../services/hr/employeeService';
 
 const LoanDrawer = ({ open, onClose, onSuccess }) => {
   const { message } = App.useApp();

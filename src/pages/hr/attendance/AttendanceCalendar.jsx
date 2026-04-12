@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Calendar, Select, Row, Col, Tag, Badge, Drawer, Descriptions, Space, Spin } from 'antd';
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAttendanceCalendar } from '../../../services/attendanceService';
-import { searchEmployees } from '../../../services/employeeService';
-import { getActiveFactories } from '../../../services/factoryService';
-import { getActiveDepartmentsByFactory } from '../../../services/hrMasterService';
+import { getAttendanceCalendar } from '../../../services/hr/attendanceService';
+import { searchEmployees } from '../../../services/hr/employeeService';
+import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 

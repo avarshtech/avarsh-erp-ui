@@ -5,7 +5,7 @@ import { SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
-import axiosInstance from '../../../services/axiosInstance';
+import axiosInstance from '../../../services/core/axiosInstance';
 
 const MODULE_ID = 'hr-masters';
 const PT_URL = '/hr/pt-slabs';

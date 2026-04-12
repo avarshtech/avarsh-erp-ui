@@ -19,7 +19,7 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getFabricQCList, deleteFabricQCDraft } from '../../../services/inventoryService';
+import { getFabricQCList, deleteFabricQCDraft } from '../../../services/inventory/inventoryService';
 import { formatDate } from '../../../utils/formatters';
 import QCViewModal from './QCViewModal';
 
@@ -47,6 +47,7 @@ const FabricQCList = ({ embedded = false }) => {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [apiStats, setApiStats] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [dateRange, setDateRange] = useState(null);
@@ -55,14 +56,20 @@ const FabricQCList = ({ embedded = false }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getFabricQCList();
+      const res = await getFabricQCList({
+        search: searchText || undefined,
+        status: statusFilter || undefined,
+        dateStart: dateRange?.[0] ? dateRange[0].format('YYYY-MM-DD') : undefined,
+        dateEnd: dateRange?.[1] ? dateRange[1].format('YYYY-MM-DD') : undefined,
+      });
       setData(res.content || []);
+      setApiStats(res.stats || null);
     } catch {
       message.error('Failed to load fabric QC list');
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [message, searchText, statusFilter, dateRange]);
 
   const handleDelete = useCallback((record) => {
     modal.confirm({
@@ -113,15 +120,21 @@ const FabricQCList = ({ embedded = false }) => {
     return result;
   }, [data, statusFilter, searchText, dateRange]);
 
-  // Stats reflect the CURRENTLY FILTERED rows so filter/search changes update the
-  // counts live. When the API phase lands, the same filter params (search, status,
-  // date range) should be POSTed to the backend which returns both the page + a
-  // matching aggregate block — the memo below becomes a pass-through of that block.
+  // Stats come from the paginated API response — server-side FY aggregates
+  // that reflect the current filter set. Falls back to counting the currently
+  // loaded rows until the first response arrives.
   const stats = useMemo(() => {
+    if (apiStats) {
+      return {
+        total: apiStats.totalInspections || 0,
+        passed: apiStats.passed || 0,
+        failed: apiStats.failed || 0,
+      };
+    }
     const passed = filteredData.filter((r) => r.overallResult === 'Pass').length;
     const failed = filteredData.filter((r) => r.overallResult === 'Fail').length;
     return { total: filteredData.length, passed, failed };
-  }, [filteredData]);
+  }, [apiStats, filteredData]);
 
   const columns = useMemo(
     () => [

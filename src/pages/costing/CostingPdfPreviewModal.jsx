@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal, Button, Space, Spin } from 'antd';
 import { PrinterOutlined, DownloadOutlined } from '@ant-design/icons';
 import { buildCostingHtml } from '../../utils/costingPdfGenerator';
-import { getOrgInfo } from '../../services/sessionStore';
+import { getOrgInfo } from '../../services/auth/sessionStore';
 
 const CostingPdfPreviewModal = ({ open, onClose, costSheetData }) => {
   const iframeRef = useRef(null);

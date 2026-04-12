@@ -11,7 +11,7 @@ import {
   NotificationOutlined,
 } from '@ant-design/icons';
 import { hasPermission } from '../utils/permissions';
-import { getPreferences, updatePreferences } from '../services/notificationService';
+import { getPreferences, updatePreferences } from '../services/core/notificationService';
 import usePushNotification from '../hooks/usePushNotification';
 
 const { Title, Text } = Typography;

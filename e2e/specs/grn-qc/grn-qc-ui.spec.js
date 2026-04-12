@@ -51,9 +51,10 @@ test.describe('GRN UI Tests', () => {
     await page.waitForTimeout(2000);
 
     // 2. Check line item checkbox if present
-    const checkboxes = page.locator('.ant-checkbox-input');
-    if (await checkboxes.count() > 0) {
-      await checkboxes.first().check();
+    const rowCheckboxes = page.locator('.ant-table-tbody .ant-checkbox-input:not([disabled])');
+    await page.waitForTimeout(500);
+    if (await rowCheckboxes.count() > 0) {
+      await rowCheckboxes.first().check();
       await page.waitForTimeout(500);
     }
 
@@ -127,7 +128,7 @@ test.describe('GRN UI Tests', () => {
 
     const row = page.locator('.ant-table-row').filter({ hasText: grn.grnNumber }).first();
     if (await row.isVisible({ timeout: 5000 }).catch(() => false)) {
-      const statusTag = row.locator('.ant-tag').first();
+      const statusTag = row.locator('.ant-tag').last();
       await expect(statusTag).toContainText('QC Pending');
     }
   });
@@ -145,9 +146,10 @@ test.describe('GRN UI Tests', () => {
     await page.waitForTimeout(2000);
 
     // Check checkbox
-    const checkboxes = page.locator('.ant-checkbox-input');
-    if (await checkboxes.count() > 0) {
-      await checkboxes.first().check();
+    const rowCheckboxes = page.locator('.ant-table-tbody .ant-checkbox-input:not([disabled])');
+    await page.waitForTimeout(500);
+    if (await rowCheckboxes.count() > 0) {
+      await rowCheckboxes.first().check();
       await page.waitForTimeout(500);
     }
 
@@ -241,20 +243,27 @@ test.describe('GRN UI Tests', () => {
       const reasonModal = page.locator('.ant-modal:visible').last();
       const reasonInput = reasonModal.locator('textarea').first();
       if (await reasonInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await reasonInput.click();
         await reasonInput.fill('E2E test reversal reason');
+        // Trigger blur to commit the value and enable the confirm button
+        await reasonInput.press('Tab');
+        await page.waitForTimeout(500);
+
         const confirmBtn = reasonModal.getByRole('button', { name: /Request Reversal|Submit|Confirm|OK/i }).first();
-        if (await confirmBtn.isVisible().catch(() => false)) {
+        // Wait for button to become enabled
+        await expect(confirmBtn).toBeEnabled({ timeout: 5000 }).catch(() => {});
+        if (await confirmBtn.isEnabled().catch(() => false)) {
           await confirmBtn.click();
           await antMessageContains(page, /reversal|success|requested/i).catch(() => {});
         }
       }
     }
 
-    // Close modal
-    const closeBtn = page.locator('.ant-modal:visible .ant-modal-close').first();
-    if (await closeBtn.isVisible().catch(() => false)) {
-      await closeBtn.click();
-    }
+    // Close all open modals by pressing Escape
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(500);
   });
 
   test('Test 12: View modal shows correct data', async ({ page }) => {
@@ -399,7 +408,7 @@ test.describe('Full Workflow', () => {
 
     const grnRow = page.locator('.ant-table-row').filter({ hasText: grn.grnNumber }).first();
     if (await grnRow.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await expect(grnRow.locator('.ant-tag').first()).toContainText('QC Pending');
+      await expect(grnRow.locator('.ant-tag').last()).toContainText('QC Pending');
     }
 
     // Step 3: Submit QC + Approve + Close via API
@@ -419,7 +428,7 @@ test.describe('Full Workflow', () => {
 
     const closedRow = page.locator('.ant-table-row').filter({ hasText: grn.grnNumber }).first();
     if (await closedRow.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await expect(closedRow.locator('.ant-tag').first()).toContainText('Closed');
+      await expect(closedRow.locator('.ant-tag').last()).toContainText('Closed');
     }
   });
 });

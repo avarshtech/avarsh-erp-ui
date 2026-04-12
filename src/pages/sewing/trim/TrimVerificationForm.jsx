@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import {
   createTrimVerification, getTrimVerificationById, searchSewingPlans,
-} from '../../../services/sewingService';
+} from '../../../services/sewing/sewingService';
 import { TRIM_CHECK_TYPES, TRIM_ITEM_STATUS } from '../../../utils/sewingConstants';
 
 const DEFAULT_MATERIALS = [

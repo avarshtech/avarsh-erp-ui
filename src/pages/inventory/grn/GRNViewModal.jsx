@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Modal, Row, Col, Card, Table, Tag, Typography, Avatar, Divider, Alert, Space, Skeleton } from 'antd';
+import { Modal, Row, Col, Card, Table, Tag, Typography, Avatar, Divider, Alert, Space, Skeleton, Button, App } from 'antd';
+import { DownloadOutlined, FilePdfOutlined, FileImageOutlined } from '@ant-design/icons';
+import { getFilesByEntity, downloadFileAsBlob } from '../../../services/core/fileService';
 import useResponsive from '../../../hooks/useResponsive';
 import {
   ShopOutlined,
@@ -18,6 +20,7 @@ import { ActionButton } from '../../../components/buttons';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { formatNumber, formatDate } from '../../../utils/formatters';
+import { generateGRNPdf } from '../../../utils/grnPdfGenerator';
 import GRNApprovalActions from './GRNApprovalActions';
 
 const { Text, Title } = Typography;
@@ -67,11 +70,47 @@ const flattenFabricRolls = (grn) => {
 };
 
 const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
+  const { message } = App.useApp();
   const [grn, setGrn] = useState(initialGrn);
+  const [attachments, setAttachments] = useState([]);
   const { isMobile, isTablet } = useResponsive();
   const modalWidth = isMobile ? '100vw' : isTablet ? '94vw' : 1200;
 
   useEffect(() => { setGrn(initialGrn); }, [initialGrn]);
+
+  // Fetch file attachments from GCS whenever the modal opens for a new GRN.
+  useEffect(() => {
+    if (!open || !initialGrn?.id) { setAttachments([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const files = await getFilesByEntity('GRN', initialGrn.id);
+        if (!cancelled) setAttachments(files || []);
+      } catch (err) {
+        console.warn('Failed to load GRN attachments:', err);
+        if (!cancelled) setAttachments([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, initialGrn?.id]);
+
+  const handleDownload = async (file) => {
+    try {
+      const blob = await downloadFileAsBlob(file.fileId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.originalFilename || 'download';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoke the blob URL after a short delay so the browser can finalise the download
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      message.error('Failed to download file');
+    }
+  };
 
   const isFabric = grn?.type === 'Fabric';
   const accent = HERO_ACCENT[grn?.status] || 'var(--primary-color)';
@@ -107,7 +146,9 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px' }}>
           <Space size="middle">
-            <ActionButton action="print" text="Print GRN" />
+            {grn && grn.status !== GRN_STATUS.DRAFT && (
+              <ActionButton action="print" text="Print GRN" onClick={() => generateGRNPdf(grn)} />
+            )}
             <GRNApprovalActions grn={grn} onUpdated={(updated) => setGrn(updated)} />
           </Space>
           <ActionButton action="close" text="Close" onClick={onClose} />
@@ -372,7 +413,7 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
               </Card>
             )}
 
-            {grn.dcImageName && (
+            {attachments.length > 0 && (
               <Card
                 size="small"
                 style={{ marginBottom: 20, borderRadius: 12 }}
@@ -380,11 +421,64 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                 title={
                   <Space>
                     <FileTextOutlined style={{ color: 'var(--primary-color)' }} />
-                    <Text strong style={{ fontSize: 14 }}>Delivery Challan Attachment</Text>
+                    <Text strong style={{ fontSize: 14 }}>Attachments</Text>
                   </Space>
                 }
               >
-                <Text>{grn.dcImageName}</Text>
+                <Row gutter={[16, 12]}>
+                  {attachments.map((f) => {
+                    const isImage = (f.fileType || '').startsWith('image/');
+                    const isPdf = (f.fileType || '').includes('pdf');
+                    const categoryLabel = f.fileCategory === 'INVOICE'
+                      ? 'Supplier Invoice'
+                      : f.fileCategory === 'ATTACHMENT'
+                      ? 'Delivery Challan'
+                      : f.fileCategory;
+                    return (
+                      <Col xs={24} md={12} key={f.fileId}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 12,
+                            padding: '10px 12px',
+                            border: '1px solid var(--border-color, #f0f0f0)',
+                            borderRadius: 8,
+                            background: 'var(--bg-secondary, #fafafa)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 8,
+                              background: 'var(--bg-tertiary, rgba(99, 102, 241, 0.08))',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              color: isPdf ? '#d32f2f' : 'var(--primary-color)',
+                            }}
+                          >
+                            {isImage ? <FileImageOutlined style={{ fontSize: 18 }} /> : <FilePdfOutlined style={{ fontSize: 18 }} />}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <Text type="secondary" style={labelStyle}>{categoryLabel}</Text>
+                            <Text style={{ fontSize: 13, display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                              {f.originalFilename}
+                            </Text>
+                          </div>
+                          <Button
+                            type="text"
+                            icon={<DownloadOutlined />}
+                            onClick={() => handleDownload(f)}
+                            aria-label="Download attachment"
+                          />
+                        </div>
+                      </Col>
+                    );
+                  })}
+                </Row>
               </Card>
             )}
           </div>

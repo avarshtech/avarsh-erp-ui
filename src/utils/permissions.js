@@ -663,7 +663,7 @@ export const isAdminRole = (role) => {
 // This avoids direct sessionStorage access and ensures the token field
 // is never persisted in browser storage.
 
-import { getCachedUserDisplay, cacheUserDisplay } from '../services/sessionStore';
+import { getCachedUserDisplay, cacheUserDisplay } from '../services/auth/sessionStore';
 
 export const getCurrentUser = () => getCachedUserDisplay();
 

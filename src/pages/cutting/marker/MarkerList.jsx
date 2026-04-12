@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchMarkers, deleteMarker, approveMarker } from '../../../services/cuttingService';
+import { searchMarkers, deleteMarker, approveMarker } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   MARKER_STATUS, getMarkerStatusLabel, getMarkerStatusColor,

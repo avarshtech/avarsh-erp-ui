@@ -3,7 +3,7 @@ import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, TimePicker } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAllShifts, createShift, updateShift, deleteShift } from '../../../services/hrMasterService';
+import { getAllShifts, createShift, updateShift, deleteShift } from '../../../services/master/hrMasterService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 

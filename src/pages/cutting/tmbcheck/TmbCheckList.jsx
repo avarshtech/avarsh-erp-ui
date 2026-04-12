@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { searchTmbChecks } from '../../../services/cuttingService';
+import { searchTmbChecks } from '../../../services/cutting/cuttingService';
 import { hasPermission } from '../../../utils/permissions';
 import {
   TMB_RESULT, getTmbResultLabel, getTmbResultColor,

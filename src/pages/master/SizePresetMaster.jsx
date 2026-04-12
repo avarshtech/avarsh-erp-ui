@@ -10,7 +10,7 @@ import MasterSplitView from '../../components/MasterSplitView';
 import { useStore } from '../../context/StoreContext';
 import {
   getAllSizePresets, createSizePreset, updateSizePreset, deleteSizePreset,
-} from '../../services/sizePresetService';
+} from '../../services/master/sizePresetService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 

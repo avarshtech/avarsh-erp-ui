@@ -12,8 +12,8 @@ import {
   markAllAsRead,
   deleteNotification,
   deleteAllRead,
-} from '../services/notificationService';
-import { getAccessToken } from '../services/sessionStore';
+} from '../services/core/notificationService';
+import { getAccessToken } from '../services/auth/sessionStore';
 
 const { Text } = Typography;
 

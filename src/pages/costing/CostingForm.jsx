@@ -53,7 +53,7 @@ import {
   getAttachments,
   downloadAttachment,
   deleteAttachment,
-} from '../../services/costingService';
+} from '../../services/costing/costingService';
 import {
   COSTING_STATUS,
   FABRIC_CLASSIFICATIONS,
@@ -75,14 +75,14 @@ import {
   formatCurrency,
 } from '../../utils/costingConstants';
 import { getCurrencySymbol } from '../../utils/orderConstants';
-import { getBuyers } from '../../services/buyerService';
-import { getStylesByBuyerId, saveStyle } from '../../services/styleService';
-import { uploadFile } from '../../services/fileService';
-import { getFilesByEntity, downloadFileAsBlob } from '../../services/fileService';
-import { searchItems } from '../../services/itemService';
-import { getAllCategories } from '../../services/masterDataService';
-import { getActiveProcesses, createProcess } from '../../services/processService';
-import { getSuppliers } from '../../services/supplierService';
+import { getBuyers } from '../../services/master/buyerService';
+import { getStylesByBuyerId, saveStyle } from '../../services/master/styleService';
+import { uploadFile } from '../../services/core/fileService';
+import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
+import { searchItems } from '../../services/master/itemService';
+import { getAllCategories } from '../../services/master/masterDataService';
+import { getActiveProcesses, createProcess } from '../../services/master/processService';
+import { getSuppliers } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
 import { generateCostingPdf } from '../../utils/costingPdfGenerator';
@@ -714,7 +714,7 @@ const CostingForm = () => {
     if (result.matchedBuyerId) {
       form.setFieldValue('buyerId', result.matchedBuyerId);
       try {
-        const styles = await import('../../services/styleService').then((m) =>
+        const styles = await import('../../services/master/styleService').then((m) =>
           m.getStylesByBuyerId(result.matchedBuyerId)
         );
         setStyleOptions((styles || []).map((s) => ({ value: s.id, label: s.styleNo, style: s })));
