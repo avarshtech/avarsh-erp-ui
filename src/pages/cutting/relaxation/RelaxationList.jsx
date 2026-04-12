@@ -9,6 +9,7 @@ import {
   getRelaxationLabel,
   getRelaxationColor,
 } from '../../../utils/cuttingConstants';
+import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';
 import SearchFilterBar from '../../../components/SearchFilterBar';
 import EmptyState from '../../../components/EmptyState';
@@ -153,6 +154,7 @@ const RelaxationList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/relaxation/complete/${record.id}`)} />
           {record.status === RELAXATION_STATUS.IN_PROGRESS && (
             <Button
               size="small"

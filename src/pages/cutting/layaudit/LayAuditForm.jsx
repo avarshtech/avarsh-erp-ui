@@ -67,7 +67,7 @@ const LayAuditForm = () => {
     if (!search || search.length < 2) return;
     setPlanSearching(true);
     try {
-      const res = await searchCutOrderPlans({ search, status: 'APPROVED', page: 0, size: 20 });
+      const res = await searchCutOrderPlans({ search, page: 0, size: 20 });
       setPlanOptions((res.content || []).map((p) => ({
         value: p.id,
         label: `${p.planNo} — ${p.styleNo || ''} — ${p.color || ''}`,
@@ -82,7 +82,7 @@ const LayAuditForm = () => {
     if (!search || search.length < 2) return;
     setMarkerSearching(true);
     try {
-      const res = await searchMarkers({ search, status: 'APPROVED', page: 0, size: 20 });
+      const res = await searchMarkers({ search, page: 0, size: 20 });
       setMarkerOptions((res.content || []).map((m) => ({
         value: m.id,
         label: `${m.markerNo} — ${m.styleNo || ''}`,

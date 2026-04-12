@@ -128,6 +128,7 @@ const MarkerList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/marker/edit/${record.id}`)} />
           {canUpdate && record.status === MARKER_STATUS.DRAFT && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/marker/edit/${record.id}`)} />
           )}

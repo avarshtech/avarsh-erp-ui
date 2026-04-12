@@ -6,7 +6,7 @@ import {
 import { SaveOutlined, ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  searchSewingPlans, searchHourlyProduction,
+  searchSewingPlans, searchHourlyProduction, getHourlyProductionById,
   createHourlyProduction, updateHourlyEntries,
 } from '../../../services/sewing/sewingService';
 import PageHeader from '../../../components/PageHeader';
@@ -17,8 +17,9 @@ import {
 } from '../../../utils/sewingConstants';
 import { formatNumber, formatPercentage } from '../../../utils/formatters';
 
-const HOUR_COLUMNS = ['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8'];
-const OT_COLUMN = 'OT';
+// Map to actual API field names: hour1, hour2, ..., hour8, ot
+const HOUR_FIELDS = ['hour1', 'hour2', 'hour3', 'hour4', 'hour5', 'hour6', 'hour7', 'hour8'];
+const OT_FIELD = 'ot';
 
 const HourlyProductionPage = () => {
   const { message } = App.useApp();
@@ -35,20 +36,32 @@ const HourlyProductionPage = () => {
   const [saving, setSaving] = useState(false);
   const [entries, setEntries] = useState([]);
 
-  // Search sewing plans
-  const handlePlanSearch = useCallback(async (search) => {
-    if (!search || search.length < 2) return;
+  // Load all active plans on mount
+  const loadPlans = useCallback(async (search) => {
     setPlanSearching(true);
     try {
-      const res = await searchSewingPlans({ search, status: 'APPROVED', page: 0, size: 20 });
-      setPlanOptions((res.content || []).map((p) => ({
+      const params = { page: 0, size: 50 };
+      if (search && search.length >= 2) params.search = search;
+      const res = await searchSewingPlans(params);
+      const opts = (res.content || []).map((p) => ({
         value: p.id,
-        label: `${p.planNo || ''} — ${p.styleNo || ''} — ${p.lineName || ''}`,
+        label: `${p.planNo || ''} — ${p.styleNo || ''} — ${p.buyerName || ''} — ${p.color || ''}`,
         plan: p,
-      })));
+      }));
+      setPlanOptions(opts);
+      // Auto-select if only one plan and nothing selected
+      if (opts.length === 1 && !selectedPlanId) {
+        setSelectedPlanId(opts[0].value);
+        setSelectedPlan(opts[0].plan);
+      }
     } catch { /* ignore */ }
     finally { setPlanSearching(false); }
-  }, []);
+  }, [selectedPlanId]);
+
+  // Auto-load plans on mount
+  useEffect(() => { loadPlans(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePlanSearch = useCallback((search) => { loadPlans(search); }, [loadPlans]);
 
   const handlePlanSelect = useCallback((_value, option) => {
     setSelectedPlanId(option.value);
@@ -62,25 +75,29 @@ const HourlyProductionPage = () => {
     try {
       const date = selectedDate.format('YYYY-MM-DD');
       const res = await searchHourlyProduction({
-        sewingPlanId: selectedPlanId,
-        productionDate: date,
-        shift: selectedShift,
+        planId: selectedPlanId,
+        dateStart: date,
+        dateEnd: date,
         page: 0,
         size: 1,
       });
 
       if (res.content && res.content.length > 0) {
-        const record = res.content[0];
-        setRecordId(record.id);
-        setStatus(record.status);
-        setEntries(record.entries || []);
+        // Search returns header only — fetch full record with entries
+        const fullRecord = await getHourlyProductionById(res.content[0].id);
+        setRecordId(fullRecord.id);
+        setStatus(fullRecord.status);
+        setEntries(fullRecord.entries || []);
       } else {
         // Auto-create new record
         try {
           const created = await createHourlyProduction({
-            sewingPlanId: selectedPlanId,
+            planId: selectedPlanId,
+            lineId: selectedPlan?.lineId,
             productionDate: date,
             shift: selectedShift,
+            orderQty: selectedPlan?.totalOrderQty || 0,
+            targetOutput: selectedPlan?.targetPerDay || 0,
           });
           setRecordId(created.id);
           setStatus(created.status);
@@ -89,9 +106,9 @@ const HourlyProductionPage = () => {
           // If 409 (already exists), try loading again
           if (err?.response?.status === 409) {
             const retry = await searchHourlyProduction({
-              sewingPlanId: selectedPlanId,
-              productionDate: date,
-              shift: selectedShift,
+              planId: selectedPlanId,
+              dateStart: date,
+              dateEnd: date,
               page: 0,
               size: 1,
             });
@@ -121,31 +138,26 @@ const HourlyProductionPage = () => {
     }
   }, [selectedPlanId, selectedDate, selectedShift]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Update entry value
-  const updateEntry = useCallback((operatorIndex, hour, value) => {
+  // Update entry value (direct field update: hour1, hour2, ..., ot)
+  const updateEntry = useCallback((operatorIndex, field, value) => {
     setEntries((prev) => prev.map((entry, i) => {
       if (i !== operatorIndex) return entry;
-      const hourlyData = { ...(entry.hourlyData || {}) };
-      hourlyData[hour] = value;
-      return { ...entry, hourlyData };
+      return { ...entry, [field]: value };
     }));
   }, []);
 
-  // Calculate totals
+  // Calculate totals from flat fields (hour1..hour8 + ot)
   const totals = useMemo(() => {
     const colTotals = {};
-    HOUR_COLUMNS.forEach((h) => { colTotals[h] = 0; });
-    colTotals[OT_COLUMN] = 0;
+    HOUR_FIELDS.forEach((h) => { colTotals[h] = 0; });
+    colTotals[OT_FIELD] = 0;
     let grandTotal = 0;
 
     entries.forEach((entry) => {
-      const data = entry.hourlyData || {};
-      HOUR_COLUMNS.forEach((h) => {
-        const v = data[h] || 0;
-        colTotals[h] += v;
+      HOUR_FIELDS.forEach((h) => {
+        colTotals[h] += entry[h] || 0;
       });
-      const ot = data[OT_COLUMN] || 0;
-      colTotals[OT_COLUMN] += ot;
+      colTotals[OT_FIELD] += entry[OT_FIELD] || 0;
     });
 
     Object.values(colTotals).forEach((v) => { grandTotal += v; });
@@ -154,10 +166,9 @@ const HourlyProductionPage = () => {
 
   const rowTotals = useMemo(() => {
     return entries.map((entry) => {
-      const data = entry.hourlyData || {};
       let total = 0;
-      HOUR_COLUMNS.forEach((h) => { total += data[h] || 0; });
-      total += data[OT_COLUMN] || 0;
+      HOUR_FIELDS.forEach((h) => { total += entry[h] || 0; });
+      total += entry[OT_FIELD] || 0;
       return total;
     });
   }, [entries]);
@@ -178,14 +189,24 @@ const HourlyProductionPage = () => {
     if (!recordId) return;
     setSaving(true);
     try {
-      await updateHourlyEntries(recordId, {
-        entries: entries.map((entry) => ({
-          id: entry.id,
-          operatorId: entry.operatorId,
-          operatorName: entry.operatorName,
-          hourlyData: entry.hourlyData || {},
-        })),
-      });
+      await updateHourlyEntries(recordId, entries.map((entry) => ({
+        id: entry.id,
+        operatorId: entry.operatorId,
+        operatorName: entry.operatorName,
+        partsName: entry.partsName,
+        operationName: entry.operationName,
+        machineType: entry.machineType,
+        samTarget: entry.samTarget,
+        hour1: entry.hour1 || 0,
+        hour2: entry.hour2 || 0,
+        hour3: entry.hour3 || 0,
+        hour4: entry.hour4 || 0,
+        hour5: entry.hour5 || 0,
+        hour6: entry.hour6 || 0,
+        hour7: entry.hour7 || 0,
+        hour8: entry.hour8 || 0,
+        ot: entry.ot || 0,
+      })));
       message.success('Hourly production saved');
     } catch {
       message.error('Failed to save');
@@ -194,39 +215,55 @@ const HourlyProductionPage = () => {
     }
   }, [recordId, entries]);
 
-  // Build table columns
+  // Build table columns — industry standard: Operator | Operation | Machine | SAM | Hr1-8 | OT | Total | Target | Eff%
   const columns = useMemo(() => {
     const cols = [
       {
         title: 'Operator',
         dataIndex: 'operatorName',
         key: 'operatorName',
-        width: 180,
+        width: 140,
         fixed: 'left',
-        render: (name, record) => (
-          <span>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#888' }}>
-              {record.empCode || ''}
-            </span>
-            {record.empCode ? ' ' : ''}
-            {name || 'Unknown'}
-          </span>
-        ),
+        ellipsis: true,
+        render: (name) => name || 'Unknown',
+      },
+      {
+        title: 'Operation',
+        dataIndex: 'operationName',
+        key: 'operationName',
+        width: 130,
+        ellipsis: true,
+        render: (v) => v || '-',
+      },
+      {
+        title: 'Machine',
+        dataIndex: 'machineType',
+        key: 'machineType',
+        width: 80,
+        render: (v) => <span style={{ fontSize: 11 }}>{v || '-'}</span>,
+      },
+      {
+        title: 'SAM',
+        dataIndex: 'samTarget',
+        key: 'samTarget',
+        width: 60,
+        align: 'right',
+        render: (v) => v ? Number(v).toFixed(2) : '-',
       },
     ];
 
-    HOUR_COLUMNS.forEach((h, idx) => {
+    HOUR_FIELDS.forEach((field, idx) => {
       cols.push({
         title: `Hr ${idx + 1}`,
-        key: h,
+        key: field,
         width: 80,
         align: 'center',
         render: (_, _record, rowIndex) => (
           <InputNumber
             size="small"
             min={0}
-            value={entries[rowIndex]?.hourlyData?.[h] || 0}
-            onChange={(v) => updateEntry(rowIndex, h, v || 0)}
+            value={entries[rowIndex]?.[field] || 0}
+            onChange={(v) => updateEntry(rowIndex, field, v || 0)}
             style={{ width: '100%' }}
             controls={false}
           />
@@ -236,15 +273,15 @@ const HourlyProductionPage = () => {
 
     cols.push({
       title: 'OT',
-      key: OT_COLUMN,
+      key: OT_FIELD,
       width: 80,
       align: 'center',
       render: (_, _record, rowIndex) => (
         <InputNumber
           size="small"
           min={0}
-          value={entries[rowIndex]?.hourlyData?.[OT_COLUMN] || 0}
-          onChange={(v) => updateEntry(rowIndex, OT_COLUMN, v || 0)}
+          value={entries[rowIndex]?.[OT_FIELD] || 0}
+          onChange={(v) => updateEntry(rowIndex, OT_FIELD, v || 0)}
           style={{ width: '100%' }}
           controls={false}
         />
@@ -254,12 +291,42 @@ const HourlyProductionPage = () => {
     cols.push({
       title: 'Total',
       key: 'total',
-      width: 80,
+      width: 70,
       align: 'right',
-      fixed: 'right',
       render: (_, __, rowIndex) => (
         <strong>{formatNumber(rowTotals[rowIndex] || 0)}</strong>
       ),
+    });
+
+    cols.push({
+      title: 'Tgt/Day',
+      key: 'targetPerDay',
+      width: 70,
+      align: 'right',
+      render: (_, record) => {
+        const sam = record.samTarget ? Number(record.samTarget) : 0;
+        if (sam <= 0) return '-';
+        const targetPerHour = Math.floor(60 / sam);
+        const targetPerDay = targetPerHour * 8;
+        return <span style={{ color: '#888' }}>{targetPerDay}</span>;
+      },
+    });
+
+    cols.push({
+      title: 'Eff %',
+      key: 'efficiency',
+      width: 75,
+      align: 'right',
+      fixed: 'right',
+      render: (_, record, rowIndex) => {
+        const sam = record.samTarget ? Number(record.samTarget) : 0;
+        const total = rowTotals[rowIndex] || 0;
+        if (sam <= 0 || total <= 0) return <span style={{ color: '#ccc' }}>-</span>;
+        const targetPerDay = Math.floor(60 / sam) * 8;
+        const eff = targetPerDay > 0 ? (total / targetPerDay) * 100 : 0;
+        const color = eff >= 100 ? '#52c41a' : eff >= 80 ? '#faad14' : '#ff4d4f';
+        return <strong style={{ color }}>{eff.toFixed(0)}%</strong>;
+      },
     });
 
     return cols;
@@ -345,20 +412,20 @@ const HourlyProductionPage = () => {
               dataSource={entries}
               pagination={false}
               size="small"
-              scroll={{ x: 1100 }}
+              scroll={{ x: 1500 }}
               summary={() => (
                 <Table.Summary fixed>
                   <Table.Summary.Row>
                     <Table.Summary.Cell index={0} fixed="left"><strong>Total</strong></Table.Summary.Cell>
-                    {HOUR_COLUMNS.map((h, idx) => (
+                    {HOUR_FIELDS.map((h, idx) => (
                       <Table.Summary.Cell key={h} index={idx + 1} align="center">
                         <strong>{formatNumber(totals.colTotals[h])}</strong>
                       </Table.Summary.Cell>
                     ))}
-                    <Table.Summary.Cell index={HOUR_COLUMNS.length + 1} align="center">
-                      <strong>{formatNumber(totals.colTotals[OT_COLUMN])}</strong>
+                    <Table.Summary.Cell index={HOUR_FIELDS.length + 1} align="center">
+                      <strong>{formatNumber(totals.colTotals[OT_FIELD])}</strong>
                     </Table.Summary.Cell>
-                    <Table.Summary.Cell index={HOUR_COLUMNS.length + 2} align="right" fixed="right">
+                    <Table.Summary.Cell index={HOUR_FIELDS.length + 2} align="right" fixed="right">
                       <strong>{formatNumber(totals.grandTotal)}</strong>
                     </Table.Summary.Cell>
                   </Table.Summary.Row>

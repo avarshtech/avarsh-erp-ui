@@ -128,6 +128,7 @@ const CuttingReportList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/report/edit/${record.id}`)} />
           {canUpdate && CUT_REPORT_EDITABLE.includes(record.status) && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/report/edit/${record.id}`)} />
           )}

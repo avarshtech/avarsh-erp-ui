@@ -123,6 +123,7 @@ const LayAuditList = () => {
       fixed: 'right',
       render: (_, record) => (
         <span style={{ display: 'flex', gap: 4 }}>
+          <ActionButton action="view" onClick={() => navigate(`/cutting/lay-audit/edit/${record.id}`)} />
           {canUpdate && LAY_AUDIT_EDITABLE.includes(record.status) && (
             <ActionButton action="edit" onClick={() => navigate(`/cutting/lay-audit/edit/${record.id}`)} />
           )}
