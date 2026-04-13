@@ -774,14 +774,17 @@ body {
   color: var(--text-primary) !important;
 }
 
-/* DatePicker Dropdown */
+/* DatePicker Dropdown — only the inner panel-container carries the visible
+   background; the outer dropdown wrapper must stay transparent so it doesn't
+   create an extra "card" around the calendar panel. */
 .ant-picker-dropdown {
-  background: var(--card-bg) !important;
+  background: transparent !important;
 }
 
 .ant-picker-panel-container {
   background: var(--card-bg) !important;
   box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--radius-lg) !important;
 }
 
 .ant-picker-header {
