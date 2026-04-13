@@ -589,6 +589,22 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    key: 'hr',
+    label: 'HR & Payroll',
+    icon: 'TeamOutlined',
+    modules: [
+      { id: 'hr-masters', name: 'HR Masters', operations: STANDARD_OPERATIONS, path: '/hr/masters' },
+      { id: 'hr-employees', name: 'Employees', operations: STANDARD_OPERATIONS, path: '/hr/employees' },
+      { id: 'hr-attendance', name: 'Attendance', operations: STANDARD_OPERATIONS, path: '/hr/attendance' },
+      { id: 'hr-leave', name: 'Leave Management', operations: STANDARD_OPERATIONS, path: '/hr/leaves' },
+      { id: 'hr-payroll', name: 'Payroll', operations: STANDARD_OPERATIONS, path: '/hr/payroll' },
+      { id: 'hr-loans', name: 'Loans & Advances', operations: STANDARD_OPERATIONS, path: '/hr/loans' },
+      { id: 'hr-bonus', name: 'Bonus', operations: STANDARD_OPERATIONS, path: '/hr/bonus' },
+      { id: 'hr-statutory', name: 'Statutory', operations: STANDARD_OPERATIONS, path: '/hr/statutory' },
+      { id: 'hr-fnf', name: 'F&F Settlement', operations: STANDARD_OPERATIONS, path: '/hr/fnf' },
+    ],
+  },
+  {
     key: 'admin',
     label: 'Administration',
     icon: 'SettingOutlined',
