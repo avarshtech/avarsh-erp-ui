@@ -321,13 +321,121 @@ test.describe('QC UI Tests', () => {
     }
   });
 
-  test('Test 7: Create Fabric QC via UI', async ({ page }) => {
+  test('Test 6a: Fabric QC new page loads without API errors', async ({ page }) => {
+    // Collect all API errors during page load
+    const apiErrors = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/v1/') && response.status() >= 500) {
+        apiErrors.push({ url: response.url(), status: response.status() });
+      }
+    });
+
     await navigateWithAuth(page, '/inventory/qc/fabric/new');
     await waitForPageReady(page);
 
-    // Select GRN
+    // Assert zero 500 errors from any API call during QC page load
+    expect(apiErrors, `API 500 errors during QC page load: ${JSON.stringify(apiErrors)}`).toHaveLength(0);
+
+    // The GRN dropdown should be populated (or at least the API should succeed)
+    // Even if there are no QC_Pending GRNs, the select should render without errors
     const grnSelect = page.locator('.ant-form-item').filter({ hasText: 'GRN Number' }).locator('.ant-select').first();
-    await antSelect(page, grnSelect, null, { first: true });
+    await expect(grnSelect).toBeVisible({ timeout: 10000 });
+
+    // Verify no error toast appeared
+    const errorMessage = page.locator('.ant-message-error');
+    const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
+    expect(hasError, 'Error toast appeared on QC page load').toBe(false);
+  });
+
+  test('Test 6b: Trims QC new page loads without API errors', async ({ page }) => {
+    const apiErrors = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/v1/') && response.status() >= 500) {
+        apiErrors.push({ url: response.url(), status: response.status() });
+      }
+    });
+
+    await navigateWithAuth(page, '/inventory/qc/trims/new');
+    await waitForPageReady(page);
+
+    expect(apiErrors, `API 500 errors during Trims QC page load: ${JSON.stringify(apiErrors)}`).toHaveLength(0);
+
+    const grnSelect = page.locator('.ant-form-item').filter({ hasText: 'GRN Number' }).locator('.ant-select').first();
+    await expect(grnSelect).toBeVisible({ timeout: 10000 });
+
+    const errorMessage = page.locator('.ant-message-error');
+    const hasError = await errorMessage.isVisible({ timeout: 2000 }).catch(() => false);
+    expect(hasError, 'Error toast appeared on Trims QC page load').toBe(false);
+  });
+
+  test('Test 6c: DatePicker popup renders cleanly without extra card', async ({ page }) => {
+    await navigateWithAuth(page, '/inventory/qc/fabric/new');
+    await waitForPageReady(page);
+
+    // Click the Inspection Date picker to open the popup
+    const datePicker = page.locator('.ant-form-item').filter({ hasText: 'Inspection Date' }).locator('.ant-picker').first();
+    await expect(datePicker).toBeVisible({ timeout: 10000 });
+    await datePicker.click();
+
+    // Wait for the dropdown popup to appear
+    const dropdown = page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
+    await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+
+    // The outer dropdown wrapper must have transparent background so it
+    // doesn't create a visible "extra card" around the calendar panel
+    const dropdownBg = await dropdown.evaluate(
+      (el) => window.getComputedStyle(el).backgroundColor,
+    );
+    const isTransparent = dropdownBg === 'transparent'
+      || dropdownBg === 'rgba(0, 0, 0, 0)'
+      || dropdownBg === '';
+    expect(isTransparent, `ant-picker-dropdown background should be transparent, got: ${dropdownBg}`).toBe(true);
+
+    // The inner panel container should have a visible background
+    const panelContainer = dropdown.locator('.ant-picker-panel-container').first();
+    await expect(panelContainer).toBeVisible();
+
+    // Calendar panel should show today's month and have day cells
+    const calendarCells = dropdown.locator('.ant-picker-cell');
+    const cellCount = await calendarCells.count();
+    expect(cellCount, 'Calendar should render day cells').toBeGreaterThan(20);
+
+    // "Today" link should be visible
+    const todayLink = dropdown.locator('.ant-picker-today-btn, .ant-picker-footer a, .ant-picker-footer button').first();
+    await expect(todayLink).toBeVisible();
+
+    // Close the picker
+    await datePicker.click();
+  });
+
+  test('Test 7: Create Fabric QC via UI', async ({ page }) => {
+    // Monitor for API errors during this test
+    const apiErrors = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/v1/') && response.status() >= 500) {
+        apiErrors.push({ url: response.url(), status: response.status() });
+      }
+    });
+
+    await navigateWithAuth(page, '/inventory/qc/fabric/new');
+    await waitForPageReady(page);
+
+    // Verify no API errors occurred during page load
+    expect(apiErrors, `API errors on QC form load: ${JSON.stringify(apiErrors)}`).toHaveLength(0);
+
+    // Select GRN — verify dropdown has options before selecting
+    const grnSelect = page.locator('.ant-form-item').filter({ hasText: 'GRN Number' }).locator('.ant-select').first();
+    await grnSelect.click();
+    const grnDropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    await grnDropdown.waitFor({ state: 'visible', timeout: 5000 });
+    const grnOptionCount = await grnDropdown.locator('.ant-select-item-option').count();
+    if (grnOptionCount === 0) {
+      // Close dropdown and skip — no QC_Pending GRNs available
+      await page.keyboard.press('Escape');
+      test.skip(true, 'No QC_Pending GRNs available in dropdown');
+    }
+    await grnDropdown.locator('.ant-select-item-option').first().click();
+    await grnDropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
     await page.waitForTimeout(1500);
 
     // Select PO Line Item (enabled after GRN selection)
@@ -355,8 +463,17 @@ test.describe('QC UI Tests', () => {
   });
 
   test('Test 8: Create Trims QC via UI', async ({ page }) => {
+    const apiErrors = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/v1/') && response.status() >= 500) {
+        apiErrors.push({ url: response.url(), status: response.status() });
+      }
+    });
+
     await navigateWithAuth(page, '/inventory/qc/trims/new');
     await waitForPageReady(page);
+
+    expect(apiErrors, `API errors on Trims QC form load: ${JSON.stringify(apiErrors)}`).toHaveLength(0);
 
     // Select GRN
     const grnSelect = page.locator('.ant-form-item').filter({ hasText: 'GRN Number' }).locator('.ant-select').first();

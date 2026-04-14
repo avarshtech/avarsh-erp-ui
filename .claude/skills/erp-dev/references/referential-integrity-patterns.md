@@ -8,6 +8,7 @@
 5. [Line-Level Edit Protection](#line-level-edit-protection)
 6. [Cross-Module Edit Warnings](#cross-module-edit-warnings)
 7. [Entity Protection Matrix](#entity-protection-matrix)
+8. [⚠️ Approval Flow Integrity (CRITICAL)](#-approval-flow-integrity-critical)
 
 ---
 
@@ -291,3 +292,111 @@ PO Edit (Draft/Referred_Back only)
   └─→ ❌ Block if status is Approved/Submitted/InProgress
   └─→ ❌ Block if GRN exists against PO lines (when GRN module is complete)
 ```
+
+---
+
+## ⚠️ Approval Flow Integrity (CRITICAL)
+
+> **⛔ READ THIS BEFORE TOUCHING ANY APPROVAL-FLOW CODE.**
+> The approval engine is shared across PO, Costing, Order, GRN, Work Order, Cutting PO, Production PO. Its integrity protects the audit trail for every business-critical document in the ERP. Breaking it silently corrupts history for ALL modules, not just the one you're editing.
+
+### The audit-trail landmine
+
+Historical actions in `apv_actions` bind to levels by **integer `level_number`** — NOT by FK to `apv_levels.id`:
+
+```java
+// ApprovalAction.java
+@Column(name = "level_number", nullable = false)
+private int levelNumber;   // ← just an int, not a FK
+```
+
+And on every flow update, `ApprovalFlowService.updateFlow()` does:
+
+```java
+flow.getLevels().clear();                  // DELETES all apv_levels rows
+addLevelsToFlow(flow, request.getLevels()); // INSERTS fresh rows
+```
+
+**Consequence:** If a user edits flow levels (even just renames one), every historical `apv_actions` row gets re-interpreted against the NEW level definitions at the same number. An action logged under "Manager Review" at level 1 silently becomes "Finance Review" — wrong person credited/blamed in the audit trail. Auditors lose the ability to reconstruct who approved what.
+
+### Non-obvious dangers when editing flows
+
+| # | Scenario | Silent damage |
+|---|----------|--------------|
+| 1 | Rename level 1 "Manager" → "Finance" | All historical approvals at L1 now display under new name |
+| 2 | Swap approver role on level 2 | Audit history shows wrong approver role for past rejections |
+| 3 | Remove level 3 entirely | Past L3 actions become orphaned — blank level name in UI |
+| 4 | Add a new level at position 2 (shift) | All old L2+ actions re-map to wrong levels |
+| 5 | Flip `allowReject` / `allowReferBack` | Retroactively changes what "should have been allowed" |
+| 6 | Change `conditions` JSONB | New submits route differently; old audit unaffected (this one is safe) |
+| 7 | Delete flow with only non-pending requests | Service allows it → Postgres FK RESTRICT throws cryptic error |
+| 8 | Resubmit of a REFERRED_BACK PO after flow edit | Silently uses NEW flow, user unaware routing changed |
+
+### Mandatory rules for approval flow code
+
+#### Rule 1 — Block structural edits once any request exists
+
+The current check only blocks on `PENDING` requests. That is **insufficient**. Expand to:
+
+```java
+long totalRequestCount = requestRepository.countByApprovalFlowId(id);
+boolean levelsChanged = levelsStructurallyDiffer(flow.getLevels(), request.getLevels());
+
+if (levelsChanged && totalRequestCount > 0) {
+    throw new ApprovalFlowLockedException(
+        "Cannot modify approval levels — " + totalRequestCount +
+        " request(s) reference this flow. Editing levels would corrupt audit history. " +
+        "Clone this flow as a new version instead.");
+}
+```
+
+**Metadata edits (name, description, priority, conditions, active toggle) remain allowed** even when history exists — they do not affect level-number semantics.
+
+#### Rule 2 — Block delete on ANY historical usage
+
+The current `deleteFlow()` only blocks on PENDING. Must also block on ANY `apv_requests` row referencing the flow, to convert the FK RESTRICT exception into a business-friendly message:
+
+```java
+long totalRequestCount = requestRepository.countByApprovalFlowId(id);
+if (totalRequestCount > 0) {
+    throw new RuntimeException(
+        "Cannot delete flow — " + totalRequestCount + " request(s) reference it. " +
+        "Deactivate it instead (toggle active=false).");
+}
+```
+
+#### Rule 3 — Prefer "clone & version" over in-place edit
+
+For structural changes, the UX pattern is:
+1. User clicks **"Clone & Edit"** on the existing flow
+2. Backend copies flow row + levels → new `apv_flows` row (`active=false` by default)
+3. User edits the clone freely (no history constraint)
+4. User activates the clone + deactivates the old flow → new POs route to new flow
+5. Old flow stays in DB, read-only, audit-intact
+
+Do NOT implement in-place "deep edit" of levels when history exists. Do NOT add a force-edit override. Do NOT soft-delete `apv_actions` rows on level replacement.
+
+#### Rule 4 — Never change the `level_number` binding
+
+Do **not** change `apv_actions.level_number` (int) to anything other than a proper `level_id` FK without a full data migration that preserves history. If you migrate to `level_id` FK, first backfill old rows by matching `(approval_flow_id, level_number) → apv_levels.id` at the moment of the migration.
+
+#### Rule 5 — Test every change with historical data
+
+Before shipping any approval flow change:
+1. Seed `apv_flows`, `apv_levels`, `apv_requests` (all statuses: PENDING, APPROVED, REJECTED, REFERRED_BACK, CANCELLED), `apv_actions`.
+2. Attempt flow edits and verify the guards trigger correctly.
+3. Open the approval history view for an old PO and verify level names still render correctly after edits.
+
+### Hibernate pitfall — two-bag fetch
+
+`ApprovalRequest.actions` (List) and `ApprovalFlow.levels` (List) are both Hibernate **bags** (no `@OrderColumn`). Never put both in the same `@EntityGraph` or `JOIN FETCH` — Hibernate 6 throws `"Could not generate fetch"` at query plan time, not at runtime. Always split into separate queries or use lazy-load within `@Transactional`.
+
+### Checklist — Before modifying any approval-flow file
+
+- [ ] I understand that `apv_actions.level_number` is an int, not a FK
+- [ ] I verified my change does NOT silently alter historical audit meaning
+- [ ] If touching `updateFlow`, I checked that structural edits are blocked when history exists
+- [ ] If touching `deleteFlow`, I checked it rejects on any historical usage, not just PENDING
+- [ ] If touching `@EntityGraph` or `JOIN FETCH`, I verified I don't fetch `levels` + `actions` together
+- [ ] If adding UI, I surfaced the "levels locked" state to the user with a clone option
+- [ ] I tested with multi-status `apv_requests` seeded data, not just the happy path

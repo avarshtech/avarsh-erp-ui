@@ -73,6 +73,21 @@ These banners ensure the user always knows what the agent is doing. Never skip t
 
 ---
 
+## ⛔ Critical Landmines — Read Before Any Task Near These Areas
+
+These are cross-cutting integrity traps that corrupt data silently. Before editing **anything** that touches these subsystems, read the referenced section in full. Do NOT attempt quick fixes, refactors, or "small improvements" in these areas without re-reading the rules.
+
+| Subsystem | Landmine | Reference |
+|-----------|----------|-----------|
+| **Approval Flows** (`apv_*` tables — used by PO, Costing, Order, GRN, Work Order, Cutting PO, Production PO) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate 6 with "Could not generate fetch". | [`referential-integrity-patterns.md` → ⚠️ Approval Flow Integrity (CRITICAL)](.claude/skills/erp-dev/references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
+| **Flyway Migrations V1–V34** | Pushed to production — **immutable**. Never edit. Add a new V* file. | `CLAUDE.md` |
+| **BOM PO-generated lines** | Locked once a PO is generated against them. | [`referential-integrity-patterns.md` → Line-Level Edit Protection](.claude/skills/erp-dev/references/referential-integrity-patterns.md) |
+
+**Trigger words that mean STOP and read the rules first:**
+> "approval flow", "approval levels", "apv_flows", "apv_levels", "apv_requests", "apv_actions", "edit approval", "change approval", "approval history", "audit trail"
+
+---
+
 ## Core Behavior Rules
 
 ### 1. NEVER Ask the User to Execute Commands

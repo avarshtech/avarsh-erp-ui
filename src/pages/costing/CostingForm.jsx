@@ -1250,7 +1250,7 @@ const CostingForm = () => {
       clearDirty();
       navigate('/costing/list');
     } catch {
-      message.error('Failed to save cost sheet');
+      // Error toast already shown by axios interceptor with backend's specific message.
     } finally {
       setSavingDraft(false);
     }
@@ -1297,7 +1297,7 @@ const CostingForm = () => {
       clearDirty();
       navigate('/costing/list');
     } catch {
-      message.error('Failed to submit cost sheet');
+      // Error toast already shown by axios interceptor with backend's specific message.
     } finally {
       setSubmitting(false);
     }
