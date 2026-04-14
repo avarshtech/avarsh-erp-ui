@@ -28,7 +28,9 @@
       "Bash(cd f:/Ranjith/project/RK/Repos/erp-purchase && ./mvnw compile:*)",
       "Bash(npx skills:*)",
       "Bash(./gradlew compileJava -x test --no-daemon)",
-      "Bash(ls V3[4-9]* V4*)"
+      "Bash(ls V3[4-9]* V4*)",
+      "Bash(ls mvnw*)",
+      "Bash(ls *.cmd)"
     ]
   }
 }

@@ -86,52 +86,79 @@ function ItemSearchSelect({ value, onChange }) {
 // ── QuickCreateItemModal ──────────────────────────────────────────────────────
 
 function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
-  const [form]         = Form.useForm();
+  const { message }           = App.useApp();
+  const [form]                = Form.useForm();
   const [meta, setMeta]       = useState([]);
   const [subs, setSubs]       = useState([]);
   const [types, setTypes]     = useState([]);
   const [uoms, setUoms]       = useState([]);
+  const [categorySelected, setCategorySelected]       = useState(false);
+  const [subcategorySelected, setSubcategorySelected] = useState(false);
+  const [itemTypeSelected, setItemTypeSelected]       = useState(false);
   const [saving, setSaving]   = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    getItemMetaData()
-      .then((res) => {
-        const data = res.data || res || [];
-        setMeta(data);
+  const noSubsForCategory    = categorySelected    && subs.length  === 0;
+  const noTypesForSubcategory = subcategorySelected && types.length === 0;
+  const noUomsForItemType    = itemTypeSelected    && uoms.length  === 0;
+  const hasDeadEnd = noSubsForCategory || noTypesForSubcategory || noUomsForItemType;
 
-        // Auto-detect category from row type
-        const keyword = ROW_TYPE_CATEGORY[extractedRow?.rowType] || '';
-        const cat = data.find((c) => c.name?.toLowerCase().includes(keyword));
-        if (cat) {
-          form.setFieldValue('categoryId', String(cat.id));
-          applyCategoryChange(String(cat.id), data);
-        }
-      })
-      .catch(() => {});
-
-    form.setFieldsValue({ itemName: extractedRow?.extractedName || '', isActive: true });
-  }, [open, extractedRow]);
-
-  const applyCategoryChange = (catId, source = meta) => {
+  const hydrateFromCategory = (catId, source) => {
     const cat = source.find((c) => String(c.id) === String(catId));
     setSubs(cat?.subCategories || []);
     setTypes([]);
     setUoms([]);
-    form.setFieldsValue({ subCategoryId: undefined, itemTypeId: undefined, uomId: undefined });
+    setCategorySelected(!!catId);
   };
 
-  const applySubcategoryChange = (subId) => {
-    const sub = subs.find((s) => String(s.id) === String(subId));
+  useEffect(() => {
+    if (!open) return;
+    form.setFieldsValue({ itemName: extractedRow?.extractedName || '', isActive: true });
+    getItemMetaData()
+      .then((res) => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.content || []);
+        setMeta(data);
+
+        const keyword = ROW_TYPE_CATEGORY[extractedRow?.rowType] || '';
+        const cat = data.find((c) => c.name?.toLowerCase().includes(keyword));
+        if (cat) {
+          form.setFieldValue('categoryId', String(cat.id));
+          hydrateFromCategory(String(cat.id), data);
+        }
+      })
+      .catch(() => {});
+  }, [open, extractedRow]);
+
+  const handleCategoryChange = (catId) => {
+    form.setFieldsValue({ subCategoryId: undefined, itemTypeId: undefined, uomId: undefined });
+    const cat = meta.find((c) => String(c.id) === String(catId));
+    setSubs(cat?.subCategories || []);
+    setTypes([]);
+    setUoms([]);
+    setCategorySelected(!!catId);
+    setSubcategorySelected(false);
+    setItemTypeSelected(false);
+  };
+
+  const handleSubcategoryChange = (subId) => {
+    form.setFieldsValue({ itemTypeId: undefined, uomId: undefined });
+    const catId = form.getFieldValue('categoryId');
+    const cat   = meta.find((c) => String(c.id) === String(catId));
+    const sub   = cat?.subCategories?.find((s) => String(s.id) === String(subId));
     setTypes(sub?.itemTypes || []);
     setUoms([]);
-    form.setFieldsValue({ itemTypeId: undefined, uomId: undefined });
+    setSubcategorySelected(!!subId);
+    setItemTypeSelected(false);
   };
 
-  const applyItemTypeChange = (typeId) => {
-    const type = types.find((t) => String(t.id) === String(typeId));
-    setUoms(type?.uoms || []);
+  const handleItemTypeChange = (typeId) => {
     form.setFieldValue('uomId', undefined);
+    const catId = form.getFieldValue('categoryId');
+    const subId = form.getFieldValue('subCategoryId');
+    const cat   = meta.find((c) => String(c.id) === String(catId));
+    const sub   = cat?.subCategories?.find((s) => String(s.id) === String(subId));
+    const type  = sub?.itemTypes?.find((t) => String(t.id) === String(typeId));
+    setUoms(type?.uoms || []);
+    setItemTypeSelected(!!typeId);
   };
 
   const handleSave = async () => {
@@ -164,31 +191,55 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
       open={open}
       onCancel={onClose}
       afterClose={() => form.resetFields()}
-      title={<Space><PlusOutlined /> Quick Create Item</Space>}
-      width={540}
+      title={<span style={{ fontSize: 18, fontWeight: 600 }}>Quick Create Item</span>}
+      width={640}
       centered
       onOk={handleSave}
       okText="Create Item"
-      okButtonProps={{ loading: saving }}
+      okButtonProps={{ loading: saving, disabled: hasDeadEnd }}
       destroyOnClose
-      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
     >
       <Alert
         type="info" showIcon
-        style={{ marginBottom: 16, fontSize: 12 }}
+        style={{ marginBottom: 16 }}
         message={`Creating item for: "${extractedRow?.extractedName}"`}
       />
-      <Form form={form} layout="vertical" size="small">
+      {noSubsForCategory && (
+        <Alert
+          type="warning" showIcon
+          style={{ marginBottom: 16 }}
+          message="No Subcategory configured for this Category"
+          description="Please open the Subcategory master screen and add at least one subcategory under this category before creating this item."
+        />
+      )}
+      {noTypesForSubcategory && (
+        <Alert
+          type="warning" showIcon
+          style={{ marginBottom: 16 }}
+          message="No Item Type configured for this Subcategory"
+          description="Please open the Item Type master screen and add at least one item type under this subcategory before creating this item."
+        />
+      )}
+      {noUomsForItemType && (
+        <Alert
+          type="warning" showIcon
+          style={{ marginBottom: 16 }}
+          message="No UOM configured for this Item Type"
+          description="Please open the Item Type master screen and assign at least one UOM before creating this item."
+        />
+      )}
+      <Form form={form} layout="vertical">
         <Form.Item name="itemName" label="Item Name" rules={[{ required: true }]}>
           <Input />
         </Form.Item>
-        <Row gutter={12}>
+        <Row gutter={16}>
           <Col span={12}>
             <Form.Item name="categoryId" label="Category" rules={[{ required: true }]}>
               <Select
                 placeholder="Category" showSearch optionFilterProp="label"
                 options={meta.map((c) => ({ value: String(c.id), label: c.name }))}
-                onChange={(v) => applyCategoryChange(v)}
+                onChange={handleCategoryChange}
               />
             </Form.Item>
           </Col>
@@ -198,7 +249,7 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
                 placeholder="Subcategory" showSearch optionFilterProp="label"
                 disabled={subs.length === 0}
                 options={subs.map((s) => ({ value: String(s.id), label: s.name }))}
-                onChange={applySubcategoryChange}
+                onChange={handleSubcategoryChange}
               />
             </Form.Item>
           </Col>
@@ -208,7 +259,7 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
                 placeholder="Item Type" showSearch optionFilterProp="label"
                 disabled={types.length === 0}
                 options={types.map((t) => ({ value: String(t.id), label: t.name }))}
-                onChange={applyItemTypeChange}
+                onChange={handleItemTypeChange}
               />
             </Form.Item>
           </Col>
@@ -481,7 +532,11 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
         open={open}
         onCancel={handleClose}
         afterClose={handleAfterClose}
-        title={<Space><ImportOutlined /> Import from Techpack PDF</Space>}
+        title={
+          <Space size={8} style={{ fontSize: 18, fontWeight: 600 }}>
+            <ImportOutlined /> Import from Techpack PDF
+          </Space>
+        }
         width={880}
         centered
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
@@ -538,7 +593,11 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
           <div>
 
             {/* ── Buyer & Style Card ── */}
-            <Card size="small" style={{ marginBottom: 12, background: '#f6f8ff' }}>
+            <Card
+              size="small"
+              style={{ marginBottom: 12, background: '#f6f8ff' }}
+              styles={{ body: { paddingTop: 20 } }}
+            >
               <Title level={5} style={{ margin: '0 0 12px 0' }}>Extracted Style Info</Title>
 
               {/* Buyer row */}
@@ -554,57 +613,14 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                       ? <Text style={{ fontSize: 12, color: 'var(--success-color)' }}>{matchedBuyer.name}</Text>
                       : (
                         <Button
-                          size="small" icon={<PlusOutlined />}
-                          type={buyerCreateOpen ? 'primary' : 'dashed'}
-                          onClick={() => setBuyerCreateOpen((v) => !v)}
+                          size="small" icon={<PlusOutlined />} type="dashed"
+                          onClick={() => setBuyerCreateOpen(true)}
                         >
-                          {buyerCreateOpen ? 'Close' : 'Quick Create Buyer'}
+                          Quick Create Buyer
                         </Button>
                       )
                     }
                   </Space>
-
-                  {buyerCreateOpen && !matchedBuyer.id && (
-                    <Card
-                      size="small"
-                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: 'var(--primary-color)' }}
-                    >
-                      <Form form={buyerForm} layout="vertical" size="small">
-                        <Row gutter={12}>
-                          <Col span={8}>
-                            <Form.Item name="name" label="Buyer Name"
-                              rules={[{ required: true, message: 'Required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Input />
-                            </Form.Item>
-                          </Col>
-                          <Col span={8}>
-                            <Form.Item name="contactPerson" label="Contact Person"
-                              rules={[{ required: true, message: 'Required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Input placeholder="e.g. John Smith" />
-                            </Form.Item>
-                          </Col>
-                          <Col span={8}>
-                            <Form.Item name="email" label="Email"
-                              rules={[{ required: true, type: 'email', message: 'Valid email required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Input placeholder="buyer@brand.com" />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        <Space>
-                          <Button type="primary" size="small" loading={savingBuyer}
-                            onClick={handleSaveBuyer} icon={<PlusOutlined />}>
-                            Create Buyer
-                          </Button>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            Shipping details can be added later in Buyer Master
-                          </Text>
-                        </Space>
-                      </Form>
-                    </Card>
-                  )}
                 </Col>
               </Row>
 
@@ -621,70 +637,14 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
                       ? <Text style={{ fontSize: 12, color: 'var(--success-color)' }}>Linked to existing style</Text>
                       : (
                         <Button
-                          size="small" icon={<PlusOutlined />}
-                          type={styleCreateOpen ? 'primary' : 'dashed'}
-                          onClick={() => setStyleCreateOpen((v) => !v)}
+                          size="small" icon={<PlusOutlined />} type="dashed"
+                          onClick={() => setStyleCreateOpen(true)}
                         >
-                          {styleCreateOpen ? 'Close' : 'Quick Create Style'}
+                          Quick Create Style
                         </Button>
                       )
                     }
                   </Space>
-
-                  {styleCreateOpen && !matchedStyle.id && (
-                    <Card
-                      size="small"
-                      style={{ marginTop: 8, borderStyle: 'dashed', borderColor: 'var(--primary-color)' }}
-                    >
-                      <Form form={styleForm} layout="vertical" size="small">
-                        <Row gutter={12}>
-                          <Col span={8}>
-                            <Form.Item name="styleNo" label="Style No"
-                              rules={[{ required: true, message: 'Required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Input />
-                            </Form.Item>
-                          </Col>
-                          <Col span={8}>
-                            <Form.Item name="garmentName" label="Garment Name"
-                              rules={[{ required: true, message: 'Required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Input />
-                            </Form.Item>
-                          </Col>
-                          <Col span={8}>
-                            <Form.Item name="buyerId" label="Buyer"
-                              rules={[{ required: true, message: 'Required' }]}
-                              style={{ marginBottom: 8 }}>
-                              <Select
-                                placeholder="Select Buyer" showSearch optionFilterProp="label"
-                                options={allBuyers.map((b) => ({ value: b.id, label: b.name }))}
-                              />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            <Form.Item name="seasonCode" label="Season" style={{ marginBottom: 8 }}>
-                              <Select placeholder="AW/SS" options={SEASON_CODES} allowClear />
-                            </Form.Item>
-                          </Col>
-                          <Col span={4}>
-                            <Form.Item name="seasonYear" label="Year" style={{ marginBottom: 8 }}>
-                              <Select placeholder="Year" options={SEASON_YEARS} allowClear />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        <Space>
-                          <Button type="primary" size="small" loading={savingStyle}
-                            onClick={handleSaveStyle} icon={<PlusOutlined />}>
-                            Create Style
-                          </Button>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            Style will be auto-linked after creation
-                          </Text>
-                        </Space>
-                      </Form>
-                    </Card>
-                  )}
                 </Col>
               </Row>
 
@@ -716,7 +676,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
             <Divider style={{ margin: '8px 0' }} />
 
             {/* ── Row Sections ── */}
-            <div style={{ maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+            <div>
               <RowsSection
                 title="Fabric" rows={extracted.fabricRows}
                 overrides={overrides.fabric} onOverride={setRowOverride('fabric')}
@@ -745,6 +705,103 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
             />
           </div>
         )}
+      </Modal>
+
+      {/* Quick Create Buyer sub-modal */}
+      <Modal
+        open={buyerCreateOpen}
+        onCancel={() => setBuyerCreateOpen(false)}
+        title={<span style={{ fontSize: 18, fontWeight: 600 }}>Quick Create Buyer</span>}
+        width={640}
+        centered
+        onOk={handleSaveBuyer}
+        okText="Create Buyer"
+        okButtonProps={{ loading: savingBuyer, icon: <PlusOutlined /> }}
+        destroyOnClose={false}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
+      >
+        <Alert
+          type="info" showIcon
+          style={{ marginBottom: 16 }}
+          message="Shipping details can be added later in Buyer Master"
+        />
+        <Form form={buyerForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item name="name" label="Buyer Name"
+                rules={[{ required: true, message: 'Required' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="contactPerson" label="Contact Person"
+                rules={[{ required: true, message: 'Required' }]}>
+                <Input placeholder="e.g. John Smith" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="email" label="Email"
+                rules={[{ required: true, type: 'email', message: 'Valid email required' }]}>
+                <Input placeholder="buyer@brand.com" />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Quick Create Style sub-modal */}
+      <Modal
+        open={styleCreateOpen}
+        onCancel={() => setStyleCreateOpen(false)}
+        title={<span style={{ fontSize: 18, fontWeight: 600 }}>Quick Create Style</span>}
+        width={640}
+        centered
+        onOk={handleSaveStyle}
+        okText="Create Style"
+        okButtonProps={{ loading: savingStyle, icon: <PlusOutlined /> }}
+        destroyOnClose={false}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
+      >
+        <Alert
+          type="info" showIcon
+          style={{ marginBottom: 16 }}
+          message="Style will be auto-linked after creation"
+        />
+        <Form form={styleForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="styleNo" label="Style No"
+                rules={[{ required: true, message: 'Required' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="garmentName" label="Garment Name"
+                rules={[{ required: true, message: 'Required' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="buyerId" label="Buyer"
+                rules={[{ required: true, message: 'Required' }]}>
+                <Select
+                  placeholder="Select Buyer" showSearch optionFilterProp="label"
+                  options={allBuyers.map((b) => ({ value: b.id, label: b.name }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="seasonCode" label="Season">
+                <Select placeholder="AW/SS" options={SEASON_CODES} allowClear />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="seasonYear" label="Year">
+                <Select placeholder="Year" options={SEASON_YEARS} allowClear />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
       </Modal>
 
       {/* Quick Create Item sub-modal */}
