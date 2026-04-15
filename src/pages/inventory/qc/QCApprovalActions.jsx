@@ -48,6 +48,7 @@ const SUCCESS = 'var(--success-color, #52c41a)';
 const ERROR   = 'var(--error-color, #ff4d4f)';
 const WARNING = 'var(--warning-color, #faad14)';
 const CYAN    = '#13c2c2'; // Conditional Pass accent
+const VOLCANO = '#d4380d'; // Rejected_With_Backup accent
 
 const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const { message } = App.useApp();
@@ -55,6 +56,7 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const [activeAction, setActiveAction] = useState(null);
   const [reason, setReason] = useState('');
   const [conditionalPass, setConditionalPass] = useState(false);
+  const [keepBackup, setKeepBackup] = useState(false);
 
   if (!qc) return null;
   const status = qc.status;
@@ -69,6 +71,7 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const openAction = (action) => {
     setReason('');
     setConditionalPass(false);
+    setKeepBackup(false);
     setActiveAction(action);
   };
   const closeAction = () => setActiveAction(null);
@@ -86,15 +89,15 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
           // QCService.approve() — this client-side call becomes a no-op.
           if (updated?.grnId) await closeGRNOnQCApproval(updated.grnId);
           break;
-        case 'reject':     updated = await rejectFn(qc.id, enteredReason); break;
+        case 'reject':     updated = await rejectFn(qc.id, enteredReason, { keepBackup }); break;
         case 'request-rb': updated = await referBackRequestFn?.(qc.id, enteredReason); break;
         case 'approve-rb': updated = await referBackApproveFn?.(qc.id); break;
         case 'reject-rb':  updated = await referBackRejectFn?.(qc.id); break;
         default: break;
       }
-      const successMsg = activeAction.key === 'approve' && conditionalPass
-        ? 'QC approved with Conditional Pass'
-        : activeAction.successMsg || 'Action completed';
+      let successMsg = activeAction.successMsg || 'Action completed';
+      if (activeAction.key === 'approve' && conditionalPass) successMsg = 'QC approved with Conditional Pass';
+      if (activeAction.key === 'reject' && keepBackup) successMsg = 'QC rejected and kept in stock as Back-up';
       message.success(successMsg);
       onUpdated?.(updated);
       closeAction();
@@ -129,13 +132,17 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
     reject: {
       key: 'reject',
       action: 'reject',
-      label: 'Reject',
-      title: `Reject ${docLabel}`,
-      subtitle: 'Return this inspection to the creator for revision.',
-      flowLabel: 'Pending Approval → Rejected',
-      btnText: 'Reject Inspection',
+      label: keepBackup ? 'Reject with Back-up' : 'Reject',
+      title: keepBackup ? `Reject with Back-up · ${docLabel}` : `Reject ${docLabel}`,
+      subtitle: keepBackup
+        ? 'Reject this inspection but retain the physical stock in the warehouse as Back-up.'
+        : 'Return this inspection to the creator for revision.',
+      flowLabel: keepBackup
+        ? 'Pending Approval → Rejected (Back-up)'
+        : 'Pending Approval → Rejected',
+      btnText: keepBackup ? 'Reject & Keep Back-up' : 'Reject Inspection',
       icon: <CloseCircleOutlined />,
-      color: ERROR,
+      color: keepBackup ? VOLCANO : ERROR,
       danger: true,
       requiresReason: true,
       minChars: 50,
@@ -147,8 +154,12 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       action: 'refer-back',
       label: 'Request Refer Back',
       title: 'Request Refer Back',
-      subtitle: 'Reopen the approved / conditional-pass inspection so the creator can re-inspect.',
-      flowLabel: `${status === QC_STATUS.CONDITIONAL_PASS ? 'Conditional Pass' : 'Approved'} → Refer Back Pending`,
+      subtitle: 'Reopen the finalised inspection so the creator can re-inspect.',
+      flowLabel: `${
+        status === QC_STATUS.CONDITIONAL_PASS ? 'Conditional Pass'
+          : status === QC_STATUS.REJECTED_WITH_BACKUP ? 'Rejected (Back-up)'
+          : 'Approved'
+      } → Refer Back Pending`,
       btnText: 'Request Refer Back',
       icon: <RollbackOutlined />,
       color: WARNING,
@@ -194,8 +205,14 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
     if (canApproveQC()) availableKeys.push('approve');
     if (canRejectQC())  availableKeys.push('reject');
   }
-  // Refer-back flow is shared between Approved and Conditional Pass
-  if ((status === QC_STATUS.APPROVED || status === QC_STATUS.CONDITIONAL_PASS) && canRequestQCReferBack()) {
+  // Refer-back flow is shared between Approved, Conditional Pass, and
+  // Rejected (Back-up) — all three are reversible final states.
+  if (
+    (status === QC_STATUS.APPROVED
+      || status === QC_STATUS.CONDITIONAL_PASS
+      || status === QC_STATUS.REJECTED_WITH_BACKUP)
+    && canRequestQCReferBack()
+  ) {
     availableKeys.push('request-rb');
   }
   if (status === QC_STATUS.REFERRED_BACK_PENDING && canApproveQCReferBack()) {
@@ -255,6 +272,33 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
                 <Text type="secondary" style={{ fontSize: 11.5 }}>
                   Approve with qualifications — use when the lot is acceptable but some parameters
                   or criteria are borderline. The GRN still closes; the approval is flagged distinctly.
+                </Text>
+              </div>
+            </div>
+          ) : activeAction?.key === 'reject' ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 8,
+                border: `1px solid ${keepBackup ? VOLCANO : 'var(--border-color, #e5e7eb)'}`,
+                borderLeft: `4px solid ${keepBackup ? VOLCANO : 'var(--border-color, #d9d9d9)'}`,
+                background: keepBackup ? 'rgba(212, 56, 13, 0.06)' : 'transparent',
+                transition: 'background 150ms ease, border-color 150ms ease',
+              }}
+            >
+              <Checkbox
+                checked={keepBackup}
+                onChange={(e) => setKeepBackup(e.target.checked)}
+              >
+                <Text strong style={{ fontSize: 13, color: keepBackup ? VOLCANO : undefined }}>
+                  Keep rejected stock as Back-up
+                </Text>
+              </Checkbox>
+              <div style={{ marginTop: 4, marginLeft: 24 }}>
+                <Text type="secondary" style={{ fontSize: 11.5 }}>
+                  Rejected stock is retained in the warehouse as Back-up and is not returned to
+                  the supplier. The QC is flagged as Rejected (Back-up) and can still be reversed
+                  via refer-back if marked in error.
                 </Text>
               </div>
             </div>

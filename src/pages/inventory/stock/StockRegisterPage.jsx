@@ -1,13 +1,10 @@
 import { useState } from 'react';
 import { Segmented } from 'antd';
-import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
-import { ActionButton } from '../../../components/buttons';
 import FabricStockRegister from './FabricStockRegister';
 import AccessoriesStockRegister from './AccessoriesStockRegister';
 
 const StockRegisterPage = () => {
-  const navigate = useNavigate();
   const [activeSegment, setActiveSegment] = useState('Fabric');
 
   return (
@@ -16,11 +13,7 @@ const StockRegisterPage = () => {
         title="Stock Register"
         sticky
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
-      >
-        {activeSegment === 'Fabric' && (
-          <ActionButton action="view" text="Shade Lot View" onClick={() => navigate('/inventory/fabric-stock/shade-lots')} />
-        )}
-      </PageHeader>
+      />
 
       <Segmented
         options={[

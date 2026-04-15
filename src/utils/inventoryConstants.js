@@ -37,8 +37,11 @@ export const GRN_STATUS_LABELS = {
 };
 
 // ─── QC STATUS ─────────────────────────────────────────────────────────────────
-// 8-state lifecycle. Approved and Conditional_Pass are peer final states —
-// both close the linked GRN and both enter the same refer-back flow.
+// 9-state lifecycle. Approved and Conditional_Pass are peer final states —
+// both close the linked GRN and both enter the refer-back flow.
+// Rejected_With_Backup is a secondary reject terminal where physical stock is
+// retained in the warehouse (not returned to supplier) and may be re-opened
+// via the refer-back flow if marked in error.
 export const QC_STATUS = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
@@ -46,6 +49,7 @@ export const QC_STATUS = {
   APPROVED: 'Approved',
   CONDITIONAL_PASS: 'Conditional_Pass',            // approved with qualifications
   REJECTED: 'Rejected',
+  REJECTED_WITH_BACKUP: 'Rejected_With_Backup',    // rejected but kept in stock as back-up
   REFERRED_BACK_PENDING: 'Referred_Back_Pending',  // request to reopen approved QC
   REFERRED_BACK: 'Referred_Back',                  // editable, only Submit
 };
@@ -57,6 +61,7 @@ export const QC_STATUS_LABELS = {
   [QC_STATUS.APPROVED]: 'Approved',
   [QC_STATUS.CONDITIONAL_PASS]: 'Conditional Pass',
   [QC_STATUS.REJECTED]: 'Rejected',
+  [QC_STATUS.REJECTED_WITH_BACKUP]: 'Rejected (Back-up)',
   [QC_STATUS.REFERRED_BACK_PENDING]: 'Refer Back Pending',
   [QC_STATUS.REFERRED_BACK]: 'Referred Back',
 };

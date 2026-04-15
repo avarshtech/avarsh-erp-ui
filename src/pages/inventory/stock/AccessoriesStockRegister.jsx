@@ -4,17 +4,16 @@ import {
   SearchOutlined,
   AppstoreOutlined,
   NumberOutlined,
-  TagsOutlined,
+  DollarCircleOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
-import { ActionButton } from '../../../components/buttons';
 import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { getAccessoriesStock } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import getAccessoriesStockColumns from './AccessoriesStockColumns';
-import SizeColorMatrix from './SizeColorMatrix';
+import AccessoriesStockViewDrawer from './AccessoriesStockViewDrawer';
 
 const CATEGORY_OPTIONS = [
   { label: 'Buttons', value: 'Buttons' },
@@ -31,14 +30,20 @@ const AccessoriesStockRegister = ({ embedded = false }) => {
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  const [apiStats, setApiStats] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(undefined);
+  const [drawer, setDrawer] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAccessoriesStock({ search: searchText, category: categoryFilter });
+      const res = await getAccessoriesStock({
+        search: searchText || undefined,
+        category: categoryFilter || undefined,
+      });
       setData(res.content || []);
+      setApiStats(res.stats || null);
     } catch {
       message.error('Failed to load accessories stock');
     } finally {
@@ -52,29 +57,21 @@ const AccessoriesStockRegister = ({ embedded = false }) => {
 
   const columns = useMemo(() => getAccessoriesStockColumns(), []);
 
-  const stats = useMemo(() => {
-    const totalQty = data.reduce((sum, r) => sum + (r.totalQty || 0), 0);
-    const categories = new Set(data.map((r) => r.category)).size;
-    return { total: data.length, totalQty, categories };
-  }, [data]);
-
-  const expandedRowRender = useCallback((record) => (
-    <div style={{ padding: '8px 16px' }}>
-      <SizeColorMatrix sizeColorMatrix={record.sizeColorMatrix} />
-    </div>
-  ), []);
+  // Stats sourced from the paginated response. See
+  // AccessoriesStockService.search() for the server-side computation.
+  const stats = apiStats || { totalItems: 0, totalQuantity: 0, totalValue: 0 };
 
   const content = (
     <>
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={8}>
-          <StatCard title="Total Items" value={stats.total} color="var(--primary-color)" icon={<AppstoreOutlined />} />
+        <Col xs={24} sm={8}>
+          <StatCard title="Total Items" value={stats.totalItems} color="var(--primary-color)" icon={<AppstoreOutlined />} />
         </Col>
-        <Col xs={12} sm={8}>
-          <StatCard title="Total Quantity" value={formatNumber(stats.totalQty)} color="var(--primary-color)" icon={<NumberOutlined />} />
+        <Col xs={24} sm={8}>
+          <StatCard title="Total Quantity" value={formatNumber(stats.totalQuantity)} color="var(--success-color)" icon={<NumberOutlined />} />
         </Col>
-        <Col xs={12} sm={8}>
-          <StatCard title="Categories" value={stats.categories} color="var(--success-color)" icon={<TagsOutlined />} />
+        <Col xs={24} sm={8}>
+          <StatCard title="Total Value (₹)" value={formatNumber(stats.totalValue, 0)} color="var(--warning-color)" icon={<DollarCircleOutlined />} />
         </Col>
       </Row>
 
@@ -88,12 +85,21 @@ const AccessoriesStockRegister = ({ embedded = false }) => {
           columns={columns}
           dataSource={data}
           loading={loading}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1240 }}
           pagination={getTablePagination({ pageSize: 25 }, 'items')}
-          expandable={{ expandedRowRender }}
+          onRow={(record) => ({
+            onClick: () => setDrawer({ open: true, record }),
+            style: { cursor: 'pointer' },
+          })}
           locale={{ emptyText: <EmptyState title="No accessories stock found" description="Stock will appear here once GRNs are confirmed" /> }}
         />
       </Card>
+
+      <AccessoriesStockViewDrawer
+        open={drawer.open}
+        record={drawer.record}
+        onClose={() => setDrawer({ open: false, record: null })}
+      />
     </>
   );
 

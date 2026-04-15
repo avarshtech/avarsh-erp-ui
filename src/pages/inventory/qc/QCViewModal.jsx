@@ -32,9 +32,21 @@ const HERO_ACCENT = {
   [QC_STATUS.APPROVED]:               'var(--success-color)', // green
   [QC_STATUS.CONDITIONAL_PASS]:       '#13c2c2',   // cyan — approved with qualifications
   [QC_STATUS.REJECTED]:               'var(--error-color)',   // red
+  [QC_STATUS.REJECTED_WITH_BACKUP]:   '#d4380d',   // volcano — rejected but kept as back-up
   [QC_STATUS.REFERRED_BACK_PENDING]:  '#faad14',   // gold
   [QC_STATUS.REFERRED_BACK]:          '#722ed1',   // purple
 };
+
+// Statuses that hide the Print Report button — the QC is either still being
+// drafted, has been invalidated (rejected / rejected-with-backup) or has been
+// pulled back for re-inspection (referred back). Applies to both Fabric and
+// Accessories QC.
+const PDF_HIDDEN_STATUSES = new Set([
+  QC_STATUS.DRAFT,
+  QC_STATUS.REJECTED,
+  QC_STATUS.REJECTED_WITH_BACKUP,
+  QC_STATUS.REFERRED_BACK,
+]);
 
 const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 };
 
@@ -128,7 +140,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 8px' }}>
           <Space size="middle">
-            {qc && qc.status !== QC_STATUS.DRAFT && (
+            {qc && !PDF_HIDDEN_STATUSES.has(qc.status) && (
               <ActionButton
                 action="print"
                 text="Print Report"

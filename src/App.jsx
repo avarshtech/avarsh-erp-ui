@@ -36,7 +36,6 @@ const FabricQCInspection = lazy(() => import('./pages/inventory/qc/FabricQCInspe
 const TrimsQCInspection = lazy(() => import('./pages/inventory/qc/TrimsQCInspection'));
 const QualityControlPage = lazy(() => import('./pages/inventory/qc/QualityControlPage'));
 const StockRegisterPage = lazy(() => import('./pages/inventory/stock/StockRegisterPage'));
-const FabricShadeLotView = lazy(() => import('./pages/inventory/stock/FabricShadeLotView'));
 const MaterialIssuePage = lazy(() => import('./pages/inventory/issue/MaterialIssuePage'));
 const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueForm'));
 const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
@@ -325,7 +324,6 @@ const ThemedApp = () => {
             <Route path="inventory/qc/trims/new" element={<PermissionRoute module="inventory-qc" operation="add"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/qc/trims/:id" element={<PermissionRoute module="inventory-qc"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/stock" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><StockRegisterPage /></Suspense></PermissionRoute>} />
-            <Route path="inventory/fabric-stock/shade-lots" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><FabricShadeLotView /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue" element={<PermissionRoute module="inventory-issue"><Suspense fallback={<PageSkeleton />}><MaterialIssuePage /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/fabric/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />

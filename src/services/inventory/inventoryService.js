@@ -491,12 +491,15 @@ const postQcAction = async (qcId, action, reason, version, extras = {}) => {
 
 // Approve / Reject — unified for both QC types (server dispatches on qcType).
 // `options.conditionalPass` on approve → server moves the QC to Conditional_Pass.
+// `options.keepBackup`       on reject  → server moves the QC to Rejected_With_Backup.
 export const approveFabricQC = (id, reason, options = {}) =>
   postQcAction(id, 'approve', reason, undefined, { conditionalPass: !!options.conditionalPass });
-export const rejectFabricQC  = (id, reason) => postQcAction(id, 'reject', reason);
+export const rejectFabricQC  = (id, reason, options = {}) =>
+  postQcAction(id, 'reject', reason, undefined, { keepBackup: !!options.keepBackup });
 export const approveTrimsQC  = (id, reason, options = {}) =>
   postQcAction(id, 'approve', reason, undefined, { conditionalPass: !!options.conditionalPass });
-export const rejectTrimsQC   = (id, reason) => postQcAction(id, 'reject', reason);
+export const rejectTrimsQC   = (id, reason, options = {}) =>
+  postQcAction(id, 'reject', reason, undefined, { keepBackup: !!options.keepBackup });
 
 // Refer-back workflow — symmetric for Fabric and Accessories.
 export const requestFabricQCReferBack = (id, reason) => postQcAction(id, 'refer-back/request', reason);
@@ -520,28 +523,201 @@ export const deleteTrimsQCDraft = async (id) => {
 export const getActiveDefectTypes     = () => fetchActiveDefectTypes();
 export const getActiveTrimsQCCriteria = () => fetchActiveTrimsQCCriteria();
 
-// ─── STOCK (mock) ──────────────────────────────────────────────────────────────
-export const getFabricStock = async (params = {}) => {
-  await delay();
-  let filtered = [...MOCK_FABRIC_STOCK];
-  if (params.status) filtered = filtered.filter((s) => s.status === params.status);
-  if (params.shadeLot) filtered = filtered.filter((s) => s.shadeLot === params.shadeLot);
-  if (params.search) {
-    const q = params.search.toLowerCase();
-    filtered = filtered.filter((s) => s.rollNumber.toLowerCase().includes(q) || s.fabricDescription.toLowerCase().includes(q));
+// ─── STOCK ─────────────────────────────────────────────────────────────────────
+// Server endpoints (live when USE_MOCK_INVENTORY_DATA is false):
+//   GET /api/v1/inventory/stock/fabric       — paginated, filters: subCategory, search
+//   GET /api/v1/inventory/stock/accessories  — paginated, filters: category,    search
+// Both return { content: items[], totalElements, totalPages, number, size, stats }
+// pre-aggregated at the (itemCode × grnNumber) level with rolls / variants nested.
+const STOCK_FABRIC_ENDPOINT      = '/inventory/stock/fabric';
+const STOCK_ACCESSORIES_ENDPOINT = '/inventory/stock/accessories';
+
+// Current financial year window (April 1 → March 31) used by mock stat scoping.
+const currentFYWindow = () => {
+  const t = new Date();
+  const startYear = t.getMonth() >= 3 ? t.getFullYear() : t.getFullYear() - 1;
+  return [new Date(startYear, 3, 1), new Date(startYear + 1, 2, 31)];
+};
+
+// Aggregate the flat mock roll list into item-level rows so the mock path
+// surfaces the same shape as the server endpoint. Rolls are nested on each row.
+const aggregateMockFabricRolls = (rolls) => {
+  const map = new Map();
+  for (const r of rolls) {
+    const key = `${r.itemCode}|${r.grnNumber}`;
+    const entry = map.get(key) || {
+      id: key,
+      itemCode: r.itemCode,
+      fabricDescription: r.fabricDescription,
+      subCategory: r.subCategory,
+      style: r.style,
+      orderRef: r.orderRef,
+      supplier: r.supplier,
+      grnNumber: r.grnNumber,
+      grnDate: r.grnDate,
+      uom: r.uom || 'kg',
+      composition: r.composition,
+      color: r.color,
+      width: r.width,
+      gsm: r.gsm,
+      poLineValue: r.poLineValue,
+      totalQty: 0,
+      rolls: [],
+      statuses: new Set(),
+    };
+    entry.totalQty += Number(r.weight || 0);
+    entry.rolls.push({
+      rollId: r.rollId,
+      rollNumber: r.rollNumber,
+      width: r.width,
+      gsm: r.gsm,
+      weight: r.weight,
+      shadeLot: r.shadeLot,
+      qcStatus: r.qcStatus,
+    });
+    if (r.status) entry.statuses.add(r.status);
+    map.set(key, entry);
   }
-  return { content: filtered, totalElements: filtered.length };
+  return Array.from(map.values()).map((e) => ({ ...e, statuses: Array.from(e.statuses) }));
+};
+
+// Build variant rows from sizeColorMatrix for the drawer.
+const buildMockAccessoryVariants = (record) => {
+  const matrix = record?.sizeColorMatrix;
+  if (!matrix?.quantities) return [];
+  return Object.entries(matrix.quantities).map(([key, qty], idx) => {
+    const lastDash = key.lastIndexOf('-');
+    const color = lastDash > 0 ? key.slice(0, lastDash) : key;
+    const size  = lastDash > 0 ? key.slice(lastDash + 1) : '';
+    return {
+      variantId: idx,
+      size,
+      color,
+      qty: Number(qty) || 0,
+      uom: record.uom,
+      unitCost: record.unitCost,
+      lineValue: (Number(qty) || 0) * (Number(record.unitCost) || 0),
+    };
+  });
+};
+
+const computeFabricStats = (items) => {
+  const [fyStart, fyEnd] = currentFYWindow();
+  const inStockItems = items.filter((it) => {
+    if (!it.grnDate) return false;
+    const d = new Date(it.grnDate);
+    if (d < fyStart || d > fyEnd) return false;
+    return Array.isArray(it.statuses) ? it.statuses.includes('In_Stock') : true;
+  });
+  const subCategories = new Set(inStockItems.map((it) => it.subCategory).filter(Boolean));
+  const subCategoryValue = inStockItems.reduce((sum, it) => sum + Number(it.poLineValue || 0), 0);
+  return {
+    totalItems: inStockItems.length,
+    subCategoryCount: subCategories.size,
+    subCategoryValue,
+  };
+};
+
+const computeAccessoriesStats = (items) => {
+  const totalQuantity = items.reduce((sum, r) => sum + Number(r.totalQty || 0), 0);
+  const totalValue    = items.reduce((sum, r) => sum + Number(r.poLineValue || 0), 0);
+  return { totalItems: items.length, totalQuantity, totalValue };
+};
+
+export const getFabricStock = async (params = {}) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    let filtered = [...MOCK_FABRIC_STOCK];
+    if (params.subCategory) filtered = filtered.filter((s) => s.subCategory === params.subCategory);
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      filtered = filtered.filter((s) =>
+        (s.itemCode || '').toLowerCase().includes(q)
+        || (s.fabricDescription || '').toLowerCase().includes(q)
+        || (s.grnNumber || '').toLowerCase().includes(q)
+        || (s.rollNumber || '').toLowerCase().includes(q)
+        || (s.style || '').toLowerCase().includes(q)
+        || (s.supplier || '').toLowerCase().includes(q),
+      );
+    }
+    const items = aggregateMockFabricRolls(filtered);
+    return {
+      content: items,
+      totalElements: items.length,
+      totalPages: 1,
+      number: 0,
+      size: items.length,
+      stats: computeFabricStats(items),
+    };
+  }
+
+  const apiParams = {
+    page: params.page ?? 0,
+    size: params.size ?? 25,
+    sort: params.sort || 'itemCode',
+    direction: params.direction || 'asc',
+  };
+  if (params.search) apiParams.search = params.search;
+  if (params.subCategory) apiParams.subCategory = params.subCategory;
+
+  const response = await axiosInstance.get(STOCK_FABRIC_ENDPOINT, { params: apiParams });
+  const data = response.data ?? response;
+  return {
+    content: data.content || [],
+    totalElements: data.totalElements ?? 0,
+    totalPages: data.totalPages ?? 0,
+    number: data.number ?? 0,
+    size: data.size ?? apiParams.size,
+    stats: data.stats || null,
+  };
 };
 
 export const getAccessoriesStock = async (params = {}) => {
-  await delay();
-  let filtered = [...MOCK_ACCESSORIES_STOCK];
-  if (params.category) filtered = filtered.filter((s) => s.category === params.category);
-  if (params.search) {
-    const q = params.search.toLowerCase();
-    filtered = filtered.filter((s) => s.itemCode.toLowerCase().includes(q) || s.description.toLowerCase().includes(q));
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    let filtered = [...MOCK_ACCESSORIES_STOCK];
+    if (params.category) filtered = filtered.filter((s) => s.category === params.category);
+    if (params.search) {
+      const q = params.search.toLowerCase();
+      filtered = filtered.filter((s) =>
+        (s.itemCode || '').toLowerCase().includes(q)
+        || (s.description || '').toLowerCase().includes(q)
+        || (s.grnNumber || '').toLowerCase().includes(q)
+        || (s.style || '').toLowerCase().includes(q)
+        || (s.supplier || '').toLowerCase().includes(q),
+      );
+    }
+    // Normalise mock rows to the item-level response shape: add `variants`.
+    const items = filtered.map((r) => ({ ...r, variants: buildMockAccessoryVariants(r) }));
+    return {
+      content: items,
+      totalElements: items.length,
+      totalPages: 1,
+      number: 0,
+      size: items.length,
+      stats: computeAccessoriesStats(items),
+    };
   }
-  return { content: filtered, totalElements: filtered.length };
+
+  const apiParams = {
+    page: params.page ?? 0,
+    size: params.size ?? 25,
+    sort: params.sort || 'itemCode',
+    direction: params.direction || 'asc',
+  };
+  if (params.search) apiParams.search = params.search;
+  if (params.category) apiParams.category = params.category;
+
+  const response = await axiosInstance.get(STOCK_ACCESSORIES_ENDPOINT, { params: apiParams });
+  const data = response.data ?? response;
+  return {
+    content: data.content || [],
+    totalElements: data.totalElements ?? 0,
+    totalPages: data.totalPages ?? 0,
+    number: data.number ?? 0,
+    size: data.size ?? apiParams.size,
+    stats: data.stats || null,
+  };
 };
 
 // ─── ISSUE (mock) ──────────────────────────────────────────────────────────────

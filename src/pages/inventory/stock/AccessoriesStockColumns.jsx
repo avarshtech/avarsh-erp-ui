@@ -1,5 +1,7 @@
-import { Tag } from 'antd';
+import { Tag, Typography } from 'antd';
 import { formatNumber } from '../../../utils/formatters';
+
+const { Text } = Typography;
 
 const CATEGORY_COLORS = {
   Buttons: 'blue',
@@ -11,88 +13,71 @@ const CATEGORY_COLORS = {
   Packaging: 'volcano',
 };
 
+
 const getAccessoriesStockColumns = () => [
   {
     title: 'Item Code',
     dataIndex: 'itemCode',
     key: 'itemCode',
     fixed: 'left',
-    width: 160,
-    render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>,
-  },
-  {
-    title: 'Description',
-    dataIndex: 'description',
-    key: 'description',
-    width: 220,
-    ellipsis: true,
+    width: 200,
+    align: 'center',
+    render: (code) => code,
   },
   {
     title: 'Category',
     dataIndex: 'category',
     key: 'category',
     width: 120,
+    align: 'center',
     render: (cat) => <Tag color={CATEGORY_COLORS[cat] || 'default'}>{cat}</Tag>,
+  },
+  {
+    title: 'Description',
+    dataIndex: 'description',
+    key: 'description',
+    width: 260,
+    align: 'center',
+    ellipsis: true,
   },
   {
     title: 'Style',
     dataIndex: 'style',
     key: 'style',
     width: 140,
+    align: 'center',
     render: (text) => <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text || '-'}</span>,
   },
   {
-    title: 'UOM',
-    dataIndex: 'uom',
-    key: 'uom',
-    width: 70,
+    title: 'Supplier',
+    dataIndex: 'supplier',
+    key: 'supplier',
+    width: 180,
     align: 'center',
+    ellipsis: true,
   },
   {
-    title: 'Total Qty',
-    dataIndex: 'totalQty',
+    title: 'GRN #',
+    dataIndex: 'grnNumber',
+    key: 'grnNumber',
+    width: 160,
+    align: 'center',
+    render: (text) => (
+      <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text || '-'}</span>
+    ),
+  },
+  {
+    title: 'Total Stock Qty',
     key: 'totalQty',
-    width: 100,
-    align: 'right',
-    render: (v) => formatNumber(v),
-  },
-  {
-    title: 'Available',
-    dataIndex: 'available',
-    key: 'available',
-    width: 100,
-    align: 'right',
-    render: (v) => <span style={{ color: 'var(--success-color)', fontWeight: 600 }}>{formatNumber(v)}</span>,
-  },
-  {
-    title: 'Reserved',
-    dataIndex: 'reserved',
-    key: 'reserved',
-    width: 90,
-    align: 'right',
-    render: (v) => <span style={{ color: 'var(--primary-color)' }}>{formatNumber(v)}</span>,
-  },
-  {
-    title: 'Issued',
-    dataIndex: 'issued',
-    key: 'issued',
-    width: 90,
-    align: 'right',
-    render: (v) => <span style={{ color: '#13c2c2' }}>{formatNumber(v)}</span>,
-  },
-  {
-    title: 'Status',
-    key: 'stockStatus',
-    width: 90,
+    width: 150,
     align: 'center',
-    render: (_, record) => {
-      const hasAvailable = record.available > 0;
-      return (
-        <Tag color={hasAvailable ? 'green' : 'default'}>
-          {hasAvailable ? 'In Stock' : 'Depleted'}
-        </Tag>
-      );
-    },
+    sorter: (a, b) => (a.totalQty || 0) - (b.totalQty || 0),
+    render: (_, r) => (
+      <span style={{ fontWeight: 600 }}>
+        {formatNumber(r.totalQty, 2)}{' '}
+        <Text type="secondary" style={{ fontSize: 12 }}>{r.uom || ''}</Text>
+      </span>
+    ),
   },
 ];
 

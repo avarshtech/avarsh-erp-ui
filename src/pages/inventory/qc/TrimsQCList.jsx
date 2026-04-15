@@ -38,6 +38,7 @@ const STATUS_OPTIONS = [
   { label: 'Approved', value: QC_STATUS.APPROVED },
   { label: 'Conditional Pass', value: QC_STATUS.CONDITIONAL_PASS },
   { label: 'Rejected', value: QC_STATUS.REJECTED },
+  { label: 'Rejected (Back-up)', value: QC_STATUS.REJECTED_WITH_BACKUP },
   { label: 'Refer Back Pending', value: QC_STATUS.REFERRED_BACK_PENDING },
   { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
 ];

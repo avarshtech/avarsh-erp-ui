@@ -1,43 +1,66 @@
-import { Tag } from 'antd';
-import StatusTag from '../../../components/StatusTag';
-import { STOCK_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { Tag, Typography } from 'antd';
 import { formatNumber } from '../../../utils/formatters';
+import dayjs from 'dayjs';
+
+const { Text } = Typography;
+
+const SUB_CATEGORY_COLORS = {
+  Knit: 'blue',
+  Woven: 'geekblue',
+  Denim: 'purple',
+  Lining: 'cyan',
+};
+
 
 const getAgeColor = (days) => {
+  if (days == null) return 'var(--text-secondary)';
   if (days <= 90) return 'var(--success-color)';
   if (days <= 180) return 'var(--warning-color)';
   return 'var(--error-color)';
 };
 
+const ageDays = (grnDate) => (grnDate ? dayjs().diff(dayjs(grnDate), 'day') : null);
+
 const getFabricStockColumns = () => [
   {
-    title: 'Roll #',
-    dataIndex: 'rollNumber',
-    key: 'rollNumber',
+    title: 'Item Code',
+    dataIndex: 'itemCode',
+    key: 'itemCode',
     fixed: 'left',
-    width: 100,
-    render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>,
+    width: 180,
+    align: 'center',
+    render: (code) => code,
   },
   {
     title: 'Fabric Description',
     dataIndex: 'fabricDescription',
     key: 'fabricDescription',
-    width: 200,
+    width: 240,
+    align: 'center',
     ellipsis: true,
+  },
+  {
+    title: 'Sub Category',
+    dataIndex: 'subCategory',
+    key: 'subCategory',
+    width: 140,
+    align: 'center',
+    render: (sc) => sc ? <Tag color={SUB_CATEGORY_COLORS[sc] || 'default'}>{sc}</Tag> : '-',
   },
   {
     title: 'Style',
     dataIndex: 'style',
     key: 'style',
     width: 140,
+    align: 'center',
     render: (text) => <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text || '-'}</span>,
   },
   {
-    title: 'Order',
+    title: 'Order No',
     dataIndex: 'orderRef',
     key: 'orderRef',
-    width: 140,
+    width: 150,
+    align: 'center',
     render: (text) => text || '-',
   },
   {
@@ -45,6 +68,7 @@ const getFabricStockColumns = () => [
     dataIndex: 'supplier',
     key: 'supplier',
     width: 180,
+    align: 'center',
     ellipsis: true,
   },
   {
@@ -52,63 +76,37 @@ const getFabricStockColumns = () => [
     dataIndex: 'grnNumber',
     key: 'grnNumber',
     width: 160,
-    render: (text) => (
-      <span style={{ fontWeight: 600, color: 'var(--primary-color)', cursor: 'pointer' }}>
-        {text}
-      </span>
-    ),
-  },
-  {
-    title: 'Width (in)',
-    dataIndex: 'width',
-    key: 'width',
-    width: 90,
-    align: 'right',
-    render: (v) => formatNumber(v, 0),
-  },
-  {
-    title: 'Weight (kg)',
-    dataIndex: 'weight',
-    key: 'weight',
-    width: 100,
-    align: 'right',
-    render: (v) => formatNumber(v, 1),
-  },
-  {
-    title: 'GSM',
-    dataIndex: 'gsm',
-    key: 'gsm',
-    width: 70,
-    align: 'right',
-  },
-  {
-    title: 'Shade Lot',
-    dataIndex: 'shadeLot',
-    key: 'shadeLot',
-    width: 110,
-    render: (lot) => lot ? <Tag color="purple">{lot}</Tag> : '-',
-  },
-  {
-    title: 'Status',
-    dataIndex: 'status',
-    key: 'status',
-    width: 130,
-    render: (status) => (
-      <StatusTag status={status} config={STOCK_STATUS_CONFIG} getLabel={getInventoryStatusLabel} />
-    ),
-  },
-  {
-    title: 'Age (days)',
-    dataIndex: 'ageDays',
-    key: 'ageDays',
-    width: 100,
     align: 'center',
-    sorter: (a, b) => a.ageDays - b.ageDays,
-    render: (days) => (
-      <span style={{ fontWeight: 600, color: getAgeColor(days) }}>
-        {days ?? '-'}
+    render: (text) => (
+      <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text}</span>
+    ),
+  },
+  {
+    title: 'Qty',
+    key: 'qty',
+    width: 140,
+    align: 'center',
+    sorter: (a, b) => (a.totalQty || 0) - (b.totalQty || 0),
+    render: (_, r) => (
+      <span style={{ fontWeight: 600 }}>
+        {formatNumber(r.totalQty, 2)} <Text type="secondary" style={{ fontSize: 12 }}>{r.uom || 'kg'}</Text>
       </span>
     ),
+  },
+  {
+    title: 'Age',
+    key: 'age',
+    width: 110,
+    align: 'center',
+    sorter: (a, b) => (ageDays(a.grnDate) ?? 0) - (ageDays(b.grnDate) ?? 0),
+    render: (_, r) => {
+      const d = ageDays(r.grnDate);
+      return (
+        <span style={{ fontWeight: 600, color: getAgeColor(d) }}>
+          {d != null ? `${d} days` : '-'}
+        </span>
+      );
+    },
   },
 ];
 
