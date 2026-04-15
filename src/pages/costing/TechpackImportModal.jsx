@@ -539,7 +539,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
         }
         width={880}
         centered
-        styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+        styles={{ body: { maxHeight: '70vh', overflowY: 'auto', paddingRight: 12, paddingTop: 8, paddingBottom: 8 } }}
         footer={
           step === 'review' ? (
             <Space style={{ width: '100%', justifyContent: 'space-between' }}>

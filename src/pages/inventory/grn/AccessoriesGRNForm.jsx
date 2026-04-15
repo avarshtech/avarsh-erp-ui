@@ -158,7 +158,7 @@ const AccessoriesGRNForm = () => {
           poQty: li?.orderedQty,
           alreadyReceived: li?.receivedQty,
           balance: li?.pendingQty,
-          receivingQty: 0,
+          receivingQty: null,
           uom: v?.primaryUom || li?.uom,
           rate: li?.rate,
         };
@@ -185,7 +185,7 @@ const AccessoriesGRNForm = () => {
           itemDescription: li?.description,
           color: v?.color || '—',
           size: v?.size || '—',
-          quantity: 0,
+          quantity: null,
           uom: v?.secondaryUom || v?.primaryUom || li?.uom,
         };
       });
@@ -544,12 +544,12 @@ const AccessoriesGRNForm = () => {
           />
         )}
 
-        <Card title={<Space><InboxOutlined /><span>Item Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
+        <Card title={<Space><InboxOutlined /><span>Accessories Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
           <AccessoriesGRNItemTable items={items} onItemChange={handleItemChange} readOnly={readOnly} />
         </Card>
 
         <Card title={<Space><InboxOutlined /><span>Carton Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
-          <AccessoriesGRNCartonTable cartons={cartons} onCartonChange={handleCartonChange} readOnly={readOnly} />
+          <AccessoriesGRNCartonTable cartons={cartons} items={items} onCartonChange={handleCartonChange} readOnly={readOnly} />
         </Card>
 
         <Card size="small">

@@ -30,6 +30,7 @@ const HERO_ACCENT = {
   [QC_STATUS.SUBMITTED]:              'var(--primary-color)', // processing blue
   [QC_STATUS.PENDING_APPROVAL]:       '#2f54eb',   // geekblue
   [QC_STATUS.APPROVED]:               'var(--success-color)', // green
+  [QC_STATUS.CONDITIONAL_PASS]:       '#13c2c2',   // cyan — approved with qualifications
   [QC_STATUS.REJECTED]:               'var(--error-color)',   // red
   [QC_STATUS.REFERRED_BACK_PENDING]:  '#faad14',   // gold
   [QC_STATUS.REFERRED_BACK]:          '#722ed1',   // purple
@@ -39,6 +40,7 @@ const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase',
 
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text> },
   { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
   { title: 'Width', dataIndex: 'stdWidth', align: 'center', width: 100 },
   { title: 'GSM', dataIndex: 'stdGsm', align: 'center', width: 100 },
@@ -63,25 +65,6 @@ const trimsCriteriaColumns = [
     render: (_, r) => r.ok ? <Tag color="green">OK</Tag> : r.notOk ? <Tag color="red">Not OK</Tag> : <Tag>—</Tag>,
   },
   { title: 'Remarks', dataIndex: 'remarks', align: 'center', ellipsis: true },
-];
-
-const trimsSizeColumns = [
-  { title: 'Size', dataIndex: 'size', align: 'center', width: 140 },
-  { title: 'Expected Qty', dataIndex: 'expectedQty', align: 'right', width: 140, render: (v) => formatNumber(v || 0) },
-  { title: 'Checked Qty', dataIndex: 'checkedQty', align: 'right', width: 140, render: (v) => formatNumber(v || 0) },
-  {
-    title: 'Match',
-    key: 'match',
-    align: 'center',
-    width: 120,
-    render: (_, r) => {
-      const exp = Number(r.expectedQty) || 0;
-      const chk = Number(r.checkedQty) || 0;
-      if (chk === 0 && exp === 0) return <Tag>—</Tag>;
-      if (chk === exp) return <Tag color="success">OK</Tag>;
-      return <Tag color="error">Short {Math.max(0, exp - chk)}</Tag>;
-    },
-  },
 ];
 
 const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) => {
@@ -260,12 +243,20 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                           <Text strong style={{ fontSize: 14 }}>{formatNumber(qc.qtyOrdered || 0)}</Text>
                         </Col>
                         <Col xs={12} sm={8}>
-                          <Text type="secondary" style={labelStyle}>Qty Received</Text>
+                          <Text type="secondary" style={labelStyle}>Qty Received (cumulative)</Text>
                           <Text strong style={{ fontSize: 14 }}>{formatNumber(qc.qtyReceived || 0)}</Text>
                         </Col>
                         <Col xs={12} sm={8}>
-                          <Text type="secondary" style={labelStyle}>Qty Checked (AQL)</Text>
+                          <Text type="secondary" style={labelStyle}>Qty Checked (this GRN)</Text>
                           <Text strong style={{ fontSize: 14 }}>{formatNumber(qc.qtyChecked || 0)}</Text>
+                        </Col>
+                        <Col xs={12} sm={8}>
+                          <Text type="secondary" style={labelStyle}>Qty Verdict</Text>
+                          {qc.qtyVerdict === 'MATCHED'
+                            ? <Tag color="success">Matched</Tag>
+                            : qc.qtyVerdict === 'SHORT'
+                            ? <Tag color="error">Short</Tag>
+                            : <Tag>—</Tag>}
                         </Col>
                       </>
                     )}
@@ -402,7 +393,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                   </Space>
                 }
               >
-                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 700 }} />
+                <Table rowKey={(r, i) => `${r.rollNumber}-${i}`} columns={fabricRollColumns} dataSource={qc.rolls} pagination={false} size="small" scroll={{ x: 840 }} />
               </Card>
             )}
 
@@ -438,45 +429,6 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
               </Card>
             )}
 
-            {!isFabric && qc.sizeInspectionRows?.length > 0 && (
-              <Card
-                size="small"
-                style={{ marginBottom: 20, borderRadius: 12 }}
-                styles={{ body: { padding: '14px 20px' } }}
-                title={
-                  <Space>
-                    <AppstoreOutlined style={{ color: 'var(--primary-color)' }} />
-                    <Text strong style={{ fontSize: 14 }}>Size-wise Inspection</Text>
-                  </Space>
-                }
-              >
-                <Table
-                  rowKey={(r, i) => `${r.size || 'row'}-${i}`}
-                  columns={trimsSizeColumns}
-                  dataSource={qc.sizeInspectionRows}
-                  pagination={false}
-                  size="small"
-                  summary={(rows) => {
-                    const exp = rows.reduce((s, r) => s + (Number(r.expectedQty) || 0), 0);
-                    const chk = rows.reduce((s, r) => s + (Number(r.checkedQty) || 0), 0);
-                    return (
-                      <Table.Summary.Row>
-                        <Table.Summary.Cell index={0} align="right"><Text strong>Total</Text></Table.Summary.Cell>
-                        <Table.Summary.Cell index={1} align="right"><Text strong>{formatNumber(exp)}</Text></Table.Summary.Cell>
-                        <Table.Summary.Cell index={2} align="right"><Text strong>{formatNumber(chk)}</Text></Table.Summary.Cell>
-                        <Table.Summary.Cell index={3} align="center">
-                          {exp > 0 && chk === exp
-                            ? <Tag color="success">Matched</Tag>
-                            : chk < exp
-                            ? <Tag color="error">Short {exp - chk}</Tag>
-                            : <Tag>—</Tag>}
-                        </Table.Summary.Cell>
-                      </Table.Summary.Row>
-                    );
-                  }}
-                />
-              </Card>
-            )}
           </div>
         </>
       )}

@@ -22,6 +22,7 @@ const FabricQCRollInspectionTable = memo(function FabricQCRollInspectionTable({
     () => [
       { title: '#', key: 'idx', align: 'center', width: 50, render: (_, __, i) => i + 1 },
       { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 100, render: (v) => <Text strong>{v}</Text> },
+      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text> },
       { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
       {
         title: 'Qty',
@@ -114,7 +115,7 @@ const FabricQCRollInspectionTable = memo(function FabricQCRollInspectionTable({
         dataSource={rolls}
         pagination={false}
         size="small"
-        scroll={{ x: 1080 }}
+        scroll={{ x: 1220 }}
         locale={{
           emptyText: <Empty description="Pick a PO line item to load rolls from the GRN." />,
         }}

@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { FABRIC_QC_DEFECT_FAIL_THRESHOLD, FABRIC_QC_TOLERANCE_PCT } from './inventoryConstants';
+import { FABRIC_QC_DEFECT_FAIL_THRESHOLD, FABRIC_QC_TOLERANCE_PCT, FABRIC_QC_PARAMETERS } from './inventoryConstants';
 
 /**
  * Returns true if `actual` is within ±tolerance% of `std` (inclusive boundary).
@@ -65,15 +65,50 @@ export const validateFabricQC = (data, isSubmit = false, ctx = {}) => {
     // Roll inspection completeness
     const rolls = data.rolls || [];
     if (rolls.length === 0) errors.push('No rolls available to inspect');
+    const knownRollNumbers = new Set(rolls.map((r) => r.rollNumber).filter(Boolean));
     rolls.forEach((r, i) => {
-      if (r.actualWidth == null || r.actualWidth === '') errors.push(`Roll ${r.rollNumber || i + 1}: Actual Width is required`);
-      if (r.actualGsm == null || r.actualGsm === '') errors.push(`Roll ${r.rollNumber || i + 1}: Actual GSM is required`);
+      const label = r.rollNumber || `#${i + 1}`;
+      if (r.actualWidth == null || r.actualWidth === '') {
+        errors.push(`Roll ${label}: Actual Width is required`);
+      } else if (Number(r.actualWidth) <= 0) {
+        errors.push(`Roll ${label}: Actual Width must be greater than 0`);
+      }
+      if (r.actualGsm == null || r.actualGsm === '') {
+        errors.push(`Roll ${label}: Actual GSM is required`);
+      } else if (Number(r.actualGsm) <= 0) {
+        errors.push(`Roll ${label}: Actual GSM must be greater than 0`);
+      }
     });
 
-    // Defect rows: each needs roll, type, count > 0
+    // QC parameters — every parameter in the standard set must have an actual value on submit
+    const paramRows = Array.isArray(data.parameters) ? data.parameters : [];
+    const paramByKey = new Map(paramRows.map((p) => [p.key, p]));
+    FABRIC_QC_PARAMETERS.forEach((def) => {
+      const row = paramByKey.get(def.key);
+      const actual = row?.actual;
+      if (actual == null || actual === '') {
+        errors.push(`Parameter "${def.label}": Actual value is required`);
+        return;
+      }
+      if (def.type === 'rating') {
+        const n = Number(actual);
+        if (!Number.isFinite(n) || n < 1 || n > 5) {
+          errors.push(`Parameter "${def.label}": rating must be between 1 and 5`);
+        }
+      }
+      if (def.type === 'number' && Number(actual) < 0) {
+        errors.push(`Parameter "${def.label}": cannot be negative`);
+      }
+    });
+
+    // Defect rows: each needs roll, type, count > 0 — and rollNumber must reference an inspected roll
     const defects = data.defects || [];
     defects.forEach((d, i) => {
-      if (!d.rollNumber) errors.push(`Defect row ${i + 1}: Roll # is required`);
+      if (!d.rollNumber) {
+        errors.push(`Defect row ${i + 1}: Roll # is required`);
+      } else if (knownRollNumbers.size > 0 && !knownRollNumbers.has(d.rollNumber)) {
+        errors.push(`Defect row ${i + 1}: Roll ${d.rollNumber} is not part of this inspection`);
+      }
       if (!d.defectTypeId) errors.push(`Defect row ${i + 1}: Defect Type is required`);
       if (!d.count || Number(d.count) <= 0) errors.push(`Defect row ${i + 1}: Defects count must be > 0`);
     });
@@ -81,6 +116,7 @@ export const validateFabricQC = (data, isSubmit = false, ctx = {}) => {
     // Uniqueness: (rollNumber, defectTypeId)
     const seen = new Set();
     defects.forEach((d, i) => {
+      if (!d.rollNumber || !d.defectTypeId) return;
       const k = `${d.rollNumber}::${d.defectTypeId}`;
       if (seen.has(k)) errors.push(`Defect row ${i + 1}: duplicate (Roll + Defect Type) combination`);
       else seen.add(k);
@@ -113,26 +149,25 @@ export const validateTrimsQC = (data, isSubmit = false, ctx = {}) => {
       }
     }
 
+    if (!data.inspector || !String(data.inspector).trim()) {
+      errors.push('Inspector name is required');
+    }
+
     const criteria = data.criteriaRows || [];
     if (criteria.length === 0) errors.push('Select at least one criterion to inspect');
+    const seenCriteria = new Set();
     criteria.forEach((c) => {
       if (!c.ok && !c.notOk) errors.push(`Criterion "${c.criteria}": mark as OK or Not OK`);
       if (c.notOk && !c.remarks?.trim()) errors.push(`Criterion "${c.criteria}": remarks required when Not OK`);
+      if (c.id != null) {
+        if (seenCriteria.has(c.id)) errors.push(`Criterion "${c.criteria}": duplicate selection`);
+        else seenCriteria.add(c.id);
+      }
     });
 
-    // Size-wise inspection — at least one row; every row needs a size + non-zero checked qty
-    const sizeRows = data.sizeInspectionRows || [];
-    if (sizeRows.length === 0) {
-      errors.push('Add at least one size row in Size-wise Inspection');
-    } else {
-      sizeRows.forEach((r, i) => {
-        if (!r.size || !String(r.size).trim()) {
-          errors.push(`Size row ${i + 1}: Size is required`);
-        }
-        if (r.checkedQty == null || Number(r.checkedQty) < 0) {
-          errors.push(`Size row ${i + 1}: Checked Qty must be a non-negative number`);
-        }
-      });
+    // GRN Quantity Verdict — inspector must confirm Matched or Short for this GRN lot
+    if (data.qtyVerdict !== 'MATCHED' && data.qtyVerdict !== 'SHORT') {
+      errors.push('Mark the GRN Quantity Verdict as Matched or Short');
     }
   }
 

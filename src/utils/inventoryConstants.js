@@ -37,15 +37,16 @@ export const GRN_STATUS_LABELS = {
 };
 
 // ─── QC STATUS ─────────────────────────────────────────────────────────────────
-// 7-state lifecycle. No legacy statuses (Passed/Failed/In_Progress/Conditional_Pass/Pending
-// were removed in the QC UI refresh).
+// 8-state lifecycle. Approved and Conditional_Pass are peer final states —
+// both close the linked GRN and both enter the same refer-back flow.
 export const QC_STATUS = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
   PENDING_APPROVAL: 'Pending_Approval',
   APPROVED: 'Approved',
+  CONDITIONAL_PASS: 'Conditional_Pass',            // approved with qualifications
   REJECTED: 'Rejected',
-  REFERRED_BACK_PENDING: 'Referred_Back_Pending', // request to reopen approved QC
+  REFERRED_BACK_PENDING: 'Referred_Back_Pending',  // request to reopen approved QC
   REFERRED_BACK: 'Referred_Back',                  // editable, only Submit
 };
 
@@ -54,6 +55,7 @@ export const QC_STATUS_LABELS = {
   [QC_STATUS.SUBMITTED]: 'Submitted',
   [QC_STATUS.PENDING_APPROVAL]: 'Pending Approval',
   [QC_STATUS.APPROVED]: 'Approved',
+  [QC_STATUS.CONDITIONAL_PASS]: 'Conditional Pass',
   [QC_STATUS.REJECTED]: 'Rejected',
   [QC_STATUS.REFERRED_BACK_PENDING]: 'Refer Back Pending',
   [QC_STATUS.REFERRED_BACK]: 'Referred Back',

@@ -47,6 +47,7 @@ const ApprovalReasonDialog = ({
   docNumber,
   reason = '',
   onReasonChange,
+  extraContent = null,
 }) => {
   const cfg = action || {};
   const minChars = cfg.minChars ?? (cfg.requiresReason ? 20 : 0);
@@ -147,6 +148,13 @@ const ApprovalReasonDialog = ({
                     </Text>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ─── Extra content slot (e.g. Conditional Pass toggle) ── */}
+            {extraContent && (
+              <div style={{ marginBottom: 20 }}>
+                {extraContent}
               </div>
             )}
 

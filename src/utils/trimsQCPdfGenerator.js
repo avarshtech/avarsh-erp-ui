@@ -37,7 +37,7 @@ const escapeHtml = (val) => {
 const buildTrimsQCHtml = (qc, grn, org) => {
   const companyName = org?.organisationName || 'Company Name';
   const criteriaRows = qc.criteriaRows || qc.criteriaChecks || [];
-  const sizeRows = qc.sizeInspectionRows || [];
+  const qtyVerdict = qc.qtyVerdict || null;
 
   // Metadata
   const poNumber = grn?.poNumber || '—';
@@ -78,45 +78,17 @@ const buildTrimsQCHtml = (qc, grn, org) => {
     criteriaHtml = `<tr><td colspan="5" class="empty">No criteria checked for this inspection.</td></tr>`;
   }
 
-  // Build size rows
-  let sizeHtml = '';
-  let totalExpected = 0;
-  let totalChecked = 0;
-  sizeRows.forEach((r, i) => {
-    const exp = Number(r.expectedQty) || 0;
-    const chk = Number(r.checkedQty) || 0;
-    totalExpected += exp;
-    totalChecked += chk;
-    const short = Math.max(0, exp - chk);
-    const badge = chk === 0 && exp === 0
-      ? '—'
-      : chk === exp
-      ? '<span class="badge ok">OK</span>'
-      : `<span class="badge err">Short ${short}</span>`;
-    sizeHtml += `
-      <tr>
-        <td class="num">${i + 1}</td>
-        <td class="center">${escapeHtml(r.size || '—')}</td>
-        <td class="num">${formatNum(exp)}</td>
-        <td class="num">${formatNum(chk)}</td>
-        <td class="center">${badge}</td>
-      </tr>
-    `;
-  });
-  if (sizeRows.length === 0) {
-    sizeHtml = `<tr><td colspan="5" class="empty">No size-wise rows captured for this inspection.</td></tr>`;
-  }
-
-  const totalMatch = totalExpected > 0 && totalChecked === totalExpected;
-  const totalBadge = totalMatch
-    ? '<span class="badge ok">Matched</span>'
-    : `<span class="badge err">Short ${Math.max(0, totalExpected - totalChecked)}</span>`;
-
-  // Overall status banner
+  // Overall status banner — Conditional_Pass status overrides the criteria-derived label
   const okCount = criteriaRows.filter((c) => c.ok).length;
   const notOkCount = criteriaRows.filter((c) => c.notOk).length;
-  const overallStatus = notOkCount > 0 ? 'FAIL' : okCount > 0 ? 'PASS' : 'PENDING';
-  const statusColor = overallStatus === 'PASS' ? '#16a34a' : overallStatus === 'FAIL' ? '#dc2626' : '#f59e0b';
+  const isConditionalPass = qc.status === 'Conditional_Pass';
+  const overallStatus = isConditionalPass
+    ? 'CONDITIONAL PASS'
+    : notOkCount > 0 ? 'FAIL' : okCount > 0 ? 'PASS' : 'PENDING';
+  const statusColor = isConditionalPass ? '#13c2c2'
+    : overallStatus === 'PASS' ? '#16a34a'
+    : overallStatus === 'FAIL' ? '#dc2626'
+    : '#f59e0b';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -337,8 +309,8 @@ const buildTrimsQCHtml = (qc, grn, org) => {
         <div class="row"><div class="label">Supplier</div><div class="value">${escapeHtml(supplier)}</div></div>
         <div class="row"><div class="label">DC # / Date</div><div class="value mono">${escapeHtml(dcNumber)} / ${formatDate(dcDate)}</div></div>
         <div class="row"><div class="label">Qty Ordered</div><div class="value">${formatNum(qtyOrdered)}</div></div>
-        <div class="row"><div class="label">Qty Received</div><div class="value">${formatNum(qtyReceived)}</div></div>
-        <div class="row"><div class="label">Qty Checked (AQL)</div><div class="value">${formatNum(qtyChecked)}</div></div>
+        <div class="row"><div class="label">Qty Received (cum.)</div><div class="value">${formatNum(qtyReceived)}</div></div>
+        <div class="row"><div class="label">Qty Checked (GRN)</div><div class="value">${formatNum(qtyChecked)}</div></div>
       </div>
     </div>
 
@@ -359,31 +331,23 @@ const buildTrimsQCHtml = (qc, grn, org) => {
       </tbody>
     </table>
 
-    <!-- Size-wise inspection -->
-    <div class="section-title">Size-wise Inspection</div>
+    <!-- Quantity verdict -->
+    <div class="section-title">GRN Quantity Verdict</div>
     <table class="data">
-      <thead>
-        <tr>
-          <th style="width:36px">S.No</th>
-          <th class="center" style="width:120px">Size</th>
-          <th style="width:120px" class="center">Expected Qty</th>
-          <th style="width:120px" class="center">Checked Qty</th>
-          <th class="center" style="width:120px">Match</th>
-        </tr>
-      </thead>
       <tbody>
-        ${sizeHtml}
-      </tbody>
-      ${sizeRows.length > 0 ? `
-      <tfoot>
         <tr>
-          <td colspan="2" class="center">TOTAL</td>
-          <td class="num">${formatNum(totalExpected)}</td>
-          <td class="num">${formatNum(totalChecked)}</td>
-          <td class="center">${totalBadge}</td>
+          <td style="width:160px">Qty Checked (this GRN)</td>
+          <td class="num">${formatNum(qtyChecked)}</td>
+          <td style="width:160px">Verdict</td>
+          <td class="center">
+            ${qtyVerdict === 'MATCHED'
+              ? '<span class="badge ok">Matched</span>'
+              : qtyVerdict === 'SHORT'
+              ? '<span class="badge err">Short</span>'
+              : '<span>—</span>'}
+          </td>
         </tr>
-      </tfoot>
-      ` : ''}
+      </tbody>
     </table>
 
     <!-- Overall status banner -->
@@ -394,9 +358,27 @@ const buildTrimsQCHtml = (qc, grn, org) => {
       </div>
       <div class="summary">
         <div>Criteria: ${okCount} OK / ${notOkCount} Not OK</div>
-        <div>Sizes: ${sizeRows.length} rows, ${formatNum(totalChecked)} pcs checked</div>
+        <div>Qty Verdict: ${qtyVerdict === 'MATCHED' ? 'Matched' : qtyVerdict === 'SHORT' ? 'Short' : '—'}</div>
       </div>
     </div>
+
+    ${qc.approvalReason || isConditionalPass ? `
+    <!-- Approver notes -->
+    <div class="approver-note" style="
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid ${isConditionalPass ? '#13c2c2' : '#e5e7eb'};
+      border-left: 4px solid ${isConditionalPass ? '#13c2c2' : '#16a34a'};
+      background: ${isConditionalPass ? 'rgba(19, 194, 194, 0.06)' : '#f9fafb'};
+    ">
+      <div style="font-size: 8.5px; font-weight: 700; color: ${isConditionalPass ? '#0e9999' : '#16a34a'}; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px;">
+        ${isConditionalPass ? 'Conditional Pass — Approver Note' : 'Approval Note'}
+      </div>
+      <div style="font-size: 9.5px; color: #1f2937; line-height: 1.5;">
+        ${escapeHtml(qc.approvalReason || '')}
+      </div>
+    </div>` : ''}
 
     <!-- Signatures -->
     <div class="signatures">
@@ -405,8 +387,8 @@ const buildTrimsQCHtml = (qc, grn, org) => {
         <div class="sig-sub">${escapeHtml(qc.inspector || '')}</div>
       </div>
       <div class="sig-block">
-        <div class="sig-title">Approved By</div>
-        <div class="sig-sub">Quality Manager</div>
+        <div class="sig-title">${isConditionalPass ? 'Conditional Pass By' : 'Approved By'}</div>
+        <div class="sig-sub">${escapeHtml(qc.approver || 'Quality Manager')}</div>
       </div>
     </div>
 

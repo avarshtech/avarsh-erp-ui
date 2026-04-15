@@ -36,6 +36,7 @@ const STATUS_OPTIONS = [
   { label: 'Draft', value: QC_STATUS.DRAFT },
   { label: 'Pending Approval', value: QC_STATUS.PENDING_APPROVAL },
   { label: 'Approved', value: QC_STATUS.APPROVED },
+  { label: 'Conditional Pass', value: QC_STATUS.CONDITIONAL_PASS },
   { label: 'Rejected', value: QC_STATUS.REJECTED },
   { label: 'Refer Back Pending', value: QC_STATUS.REFERRED_BACK_PENDING },
   { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
@@ -131,8 +132,14 @@ const FabricQCList = ({ embedded = false }) => {
         failed: apiStats.failed || 0,
       };
     }
-    const passed = filteredData.filter((r) => r.overallResult === 'Pass').length;
-    const failed = filteredData.filter((r) => r.overallResult === 'Fail').length;
+    // Conditional Pass counts as "passed" (approver signed off, just with qualifications);
+    // exclude it from "failed" even if its underlying overallResult is Fail.
+    const passed = filteredData.filter(
+      (r) => r.overallResult === 'Pass' || r.status === QC_STATUS.CONDITIONAL_PASS,
+    ).length;
+    const failed = filteredData.filter(
+      (r) => r.overallResult === 'Fail' && r.status !== QC_STATUS.CONDITIONAL_PASS,
+    ).length;
     return { total: filteredData.length, passed, failed };
   }, [apiStats, filteredData]);
 

@@ -69,12 +69,15 @@ export const GRN_STATUS_CONFIG = {
 };
 
 // ==================== QC STATUS CONFIG ====================
-// 7-state QC lifecycle. Every state is visually distinct.
+// 8-state QC lifecycle. Every state is visually distinct.
+// Conditional_Pass uses `cyan` to sit between Approved (green) and any warning
+// tone — a clear "approved with qualifications" accent.
 export const QC_STATUS_CONFIG = {
   [QC_STATUS.DRAFT]:                  { color: 'default',    icon: FileTextOutlined },
   [QC_STATUS.SUBMITTED]:              { color: 'processing', icon: SendOutlined },
   [QC_STATUS.PENDING_APPROVAL]:       { color: 'geekblue',   icon: AuditOutlined },
   [QC_STATUS.APPROVED]:               { color: 'green',      icon: SafetyCertificateOutlined },
+  [QC_STATUS.CONDITIONAL_PASS]:       { color: 'cyan',       icon: WarningOutlined },
   [QC_STATUS.REJECTED]:               { color: 'red',        icon: CloseCircleOutlined },
   [QC_STATUS.REFERRED_BACK_PENDING]:  { color: 'gold',       icon: ExclamationCircleOutlined },
   [QC_STATUS.REFERRED_BACK]:          { color: 'purple',     icon: UndoOutlined },
@@ -114,7 +117,7 @@ export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Sent_To_Supplier', 
 export const COSTING_STATUS_FLOW = ['Draft', 'Final', 'Approved', 'Rejected'];
 export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
 export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];
-export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved'];
+export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved', 'Conditional_Pass'];
 export const ISSUE_STATUS_FLOW = ['Draft', 'Approved', 'Issued', 'Closed'];
 
 // ==================== HELPER ====================

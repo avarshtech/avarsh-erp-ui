@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Input, DatePicker, Select, Row, Col } from 'antd';
-import {
-  SearchOutlined,
-  InboxOutlined,
-  ExperimentOutlined,
-  DollarOutlined,
-  UndoOutlined,
-} from '@ant-design/icons';
+import { SearchOutlined, InboxOutlined, DollarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
@@ -100,22 +94,19 @@ const GRNList = () => {
   );
 
   // Stats come from the paginated API response (computed server-side across
-  // the full financial year). If the API hasn't returned them yet (first load
-  // in flight, or older backend), we fall back to local counts over the
-  // currently-loaded page so the cards never go blank.
+  // the full financial year by default, or the filter range when applied).
+  // If the API hasn't returned them yet (first load in flight, or older
+  // backend), we fall back to local counts over the currently-loaded page so
+  // the cards never go blank.
   const stats = useMemo(() => {
     if (apiStats) {
       return {
         total: apiStats.totalGrns || 0,
-        pendingQC: apiStats.pendingQc || 0,
-        totalAmount: Number(apiStats.monthValue || 0),
-        reversed: apiStats.reversed || 0,
+        totalAmount: Number(apiStats.totalValue ?? apiStats.monthValue ?? 0),
       };
     }
-    const pendingQC = data.filter((g) => g.status === GRN_STATUS.QC_PENDING).length;
-    const reversed = data.filter((g) => g.status === GRN_STATUS.REVERSED).length;
     const totalAmount = data.reduce((sum, g) => sum + (g.totalAmount || 0), 0);
-    return { total: data.length, pendingQC, totalAmount, reversed };
+    return { total: data.length, totalAmount };
   }, [data, apiStats]);
 
   return (
@@ -128,17 +119,11 @@ const GRNList = () => {
       </PageHeader>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={6}>
+        <Col xs={24} sm={12}>
           <StatCard title="Total GRNs" value={stats.total} color="var(--primary-color)" icon={<InboxOutlined />} />
         </Col>
-        <Col xs={12} sm={6}>
-          <StatCard title="Pending QC" value={stats.pendingQC} color="var(--warning-color)" icon={<ExperimentOutlined />} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <StatCard title="This Month Value" value={stats.totalAmount} prefix="₹" color="var(--success-color)" icon={<DollarOutlined />} />
-        </Col>
-        <Col xs={12} sm={6}>
-          <StatCard title="Reversed" value={stats.reversed} color="var(--error-color)" icon={<UndoOutlined />} />
+        <Col xs={24} sm={12}>
+          <StatCard title="Total Value" value={stats.totalAmount} prefix="₹" color="var(--success-color)" icon={<DollarOutlined />} />
         </Col>
       </Row>
 

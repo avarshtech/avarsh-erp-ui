@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Space, App } from 'antd';
+import { Space, App, Checkbox, Typography } from 'antd';
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   RollbackOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
 import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
 import { QC_STATUS } from '../../../utils/inventoryConstants';
+
+const { Text } = Typography;
 import {
   approveFabricQC,
   rejectFabricQC,
@@ -44,12 +47,14 @@ import {
 const SUCCESS = 'var(--success-color, #52c41a)';
 const ERROR   = 'var(--error-color, #ff4d4f)';
 const WARNING = 'var(--warning-color, #faad14)';
+const CYAN    = '#13c2c2'; // Conditional Pass accent
 
 const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
   const [activeAction, setActiveAction] = useState(null);
   const [reason, setReason] = useState('');
+  const [conditionalPass, setConditionalPass] = useState(false);
 
   if (!qc) return null;
   const status = qc.status;
@@ -61,7 +66,11 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const referBackApproveFn  = isFabric ? approveFabricQCReferBack : approveTrimsQCReferBack;
   const referBackRejectFn   = isFabric ? rejectFabricQCReferBack  : rejectTrimsQCReferBack;
 
-  const openAction = (action) => { setReason(''); setActiveAction(action); };
+  const openAction = (action) => {
+    setReason('');
+    setConditionalPass(false);
+    setActiveAction(action);
+  };
   const closeAction = () => setActiveAction(null);
 
   const performAction = async (enteredReason) => {
@@ -71,8 +80,8 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       let updated;
       switch (activeAction.key) {
         case 'approve':
-          updated = await approveFn(qc.id, enteredReason);
-          // QC approval → close the linked GRN (QC_Pending → Closed). When the
+          updated = await approveFn(qc.id, enteredReason, { conditionalPass });
+          // QC approval (incl. Conditional Pass) → close the linked GRN. When the
           // QC API phase lands, the backend owns this interlock inside
           // QCService.approve() — this client-side call becomes a no-op.
           if (updated?.grnId) await closeGRNOnQCApproval(updated.grnId);
@@ -83,7 +92,10 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
         case 'reject-rb':  updated = await referBackRejectFn?.(qc.id); break;
         default: break;
       }
-      message.success(activeAction.successMsg || 'Action completed');
+      const successMsg = activeAction.key === 'approve' && conditionalPass
+        ? 'QC approved with Conditional Pass'
+        : activeAction.successMsg || 'Action completed';
+      message.success(successMsg);
       onUpdated?.(updated);
       closeAction();
     } catch {
@@ -100,12 +112,16 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       key: 'approve',
       action: 'approve',
       label: 'Approve',
-      title: `Approve ${docLabel}`,
-      subtitle: 'Sign off on this quality-control inspection.',
-      flowLabel: 'Pending Approval → Approved',
-      btnText: 'Approve',
-      icon: <CheckCircleOutlined />,
-      color: SUCCESS,
+      title: conditionalPass ? `Conditional Pass ${docLabel}` : `Approve ${docLabel}`,
+      subtitle: conditionalPass
+        ? 'Sign off with qualifications — the GRN will be released but the approval remains flagged as Conditional Pass.'
+        : 'Sign off on this quality-control inspection.',
+      flowLabel: conditionalPass
+        ? 'Pending Approval → Conditional Pass'
+        : 'Pending Approval → Approved',
+      btnText: conditionalPass ? 'Conditional Pass' : 'Approve',
+      icon: conditionalPass ? <WarningOutlined /> : <CheckCircleOutlined />,
+      color: conditionalPass ? CYAN : SUCCESS,
       danger: false,
       requiresReason: false,
       successMsg: 'QC approved',
@@ -131,8 +147,8 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       action: 'refer-back',
       label: 'Request Refer Back',
       title: 'Request Refer Back',
-      subtitle: 'Reopen the approved inspection so the creator can re-inspect.',
-      flowLabel: 'Approved → Refer Back Pending',
+      subtitle: 'Reopen the approved / conditional-pass inspection so the creator can re-inspect.',
+      flowLabel: `${status === QC_STATUS.CONDITIONAL_PASS ? 'Conditional Pass' : 'Approved'} → Refer Back Pending`,
       btnText: 'Request Refer Back',
       icon: <RollbackOutlined />,
       color: WARNING,
@@ -178,7 +194,8 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
     if (canApproveQC()) availableKeys.push('approve');
     if (canRejectQC())  availableKeys.push('reject');
   }
-  if (status === QC_STATUS.APPROVED && canRequestQCReferBack()) {
+  // Refer-back flow is shared between Approved and Conditional Pass
+  if ((status === QC_STATUS.APPROVED || status === QC_STATUS.CONDITIONAL_PASS) && canRequestQCReferBack()) {
     availableKeys.push('request-rb');
   }
   if (status === QC_STATUS.REFERRED_BACK_PENDING && canApproveQCReferBack()) {
@@ -214,6 +231,35 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
         docNumber={qc?.qcNumber}
         reason={reason}
         onReasonChange={setReason}
+        extraContent={
+          activeAction?.key === 'approve' ? (
+            <div
+              style={{
+                padding: '12px 14px',
+                borderRadius: 8,
+                border: `1px solid ${conditionalPass ? CYAN : 'var(--border-color, #e5e7eb)'}`,
+                borderLeft: `4px solid ${conditionalPass ? CYAN : 'var(--border-color, #d9d9d9)'}`,
+                background: conditionalPass ? 'rgba(19, 194, 194, 0.06)' : 'transparent',
+                transition: 'background 150ms ease, border-color 150ms ease',
+              }}
+            >
+              <Checkbox
+                checked={conditionalPass}
+                onChange={(e) => setConditionalPass(e.target.checked)}
+              >
+                <Text strong style={{ fontSize: 13, color: conditionalPass ? CYAN : undefined }}>
+                  Mark as Conditional Pass
+                </Text>
+              </Checkbox>
+              <div style={{ marginTop: 4, marginLeft: 24 }}>
+                <Text type="secondary" style={{ fontSize: 11.5 }}>
+                  Approve with qualifications — use when the lot is acceptable but some parameters
+                  or criteria are borderline. The GRN still closes; the approval is flagged distinctly.
+                </Text>
+              </div>
+            </div>
+          ) : null
+        }
       />
     </>
   );

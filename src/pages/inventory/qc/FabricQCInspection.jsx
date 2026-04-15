@@ -111,6 +111,7 @@ const FabricQCInspection = () => {
       const stdGsm = v?.attributes?.gsm ?? lineItem.gsm ?? null;
       const newRolls = (lineItem.rolls || []).map((r) => ({
         rollNumber: r.rollNumber,
+        itemCode: lineItem.itemCode,
         description: lineItem.description,
         qty: r.receivingQty || r.qty || 0,
         uom: lineItem.uom || v?.primaryUom || '',

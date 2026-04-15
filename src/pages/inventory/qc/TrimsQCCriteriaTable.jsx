@@ -103,10 +103,8 @@ const TrimsQCCriteriaTable = memo(function TrimsQCCriteriaTable({
         <Text
           strong
           style={{
-            fontSize: 12,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            color: 'var(--text-secondary)',
+            fontSize: 13,
+            color: 'var(--text-primary)',
             display: 'block',
             marginBottom: 6,
           }}

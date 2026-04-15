@@ -74,13 +74,14 @@ const pivotDefects = (rolls, defects) => {
     entry[name] = (entry[name] || 0) + (Number(d.count) || 0);
   });
 
-  // For each roll, build { rollNumber, counts[], total }
+  // For each roll, build { rollNumber, itemCode, counts[], total }
   const rows = rolls.map((r) => {
     const rollCounts = byRoll.get(r.rollNumber) || {};
     const counts = typeOrder.map((t) => rollCounts[t] || 0);
     const total = counts.reduce((s, c) => s + c, 0);
     return {
       rollNumber: r.rollNumber,
+      itemCode: r.itemCode || '',
       qty: Number(r.qty) || 0,
       uom: r.uom || '',
       width: r.width ?? r.stdWidth,
@@ -140,7 +141,12 @@ const buildFabricQCHtml = (qc, grn, org) => {
   const avgPointsDisplay = avgPointsNum != null ? avgPointsNum.toFixed(2) : '—';
   const limitPoints = 28;
   const overallPass = qc.overallResult === 'Pass' || (avgPointsNum != null && avgPointsNum <= limitPoints);
-  const overallLabel = qc.overallResult || (avgPointsNum != null ? (overallPass ? 'PASS' : 'FAIL') : 'PENDING');
+  // Conditional Pass status overrides the pass/fail label — the approver signed off
+  // with qualifications, and the PDF must surface that distinctly from a plain Pass.
+  const isConditionalPass = qc.status === 'Conditional_Pass';
+  const overallLabel = isConditionalPass
+    ? 'CONDITIONAL PASS'
+    : qc.overallResult || (avgPointsNum != null ? (overallPass ? 'PASS' : 'FAIL') : 'PENDING');
 
   // Build defect matrix header
   const defectHeaderCols = typeOrder
@@ -154,6 +160,7 @@ const buildFabricQCHtml = (qc, grn, org) => {
     matrixRows += `
       <tr>
         <td class="num">${escapeHtml(row.rollNumber)}</td>
+        <td class="num mono">${escapeHtml(row.itemCode || '—')}</td>
         <td class="num">${formatNum(row.qty, 3)}</td>
         <td class="num">${row.width ?? '—'}</td>
         <td class="num">${row.gsm ?? '—'}</td>
@@ -166,11 +173,12 @@ const buildFabricQCHtml = (qc, grn, org) => {
   });
 
   if (rows.length === 0) {
-    matrixRows = `<tr><td colspan="${7 + typeOrder.length}" class="empty">No roll data captured for this inspection.</td></tr>`;
+    matrixRows = `<tr><td colspan="${8 + typeOrder.length}" class="empty">No roll data captured for this inspection.</td></tr>`;
   }
 
   // Status colour
-  const statusColor = overallLabel === 'PASS' ? '#16a34a'
+  const statusColor = isConditionalPass ? '#13c2c2'
+    : overallLabel === 'PASS' ? '#16a34a'
     : overallLabel === 'FAIL' ? '#dc2626'
     : '#f59e0b';
 
@@ -293,6 +301,7 @@ const buildFabricQCHtml = (qc, grn, org) => {
     text-align: center;
   }
   table.matrix td.num { font-variant-numeric: tabular-nums; }
+  table.matrix td.mono { font-family: 'Courier New', monospace; font-size: 8px; }
   table.matrix td.total { font-weight: 700; color: #1e40af; background: #eff6ff; }
   table.matrix td.empty {
     text-align: center;
@@ -441,6 +450,7 @@ const buildFabricQCHtml = (qc, grn, org) => {
       <thead>
         <tr>
           <th rowspan="1">Roll #</th>
+          <th rowspan="1">Item<br>Code</th>
           <th rowspan="1">Yards /<br>Kg / Mtr</th>
           <th rowspan="1">PO<br>Width</th>
           <th rowspan="1">PO<br>GSM</th>
@@ -454,7 +464,7 @@ const buildFabricQCHtml = (qc, grn, org) => {
         ${matrixRows}
         ${rows.length > 0 ? `
         <tr>
-          <td class="num total" colspan="1">Total</td>
+          <td class="num total" colspan="2">Total</td>
           <td class="num total">${formatNum(totalYards, 3)}</td>
           <td colspan="4"></td>
           ${typeOrder.map(() => '<td></td>').join('')}
@@ -503,6 +513,24 @@ const buildFabricQCHtml = (qc, grn, org) => {
       </div>
     </div>
 
+    ${qc.approvalReason || isConditionalPass ? `
+    <!-- Approver notes -->
+    <div class="approver-note" style="
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid ${isConditionalPass ? '#13c2c2' : '#e5e7eb'};
+      border-left: 4px solid ${isConditionalPass ? '#13c2c2' : '#16a34a'};
+      background: ${isConditionalPass ? 'rgba(19, 194, 194, 0.06)' : '#f9fafb'};
+    ">
+      <div style="font-size: 8.5px; font-weight: 700; color: ${isConditionalPass ? '#0e9999' : '#16a34a'}; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px;">
+        ${isConditionalPass ? 'Conditional Pass — Approver Note' : 'Approval Note'}
+      </div>
+      <div style="font-size: 9.5px; color: #1f2937; line-height: 1.5;">
+        ${escapeHtml(qc.approvalReason || '')}
+      </div>
+    </div>` : ''}
+
     <!-- Signatures -->
     <div class="signatures">
       <div class="sig-block">
@@ -510,8 +538,8 @@ const buildFabricQCHtml = (qc, grn, org) => {
         <div class="sig-sub">${escapeHtml(qc.inspector || '')}</div>
       </div>
       <div class="sig-block">
-        <div class="sig-title">Approved By</div>
-        <div class="sig-sub">Quality Manager</div>
+        <div class="sig-title">${isConditionalPass ? 'Conditional Pass By' : 'Approved By'}</div>
+        <div class="sig-sub">${escapeHtml(qc.approver || 'Quality Manager')}</div>
       </div>
       <div class="sig-block">
         <div class="sig-title">Received By</div>

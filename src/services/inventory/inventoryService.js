@@ -10,10 +10,17 @@ import axiosInstance from '../core/axiosInstance';
 import {
   MOCK_FABRIC_STOCK, MOCK_ACCESSORIES_STOCK, MOCK_FABRIC_ISSUES, MOCK_ACCESSORIES_ISSUES,
   MOCK_ADJUSTMENTS, MOCK_PRODUCTION_ORDERS, MOCK_DASHBOARD_STATS,
-  MOCK_ITEM_VARIANTS,
+  MOCK_ITEM_VARIANTS, MOCK_PURCHASE_ORDERS_FOR_GRN,
+  MOCK_FABRIC_GRNS, MOCK_ACCESSORIES_GRNS, MOCK_FABRIC_QC, MOCK_TRIMS_QC,
 } from './inventoryMockData';
 import { getActiveDefectTypes as fetchActiveDefectTypes } from '../master/defectTypeService';
 import { getActiveTrimsQCCriteria as fetchActiveTrimsQCCriteria } from '../master/trimsQCCriteriaService';
+
+// Dev-only flag — when true, PO / GRN / QC reads are served from local mock data.
+// GRN + QC screens are now wired to the real API; leave false unless you need to
+// demo without a running backend. Write operations (save / submit / approve)
+// always hit the real API regardless of this flag.
+export const USE_MOCK_INVENTORY_DATA = false;
 
 const delay = (ms = 200) => new Promise((r) => setTimeout(r, ms));
 
@@ -82,7 +89,31 @@ const adaptQC = (qc) => {
 
 // ─── GRN list / get ────────────────────────────────────────────────────────────
 
+const filterMockGRNs = (params = {}) => {
+  const pool = params.type === 'Accessories' ? MOCK_ACCESSORIES_GRNS
+             : params.type === 'Fabric' ? MOCK_FABRIC_GRNS
+             : [...MOCK_FABRIC_GRNS, ...MOCK_ACCESSORIES_GRNS];
+  let list = pool;
+  if (params.status) list = list.filter((g) => g.status === params.status);
+  if (params.search) {
+    const q = params.search.toLowerCase();
+    list = list.filter((g) =>
+      (g.grnNumber || '').toLowerCase().includes(q) ||
+      (g.poNumber || '').toLowerCase().includes(q) ||
+      (g.supplier || '').toLowerCase().includes(q),
+    );
+  }
+  if (params.dateStart) list = list.filter((g) => (g.grnDate || '') >= params.dateStart);
+  if (params.dateEnd)   list = list.filter((g) => (g.grnDate || '') <= params.dateEnd);
+  return list;
+};
+
 export const getGRNList = async (params = {}) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    const content = filterMockGRNs(params).map(adaptGRN);
+    return { content, totalElements: content.length, stats: null };
+  }
   const apiParams = {
     page: params.page ?? 0,
     size: params.size ?? 100,
@@ -106,6 +137,12 @@ export const getGRNList = async (params = {}) => {
 };
 
 const fetchGrnById = async (id) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay(50);
+    const numeric = Number(id);
+    const found = [...MOCK_FABRIC_GRNS, ...MOCK_ACCESSORIES_GRNS].find((g) => g.id === numeric);
+    return adaptGRN(found || null);
+  }
   const response = await axiosInstance.get(`${GRN_ENDPOINT}/${id}`);
   return adaptGRN(response.data ?? response);
 };
@@ -114,6 +151,11 @@ export const getFabricGRN = (id) => fetchGrnById(id);
 export const getAccessoriesGRN = (id) => fetchGrnById(id);
 
 export const getPurchaseOrdersForGRN = async () => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    // Mock POs are already in the legacy UI shape — bypass adaptPO.
+    return MOCK_PURCHASE_ORDERS_FOR_GRN;
+  }
   const response = await axiosInstance.get('/purchase-orders/grn-eligible');
   const list = response.data ?? response;
   return (list || []).map(adaptPO);
@@ -121,6 +163,10 @@ export const getPurchaseOrdersForGRN = async () => {
 
 export const getPurchaseOrderByIdAnyStatus = async (poId) => {
   if (!poId) return null;
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    return MOCK_PURCHASE_ORDERS_FOR_GRN.find((p) => p.id === poId) || null;
+  }
   const response = await axiosInstance.get(`/purchase-orders/${poId}`);
   return adaptPO(response.data ?? response);
 };
@@ -131,6 +177,23 @@ export const getPurchaseOrderByIdAnyStatus = async (poId) => {
  */
 export const computePOLineItemReceipts = async (poId, excludeGrnId = null) => {
   if (!poId) return {};
+  if (USE_MOCK_INVENTORY_DATA) {
+    // Derive receipts from any existing mock GRNs tied to this PO (excluding current).
+    await delay(50);
+    const grns = [...MOCK_FABRIC_GRNS, ...MOCK_ACCESSORIES_GRNS].filter(
+      (g) => g.poId === poId && g.id !== excludeGrnId && g.status !== 'Reversed',
+    );
+    const out = {};
+    grns.forEach((g) => {
+      (g.lineItems || []).forEach((li) => {
+        const lineId = li.poLineItemId;
+        const qty = (li.rolls || []).reduce((s, r) => s + (Number(r.receivingQty) || 0), 0)
+                  + Number(li.receivingQty || 0);
+        if (lineId != null) out[lineId] = (out[lineId] || 0) + qty;
+      });
+    });
+    return out;
+  }
   const params = excludeGrnId ? { excludeGrnId } : {};
   const response = await axiosInstance.get(`${GRN_ENDPOINT}/po/${poId}/receipts`, { params });
   const data = response.data ?? response;
@@ -295,7 +358,28 @@ export const closeGRNOnQCApproval = async (grnId) => {
 
 // ─── QC list / get ─────────────────────────────────────────────────────────────
 
+const filterMockQC = (type, params = {}) => {
+  const pool = type === 'Accessories' ? MOCK_TRIMS_QC : MOCK_FABRIC_QC;
+  let list = pool;
+  if (params.status) list = list.filter((q) => q.status === params.status);
+  if (params.search) {
+    const s = params.search.toLowerCase();
+    list = list.filter((q) =>
+      (q.qcNumber || '').toLowerCase().includes(s) ||
+      (q.grnNumber || '').toLowerCase().includes(s),
+    );
+  }
+  if (params.dateStart) list = list.filter((q) => (q.inspectionDate || '') >= params.dateStart);
+  if (params.dateEnd)   list = list.filter((q) => (q.inspectionDate || '') <= params.dateEnd);
+  return list;
+};
+
 const fetchQCList = async (type, params = {}) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    const content = filterMockQC(type, params).map(adaptQC);
+    return { content, totalElements: content.length, stats: null };
+  }
   const apiParams = {
     page: params.page ?? 0,
     size: params.size ?? 100,
@@ -322,6 +406,12 @@ export const getFabricQCList = (params = {}) => fetchQCList('Fabric', params);
 export const getTrimsQCList = (params = {}) => fetchQCList('Accessories', params);
 
 const fetchQCById = async (id) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay(50);
+    const numeric = Number(id);
+    const found = [...MOCK_FABRIC_QC, ...MOCK_TRIMS_QC].find((q) => q.id === numeric);
+    return adaptQC(found || null);
+  }
   const response = await axiosInstance.get(`${QC_ENDPOINT}/${id}`);
   return adaptQC(response.data ?? response);
 };
@@ -334,6 +424,11 @@ export const getTrimsQCById = (id) => fetchQCById(id);
  * be created against a GRN.
  */
 export const getSubmittedGRNsForQC = async (type) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    const pool = type === 'Accessories' ? MOCK_ACCESSORIES_GRNS : MOCK_FABRIC_GRNS;
+    return pool.filter((g) => g.status === 'QC_Pending').map(adaptGRN);
+  }
   const apiType = type === 'Accessories' ? 'Trims' : type;
   const response = await axiosInstance.get(GRN_ENDPOINT, {
     params: { type: apiType, status: 'QC_Pending', size: 200 },
@@ -367,7 +462,7 @@ const buildQCRequest = (data, qcType) => ({
   qtyReceived: data.qtyReceived,
   qtyChecked: data.qtyChecked,
   criteriaRows: data.criteriaRows || [],
-  sizeInspectionRows: data.sizeInspectionRows || [],
+  qtyVerdict: data.qtyVerdict || null,
   // Result
   overallResult: data.overallResult,
   rollsPassed: data.rollsPassed,
@@ -389,15 +484,18 @@ export const submitFabricQC = (data) => submitQc(data, 'Fabric');
 export const saveTrimsQCDraft = (data) => saveQcDraft(data, 'Accessories');
 export const submitTrimsQC = (data) => submitQc(data, 'Accessories');
 
-const postQcAction = async (qcId, action, reason, version) => {
-  const response = await axiosInstance.post(`${QC_ENDPOINT}/${qcId}/${action}`, { reason, version });
+const postQcAction = async (qcId, action, reason, version, extras = {}) => {
+  const response = await axiosInstance.post(`${QC_ENDPOINT}/${qcId}/${action}`, { reason, version, ...extras });
   return adaptQC(response.data ?? response);
 };
 
 // Approve / Reject — unified for both QC types (server dispatches on qcType).
-export const approveFabricQC = (id, reason) => postQcAction(id, 'approve', reason);
+// `options.conditionalPass` on approve → server moves the QC to Conditional_Pass.
+export const approveFabricQC = (id, reason, options = {}) =>
+  postQcAction(id, 'approve', reason, undefined, { conditionalPass: !!options.conditionalPass });
 export const rejectFabricQC  = (id, reason) => postQcAction(id, 'reject', reason);
-export const approveTrimsQC  = (id, reason) => postQcAction(id, 'approve', reason);
+export const approveTrimsQC  = (id, reason, options = {}) =>
+  postQcAction(id, 'approve', reason, undefined, { conditionalPass: !!options.conditionalPass });
 export const rejectTrimsQC   = (id, reason) => postQcAction(id, 'reject', reason);
 
 // Refer-back workflow — symmetric for Fabric and Accessories.

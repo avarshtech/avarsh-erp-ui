@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Form, Card, Row, Col, Select, DatePicker, Input, Space } from 'antd';
+import { App, Form, Card, Row, Col, Select, DatePicker, Input, Space, Segmented, Typography } from 'antd';
 import {
   SaveOutlined,
   SendOutlined,
@@ -7,6 +7,8 @@ import {
   ShoppingCartOutlined,
   InboxOutlined,
   ExperimentOutlined,
+  CheckCircleFilled,
+  CloseCircleFilled,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -18,24 +20,14 @@ import {
   getActiveTrimsQCCriteria,
   saveTrimsQCDraft,
   submitTrimsQC,
+  computePOLineItemReceipts,
 } from '../../../services/inventory/inventoryService';
 import { validateTrimsQC } from '../../../utils/qcValidation';
 import { QC_STATUS } from '../../../utils/inventoryConstants';
 import { formatNumber } from '../../../utils/formatters';
 import TrimsQCCriteriaTable from './TrimsQCCriteriaTable';
-import TrimsQCSizeTable from './TrimsQCSizeTable';
 
-const getSampleSize = (lotSize) => {
-  if (!lotSize || lotSize <= 0) return 0;
-  if (lotSize <= 150) return 20;
-  if (lotSize <= 500) return 50;
-  if (lotSize <= 1200) return 80;
-  if (lotSize <= 3200) return 125;
-  if (lotSize <= 10000) return 200;
-  if (lotSize <= 35000) return 315;
-  if (lotSize <= 150000) return 500;
-  return 800;
-};
+const { Text } = Typography;
 
 /**
  * Small presentation component used to render the three quantity summary
@@ -100,7 +92,8 @@ const TrimsQCInspection = () => {
   const [poLineItemId, setPoLineItemId] = useState(null);
   const [criteriaMaster, setCriteriaMaster] = useState([]);
   const [criteriaRows, setCriteriaRows] = useState([]);
-  const [sizeInspectionRows, setSizeInspectionRows] = useState([]);
+  const [qtyVerdict, setQtyVerdict] = useState(null); // 'MATCHED' | 'SHORT' | null
+  const [poReceipts, setPoReceipts] = useState({}); // cumulative received qty per PO line item across all GRNs
   const [qcData, setQcData] = useState(null);
 
   const readOnly = !isNew && qcData?.status && qcData.status !== QC_STATUS.DRAFT && qcData.status !== QC_STATUS.REFERRED_BACK;
@@ -119,7 +112,7 @@ const TrimsQCInspection = () => {
       setSelectedGRN({ id: data.grnId, grnNumber: data.grnNumber });
       setPoLineItemId(data.poLineItemId);
       setCriteriaRows(data.criteriaRows || data.criteriaChecks || []);
-      setSizeInspectionRows(data.sizeInspectionRows || []);
+      setQtyVerdict(data.qtyVerdict || null);
       form.setFieldsValue({
         grnId: data.grnId,
         poLineItemId: data.poLineItemId,
@@ -134,9 +127,25 @@ const TrimsQCInspection = () => {
     setSelectedGRN(grn || null);
     setPoLineItemId(null);
     setCriteriaRows([]);
+    setPoReceipts({});
     form.setFieldsValue({ poLineItemId: undefined });
     setIsDirty(true);
   }, [grns, form]);
+
+  // Fetch cumulative receipts across all GRNs for the selected GRN's parent PO.
+  // This lets us show "Qty Received" as the total received-to-date for the line item,
+  // while "Qty Checked" remains the current GRN's receivingQty (single-GRN scope).
+  useEffect(() => {
+    if (!selectedGRN?.poId) {
+      setPoReceipts({});
+      return;
+    }
+    let cancelled = false;
+    computePOLineItemReceipts(selectedGRN.poId)
+      .then((receipts) => { if (!cancelled) setPoReceipts(receipts || {}); })
+      .catch(() => { if (!cancelled) setPoReceipts({}); });
+    return () => { cancelled = true; };
+  }, [selectedGRN?.poId]);
 
   // Different accessories line items require different criteria — for example a
   // button line item needs Pull Strength but a woven label needs Print Quality.
@@ -146,7 +155,7 @@ const TrimsQCInspection = () => {
     setPoLineItemId(newPoLineItemId);
     if (isNew) {
       setCriteriaRows([]);
-      setSizeInspectionRows([]);
+      setQtyVerdict(null);
     }
     setIsDirty(true);
   }, [isNew]);
@@ -196,46 +205,17 @@ const TrimsQCInspection = () => {
     [lineItemSource, poLineItemId],
   );
 
-  const qtyReceived = selectedLineItem?.receivingQty || 0;
-  const qtyChecked = useMemo(() => getSampleSize(qtyReceived), [qtyReceived]);
+  // Qty Checked = quantity received in THIS specific GRN (single-GRN scope — the lot being inspected).
+  // Qty Received = cumulative received across ALL GRNs for this PO line item, *including*
+  // the currently selected GRN and any prior partial GRNs. The /receipts endpoint returns
+  // sums over every non-Reversed GRN for the PO (no exclude), so the current GRN is part
+  // of the total. Max() is a defensive floor in case the map omits this line id.
+  const qtyChecked = Number(selectedLineItem?.receivingQty || 0);
+  const cumulativeFromAllGrns = poLineItemId != null ? Number(poReceipts[poLineItemId] || 0) : 0;
+  const qtyReceived = Math.max(cumulativeFromAllGrns, qtyChecked);
 
-  // Auto-populate size rows from related GRN items when a PO line item is picked.
-  // We group all items that share the same base identity (itemCode / itemId) as
-  // the selected line — each size variant becomes one size row with its received
-  // qty as the expected qty. Inspector then enters checked qty per row.
-  useEffect(() => {
-    if (!isNew || !selectedLineItem || !selectedGRN) return;
-    const baseKey = selectedLineItem.itemCode || selectedLineItem.itemId;
-    if (!baseKey) return;
-    const relatedItems = lineItemSource.filter((li) => {
-      const k = li.itemCode || li.itemId;
-      return k === baseKey && li.size;
-    });
-    if (relatedItems.length === 0) {
-      // Fall back: if only the selected line has a size, seed a single row
-      if (selectedLineItem.size) {
-        setSizeInspectionRows([{ size: selectedLineItem.size, expectedQty: Number(selectedLineItem.receivingQty) || 0, checkedQty: 0 }]);
-      } else {
-        setSizeInspectionRows([]);
-      }
-      return;
-    }
-    // Group by size (sum receivingQty per size)
-    const bySize = new Map();
-    relatedItems.forEach((li) => {
-      const qty = Number(li.receivingQty) || 0;
-      bySize.set(li.size, (bySize.get(li.size) || 0) + qty);
-    });
-    const rows = Array.from(bySize.entries()).map(([size, qty]) => ({
-      size,
-      expectedQty: qty,
-      checkedQty: 0,
-    }));
-    setSizeInspectionRows(rows);
-  }, [isNew, selectedLineItem, selectedGRN, lineItemSource]);
-
-  const handleSizeRowsChange = useCallback((nextRows) => {
-    setSizeInspectionRows(nextRows);
+  const handleQtyVerdictChange = useCallback((next) => {
+    setQtyVerdict(next || null);
     setIsDirty(true);
   }, []);
 
@@ -263,8 +243,8 @@ const TrimsQCInspection = () => {
       qtyOrdered: selectedLineItem?.poQty || selectedLineItem?.orderedQty || 0,
       qtyReceived,
       qtyChecked,
+      qtyVerdict,
       criteriaRows,
-      sizeInspectionRows,
     };
   };
 
@@ -391,39 +371,111 @@ const TrimsQCInspection = () => {
         </Form>
 
         {selectedLineItem && (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-around',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 16,
-              marginTop: 16,
-              padding: '14px 20px',
-              background: 'var(--bg-secondary, rgba(0,0,0,0.02))',
-              border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
-              borderRadius: 'var(--radius-md, 8px)',
-            }}
-          >
-            <QtyBadge
-              label="Qty Ordered"
-              value={selectedLineItem.poQty || selectedLineItem.orderedQty || 0}
-              icon={<ShoppingCartOutlined />}
-              color="var(--primary-color, #1677ff)"
-            />
-            <QtyBadge
-              label="Qty Received"
-              value={qtyReceived}
-              icon={<InboxOutlined />}
-              color="var(--success-color, #52c41a)"
-            />
-            <QtyBadge
-              label="Qty Checked (AQL)"
-              value={qtyChecked}
-              icon={<ExperimentOutlined />}
-              color="var(--warning-color, #faad14)"
-            />
-          </div>
+          <>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-around',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 16,
+                marginTop: 16,
+                padding: '14px 20px',
+                background: 'var(--bg-secondary, rgba(0,0,0,0.02))',
+                border: '1px solid var(--border-color, rgba(0,0,0,0.06))',
+                borderRadius: 'var(--radius-md, 8px)',
+              }}
+            >
+              <QtyBadge
+                label="Qty Ordered"
+                value={selectedLineItem.poQty || selectedLineItem.orderedQty || 0}
+                icon={<ShoppingCartOutlined />}
+                color="var(--primary-color, #1677ff)"
+              />
+              <QtyBadge
+                label="Qty Received (cumulative)"
+                value={qtyReceived}
+                icon={<InboxOutlined />}
+                color="var(--success-color, #52c41a)"
+              />
+              <QtyBadge
+                label="Qty Checked (this GRN)"
+                value={qtyChecked}
+                icon={<ExperimentOutlined />}
+                color="var(--warning-color, #faad14)"
+              />
+            </div>
+
+            {/* Qty verdict — inspector confirms whether the physically-checked qty matches the GRN received qty */}
+            <div
+              style={{
+                marginTop: 12,
+                padding: '14px 20px',
+                border: `1px solid ${
+                  qtyVerdict === 'SHORT'
+                    ? 'var(--error-color)'
+                    : qtyVerdict === 'MATCHED'
+                    ? 'var(--success-color)'
+                    : 'var(--border-color, rgba(0,0,0,0.1))'
+                }`,
+                borderLeft: `4px solid ${
+                  qtyVerdict === 'SHORT'
+                    ? 'var(--error-color)'
+                    : qtyVerdict === 'MATCHED'
+                    ? 'var(--success-color)'
+                    : 'var(--border-color, rgba(0,0,0,0.2))'
+                }`,
+                borderRadius: 'var(--radius-md, 8px)',
+                background:
+                  qtyVerdict === 'SHORT'
+                    ? 'rgba(255, 77, 79, 0.04)'
+                    : qtyVerdict === 'MATCHED'
+                    ? 'rgba(82, 196, 26, 0.04)'
+                    : 'transparent',
+                transition: 'background 150ms ease, border-color 150ms ease',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <div style={{ minWidth: 0, flex: '1 1 260px' }}>
+                <Text strong style={{ display: 'block', fontSize: 14, marginBottom: 2 }}>
+                  GRN Quantity Verdict
+                </Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Does the physical count match this GRN&apos;s received quantity ({formatNumber(qtyChecked)})? Mark Short if pieces are missing in this lot.
+                </Text>
+              </div>
+              <Segmented
+                size="middle"
+                value={qtyVerdict || ''}
+                disabled={readOnly}
+                options={[
+                  {
+                    label: (
+                      <Space size={6}>
+                        <CheckCircleFilled style={{ color: qtyVerdict === 'MATCHED' ? 'var(--success-color)' : undefined }} />
+                        <span>Matched</span>
+                      </Space>
+                    ),
+                    value: 'MATCHED',
+                  },
+                  {
+                    label: (
+                      <Space size={6}>
+                        <CloseCircleFilled style={{ color: qtyVerdict === 'SHORT' ? 'var(--error-color)' : undefined }} />
+                        <span>Short</span>
+                      </Space>
+                    ),
+                    value: 'SHORT',
+                  },
+                ]}
+                onChange={handleQtyVerdictChange}
+              />
+            </div>
+          </>
         )}
       </Card>
 
@@ -433,13 +485,6 @@ const TrimsQCInspection = () => {
         selectedIds={criteriaRows.map((r) => r.id)}
         onSelectedIdsChange={handleSelectedCriteriaChange}
         onChange={handleCriteriaChange}
-        readOnly={readOnly}
-        lineItemSelected={Boolean(poLineItemId)}
-      />
-
-      <TrimsQCSizeTable
-        rows={sizeInspectionRows}
-        onChange={handleSizeRowsChange}
         readOnly={readOnly}
         lineItemSelected={Boolean(poLineItemId)}
       />

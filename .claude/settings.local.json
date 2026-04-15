@@ -30,7 +30,12 @@
       "Bash(./gradlew compileJava -x test --no-daemon)",
       "Bash(ls V3[4-9]* V4*)",
       "Bash(ls mvnw*)",
-      "Bash(ls *.cmd)"
+      "Bash(ls *.cmd)",
+      "Bash(cmd.exe //c \"mvnw.cmd compile -q\")",
+      "Bash(cmd.exe //c \"gradlew.bat compileJava -q\")",
+      "Bash(./gradlew.bat compileJava)",
+      "Bash(wait)",
+      "Bash(ls f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V3[89]* f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V40*)"
     ]
   }
 }

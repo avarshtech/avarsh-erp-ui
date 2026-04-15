@@ -327,6 +327,20 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/inventory",
+      icon: <AppstoreOutlined />,
+      label: "Inventory",
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment"],
+      children: [
+        { key: "/inventory/dashboard", label: "Dashboard" },
+        { key: "/inventory/grn/list", label: "GRN List" },
+        { key: "/inventory/qc", label: "Quality Control" },
+        { key: "/inventory/stock", label: "Stock" },
+        { key: "/inventory/issue", label: "Material Issue" },
+        { key: "/inventory/adjustment", label: "Stock Adjustment" },
+      ],
+    },
+    {
       key: "/production-po",
       icon: <AppstoreOutlined />,
       label: "Production PO",
@@ -400,18 +414,22 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/inventory",
-      icon: <AppstoreOutlined />,
-      label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment"],
+      key: "/reports",
+      icon: <BarChartOutlined />,
+      label: "Reports",
+      moduleId: "reports",
       children: [
-        { key: "/inventory/dashboard", label: "Dashboard" },
-        { key: "/inventory/grn/list", label: "GRN List" },
-        { key: "/inventory/qc", label: "Quality Control" },
-        { key: "/inventory/stock", label: "Stock" },
-        { key: "/inventory/issue", label: "Material Issue" },
-        { key: "/inventory/adjustment", label: "Stock Adjustment" },
+        { key: "/reports/list", label: "All Reports", moduleId: "reports" },
+        { key: "/reports/ai-chat", label: "AI Assistant", moduleId: "ai-assistant" },
+        { key: "/reports/saved", label: "Saved Reports", moduleId: "reports" },
       ],
+    },
+    {
+      key: "/master",
+      icon: <DatabaseOutlined />,
+      label: "Master Data",
+      // Master Data is visible if user has access to any master module
+      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
     },
     {
       key: "/hr",
@@ -429,24 +447,6 @@ const MainLayoutInner = () => {
         { key: "/hr/statutory/pt", label: "Statutory", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
       ],
-    },
-    {
-      key: "/reports",
-      icon: <BarChartOutlined />,
-      label: "Reports",
-      moduleId: "reports",
-      children: [
-        { key: "/reports/list", label: "All Reports", moduleId: "reports" },
-        { key: "/reports/ai-chat", label: "AI Assistant", moduleId: "ai-assistant" },
-        { key: "/reports/saved", label: "Saved Reports", moduleId: "reports" },
-      ],
-    },
-    {
-      key: "/master",
-      icon: <DatabaseOutlined />,
-      label: "Master Data",
-      // Master Data is visible if user has access to any master module
-      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
     },
     {
       key: "/admin",

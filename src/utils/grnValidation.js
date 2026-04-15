@@ -94,12 +94,27 @@ const validateRollRows = ({ rolls, errors, isSubmit }) => {
   rolls.forEach((r, i) => {
     if (isSubmit) {
       if (!r.rollNumber || !String(r.rollNumber).trim()) errors.push(`Row ${i + 1}: Roll Number is required`);
-      if (!r.receivingQty || Number(r.receivingQty) <= 0) errors.push(`Row ${i + 1}: Receiving Qty must be > 0`);
+      if (!r.receivingQty || Number(r.receivingQty) <= 0) errors.push(`Row ${i + 1}: Quantity must be > 0`);
       if (!r.shadeLot || !String(r.shadeLot).trim()) errors.push(`Row ${i + 1}: Shade Lot is required`);
     }
-    // Receiving qty <= balance check is always enforced when a value exists
+    // Per-row: a single roll can't exceed the line balance on its own
     if (r.receivingQty != null && r.balance != null && Number(r.receivingQty) > Number(r.balance)) {
-      errors.push(`Row ${i + 1}: Receiving Qty (${r.receivingQty}) exceeds balance (${r.balance})`);
+      errors.push(`Row ${i + 1}: Quantity (${r.receivingQty}) exceeds balance (${r.balance})`);
+    }
+  });
+
+  // Group check: sum of Quantity across rolls of the same line item must not exceed balance.
+  // Catches the case where each individual roll is within balance but the total spills over.
+  const totalsByLine = new Map();
+  rolls.forEach((r) => {
+    if (r.poLineItemId == null) return;
+    totalsByLine.set(r.poLineItemId, (totalsByLine.get(r.poLineItemId) || 0) + (Number(r.receivingQty) || 0));
+  });
+  totalsByLine.forEach((total, lineId) => {
+    const sample = rolls.find((r) => r.poLineItemId === lineId);
+    const balance = Number(sample?.balance);
+    if (Number.isFinite(balance) && total > balance) {
+      errors.push(`${sample?.itemCode || `Line ${lineId}`}: Total Quantity (${total}) exceeds balance (${balance})`);
     }
   });
 
@@ -120,12 +135,17 @@ const validateCartonRows = ({ cartons, items, errors, isSubmit }) => {
       if (!c.quantity || Number(c.quantity) <= 0) errors.push(`Carton row ${i + 1}: Quantity must be > 0`);
     }
   });
-  // Carton sum vs item receiving qty
+  // On submit, every selected line item must be fully packed — the over-case
+  // is already caught by the always-on sum-exceeds-received check above, so we
+  // only flag the under-packed case here.
   if (isSubmit && items) {
     items.forEach((item) => {
-      const sum = cartons.filter((c) => c.poLineItemId === item.poLineItemId).reduce((s, c) => s + (Number(c.quantity) || 0), 0);
-      if (sum > 0 && item.receivingQty > 0 && sum !== Number(item.receivingQty)) {
-        errors.push(`Carton total (${sum}) for ${item.itemCode} does not equal Receiving Qty (${item.receivingQty})`);
+      const sum = cartons
+        .filter((c) => c.poLineItemId === item.poLineItemId)
+        .reduce((s, c) => s + (Number(c.quantity) || 0), 0);
+      const received = Number(item.receivingQty) || 0;
+      if (received > 0 && sum < received) {
+        errors.push(`${item.itemCode || `Line ${item.poLineItemId}`}: Carton total (${sum}) is less than received Quantity (${received}) — pack the full received quantity`);
       }
     });
   }
@@ -161,13 +181,28 @@ export const validateTrimsGRN = (data, isSubmit = false, ctx = {}) => {
   baseHeaderValidations({ data, po, errors });
   validateSupplierInvoice({ data, errors, isSubmit });
 
-  // Items: receiving qty checks
+  // Items: quantity checks
   (data.items || []).forEach((item, i) => {
     if (isSubmit && (!item.receivingQty || Number(item.receivingQty) <= 0)) {
-      errors.push(`Item row ${i + 1}: Receiving Qty must be > 0`);
+      errors.push(`Item row ${i + 1}: Quantity must be > 0`);
     }
     if (item.receivingQty != null && item.balance != null && Number(item.receivingQty) > Number(item.balance)) {
-      errors.push(`Item row ${i + 1}: Receiving Qty (${item.receivingQty}) exceeds balance (${item.balance})`);
+      errors.push(`${item.itemCode || `Item row ${i + 1}`}: Quantity (${item.receivingQty}) exceeds balance (${item.balance})`);
+    }
+  });
+
+  // Carton sum per line item must never exceed the item's received quantity
+  // (enforced on draft + submit so it matches the inline feedback).
+  const cartonTotals = new Map();
+  (data.cartons || []).forEach((c) => {
+    if (c.poLineItemId == null) return;
+    cartonTotals.set(c.poLineItemId, (cartonTotals.get(c.poLineItemId) || 0) + (Number(c.quantity) || 0));
+  });
+  (data.items || []).forEach((item) => {
+    const total = cartonTotals.get(item.poLineItemId) || 0;
+    const allowance = Number(item.receivingQty) || 0;
+    if (total > 0 && allowance > 0 && total > allowance) {
+      errors.push(`${item.itemCode || `Line ${item.poLineItemId}`}: Total carton quantity (${total}) exceeds received quantity (${allowance})`);
     }
   });
 

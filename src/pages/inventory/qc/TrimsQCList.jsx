@@ -36,6 +36,7 @@ const STATUS_OPTIONS = [
   { label: 'Draft', value: QC_STATUS.DRAFT },
   { label: 'Pending Approval', value: QC_STATUS.PENDING_APPROVAL },
   { label: 'Approved', value: QC_STATUS.APPROVED },
+  { label: 'Conditional Pass', value: QC_STATUS.CONDITIONAL_PASS },
   { label: 'Rejected', value: QC_STATUS.REJECTED },
   { label: 'Refer Back Pending', value: QC_STATUS.REFERRED_BACK_PENDING },
   { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
@@ -140,7 +141,10 @@ const TrimsQCList = ({ embedded = false }) => {
         rejected: apiStats.rejected || 0,
       };
     }
-    const approved = filteredData.filter((r) => r.status === QC_STATUS.APPROVED).length;
+    // Approved bucket includes Conditional_Pass (peer final state).
+    const approved = filteredData.filter(
+      (r) => r.status === QC_STATUS.APPROVED || r.status === QC_STATUS.CONDITIONAL_PASS,
+    ).length;
     const rejected = filteredData.filter((r) => r.status === QC_STATUS.REJECTED).length;
     return { total: filteredData.length, approved, rejected };
   }, [apiStats, filteredData]);
