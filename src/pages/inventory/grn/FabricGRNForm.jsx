@@ -175,6 +175,7 @@ const FabricGRNForm = () => {
           balance: li?.pendingQty,
           rate: li?.rate,
           uom: li?.uom,
+          defaultAllowance: li?.defaultAllowance,
           rollNumber: '',
           receivingQty: null,
           shadeLot: '',

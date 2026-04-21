@@ -18,7 +18,7 @@ import {
 import { ORDER_STATUS } from './orderConstants';
 import { PO_STATUS } from './poStatusConstants';
 import { BOM_STATUS } from './bomConstants';
-import { GRN_STATUS, QC_STATUS, STOCK_STATUS, ISSUE_STATUS, ADJUSTMENT_STATUS } from './inventoryConstants';
+import { GRN_STATUS, QC_STATUS, STOCK_STATUS } from './inventoryConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -96,23 +96,6 @@ export const STOCK_STATUS_CONFIG = {
   [STOCK_STATUS.DAMAGED]:   { color: 'red',     icon: WarningOutlined },
 };
 
-// ==================== ISSUE STATUS CONFIG ====================
-export const ISSUE_STATUS_CONFIG = {
-  [ISSUE_STATUS.DRAFT]:    { color: 'default',    icon: FileTextOutlined },
-  [ISSUE_STATUS.APPROVED]: { color: 'blue',       icon: CheckCircleOutlined },
-  [ISSUE_STATUS.ISSUED]:   { color: 'green',      icon: SendOutlined },
-  [ISSUE_STATUS.PARTIAL]:  { color: 'orange',     icon: SwapOutlined },
-  [ISSUE_STATUS.RETURNED]: { color: 'cyan',       icon: UndoOutlined },
-  [ISSUE_STATUS.CLOSED]:   { color: 'green',      icon: CheckCircleOutlined },
-};
-
-// ==================== ADJUSTMENT STATUS CONFIG ====================
-export const ADJUSTMENT_STATUS_CONFIG = {
-  [ADJUSTMENT_STATUS.DRAFT]:            { color: 'default',    icon: FileTextOutlined },
-  [ADJUSTMENT_STATUS.PENDING_APPROVAL]: { color: 'processing', icon: ClockCircleOutlined },
-  [ADJUSTMENT_STATUS.APPROVED]:         { color: 'green',      icon: CheckCircleOutlined },
-  [ADJUSTMENT_STATUS.REJECTED]:         { color: 'red',        icon: CloseCircleOutlined },
-};
 
 // ==================== STATUS FLOW (for StatusSteps) ====================
 export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLETED'];
@@ -121,7 +104,6 @@ export const COSTING_STATUS_FLOW = ['Draft', 'Final', 'Approved', 'Rejected'];
 export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
 export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];
 export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved', 'Conditional_Pass'];
-export const ISSUE_STATUS_FLOW = ['Draft', 'Approved', 'Issued', 'Closed'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

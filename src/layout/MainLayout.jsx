@@ -44,6 +44,7 @@ import { hasModuleAccess } from "../utils/permissions";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
+import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
 import useIsPwa from "../hooks/useIsPwa";
@@ -334,8 +335,10 @@ const MainLayoutInner = () => {
       children: [
         { key: "/inventory/dashboard", label: "Dashboard" },
         { key: "/inventory/grn/list", label: "GRN List" },
+        { key: "/inventory/grn/allowance", label: "GRN Allowance" },
         { key: "/inventory/qc", label: "Quality Control" },
         { key: "/inventory/stock", label: "Stock" },
+        { key: "/inventory/opening-stock", label: "Opening Stock" },
         { key: "/inventory/issue", label: "Material Issue" },
         { key: "/inventory/adjustment", label: "Stock Adjustment" },
       ],
@@ -536,8 +539,10 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/qc')) return ['/inventory/qc'];
     if (path.startsWith('/inventory/fabric-stock') || path.startsWith('/inventory/stock')) return ['/inventory/stock'];
     if (path.startsWith('/inventory/accessories-stock')) return ['/inventory/stock'];
+    if (path.startsWith('/inventory/opening-stock')) return ['/inventory/opening-stock'];
     if (path.startsWith('/inventory/issue')) return ['/inventory/issue'];
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
+    if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
@@ -882,6 +887,7 @@ const MainLayoutInner = () => {
             <Outlet />
           </Content>
         </Layout>
+        <LiveActivityFeedWindow />
       </Layout>
     </SessionExpiryGuard>
   );

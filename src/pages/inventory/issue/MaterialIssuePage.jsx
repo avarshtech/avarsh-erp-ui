@@ -25,8 +25,12 @@ const MaterialIssuePage = () => {
         sticky
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
-        {hasPermission('inventory', 'add') && (
-          <ActionButton action="create" text="New Issue" onClick={handleNewIssue} />
+        {hasPermission('inventory-issue', 'add') && (
+          <ActionButton
+            action="create"
+            text={activeSegment === 'Fabric' ? 'New Fabric Issue' : 'New Accessories Issue'}
+            onClick={handleNewIssue}
+          />
         )}
       </PageHeader>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Space, Input, Select, Tag, Row, Col } from 'antd';
-import { SearchOutlined, FileTextOutlined, ClockCircleOutlined, DollarOutlined } from '@ant-design/icons';
+import { App, Table, Card, Space, Input, Select, DatePicker, Row, Col, Typography } from 'antd';
+import { SearchOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
@@ -8,43 +8,48 @@ import PermissionGuard from '../../../components/PermissionGuard';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import StatCard from '../../../components/StatCard';
-import StatusTag from '../../../components/StatusTag';
 import RecordLink from '../../../components/RecordLink';
-import CurrencyDisplay from '../../../components/CurrencyDisplay';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { ADJUSTMENT_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
-import { ADJUSTMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getAdjustmentList } from '../../../services/inventory/inventoryService';
+import { getAllCategories, getAllSubCategories } from '../../../services/master/masterDataService';
+import { useStore } from '../../../context/StoreContext';
 import { formatNumber } from '../../../utils/formatters';
 import AdjustmentViewDrawer from './AdjustmentViewDrawer';
 
-const STATUS_OPTIONS = Object.entries(ADJUSTMENT_STATUS).map(([, value]) => ({
-  label: getInventoryStatusLabel(value),
-  value,
-}));
+const { RangePicker } = DatePicker;
+const { Text } = Typography;
 
-const TYPE_OPTIONS = [
-  { label: 'Fabric', value: 'Fabric' },
-  { label: 'Accessories', value: 'Accessories' },
-];
+const fyStart = (today = dayjs()) => (today.month() + 1 >= 4 ? today.startOf('year').month(3) : today.subtract(1, 'year').startOf('year').month(3)).startOf('day');
+const fyEnd = (today = dayjs()) => fyStart(today).add(1, 'year').subtract(1, 'day').endOf('day');
+
+const unwrapList = (res) => {
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.data)) return res.data;
+  if (Array.isArray(res?.content)) return res.content;
+  if (Array.isArray(res?.data?.content)) return res.data.content;
+  return [];
+};
 
 const StockAdjustmentList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  const store = useStore();
+  const { categories: storeCategories, subCategories: storeSubCategories } = store;
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [searchText, setSearchText] = useState('');
-  const [statusFilter, setStatusFilter] = useState(undefined);
-  const [typeFilter, setTypeFilter] = useState(undefined);
+  const [categoryId, setCategoryId] = useState(undefined);
+  const [subCategoryId, setSubCategoryId] = useState(undefined);
+  const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAdjustmentList();
-      setData(res.content || []);
+      const listRes = await getAdjustmentList();
+      setData(listRes.content || []);
     } catch {
       message.error('Failed to load adjustments');
     } finally {
@@ -54,71 +59,133 @@ const StockAdjustmentList = () => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Hydrate StoreContext on mount if master lists haven't been cached yet
+  // (e.g., user navigates here directly without visiting MasterDashboard first).
+  useEffect(() => {
+    if (!storeCategories || storeCategories.length === 0) {
+      getAllCategories()
+        .then((res) => store.setData('categories', unwrapList(res)))
+        .catch(() => {});
+    }
+    if (!storeSubCategories || storeSubCategories.length === 0) {
+      getAllSubCategories()
+        .then((res) => store.setData('subCategories', unwrapList(res)))
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const subCategoryOptions = useMemo(() => {
+    const list = storeSubCategories || [];
+    const scoped = categoryId ? list.filter((s) => s.categoryId === categoryId) : list;
+    return scoped.map((s) => ({ value: s.id, label: s.name }));
+  }, [storeSubCategories, categoryId]);
+
   const filtered = useMemo(() => {
     let list = data;
-    if (typeFilter) list = list.filter((a) => a.type === typeFilter);
-    if (statusFilter) list = list.filter((a) => a.status === statusFilter);
+    if (categoryId) list = list.filter((a) => a.categoryId === categoryId);
+    if (subCategoryId) list = list.filter((a) => a.subCategoryId === subCategoryId);
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const [from, to] = dateRange;
+      list = list.filter((a) => {
+        const d = dayjs(a.adjustmentDate);
+        return d.isAfter(from.startOf('day').subtract(1, 'ms')) && d.isBefore(to.endOf('day').add(1, 'ms'));
+      });
+    }
     if (searchText) {
       const s = searchText.toLowerCase();
-      list = list.filter((a) => a.adjustmentNumber.toLowerCase().includes(s) || a.countedBy.toLowerCase().includes(s));
+      list = list.filter((a) =>
+        a.adjustmentNumber?.toLowerCase().includes(s) ||
+        a.adjustedBy?.toLowerCase().includes(s),
+      );
     }
     return list;
-  }, [data, typeFilter, statusFilter, searchText]);
+  }, [data, categoryId, subCategoryId, dateRange, searchText]);
 
   const stats = useMemo(() => {
-    const pending = data.filter((a) => a.status === ADJUSTMENT_STATUS.PENDING_APPROVAL).length;
-    const totalVariance = data.reduce((sum, a) => sum + (a.totalVarianceValue || 0), 0);
-    return { total: data.length, pending, totalVariance };
-  }, [data]);
+    const start = fyStart();
+    const end = fyEnd();
+    const inFy = filtered.filter((a) => {
+      const d = dayjs(a.adjustmentDate);
+      return d.isAfter(start.subtract(1, 'ms')) && d.isBefore(end.add(1, 'ms'));
+    });
+    const totalVariance = filtered.reduce((sum, a) => sum + Math.abs(a.totalVarianceQty || 0), 0);
+    return { totalFy: inFy.length, totalVariance };
+  }, [filtered]);
+
+  const categoryOptions = useMemo(
+    () => (storeCategories || []).map((c) => ({ value: c.id, label: c.name })),
+    [storeCategories],
+  );
+
+  const handleCategoryChange = (v) => {
+    setCategoryId(v);
+    setSubCategoryId(undefined);
+  };
 
   const columns = useMemo(() => [
-    { title: 'Adjustment #', dataIndex: 'adjustmentNumber', key: 'adjustmentNumber', width: 160, render: (text, record) => <RecordLink text={text} onClick={() => setViewDrawer({ open: true, record })} /> },
-    { title: 'Date', dataIndex: 'adjustmentDate', key: 'adjustmentDate', width: 120, render: (d) => dayjs(d).format('DD-MMM-YYYY') },
-    { title: 'Type', dataIndex: 'type', key: 'type', width: 120, render: (t) => <Tag color={t === 'Fabric' ? 'blue' : 'purple'}>{t}</Tag> },
-    { title: 'Items', dataIndex: 'items', key: 'itemsCount', width: 80, align: 'center', render: (items) => items?.length || 0 },
-    { title: 'Total Variance', dataIndex: 'totalVarianceValue', key: 'totalVarianceValue', width: 160, render: (val) => <CurrencyDisplay amount={val} color={val < 0 ? 'var(--error-color)' : 'var(--success-color)'} /> },
-    { title: 'Counted By', dataIndex: 'countedBy', key: 'countedBy', width: 150 },
-    { title: 'Status', dataIndex: 'status', key: 'status', width: 150, render: (s) => <StatusTag status={s} config={ADJUSTMENT_STATUS_CONFIG} getLabel={getInventoryStatusLabel} /> },
-    { title: 'Approver', dataIndex: 'approver', key: 'approver', width: 150, render: (v) => v || '\u2014' },
     {
-      title: 'Actions', key: 'actions', width: 100, fixed: 'right',
+      title: 'Adjustment #', dataIndex: 'adjustmentNumber', key: 'adjustmentNumber', width: 170, align: 'center',
+      render: (text, record) => <RecordLink text={text} onClick={() => setViewDrawer({ open: true, record })} />,
+    },
+    { title: 'Date', dataIndex: 'adjustmentDate', key: 'adjustmentDate', width: 120, align: 'center', render: (d) => dayjs(d).format('DD-MMM-YYYY') },
+    { title: 'Category', dataIndex: 'categoryName', key: 'categoryName', width: 130, align: 'center' },
+    { title: 'Items', dataIndex: 'items', key: 'itemsCount', width: 80, align: 'center', render: (items) => items?.length || 0 },
+    {
+      title: 'Total Variance', key: 'totalVarianceQty', width: 160, align: 'center',
+      render: (_, r) => {
+        const q = r.totalVarianceQty || 0;
+        return (
+          <Text strong style={{ color: q < 0 ? 'var(--error-color)' : q > 0 ? 'var(--success-color)' : undefined }}>
+            {q >= 0 ? '+' : ''}{formatNumber(q, 2)} <Text type="secondary">{r.uom}</Text>
+          </Text>
+        );
+      },
+    },
+    { title: 'Adjusted By', dataIndex: 'adjustedBy', key: 'adjustedBy', width: 160, align: 'center' },
+    {
+      title: 'Actions', key: 'actions', width: 110, fixed: 'right', align: 'center',
       render: (_, record) => (
         <Space size="small">
           <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
-          {record.status === ADJUSTMENT_STATUS.DRAFT && hasPermission('inventory', 'edit') && (
+          {hasPermission('inventory-adjustment', 'update') && (
             <ActionButton action="edit" onClick={() => navigate(`/inventory/adjustment/${record.id}`)} />
           )}
         </Space>
       ),
     },
-  ], [navigate, setViewDrawer]);
+  ], [navigate]);
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Stock Adjustments" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-adjustment" operation="add">
           <ActionButton action="create" text="New Adjustment" onClick={() => navigate('/inventory/adjustment/new')} />
         </PermissionGuard>
       </PageHeader>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        <Col xs={12} sm={8}><StatCard title="Total Adjustments" value={stats.total} color="var(--primary-color)" icon={<FileTextOutlined />} /></Col>
-        <Col xs={12} sm={8}><StatCard title="Pending Approval" value={stats.pending} color="var(--warning-color)" icon={<ClockCircleOutlined />} /></Col>
-        <Col xs={12} sm={8}><StatCard title="Total Variance" value={formatNumber(Math.abs(stats.totalVariance), 2)} prefix="₹" color={stats.totalVariance < 0 ? 'var(--error-color)' : 'var(--success-color)'} icon={<DollarOutlined />} /></Col>
+        <Col xs={12} sm={12}>
+          <StatCard title="Total Adjustments" value={stats.totalFy} color="var(--primary-color)" icon={<FileTextOutlined />} />
+        </Col>
+        <Col xs={12} sm={12}>
+          <StatCard title="Total Variance" value={formatNumber(stats.totalVariance, 2)} color="var(--warning-color)" icon={<SwapOutlined />} />
+        </Col>
       </Row>
 
       <Card>
         <Space wrap style={{ marginBottom: 16 }}>
-          <Input placeholder="Search adjustments..." prefix={<SearchOutlined />} style={{ width: 250 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
-          <Select placeholder="Status" style={{ width: 170 }} allowClear options={STATUS_OPTIONS} value={statusFilter} onChange={setStatusFilter} />
-          <Select placeholder="Type" style={{ width: 150 }} allowClear options={TYPE_OPTIONS} value={typeFilter} onChange={setTypeFilter} />
+          <Input placeholder="Search adjustments..." prefix={<SearchOutlined />} style={{ width: 260 }} value={searchText} onChange={(e) => setSearchText(e.target.value)} allowClear />
+          <Select placeholder="Category" style={{ width: 180 }} allowClear options={categoryOptions} value={categoryId} onChange={handleCategoryChange} />
+          <Select placeholder="Sub-Category" style={{ width: 180 }} allowClear options={subCategoryOptions} value={subCategoryId} onChange={setSubCategoryId} disabled={!categoryId} />
+          <RangePicker style={{ width: 280 }} value={dateRange} onChange={setDateRange} />
         </Space>
         <Table
           rowKey="id"
           columns={columns}
           dataSource={filtered}
           loading={loading}
-          scroll={{ x: 1200 }}
+          scroll={{ x: 1100 }}
           pagination={getTablePagination({ pageSize: 10 }, 'adjustments')}
           locale={{ emptyText: <EmptyState title="No adjustments found" description="Create a new stock adjustment to get started" /> }}
         />

@@ -161,6 +161,7 @@ const AccessoriesGRNForm = () => {
           receivingQty: null,
           uom: v?.primaryUom || li?.uom,
           rate: li?.rate,
+          defaultAllowance: li?.defaultAllowance,
         };
       });
       const byId = new Map();

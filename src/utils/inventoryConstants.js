@@ -85,47 +85,11 @@ export const STOCK_STATUS_LABELS = {
   [STOCK_STATUS.DAMAGED]: 'Damaged',
 };
 
-// ─── ISSUE STATUS ──────────────────────────────────────────────────────────────
-export const ISSUE_STATUS = {
-  DRAFT: 'Draft',
-  APPROVED: 'Approved',
-  ISSUED: 'Issued',
-  PARTIAL: 'Partially_Issued',
-  RETURNED: 'Returned',
-  CLOSED: 'Closed',
-};
-
-export const ISSUE_STATUS_LABELS = {
-  [ISSUE_STATUS.DRAFT]: 'Draft',
-  [ISSUE_STATUS.APPROVED]: 'Approved',
-  [ISSUE_STATUS.ISSUED]: 'Issued',
-  [ISSUE_STATUS.PARTIAL]: 'Partially Issued',
-  [ISSUE_STATUS.RETURNED]: 'Returned',
-  [ISSUE_STATUS.CLOSED]: 'Closed',
-};
-
-// ─── ADJUSTMENT STATUS ─────────────────────────────────────────────────────────
-export const ADJUSTMENT_STATUS = {
-  DRAFT: 'Draft',
-  PENDING_APPROVAL: 'Pending_Approval',
-  APPROVED: 'Approved',
-  REJECTED: 'Rejected',
-};
-
-export const ADJUSTMENT_STATUS_LABELS = {
-  [ADJUSTMENT_STATUS.DRAFT]: 'Draft',
-  [ADJUSTMENT_STATUS.PENDING_APPROVAL]: 'Pending Approval',
-  [ADJUSTMENT_STATUS.APPROVED]: 'Approved',
-  [ADJUSTMENT_STATUS.REJECTED]: 'Rejected',
-};
-
 // ─── LABEL HELPERS ─────────────────────────────────────────────────────────────
 const ALL_LABELS = {
   ...GRN_STATUS_LABELS,
   ...QC_STATUS_LABELS,
   ...STOCK_STATUS_LABELS,
-  ...ISSUE_STATUS_LABELS,
-  ...ADJUSTMENT_STATUS_LABELS,
 };
 
 export const getInventoryStatusLabel = (status) => ALL_LABELS[status] || status?.replace(/_/g, ' ') || '';

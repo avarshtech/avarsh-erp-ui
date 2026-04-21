@@ -4,6 +4,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 import { lazy, Suspense, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
+import { LiveActivityFeedProvider } from './context/LiveActivityFeedContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
 import GlobalMessageEmitter from './components/GlobalMessageEmitter';
@@ -30,12 +31,15 @@ import POForm from './pages/po/POForm';
 // Inventory Module (lazy-loaded)
 const InventoryDashboard = lazy(() => import('./pages/inventory/dashboard/InventoryDashboard'));
 const GRNList = lazy(() => import('./pages/inventory/grn/GRNList'));
+const AllowancePage = lazy(() => import('./pages/inventory/allowance/AllowancePage'));
 const FabricGRNForm = lazy(() => import('./pages/inventory/grn/FabricGRNForm'));
 const AccessoriesGRNForm = lazy(() => import('./pages/inventory/grn/AccessoriesGRNForm'));
 const FabricQCInspection = lazy(() => import('./pages/inventory/qc/FabricQCInspection'));
 const TrimsQCInspection = lazy(() => import('./pages/inventory/qc/TrimsQCInspection'));
 const QualityControlPage = lazy(() => import('./pages/inventory/qc/QualityControlPage'));
 const StockRegisterPage = lazy(() => import('./pages/inventory/stock/StockRegisterPage'));
+const OpeningStockDashboard = lazy(() => import('./pages/inventory/opening-stock/OpeningStockDashboard'));
+const OpeningStockBatchForm = lazy(() => import('./pages/inventory/opening-stock/OpeningStockBatchForm'));
 const MaterialIssuePage = lazy(() => import('./pages/inventory/issue/MaterialIssuePage'));
 const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueForm'));
 const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
@@ -205,6 +209,7 @@ const ThemedApp = () => {
       <UpdateOverlay />
       <StoreProvider>
         <BrowserRouter>
+          <LiveActivityFeedProvider>
           <ScrollToTop />
           <Routes>
             {/* Public Route */}
@@ -314,6 +319,7 @@ const ThemedApp = () => {
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/grn/allowance" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><AllowancePage /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/fabric/new" element={<PermissionRoute module="inventory" operation="add"><Suspense fallback={<PageSkeleton />}><FabricGRNForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/fabric/edit/:id" element={<PermissionRoute module="inventory" operation="update"><Suspense fallback={<PageSkeleton />}><FabricGRNForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/accessories/new" element={<PermissionRoute module="inventory" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesGRNForm /></Suspense></PermissionRoute>} />
@@ -324,9 +330,16 @@ const ThemedApp = () => {
             <Route path="inventory/qc/trims/new" element={<PermissionRoute module="inventory-qc" operation="add"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/qc/trims/:id" element={<PermissionRoute module="inventory-qc"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/stock" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><StockRegisterPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/opening-stock" element={<PermissionRoute module="opening-stock"><Suspense fallback={<PageSkeleton />}><OpeningStockDashboard /></Suspense></PermissionRoute>} />
+            <Route path="inventory/opening-stock/fabric/new" element={<PermissionRoute module="opening-stock" operation="add"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="FABRIC" /></Suspense></PermissionRoute>} />
+            <Route path="inventory/opening-stock/fabric/:id" element={<PermissionRoute module="opening-stock"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="FABRIC" /></Suspense></PermissionRoute>} />
+            <Route path="inventory/opening-stock/accessories/new" element={<PermissionRoute module="opening-stock" operation="add"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="ACCESSORIES" /></Suspense></PermissionRoute>} />
+            <Route path="inventory/opening-stock/accessories/:id" element={<PermissionRoute module="opening-stock"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="ACCESSORIES" /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue" element={<PermissionRoute module="inventory-issue"><Suspense fallback={<PageSkeleton />}><MaterialIssuePage /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/fabric/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue/fabric/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue/accessories/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentList /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
@@ -387,6 +400,7 @@ const ThemedApp = () => {
           {/* Catch-all: redirect to root (ProtectedRoute will send to login if unauthenticated) */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </LiveActivityFeedProvider>
       </BrowserRouter>
     </StoreProvider>
       </AntdApp>

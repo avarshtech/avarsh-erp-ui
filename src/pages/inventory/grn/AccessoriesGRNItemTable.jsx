@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Table, InputNumber, Typography, Empty } from 'antd';
-import { ExclamationCircleOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../../utils/inputHelpers';
 import { formatNumber } from '../../../utils/formatters';
 
@@ -9,31 +9,35 @@ const { Text } = Typography;
 const ReadOnlyText = ({ value }) => <Text style={{ fontSize: 13 }}>{value ?? '—'}</Text>;
 
 const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false }) => {
-  // Flag rows where the entered Quantity exceeds the line-item balance.
-  const overageByIdx = useMemo(() => {
+  // Flag rows that deviate from the PO balance in either direction.
+  // Extras (qty > balance) show as info — supplier mutually sends a bit extra.
+  // Shortages (qty < balance) show as warning — partial delivery vs pending qty.
+  const noticesByIdx = useMemo(() => {
     const out = new Map();
     items.forEach((r, i) => {
       const qty = Number(r.receivingQty);
       const balance = Number(r.balance);
-      if (Number.isFinite(qty) && Number.isFinite(balance) && qty > balance) {
-        out.set(i, { qty, balance, itemCode: r.itemCode, uom: r.uom });
+      if (!Number.isFinite(qty) || !Number.isFinite(balance) || qty <= 0 || balance <= 0) return;
+      const allowance = Number.isFinite(Number(r.defaultAllowance)) ? Number(r.defaultAllowance) : null;
+      if (qty > balance) {
+        out.set(i, { kind: 'extra', qty, balance, pct: ((qty - balance) / balance) * 100, itemCode: r.itemCode, uom: r.uom, allowance });
+      } else if (qty < balance) {
+        out.set(i, { kind: 'short', qty, balance, pct: ((balance - qty) / balance) * 100, itemCode: r.itemCode, uom: r.uom, allowance });
       }
     });
     return out;
   }, [items]);
 
-  // Build display rows: each item row + a synthetic error row directly below
-  // when that item's quantity exceeds its balance.
   const dataSource = useMemo(() => {
     const out = [];
     items.forEach((r, i) => {
       out.push({ ...r, __type: 'data', __srcIdx: i });
-      if (overageByIdx.has(i)) {
-        out.push({ __type: 'error', __key: `err-${r.poLineItemId}-${i}`, __srcIdx: i });
+      if (noticesByIdx.has(i)) {
+        out.push({ __type: 'notice', __key: `notice-${r.poLineItemId}-${i}`, __srcIdx: i });
       }
     });
     return out;
-  }, [items, overageByIdx]);
+  }, [items, noticesByIdx]);
 
   const totalCols = 8; // #, Item Code, Description, Color, Size, Rate, Quantity, Amount
 
@@ -45,8 +49,10 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 50,
         render: (_, row) => {
-          if (row.__type === 'error') {
-            const o = overageByIdx.get(row.__srcIdx);
+          if (row.__type === 'notice') {
+            const o = noticesByIdx.get(row.__srcIdx);
+            const isExtra = o.kind === 'extra';
+            const accent = isExtra ? 'var(--primary-color)' : 'var(--warning-color)';
             return {
               children: (
                 <div
@@ -55,17 +61,20 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
                     alignItems: 'center',
                     gap: 8,
                     padding: '6px 12px',
-                    background: 'color-mix(in srgb, var(--error-color) 18%, transparent)',
-                    color: 'var(--error-color)',
+                    background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+                    color: accent,
                     fontSize: 12,
                     fontWeight: 500,
                     textAlign: 'left',
-                    borderLeft: '3px solid var(--error-color)',
+                    borderLeft: `3px solid ${accent}`,
                   }}
                 >
-                  <ExclamationCircleOutlined />
+                  {isExtra ? <InfoCircleOutlined /> : <WarningOutlined />}
                   <span>
-                    Quantity ({formatNumber(o.qty, 2)} {o.uom || ''}) exceeds available balance ({formatNumber(o.balance, 2)} {o.uom || ''}) for {o.itemCode}
+                    {isExtra
+                      ? `Supplier sent ${formatNumber(o.pct, 2)}% extra for ${o.itemCode} (received ${formatNumber(o.qty, 2)} ${o.uom || ''}, PO balance ${formatNumber(o.balance, 2)} ${o.uom || ''})`
+                      : `Short by ${formatNumber(o.pct, 2)}% from PO balance for ${o.itemCode} (received ${formatNumber(o.qty, 2)} ${o.uom || ''}, PO balance ${formatNumber(o.balance, 2)} ${o.uom || ''})`}
+                    {o.allowance != null && ` • Item allowance: ${formatNumber(o.allowance, 2)}%`}
                   </span>
                 </div>
               ),
@@ -81,7 +90,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 170,
         render: (v, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{v ?? '—'}</Text>;
         },
       },
@@ -91,7 +100,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         ellipsis: true,
         render: (v, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return <ReadOnlyText value={v} />;
         },
       },
@@ -101,7 +110,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 100,
         render: (v, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return <ReadOnlyText value={v} />;
         },
       },
@@ -111,7 +120,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 80,
         render: (v, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return <ReadOnlyText value={v} />;
         },
       },
@@ -121,7 +130,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 100,
         render: (v, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return <ReadOnlyText value={formatNumber(v, 2)} />;
         },
       },
@@ -131,8 +140,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 170,
         render: (val, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
-          const hasOverage = overageByIdx.has(row.__srcIdx);
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           return (
             <InputNumber
               size="small"
@@ -143,7 +151,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
               addonAfter={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
-              status={hasOverage ? 'error' : (!val ? 'warning' : '')}
+              status={!val ? 'warning' : ''}
               onChange={(v) => onItemChange?.(row.__srcIdx, 'receivingQty', v)}
               {...numericInputProps}
             />
@@ -156,13 +164,13 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         align: 'center',
         width: 120,
         render: (_, row) => {
-          if (row.__type === 'error') return { children: null, props: { colSpan: 0 } };
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
           const amount = (Number(row.receivingQty) || 0) * (Number(row.rate) || 0);
           return <ReadOnlyText value={formatNumber(amount, 2)} />;
         },
       },
     ],
-    [onItemChange, readOnly, overageByIdx],
+    [onItemChange, readOnly, noticesByIdx],
   );
 
   const totalQty = useMemo(() => items.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0), [items]);
@@ -173,7 +181,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
 
   return (
     <Table
-      rowKey={(row) => (row.__type === 'error' ? row.__key : `row-${row.__srcIdx}`)}
+      rowKey={(row) => (row.__type === 'notice' ? row.__key : `row-${row.__srcIdx}`)}
       columns={columns}
       dataSource={dataSource}
       pagination={false}

@@ -100,6 +100,12 @@ const pivotDefects = (rolls, defects) => {
 
 const buildFabricQCHtml = (qc, grn, org) => {
   const companyName = org?.organisationName || 'Company Name';
+  const orgAddress = [org?.addressLine1, org?.addressLine2, org?.city, org?.state, org?.pincode]
+    .filter(Boolean).join(', ');
+  const orgGstin = org?.gstin || '';
+  const orgPan = org?.pan || '';
+  const orgPhone = org?.phone || '';
+  const orgEmail = org?.email || '';
   const rolls = qc.rolls || [];
   const defects = qc.defects || [];
   const { typeOrder, rows } = pivotDefects(rolls, defects);
@@ -223,6 +229,20 @@ const buildFabricQCHtml = (qc, grn, org) => {
     letter-spacing: 1px;
     text-transform: uppercase;
   }
+  .header .brand .company-info .org-addr {
+    font-size: 8.5px;
+    color: #6b7280;
+    margin-top: 3px;
+    max-width: 340px;
+    line-height: 1.45;
+  }
+  .header .brand .company-info .org-ids {
+    font-size: 8.5px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  .header .brand .company-info .org-ids strong { color: #374151; }
+  .header .brand .company-info .org-ids .sep { margin: 0 5px; color: #c7cfda; }
   .header .doc-meta { text-align: right; }
   .header .doc-meta .date { font-size: 10px; color: #6b7280; }
   .header .doc-meta .report-no {
@@ -414,6 +434,14 @@ const buildFabricQCHtml = (qc, grn, org) => {
         <div class="company-info">
           <h1>${escapeHtml(companyName)}</h1>
           <div class="tagline">Fabric Inspection Report</div>
+          ${orgAddress ? `<div class="org-addr">${escapeHtml(orgAddress)}</div>` : ''}
+          <div class="org-ids">
+            ${orgGstin ? `<strong>GSTIN</strong> ${escapeHtml(orgGstin)}` : ''}
+            ${orgGstin && orgPan ? '<span class="sep">·</span>' : ''}
+            ${orgPan ? `<strong>PAN</strong> ${escapeHtml(orgPan)}` : ''}
+            ${orgPhone ? `<span class="sep">·</span><strong>Tel</strong> ${escapeHtml(orgPhone)}` : ''}
+            ${orgEmail ? `<span class="sep">·</span><strong>Email</strong> ${escapeHtml(orgEmail)}` : ''}
+          </div>
         </div>
       </div>
       <div class="doc-meta">

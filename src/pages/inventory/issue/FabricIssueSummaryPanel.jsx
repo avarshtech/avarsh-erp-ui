@@ -1,73 +1,56 @@
 import { useMemo } from 'react';
-import { Card, Descriptions, Divider, Progress, Typography, Alert } from 'antd';
+import { Card, Descriptions, Divider, Typography } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { formatNumber } from '../../../utils/formatters';
 
 const { Title, Text } = Typography;
 
-const FabricIssueSummaryPanel = ({ productionOrder, selectedRolls = [], bomRequired = 0 }) => {
-  const summary = useMemo(() => {
-    const totalWeight = selectedRolls.reduce((sum, r) => sum + (r.weight || 0), 0);
-    const variance = totalWeight - bomRequired;
-    const variancePct = bomRequired > 0 ? (variance / bomRequired) * 100 : 0;
-    const issuedPct = bomRequired > 0 ? Math.min((totalWeight / bomRequired) * 100, 100) : 0;
-    return { rollCount: selectedRolls.length, totalWeight, variance, variancePct, issuedPct };
-  }, [selectedRolls, bomRequired]);
+const SummaryRow = ({ label, value, strong = true }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+    <Text type="secondary">{label}</Text>
+    <Text strong={strong}>{value}</Text>
+  </div>
+);
 
-  const varianceColor = Math.abs(summary.variancePct) <= 5 ? 'var(--success-color)' : 'var(--error-color)';
+const FabricIssueSummaryPanel = ({ cuttingPO, cuttingPOLine, selectedRolls = [], bomRequired = 0, uom = 'kg' }) => {
+  const totalWeight = useMemo(
+    () => selectedRolls.reduce((sum, r) => sum + (Number(r.weight) || 0), 0),
+    [selectedRolls],
+  );
 
   return (
     <Card style={{ marginBottom: 24, height: '100%' }}>
-      <Title level={5} style={{ marginBottom: 16 }}>Production Order</Title>
-      {productionOrder ? (
+      <Title level={5} style={{ marginBottom: 16 }}>Cutting Order</Title>
+      {cuttingPO ? (
         <>
           <Descriptions size="small" column={1}>
-            <Descriptions.Item label="PO #">{productionOrder.poNumber}</Descriptions.Item>
-            <Descriptions.Item label="Style">{productionOrder.style}</Descriptions.Item>
-            <Descriptions.Item label="Buyer">{productionOrder.buyer}</Descriptions.Item>
-            <Descriptions.Item label="Order Qty">{formatNumber(productionOrder.orderQty)}</Descriptions.Item>
+            <Descriptions.Item label="Cutting PO">{cuttingPO.cuttingPONumber}</Descriptions.Item>
+            <Descriptions.Item label="Style">{cuttingPOLine?.style || cuttingPO.style}</Descriptions.Item>
+            <Descriptions.Item label="Buyer">{cuttingPO.buyer}</Descriptions.Item>
+            <Descriptions.Item label="Order Qty">{formatNumber(cuttingPO.orderQty)}</Descriptions.Item>
+            <Descriptions.Item label="Production Unit">{cuttingPO.productionUnit || '—'}</Descriptions.Item>
+            {cuttingPOLine && (
+              <>
+                <Descriptions.Item label="PO Line">{cuttingPOLine.orderNumber}</Descriptions.Item>
+                <Descriptions.Item label="Fabric">{cuttingPOLine.fabric}</Descriptions.Item>
+              </>
+            )}
           </Descriptions>
 
           <Divider style={{ margin: '16px 0' }} />
 
           <Title level={5} style={{ marginBottom: 12 }}>Issue Summary</Title>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">Rolls Selected</Text>
-              <Text strong>{summary.rollCount}</Text>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">Total Weight</Text>
-              <Text strong>{formatNumber(summary.totalWeight, 1)} kg</Text>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">BOM Required</Text>
-              <Text strong>{formatNumber(bomRequired, 1)} kg</Text>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">Variance</Text>
-              <Text strong style={{ color: varianceColor }}>{summary.variance >= 0 ? '+' : ''}{formatNumber(summary.variance, 1)} kg</Text>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text type="secondary">Variance %</Text>
-              <Text strong style={{ color: varianceColor }}>{summary.variancePct >= 0 ? '+' : ''}{formatNumber(summary.variancePct, 1)}%</Text>
-            </div>
+            <SummaryRow label="Rolls Selected" value={selectedRolls.length} />
+            <SummaryRow label={`Total ${uom === 'kg' ? 'Weight' : 'Qty'}`} value={`${formatNumber(totalWeight, 1)} ${uom}`} />
+            <SummaryRow label="BOM Required" value={`${formatNumber(bomRequired, 1)} ${uom}`} />
           </div>
-
-          <Progress percent={Number(summary.issuedPct.toFixed(1))} status={summary.issuedPct >= 100 ? 'success' : 'active'} style={{ marginTop: 16 }} />
-
-          {summary.variance > 0 && Math.abs(summary.variancePct) > 5 && (
-            <Alert type="warning" showIcon message="Over-issue detected" description="Issued weight exceeds BOM + 5% tolerance" style={{ marginTop: 12 }} />
-          )}
-          {summary.totalWeight > 0 && summary.variance < 0 && Math.abs(summary.variancePct) > 5 && (
-            <Alert type="info" showIcon message="Under-issue" description="Issued weight is below BOM requirement" style={{ marginTop: 12 }} />
-          )}
         </>
       ) : (
         <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-secondary)' }}>
           <InboxOutlined style={{ fontSize: 32, marginBottom: 8 }} />
           <br />
-          <Text type="secondary">Select a Production Order</Text>
+          <Text type="secondary">Select a Cutting PO</Text>
         </div>
       )}
     </Card>

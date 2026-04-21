@@ -191,7 +191,7 @@ const buildGRNHtml = (grn, rows, totals, org, supplier, po, isIgst) => {
   const isFabric = grn.type === 'Fabric' || grn.grnType === 'Fabric';
   const typeBadge = isFabric ? 'FABRIC' : 'ACCESSORIES';
   const companyName = org?.organisationName || 'Company Name';
-  const companyAddr = [org?.addressLine1, org?.addressLine2, org?.city, org?.stateName, org?.pincode]
+  const companyAddr = [org?.addressLine1, org?.addressLine2, org?.city, org?.state, org?.pincode]
     .filter(Boolean).join(', ');
   const orgGstin = org?.gstin || '';
   const orgPan = org?.pan || '';

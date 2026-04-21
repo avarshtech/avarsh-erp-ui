@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Form, Card, Row, Col, Select, DatePicker, Input, Space, Segmented, Typography } from 'antd';
+import { App, Form, Card, Row, Col, Select, DatePicker, Input, Space, Segmented, Typography, Alert } from 'antd';
 import {
   SaveOutlined,
   SendOutlined,
@@ -9,6 +9,8 @@ import {
   ExperimentOutlined,
   CheckCircleFilled,
   CloseCircleFilled,
+  InfoCircleOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -21,6 +23,7 @@ import {
   saveTrimsQCDraft,
   submitTrimsQC,
   computePOLineItemReceipts,
+  getAccessoriesGRN,
 } from '../../../services/inventory/inventoryService';
 import { validateTrimsQC } from '../../../utils/qcValidation';
 import { QC_STATUS } from '../../../utils/inventoryConstants';
@@ -106,10 +109,13 @@ const TrimsQCInspection = () => {
 
   useEffect(() => {
     if (isNew) return;
-    getTrimsQCById(id).then((data) => {
+    getTrimsQCById(id).then(async (data) => {
       if (!data) return;
       setQcData(data);
-      setSelectedGRN({ id: data.grnId, grnNumber: data.grnNumber });
+      // Fetch the full GRN so we have poId + items[] even if the GRN is no
+      // longer in QC_PENDING (the filtered `grns` list excludes those).
+      const fullGrn = await getAccessoriesGRN(data.grnId).catch(() => null);
+      setSelectedGRN(fullGrn || { id: data.grnId, grnNumber: data.grnNumber });
       setPoLineItemId(data.poLineItemId);
       setCriteriaRows(data.criteriaRows || data.criteriaChecks || []);
       setQtyVerdict(data.qtyVerdict || null);
@@ -213,6 +219,22 @@ const TrimsQCInspection = () => {
   const qtyChecked = Number(selectedLineItem?.receivingQty || 0);
   const cumulativeFromAllGrns = poLineItemId != null ? Number(poReceipts[poLineItemId] || 0) : 0;
   const qtyReceived = Math.max(cumulativeFromAllGrns, qtyChecked);
+
+  // Supply notice vs the originally requested PO line quantity, across all GRNs.
+  // Inspectors need to see whether the supplier over-shipped (allowance) or
+  // under-shipped (shortage) so they can plan inspection + downstream stock actions.
+  const qtyOrdered = Number(selectedLineItem?.poQty || selectedLineItem?.orderedQty || 0);
+  const itemAllowance = Number.isFinite(Number(selectedLineItem?.defaultAllowance)) ? Number(selectedLineItem.defaultAllowance) : null;
+  const supplyNotice = (() => {
+    if (qtyOrdered <= 0 || qtyReceived <= 0) return null;
+    if (qtyReceived > qtyOrdered) {
+      return { kind: 'extra', diff: qtyReceived - qtyOrdered, pct: ((qtyReceived - qtyOrdered) / qtyOrdered) * 100 };
+    }
+    if (qtyReceived < qtyOrdered) {
+      return { kind: 'short', diff: qtyOrdered - qtyReceived, pct: ((qtyOrdered - qtyReceived) / qtyOrdered) * 100 };
+    }
+    return null;
+  })();
 
   const handleQtyVerdictChange = useCallback((next) => {
     setQtyVerdict(next || null);
@@ -405,6 +427,28 @@ const TrimsQCInspection = () => {
                 color="var(--warning-color, #faad14)"
               />
             </div>
+
+            {supplyNotice && (
+              <Alert
+                type={supplyNotice.kind === 'extra' ? 'info' : 'warning'}
+                showIcon
+                icon={supplyNotice.kind === 'extra' ? <InfoCircleOutlined /> : <WarningOutlined />}
+                style={{ marginTop: 12 }}
+                message={
+                  supplyNotice.kind === 'extra' ? (
+                    <span>
+                      Supplier sent <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> extra over the requested PO quantity — {formatNumber(supplyNotice.diff)} {selectedLineItem?.uom || ''} above the ordered {formatNumber(qtyOrdered)} {selectedLineItem?.uom || ''}.
+                      {itemAllowance != null && <> Item allowance: <strong>{formatNumber(itemAllowance, 2)}%</strong>.</>}
+                    </span>
+                  ) : (
+                    <span>
+                      Supplier short by <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> from the requested PO quantity — received {formatNumber(qtyReceived)} {selectedLineItem?.uom || ''} of ordered {formatNumber(qtyOrdered)} {selectedLineItem?.uom || ''} ({formatNumber(supplyNotice.diff)} {selectedLineItem?.uom || ''} short).
+                      {itemAllowance != null && <> Item allowance: <strong>{formatNumber(itemAllowance, 2)}%</strong>.</>}
+                    </span>
+                  )
+                }
+              />
+            )}
 
             {/* Qty verdict — inspector confirms whether the physically-checked qty matches the GRN received qty */}
             <div

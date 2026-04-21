@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-  Card, Table, Button, Input, Select, Tag, Space, Modal, Form, Row, Col,
+  Card, Table, Button, Input, InputNumber, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, App, Divider, Badge, Checkbox, Typography, Empty,
   Drawer, Descriptions, Alert, Skeleton,
 } from 'antd';
@@ -798,6 +798,7 @@ const ItemMaster = () => {
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
       hsnCode: item.hsnCode || '',
+      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
       isActive: item.isActive ?? true,
     });
 
@@ -1093,6 +1094,7 @@ const ItemMaster = () => {
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
       hsnCode: item.hsnCode || '',
+      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
       isActive: item.isActive ?? true,
     });
 
@@ -1253,6 +1255,7 @@ const ItemMaster = () => {
           ? formUomOptions.find((opt) => opt.id.toString() === values.secondaryUomId.toString())?.name || null
           : null,
         hsnCode: values.hsnCode,
+        defaultAllowance: values.defaultAllowance,
         isActive: values.isActive,
         variants: variantsPayload,
       };
@@ -1620,23 +1623,29 @@ const ItemMaster = () => {
                 </div>
               </Col>
             </Row>
-            {/* Row 3: Primary UOM + Secondary UOM + HSN Code */}
+            {/* Row 3: Primary UOM + Secondary UOM + HSN Code + Allowance */}
             <Row gutter={16}>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 100, height: 16 }} /></div>
                   <Skeleton.Input active block style={{ height: 32 }} />
                 </div>
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 120, height: 16 }} /></div>
                   <Skeleton.Input active block style={{ height: 32 }} />
                 </div>
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <div style={{ marginBottom: 24 }}>
                   <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 80, height: 16 }} /></div>
+                  <Skeleton.Input active block style={{ height: 32 }} />
+                </div>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ marginBottom: 8, height: 22 }}><Skeleton.Input active size="small" style={{ width: 90, height: 16 }} /></div>
                   <Skeleton.Input active block style={{ height: 32 }} />
                 </div>
               </Col>
@@ -1786,7 +1795,7 @@ const ItemMaster = () => {
             </Row>
 
             <Row gutter={16}>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item
                   name="uomId"
                   label="Primary UOM"
@@ -1800,7 +1809,7 @@ const ItemMaster = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item
                   name="secondaryUomId"
                   label="Secondary UOM"
@@ -1825,13 +1834,32 @@ const ItemMaster = () => {
                     />
                 </Form.Item>
               </Col>
-              <Col xs={24} md={8}>
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item
                   name="hsnCode"
                   label="HSN Code"
                   rules={[{ required: true, message: 'HSN Code is required' }]}
                 >
                   <Input placeholder="Enter HSN Code" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Form.Item
+                  name="defaultAllowance"
+                  label="Allowance"
+                  rules={[
+                    { required: true, message: 'Allowance is required' },
+                    { type: 'number', min: 0, message: 'Allowance cannot be negative' },
+                  ]}
+                >
+                  <InputNumber
+                    placeholder="Enter Allowance"
+                    controls={false}
+                    addonAfter="%"
+                    min={0}
+                    precision={2}
+                    style={{ width: '100%', height: 40 }}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -2122,6 +2150,7 @@ const ItemMaster = () => {
               { key: 'itemType', label: 'Item Type', children: viewingItem.itemTypeName || '-' },
               { key: 'uom', label: 'UOM', children: viewingItem.uomName || '-' },
               { key: 'hsn', label: 'HSN Code', children: viewingItem.hsnCode || '-' },
+              { key: 'allowance', label: 'Allowance', children: viewingItem.defaultAllowance != null ? `${Number(viewingItem.defaultAllowance)}%` : '-' },
             ]} />
 
             <Divider titlePlacement="start">Variants</Divider>

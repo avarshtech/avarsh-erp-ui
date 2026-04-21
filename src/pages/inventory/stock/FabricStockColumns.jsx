@@ -72,13 +72,26 @@ const getFabricStockColumns = () => [
     ellipsis: true,
   },
   {
-    title: 'GRN #',
+    title: 'Source',
+    dataIndex: 'sourceType',
+    key: 'sourceType',
+    width: 100,
+    align: 'center',
+    render: (src) => src === 'OPENING_BALANCE'
+      ? <Tag color="geekblue">Opening</Tag>
+      : <Tag>GRN</Tag>,
+  },
+  {
+    title: 'GRN # / Batch',
     dataIndex: 'grnNumber',
     key: 'grnNumber',
     width: 160,
     align: 'center',
-    render: (text) => (
-      <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text}</span>
+    render: (text, r) => (
+      <span style={{
+        fontWeight: 600,
+        color: r?.sourceType === 'OPENING_BALANCE' ? 'var(--info-color, #1677ff)' : 'var(--primary-color)',
+      }}>{text}</span>
     ),
   },
   {

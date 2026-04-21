@@ -88,6 +88,78 @@ These are cross-cutting integrity traps that corrupt data silently. Before editi
 
 ---
 
+## Prompt Engineering & Token Optimization (First Action After Banner)
+
+After displaying the banner, BEFORE reading any code, entering plan mode, or dispatching subagents, run this triage on the user's prompt. The goal: better results AND tight token usage.
+
+### Triage Rules (R1–R7)
+
+A prompt is **action-ready** if it satisfies enough of these to execute without back-and-forth:
+
+| # | Rule |
+|---|------|
+| R1 | NAMES the target repo, module, file, or component when applicable |
+| R2 | STATES the user-visible outcome or business intent |
+| R3 | SCOPE identifiable: new feature / bug fix / refactor / read-only / spike |
+| R4 | DEPRECATION/MIGRATION concerns flagged (AntD 6.x deprecated props; immutable Flyway V1–V34) |
+| R5 | DEPENDENCIES named: API endpoint, master data, permissions, StoreContext, SessionContext, axiosInstance |
+| R6 | SUCCESS CRITERIA defined (browser works, no console errors, build green, etc.) |
+| R7 | AVOIDS vague verbs ("fix it", "update X", "make it better") without a concrete target |
+
+### Decision Branch
+
+**A. Action-ready** → proceed silently. Do not echo R1–R7. Do not restate the prompt.
+
+**B. Vague / missing critical context** → output the rewrite in this exact form and STOP — do not call any tool until approval:
+
+> **Enhanced prompt proposal**
+> > _<rewritten prompt that satisfies R1–R7, preserving user intent verbatim>_
+> _Why:_ <one short sentence on what was missing>
+> Reply `yes` to proceed, or amend.
+
+**Skip the whole triage** when the prompt is: a follow-up reply, a confirmation, continuation of in-progress work, or a clearly-scoped Small task (single-file fix).
+
+### Token Optimization (Always-On)
+
+Apply these to every task — they compound across a session.
+
+**Discovery before reading:**
+- `Glob` for file paths first; never list-then-read entire directories
+- `Grep --output-mode=files_with_matches` to narrow before `output_mode=content`
+- `Read` with `offset`/`limit` for files > 200 lines — never read full file when targeting a known function
+
+**Reference, don't restate:**
+- Reference files by `[name.jsx:42](path#L42)` — do not paste file content into responses
+- Cite ERP master data via StoreContext keys (e.g. `partyTypes`, `uomList`) — do not re-fetch or describe
+- Use existing references in `.claude/skills/erp-dev/references/*.md` instead of re-deriving patterns
+- CLAUDE.md is already in context — do not re-read it
+
+**Subagent prompts MUST be self-contained and ERP-engineered:**
+- Pass file paths + line numbers, not "the file you discussed"
+- Pre-state R1–R7 facts in the subagent prompt (target repo, scope, success criteria)
+- Specify return format ("report under 200 words", "list of {file, line, issue}")
+- Never write "based on the conversation above" — subagents have no conversation context
+
+**Parallel where possible:**
+- Independent reads/greps go in a single message with multiple tool calls
+- Sequential only when output of A determines input of B
+
+**Output discipline:**
+- Plan mode plans: bullet lists with file paths, not prose paragraphs
+- Code review reports: `{severity, file:line, issue, fix}` rows, not narrative
+- Status updates between tool calls: ≤ 25 words
+
+**For Garment ERP specifically:**
+- Inventory module: read only the target form + its existing sibling (e.g., editing `AccessoriesIssueForm.jsx` → also read `FabricIssueForm.jsx` for pattern, skip the rest)
+- API CRUD work: read the target controller/service/repository triple only — skip unrelated DTOs
+- Approval flow work: ALWAYS read `referential-integrity-patterns.md` first (saves rewriting it)
+
+### Coordination With the UserPromptSubmit Hook
+
+The `erp_prompt_enhancer` UserPromptSubmit hook DEFERS to this skill's plan-mode gate when it detects an `erp-dev` trigger. That means: **this skill owns the approval gate** for full-stack work — do not also invoke the hook's "reply yes" protocol on top. One gate, here, via Plan Mode + Step 2B above.
+
+---
+
 ## Core Behavior Rules
 
 ### 1. NEVER Ask the User to Execute Commands

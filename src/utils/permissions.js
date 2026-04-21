@@ -113,6 +113,13 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'inventory',
   },
+  OPENING_STOCK: {
+    id: 'opening-stock',
+    name: 'Opening Stock Balance',
+    path: '/inventory/opening-stock',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
   COSTING: {
     id: 'costing',
     name: 'Costing',
@@ -519,6 +526,7 @@ export const PERMISSION_GROUPS = [
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
       { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
+      { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
       { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },

@@ -16,6 +16,7 @@ import { getRoles } from '../../services/admin/roleService';
 import { getActivityLogsByDateRange } from '../../services/core/activityLogService';
 import PageHeader from '../../components/PageHeader';
 import StatCard from '../../components/StatCard';
+import LiveActivityFeedEnableCard from '../../components/LiveActivityFeed/LiveActivityFeedEnableCard';
 import EmptyState from '../../components/EmptyState';
 import { ActionButton } from '../../components/buttons';
 import { getTablePagination } from '../../utils/paginationConfig';
@@ -211,6 +212,10 @@ const AdminDashboard = () => {
       <PageHeader title="Admin Dashboard">
         <ActionButton action="refresh" text="Refresh" onClick={() => { fetchStats(); fetchActivityLogs(); }} />
       </PageHeader>
+
+      <div style={{ marginBottom: 16 }}>
+        <LiveActivityFeedEnableCard />
+      </div>
 
       {/* Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>

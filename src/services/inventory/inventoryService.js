@@ -12,9 +12,11 @@ import {
   MOCK_ADJUSTMENTS, MOCK_PRODUCTION_ORDERS, MOCK_DASHBOARD_STATS,
   MOCK_ITEM_VARIANTS, MOCK_PURCHASE_ORDERS_FOR_GRN,
   MOCK_FABRIC_GRNS, MOCK_ACCESSORIES_GRNS, MOCK_FABRIC_QC, MOCK_TRIMS_QC,
+  MOCK_APPROVED_CUTTING_POS, MOCK_APPROVED_WORK_ORDERS,
 } from './inventoryMockData';
 import { getActiveDefectTypes as fetchActiveDefectTypes } from '../master/defectTypeService';
 import { getActiveTrimsQCCriteria as fetchActiveTrimsQCCriteria } from '../master/trimsQCCriteriaService';
+import { getItemMetaData } from '../master/itemService';
 
 // Dev-only flag — when true, PO / GRN / QC reads are served from local mock data.
 // GRN + QC screens are now wired to the real API; leave false unless you need to
@@ -150,6 +152,106 @@ const fetchGrnById = async (id) => {
 export const getFabricGRN = (id) => fetchGrnById(id);
 export const getAccessoriesGRN = (id) => fetchGrnById(id);
 
+// ─── GRN Allowance Exceed view ────────────────────────────────────────────────
+// Returns GRNs on the given date whose line items received qty exceeds the PO
+// balance by MORE than the master-data defaultAllowance%. Each returned GRN
+// carries a non-empty offendingLines[] — compliant lines are stripped out.
+// Why UI-side derivation: the existing list/detail endpoints already carry
+// defaultAllowance + balance + receivingQty. A dedicated backend endpoint can
+// replace this later if volumes grow; today the set is small (single-day).
+
+const buildFabricOffendingLines = (grn) =>
+  (grn.lineItems || []).map((li) => {
+    const rolls = li.rolls || [];
+    const sample = rolls[0] || {};
+    const balance = Number(sample.balance);
+    const receivedQty = rolls.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0)
+                      + Number(li.receivingQty || 0);
+    const allowedPct = Number.isFinite(Number(sample.defaultAllowance)) ? Number(sample.defaultAllowance) : 0;
+    if (!Number.isFinite(balance) || balance <= 0 || receivedQty <= balance) return null;
+    const overPct = ((receivedQty - balance) / balance) * 100;
+    if (!(overPct > allowedPct)) return null;
+    return {
+      lineKey: `F-${grn.id}-${li.poLineItemId}`,
+      type: 'Fabric',
+      itemCode: sample.itemCode || li.itemCode,
+      description: sample.description || li.description,
+      width: sample.width,
+      gsm: sample.gsm,
+      uom: sample.uom,
+      rate: Number(sample.rate) || 0,
+      balance,
+      receivedQty,
+      excessQty: receivedQty - balance,
+      overPct,
+      allowedPct,
+      severity: allowedPct > 0 && overPct >= allowedPct * 2 ? 'high' : 'medium',
+    };
+  }).filter(Boolean);
+
+const buildAccessoriesOffendingLines = (grn) =>
+  (grn.items || []).map((it) => {
+    const balance = Number(it.balance);
+    const receivedQty = Number(it.receivingQty) || 0;
+    const allowedPct = Number.isFinite(Number(it.defaultAllowance)) ? Number(it.defaultAllowance) : 0;
+    if (!Number.isFinite(balance) || balance <= 0 || receivedQty <= balance) return null;
+    const overPct = ((receivedQty - balance) / balance) * 100;
+    if (!(overPct > allowedPct)) return null;
+    return {
+      lineKey: `A-${grn.id}-${it.poLineItemId}`,
+      type: 'Accessories',
+      itemCode: it.itemCode,
+      description: it.description,
+      color: it.color,
+      size: it.size,
+      uom: it.uom,
+      rate: Number(it.rate) || 0,
+      balance,
+      receivedQty,
+      excessQty: receivedQty - balance,
+      overPct,
+      allowedPct,
+      severity: allowedPct > 0 && overPct >= allowedPct * 2 ? 'high' : 'medium',
+    };
+  }).filter(Boolean);
+
+// Accessories GRNs carry a non-empty `items[]`. Fabric GRNs carry `lineItems[]`
+// whose entries are objects with a `rolls[]` array. We use shape detection
+// instead of `g.type` because the shared adaptGRN only maps 'Trims' → 'Accessories'
+// and will mis-label any mock GRN whose source type is already 'Accessories' as
+// 'Fabric'. Fixing the adapter risks the GRN list screen, so this is surgical.
+const detectGRNCategory = (g) => {
+  if (Array.isArray(g?.items) && g.items.length > 0) return 'Accessories';
+  const hasRollLines = Array.isArray(g?.lineItems)
+    && g.lineItems.some((li) => li && typeof li === 'object' && Array.isArray(li.rolls));
+  if (hasRollLines) return 'Fabric';
+  return g?.type === 'Accessories' ? 'Accessories' : 'Fabric';
+};
+
+export const getAllowanceExceedGRNs = async ({ dateStart, dateEnd } = {}) => {
+  if (!dateStart || !dateEnd) return [];
+  const { content } = await getGRNList({ dateStart, dateEnd });
+  // If the list endpoint doesn't embed line items (live API), hydrate detail.
+  const hydrated = await Promise.all(
+    (content || []).map(async (g) => {
+      const hasFabricLines = Array.isArray(g.lineItems)
+        && g.lineItems.some((li) => li && typeof li === 'object' && Array.isArray(li.rolls));
+      if (hasFabricLines || (Array.isArray(g.items) && g.items.length > 0)) return g;
+      return fetchGrnById(g.id);
+    }),
+  );
+  return hydrated
+    .filter(Boolean)
+    .map((g) => {
+      const category = detectGRNCategory(g);
+      const offendingLines = category === 'Fabric'
+        ? buildFabricOffendingLines(g)
+        : buildAccessoriesOffendingLines(g);
+      return { ...g, type: category, offendingLines };
+    })
+    .filter((g) => g.offendingLines.length > 0);
+};
+
 export const getPurchaseOrdersForGRN = async () => {
   if (USE_MOCK_INVENTORY_DATA) {
     await delay();
@@ -185,11 +287,20 @@ export const computePOLineItemReceipts = async (poId, excludeGrnId = null) => {
     );
     const out = {};
     grns.forEach((g) => {
+      // Fabric GRN: lineItems[] carries roll objects with receivingQty.
       (g.lineItems || []).forEach((li) => {
+        if (li == null || typeof li !== 'object') return;
         const lineId = li.poLineItemId;
+        if (lineId == null) return;
         const qty = (li.rolls || []).reduce((s, r) => s + (Number(r.receivingQty) || 0), 0)
                   + Number(li.receivingQty || 0);
-        if (lineId != null) out[lineId] = (out[lineId] || 0) + qty;
+        out[lineId] = (out[lineId] || 0) + qty;
+      });
+      // Accessories GRN: items[] carries the per-line receivingQty directly.
+      (g.items || []).forEach((it) => {
+        const lineId = it?.poLineItemId;
+        if (lineId == null) return;
+        out[lineId] = (out[lineId] || 0) + Number(it.receivingQty || 0);
       });
     });
     return out;
@@ -723,10 +834,191 @@ export const getAccessoriesStock = async (params = {}) => {
 // ─── ISSUE (mock) ──────────────────────────────────────────────────────────────
 export const getFabricIssueList = async () => { await delay(); return { content: MOCK_FABRIC_ISSUES, totalElements: MOCK_FABRIC_ISSUES.length }; };
 export const getAccessoriesIssueList = async () => { await delay(); return { content: MOCK_ACCESSORIES_ISSUES, totalElements: MOCK_ACCESSORIES_ISSUES.length }; };
+export const getFabricIssueById = async (id) => {
+  await delay(50);
+  return MOCK_FABRIC_ISSUES.find((i) => String(i.id) === String(id)) || null;
+};
+export const getAccessoriesIssueById = async (id) => {
+  await delay(50);
+  return MOCK_ACCESSORIES_ISSUES.find((i) => String(i.id) === String(id)) || null;
+};
 export const getProductionOrders = async () => { await delay(); return MOCK_PRODUCTION_ORDERS; };
 
-// ─── ADJUSTMENT (mock) ─────────────────────────────────────────────────────────
-export const getAdjustmentList = async () => { await delay(); return { content: MOCK_ADJUSTMENTS, totalElements: MOCK_ADJUSTMENTS.length }; };
+// Cutting PO lookup for Fabric Material Issue. The mock already represents the
+// server's filtered response: APPROVED status and not fully issued. When the
+// Cutting PO module's API lands, this function will call the real endpoint and
+// the server will enforce the filter.
+export const getApprovedCuttingPOs = async () => {
+  await delay();
+  return { content: MOCK_APPROVED_CUTTING_POS, totalElements: MOCK_APPROVED_CUTTING_POS.length };
+};
+
+// Work Order lookup for Accessories Material Issue — same pattern.
+export const getApprovedWorkOrders = async () => {
+  await delay();
+  return { content: MOCK_APPROVED_WORK_ORDERS, totalElements: MOCK_APPROVED_WORK_ORDERS.length };
+};
+
+// ─── ADJUSTMENT ───────────────────────────────────────────────────────────────
+const ADJUSTMENT_ENDPOINT = '/stock-adjustments';
+
+export const getAdjustmentList = async () => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    return { content: MOCK_ADJUSTMENTS, totalElements: MOCK_ADJUSTMENTS.length };
+  }
+  const response = await axiosInstance.get(ADJUSTMENT_ENDPOINT);
+  const data = response.data ?? response;
+  return {
+    content: data.content || data || [],
+    totalElements: data.totalElements ?? (data.content?.length ?? (Array.isArray(data) ? data.length : 0)),
+  };
+};
+
+// Nested metadata tree shaped like /items/meta so the filter card can
+// cascade Cat → SubCat → ItemType the same way the ItemMaster dialog does.
+const ADJUSTMENT_META_DATA = [
+  {
+    id: 1, name: 'Fabric',
+    subCategories: [
+      { id: 11, name: 'Knit', itemTypes: [{ id: 111, name: 'Jersey' }, { id: 112, name: 'Pique' }] },
+      { id: 12, name: 'Woven', itemTypes: [{ id: 121, name: 'Satin' }, { id: 122, name: 'Twill' }] },
+      { id: 13, name: 'Denim', itemTypes: [{ id: 131, name: 'Indigo Denim' }, { id: 132, name: 'Stretch Denim' }] },
+      { id: 14, name: 'Lining', itemTypes: [{ id: 141, name: 'Linen Blend' }] },
+    ],
+  },
+  {
+    id: 2, name: 'Accessories',
+    subCategories: [
+      { id: 21, name: 'Buttons', itemTypes: [{ id: 211, name: '4-Hole Button' }] },
+      { id: 22, name: 'Zippers', itemTypes: [{ id: 221, name: 'Invisible Zipper' }] },
+      { id: 23, name: 'Labels', itemTypes: [{ id: 231, name: 'Woven Label' }, { id: 232, name: 'Printed Label' }] },
+      { id: 24, name: 'Thread', itemTypes: [{ id: 241, name: 'Sewing Thread' }] },
+      { id: 25, name: 'Interlining', itemTypes: [{ id: 251, name: 'Fusible Interlining' }] },
+    ],
+  },
+];
+
+export const getAdjustmentMetaData = async () => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay();
+    return ADJUSTMENT_META_DATA;
+  }
+  // Reuse ItemMaster's metadata call — same endpoint, same auth path — so
+  // whichever shape the backend returns, we handle it exactly like ItemMaster.
+  const response = await getItemMetaData();
+  console.log(response);
+  if (Array.isArray(response)) return response;
+  if (response?.data && Array.isArray(response.data)) return response.data;
+  if (response?.content && Array.isArray(response.content)) return response.content;
+  return [];
+};
+
+const resolveMeta = ({ categoryId, subCategoryId, itemTypeId }) => {
+  const cat = ADJUSTMENT_META_DATA.find((c) => c.id === Number(categoryId));
+  const sub = cat?.subCategories.find((s) => s.id === Number(subCategoryId));
+  const type = sub?.itemTypes.find((t) => t.id === Number(itemTypeId));
+  return { cat, sub, type };
+};
+
+// Aggregate stock rolls into variant rows for the adjustment count table.
+// For fabric: one row per (itemCode + color + width) with availableRolls[] listing each roll.
+// For accessories: one row per itemCode (no roll concept; rollNumber stays null).
+export const getAdjustableVariants = async ({ categoryId, subCategoryId, itemTypeId }) => {
+  if (!USE_MOCK_INVENTORY_DATA) {
+    const params = {};
+    if (categoryId) params.categoryId = categoryId;
+    if (subCategoryId) params.subCategoryId = subCategoryId;
+    if (itemTypeId) params.itemTypeId = itemTypeId;
+    const response = await axiosInstance.get(`${ADJUSTMENT_ENDPOINT}/adjustable-items`, { params });
+    const data = response.data ?? response;
+    return Array.isArray(data) ? data : (data.content || []);
+  }
+
+  await delay();
+  const { cat, sub } = resolveMeta({ categoryId, subCategoryId, itemTypeId });
+  if (!cat) return [];
+
+  if (cat.name === 'Fabric') {
+    const rows = sub
+      ? MOCK_FABRIC_STOCK.filter((r) => r.subCategory === sub.name)
+      : MOCK_FABRIC_STOCK;
+    const grouped = new Map();
+    rows.forEach((r) => {
+      const key = `${r.itemCode}__${r.color}__${r.width}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          itemId: r.id,
+          itemCode: r.itemCode,
+          itemName: r.fabricDescription,
+          variantLabel: `${r.color} / ${r.width}"`,
+          uom: r.uom,
+          availableRolls: [],
+        });
+      }
+      grouped.get(key).availableRolls.push({ rollNumber: r.rollNumber, qty: r.weight });
+    });
+    return Array.from(grouped.values()).map((v) => {
+      const first = v.availableRolls[0];
+      return {
+        ...v,
+        rollNumber: first?.rollNumber ?? null,
+        inStockQty: first?.qty ?? 0,
+        physicalQty: null,
+        variance: 0,
+        variancePct: 0,
+        remarks: '',
+      };
+    });
+  }
+
+  // Accessories
+  const rows = sub
+    ? MOCK_ACCESSORIES_STOCK.filter((r) => r.category === sub.name)
+    : MOCK_ACCESSORIES_STOCK;
+  return rows.map((r) => ({
+    itemId: r.id,
+    itemCode: r.itemCode,
+    itemName: r.description,
+    variantLabel: `${r.color} / ${r.size}`,
+    uom: r.uom,
+    rollNumber: null,
+    availableRolls: [],
+    inStockQty: r.available,
+    physicalQty: null,
+    variance: 0,
+    variancePct: 0,
+    remarks: '',
+  }));
+};
+
+// Mock persistence. Assigns a slash-format adjustmentNumber based on current FY.
+const fyLabel = (date) => {
+  const d = date || new Date();
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const startYear = month >= 4 ? year : year - 1;
+  return `${String(startYear).slice(-2)}-${String(startYear + 1).slice(-2)}`;
+};
+
+let _nextAdjId = MOCK_ADJUSTMENTS.length + 1000;
+export const saveAdjustment = async (payload) => {
+  if (!USE_MOCK_INVENTORY_DATA) {
+    const response = await axiosInstance.post(ADJUSTMENT_ENDPOINT, payload);
+    return response.data ?? response;
+  }
+  await delay();
+  _nextAdjId += 1;
+  const today = new Date();
+  const record = {
+    id: _nextAdjId,
+    adjustmentNumber: `ADJ/${fyLabel(today)}/${_nextAdjId}`,
+    adjustmentDate: today.toISOString().slice(0, 10),
+    ...payload,
+  };
+  MOCK_ADJUSTMENTS.unshift(record);
+  return record;
+};
 
 // ─── DASHBOARD (mock) ──────────────────────────────────────────────────────────
 export const getDashboardStats = async () => { await delay(); return MOCK_DASHBOARD_STATS; };

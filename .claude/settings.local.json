@@ -35,7 +35,26 @@
       "Bash(cmd.exe //c \"gradlew.bat compileJava -q\")",
       "Bash(./gradlew.bat compileJava)",
       "Bash(wait)",
-      "Bash(ls f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V3[89]* f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V40*)"
+      "Bash(ls f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V3[89]* f:/Ranjith/project/RK/Repos/erp-purchase/src/main/resources/db/migration/V40*)",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(jq --version)",
+      "Skill(erp-dev)",
+      "Skill(erp-dev:*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"$HOME/.claude/hooks/erp_prompt_enhancer.py\"",
+            "timeout": 10,
+            "statusMessage": "ERP prompt enhancer..."
+          }
+        ]
+      }
     ]
   }
 }

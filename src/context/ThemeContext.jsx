@@ -122,6 +122,12 @@ const lightComponentsToken = {
     borderRadius: 8,
     fontSize: 13,
   },
+  Checkbox: {
+    borderRadiusSM: 4,
+  },
+  Radio: {
+    borderRadiusSM: 4,
+  },
 };
 
 // Component-level theme overrides for dark mode
@@ -192,6 +198,12 @@ const darkComponentsToken = {
   },
   Tag: {
     defaultBg: '#334155',
+  },
+  Checkbox: {
+    borderRadiusSM: 4,
+  },
+  Radio: {
+    borderRadiusSM: 4,
   },
 };
 

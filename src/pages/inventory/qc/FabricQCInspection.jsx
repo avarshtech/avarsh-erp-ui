@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Form, Card, Row, Col, Select, DatePicker, Space, Input, Tag, Skeleton } from 'antd';
-import { SaveOutlined, SendOutlined, BranchesOutlined } from '@ant-design/icons';
+import { App, Form, Card, Row, Col, Select, DatePicker, Space, Input, Tag, Skeleton, Alert } from 'antd';
+import { SaveOutlined, SendOutlined, BranchesOutlined, InfoCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
@@ -12,10 +12,13 @@ import {
   saveFabricQCDraft,
   submitFabricQC,
   getItemVariant,
+  computePOLineItemReceipts,
+  getFabricGRN,
 } from '../../../services/inventory/inventoryService';
 import { validateFabricQC } from '../../../utils/qcValidation';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
+import { formatNumber } from '../../../utils/formatters';
 import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import FabricQCParameters from './FabricQCParameters';
@@ -64,6 +67,7 @@ const FabricQCInspection = () => {
   const [defectTypes, setDefectTypes] = useState([]);
   const [qcData, setQcData] = useState(null);
   const [parameters, setParameters] = useState([]);
+  const [poReceipts, setPoReceipts] = useState({});
 
   const readOnly =
     !isNew && qcData?.status && qcData.status !== QC_STATUS.DRAFT && qcData.status !== QC_STATUS.REFERRED_BACK;
@@ -79,10 +83,13 @@ const FabricQCInspection = () => {
     if (isNew) return;
     setLoading(true);
     getFabricQCById(id)
-      .then((data) => {
+      .then(async (data) => {
         if (!data) return;
         setQcData(data);
-        setSelectedGRN({ id: data.grnId, grnNumber: data.grnNumber });
+        // Fetch the full GRN so we have poId + lineItems even if the GRN is no
+        // longer in QC_PENDING (the filtered `grns` list excludes those).
+        const fullGrn = await getFabricGRN(data.grnId).catch(() => null);
+        setSelectedGRN(fullGrn || { id: data.grnId, grnNumber: data.grnNumber });
         setPoLineItemId(data.poLineItemId);
         setRolls(data.rolls || []);
         setDefects(data.defects || []);
@@ -98,6 +105,17 @@ const FabricQCInspection = () => {
       .catch(() => message.error('Failed to load QC inspection'))
       .finally(() => setLoading(false));
   }, [id, isNew, form, message]);
+
+  // ─── Fetch cumulative receipts across all GRNs for this PO ───────────────
+  // Needed to show the supplier over-supply allowance vs the original PO quantity.
+  useEffect(() => {
+    if (!selectedGRN?.poId) { setPoReceipts({}); return; }
+    let cancelled = false;
+    computePOLineItemReceipts(selectedGRN.poId)
+      .then((receipts) => { if (!cancelled) setPoReceipts(receipts || {}); })
+      .catch(() => { if (!cancelled) setPoReceipts({}); });
+    return () => { cancelled = true; };
+  }, [selectedGRN?.poId]);
 
   // ─── Materialise rolls when line item changes ─────────────────────────────
   useEffect(() => {
@@ -181,6 +199,30 @@ const FabricQCInspection = () => {
     () => rolls.map((r) => ({ label: r.rollNumber, value: r.rollNumber })),
     [rolls],
   );
+
+  const selectedLineItem = useMemo(() => {
+    const lineItems = selectedGRN?.lineItems || [];
+    return lineItems.find((li) => li.poLineItemId === poLineItemId || li.id === poLineItemId) || null;
+  }, [selectedGRN, poLineItemId]);
+
+  // Supply notice vs the originally requested PO line quantity, across all GRNs.
+  // Inspectors need to see whether the supplier over-shipped (allowance) or
+  // under-shipped (shortage) so they can plan inspection + downstream stock actions.
+  const supplyNotice = useMemo(() => {
+    const qtyOrdered = Number(selectedLineItem?.poQty || selectedLineItem?.orderedQty || 0);
+    const qtyReceived = poLineItemId != null ? Number(poReceipts[poLineItemId] || 0) : 0;
+    if (qtyOrdered <= 0 || qtyReceived <= 0) return null;
+    const uom = selectedLineItem?.uom || selectedLineItem?.rolls?.[0]?.uom || '';
+    const rawAllowance = selectedLineItem?.defaultAllowance ?? selectedLineItem?.rolls?.[0]?.defaultAllowance;
+    const allowance = Number.isFinite(Number(rawAllowance)) ? Number(rawAllowance) : null;
+    if (qtyReceived > qtyOrdered) {
+      return { kind: 'extra', qtyOrdered, qtyReceived, diff: qtyReceived - qtyOrdered, pct: ((qtyReceived - qtyOrdered) / qtyOrdered) * 100, uom, allowance };
+    }
+    if (qtyReceived < qtyOrdered) {
+      return { kind: 'short', qtyOrdered, qtyReceived, diff: qtyOrdered - qtyReceived, pct: ((qtyOrdered - qtyReceived) / qtyOrdered) * 100, uom, allowance };
+    }
+    return null;
+  }, [selectedLineItem, poReceipts, poLineItemId]);
 
   const defectsByRoll = useMemo(() => {
     const map = new Map();
@@ -433,6 +475,27 @@ const FabricQCInspection = () => {
                     </Col>
                   </Row>
                 </Form>
+                {supplyNotice && (
+                  <Alert
+                    type={supplyNotice.kind === 'extra' ? 'info' : 'warning'}
+                    showIcon
+                    icon={supplyNotice.kind === 'extra' ? <InfoCircleOutlined /> : <WarningOutlined />}
+                    style={{ marginTop: 4 }}
+                    message={
+                      supplyNotice.kind === 'extra' ? (
+                        <span>
+                          Supplier sent <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> extra over the requested PO quantity — {formatNumber(supplyNotice.diff)} {supplyNotice.uom} above the ordered {formatNumber(supplyNotice.qtyOrdered)} {supplyNotice.uom}.
+                          {supplyNotice.allowance != null && <> Item allowance: <strong>{formatNumber(supplyNotice.allowance, 2)}%</strong>.</>}
+                        </span>
+                      ) : (
+                        <span>
+                          Supplier short by <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> from the requested PO quantity — received {formatNumber(supplyNotice.qtyReceived)} {supplyNotice.uom} of ordered {formatNumber(supplyNotice.qtyOrdered)} {supplyNotice.uom} ({formatNumber(supplyNotice.diff)} {supplyNotice.uom} short).
+                          {supplyNotice.allowance != null && <> Item allowance: <strong>{formatNumber(supplyNotice.allowance, 2)}%</strong>.</>}
+                        </span>
+                      )
+                    }
+                  />
+                )}
               </Card>
             </Col>
 
