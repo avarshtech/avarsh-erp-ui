@@ -331,7 +331,7 @@ const MainLayoutInner = () => {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment"],
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier"],
       children: [
         { key: "/inventory/dashboard", label: "Dashboard" },
         { key: "/inventory/grn/list", label: "GRN List" },
@@ -341,6 +341,7 @@ const MainLayoutInner = () => {
         { key: "/inventory/opening-stock", label: "Opening Stock" },
         { key: "/inventory/issue", label: "Material Issue" },
         { key: "/inventory/adjustment", label: "Stock Adjustment" },
+        { key: "/inventory/return-to-supplier", label: "Return to Supplier" },
       ],
     },
     {
@@ -542,6 +543,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/opening-stock')) return ['/inventory/opening-stock'];
     if (path.startsWith('/inventory/issue')) return ['/inventory/issue'];
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
+    if (path.startsWith('/inventory/return-to-supplier')) return ['/inventory/return-to-supplier'];
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];

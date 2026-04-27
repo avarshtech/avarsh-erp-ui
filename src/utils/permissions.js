@@ -113,6 +113,13 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'inventory',
   },
+  INVENTORY_RETURN_SUPPLIER: {
+    id: 'inventory-return-supplier',
+    name: 'Return to Supplier',
+    path: '/inventory/return-to-supplier',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
   OPENING_STOCK: {
     id: 'opening-stock',
     name: 'Opening Stock Balance',
@@ -526,6 +533,7 @@ export const PERMISSION_GROUPS = [
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
       { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
+      { id: 'inventory-return-supplier', name: 'Return to Supplier', operations: ['view', 'add'], linkedTo: 'inventory', path: '/inventory/return-to-supplier' },
       { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
@@ -645,6 +653,7 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
   if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
+  if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;

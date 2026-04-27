@@ -45,6 +45,7 @@ const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueFo
 const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
+const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -343,6 +344,7 @@ const ThemedApp = () => {
             <Route path="inventory/adjustment" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentList /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/return-to-supplier" element={<PermissionRoute module="inventory-return-supplier"><Suspense fallback={<PageSkeleton />}><ReturnToSupplierPage /></Suspense></PermissionRoute>} />
             {/* Costing */}
             <Route path="costing/list" element={<PermissionRoute module="costing"><CostingList /></PermissionRoute>} />
             <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingForm /></PermissionRoute>} />

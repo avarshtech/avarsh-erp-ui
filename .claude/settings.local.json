@@ -40,7 +40,9 @@
       "Skill(update-config:*)",
       "Bash(jq --version)",
       "Skill(erp-dev)",
-      "Skill(erp-dev:*)"
+      "Skill(erp-dev:*)",
+      "Bash(./mvnw compile *)",
+      "Bash(./gradlew compileJava -q)"
     ]
   },
   "hooks": {
