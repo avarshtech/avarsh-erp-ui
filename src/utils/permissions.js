@@ -74,18 +74,6 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
-  PRODUCTION_PO: {
-    id: 'production-po',
-    name: 'Production PO',
-    path: '/production-po',
-    group: 'transactions',
-  },
-  WORK_ORDERS: {
-    id: 'work-orders',
-    name: 'Work Orders',
-    path: '/work-orders',
-    group: 'transactions',
-  },
   INVENTORY: {
     id: 'inventory',
     name: 'Inventory Management',
@@ -293,188 +281,6 @@ export const MODULES = {
     path: '/hr/fnf',
     group: 'hr',
   },
-  // ── Cutting Production ──
-  CUT_ORDER_PLAN: {
-    id: 'cut-order-plan',
-    name: 'Cut Order Plan',
-    path: '/cutting/order-plan',
-    group: 'production',
-  },
-  FABRIC_RECEIPT: {
-    id: 'fabric-receipt',
-    name: 'Fabric Receipt',
-    path: '/cutting/fabric-receipt',
-    group: 'production',
-  },
-  FABRIC_RELAXATION: {
-    id: 'fabric-relaxation',
-    name: 'Fabric Relaxation',
-    path: '/cutting/relaxation',
-    group: 'production',
-  },
-  MARKER_PLANNING: {
-    id: 'marker-planning',
-    name: 'Marker Planning',
-    path: '/cutting/marker',
-    group: 'production',
-  },
-  LAY_AUDIT: {
-    id: 'lay-audit',
-    name: 'Lay Audit',
-    path: '/cutting/lay-audit',
-    group: 'production',
-  },
-  TMB_CHECK: {
-    id: 'tmb-check',
-    name: 'TMB Check',
-    path: '/cutting/tmb-check',
-    group: 'production',
-  },
-  CUTTING_REPORT: {
-    id: 'cutting-report',
-    name: 'Cutting Report',
-    path: '/cutting/report',
-    group: 'production',
-  },
-  CUT_BUNDLING: {
-    id: 'cut-bundling',
-    name: 'Bundling',
-    path: '/cutting/bundling',
-    group: 'production',
-  },
-  BUNDLE_ISSUE: {
-    id: 'bundle-issue',
-    name: 'Bundle Issue',
-    path: '/cutting/bundle-issue',
-    group: 'production',
-  },
-  PANEL_ISSUE: {
-    id: 'panel-issue',
-    name: 'Panel Issue',
-    path: '/cutting/panel-issue',
-    group: 'production',
-  },
-  PANEL_CHECK: {
-    id: 'panel-check',
-    name: 'Panel Check',
-    path: '/cutting/panel-check',
-    group: 'production',
-  },
-  PROCESS_RETURN: {
-    id: 'process-return',
-    name: 'Process Return',
-    path: '/cutting/process-return',
-    group: 'production',
-  },
-  RECUTTING: {
-    id: 'recutting',
-    name: 'Re-Cutting',
-    path: '/cutting/recutting',
-    group: 'production',
-  },
-  WASTAGE_RECONCILIATION: {
-    id: 'wastage-reconciliation',
-    name: 'Wastage Reconciliation',
-    path: '/cutting/wastage',
-    group: 'production',
-  },
-  CUTTING_DASHBOARD: {
-    id: 'cutting-dashboard',
-    name: 'Cutting Dashboard',
-    path: '/cutting/dashboard',
-    group: 'production',
-  },
-  // ── Sewing Production ──
-  SEWING_LINE_MASTER: {
-    id: 'sewing-line-master',
-    name: 'Sewing Lines',
-    path: '/sewing/lines',
-    group: 'production',
-  },
-  SEWING_OPERATORS: {
-    id: 'sewing-operators',
-    name: 'Sewing Operators',
-    path: '/sewing/operators',
-    group: 'production',
-  },
-  SAM_MANAGEMENT: {
-    id: 'sam-management',
-    name: 'SAM Management',
-    path: '/sewing/sam',
-    group: 'production',
-  },
-  SEWING_PLAN: {
-    id: 'sewing-plan',
-    name: 'Sewing Plan',
-    path: '/sewing/plan',
-    group: 'production',
-  },
-  CUT_PARTS_RECEIPT: {
-    id: 'cut-parts-receipt',
-    name: 'Cut Parts Receipt',
-    path: '/sewing/cut-parts-receipt',
-    group: 'production',
-  },
-  HOURLY_PRODUCTION: {
-    id: 'hourly-production',
-    name: 'Hourly Production',
-    path: '/sewing/hourly',
-    group: 'production',
-  },
-  GARMENT_ISSUE: {
-    id: 'garment-issue',
-    name: 'Garment Issue',
-    path: '/sewing/garment-issue',
-    group: 'production',
-  },
-  TRIM_VERIFICATION: {
-    id: 'trim-verification',
-    name: 'Trim Verification',
-    path: '/sewing/trim-verification',
-    group: 'production',
-  },
-  MEASUREMENT_REPORT: {
-    id: 'measurement-report',
-    name: 'Measurement Report',
-    path: '/sewing/measurement',
-    group: 'production',
-  },
-  ENDLINE_TOPSE: {
-    id: 'endline-topse',
-    name: 'End-line TOPSE',
-    path: '/sewing/topse',
-    group: 'production',
-  },
-  CUT_PARTS_REPLACEMENT: {
-    id: 'cut-parts-replacement',
-    name: 'Cut Parts Replacement',
-    path: '/sewing/replacement',
-    group: 'production',
-  },
-  OPERATOR_SKILL_MATRIX: {
-    id: 'operator-skill-matrix',
-    name: 'Skill Matrix',
-    path: '/sewing/skills',
-    group: 'production',
-  },
-  INCENTIVE_CALC: {
-    id: 'incentive-calc',
-    name: 'Incentive Calculation',
-    path: '/sewing/incentive',
-    group: 'production',
-  },
-  SEWING_DASHBOARD: {
-    id: 'sewing-dashboard',
-    name: 'Sewing Dashboard',
-    path: '/sewing/dashboard',
-    group: 'production',
-  },
-  SEWING_QUALITY_DASHBOARD: {
-    id: 'sewing-quality-dashboard',
-    name: 'Quality Dashboard',
-    path: '/sewing/quality-dashboard',
-    group: 'production',
-  },
 };
 
 // ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
@@ -527,8 +333,6 @@ export const PERMISSION_GROUPS = [
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'production-po', name: 'Production PO', operations: STANDARD_OPERATIONS, path: '/production-po/list' },
-      { id: 'work-orders', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/work-orders/list' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
@@ -563,45 +367,6 @@ export const PERMISSION_GROUPS = [
       { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'overhead-master', name: 'Overheads',                  description: 'Costing, Shipment',     operations: STANDARD_OPERATIONS },
-    ],
-  },
-  {
-    key: 'production',
-    label: 'Production',
-    icon: 'ToolOutlined',
-    modules: [
-      // Cutting
-      { id: 'cutting-dashboard', name: 'Cutting Dashboard', operations: DASHBOARD_OPERATIONS },
-      { id: 'cut-order-plan', name: 'Cut Order Plan', operations: STANDARD_OPERATIONS },
-      { id: 'fabric-receipt', name: 'Fabric Receipt', operations: STANDARD_OPERATIONS },
-      { id: 'fabric-relaxation', name: 'Fabric Relaxation', operations: STANDARD_OPERATIONS },
-      { id: 'marker-planning', name: 'Marker Planning', operations: STANDARD_OPERATIONS },
-      { id: 'lay-audit', name: 'Lay Audit', operations: STANDARD_OPERATIONS },
-      { id: 'tmb-check', name: 'TMB Check', operations: STANDARD_OPERATIONS },
-      { id: 'cutting-report', name: 'Cutting Report', operations: STANDARD_OPERATIONS },
-      { id: 'cut-bundling', name: 'Bundling', operations: STANDARD_OPERATIONS },
-      { id: 'bundle-issue', name: 'Bundle Issue', operations: STANDARD_OPERATIONS },
-      { id: 'panel-issue', name: 'Panel Issue', operations: STANDARD_OPERATIONS },
-      { id: 'panel-check', name: 'Panel Check', operations: STANDARD_OPERATIONS },
-      { id: 'process-return', name: 'Process Return', operations: STANDARD_OPERATIONS },
-      { id: 'recutting', name: 'Re-Cutting', operations: STANDARD_OPERATIONS },
-      { id: 'wastage-reconciliation', name: 'Wastage Reconciliation', operations: STANDARD_OPERATIONS },
-      // Sewing
-      { id: 'sewing-dashboard', name: 'Sewing Dashboard', operations: DASHBOARD_OPERATIONS },
-      { id: 'sewing-quality-dashboard', name: 'Quality Dashboard', operations: DASHBOARD_OPERATIONS },
-      { id: 'sewing-line-master', name: 'Sewing Lines', operations: STANDARD_OPERATIONS },
-      { id: 'sewing-operators', name: 'Sewing Operators', operations: STANDARD_OPERATIONS },
-      { id: 'sam-management', name: 'SAM Management', operations: STANDARD_OPERATIONS },
-      { id: 'sewing-plan', name: 'Sewing Plan', operations: STANDARD_OPERATIONS },
-      { id: 'cut-parts-receipt', name: 'Cut Parts Receipt', operations: STANDARD_OPERATIONS },
-      { id: 'hourly-production', name: 'Hourly Production', operations: STANDARD_OPERATIONS },
-      { id: 'garment-issue', name: 'Garment Issue', operations: STANDARD_OPERATIONS },
-      { id: 'trim-verification', name: 'Trim Verification', operations: STANDARD_OPERATIONS },
-      { id: 'measurement-report', name: 'Measurement Report', operations: STANDARD_OPERATIONS },
-      { id: 'endline-topse', name: 'End-line TOPSE', operations: STANDARD_OPERATIONS },
-      { id: 'cut-parts-replacement', name: 'Cut Parts Replacement', operations: STANDARD_OPERATIONS },
-      { id: 'operator-skill-matrix', name: 'Skill Matrix', operations: STANDARD_OPERATIONS },
-      { id: 'incentive-calc', name: 'Incentive Calculation', operations: STANDARD_OPERATIONS },
     ],
   },
   {
@@ -645,9 +410,6 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
-  if (moduleId === 'cutting-dashboard')   return DASHBOARD_OPERATIONS;
-  if (moduleId === 'sewing-dashboard')    return DASHBOARD_OPERATIONS;
-  if (moduleId === 'sewing-quality-dashboard') return DASHBOARD_OPERATIONS;
   if (moduleId === 'reports')              return ['view'];
   if (moduleId === 'ai-assistant')        return ['view'];
   if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];

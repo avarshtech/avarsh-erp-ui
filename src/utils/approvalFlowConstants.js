@@ -3,9 +3,6 @@ export const ENTITY_TYPES = [
   { value: 'COST_SHEET', label: 'Cost Sheet' },
   { value: 'ORDER', label: 'Order' },
   { value: 'GRN', label: 'Goods Receipt Note' },
-  { value: 'CUTTING_PO', label: 'Cutting PO' },
-  { value: 'WORK_ORDER', label: 'Work Order' },
-  { value: 'PRODUCTION_PO', label: 'Production PO' },
 ];
 
 export const ENTITY_TYPE_COLORS = {
@@ -13,9 +10,6 @@ export const ENTITY_TYPE_COLORS = {
   COST_SHEET: 'purple',
   ORDER: 'green',
   GRN: 'orange',
-  CUTTING_PO: 'cyan',
-  WORK_ORDER: 'magenta',
-  PRODUCTION_PO: 'lime',
 };
 
 export const APPROVER_TYPES = [
@@ -60,15 +54,4 @@ export const CONDITION_FIELDS = {
     { value: 'totalQuantity', label: 'Total Quantity', type: 'number' },
   ],
   GRN: [],
-  CUTTING_PO: [
-    { value: 'totalPlannedQty', label: 'Total Planned Qty', type: 'number' },
-    { value: 'processingUnitType', label: 'Processing Type', type: 'select', options: ['UNIT', 'VENDOR'] },
-  ],
-  WORK_ORDER: [
-    { value: 'totalPlannedQty', label: 'Total Planned Qty', type: 'number' },
-    { value: 'processingUnitType', label: 'Processing Type', type: 'select', options: ['UNIT', 'VENDOR'] },
-  ],
-  PRODUCTION_PO: [
-    { value: 'totalOrderQty', label: 'Total Order Qty', type: 'number' },
-  ],
 };
