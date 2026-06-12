@@ -52,6 +52,8 @@ import MasterDashboard from './pages/master/MasterDashboard';
 import Profile from './pages/Profile';
 
 // Lazy-loaded report pages
+const MyApprovals = lazy(() => import('./pages/approvals/MyApprovals'));
+
 const ReportListPage = lazy(() => import('./pages/reports/ReportListPage'));
 const ReportBuilderPage = lazy(() => import('./pages/reports/ReportBuilderPage'));
 const SavedReportsPage = lazy(() => import('./pages/reports/SavedReportsPage'));
@@ -164,6 +166,8 @@ const ThemedApp = () => {
             }
           >
             <Route index element={<Dashboard />} />
+            {/* My Approvals — server-scoped to the current user, no module permission needed */}
+            <Route path="approvals" element={<Suspense fallback={<PageSkeleton />}><MyApprovals /></Suspense>} />
             {/* Orders */}
             <Route path="orders/list" element={<PermissionRoute module="orders"><OrderList /></PermissionRoute>} />
             <Route path="orders/new" element={<PermissionRoute module="orders" operation="add"><OrderForm /></PermissionRoute>} />

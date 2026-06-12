@@ -7,11 +7,13 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
 import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
+import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
 import { GRN_STATUS } from '../../../utils/inventoryConstants';
 import {
   requestGRNReversal,
   approveGRNReversal,
   rejectGRNReversal,
+  getFabricGRN,
 } from '../../../services/inventory/inventoryService';
 import {
   canRequestGRNReversal,
@@ -114,34 +116,52 @@ const GRNApprovalActions = ({ grn, onUpdated }) => {
   };
 
   // ─── Which buttons to show for current status ────────────────────────
-  const availableKeys = [];
-  if (status === GRN_STATUS.QC_PENDING && canRequestGRNReversal()) {
-    availableKeys.push('request-reversal');
-  }
-  if (status === GRN_STATUS.PENDING_REVERSAL && canApproveGRNReversal()) {
-    availableKeys.push('approve-reversal', 'reject-reversal');
-  }
+  const renderLegacyButtons = (keys) => (
+    <Space wrap>
+      {keys.map((k) => {
+        const cfg = ACTION_CONFIGS[k];
+        return (
+          <ActionButton
+            key={cfg.key}
+            action={cfg.action}
+            text={cfg.label}
+            icon={cfg.icon}
+            color={cfg.action === 'custom' ? cfg.color : undefined}
+            onClick={() => openAction(cfg)}
+            loading={busy && activeAction?.key === cfg.key}
+          />
+        );
+      })}
+    </Space>
+  );
 
-  if (availableKeys.length === 0) return null;
+  const showRequest = status === GRN_STATUS.QC_PENDING && canRequestGRNReversal();
+  const showDecision = status === GRN_STATUS.PENDING_REVERSAL;
+
+  if (!showRequest && !showDecision) return null;
+
+  // After an engine decision the GRN status changed server-side — refetch it
+  const refreshGrn = async () => {
+    try { onUpdated?.(await getFabricGRN(grn.id)); } catch { /* parent keeps stale copy */ }
+  };
 
   return (
     <>
-      <Space wrap>
-        {availableKeys.map((k) => {
-          const cfg = ACTION_CONFIGS[k];
-          return (
-            <ActionButton
-              key={cfg.key}
-              action={cfg.action}
-              text={cfg.label}
-              icon={cfg.icon}
-              color={cfg.action === 'custom' ? cfg.color : undefined}
-              onClick={() => openAction(cfg)}
-              loading={busy && activeAction?.key === cfg.key}
-            />
-          );
-        })}
-      </Space>
+      {showRequest && renderLegacyButtons(['request-reversal'])}
+      {/* Reversal decisions route through the centralized approval engine when a flow
+          is configured; legacy direct buttons are the no-flow fallback. */}
+      {showDecision && (
+        <ApprovalActionBar
+          entityType="GRN_REVERSAL"
+          entityId={grn.id}
+          docLabel="Goods Received Note"
+          docNumber={grn.grnNumber}
+          onActionComplete={refreshGrn}
+          fallback={canApproveGRNReversal()
+            ? renderLegacyButtons(['approve-reversal', 'reject-reversal'])
+            : null}
+        />
+      )}
 
       <ApprovalReasonDialog
         open={!!activeAction}

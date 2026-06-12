@@ -113,7 +113,19 @@ export const deletePurchaseOrder = async (id) => {
   return response.data;
 };
 
-// ==================== PO ACTIONS (Reject / Refer Back / Cancel) ====================
+// ==================== PO ACTIONS (Approve / Reject / Refer Back / Cancel) ====================
+
+/**
+ * Approve a purchase order (no-flow fallback path — when an approval flow is
+ * configured, approval goes through the centralized approval engine instead)
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { comment?, pdfBucketPath? }
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const approvePurchaseOrder = async (id, data = {}) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/approve`, data);
+  return response.data;
+};
 
 /**
  * Reject a purchase order

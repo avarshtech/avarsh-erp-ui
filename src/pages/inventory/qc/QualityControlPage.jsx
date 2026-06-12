@@ -1,11 +1,13 @@
-import { useState, useCallback } from 'react';
-import { Segmented } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useState, useCallback, useEffect } from 'react';
+import { Segmented, App } from 'antd';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import PermissionGuard from '../../../components/PermissionGuard';
+import { getFabricQCById } from '../../../services/inventory/inventoryService';
 import FabricQCList from './FabricQCList';
 import TrimsQCList from './TrimsQCList';
+import QCViewModal from './QCViewModal';
 
 /**
  * Quality Control landing page — segmented tab switcher between Fabric and Accessories.
@@ -20,10 +22,28 @@ import TrimsQCList from './TrimsQCList';
  *   - Accessories tab  → "New Accessories Inspection"  → /inventory/qc/trims/new
  */
 const QualityControlPage = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [activeSegment, setActiveSegment] = useState('Fabric');
+  const [deepLinkQc, setDeepLinkQc] = useState(null);
 
   const isFabric = activeSegment === 'Fabric';
+
+  // Deep link from approval notifications / My Approvals inbox (?viewId=X) —
+  // resolves fabric vs accessories from the QC record itself.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getFabricQCById(viewId)
+      .then((qc) => {
+        setActiveSegment(qc.type === 'Accessories' ? 'Trims' : 'Fabric');
+        setDeepLinkQc(qc);
+      })
+      .catch(() => message.error('QC inspection not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewInspection = useCallback(() => {
     const path = isFabric
@@ -66,6 +86,13 @@ const QualityControlPage = () => {
       />
 
       {isFabric ? <FabricQCList embedded /> : <TrimsQCList embedded />}
+
+      <QCViewModal
+        open={!!deepLinkQc}
+        onClose={() => setDeepLinkQc(null)}
+        record={deepLinkQc}
+        type={deepLinkQc?.type === 'Accessories' ? 'trims' : 'fabric'}
+      />
     </div>
   );
 };

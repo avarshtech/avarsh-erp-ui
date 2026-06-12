@@ -60,10 +60,12 @@ import {
   updateStageCompletion,
   addStagesToLineItem,
   reorderStages,
+  approvePurchaseOrder,
   rejectPurchaseOrder,
   referBackPurchaseOrder,
   cancelPurchaseOrder,
 } from '../../services/po/purchaseOrderService';
+import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
 import { updateBomLinePoStatus } from '../../services/bom/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -112,7 +114,7 @@ const StageCompleteModal = ({ open, onCancel, poDate, deliveryDate, isUpdating, 
       onCancel={onCancel}
       width={360}
       centered
-      destroyOnClose
+      destroyOnHidden
       footer={
         <Button
           type="primary"
@@ -431,11 +433,37 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
     }
   };
 
+  // Unlock BOM lines when the PO leaves the active pipeline (reject/cancel/refer back)
+  const unlockBomLinesIfNeeded = useCallback(async (newStatus) => {
+    if (!po?.poType || po.poType === 'General') return;
+    if (!BOM_UNLOCK_STATUSES.includes(newStatus)) return;
+    const byBomId = {};
+    (po.lineItems || []).forEach((li) => {
+      (li.bomLineSources || []).forEach((src) => {
+        if (!byBomId[src.bomId]) byBomId[src.bomId] = [];
+        byBomId[src.bomId].push(src.lineId);
+      });
+    });
+    try {
+      await Promise.allSettled(Object.entries(byBomId).map(([bomId, lineIds]) => updateBomLinePoStatus(Number(bomId), [...new Set(lineIds)], false)));
+    } catch (err) { console.error('Failed to unlock BOM lines:', err); }
+  }, [po]);
+
+  // Called after the centralized approval engine records a decision
+  const handleEngineActionComplete = useCallback(async (updatedRequest) => {
+    const outcome = updatedRequest?.status;
+    if (outcome === 'REJECTED') await unlockBomLinesIfNeeded(PO_STATUS.REJECTED);
+    if (outcome === 'REFERRED_BACK') await unlockBomLinesIfNeeded(PO_STATUS.REFERRED_BACK);
+    if (onStatusChange) onStatusChange();
+    onClose();
+  }, [unlockBomLinesIfNeeded, onStatusChange, onClose]);
+
   const executeStatusChange = async (action, reason) => {
     if (!po) return;
     setActionLoading(true);
     try {
-      // Use dedicated endpoints for reject/refer_back/cancel; generic save for approve
+      // Dedicated endpoints for all decisions — the backend routes them through the
+      // centralized approval engine when a flow is configured, or applies directly otherwise
       if (action.key === 'reject' || action.key === 'refer_back' || action.key === 'cancel') {
         const actionData = {
           reason,
@@ -451,31 +479,11 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         }
         // Activity log + notification handled server-side
       } else {
-        // Approve / other flows — keep existing generic save + client-side activity
-        const updatedLineItems = (po.lineItems || []).map((li) => ({ ...li, status: action.lineItemStatus || li.status }));
-        await updatePurchaseOrder(po.id, { ...po, status: action.toStatus, lineItems: updatedLineItems, version: po.version });
-        const currentUser = getCurrentUser();
-        const name = currentUser?.name || '';
-        const commentData = { type: 'status_change', action: action.key, actionLabel: action.label, from: po.status, to: action.toStatus, by: name, ...(reason ? { reason } : {}) };
-        await createActivity(po.id, { comment: JSON.stringify(commentData), status: action.toStatus, isSystemGenerated: true, name });
+        // Approve — server-side handles status, line items, activity log and email
+        await approvePurchaseOrder(po.id, { comment: reason || undefined });
       }
 
-      // Unlock BOM lines on reject/cancel/referback
-      if (po.poType && po.poType !== 'General') {
-        const newStatus = action.toStatus;
-        if (BOM_UNLOCK_STATUSES.includes(newStatus)) {
-          const byBomId = {};
-          (po.lineItems || []).forEach((li) => {
-            (li.bomLineSources || []).forEach((src) => {
-              if (!byBomId[src.bomId]) byBomId[src.bomId] = [];
-              byBomId[src.bomId].push(src.lineId);
-            });
-          });
-          try {
-            await Promise.allSettled(Object.entries(byBomId).map(([bomId, lineIds]) => updateBomLinePoStatus(Number(bomId), [...new Set(lineIds)], false)));
-          } catch (err) { console.error('Failed to unlock BOM lines:', err); }
-        }
-      }
+      await unlockBomLinesIfNeeded(action.toStatus);
 
       message.success(`Purchase order ${action.label.toLowerCase()}d successfully`);
       setStatusAction(null);
@@ -483,7 +491,9 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       setRejectionCategory(null);
       if (onStatusChange) onStatusChange();
       onClose();
-    } catch { message.error(`Failed to ${action.label.toLowerCase()} purchase order`); }
+    } catch (err) {
+      message.error(err?.response?.data?.message || `Failed to ${action.label.toLowerCase()} purchase order`);
+    }
     finally { setActionLoading(false); }
   };
 
@@ -1141,8 +1151,33 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
               {po && canPrintPO && (
                 <ActionButton action="print" text="Print PO" onClick={handlePrint} loading={printLoading} />
               )}
-              {availableActions.map((action) => {
-                const actionMap = { approve: 'approve', reject: 'reject', cancel: 'cancel', refer_back: 'refer-back' };
+              {/* Approve/Reject route through the centralized approval engine when a flow
+                  is configured; legacy direct buttons are the no-flow fallback. */}
+              {po && po.status === PO_STATUS.PENDING_APPROVAL && (
+                <ApprovalActionBar
+                  entityType="PURCHASE_ORDER"
+                  entityId={po.id}
+                  docLabel="Purchase Order"
+                  docNumber={po.poNumber || po.poNo}
+                  onActionComplete={handleEngineActionComplete}
+                  fallback={
+                    <Space size="middle">
+                      {availableActions.filter((a) => a.key === 'approve' || a.key === 'reject').map((action) => (
+                        <ActionButton
+                          key={action.key}
+                          action={action.key}
+                          text={action.label}
+                          onClick={() => handleStatusAction(action)}
+                          loading={actionLoading}
+                          danger={action.danger}
+                        />
+                      ))}
+                    </Space>
+                  }
+                />
+              )}
+              {availableActions.filter((a) => a.key !== 'approve' && a.key !== 'reject').map((action) => {
+                const actionMap = { cancel: 'cancel', refer_back: 'refer-back' };
                 return (
                   <ActionButton
                     key={action.key}

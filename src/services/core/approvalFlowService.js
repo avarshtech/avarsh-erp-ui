@@ -42,6 +42,11 @@ export const toggleFlowActive = async (id) => {
   return response.data;
 };
 
+export const cloneApprovalFlow = async (id) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.FLOWS}/${id}/clone`);
+  return response.data;
+};
+
 // ─── Runtime Approval Requests ───
 
 export const submitForApproval = async (data) => {

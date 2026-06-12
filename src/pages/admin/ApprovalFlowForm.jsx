@@ -91,6 +91,7 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
             description: flow.description,
             priority: flow.priority,
             active: flow.active,
+            preventSelfApproval: flow.preventSelfApproval ?? false,
             conditions: flow.conditions?.length > 0 ? flow.conditions : [],
             levels: flow.levels?.map(l => ({
               levelName: l.levelName,
@@ -110,6 +111,7 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
       form.setFieldsValue({
         active: true,
         priority: 0,
+        preventSelfApproval: false,
         conditions: [],
         levels: [{ approverType: 'ROLE', allowReferBack: true, allowReject: true }],
       });
@@ -128,6 +130,7 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
         description: values.description,
         active: values.active ?? true,
         priority: values.priority ?? 0,
+        preventSelfApproval: values.preventSelfApproval ?? false,
         conditions: values.conditions?.filter(c => c?.field && c?.operator) || [],
         levels: values.levels.map((l, idx) => ({
           levelNumber: idx + 1,
@@ -170,7 +173,7 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
       open={open}
       onClose={onClose}
       width={720}
-      destroyOnClose
+      destroyOnHidden
       extra={
         <Space>
           <Button onClick={onClose}>Cancel</Button>
@@ -235,6 +238,19 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
             </Col>
             <Col xs={12} md={8}>
               <Form.Item name="active" label="Active" valuePropName="checked">
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="preventSelfApproval"
+                valuePropName="checked"
+                label={
+                  <Tooltip title="When on, the user who submitted the request cannot approve/reject it — even if they match the approver level.">
+                    <Space size={4}>Prevent Self-Approval <InfoCircleOutlined /></Space>
+                  </Tooltip>
+                }
+              >
                 <Switch />
               </Form.Item>
             </Col>

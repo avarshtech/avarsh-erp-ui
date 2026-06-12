@@ -22,6 +22,7 @@ import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryCon
 import { formatNumber, formatDate } from '../../../utils/formatters';
 import { generateGRNPdf } from '../../../utils/grnPdfGenerator';
 import GRNApprovalActions from './GRNApprovalActions';
+import ApprovalHistoryPanel from '../../../components/approval/ApprovalHistoryPanel';
 
 const { Text, Title } = Typography;
 
@@ -481,6 +482,12 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
                 </Row>
               </Card>
             )}
+
+            <ApprovalHistoryPanel
+              entityType="GRN_REVERSAL"
+              entityId={grn?.id}
+              style={{ marginTop: 16 }}
+            />
           </div>
         </>
       )}

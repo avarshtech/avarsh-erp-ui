@@ -9,6 +9,7 @@ import {
   Tooltip,
   Drawer,
   App,
+  Badge,
 } from "antd";
 import {
   DashboardOutlined,
@@ -33,12 +34,14 @@ import {
   CloseOutlined,
   BarChartOutlined,
   TeamOutlined,
+  AuditOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
+import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
@@ -186,6 +189,19 @@ const MainLayoutInner = () => {
   useFocusManagement();
   useKeyboardShortcuts();
 
+  // ── Pending approvals badge (refreshes on navigation + every 2 minutes) ──
+  const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () =>
+      getPendingApprovals()
+        .then((list) => { if (!cancelled) setPendingApprovalCount(list?.length || 0); })
+        .catch(() => {});
+    refresh();
+    const timer = setInterval(refresh, 120000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [location.pathname]);
+
   // ── WCO: Auto-hide header (desktop standalone only) ──
   const [wcoHeaderVisible, setWcoHeaderVisible] = useState(true);
   const wcoHideTimer = useRef(null);
@@ -283,6 +299,16 @@ const MainLayoutInner = () => {
       icon: <DashboardOutlined />,
       label: "Dashboard",
       moduleId: "dashboard",
+    },
+    {
+      key: "/approvals",
+      icon: <AuditOutlined />,
+      label: (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          My Approvals
+          <Badge count={pendingApprovalCount} size="small" />
+        </span>
+      ),
     },
     {
       key: "/costing",

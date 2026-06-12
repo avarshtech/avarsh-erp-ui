@@ -25,7 +25,10 @@ import {
   getCostSheetById,
   duplicateCostSheet,
   updateCostSheet,
+  approveCostSheet,
+  rejectCostSheet,
 } from '../../services/costing/costingService';
+import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
 import {
   COSTING_STATUS,
   EDITABLE_STATUSES,
@@ -115,14 +118,11 @@ const CostingView = () => {
   const handleApprove = async () => {
     setApproving(true);
     try {
-      // Send header fields (required by DTO validation) but omit detail rows
-      // so backend's isDataChanged() returns false for status-only transitions
-      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
-      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.APPROVED, version: data.version });
+      await approveCostSheet(id);
       message.success('Cost sheet approved');
       loadData();
-    } catch {
-      message.error('Failed to approve cost sheet');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to approve cost sheet');
     } finally {
       setApproving(false);
     }
@@ -154,14 +154,13 @@ const CostingView = () => {
     }
     setRejecting(true);
     try {
-      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
-      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.REJECTED, rejectionReason: rejectReason, version: data.version });
+      await rejectCostSheet(id, rejectReason);
       message.success('Cost sheet rejected');
       setRejectModalOpen(false);
       setRejectReason('');
       loadData();
-    } catch {
-      message.error('Failed to reject cost sheet');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to reject cost sheet');
     } finally {
       setRejecting(false);
     }
@@ -602,11 +601,22 @@ const CostingView = () => {
           )}
           <ActionButton action="print" text="Preview / PDF" onClick={() => setPdfPreviewOpen(true)} />
           <ActionButton action="print" text="Direct Print" onClick={handlePrint} loading={printing} />
-          {data.status === COSTING_STATUS.FINAL && canApprove && (
-            <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
-          )}
-          {data.status === COSTING_STATUS.FINAL && canApprove && (
-            <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
+          {/* Approve/Reject route through the centralized approval engine when a flow
+              is configured; legacy direct buttons are the no-flow fallback. */}
+          {data.status === COSTING_STATUS.FINAL && (
+            <ApprovalActionBar
+              entityType="COST_SHEET"
+              entityId={data.id}
+              docLabel="Cost Sheet"
+              docNumber={data.costingId}
+              onActionComplete={() => loadData()}
+              fallback={canApprove ? (
+                <Space>
+                  <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
+                  <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
+                </Space>
+              ) : null}
+            />
           )}
           {data.status === COSTING_STATUS.FINAL && canRevise && (
             <ActionButton

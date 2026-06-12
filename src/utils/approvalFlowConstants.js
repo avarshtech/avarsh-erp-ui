@@ -3,6 +3,15 @@ export const ENTITY_TYPES = [
   { value: 'COST_SHEET', label: 'Cost Sheet' },
   { value: 'ORDER', label: 'Order' },
   { value: 'GRN', label: 'Goods Receipt Note' },
+  { value: 'GRN_REVERSAL', label: 'GRN Reversal' },
+  { value: 'QC', label: 'QC Inspection' },
+  { value: 'LEAVE', label: 'Leave Application' },
+  { value: 'GATE_PASS', label: 'Gate Pass' },
+  { value: 'MISS_PUNCH', label: 'Miss Punch' },
+  { value: 'PAYROLL_RUN', label: 'Payroll Run' },
+  { value: 'BONUS_RUN', label: 'Bonus Run' },
+  { value: 'FNF_SETTLEMENT', label: 'F&F Settlement' },
+  { value: 'EL_ENCASHMENT', label: 'EL Encashment' },
 ];
 
 export const ENTITY_TYPE_COLORS = {
@@ -10,6 +19,35 @@ export const ENTITY_TYPE_COLORS = {
   COST_SHEET: 'purple',
   ORDER: 'green',
   GRN: 'orange',
+  GRN_REVERSAL: 'volcano',
+  QC: 'gold',
+  LEAVE: 'cyan',
+  GATE_PASS: 'geekblue',
+  MISS_PUNCH: 'magenta',
+  PAYROLL_RUN: 'lime',
+  BONUS_RUN: 'lime',
+  FNF_SETTLEMENT: 'red',
+  EL_ENCASHMENT: 'cyan',
+};
+
+/** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
+export const entityActionUrl = (entityType, entityId) => {
+  switch (entityType) {
+    case 'PURCHASE_ORDER': return `/purchase-orders/list?viewId=${entityId}`;
+    case 'COST_SHEET': return `/costing/${entityId}`;
+    case 'ORDER': return `/orders/list?viewId=${entityId}`;
+    case 'GRN':
+    case 'GRN_REVERSAL': return `/inventory/grn/list?viewId=${entityId}`;
+    case 'QC': return `/inventory/qc?viewId=${entityId}`;
+    case 'LEAVE': return `/hr/leaves?viewId=${entityId}`;
+    case 'GATE_PASS': return `/hr/attendance/gate-pass?viewId=${entityId}`;
+    case 'MISS_PUNCH': return `/hr/attendance/miss-punch?viewId=${entityId}`;
+    case 'PAYROLL_RUN': return `/hr/payroll/${entityId}`;
+    case 'BONUS_RUN': return `/hr/bonus?viewId=${entityId}`;
+    case 'FNF_SETTLEMENT': return `/hr/fnf/${entityId}`;
+    case 'EL_ENCASHMENT': return `/hr/statutory/el?viewId=${entityId}`;
+    default: return '/';
+  }
 };
 
 export const APPROVER_TYPES = [
@@ -52,6 +90,29 @@ export const CONDITION_FIELDS = {
   ],
   ORDER: [
     { value: 'totalQuantity', label: 'Total Quantity', type: 'number' },
+    { value: 'requestType', label: 'Request Type', type: 'select', options: ['REFER_BACK', 'CANCEL'] },
   ],
   GRN: [],
+  GRN_REVERSAL: [],
+  QC: [
+    { value: 'qcType', label: 'QC Type', type: 'select', options: ['Fabric', 'Accessories'] },
+    { value: 'stage', label: 'Stage', type: 'select', options: ['INSPECTION', 'REFER_BACK'] },
+  ],
+  LEAVE: [
+    { value: 'days', label: 'Number of Days', type: 'number' },
+  ],
+  GATE_PASS: [],
+  MISS_PUNCH: [],
+  PAYROLL_RUN: [
+    { value: 'netAmount', label: 'Net Amount', type: 'number' },
+  ],
+  BONUS_RUN: [
+    { value: 'totalAmount', label: 'Total Amount', type: 'number' },
+  ],
+  FNF_SETTLEMENT: [
+    { value: 'settlementAmount', label: 'Settlement Amount', type: 'number' },
+  ],
+  EL_ENCASHMENT: [
+    { value: 'amount', label: 'Encashment Amount', type: 'number' },
+  ],
 };

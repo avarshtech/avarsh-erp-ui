@@ -21,6 +21,7 @@ import { formatNumber, formatDate } from '../../../utils/formatters';
 import { generateFabricQCPdf } from '../../../utils/fabricQCPdfGenerator';
 import { generateTrimsQCPdf } from '../../../utils/trimsQCPdfGenerator';
 import QCApprovalActions from './QCApprovalActions';
+import ApprovalHistoryPanel from '../../../components/approval/ApprovalHistoryPanel';
 
 const { Text, Title } = Typography;
 
@@ -441,6 +442,11 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
               </Card>
             )}
 
+            <ApprovalHistoryPanel
+              entityType="QC"
+              entityId={qc?.id}
+              style={{ marginTop: 16 }}
+            />
           </div>
         </>
       )}

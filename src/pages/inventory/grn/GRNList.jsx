@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Space, Input, DatePicker, Select, Row, Col } from 'antd';
 import { SearchOutlined, InboxOutlined, DollarOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
@@ -11,7 +11,7 @@ import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { GRN_STATUS } from '../../../utils/inventoryConstants';
-import { getGRNList, deleteDraftGRN } from '../../../services/inventory/inventoryService';
+import { getGRNList, deleteDraftGRN, getFabricGRN } from '../../../services/inventory/inventoryService';
 import getGRNListColumns from './GRNListColumns';
 import GRNViewModal from './GRNViewModal';
 
@@ -66,6 +66,18 @@ const GRNList = () => {
   const handleView = useCallback((record) => {
     setViewDrawer({ open: true, grn: record });
   }, []);
+
+  // Deep link from approval notifications / My Approvals inbox (?viewId=X)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getFabricGRN(viewId)
+      .then((grn) => setViewDrawer({ open: true, grn }))
+      .catch(() => message.error('GRN not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEdit = useCallback(
     (record) => {

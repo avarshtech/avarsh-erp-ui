@@ -15,11 +15,13 @@ import {
   PlusOutlined,
   ApartmentOutlined,
   ExclamationCircleOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import {
   getApprovalFlows,
   deleteApprovalFlow,
   toggleFlowActive,
+  cloneApprovalFlow,
 } from '../../services/core/approvalFlowService';
 import { ENTITY_TYPES, ENTITY_TYPE_COLORS } from '../../utils/approvalFlowConstants';
 import PermissionGuard from '../../components/PermissionGuard';
@@ -89,6 +91,19 @@ const ApprovalFlowList = () => {
         next.delete(id);
         return next;
       });
+    }
+  }, [fetchFlows]);
+
+  // Clone & Edit — the supported way to "change levels" of a flow that has history
+  const handleClone = useCallback(async (record) => {
+    try {
+      const clone = await cloneApprovalFlow(record.id);
+      message.success(`Cloned as "${clone.name}" (inactive). Edit it, then activate.`);
+      await fetchFlows();
+      setEditingFlow(clone);
+      setDrawerOpen(true);
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to clone flow');
     }
   }, [fetchFlows]);
 
@@ -192,6 +207,11 @@ const ApprovalFlowList = () => {
           <PermissionGuard module="approval-flows" operation="update">
             <ActionButton type="edit" onClick={() => handleEdit(record)} />
           </PermissionGuard>
+          <PermissionGuard module="approval-flows" operation="add">
+            <Tooltip title="Clone as a new inactive flow (use this to change levels of a flow with history)">
+              <ActionButton icon={<CopyOutlined />} onClick={() => handleClone(record)} />
+            </Tooltip>
+          </PermissionGuard>
           <PermissionGuard module="approval-flows" operation="delete">
             <DeleteConfirm
               title="Delete Approval Flow"
@@ -205,7 +225,7 @@ const ApprovalFlowList = () => {
         </Space>
       ),
     },
-  ], [handleEdit, handleDelete, handleToggleActive, togglingIds]);
+  ], [handleEdit, handleDelete, handleToggleActive, handleClone, togglingIds]);
 
   return (
     <>

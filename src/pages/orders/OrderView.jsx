@@ -19,6 +19,7 @@ import {
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import { changeOrderStatus } from '../../services/orders/orderService';
+import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import {
   hasPermission,
@@ -402,42 +403,54 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           onClick={handlePrint}
         />
 
-        {/* Approve — shown when a request is pending and user has approve permission */}
-        {isPendingApproval && canApproveOrderAction() && (
-          <Popconfirm
-            title={isReferBackPending ? 'Approve Refer Back' : 'Approve Cancellation'}
-            description={
-              isReferBackPending
-                ? 'Approve this refer back request? The order will be returned to the creator for editing.'
-                : 'Approve this cancellation? The order will be permanently cancelled.'
+        {/* Request decisions route through the centralized approval engine when a flow
+            is configured; legacy Popconfirm buttons are the no-flow fallback. */}
+        {isPendingApproval && (
+          <ApprovalActionBar
+            entityType="ORDER"
+            entityId={orderData.id}
+            docLabel={isReferBackPending ? 'Order Refer Back Request' : 'Order Cancel Request'}
+            docNumber={orderNo}
+            onActionComplete={() => onStatusChange?.()}
+            fallback={
+              <Space>
+                {canApproveOrderAction() && (
+                  <Popconfirm
+                    title={isReferBackPending ? 'Approve Refer Back' : 'Approve Cancellation'}
+                    description={
+                      isReferBackPending
+                        ? 'Approve this refer back request? The order will be returned to the creator for editing.'
+                        : 'Approve this cancellation? The order will be permanently cancelled.'
+                    }
+                    onConfirm={handleApprove}
+                    okText="Approve"
+                    cancelText="No"
+                    okButtonProps={{ loading: actionLoading, type: 'primary' }}
+                  >
+                    <ActionButton
+                      action="approve"
+                      text="Approve"
+                    />
+                  </Popconfirm>
+                )}
+                {canRejectOrderAction() && (
+                  <Popconfirm
+                    title="Reject Request"
+                    description="Reject this request? The order will be restored to Confirmed status."
+                    onConfirm={handleReject}
+                    okText="Reject"
+                    cancelText="No"
+                    okButtonProps={{ danger: true, loading: actionLoading }}
+                  >
+                    <ActionButton
+                      action="reject"
+                      text="Reject"
+                    />
+                  </Popconfirm>
+                )}
+              </Space>
             }
-            onConfirm={handleApprove}
-            okText="Approve"
-            cancelText="No"
-            okButtonProps={{ loading: actionLoading, type: 'primary' }}
-          >
-            <ActionButton
-              action="approve"
-              text="Approve"
-            />
-          </Popconfirm>
-        )}
-
-        {/* Reject — separate permission check; restores order to Confirmed */}
-        {isPendingApproval && canRejectOrderAction() && (
-          <Popconfirm
-            title="Reject Request"
-            description="Reject this request? The order will be restored to Confirmed status."
-            onConfirm={handleReject}
-            okText="Reject"
-            cancelText="No"
-            okButtonProps={{ danger: true, loading: actionLoading }}
-          >
-            <ActionButton
-              action="reject"
-              text="Reject"
-            />
-          </Popconfirm>
+          />
         )}
 
         {/* Refer Back request — only for CONFIRMED, hide when pending approval */}

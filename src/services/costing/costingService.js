@@ -98,6 +98,32 @@ export const updateCostSheet = async (id, data) => {
 };
 
 /**
+ * Approve a cost sheet. Routed through the centralized approval engine when a
+ * flow is configured; applied directly otherwise.
+ * PUT /api/v1/cost-sheets/{id}/approve
+ * @param {number|string} id - Cost sheet ID
+ * @param {string} [comments] - Optional approval comment
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const approveCostSheet = async (id, comments) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.COST_SHEETS}/${id}/approve`, { comments });
+  return response.data;
+};
+
+/**
+ * Reject a cost sheet. Routed through the centralized approval engine when a
+ * flow is configured; applied directly otherwise.
+ * PUT /api/v1/cost-sheets/{id}/reject
+ * @param {number|string} id - Cost sheet ID
+ * @param {string} reason - Rejection reason
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const rejectCostSheet = async (id, reason) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.COST_SHEETS}/${id}/reject`, { comments: reason });
+  return response.data;
+};
+
+/**
  * Delete a cost sheet (Draft status only).
  * DELETE /api/v1/cost-sheets/{id}
  * @param {number|string} id - Cost sheet ID
