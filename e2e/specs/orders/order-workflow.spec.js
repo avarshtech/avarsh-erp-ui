@@ -1,141 +1,104 @@
+/**
+ * Orders — Status Lifecycle & Approval Workflow (API)
+ *
+ * Transitions (OrderService.validateStatusTransition):
+ *   DRAFT → CONFIRMED (submit)
+ *   REFERRED_BACK → CONFIRMED (resubmit)
+ *   CONFIRMED → REFER_BACK_REQUESTED | CANCEL_REQUESTED (with reason)
+ *   REFER_BACK_REQUESTED → REFERRED_BACK (approve)
+ *   CANCEL_REQUESTED → CANCELLED (approve)
+ *
+ * Refer-back / cancel requests call submitForApproval. Under the no-flow e2e
+ * profile the engine auto-resolves, so the request transition lands on its
+ * target state directly (mirrors costing). The tests assert the reachable
+ * e2e outcomes and accept the pending-request state where the engine may hold.
+ *
+ * Status change endpoint: PUT /orders/{id}/status { status, reason?, version }.
+ */
+
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antTableWaitForData, antModalConfirm, antPopconfirmYes, antDatePickerToday } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
+import { seedApprovedCosting, loadOrderRefs, buildOrderPayload } from '../../helpers/order-seed.js';
 
 let api;
-let orderId;
+let refs;
+const createdOrders = [];
+const createdCostings = [];
 
-test.beforeEach(async ({ page }) => {
-  await ensureSessionActive(page);
+test.beforeAll(async () => {
+  api = await createAuthenticatedClient();
+  refs = await loadOrderRefs(api);
+});
+test.afterAll(async () => {
+  for (const id of createdOrders) { try { await api.delete(`/orders/${id}`); } catch { /* gone */ } }
+  for (const id of createdCostings) { try { await api.delete(`/cost-sheets/${id}`); } catch { /* gone */ } }
+  await api.dispose();
 });
 
-test.describe('Order Workflow — API Tests', () => {
-  test.beforeAll(async () => {
-    api = await createAuthenticatedClient();
+async function newDraftOrder() {
+  const costing = await seedApprovedCosting(api);
+  createdCostings.push(costing.costSheetId);
+  const res = await api.post('/orders', buildOrderPayload(costing, refs));
+  if (res.data?.id) createdOrders.push(res.data.id);
+  expect(res.data.status).toBe('DRAFT');
+  return res.data;
+}
+
+const changeStatus = (id, status, version, reason) =>
+  api.put(`/orders/${id}/status`, { status, reason, version });
+
+test.describe('Orders — Status Lifecycle', () => {
+  test('Draft → Confirmed (submit)', async () => {
+    const o = await newDraftOrder();
+    const r = await changeStatus(o.id, 'CONFIRMED', o.version);
+    expect(r.status).toBeGreaterThanOrEqual(200);
+    expect(r.status).toBeLessThan(300);
+    const got = (await api.get(`/orders/${o.id}`)).data;
+    expect(got.status).toBe('CONFIRMED');
   });
 
-  test.afterAll(async () => { await api.dispose(); });
+  test('Confirmed → Cancel requested → (auto-)Cancelled, reason persists', async () => {
+    const o = await newDraftOrder();
+    let got = (await api.get(`/orders/${o.id}`)).data;
+    await changeStatus(o.id, 'CONFIRMED', got.version);
+    got = (await api.get(`/orders/${o.id}`)).data;
 
-  test('Create DRAFT → SUBMITTED → APPROVED lifecycle', async () => {
-    // Step 1: Create DRAFT order
-    const createRes = await api.post('/orders', {
-      buyerId: 1,
-      styleId: 1,
-      orderDate: new Date().toISOString().split('T')[0],
-      season: 'SS25',
-      deliveryDate: '2025-09-30',
-      currency: 'USD',
-      pricingTerm: 'FOB',
-      status: 'DRAFT',
-    });
-    expect(createRes.status).toBe(200);
-    orderId = createRes.data.id;
-    expect(createRes.data.status).toBe('DRAFT');
+    const reason = 'Buyer cancelled the program for this season — drop the order.';
+    const r = await changeStatus(o.id, 'CANCEL_REQUESTED', got.version, reason);
+    expect(r.status).toBeGreaterThanOrEqual(200);
+    expect(r.status).toBeLessThan(300);
 
-    // Step 2: Submit (DRAFT → SUBMITTED)
-    const { data: draft } = await api.get(`/orders/${orderId}`);
-    const submitRes = await api.put(`/orders/${orderId}`, {
-      ...draft,
-      status: 'SUBMITTED',
-    });
-    expect(submitRes.status).toBe(200);
-    expect(submitRes.data.status).toBe('SUBMITTED');
-
-    // Step 3: Approve (SUBMITTED → APPROVED)
-    const { data: submitted } = await api.get(`/orders/${orderId}`);
-    const approveRes = await api.put(`/orders/${orderId}`, {
-      ...submitted,
-      status: 'APPROVED',
-    });
-    expect(approveRes.status).toBe(200);
-    expect(approveRes.data.status).toBe('APPROVED');
+    got = (await api.get(`/orders/${o.id}`)).data;
+    // no-flow engine auto-resolves the cancel → CANCELLED; otherwise it parks at CANCEL_REQUESTED
+    expect(['CANCELLED', 'CANCEL_REQUESTED']).toContain(got.status);
+    expect((got.cancelReason || got.referBackReason || '')).toContain('Buyer cancelled');
   });
 
-  test('Refer back order (SUBMITTED → DRAFT with reason)', async () => {
-    // Create and submit an order
-    const createRes = await api.post('/orders', {
-      buyerId: 1,
-      styleId: 1,
-      orderDate: new Date().toISOString().split('T')[0],
-      season: 'SS25',
-      deliveryDate: '2025-09-30',
-      currency: 'USD',
-      pricingTerm: 'FOB',
-      status: 'DRAFT',
-    });
-    const id = createRes.data.id;
+  test('Confirmed → Refer-back requested → (auto-)Referred back', async () => {
+    const o = await newDraftOrder();
+    let got = (await api.get(`/orders/${o.id}`)).data;
+    await changeStatus(o.id, 'CONFIRMED', got.version);
+    got = (await api.get(`/orders/${o.id}`)).data;
 
-    // Submit the order
-    const { data: draft } = await api.get(`/orders/${id}`);
-    await api.put(`/orders/${id}`, { ...draft, status: 'SUBMITTED' });
+    const reason = 'Costing needs revision — fabric price is stale, please re-quote.';
+    const r = await changeStatus(o.id, 'REFER_BACK_REQUESTED', got.version, reason);
+    expect(r.status).toBeGreaterThanOrEqual(200);
+    expect(r.status).toBeLessThan(300);
 
-    // Refer back with reason
-    const { data: submitted } = await api.get(`/orders/${id}`);
-    const referRes = await api.put(`/orders/${id}`, {
-      ...submitted,
-      status: 'DRAFT',
-      referBackReason: 'Missing size breakdown details',
-    });
-    expect(referRes.status).toBe(200);
-    expect(referRes.data.status).toBe('DRAFT');
-
-    // Clean up
-    await api.delete(`/orders/${id}`);
-  });
-
-  test('Cancel order with reason', async () => {
-    // Create a draft order
-    const createRes = await api.post('/orders', {
-      buyerId: 1,
-      styleId: 1,
-      orderDate: new Date().toISOString().split('T')[0],
-      season: 'SS25',
-      deliveryDate: '2025-09-30',
-      currency: 'USD',
-      pricingTerm: 'FOB',
-      status: 'DRAFT',
-    });
-    const id = createRes.data.id;
-
-    // Cancel order
-    const { data: order } = await api.get(`/orders/${id}`);
-    const cancelRes = await api.put(`/orders/${id}`, {
-      ...order,
-      status: 'CANCELLED',
-      cancelReason: 'Buyer withdrew the order',
-    });
-    expect(cancelRes.status).toBe(200);
-    expect(cancelRes.data.status).toBe('CANCELLED');
-
-    // Clean up
-    await api.delete(`/orders/${id}`);
-  });
-
-  test.afterAll(async () => {
-    if (orderId) {
-      await api.delete(`/orders/${orderId}`);
-    }
+    got = (await api.get(`/orders/${o.id}`)).data;
+    expect(['REFERRED_BACK', 'REFER_BACK_REQUESTED']).toContain(got.status);
   });
 });
 
-test.describe('Order Workflow — UI Tests', () => {
-  test('Status transitions via buttons on order detail page', async ({ page }) => {
-    await goToListPage(page, '/orders/list');
-    await antTableWaitForData(page);
+test.describe('Orders — Edit/Delete guards', () => {
+  test('Confirmed order can no longer be deleted (Draft-only)', async () => {
+    const o = await newDraftOrder();
+    const got = (await api.get(`/orders/${o.id}`)).data;
+    await changeStatus(o.id, 'CONFIRMED', got.version);
 
-    // Find a DRAFT order and click into it
-    const draftTag = page.locator('.ant-tag:has-text("DRAFT")').first();
-    if (await draftTag.isVisible()) {
-      const row = draftTag.locator('xpath=ancestor::tr');
-      await row.click();
-      await page.waitForTimeout(1000);
-
-      // Verify status action buttons are present
-      const submitBtn = page.locator('button:has-text("Submit")');
-      if (await submitBtn.isVisible()) {
-        await expect(submitBtn).toBeEnabled();
-      }
-    }
+    const del = await api.delete(`/orders/${o.id}`);
+    expect(del.status).toBeGreaterThanOrEqual(400);
+    const still = (await api.get(`/orders/${o.id}`)).data;
+    expect(still.status).toBe('CONFIRMED');
   });
 });

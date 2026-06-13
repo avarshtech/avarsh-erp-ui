@@ -25,7 +25,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$ApiRepoPath = if ($env:API_REPO_PATH) { $env:API_REPO_PATH } else { Join-Path $PSScriptRoot "..\..\erp-purchase" }
+$ApiRepoPath = if ($env:API_REPO_PATH) {
+    $env:API_REPO_PATH
+} else {
+    # Try sibling of the UI repo first, then sibling of the parent folder (e.g. github\Avarsh\new\avarsh-erp-ui + github\Avarsh\erp-purchase)
+    $candidates = @(
+        (Join-Path $PSScriptRoot "..\..\erp-purchase"),
+        (Join-Path $PSScriptRoot "..\..\..\erp-purchase")
+    )
+    $found = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($found) { $found } else { $candidates[0] }
+}
 $ApiPort = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8088" }
 $UiPort = "3000"
 $ApiJob = $null

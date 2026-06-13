@@ -340,16 +340,13 @@ test.describe('Accessories QC — Validation (API)', () => {
     // Keep inspectionDate since DB requires it
 
     const { data, status } = await api.post('/qc/draft', payload);
+    // A draft with no criteria is allowed (criteria are required only on submit).
+    expect([200, 400]).toContain(status);
     if (status === 200 && data?.id) {
       createdQcIds.push(data.id);
-      expect(data.id).toBeDefined();
-    } else {
-      // If empty criteria are rejected on draft, that's also valid behavior
-      expect([200, 400].includes(status)).toBeTruthy();
+      const { data: fetched } = await api.get(`/qc/${data.id}`);
+      expect(fetched).toBeDefined();
+      expect((fetched.criteriaRows || []).length).toBe(0);
     }
-
-    const { data: fetched } = await api.get(`/qc/${draft.id}`);
-    expect(fetched).toBeDefined();
-    expect((fetched.criteriaRows || []).length).toBe(0);
   });
 });

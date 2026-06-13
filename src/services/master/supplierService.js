@@ -67,8 +67,10 @@ export const updateSupplier = async (id, supplierData) => {
  * @returns {Promise<Object>} Response with deletion status
  */
 export const deleteSupplier = async (supplierId) => {
-  // Soft delete: update the supplier with active = false
-  const response = await axiosInstance.post(ENDPOINTS.SUPPLIERS, { id: supplierId, active: false });
+  // Soft delete via the dedicated endpoint (backend sets active=false).
+  // NOTE: POSTing a partial {id, active:false} body to the create endpoint
+  // triggers a 409 REFERENCE_CONSTRAINT — use DELETE /{id} instead.
+  const response = await axiosInstance.delete(`${ENDPOINTS.SUPPLIERS}/${supplierId}`);
   return response;
 };
 

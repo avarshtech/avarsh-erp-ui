@@ -367,6 +367,8 @@ export function trimsQcPayload(grn, poLineItemId, criteriaRows = [], options = {
     qtyReceived: lineItem?.receivingQty || lineItem?.poQty || 100,
     qtyChecked: options.qtyChecked || lineItem?.receivingQty || lineItem?.poQty || 100,
     criteriaRows,
+    // Required on Accessories QC submit: MATCHED | SHORT (qty verdict vs received).
+    qtyVerdict: options.qtyVerdict || 'MATCHED',
     overallResult: allOk ? 'PASS' : 'FAIL',
   };
 }

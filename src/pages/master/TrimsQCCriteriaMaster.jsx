@@ -96,7 +96,7 @@ const TrimsQCCriteriaMaster = ({ onDirtyChange }) => {
     modal.confirm({
       title: 'Delete Criterion',
       icon: <ExclamationCircleOutlined />,
-      content: 'This will mark the criterion as inactive. Continue?',
+      content: 'This will permanently delete the criterion. Deletion is blocked if it is already used by QC inspections — use the Active switch to deactivate instead. Continue?',
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {

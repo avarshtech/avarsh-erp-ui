@@ -96,7 +96,7 @@ const DefectTypeMaster = ({ onDirtyChange }) => {
     modal.confirm({
       title: 'Delete Defect Type',
       icon: <ExclamationCircleOutlined />,
-      content: 'This will mark the defect type as inactive. Existing QC records will continue to display it. Continue?',
+      content: 'This will permanently delete the defect type. Deletion is blocked if it is already used by QC records — use the Active switch to deactivate instead. Continue?',
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {

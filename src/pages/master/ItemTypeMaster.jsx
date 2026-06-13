@@ -231,12 +231,13 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                 <Form.Item
                   name="subCategoryId"
                   label="Sub Category"
+                  rules={[{ required: true, message: 'Please select a sub category' }]}
                 >
                   <Select
                     placeholder="Select Sub Category"
                     size="large"
                     showSearch
-                    allowClear
+                    optionFilterProp="label"
                     options={subCategories.map(s => ({ value: s.id, label: s.name }))}
                   />
                 </Form.Item>
@@ -259,6 +260,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                     placeholder="Select Attributes"
                     size="large"
                     showSearch
+                    optionFilterProp="label"
                     options={attributes.map(a => ({ value: a.id, label: a.attributeName || a.name }))}
                   />
                 </Form.Item>
@@ -271,6 +273,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
                     placeholder="Select UOMs"
                     size="large"
                     showSearch
+                    optionFilterProp="label"
                     options={uoms.map(u => ({ value: u.id, label: u.name }))}
                   />
                 </Form.Item>

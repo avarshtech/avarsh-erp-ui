@@ -231,6 +231,7 @@ const SubCategoryMaster = ({ onDirtyChange }) => {
                   placeholder="Select Category"
                   size="large"
                   showSearch
+                  optionFilterProp="label"
                   options={categories.map(c => ({ value: c.id, label: c.name }))}
                 />
               </Form.Item>

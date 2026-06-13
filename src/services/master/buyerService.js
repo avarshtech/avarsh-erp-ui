@@ -38,9 +38,11 @@ export const updateBuyer = async (data) => {
 };
 
 /**
- * Delete buyer (soft delete - POST with active: false)
+ * Delete buyer (soft delete via DELETE /{id}; backend sets active=false).
+ * POSTing a partial {id, active:false} body to the create endpoint triggers a
+ * 409 REFERENCE_CONSTRAINT, so use the dedicated DELETE endpoint instead.
  */
 export const deleteBuyer = async (id) => {
-  const response = await axiosInstance.post(ENDPOINTS.BUYERS, { id, active: false });
+  const response = await axiosInstance.delete(`${ENDPOINTS.BUYERS}/${id}`);
   return response.data ?? response;
 };

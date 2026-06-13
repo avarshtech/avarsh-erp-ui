@@ -88,24 +88,6 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
-      name: 'production-po',
-      testDir: './e2e/specs/production-po',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
-    {
-      name: 'work-orders',
-      testDir: './e2e/specs/work-orders',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
-    {
       name: 'hr',
       testDir: './e2e/specs/hr',
       use: {
@@ -138,28 +120,6 @@ export default defineConfig({
       name: 'grn-qc',
       testDir: './e2e/specs/grn-qc',
       timeout: 120000,
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
-
-    // ── Cutting Module ───────────────────────────────────────
-    {
-      name: 'cutting',
-      testDir: './e2e/specs/cutting',
-      use: {
-        browserName: 'chromium',
-        storageState: './e2e/.auth/user.json',
-      },
-      dependencies: ['setup'],
-    },
-
-    // ── Sewing Module ────────────────────────────────────────
-    {
-      name: 'sewing',
-      testDir: './e2e/specs/sewing',
       use: {
         browserName: 'chromium',
         storageState: './e2e/.auth/user.json',

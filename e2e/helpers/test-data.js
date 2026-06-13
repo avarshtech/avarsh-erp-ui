@@ -56,12 +56,23 @@ export function subCategoryPayload(categoryId, overrides = {}) {
   };
 }
 
-export function itemPayload(overrides = {}) {
+/**
+ * Item payload matching backend ItemDTO.
+ * itemCode is server-generated (do NOT send/assert a client value).
+ * defaultAllowance is @NotNull on the backend.
+ * Pass real seeded ids: categoryId, subCategoryId, itemTypeId, uomId.
+ */
+export function itemPayload(ids = {}, overrides = {}) {
   return {
-    itemCode: `E2E-${ts()}`,
     itemName: `E2E Test Item ${ts()}`,
+    categoryId: ids.categoryId,
+    subCategoryId: ids.subCategoryId,
+    itemTypeId: ids.itemTypeId,
+    uomId: ids.uomId,
     hsnCode: '9999',
+    defaultAllowance: 5,
     isActive: true,
+    variants: [],
     ...overrides,
   };
 }

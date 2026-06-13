@@ -13,7 +13,14 @@
 set -e
 
 MODULE=${1:-""}
-API_REPO_PATH=${API_REPO_PATH:-"$(dirname "$0")/../../erp-purchase"}
+if [ -z "$API_REPO_PATH" ]; then
+  # Try sibling of the UI repo first, then sibling of the parent folder
+  if [ -d "$(dirname "$0")/../../erp-purchase" ]; then
+    API_REPO_PATH="$(dirname "$0")/../../erp-purchase"
+  else
+    API_REPO_PATH="$(dirname "$0")/../../../erp-purchase"
+  fi
+fi
 API_PORT=${SERVER_PORT:-8088}
 UI_PORT=3000
 API_PID=""
