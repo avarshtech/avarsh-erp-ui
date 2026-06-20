@@ -4,7 +4,7 @@ import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 
-const SizeColorMatrix = ({ items, onChange, editable = true }) => {
+const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable = true }) => {
   const handleFieldChange = useCallback((index, field, value) => {
     const updated = [...items];
     const item = { ...updated[index] };
@@ -22,7 +22,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true }) => {
     { title: 'Order Qty', dataIndex: 'orderQty', key: 'orderQty', width: 100, align: 'right',
       render: (q) => (q || 0).toLocaleString() },
     { title: 'Allowance %', dataIndex: 'allowancePercent', key: 'allowancePercent', width: 120, align: 'right',
-      render: (val, _, index) => editable
+      render: (val, _, index) => (editable && allowanceEditable)
         ? <InputNumber size="small" min={0} max={50} value={val} onChange={(v) => handleFieldChange(index, 'allowancePercent', v)} style={{ width: 80 }} {...numericInputProps} />
         : `${val || 0}%`,
     },
@@ -35,7 +35,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true }) => {
     },
     { title: 'Total Cost', key: 'totalCost', width: 120, align: 'right',
       render: (_, r) => <Text strong>{((r.plannedQty || 0) * (r.ratePerPiece || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text> },
-  ], [handleFieldChange, editable]);
+  ], [handleFieldChange, editable, allowanceEditable]);
 
   const totals = useMemo(() => ({
     orderQty: items.reduce((s, i) => s + (i.orderQty || 0), 0),

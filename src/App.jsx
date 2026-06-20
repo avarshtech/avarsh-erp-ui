@@ -40,6 +40,15 @@ const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/Accessor
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
+// Production PO module (Cutting PO, Work Order, Finishing PO)
+const ProductionHub = lazy(() => import('./pages/production/ProductionHub'));
+const CuttingPoList = lazy(() => import('./pages/production/cutting/CuttingPoList'));
+const CuttingPoForm = lazy(() => import('./pages/production/cutting/CuttingPoForm'));
+const WorkOrderList = lazy(() => import('./pages/production/workorder/WorkOrderList'));
+const WorkOrderForm = lazy(() => import('./pages/production/workorder/WorkOrderForm'));
+const FinishingPoList = lazy(() => import('./pages/production/finishing/FinishingPoList'));
+const FinishingPoGenerateWizard = lazy(() => import('./pages/production/finishing/FinishingPoGenerateWizard'));
+const FinishingPoForm = lazy(() => import('./pages/production/finishing/FinishingPoForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -180,6 +189,17 @@ const ThemedApp = () => {
             <Route path="purchase-orders/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
             <Route path="purchase-orders/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
             <Route path="purchase-orders/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><POForm /></PermissionRoute>} />
+            {/* Production POs (Cutting / Work Order / Finishing) */}
+            <Route path="production" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><ProductionHub /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting-po/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><CuttingPoList /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting-po/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><CuttingPoForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting-po/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><CuttingPoForm /></Suspense></PermissionRoute>} />
+            <Route path="production/work-order/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><WorkOrderList /></Suspense></PermissionRoute>} />
+            <Route path="production/work-order/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
+            <Route path="production/work-order/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing-po/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing-po/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing-po/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />

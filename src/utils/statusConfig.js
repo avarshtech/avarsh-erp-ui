@@ -19,6 +19,7 @@ import { ORDER_STATUS } from './orderConstants';
 import { PO_STATUS } from './poStatusConstants';
 import { BOM_STATUS } from './bomConstants';
 import { GRN_STATUS, QC_STATUS, STOCK_STATUS } from './inventoryConstants';
+import { PROD_PO_STATUS } from './productionConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -96,6 +97,16 @@ export const STOCK_STATUS_CONFIG = {
   [STOCK_STATUS.DAMAGED]:   { color: 'red',     icon: WarningOutlined },
 };
 
+// ==================== PRODUCTION PO STATUS CONFIG ====================
+// Shared by Cutting PO, Work Order (Sewing PO) and Finishing PO (PRD §7.1).
+export const PRODUCTION_PO_STATUS_CONFIG = {
+  [PROD_PO_STATUS.DRAFT]:            { color: 'default',    icon: FileTextOutlined },
+  [PROD_PO_STATUS.PENDING_APPROVAL]: { color: 'processing', icon: ClockCircleOutlined },
+  [PROD_PO_STATUS.APPROVED]:         { color: 'green',      icon: CheckCircleOutlined },
+  [PROD_PO_STATUS.REJECTED]:         { color: 'red',        icon: CloseCircleOutlined },
+  [PROD_PO_STATUS.CANCELLED]:        { color: 'volcano',    icon: StopOutlined },
+};
+
 
 // ==================== STATUS FLOW (for StatusSteps) ====================
 export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLETED'];
@@ -104,6 +115,7 @@ export const COSTING_STATUS_FLOW = ['Draft', 'Final', 'Approved', 'Rejected'];
 export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
 export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];
 export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved', 'Conditional_Pass'];
+export const PRODUCTION_PO_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {
