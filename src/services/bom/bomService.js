@@ -43,6 +43,15 @@ export const getBomByOrderNo = async (orderNo) => {
 };
 
 /**
+ * Get the 5 most recently created (CREATED status) BOMs, for suggestion dropdowns.
+ * @returns {Promise<Array>} BomRecentDTO[]
+ */
+export const getRecentBoms = async () => {
+  const response = await axiosInstance.get(`${BASE_URL}/recent`);
+  return response.data;
+};
+
+/**
  * Update PO-generated flag on specific BOM lines.
  * Called by PO module when placing or cancelling a PO against BOM lines.
  * @param {number} bomId - BOM ID

@@ -42,7 +42,8 @@
       "Skill(erp-dev)",
       "Skill(erp-dev:*)",
       "Bash(./mvnw compile *)",
-      "Bash(./gradlew compileJava -q)"
+      "Bash(./gradlew compileJava -q)",
+      "Bash(git ls-tree *)"
     ]
   },
   "hooks": {

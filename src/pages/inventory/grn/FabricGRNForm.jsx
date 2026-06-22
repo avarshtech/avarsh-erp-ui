@@ -31,6 +31,9 @@ const { TextArea } = Input;
 
 const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
+// Exact mst_categories.name denormalized onto each PO line item as categoryName.
+const PO_CATEGORY = 'Fabric';
+
 const FabricGRNForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -63,10 +66,11 @@ const FabricGRNForm = () => {
     grnRecord && grnRecord.status !== GRN_STATUS.DRAFT && grnRecord.status !== GRN_STATUS.REVERSED;
   const isReferredBack = grnRecord?.status === GRN_STATUS.REVERSED;
 
-  // Load fabric POs (Sent_To_Supplier only — service handles filter)
+  // Load fabric POs (Sent_To_Supplier only — service handles filter). A PO is eligible
+  // here if at least one of its line items belongs to the Fabric category.
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.poNumber || '').includes('FAB'))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => li.categoryName === PO_CATEGORY))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
@@ -537,7 +541,7 @@ const FabricGRNForm = () => {
 
         {selectedPO && (
           <POLineItemPicker
-            category="Fabric"
+            category={PO_CATEGORY}
             poLineItems={selectedPO.items || []}
             selectedIds={selectedLineItemIds}
             onSelectionChange={setSelectedLineItemIds}

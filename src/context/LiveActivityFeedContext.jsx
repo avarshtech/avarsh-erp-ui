@@ -14,6 +14,7 @@ import {
   updateFeedSettings,
 } from '../services/core/liveActivityFeedService';
 import { getCurrentUser, isAdminRole } from '../utils/permissions';
+import { initializeSession } from '../services/auth/authService';
 
 const BUFFER_CAP = 200;
 const STORAGE_KEY = 'liveFeed.window';
@@ -84,6 +85,13 @@ export const LiveActivityFeedProvider = ({ children }) => {
   const refreshSettings = useCallback(async () => {
     if (!isAdmin) return null;
     try {
+      // The admin check above reads from the localStorage-cached user display,
+      // which survives a full page reload — but the in-memory access token does
+      // not. On a cold reload this provider mounts (and fires) before
+      // ProtectedRoute's silent cookie-based refresh restores the token, so wait
+      // for session init first or this request goes out with no Authorization
+      // header and gets a bare 403 (not 401, so the axios retry never kicks in).
+      await initializeSession();
       const data = await getFeedSettings();
       setSettings(data);
       return data;

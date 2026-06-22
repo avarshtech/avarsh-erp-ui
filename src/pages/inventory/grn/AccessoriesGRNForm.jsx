@@ -32,6 +32,12 @@ const { TextArea } = Input;
 
 const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
+// Exact mst_categories.name denormalized onto each PO line item as categoryName.
+// The UI labels this form/category "Accessories", but the master-data category
+// for buttons/zippers/elastic/etc. is named "Trims" — keep these in sync with
+// the POLineItemPicker category prop below.
+const PO_CATEGORY = 'Trims';
+
 const AccessoriesGRNForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -61,10 +67,11 @@ const AccessoriesGRNForm = () => {
     grnRecord && grnRecord.status !== GRN_STATUS.DRAFT && grnRecord.status !== GRN_STATUS.REVERSED;
   const isReferredBack = grnRecord?.status === GRN_STATUS.REVERSED;
 
-  // Trims POs only
+  // Trims POs only. A PO is eligible here if at least one of its line items
+  // belongs to the Trims category.
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.poNumber || '').includes('ACC'))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => li.categoryName === PO_CATEGORY))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
@@ -537,7 +544,7 @@ const AccessoriesGRNForm = () => {
 
         {selectedPO && (
           <POLineItemPicker
-            category="Trims"
+            category={PO_CATEGORY}
             poLineItems={selectedPO.items || []}
             selectedIds={selectedLineItemIds}
             onSelectionChange={setSelectedLineItemIds}

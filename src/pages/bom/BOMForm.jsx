@@ -38,7 +38,7 @@ import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../utils/permissions';
 import { createBom, updateBom, getBomById } from '../../services/bom/bomService';
 import { getActiveProcesses } from '../../services/master/processService';
-import { getOrderByOrderNo } from '../../services/orders/orderService';
+import { getOrderByOrderNo, getRecentOrders } from '../../services/orders/orderService';
 import { searchItems, getItemMetaData, getItemsByIds } from '../../services/master/itemService';
 import { getActiveParts } from '../../services/master/partsService';
 import { uploadFile, deleteFile, downloadFileAsBlob, getFilesByEntity } from '../../services/core/fileService';
@@ -58,6 +58,7 @@ import ConsumptionCalcModal from '../costing/ConsumptionCalcModal';
 
 import { ActionButton, DeleteConfirm, SectionAddButton } from '../../components/buttons';
 import { FormSection } from '../../components/form';
+import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import PageHeader from '../../components/PageHeader';
 
 const { Title, Text } = Typography;
@@ -287,6 +288,21 @@ const BOMForm = () => {
   const [colors, setColors] = useState([]);
   const [orderLineSummary, setOrderLineSummary] = useState([]); // [{ buyerPoNo, colors: [{ name, qty }], lineQty }]
   const [orderQty, setOrderQty] = useState(null);
+  const [recentOrders, setRecentOrders] = useState([]);
+
+  // Fetch recently created orders (suggestions) — only relevant when creating a new BOM
+  useEffect(() => {
+    if (isEdit) return;
+    getRecentOrders().then(setRecentOrders).catch(() => setRecentOrders([]));
+  }, [isEdit]);
+
+  const recentOrderItems = useMemo(
+    () => recentOrders.map((o) => ({
+      value: o.orderNo,
+      label: [o.orderNo, o.styleNo, o.buyerName].filter(Boolean).join(' · '),
+    })),
+    [recentOrders],
+  );
 
   // Derive union of all sizes from order line summary
   const allSizes = useMemo(() => {
@@ -533,8 +549,8 @@ const BOMForm = () => {
 
   const ORDER_NO_PATTERN = /^SG\/\d{2}-\d{2}\/\d{4,}$/;
 
-  const handleOrderNoBlur = async (e) => {
-    const val = e.target.value?.trim();
+  const handleOrderNoBlur = async (eOrVal) => {
+    const val = (typeof eOrVal === 'string' ? eOrVal : eOrVal?.target?.value)?.trim();
     if (!val || val === orderNo) return;
     if (!ORDER_NO_PATTERN.test(val)) return; // incomplete pattern — don't call API
     setOrderLoading(true);
@@ -2346,7 +2362,16 @@ const BOMForm = () => {
               onKeyDown={!isEdit ? (e) => formattedIdKeyDown(e, 'SG/') : undefined}
               onBlur={!isEdit ? handleOrderNoBlur : undefined}
               onPressEnter={!isEdit ? (e) => { e.target.blur(); } : undefined}
-              suffix={orderLoading ? <LoadingOutlined spin /> : null}
+              suffix={
+                orderLoading
+                  ? <LoadingOutlined spin />
+                  : !isEdit && (
+                    <RecentSuggestionsButton
+                      items={recentOrderItems}
+                      onSelect={(val) => { setOrderNoInput(val); handleOrderNoBlur(val); }}
+                    />
+                  )
+              }
               disabled={isEdit}
             />
           </Col>

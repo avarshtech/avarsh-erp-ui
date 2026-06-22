@@ -12,9 +12,10 @@ const POLineItemPicker = memo(function POLineItemPicker({
   onSelectionChange,
   readOnly = false,
 }) {
-  // Auto-filter by category
+  // Auto-filter by category — categoryName is the exact mst_categories.name
+  // denormalized onto each PO line item (see adaptPO in inventoryService.js).
   const filtered = useMemo(
-    () => poLineItems.filter((li) => (li.category || '').toLowerCase() === category.toLowerCase()),
+    () => poLineItems.filter((li) => li.categoryName === category),
     [poLineItems, category],
   );
 
