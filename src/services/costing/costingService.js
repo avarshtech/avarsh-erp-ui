@@ -73,6 +73,15 @@ export const getCostSheetByCostingId = async (costingId) => {
 };
 
 /**
+ * Get the 5 most recently created (Approved status) cost sheets, for suggestion dropdowns.
+ * GET /api/v1/cost-sheets/recent
+ */
+export const getRecentCostSheets = async () => {
+  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/recent`);
+  return response.data;
+};
+
+/**
  * Create a new cost sheet.
  * POST /api/v1/cost-sheets (no id in body)
  * @param {Object} data - CostSheetRequest payload

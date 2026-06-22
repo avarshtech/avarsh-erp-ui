@@ -45,6 +45,15 @@ export const getOrderByOrderNo = async (orderNo) => {
 };
 
 /**
+ * Get the 5 most recently created (CONFIRMED status) orders, for suggestion dropdowns.
+ * GET /api/v1/orders/recent
+ */
+export const getRecentOrders = async () => {
+  const response = await axiosInstance.get(`${BASE}/recent`);
+  return response.data;
+};
+
+/**
  * Create a new order. POST /api/v1/orders
  */
 export const createOrder = async (data) => {

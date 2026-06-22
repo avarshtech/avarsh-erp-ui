@@ -43,6 +43,7 @@ import {
 import { ActionButton } from '../../components/buttons';
 import PageHeader from '../../components/PageHeader';
 import StatusTag from '../../components/StatusTag';
+import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -50,7 +51,7 @@ import { hasPermission, canSubmitOrder } from '../../utils/permissions';
 import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orders/orderService';
 import { getBuyers, getBuyerById } from '../../services/master/buyerService';
 import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
-import { getCostSheetByCostingId, downloadAttachment } from '../../services/costing/costingService';
+import { getCostSheetByCostingId, getRecentCostSheets, downloadAttachment } from '../../services/costing/costingService';
 import { getAllSizePresets, createSizePreset } from '../../services/master/sizePresetService';
 import { extractOrderLine } from '../../services/core/aiService';
 import { getStyleById } from '../../services/master/styleService';
@@ -848,6 +849,7 @@ const OrderForm = () => {
   // Costing lookup
   const [costingLoading, setCostingLoading] = useState(false);
   const [costingAttachments, setCostingAttachments] = useState([]);
+  const [recentCostings, setRecentCostings] = useState([]);
 
   // Buyer data
   const [buyers, setBuyers] = useState([]);
@@ -882,6 +884,21 @@ const OrderForm = () => {
   const lineExtractionTimers = useRef({});
 
   const isEdit = !!id;
+
+  // Fetch recently created costings (suggestions) — only relevant when creating a new order
+  useEffect(() => {
+    if (isEdit) return;
+    getRecentCostSheets().then(setRecentCostings).catch(() => setRecentCostings([]));
+  }, [isEdit]);
+
+  const recentCostingItems = useMemo(
+    () => recentCostings.map((c) => ({
+      value: c.costingId,
+      label: [c.costingId, c.styleNo, c.buyerName].filter(Boolean).join(' · '),
+    })),
+    [recentCostings],
+  );
+
   const orderStatus = existingOrder?.status;
   const isReferredBack = orderStatus === ORDER_STATUS.REFERRED_BACK;
   const canSaveAsDraft = isEdit
@@ -1364,8 +1381,8 @@ const OrderForm = () => {
 
   const COSTING_ID_PATTERN = /^CST\/\d{2}-\d{2}\/\d{4,}$/;
 
-  const handleCostingIdBlur = async (e) => {
-    const val = e.target.value?.trim();
+  const handleCostingIdBlur = async (eOrVal) => {
+    const val = (typeof eOrVal === 'string' ? eOrVal : eOrVal?.target?.value)?.trim();
     if (!val) return;
     if (!COSTING_ID_PATTERN.test(val)) return; // incomplete pattern — don't call API
     setCostingLoading(true);
@@ -1820,7 +1837,16 @@ const OrderForm = () => {
                   onKeyDown={(e) => formattedIdKeyDown(e, 'CST/')}
                   onBlur={handleCostingIdBlur}
                   onPressEnter={(e) => { e.target.blur(); }}
-                  suffix={costingLoading ? <LoadingOutlined spin /> : null}
+                  suffix={
+                    costingLoading
+                      ? <LoadingOutlined spin />
+                      : !isEdit && (
+                        <RecentSuggestionsButton
+                          items={recentCostingItems}
+                          onSelect={(val) => { form.setFieldValue('costingId', val); handleCostingIdBlur(val); }}
+                        />
+                      )
+                  }
                 />
               </Form.Item>
             </Col>

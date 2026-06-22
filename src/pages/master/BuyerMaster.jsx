@@ -34,7 +34,7 @@ import {
   updateBuyer,
   deleteBuyer,
 } from '../../services/master/buyerService';
-import { hasPermission } from '../../utils/permissions';
+import { hasPermission, isAdminRole, getCurrentUser } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
 import { COUNTRIES, getCountryISO2 } from '../../utils/countries';
 import { lookupPostalCode } from '../../services/master/locationService';
@@ -90,6 +90,10 @@ const BuyerMaster = () => {
   const canAdd = hasPermission('buyer-info', 'add');
   const canUpdate = hasPermission('buyer-info', 'update');
   const canDelete = hasPermission('buyer-info', 'delete');
+  const isAdmin = isAdminRole(getCurrentUser()?.role);
+  // Email/phone are sensitive — non-admins only ever see the masked value
+  // returned by the API, and can't edit it (API ignores the submitted value too).
+  const sensitiveFieldsLocked = !!editingBuyer && !isAdmin;
 
   // Fetch buyers with store caching
   const fetchBuyers = useCallback(async (force = false) => {
@@ -691,12 +695,16 @@ const BuyerMaster = () => {
                 <Form.Item
                   name="email"
                   label="Email"
-                  rules={[
-                    { required: true, message: 'Email is required' },
-                    { pattern: EMAIL_REGEX, message: 'Invalid email format' },
-                  ]}
+                  rules={
+                    sensitiveFieldsLocked
+                      ? []
+                      : [
+                          { required: true, message: 'Email is required' },
+                          { pattern: EMAIL_REGEX, message: 'Invalid email format' },
+                        ]
+                  }
                 >
-                  <Input placeholder="Enter Email" maxLength={150} />
+                  <Input placeholder="Enter Email" maxLength={150} disabled={sensitiveFieldsLocked} />
                 </Form.Item>
               </Col>
 
@@ -704,9 +712,9 @@ const BuyerMaster = () => {
                 <Form.Item
                   name="phone"
                   label="Phone"
-                  normalize={phoneOnly}
+                  normalize={sensitiveFieldsLocked ? undefined : phoneOnly}
                 >
-                  <Input placeholder="Enter Phone (with country code)" maxLength={20} />
+                  <Input placeholder="Enter Phone (with country code)" maxLength={20} disabled={sensitiveFieldsLocked} />
                 </Form.Item>
               </Col>
             </Row>

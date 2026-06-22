@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Drawer,
   Button,
@@ -24,7 +24,9 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { isPantoneCode } from '../../services/core/pantoneService';
+import { getRecentBoms } from '../../services/bom/bomService';
 import orderInputIllustration from '../../assets/images/order-input-illustration.svg';
 import { formattedIdKeyDown } from '../../utils/inputHelpers';
 
@@ -102,6 +104,23 @@ const BomLineSelectionDrawer = ({
   const { message } = App.useApp();
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [orderNoInput, setOrderNoInput] = useState('SG/');
+  const [recentBoms, setRecentBoms] = useState([]);
+
+  // Fetch recently created BOMs (suggestions) each time the drawer opens
+  useEffect(() => {
+    if (!open) return;
+    getRecentBoms().then(setRecentBoms).catch(() => setRecentBoms([]));
+  }, [open]);
+
+  const recentBomItems = useMemo(() => {
+    const usedOrderNos = new Set(bomOrders.map((o) => o.orderNo));
+    return recentBoms
+      .filter((b) => b.orderNo && !usedOrderNos.has(b.orderNo))
+      .map((b) => ({
+        value: b.orderNo,
+        label: [b.orderNo, b.styleName, b.season].filter(Boolean).join(' · '),
+      }));
+  }, [recentBoms, bomOrders]);
 
   // Initialize selection and reset input when drawer opens
   useMemo(() => {
@@ -175,9 +194,10 @@ const BomLineSelectionDrawer = ({
 
   const selectedCount = selectedKeys.size;
 
-  // Handle Load BOM button click
-  const handleLoadBom = useCallback(async () => {
-    const val = orderNoInput?.trim();
+  // Handle Load BOM button click (also used by the recent-BOM suggestion picker, which
+  // passes the order number directly instead of reading it from orderNoInput)
+  const handleLoadBom = useCallback(async (overrideVal) => {
+    const val = (overrideVal ?? orderNoInput)?.trim();
     if (!val || val === 'SG/') {
       message.warning('Please enter an order number');
       return;
@@ -392,15 +412,23 @@ const BomLineSelectionDrawer = ({
                   value={orderNoInput || 'SG/'}
                   onChange={(e) => setOrderNoInput(formatOrderNo(e.target.value, orderNoInput))}
                   onKeyDown={(e) => formattedIdKeyDown(e, 'SG/')}
-                  onPressEnter={handleLoadBom}
+                  onPressEnter={() => handleLoadBom()}
                   disabled={bomLoading}
+                  suffix={
+                    <RecentSuggestionsButton
+                      items={recentBomItems}
+                      onSelect={handleLoadBom}
+                      disabled={bomLoading}
+                      placement="bottomRight"
+                    />
+                  }
                 />
               </Col>
               <Col span={10}>
                 <Button
                   type="primary"
                   block
-                  onClick={handleLoadBom}
+                  onClick={() => handleLoadBom()}
                   loading={bomLoading}
                   disabled={!orderNoInput || orderNoInput === 'SG/' || bomLoading}
                 >
