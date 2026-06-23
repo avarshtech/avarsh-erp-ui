@@ -57,7 +57,7 @@ export const CONFIRMED_ORDERS = [
   {
     id: 1, orderNo: 'ORD-2026-001', styleId: 11, styleNo: 'AV-SS26-001', buyer: 'Nordstrom Inc',
     bomId: 101, bomNo: 'BOM-2026-001', ppSampleStatus: PP_SAMPLE_STATUS.COMPLETED,
-    allowancePercent: 3, colors: ['White', 'Black'],
+    allowancePercent: 3, colors: ['White', 'Black'], garmentProcesses: ['Garment Washing'],
     bomMaterials: { fabric: ['FAB-CJ40-WHT', 'FAB-VRT-BLK'], trim: ['BTN-4H-15MM-NAT', 'LBL-WVN-MAIN-SS26', 'LBL-CARE-POLY-STD', 'THR-POLY-40-WHT'], packing: ['POLY-BAG-STD', 'CTN-MASTER-5PLY', 'TAG-HANG-SS26', 'STK-SIZE'] },
     items: mkItems(['White', 'Black'], 2500, 3),
   },
@@ -71,7 +71,7 @@ export const CONFIRMED_ORDERS = [
   {
     id: 3, orderNo: 'ORD-2026-015', styleId: 25, styleNo: 'AV-AW26-015', buyer: 'Zara International',
     bomId: 115, bomNo: 'BOM-2026-015', ppSampleStatus: PP_SAMPLE_STATUS.COMPLETED,
-    allowancePercent: 4, colors: ['Indigo'],
+    allowancePercent: 4, colors: ['Indigo'], garmentProcesses: ['Garment Washing', 'Embroidery'],
     bomMaterials: { fabric: ['FAB-DNM-IND'], trim: ['BTN-4H-15MM-NAT', 'LBL-WVN-MAIN-SS26'], packing: ['POLY-BAG-STD', 'CTN-MASTER-5PLY', 'TAG-HANG-SS26', 'TIS-WRAP'] },
     items: mkItems(['Indigo'], 2000, 4),
   },
@@ -133,6 +133,7 @@ const baseFromOrder = (order, { cadPerPc } = {}) => {
   return {
     orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
     buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
+    garmentProcesses: order.garmentProcesses || [],
     totalOrderQty: sumQty(order.items, 'orderQty'),
     allowancePercent: order.allowancePercent,
     totalPlannedQty: sumQty(order.items, 'plannedQty'),

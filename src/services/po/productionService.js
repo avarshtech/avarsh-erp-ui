@@ -7,7 +7,7 @@
  * with no UI changes once the backend lands.
  */
 import axiosInstance from '../core/axiosInstance';
-import { PROD_PO_STATUS, PO_TYPE, PO_TYPE_META, PO_ACTION, FINISHING_PROCESSES, computeVariancePercent } from '../../utils/productionConstants';
+import { PROD_PO_STATUS, PO_TYPE, PO_ACTION, FINISHING_PROCESSES } from '../../utils/productionConstants';
 import {
   cuttingPos, workOrders, finishingPos, CONFIRMED_ORDERS, PROCESSING_UNITS, VENDORS, SEWING_LINES,
   genPoNumber, nextId, nowIso, deepClone, matchPoFilters, paginate, buildStockRows, buildConsumptionRows,
@@ -298,46 +298,3 @@ export const getOrderCoverage = async (type, orderId, excludeId) => {
   };
 };
 
-// Hub "Needs attention" feed: pending approvals + variance>5% + material shortages.
-export const getAttentionItems = async () => {
-  await delay(120);
-  const out = [];
-  const all = [...cuttingPos, ...workOrders, ...finishingPos];
-  const poNo = (p) => p[PO_TYPE_META[p.poType].noField];
-  all.filter((p) => p.status === PROD_PO_STATUS.PENDING_APPROVAL).forEach((p) =>
-    out.push({ key: `pend-${p.poType}-${p.id}`, poType: p.poType, id: p.id, poNo: poNo(p), orderNo: p.orderNo, buyer: p.buyer, reason: 'Pending approval', severity: 'info' }));
-  cuttingPos.filter((p) => p.bomConsumptionPerPc
-    && Math.abs(computeVariancePercent(p.cadConsumptionPerPc, p.bomConsumptionPerPc)) > 5).forEach((p) =>
-    out.push({ key: `var-${p.id}`, poType: p.poType, id: p.id, poNo: poNo(p), orderNo: p.orderNo, buyer: p.buyer, reason: 'Consumption variance > 5%', severity: 'warning' }));
-  cuttingPos.filter((p) => p.status !== PROD_PO_STATUS.CANCELLED && p.status !== PROD_PO_STATUS.REJECTED).forEach((p) => {
-    const order = findOrder(p.orderId);
-    if (order && buildStockRows(order, 'fabric', { cadPerPc: p.cadConsumptionPerPc }).some((r) => r.shortageSurplus < 0)) {
-      out.push({ key: `short-${p.id}`, poType: p.poType, id: p.id, poNo: poNo(p), orderNo: p.orderNo, buyer: p.buyer, reason: 'Fabric shortage', severity: 'error' });
-    }
-  });
-  return out;
-};
-
-// Hub dashboard aggregation.
-export const getHubStats = async () => {
-  await delay(120);
-  const tally = (list) => ({
-    total: list.length,
-    draft: list.filter((p) => p.status === PROD_PO_STATUS.DRAFT).length,
-    pending: list.filter((p) => p.status === PROD_PO_STATUS.PENDING_APPROVAL).length,
-    approved: list.filter((p) => p.status === PROD_PO_STATUS.APPROVED).length,
-  });
-  const pendingApprovals =
-    [...cuttingPos, ...workOrders, ...finishingPos].filter((p) => p.status === PROD_PO_STATUS.PENDING_APPROVAL).length;
-  const shortages = CONFIRMED_ORDERS.reduce(
-    (n, o) => n + buildStockRows(o, 'fabric').filter((r) => r.shortageSurplus < 0).length, 0,
-  );
-  const varianceAlerts = cuttingPos.filter((p) => {
-    const v = p.bomConsumptionPerPc ? ((p.cadConsumptionPerPc - p.bomConsumptionPerPc) / p.bomConsumptionPerPc) * 100 : 0;
-    return Math.abs(v) > 5;
-  }).length;
-  return {
-    cutting: tally(cuttingPos), workOrder: tally(workOrders), finishing: tally(finishingPos),
-    pendingApprovals, shortages, varianceAlerts,
-  };
-};

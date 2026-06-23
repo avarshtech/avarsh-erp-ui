@@ -9,7 +9,7 @@ import PpSampleGate from '../components/PpSampleGate';
 import { FINISHING_PROCESSES, getProcessLabel, isPpApproved } from '../../../utils/productionConstants';
 import {
   getConfirmedOrders, getApprovedWorkOrders, getPpApprovalStatus, getVendors, generateFinishingPos,
-} from '../../../services/production/productionService';
+} from '../../../services/po/productionService';
 
 const { Text, Title } = Typography;
 const initAssignments = () => FINISHING_PROCESSES.map((p) => ({ processKey: p.key, mode: 'INHOUSE', vendorId: null }));
@@ -26,6 +26,7 @@ const FinishingPoGenerateWizard = () => {
   const [vendors, setVendors] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
   const [assignments, setAssignments] = useState(initAssignments);
+  const [formData, setFormData] = useState({});
   const [generating, setGenerating] = useState(false);
 
   useEffect(() => { getConfirmedOrders().then(setOrders); getVendors('FINISHING').then(setVendors); }, []);
@@ -51,7 +52,9 @@ const FinishingPoGenerateWizard = () => {
 
   const next = async () => {
     if (step === 0) {
-      try { await form.validateFields(['orderId', 'workOrderId', 'plannedStartDate', 'plannedEndDate']); }
+      // Capture step-1 values now — the Form unmounts when we leave this step,
+      // so reading it later via getFieldsValue() would return nothing.
+      try { setFormData(await form.validateFields(['orderId', 'workOrderId', 'plannedStartDate', 'plannedEndDate'])); }
       catch { return; }
     }
     if (step === 1) {
@@ -62,17 +65,19 @@ const FinishingPoGenerateWizard = () => {
   };
 
   const generate = async () => {
-    const v = form.getFieldsValue();
-    const wo = workOrders.find((w) => w.id === v.workOrderId);
+    const wo = workOrders.find((w) => w.id === formData.workOrderId);
+    if (!formData.orderId || !formData.workOrderId) {
+      return message.error('Order / Work Order missing — go back to step 1 and reselect.');
+    }
     setGenerating(true);
     try {
       const created = await generateFinishingPos({
-        orderId: v.orderId, workOrderId: v.workOrderId, workOrderNo: wo?.workOrderNo,
-        plannedStartDate: v.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: v.plannedEndDate?.format('YYYY-MM-DD'),
+        orderId: formData.orderId, workOrderId: formData.workOrderId, workOrderNo: wo?.workOrderNo,
+        plannedStartDate: formData.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: formData.plannedEndDate?.format('YYYY-MM-DD'),
         assignments,
       });
       message.success(`${created.length} Finishing PO(s) created`);
-      navigate('/production/finishing-po/list');
+      navigate('/purchase-orders/finishing-po/list');
     } catch (e) {
       message.error(e.message || 'Generation failed');
     } finally { setGenerating(false); }
@@ -124,7 +129,7 @@ const FinishingPoGenerateWizard = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Generate Finishing POs" backPath="/production/finishing-po/list" />
+      <PageHeader title="Generate Finishing POs" backPath="/purchase-orders/finishing-po/list" />
       <Card>
         <Steps current={step} direction={screens.md ? 'horizontal' : 'vertical'} items={steps.map((s) => ({ title: s.title }))} style={{ marginBottom: 24 }} />
         {steps[step].content}

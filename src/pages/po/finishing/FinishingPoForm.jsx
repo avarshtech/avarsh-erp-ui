@@ -5,12 +5,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormDatePicker, FormInputNumber, FormSelect, FormSection } from '../../../components/form';
-import SizeColorMatrix from '../../po/SizeColorMatrix';
+import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import { FINISHING_PROCESS, getProcessLabel, PO_ACTION, isPpApproved } from '../../../utils/productionConstants';
 import {
   getFinishingPo, updateFinishingPo, changeFinishingPoStatus, getStockByBom, getPpApprovalStatus, getProcessingUnits,
-} from '../../../services/production/productionService';
+} from '../../../services/po/productionService';
 
 const { Text } = Typography;
 
@@ -32,7 +32,7 @@ const FinishingPoForm = () => {
 
   useEffect(() => {
     getFinishingPo(id).then(async (record) => {
-      if (!record) { message.error('Finishing PO not found'); return navigate('/production/finishing-po/list'); }
+      if (!record) { message.error('Finishing PO not found'); return navigate('/purchase-orders/finishing-po/list'); }
       setPo(record);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
@@ -67,7 +67,7 @@ const FinishingPoForm = () => {
       const saved = await updateFinishingPo(id, payload);
       if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
       message.success(`${saved.finishingPoNo} ${submit ? 'submitted' : 'saved'}`);
-      navigate('/production/finishing-po/list');
+      navigate('/purchase-orders/finishing-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
     } finally { setSaving(false); }
@@ -123,7 +123,7 @@ const FinishingPoForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title={`Edit ${po.finishingPoNo}`} backPath="/production/finishing-po/list">
+      <PageHeader title={`Edit ${po.finishingPoNo}`} backPath="/purchase-orders/finishing-po/list">
         <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} />
         <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!ppApproved}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />

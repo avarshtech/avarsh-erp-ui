@@ -3,7 +3,7 @@ import { Modal, Tabs, Descriptions, Tag, Space, Typography } from 'antd';
 import StatusTag from '../../../components/StatusTag';
 import StatusSteps from '../../../components/StatusSteps';
 import { ActionButton } from '../../../components/buttons';
-import SizeColorMatrix from '../../po/SizeColorMatrix';
+import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from './MaterialStockPanel';
 import ProductionApprovalTimeline from './ProductionApprovalTimeline';
 import ProductionStatusBar from './ProductionStatusBar';
@@ -13,7 +13,7 @@ import {
   getStatusLabel, PO_TYPE, PO_TYPE_META, getProcessLabel, PROD_PO_STATUS,
   computeVariancePercent, getVarianceStatus, isPpApproved,
 } from '../../../utils/productionConstants';
-import { getStockByBom, getPpApprovalStatus } from '../../../services/production/productionService';
+import { getStockByBom, getPpApprovalStatus } from '../../../services/po/productionService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const { Text } = Typography;
@@ -66,13 +66,15 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
         ) : (
           <>
             {poType === PO_TYPE.WORK_ORDER && <Descriptions.Item label="Cutting PO">{record.cuttingPoNo}</Descriptions.Item>}
+            {poType === PO_TYPE.WORK_ORDER && record.garmentProcesses?.length > 0 && (
+              <Descriptions.Item label="Garment Processes" span={2}>
+                <Space wrap>{record.garmentProcesses.map((p) => <Tag key={p} color="purple">{p}</Tag>)}</Space>
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="Processing Unit">{record.processingUnitName}</Descriptions.Item>
             <Descriptions.Item label="Delivery Date">{fmtDate(record.plannedDeliveryDate)}</Descriptions.Item>
             {poType === PO_TYPE.CUTTING && record.markerEfficiency != null && (
               <Descriptions.Item label="Marker Efficiency">{record.markerEfficiency}%</Descriptions.Item>
-            )}
-            {poType === PO_TYPE.CUTTING && record.fabricWastagePercent != null && (
-              <Descriptions.Item label="Fabric Wastage">{record.fabricWastagePercent}%</Descriptions.Item>
             )}
           </>
         )}

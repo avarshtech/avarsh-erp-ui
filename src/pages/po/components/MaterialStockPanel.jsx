@@ -1,6 +1,7 @@
-import { useMemo, useEffect } from 'react';
-import { Table, Tag, Typography, Alert } from 'antd';
+import { useMemo, useEffect, useCallback } from 'react';
+import { Table, Tag, Typography, Alert, InputNumber } from 'antd';
 import EmptyState from '../../../components/EmptyState';
+import { numericInputProps } from '../../../utils/inputHelpers';
 
 const { Text } = Typography;
 
@@ -26,12 +27,20 @@ const computeGrn = (rows) => {
  * onShortageChange) and a stale-stock warning when the last GRN is > 48h old
  * (PRD §13). `materialType` = fabric | trim | packing.
  */
-const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = false, onShortageChange }) => {
+const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = false, onShortageChange, allocatedEditable = false, onChange }) => {
   const hasShortage = useMemo(() => rows.some((r) => r.shortageSurplus < 0), [rows]);
 
   useEffect(() => { onShortageChange?.(hasShortage); }, [hasShortage, onShortageChange]);
 
   const grn = computeGrn(rows);
+
+  // Editable Allocated (Cutting PO): recompute available + shortage from the edited value.
+  const handleAllocated = useCallback((key, value) => {
+    const allocated = value || 0;
+    onChange?.(rows.map((r) => (r.key === key
+      ? { ...r, allocated, availableBalance: r.currentStock - allocated, shortageSurplus: r.currentStock - allocated }
+      : r)));
+  }, [rows, onChange]);
 
   const columns = useMemo(() => [
     { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v) => <Text strong>{v}</Text> },
@@ -42,7 +51,10 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
       ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() }]
       : []),
     { title: 'Current Stock', dataIndex: 'currentStock', width: 120, align: 'right', render: (v) => (v || 0).toLocaleString() },
-    { title: 'Allocated', dataIndex: 'allocated', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
+    { title: 'Allocated', dataIndex: 'allocated', width: 120, align: 'right',
+      render: (v, r) => (allocatedEditable
+        ? <InputNumber size="small" min={0} value={v} onChange={(val) => handleAllocated(r.key, val)} style={{ width: 100 }} {...numericInputProps} />
+        : (v || 0).toLocaleString()) },
     { title: 'Available', dataIndex: 'availableBalance', width: 110, align: 'right', render: (v) => <Text strong>{(v || 0).toLocaleString()}</Text> },
     { title: 'Shortage / Surplus', dataIndex: 'shortageSurplus', width: 150, align: 'right',
       render: (v) => (
@@ -50,7 +62,7 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
           {v < 0 ? '▼ ' : '▲ '}{Math.abs(v || 0).toLocaleString()}
         </Tag>
       ) },
-  ], [materialType]);
+  ], [materialType, allocatedEditable, handleAllocated]);
 
   return (
     <div>

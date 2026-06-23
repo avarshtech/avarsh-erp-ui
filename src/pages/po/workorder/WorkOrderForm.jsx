@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Form, Tabs, Col, Input, Spin, Alert } from 'antd';
+import { App, Card, Form, Tabs, Col, Input, InputNumber, Button, Tag, Space, Typography, Spin, Alert } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect, FormDatePicker, FormInputNumber, FormSection } from '../../../components/form';
-import SizeColorMatrix from '../../po/SizeColorMatrix';
+import { numericInputProps } from '../../../utils/inputHelpers';
+import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
 import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel';
 import MaterialStockPanel from '../components/MaterialStockPanel';
@@ -15,9 +16,15 @@ import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, VARIA
 import {
   getConfirmedOrders, getOrderForPo, getApprovedCuttingPos, getConsumptionComparison, getStockByBom,
   getPpApprovalStatus, getSewingLines, getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getOrderCoverage,
-} from '../../../services/production/productionService';
+} from '../../../services/po/productionService';
 
+const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
+
+// Trim Allocated defaults to BOM requirement and is editable on the Work Order trim panel.
+const normTrimStock = (rows) => rows.map((r) => ({
+  ...r, allocated: r.bomRequired, availableBalance: r.currentStock - r.bomRequired, shortageSurplus: r.currentStock - r.bomRequired,
+}));
 
 const WorkOrderForm = () => {
   const { id } = useParams();
@@ -40,6 +47,7 @@ const WorkOrderForm = () => {
   const [coverage, setCoverage] = useState(null);
   const [allowanceWarn, setAllowanceWarn] = useState(null);
   const [hasShortage, setHasShortage] = useState(false);
+  const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
@@ -48,7 +56,7 @@ const WorkOrderForm = () => {
   const hydrateOrder = useCallback(async (orderId) => {
     const [o, pp, cps] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId), getApprovedCuttingPos(orderId)]);
     setOrder(o); setPpStatus(pp); setCuttingPos(cps);
-    setStock(await getStockByBom(orderId, 'trim'));
+    setStock(normTrimStock(await getStockByBom(orderId, 'trim')));
     return o;
   }, []);
 
@@ -61,7 +69,7 @@ const WorkOrderForm = () => {
   useEffect(() => {
     if (!isEdit) return;
     getWorkOrder(id).then(async (wo) => {
-      if (!wo) { message.error('Work Order not found'); return navigate('/production/work-order/list'); }
+      if (!wo) { message.error('Work Order not found'); return navigate('/purchase-orders/work-order/list'); }
       const o = await hydrateOrder(wo.orderId);
       getOrderCoverage(PO_TYPE.WORK_ORDER, wo.orderId, id).then(setCoverage);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
@@ -94,6 +102,11 @@ const WorkOrderForm = () => {
     if (cp && order) await applyCuttingPo(cp, order);
   };
 
+  const applyBulkRate = () => {
+    if (bulkRate == null) return message.warning('Enter a rate to apply');
+    setItems(items.map((i) => ({ ...i, ratePerPiece: bulkRate })));
+  };
+
   const thisPoQty = sum(items, 'plannedQty');
   const overAuth = coverage && (coverage.authorizedQty + thisPoQty) > coverage.orderQty;
   const redVariance = consumption.some((r) => Math.abs(computeVariancePercent(r.cadPerPc, r.bomPerPc)) > VARIANCE_THRESHOLD.YELLOW);
@@ -123,6 +136,7 @@ const WorkOrderForm = () => {
     totalOrderQty: sum(items, 'orderQty'), allowancePercent: order.allowancePercent, totalPlannedQty: sum(items, 'plannedQty'),
     bomConsumptionPerPc: consumption[0]?.bomPerPc, cadConsumptionPerPc: consumption[0]?.cadPerPc,
     consumptionVariance: +computeVariancePercent(consumption[0]?.cadPerPc, consumption[0]?.bomPerPc).toFixed(2),
+    garmentProcesses: order.garmentProcesses || [],
     consumptionOverrideNote: justification || null, items, remarks: values.remarks,
   });
 
@@ -131,6 +145,9 @@ const WorkOrderForm = () => {
     try { values = await form.validateFields(); }
     catch { return message.warning('Please complete the required fields in General'); }
     if (!cuttingPo) return message.warning('Select an approved Cutting PO');
+    if (!items.length || items.some((i) => !i.ratePerPiece || i.ratePerPiece <= 0)) {
+      return message.warning('Enter a rate/price for every size-color row before saving');
+    }
     if (submit && !(await confirmWarnings())) return;
     setSaving(true);
     try {
@@ -138,7 +155,7 @@ const WorkOrderForm = () => {
       const saved = isEdit ? await updateWorkOrder(id, payload) : await createWorkOrder(payload);
       if (submit) await changeWorkOrderStatus(saved.id, PO_ACTION.SUBMIT, {});
       message.success(`${saved.workOrderNo} ${submit ? 'submitted' : 'saved'}`);
-      navigate('/production/work-order/list');
+      navigate('/purchase-orders/work-order/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
     } finally { setSaving(false); }
@@ -162,6 +179,20 @@ const WorkOrderForm = () => {
               options={cuttingPos.map((c) => ({ value: c.id, label: c.cuttingPoNo }))} />
           </Form.Item>
         </FormSection>
+        {order?.garmentProcesses?.length > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            message="This garment requires additional process(es)"
+            description={
+              <Space wrap style={{ marginTop: 4 }}>
+                {order.garmentProcesses.map((p) => <Tag key={p} color="purple">{p}</Tag>)}
+                <Text type="secondary">— plan sewing output & hand-off accordingly.</Text>
+              </Space>
+            }
+          />
+        )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
             message={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
@@ -190,20 +221,27 @@ const WorkOrderForm = () => {
       </>
     ) },
     { key: 'matrix', label: 'Size-Color Matrix', disabled: !cuttingPo, children: (
-      <SizeColorMatrix items={items} onChange={setItems} editable allowanceEditable={false} />
+      <>
+        <Space style={{ marginBottom: 12 }} wrap>
+          <Text type="secondary">Set same rate for all rows:</Text>
+          <InputNumber min={0} precision={2} value={bulkRate} onChange={setBulkRate} placeholder="Rate / Pc" style={{ width: 140 }} {...numericInputProps} />
+          <Button onClick={applyBulkRate}>Apply to all</Button>
+        </Space>
+        <SizeColorMatrix items={items} onChange={setItems} editable allowanceEditable={false} />
+      </>
     ) },
     { key: 'consumption', label: 'Consumption', disabled: !cuttingPo, children: (
       <ConsumptionComparisonPanel rows={consumption} mode="inherited" onChange={setConsumption}
         justification={justification} onJustificationChange={setJustification} />
     ) },
     { key: 'stock', label: 'Trim Stock', disabled: !order, children: (
-      <MaterialStockPanel rows={stock} materialType="trim" onShortageChange={setHasShortage} />
+      <MaterialStockPanel rows={stock} materialType="trim" allocatedEditable onChange={setStock} onShortageChange={setHasShortage} />
     ) },
   ];
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title={isEdit ? 'Edit Work Order' : 'New Work Order'} backPath="/production/work-order/list">
+      <PageHeader title={isEdit ? 'Edit Work Order' : 'New Work Order'} backPath="/purchase-orders/work-order/list">
         <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} disabled={!cuttingPo} />
         <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!cuttingPo || !ppApproved}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />

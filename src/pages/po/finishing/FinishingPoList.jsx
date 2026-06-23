@@ -14,7 +14,7 @@ import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { PROD_PO_STATUS, getStatusLabel, getProcessLabel, EDITABLE_STATUSES, PO_TYPE, FINISHING_PROCESSES } from '../../../utils/productionConstants';
-import { listFinishingPos, getVendors } from '../../../services/production/productionService';
+import { listFinishingPos, getVendors } from '../../../services/po/productionService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
@@ -82,7 +82,7 @@ const FinishingPoList = () => {
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.FINISHING)} />
           {EDITABLE_STATUSES.includes(r.status) && (
             <PermissionGuard module="production" operation="update">
-              <ActionButton action="edit" onClick={() => navigate(`/production/finishing-po/edit/${r.id}`)} />
+              <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/finishing-po/edit/${r.id}`)} />
             </PermissionGuard>
           )}
         </Space>
@@ -91,9 +91,9 @@ const FinishingPoList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Finishing POs" backPath="/production">
+      <PageHeader title="Finishing POs">
         <PermissionGuard module="production" operation="add">
-          <ActionButton action="create" text="Generate Finishing POs" onClick={() => navigate('/production/finishing-po/new')} />
+          <ActionButton action="create" text="Generate Finishing POs" onClick={() => navigate('/purchase-orders/finishing-po/new')} />
         </PermissionGuard>
       </PageHeader>
 

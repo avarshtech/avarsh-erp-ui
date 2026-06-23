@@ -76,8 +76,8 @@ export const MODULES = {
   },
   PRODUCTION: {
     id: 'production',
-    name: 'Production Orders',
-    path: '/production',
+    name: 'Production POs (Cutting / Work Order / Finishing)',
+    path: '/purchase-orders/cutting-po/list',
     group: 'transactions',
   },
   INVENTORY: {
@@ -339,7 +339,7 @@ export const PERMISSION_GROUPS = [
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
       { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'production', name: 'Production Orders (Cutting / Sewing / Finishing)', operations: STANDARD_OPERATIONS, path: '/production' },
+      { id: 'production', name: 'Production POs (Cutting / Sewing / Finishing)', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },

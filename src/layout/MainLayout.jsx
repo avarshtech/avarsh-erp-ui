@@ -35,7 +35,6 @@ import {
   BarChartOutlined,
   TeamOutlined,
   AuditOutlined,
-  ScissorOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -346,22 +345,13 @@ const MainLayoutInner = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: "purchase-orders",
+      moduleId: ["purchase-orders", "production"],
       children: [
-        { key: "/purchase-orders/list", label: "PO List" },
-        { key: "/purchase-orders/new", label: "New PO" },
-      ],
-    },
-    {
-      key: "/production",
-      icon: <ScissorOutlined />,
-      label: "Production Orders",
-      moduleId: "production",
-      children: [
-        { key: "/production", label: "Production Hub" },
-        { key: "/production/cutting-po/list", label: "Cutting POs" },
-        { key: "/production/work-order/list", label: "Work Orders" },
-        { key: "/production/finishing-po/list", label: "Finishing POs" },
+        { key: "/purchase-orders/list", label: "PO List", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/new", label: "New PO", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/cutting-po/list", label: "Cutting POs", moduleId: "production" },
+        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "production" },
+        { key: "/purchase-orders/finishing-po/list", label: "Finishing POs", moduleId: "production" },
       ],
     },
     {
@@ -511,9 +501,9 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
-    if (path.startsWith('/production/cutting-po')) return ['/production/cutting-po/list'];
-    if (path.startsWith('/production/work-order')) return ['/production/work-order/list'];
-    if (path.startsWith('/production/finishing-po')) return ['/production/finishing-po/list'];
+    if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
+    if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
+    if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
@@ -529,7 +519,6 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
-    if (path.startsWith("/production")) return ["/production"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];

@@ -3,7 +3,7 @@ import { Row, Col, Form, Radio, DatePicker } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { DATE_FORMAT } from '../../../utils/uiConstants';
 import { PROCESSING_UNIT_TYPE, PROCESSING_UNIT_OPTIONS, PO_TYPE } from '../../../utils/productionConstants';
-import { getProcessingUnits, getVendors } from '../../../services/production/productionService';
+import { getProcessingUnits, getVendors } from '../../../services/po/productionService';
 
 /**
  * Header Unit/Vendor selector (PRD §4.6 / §5.4) — a radio toggle that loads the
