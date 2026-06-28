@@ -345,10 +345,13 @@ const MainLayoutInner = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: "purchase-orders",
+      moduleId: ["purchase-orders", "production"],
       children: [
-        { key: "/purchase-orders/list", label: "PO List" },
-        { key: "/purchase-orders/new", label: "New PO" },
+        { key: "/purchase-orders/list", label: "PO List", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/new", label: "New PO", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/cutting-po/list", label: "Cutting POs", moduleId: "production" },
+        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "production" },
+        { key: "/purchase-orders/finishing-po/list", label: "Finishing POs", moduleId: "production" },
       ],
     },
     {
@@ -498,6 +501,9 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
+    if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
+    if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];

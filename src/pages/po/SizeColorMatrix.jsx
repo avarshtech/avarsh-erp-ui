@@ -4,7 +4,7 @@ import { numericInputProps } from '../../utils/inputHelpers';
 
 const { Text } = Typography;
 
-const SizeColorMatrix = ({ items, onChange, editable = true }) => {
+const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable = true, plannedQtyEditable = false }) => {
   const handleFieldChange = useCallback((index, field, value) => {
     const updated = [...items];
     const item = { ...updated[index] };
@@ -22,12 +22,15 @@ const SizeColorMatrix = ({ items, onChange, editable = true }) => {
     { title: 'Order Qty', dataIndex: 'orderQty', key: 'orderQty', width: 100, align: 'right',
       render: (q) => (q || 0).toLocaleString() },
     { title: 'Allowance %', dataIndex: 'allowancePercent', key: 'allowancePercent', width: 120, align: 'right',
-      render: (val, _, index) => editable
+      render: (val, _, index) => (editable && allowanceEditable)
         ? <InputNumber size="small" min={0} max={50} value={val} onChange={(v) => handleFieldChange(index, 'allowancePercent', v)} style={{ width: 80 }} {...numericInputProps} />
         : `${val || 0}%`,
     },
     { title: 'Planned Qty', dataIndex: 'plannedQty', key: 'plannedQty', width: 110, align: 'right',
-      render: (q) => <Text strong>{(q || 0).toLocaleString()}</Text> },
+      render: (q, _, index) => (editable && plannedQtyEditable)
+        ? <InputNumber size="small" min={0} value={q} onChange={(v) => handleFieldChange(index, 'plannedQty', v)} style={{ width: 100 }} {...numericInputProps} />
+        : <Text strong>{(q || 0).toLocaleString()}</Text>,
+    },
     { title: 'Rate/Pc', dataIndex: 'ratePerPiece', key: 'ratePerPiece', width: 120, align: 'right',
       render: (val, _, index) => editable
         ? <InputNumber size="small" min={0} precision={2} value={val} onChange={(v) => handleFieldChange(index, 'ratePerPiece', v)} style={{ width: 100 }} {...numericInputProps} />
@@ -35,7 +38,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true }) => {
     },
     { title: 'Total Cost', key: 'totalCost', width: 120, align: 'right',
       render: (_, r) => <Text strong>{((r.plannedQty || 0) * (r.ratePerPiece || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text> },
-  ], [handleFieldChange, editable]);
+  ], [handleFieldChange, editable, allowanceEditable, plannedQtyEditable]);
 
   const totals = useMemo(() => ({
     orderQty: items.reduce((s, i) => s + (i.orderQty || 0), 0),

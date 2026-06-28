@@ -40,6 +40,14 @@ const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/Accessor
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
+// Production PO screens (now grouped under the Purchase Orders module)
+const CuttingPoList = lazy(() => import('./pages/po/cutting/CuttingPoList'));
+const CuttingPoForm = lazy(() => import('./pages/po/cutting/CuttingPoForm'));
+const WorkOrderList = lazy(() => import('./pages/po/workorder/WorkOrderList'));
+const WorkOrderForm = lazy(() => import('./pages/po/workorder/WorkOrderForm'));
+const FinishingPoList = lazy(() => import('./pages/po/finishing/FinishingPoList'));
+const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/FinishingPoGenerateWizard'));
+const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -180,6 +188,16 @@ const ThemedApp = () => {
             <Route path="purchase-orders/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
             <Route path="purchase-orders/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
             <Route path="purchase-orders/edit/:id" element={<PermissionRoute module="purchase-orders" operation="update"><POForm /></PermissionRoute>} />
+            {/* Production POs — Cutting / Work Order / Finishing (grouped under Purchase Orders) */}
+            <Route path="purchase-orders/cutting-po/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><CuttingPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cutting-po/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><CuttingPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cutting-po/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><CuttingPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/work-order/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><WorkOrderList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/work-order/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/work-order/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
