@@ -107,6 +107,15 @@ const WorkOrderForm = () => {
     setItems(items.map((i) => ({ ...i, ratePerPiece: bulkRate })));
   };
 
+  // Editing Planned Qty re-derives the BOM-based requirement in the consumption totals
+  // and the trim stock panel (requirement per garment = BOM consumption).
+  const onItemsChange = (newItems) => {
+    setItems(newItems);
+    const total = sum(newItems, 'plannedQty');
+    setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
+    if (order) getStockByBom(order.id, 'trim', { plannedQty: total }).then((s) => setStock(normTrimStock(s)));
+  };
+
   const thisPoQty = sum(items, 'plannedQty');
   const overAuth = coverage && (coverage.authorizedQty + thisPoQty) > coverage.orderQty;
   const redVariance = consumption.some((r) => Math.abs(computeVariancePercent(r.cadPerPc, r.bomPerPc)) > VARIANCE_THRESHOLD.YELLOW);
@@ -227,7 +236,7 @@ const WorkOrderForm = () => {
           <InputNumber min={0} precision={2} value={bulkRate} onChange={setBulkRate} placeholder="Rate / Pc" style={{ width: 140 }} {...numericInputProps} />
           <Button onClick={applyBulkRate}>Apply to all</Button>
         </Space>
-        <SizeColorMatrix items={items} onChange={setItems} editable allowanceEditable={false} />
+        <SizeColorMatrix items={items} onChange={onItemsChange} editable allowanceEditable={false} plannedQtyEditable />
       </>
     ) },
     { key: 'consumption', label: 'Consumption', disabled: !cuttingPo, children: (

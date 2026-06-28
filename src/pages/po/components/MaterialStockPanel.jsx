@@ -46,6 +46,8 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
     { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v) => <Text strong>{v}</Text> },
     { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true },
     { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
+    { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 110, align: 'right',
+      render: (v) => <Text type="secondary">{(v || 0).toFixed(3)}</Text> },
     { title: 'BOM Req', dataIndex: 'bomRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
     ...(materialType === 'fabric'
       ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() }]

@@ -104,7 +104,16 @@ const CuttingPoForm = () => {
 
   const refreshStock = (rows) => {
     setConsumption(rows);
-    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: rows[0]?.cadPerPc }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
+  };
+
+  // Editing Planned Qty re-derives the BOM-based requirement (per-garment from BOM × planned qty)
+  // in the consumption totals and the fabric stock panel.
+  const onItemsChange = (newItems) => {
+    setItems(newItems);
+    const total = sum(newItems, 'plannedQty');
+    setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
+    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
   };
 
   const applyBulkRate = () => {
@@ -186,7 +195,7 @@ const CuttingPoForm = () => {
           <InputNumber min={0} precision={2} value={bulkRate} onChange={setBulkRate} placeholder="Rate / Pc" style={{ width: 140 }} {...numericInputProps} />
           <Button onClick={applyBulkRate}>Apply to all</Button>
         </Space>
-        <SizeColorMatrix items={items} onChange={setItems} editable allowanceEditable={false} plannedQtyEditable />
+        <SizeColorMatrix items={items} onChange={onItemsChange} editable allowanceEditable={false} plannedQtyEditable />
       </>
     ) },
     { key: 'consumption', label: 'Consumption & Marker', disabled: !order, children: (
