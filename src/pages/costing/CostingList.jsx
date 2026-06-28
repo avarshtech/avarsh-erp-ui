@@ -375,6 +375,15 @@ const CostingList = () => {
               onClick={() => navigate(`/costing/edit/${record.id}`)}
             />
           )}
+          {/* Revise a submitted (Final) sheet: opening + saving as draft reverts it
+              to Draft and cancels the pending approval (CR C-13). */}
+          {record.status === COSTING_STATUS.FINAL && canUpdate && (
+            <ActionButton
+              action="edit"
+              text="Revise"
+              onClick={() => navigate(`/costing/edit/${record.id}`)}
+            />
+          )}
           <ActionButton
             action="duplicate"
             onClick={() => handleDuplicate(record)}

@@ -77,7 +77,7 @@ import {
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { getBuyers } from '../../services/master/buyerService';
 import { getStylesByBuyerId, saveStyle } from '../../services/master/styleService';
-import { uploadFile } from '../../services/core/fileService';
+import { uploadFile, deleteFile } from '../../services/core/fileService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import { searchItems } from '../../services/master/itemService';
 import { getAllCategories } from '../../services/master/masterDataService';
@@ -150,6 +150,13 @@ const CostingForm = () => {
   const [styleImageUrl, setStyleImageUrl] = useState(null);
   const [styleImageLoading, setStyleImageLoading] = useState(false);
   const imageLoadIdRef = useRef(0);
+
+  // Garment image (editable, stored against this cost sheet) — CR C-3
+  const [garmentImageFile, setGarmentImageFile] = useState(null);        // staged File (new sheets)
+  const [garmentImageUrl, setGarmentImageUrl] = useState(null);          // blob preview
+  const [garmentImageExisting, setGarmentImageExisting] = useState(null);// server-side file
+  const [garmentImageUploading, setGarmentImageUploading] = useState(false);
+  const [garmentImageLoading, setGarmentImageLoading] = useState(false);
 
   // Season code → label map
   const seasonLabelMap = useMemo(
@@ -514,6 +521,8 @@ const CostingForm = () => {
 
       // Load style image for edit mode
       if (cs.styleId) loadStyleImage(cs.styleId);
+      // Load garment image stored against this cost sheet
+      if (cs.id) loadGarmentImage(cs.id);
     } catch {
       message.error('Failed to load cost sheet');
       navigate('/costing/list');
@@ -707,6 +716,100 @@ const CostingForm = () => {
     };
   }, []);
 
+  // ==================== GARMENT IMAGE (CR C-3) ====================
+
+  const loadGarmentImage = async (costSheetId) => {
+    if (!costSheetId) return;
+    setGarmentImageLoading(true);
+    try {
+      const files = await getFilesByEntity('COST_SHEET', costSheetId);
+      const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+      if (img) {
+        const blob = await downloadFileAsBlob(img.fileId);
+        setGarmentImageExisting(img);
+        setGarmentImageUrl(URL.createObjectURL(blob));
+      }
+    } catch {
+      // Image not found / failed — non-critical
+    } finally {
+      setGarmentImageLoading(false);
+    }
+  };
+
+  const handleGarmentImageSelect = async (file) => {
+    if (garmentImageUrl && garmentImageFile) URL.revokeObjectURL(garmentImageUrl);
+    const previewUrl = URL.createObjectURL(file);
+    if (isEdit && id) {
+      // Existing sheet — upload immediately
+      setGarmentImageUrl(previewUrl);
+      setGarmentImageFile(null);
+      setGarmentImageUploading(true);
+      try {
+        if (garmentImageExisting?.fileId) {
+          await deleteFile(garmentImageExisting.fileId).catch(() => {});
+        }
+        const result = await uploadFile(file, { module: 'COST_SHEET', entity: 'COST_SHEET', entityId: id, fileCategory: 'IMAGE' });
+        setGarmentImageExisting(result?.data || result);
+        message.success('Garment image uploaded');
+      } catch {
+        message.error('Image upload failed. Please try again.');
+        URL.revokeObjectURL(previewUrl);
+        setGarmentImageUrl(garmentImageExisting ? garmentImageUrl : null);
+      } finally {
+        setGarmentImageUploading(false);
+      }
+    } else {
+      // New sheet — stage; uploaded after the cost sheet is created
+      setGarmentImageFile(file);
+      setGarmentImageUrl(previewUrl);
+      setIsDirty(true);
+    }
+  };
+
+  const handleGarmentImageRemove = async () => {
+    if (garmentImageUrl) URL.revokeObjectURL(garmentImageUrl);
+    if (garmentImageExisting?.fileId && isEdit && id) {
+      const prevImg = garmentImageExisting;
+      setGarmentImageExisting(null);
+      setGarmentImageUrl(null);
+      setGarmentImageFile(null);
+      setGarmentImageUploading(true);
+      try {
+        await deleteFile(prevImg.fileId);
+        message.success('Garment image removed');
+      } catch {
+        message.error('Failed to remove image. Please try again.');
+        setGarmentImageExisting(prevImg);
+      } finally {
+        setGarmentImageUploading(false);
+      }
+    } else {
+      setGarmentImageFile(null);
+      setGarmentImageUrl(null);
+      setIsDirty(true);
+    }
+  };
+
+  // Upload a staged garment image after a new cost sheet is created
+  const processGarmentImage = async (costSheetId) => {
+    if (!garmentImageFile || !costSheetId) return;
+    try {
+      await uploadFile(garmentImageFile, { module: 'COST_SHEET', entity: 'COST_SHEET', entityId: costSheetId, fileCategory: 'IMAGE' });
+    } catch {
+      message.warning('Cost sheet saved, but garment image upload failed. You can re-upload by editing it.');
+    }
+  };
+
+  // Cleanup garment image blob URL on unmount
+  useEffect(() => {
+    return () => {
+      setGarmentImageUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
+
   // ==================== TECHPACK IMPORT HANDLER ====================
 
   const handleTechpackApply = async (result) => {
@@ -865,6 +968,8 @@ const CostingForm = () => {
           ...r,
           itemId,
           fabricType: option.label,
+          // Auto-populate description from the item master (CR C-6); keep any existing text otherwise
+          description: rawItem?.description || r.description || '',
           // Set UOM from item's secondary UOM (fallback to primary)
           uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
           uomId: rawItem?.uomId || r.uomId || null,
@@ -1214,6 +1319,12 @@ const CostingForm = () => {
       message.warning('No changes detected.');
       return;
     }
+    // Require core header before a draft can be saved (CR C-5)
+    const header = form.getFieldsValue(['buyerId', 'styleNo', 'garmentName']);
+    if (!header.buyerId || !header.styleNo || !header.garmentName) {
+      message.error('Please select Buyer, Style and Garment before saving a draft.');
+      return;
+    }
     // For draft, validate but allow save even with warnings for optional fields
     let values;
     try {
@@ -1241,6 +1352,7 @@ const CostingForm = () => {
       // Upload new attachments
       const costSheetId = saved?.id || id;
       if (costSheetId) await uploadNewFiles(costSheetId);
+      if (costSheetId) await processGarmentImage(costSheetId);
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
@@ -1288,6 +1400,7 @@ const CostingForm = () => {
       // Upload new attachments
       const costSheetId = saved?.id || id;
       if (costSheetId) await uploadNewFiles(costSheetId);
+      if (costSheetId) await processGarmentImage(costSheetId);
       message.success({
         content: 'WhatsApp notification sent',
         icon: <WhatsAppOutlined style={{ color: '#25D366' }} />,
@@ -1430,10 +1543,28 @@ const CostingForm = () => {
     }
   };
 
+  // Open an attachment in a new tab for preview (CR C-16). Works for both
+  // already-uploaded files (download blob) and locally staged File objects.
+  const handleFilePreview = async (file) => {
+    try {
+      let url;
+      if (file.fileId) {
+        const blob = await downloadAttachment(file.fileId);
+        url = window.URL.createObjectURL(blob);
+      } else {
+        url = URL.createObjectURL(file.originFileObj || file);
+      }
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      message.error('Failed to preview file');
+    }
+  };
+
   const getUploadProps = (category) => ({
     onRemove: (file) => handleFileRemove(file, category),
     onDownload: handleFileDownload,
-    showUploadList: { showDownloadIcon: true },
+    onPreview: handleFilePreview,
+    showUploadList: { showDownloadIcon: true, showPreviewIcon: true },
     beforeUpload: (file) => {
       const isAllowed = ALLOWED_FILE_TYPES.includes(file.type);
       if (!isAllowed) {
@@ -1443,6 +1574,11 @@ const CostingForm = () => {
       const isLt5M = file.size / 1024 / 1024 < MAX_FILE_SIZE_MB;
       if (!isLt5M) {
         message.error(`File must be smaller than ${MAX_FILE_SIZE_MB}MB`);
+        return Upload.LIST_IGNORE;
+      }
+      // Reject the same file being added twice (CR C-16)
+      if ((fileList[category] || []).some((f) => f.name === file.name && (f.size ?? 0) === file.size)) {
+        message.warning('This file has already been added.');
         return Upload.LIST_IGNORE;
       }
       setFileList((prev) => ({
@@ -2227,8 +2363,16 @@ const CostingForm = () => {
                 <Form.Item label="Sizes" name="sizes">
                   <Select
                     mode="tags"
-                    placeholder="Enter sizes (e.g. S, M, L, XL)"
+                    placeholder="Select or type sizes (e.g. S, M, L, XL)"
                     style={{ width: '100%' }}
+                    tokenSeparators={[',']}
+                    options={['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'].map((s) => ({ value: s, label: s }))}
+                    onChange={(vals) => {
+                      // Normalise to upper-case + de-duplicate so "s" and "S" never coexist (CR C-15)
+                      const norm = [...new Set((vals || []).map((v) => String(v).trim().toUpperCase()).filter(Boolean))];
+                      form.setFieldsValue({ sizes: norm });
+                      setIsDirty(true);
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -2286,6 +2430,31 @@ const CostingForm = () => {
               )}
             </div>
           )}
+          {/* Garment Image — editable, stored against this cost sheet (CR C-3) */}
+          <div style={{
+            flexShrink: 0,
+            width: 130,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            paddingTop: 4,
+          }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>Garment Image</Typography.Text>
+            <FileUpload
+              accept="image/png,image/jpeg,image/jpg"
+              maxSizeMB={10}
+              previewUrl={garmentImageUrl}
+              fileName={garmentImageExisting?.originalFilename || garmentImageFile?.name || null}
+              fileType={garmentImageExisting?.fileType || garmentImageFile?.type || null}
+              fileSize={garmentImageExisting?.fileSizeBytes || garmentImageFile?.size || null}
+              onSelect={handleGarmentImageSelect}
+              onRemove={handleGarmentImageRemove}
+              disabled={garmentImageUploading}
+              loading={garmentImageUploading || garmentImageLoading}
+              compact
+              placeholder="Add garment image"
+            />
+          </div>
         </div>
         <Row gutter={16}>
               <Col xs={24}>
@@ -3002,6 +3171,16 @@ const CostingForm = () => {
         </Space>
       </PageHeader>
 
+      {isEdit && loadedStatus === COSTING_STATUS.FINAL && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Revising a submitted cost sheet"
+          description="This cost sheet is pending approval. Saving your changes will revert it to Draft and cancel the current approval request — you will need to submit it again."
+        />
+      )}
+
       <Form
         form={form}
         layout="vertical"
@@ -3113,7 +3292,7 @@ const CostingForm = () => {
         confirmLoading={quickAddProcessLoading}
         okText="Create"
         centered
-        destroyOnClose
+        destroyOnHidden
         width={420}
       >
         <Form form={quickAddProcessForm} layout="vertical" onFinish={async (values) => {
@@ -3163,7 +3342,7 @@ const CostingForm = () => {
         confirmLoading={quickAddOverheadLoading}
         okText="Create"
         centered
-        destroyOnClose
+        destroyOnHidden
         width={420}
       >
         <Form form={quickAddOverheadForm} layout="vertical" onFinish={async (values) => {
@@ -3211,7 +3390,7 @@ const CostingForm = () => {
         confirmLoading={quickAddStyleLoading}
         okText="Create"
         centered
-        destroyOnClose
+        destroyOnHidden
         width={520}
         afterClose={() => {
           quickAddStyleForm.resetFields();

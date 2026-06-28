@@ -111,6 +111,7 @@ const CostComparison = () => {
     { label: 'Quote Currency', key: 'quoteCurrency', type: 'text' },
     { label: 'Actual Rate', key: 'actualRate', type: 'number' },
     { label: 'Fabric Cost', key: 'totalFabricCost', type: 'currency' },
+    { label: 'Fabric Details', key: 'fabricRows', type: 'fabrics' },
     { label: 'Trims / Accessories', key: 'totalAccessoriesCost', type: 'currency' },
     { label: 'Manufacturing Cost', key: 'totalManufacturingCost', type: 'currency' },
     { label: 'Markup / Overhead', key: 'totalMarkupCost', type: 'currency' },
@@ -136,6 +137,22 @@ const CostComparison = () => {
         return formatCurrency(val, sheet.currency);
       case 'quoteCurrency':
         return formatCurrency(val, sheet.quoteCurrency);
+      case 'fabrics': {
+        const rows = Array.isArray(val) ? val : [];
+        if (rows.length === 0) return <Text type="secondary">-</Text>;
+        return (
+          <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {rows.map((r, i) => (
+              <div key={i} style={{ fontSize: 12 }}>
+                <Text strong>{r.fabricType || r.description || `Fabric ${i + 1}`}</Text>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  {(r.consumption ?? '-')}{r.uom ? ` ${r.uom}` : ''} @ {formatCurrency(r.fabricPrice, sheet.currency)} → {formatCurrency(r.netCost, sheet.currency)}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
       case 'percent':
         return `${val || 0}%`;
       case 'number':

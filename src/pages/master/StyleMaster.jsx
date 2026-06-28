@@ -140,6 +140,7 @@ const StyleMaster = ({ onDirtyChange }) => {
         const uploaded = result?.data || result;
         setExistingImage(uploaded);
         setImageUploading(false);
+        markDirty(true);
         message.success('Style image uploaded');
       } catch {
         message.error('Image upload failed. Please try again.');
@@ -170,6 +171,7 @@ const StyleMaster = ({ onDirtyChange }) => {
       try {
         await deleteFile(prevImage.fileId);
         setImageUploading(false);
+        markDirty(true);
         message.success('Image removed');
       } catch {
         message.error('Failed to remove image. Please try again.');

@@ -24,6 +24,11 @@ import { calculateConsumption } from '../../services/costing/costingService';
 
 const { Text, Paragraph } = Typography;
 
+// Session cache so re-calculating the SAME chart/techpack returns the SAME AI
+// result instead of a fresh (and slightly different) AI run (CR C-8).
+const consumptionCache = new Map();
+const fileKey = (f) => (f ? `${f.name}|${f.size}|${f.lastModified}` : '');
+
 export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKnitsCalc, fabricRow }) {
   const { message } = App.useApp();
   const [step, setStep]               = useState('upload');
@@ -39,9 +44,17 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
       message.warning('Please upload the size spec / measurement chart');
       return;
     }
+    // Return the cached result for an identical file pair (deterministic — CR C-8)
+    const cacheKey = `${fileKey(measurementFile)}::${fileKey(techpackFile)}`;
+    if (consumptionCache.has(cacheKey)) {
+      setResult(consumptionCache.get(cacheKey));
+      setStep('result');
+      return;
+    }
     setLoading(true);
     try {
       const data = await calculateConsumption(measurementFile, techpackFile);
+      consumptionCache.set(cacheKey, data);
       setResult(data);
       setStep('result');
     } catch {
@@ -60,6 +73,15 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
   /** Apply the average across all sizes to the parent fabric row */
   const handleApplyAverage = () => {
     const values = Object.values(result.consumptionPerSize || {});
+    if (!values.length) return;
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    onApply({ splitBySizes: false, consumption: Math.round(avg * 10000) / 10000, uom: result.uom });
+    handleClose();
+  };
+
+  /** Apply the lining fabric's average consumption (CR C-9) */
+  const handleApplyLiningAverage = () => {
+    const values = Object.values(result.liningConsumptionPerSize || {});
     if (!values.length) return;
     const avg = values.reduce((a, b) => a + b, 0) / values.length;
     onApply({ splitBySizes: false, consumption: Math.round(avg * 10000) / 10000, uom: result.uom });
@@ -87,6 +109,12 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
     : '—';
   const minVal = sizeValues.length ? Math.min(...sizeValues).toFixed(4) : '—';
   const maxVal = sizeValues.length ? Math.max(...sizeValues).toFixed(4) : '—';
+
+  // Distinct lining fabric consumption (CR C-9)
+  const liningEntries = Object.entries(result?.liningConsumptionPerSize || {});
+  const liningAvg = liningEntries.length
+    ? (liningEntries.reduce((a, [, v]) => a + v, 0) / liningEntries.length).toFixed(4)
+    : null;
 
   // ── Per-size table ───────────────────────────────────────────────────────────
 
@@ -198,7 +226,7 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
           </div>
         ) : null
       }
-      destroyOnClose
+      destroyOnHidden
     >
 
       {/* ── Step 1: Upload ──────────────────────────────────────────── */}
@@ -417,6 +445,28 @@ export default function ConsumptionCalcModal({ open, onClose, onApply, onOpenKni
             scroll={{ y: 280 }}
             tableLayout="fixed"
           />
+
+          {/* Separate lining fabric consumption (CR C-9) */}
+          {liningEntries.length > 0 && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <Alert
+                type="warning" showIcon style={{ marginBottom: 12 }}
+                message="Separate lining fabric detected"
+                description="This garment has a distinct lining. The shell consumption above excludes lining — add a lining fabric row and apply its consumption below."
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <Space wrap>
+                  {liningEntries.map(([size, v]) => (
+                    <Tag key={size} style={{ fontFamily: 'monospace', margin: 0 }}>{size}: {Number(v).toFixed(4)}</Tag>
+                  ))}
+                </Space>
+                <Button icon={<CheckCircleOutlined />} onClick={handleApplyLiningAverage}>
+                  Apply lining avg ({liningAvg ?? '—'} {result.uom})
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </Modal>

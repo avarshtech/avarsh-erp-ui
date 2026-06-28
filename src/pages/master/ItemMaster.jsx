@@ -597,23 +597,30 @@ const ItemMaster = () => {
   // Filter change handler — just update state; useEffect triggers fetch
   const handleFilterChange = (setter) => (value) => setter(value || '');
 
-  // Update subcategories when category filter changes
+  // Scope the subcategory filter to the selected category (CR M-3).
+  // When a category is chosen, only its subcategories are shown; clearing the
+  // category restores the full list. A stale child selection is reset.
   useEffect(() => {
-    // For filter dropdowns, always expose the full lists from the global
-    // master store so users can combine filters freely and rely on the
-    // centralized master data (populated by MasterDashboard).
-    setSubcategories(storeSubCategories || []);
-    setItemTypes(storeItemTypes || []);
-    // Intentionally do not reset `selectedSubcategory` or `selectedItemType` here
-    // so the user can apply multiple filters together.
-  }, [selectedCategory, storeSubCategories, storeItemTypes]);
+    const list = selectedCategory
+      ? (storeSubCategories || []).filter((sc) => String(sc.categoryId) === String(selectedCategory))
+      : (storeSubCategories || []);
+    setSubcategories(list);
+    if (selectedSubcategory && !list.some((sc) => String(sc.id) === String(selectedSubcategory))) {
+      setSelectedSubcategory('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, storeSubCategories]);
 
-  // Update item types when subcategory filter changes
+  // Scope the item-type filter to the selected subcategory (CR M-3).
   useEffect(() => {
-    // Keep item type dropdown populated from the global store so users can
-    // filter across types regardless of selected subcategory/category.
-    setItemTypes(storeItemTypes || []);
-    // Do not reset `selectedItemType` here to preserve user's selection.
+    const list = selectedSubcategory
+      ? (storeItemTypes || []).filter((it) => String(it.subCategoryId) === String(selectedSubcategory))
+      : (storeItemTypes || []);
+    setItemTypes(list);
+    if (selectedItemType && !list.some((it) => String(it.id) === String(selectedItemType))) {
+      setSelectedItemType('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubcategory, storeItemTypes]);
 
   // Form Category Change Handler
@@ -798,6 +805,7 @@ const ItemMaster = () => {
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
       hsnCode: item.hsnCode || '',
+      description: item.description || '',
       defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
       isActive: item.isActive ?? true,
     });
@@ -1094,6 +1102,7 @@ const ItemMaster = () => {
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
       hsnCode: item.hsnCode || '',
+      description: item.description || '',
       defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
       isActive: item.isActive ?? true,
     });
@@ -1255,6 +1264,7 @@ const ItemMaster = () => {
           ? formUomOptions.find((opt) => opt.id.toString() === values.secondaryUomId.toString())?.name || null
           : null,
         hsnCode: values.hsnCode,
+        description: values.description || null,
         defaultAllowance: values.defaultAllowance,
         isActive: values.isActive,
         variants: variantsPayload,
@@ -1690,6 +1700,7 @@ const ItemMaster = () => {
                     placeholder="Select Category"
                     onChange={handleFormCategoryChange}
                     loading={metaDataLoading}
+                    disabled={isEditMode}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
                     options={formCategories.map((cat) => ({ value: String(cat.id ?? ''), label: String(cat.name ?? '') }))}
                   />
@@ -1706,7 +1717,7 @@ const ItemMaster = () => {
                     onChange={handleFormSubcategoryChange}
                     loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
-                    disabled={!isEditMode && !form.getFieldValue('categoryId')}
+                    disabled={isEditMode || !form.getFieldValue('categoryId')}
                     options={formSubcategories.map((sc) => ({ value: String(sc.id ?? ''), label: String(sc.name ?? '') }))}
                   />
                 </Form.Item>
@@ -1725,7 +1736,7 @@ const ItemMaster = () => {
                     onChange={handleFormItemTypeChange}
                     loading={metaDataLoading}
                     showSearch={{ filterOption: (input, option) => String(option?.label ?? '').toLowerCase().includes(String(input).toLowerCase()) }}
-                    disabled={!isEditMode && !form.getFieldValue('subCategoryId')}
+                    disabled={isEditMode || !form.getFieldValue('subCategoryId')}
                     options={formItemTypes.map((it) => ({ value: String(it.id ?? ''), label: String(it.name ?? '') }))}
                   />
                 </Form.Item>
@@ -1741,6 +1752,7 @@ const ItemMaster = () => {
                       placeholder="Enter Item Name"
                       value={form.getFieldValue('itemName')}
                       allowClear
+                      disabled={isEditMode}
                       suffix={suggestionsLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
                       onChange={(e) => {
                         form.setFieldsValue({ itemName: e.target.value });
@@ -1803,7 +1815,7 @@ const ItemMaster = () => {
                 >
                   <Select
                     placeholder="Select Primary UOM"
-                    disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
+                    disabled={isEditMode || !form.getFieldValue('itemTypeId')}
                     options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                     onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
                   />
@@ -1828,7 +1840,7 @@ const ItemMaster = () => {
                     <Select
                       placeholder={isFabricCategory ? 'Select Secondary UOM (required)' : 'Select Secondary UOM (optional)'}
                       allowClear={!isFabricCategory}
-                      disabled={!isEditMode && !form.getFieldValue('itemTypeId')}
+                      disabled={isEditMode || !form.getFieldValue('itemTypeId')}
                       options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
                       onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
                     />
@@ -1840,7 +1852,7 @@ const ItemMaster = () => {
                   label="HSN Code"
                   rules={[{ required: true, message: 'HSN Code is required' }]}
                 >
-                  <Input placeholder="Enter HSN Code" />
+                  <Input placeholder="Enter HSN Code" disabled={isEditMode} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={6}>
@@ -1863,6 +1875,10 @@ const ItemMaster = () => {
                 </Form.Item>
               </Col>
             </Row>
+
+            <Form.Item name="description" label="Description">
+              <Input.TextArea rows={2} maxLength={500} placeholder="Optional description / composition (auto-fills costing fabric description)" />
+            </Form.Item>
 
             <Form.Item name="isActive" label="Active" valuePropName="checked">
               <Checkbox>Is Active</Checkbox>
@@ -2022,6 +2038,7 @@ const ItemMaster = () => {
                         {
                           title: '#',
                           width: 50,
+                          align: 'center',
                           render: (_, __, idx) => <Badge count={idx + 1} style={{ backgroundColor: 'var(--primary-color)' }} />,
                         },
                         ...formAttributes.map((attr) => {
@@ -2030,6 +2047,7 @@ const ItemMaster = () => {
                           return {
                             title: attr.attributeName,
                             dataIndex: ['variant', attr.id],
+                            align: 'center',
                             render: (val) => {
                               if (!val) return <Text type="secondary">—</Text>;
                               // Safety: if val is an object (e.g. {value, label}), convert to string
@@ -2047,6 +2065,7 @@ const ItemMaster = () => {
                         {
                           title: 'Image',
                           width: 50,
+                          align: 'center',
                           render: (_, record) => {
                             const v = variants[record.originalIndex];
                             const hasImage = v && !v._imageRemoved && (v._imagePreviewUrl || v._imageFile);
@@ -2063,6 +2082,7 @@ const ItemMaster = () => {
                         {
                           title: 'Actions',
                           width: 80,
+                          align: 'center',
                           render: (_, record) => (
                             <Space>
                               <Button
