@@ -21,6 +21,7 @@ const FinishingPoForm = () => {
   const [form] = Form.useForm();
 
   const [po, setPo] = useState(null);
+  const [items, setItems] = useState([]);
   const [stock, setStock] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
   const [units, setUnits] = useState([]);
@@ -34,6 +35,7 @@ const FinishingPoForm = () => {
     getFinishingPo(id).then(async (record) => {
       if (!record) { message.error('Finishing PO not found'); return navigate('/purchase-orders/finishing-po/list'); }
       setPo(record);
+      setItems(record.items || []);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
         setStock(await getStockByBom(record.orderId, 'packing'));
@@ -47,6 +49,15 @@ const FinishingPoForm = () => {
       });
     }).finally(() => setBooting(false));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Editing Planned Qty re-derives the BOM-based packing requirement.
+  const onItemsChange = (newItems) => {
+    setItems(newItems);
+    const total = newItems.reduce((s, i) => s + (i.plannedQty || 0), 0);
+    if (po && (po.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
+      getStockByBom(po.orderId, 'packing', { plannedQty: total }).then(setStock);
+    }
+  };
 
   const save = async (submit) => {
     const v = await form.validateFields();
@@ -63,6 +74,7 @@ const FinishingPoForm = () => {
         processingUnitId: po.isOutsourced ? po.processingUnitId : v.processingUnitId,
         processingUnitName: po.isOutsourced ? po.vendorName : (units.find((u) => u.id === v.processingUnitId)?.name || po.processingUnitName),
         vendorRate: v.vendorRate, vendorDeliveryDate: v.vendorDeliveryDate?.format('YYYY-MM-DD'), remarks: v.remarks,
+        items, totalPlannedQty: items.reduce((s, i) => s + (i.plannedQty || 0), 0),
       };
       const saved = await updateFinishingPo(id, payload);
       if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
@@ -108,7 +120,7 @@ const FinishingPoForm = () => {
       </>
     ) },
     { key: 'matrix', label: 'Size-Color Matrix', children: (
-      <SizeColorMatrix items={po.items || []} onChange={() => {}} editable={false} allowanceEditable={false} />
+      <SizeColorMatrix items={items} onChange={onItemsChange} editable={false} allowanceEditable={false} plannedQtyEditable />
     ) },
     ...(hasPacking ? [{ key: 'packing', label: 'Packing Stock', children: (
       <MaterialStockPanel rows={stock} materialType="packing" onShortageChange={setHasShortage} />

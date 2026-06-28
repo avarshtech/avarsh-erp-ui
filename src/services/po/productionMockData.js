@@ -281,18 +281,21 @@ export const paginate = (list, { page = 0, size = 10 } = {}) => {
 };
 
 // Build stock-availability rows for an order's BOM items of a given kind.
-export const buildStockRows = (order, kind, { cadPerPc } = {}) => {
+// requirement per garment (bomPerPc / cadPerPc) is fetched from BOM; total
+// requirement = per-garment × planned qty (caller may override planned qty with
+// the live, editable matrix total).
+export const buildStockRows = (order, kind, { cadPerPc, plannedQty } = {}) => {
   const codes = order?.bomMaterials?.[kind] || [];
-  const plannedQty = sumQty(order.items, 'plannedQty');
+  const qty = plannedQty ?? sumQty(order.items, 'plannedQty');
   return codes.map((code, idx) => {
     const m = MATERIAL_CATALOG[code];
-    const bomRequired = +(m.bomPerPc * plannedQty).toFixed(2);
-    const cadRequired = kind === 'fabric' && cadPerPc
-      ? +(cadPerPc * plannedQty).toFixed(2)
-      : bomRequired;
+    const cadPg = kind === 'fabric' && cadPerPc ? cadPerPc : m.bomPerPc;
+    const bomRequired = +(m.bomPerPc * qty).toFixed(2);
+    const cadRequired = +(cadPg * qty).toFixed(2);
     const availableBalance = m.currentStock - m.allocated;
     return {
       key: `${code}-${idx}`, itemCode: code, itemName: m.itemName, uom: m.uom,
+      bomPerPc: m.bomPerPc, cadPerPc: cadPg,
       bomRequired, cadRequired, currentStock: m.currentStock, allocated: m.allocated,
       availableBalance, shortageSurplus: +(availableBalance - cadRequired).toFixed(2),
       lastGrnAt: m.lastGrnAt,

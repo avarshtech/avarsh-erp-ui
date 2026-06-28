@@ -27,7 +27,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable =
         : `${val || 0}%`,
     },
     { title: 'Planned Qty', dataIndex: 'plannedQty', key: 'plannedQty', width: 110, align: 'right',
-      render: (q, _, index) => (editable && plannedQtyEditable)
+      render: (q, _, index) => plannedQtyEditable
         ? <InputNumber size="small" min={0} value={q} onChange={(v) => handleFieldChange(index, 'plannedQty', v)} style={{ width: 100 }} {...numericInputProps} />
         : <Text strong>{(q || 0).toLocaleString()}</Text>,
     },
