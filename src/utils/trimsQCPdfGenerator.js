@@ -1,0 +1,471 @@
+import dayjs from 'dayjs';
+import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/admin/organisationService';
+import { getAccessoriesGRN } from '../services/inventory/inventoryService';
+import sristiLogo from '../assets/images/sristi_logo.jpeg';
+
+/**
+ * Trims / Accessories QC PDF Generator — "Trims Checking Record"
+ *
+ * Matches the factory's manual TCR form layout: metadata + criteria
+ * checklist + size-wise inspection table. Opens in a new window ready
+ * to print.
+ */
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatNum = (val, digits = 0) => {
+  const n = parseFloat(val);
+  if (!isFinite(n)) return '—';
+  return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+};
+
+const formatDate = (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '—');
+const formatDateTime = (d) => (d ? dayjs(d).format('DD-MMM-YYYY HH:mm:ss') : '—');
+
+const escapeHtml = (val) => {
+  if (val === null || val === undefined) return '';
+  return String(val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+// ─── HTML builder ─────────────────────────────────────────────────────────────
+
+const buildTrimsQCHtml = (qc, grn, org) => {
+  const companyName = org?.organisationName || 'Company Name';
+  const orgAddress = [org?.addressLine1, org?.addressLine2, org?.city, org?.state, org?.pincode]
+    .filter(Boolean).join(', ');
+  const orgGstin = org?.gstin || '';
+  const orgPan = org?.pan || '';
+  const orgPhone = org?.phone || '';
+  const orgEmail = org?.email || '';
+  const criteriaRows = qc.criteriaRows || qc.criteriaChecks || [];
+  const qtyVerdict = qc.qtyVerdict || null;
+
+  // Metadata
+  const poNumber = grn?.poNumber || '—';
+  const buyer = grn?.buyerName || '—';
+  const style = grn?.styleNumber || '—';
+  const supplier = grn?.supplier || '—';
+
+  // Line item
+  const grnLineItem = (grn?.lineItems || grn?.items || []).find((li) => li.poLineItemId === qc.poLineItemId)
+    || (grn?.lineItems || grn?.items || [])[0]
+    || {};
+  const trimName = grnLineItem.description || grnLineItem.itemDescription || '—';
+
+  const dcNumber = grn?.challanNo || '—';
+  const dcDate = grn?.deliveryChallanDate;
+
+  // Qty fields
+  const qtyOrdered = qc.qtyOrdered || grnLineItem.poQty || 0;
+  const qtyReceived = qc.qtyReceived || grnLineItem.receivingQty || 0;
+  const qtyChecked = qc.qtyChecked || 0;
+
+  // Build criteria rows
+  let criteriaHtml = '';
+  criteriaRows.forEach((c, i) => {
+    const okMark = c.ok ? '✓' : '';
+    const notOkMark = c.notOk ? '✓' : '';
+    criteriaHtml += `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td>${escapeHtml(c.criteria || c.criterionName || '—')}</td>
+        <td class="center ok">${okMark}</td>
+        <td class="center notok">${notOkMark}</td>
+        <td>${escapeHtml(c.remarks || '')}</td>
+      </tr>
+    `;
+  });
+  if (criteriaRows.length === 0) {
+    criteriaHtml = `<tr><td colspan="5" class="empty">No criteria checked for this inspection.</td></tr>`;
+  }
+
+  // Overall status banner — Conditional_Pass status overrides the criteria-derived label
+  const okCount = criteriaRows.filter((c) => c.ok).length;
+  const notOkCount = criteriaRows.filter((c) => c.notOk).length;
+  const isConditionalPass = qc.status === 'Conditional_Pass';
+  const overallStatus = isConditionalPass
+    ? 'CONDITIONAL PASS'
+    : notOkCount > 0 ? 'FAIL' : okCount > 0 ? 'PASS' : 'PENDING';
+  const statusColor = isConditionalPass ? '#13c2c2'
+    : overallStatus === 'PASS' ? '#16a34a'
+    : overallStatus === 'FAIL' ? '#dc2626'
+    : '#f59e0b';
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Trims QC ${escapeHtml(qc.qcNumber || '')}</title>
+<style>
+  @page { size: A4; margin: 14mm 12mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10px;
+    color: #1f2937;
+    background: #fff;
+  }
+  .page { max-width: 190mm; margin: 0 auto; position: relative; }
+
+  /* ─── Header ─── */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 10px;
+    border-bottom: 3px solid #7c3aed;
+    margin-bottom: 12px;
+  }
+  .header .brand { display: flex; gap: 12px; align-items: flex-start; }
+  .header .brand img { width: 54px; height: 54px; object-fit: contain; }
+  .header .brand .company-info h1 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #5b21b6;
+    margin-bottom: 2px;
+  }
+  .header .brand .company-info .tagline {
+    font-size: 11.5px;
+    color: #4b5563;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .header .brand .company-info .org-addr {
+    font-size: 8.5px;
+    color: #6b7280;
+    margin-top: 3px;
+    max-width: 340px;
+    line-height: 1.45;
+  }
+  .header .brand .company-info .org-ids {
+    font-size: 8.5px;
+    color: #6b7280;
+    margin-top: 2px;
+  }
+  .header .brand .company-info .org-ids strong { color: #374151; }
+  .header .brand .company-info .org-ids .sep { margin: 0 5px; color: #c7cfda; }
+  .header .doc-meta { text-align: right; }
+  .header .doc-meta .date { font-size: 10px; color: #6b7280; }
+  .header .doc-meta .report-no {
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #5b21b6;
+    margin-top: 2px;
+  }
+  .header .doc-meta .ref {
+    font-size: 9px;
+    color: #9ca3af;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ─── Metadata grid ─── */
+  .meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .meta-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 9px 11px;
+    background: #fafafa;
+  }
+  .meta-card .row { display: flex; padding: 2px 0; font-size: 9.5px; }
+  .meta-card .row .label {
+    width: 110px;
+    color: #6b7280;
+    flex-shrink: 0;
+  }
+  .meta-card .row .value {
+    color: #1f2937;
+    font-weight: 600;
+    flex: 1;
+  }
+  .meta-card .row .value.mono { font-family: 'Courier New', monospace; }
+
+  /* ─── Section title ─── */
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #5b21b6;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 12px 0 6px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #ede9fe;
+  }
+
+  /* ─── Tables ─── */
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5px;
+    margin-bottom: 10px;
+  }
+  table.data th {
+    background: #5b21b6;
+    color: #fff;
+    padding: 7px 8px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid #5b21b6;
+  }
+  table.data td {
+    padding: 7px 8px;
+    border: 1px solid #e5e7eb;
+  }
+  table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.data td.center { text-align: center; }
+  table.data td.ok { color: #16a34a; font-weight: 700; font-size: 12px; }
+  table.data td.notok { color: #dc2626; font-weight: 700; font-size: 12px; }
+  table.data td.empty { text-align: center; padding: 20px; color: #9ca3af; font-style: italic; }
+  table.data tr:nth-child(even) td { background: #faf5ff; }
+  table.data tfoot td {
+    background: #ede9fe;
+    font-weight: 700;
+    color: #5b21b6;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 9px;
+    font-weight: 600;
+    border-radius: 10px;
+  }
+  .badge.ok { background: #dcfce7; color: #15803d; }
+  .badge.err { background: #fee2e2; color: #b91c1c; }
+
+  /* ─── Status banner ─── */
+  .status-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: ${statusColor};
+    color: #fff;
+    border-radius: 4px;
+    margin: 10px 0 14px;
+  }
+  .status-banner .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    opacity: 0.9;
+  }
+  .status-banner .value {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 2px;
+  }
+  .status-banner .summary {
+    text-align: right;
+    font-size: 10px;
+    opacity: 0.95;
+  }
+
+  /* ─── Signatures ─── */
+  .signatures {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-top: 24px;
+  }
+  .sig-block {
+    text-align: center;
+    padding-top: 36px;
+    border-top: 1px solid #9ca3af;
+  }
+  .sig-block .sig-title { font-size: 9.5px; font-weight: 600; color: #374151; }
+  .sig-block .sig-sub { font-size: 8px; color: #9ca3af; margin-top: 2px; }
+
+  .footer {
+    margin-top: 16px;
+    padding-top: 6px;
+    border-top: 1px solid #e5e7eb;
+    text-align: center;
+    font-size: 8px;
+    color: #9ca3af;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <img src="${sristiLogo}" alt="Logo" onerror="this.style.display='none'">
+        <div class="company-info">
+          <h1>${escapeHtml(companyName)}</h1>
+          <div class="tagline">Trims Checking Record</div>
+          ${orgAddress ? `<div class="org-addr">${escapeHtml(orgAddress)}</div>` : ''}
+          <div class="org-ids">
+            ${orgGstin ? `<strong>GSTIN</strong> ${escapeHtml(orgGstin)}` : ''}
+            ${orgGstin && orgPan ? '<span class="sep">·</span>' : ''}
+            ${orgPan ? `<strong>PAN</strong> ${escapeHtml(orgPan)}` : ''}
+            ${orgPhone ? `<span class="sep">·</span><strong>Tel</strong> ${escapeHtml(orgPhone)}` : ''}
+            ${orgEmail ? `<span class="sep">·</span><strong>Email</strong> ${escapeHtml(orgEmail)}` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <div class="date">Date: ${formatDate(qc.inspectionDate)}</div>
+        <div class="report-no">${escapeHtml(qc.qcNumber || '—')}</div>
+        <div class="ref">SRI/QMS/TCR</div>
+      </div>
+    </div>
+
+    <!-- Metadata grid -->
+    <div class="meta-grid">
+      <div class="meta-card">
+        <div class="row"><div class="label">PO #</div><div class="value mono">${escapeHtml(poNumber)}</div></div>
+        <div class="row"><div class="label">Buyer</div><div class="value">${escapeHtml(buyer)}</div></div>
+        <div class="row"><div class="label">Style</div><div class="value mono">${escapeHtml(style)}</div></div>
+        <div class="row"><div class="label">Trim Name</div><div class="value">${escapeHtml(trimName)}</div></div>
+      </div>
+      <div class="meta-card">
+        <div class="row"><div class="label">Supplier</div><div class="value">${escapeHtml(supplier)}</div></div>
+        <div class="row"><div class="label">DC # / Date</div><div class="value mono">${escapeHtml(dcNumber)} / ${formatDate(dcDate)}</div></div>
+        <div class="row"><div class="label">Qty Ordered</div><div class="value">${formatNum(qtyOrdered)}</div></div>
+        <div class="row"><div class="label">Qty Received (cum.)</div><div class="value">${formatNum(qtyReceived)}</div></div>
+        <div class="row"><div class="label">Qty Checked (GRN)</div><div class="value">${formatNum(qtyChecked)}</div></div>
+      </div>
+    </div>
+
+    <!-- Criteria checking -->
+    <div class="section-title">Criteria Checking</div>
+    <table class="data">
+      <thead>
+        <tr>
+          <th style="width:36px">S.No</th>
+          <th>Criteria Checked</th>
+          <th style="width:60px" class="center">OK</th>
+          <th style="width:60px" class="center">Not OK</th>
+          <th style="width:220px">Remark</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${criteriaHtml}
+      </tbody>
+    </table>
+
+    <!-- Quantity verdict -->
+    <div class="section-title">GRN Quantity Verdict</div>
+    <table class="data">
+      <tbody>
+        <tr>
+          <td style="width:160px">Qty Checked (this GRN)</td>
+          <td class="num">${formatNum(qtyChecked)}</td>
+          <td style="width:160px">Verdict</td>
+          <td class="center">
+            ${qtyVerdict === 'MATCHED'
+              ? '<span class="badge ok">Matched</span>'
+              : qtyVerdict === 'SHORT'
+              ? '<span class="badge err">Short</span>'
+              : '<span>—</span>'}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Overall status banner -->
+    <div class="status-banner">
+      <div>
+        <div class="label">Overall Result</div>
+        <div class="value">${overallStatus}</div>
+      </div>
+      <div class="summary">
+        <div>Criteria: ${okCount} OK / ${notOkCount} Not OK</div>
+        <div>Qty Verdict: ${qtyVerdict === 'MATCHED' ? 'Matched' : qtyVerdict === 'SHORT' ? 'Short' : '—'}</div>
+      </div>
+    </div>
+
+    ${qc.approvalReason || isConditionalPass ? `
+    <!-- Approver notes -->
+    <div class="approver-note" style="
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 4px;
+      border: 1px solid ${isConditionalPass ? '#13c2c2' : '#e5e7eb'};
+      border-left: 4px solid ${isConditionalPass ? '#13c2c2' : '#16a34a'};
+      background: ${isConditionalPass ? 'rgba(19, 194, 194, 0.06)' : '#f9fafb'};
+    ">
+      <div style="font-size: 8.5px; font-weight: 700; color: ${isConditionalPass ? '#0e9999' : '#16a34a'}; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 4px;">
+        ${isConditionalPass ? 'Conditional Pass — Approver Note' : 'Approval Note'}
+      </div>
+      <div style="font-size: 9.5px; color: #1f2937; line-height: 1.5;">
+        ${escapeHtml(qc.approvalReason || '')}
+      </div>
+    </div>` : ''}
+
+    <!-- Signatures -->
+    <div class="signatures">
+      <div class="sig-block">
+        <div class="sig-title">Prepared By</div>
+        <div class="sig-sub">${escapeHtml(qc.inspector || '')}</div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-title">${isConditionalPass ? 'Conditional Pass By' : 'Approved By'}</div>
+        <div class="sig-sub">${escapeHtml(qc.approver || 'Quality Manager')}</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      This is a computer-generated document. Printed on ${formatDateTime(new Date())}
+    </div>
+  </div>
+</body>
+</html>`;
+};
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export const generateTrimsQCPdf = async (qcData, options = {}) => {
+  if (!qcData) {
+    console.error('QC data is required for PDF generation');
+    return;
+  }
+  try {
+    let org = options.organisation || getCachedOrganisation();
+    if (!org) {
+      org = await fetchAndCacheOrganisation();
+    }
+    org = org || {};
+
+    let grn = options.grn || null;
+    if (!grn && qcData.grnId) {
+      try { grn = await getAccessoriesGRN(qcData.grnId); } catch { /* ignore */ }
+    }
+
+    const html = buildTrimsQCHtml(qcData, grn, org);
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      console.error('Pop-up blocked. Please allow pop-ups to print the Trims QC report.');
+      return;
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      setTimeout(() => printWindow.print(), 500);
+    };
+    setTimeout(() => {
+      try { printWindow.print(); } catch { /* ignore */ }
+    }, 2000);
+  } catch (error) {
+    console.error('Failed to generate Trims QC PDF:', error);
+    throw error;
+  }
+};
+
+export default { generateTrimsQCPdf };

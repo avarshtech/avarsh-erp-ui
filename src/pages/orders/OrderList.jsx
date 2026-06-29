@@ -1,385 +1,339 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  App,
   Table,
   Card,
-  Button,
   Space,
-  Input,
-  Tag,
-  Dropdown,
-  DatePicker,
-  Select,
   Typography,
-  Tooltip,
-  Modal,
-  message,
 } from 'antd';
-import {
-  PlusOutlined,
-  SearchOutlined,
-  FilterOutlined,
-  ExportOutlined,
-  EyeOutlined,
-  EditOutlined,
-  DeleteOutlined,
-  MoreOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { searchOrders, deleteOrder, getOrderById } from '../../services/orders/orderService';
+import { hasPermission } from '../../utils/permissions';
+import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
+import { ActionButton, DeleteConfirm } from '../../components/buttons';
+import StatusTag from '../../components/StatusTag';
+import PageHeader from '../../components/PageHeader';
+import SearchFilterBar from '../../components/SearchFilterBar';
+import RecordLink from '../../components/RecordLink';
+import CurrencyDisplay from '../../components/CurrencyDisplay';
+import EmptyState from '../../components/EmptyState';
+import { formatDate } from '../../utils/formatters';
+import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
+import { getTablePagination } from '../../utils/paginationConfig';
+import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import OrderView from './OrderView';
 
 const { Text } = Typography;
-const { RangePicker } = DatePicker;
 
 const OrderList = () => {
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [data, setData] = useState([]);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
+  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
+  const [statusFilter, setStatusFilter] = useState(undefined);
+  const [orderDateRange, setOrderDateRange] = useState(null);
+  const [sortField, setSortField] = useState('id');
+  const [sortDirection, setSortDirection] = useState('desc');
 
-  const orders = [
-    {
-      key: '1',
-      orderId: 'ORD-2024-0001',
-      orderDate: '2024-01-28',
-      customer: 'Fashion Forward Ltd',
-      buyerRef: 'FF-2024-089',
-      style: 'Men\'s Casual Shirts',
-      color: 'Navy Blue, White',
-      size: 'S, M, L, XL',
-      quantity: 5000,
-      unitPrice: 12.50,
-      totalAmount: 62500,
-      deliveryDate: '2024-03-15',
-      status: 'In Production',
-      priority: 'High',
-    },
-    {
-      key: '2',
-      orderId: 'ORD-2024-0002',
-      orderDate: '2024-01-27',
-      customer: 'Urban Style Co',
-      buyerRef: 'USC-456',
-      style: 'Women\'s Summer Dresses',
-      color: 'Floral Print',
-      size: 'XS, S, M, L',
-      quantity: 3000,
-      unitPrice: 18.75,
-      totalAmount: 56250,
-      deliveryDate: '2024-03-20',
-      status: 'Pending',
-      priority: 'Medium',
-    },
-    {
-      key: '3',
-      orderId: 'ORD-2024-0003',
-      orderDate: '2024-01-26',
-      customer: 'Kids Kingdom',
-      buyerRef: 'KK-789',
-      style: 'Children\'s T-Shirts',
-      color: 'Multicolor',
-      size: '2Y, 4Y, 6Y, 8Y',
-      quantity: 8000,
-      unitPrice: 6.25,
-      totalAmount: 50000,
-      deliveryDate: '2024-02-28',
-      status: 'Completed',
-      priority: 'Low',
-    },
-    {
-      key: '4',
-      orderId: 'ORD-2024-0004',
-      orderDate: '2024-01-25',
-      customer: 'Elite Apparel',
-      buyerRef: 'EA-2024-012',
-      style: 'Premium Polo Shirts',
-      color: 'Black, Grey',
-      size: 'M, L, XL, XXL',
-      quantity: 2500,
-      unitPrice: 22.00,
-      totalAmount: 55000,
-      deliveryDate: '2024-03-10',
-      status: 'Quality Check',
-      priority: 'High',
-    },
-    {
-      key: '5',
-      orderId: 'ORD-2024-0005',
-      orderDate: '2024-01-24',
-      customer: 'Denim Designers',
-      buyerRef: 'DD-567',
-      style: 'Slim Fit Jeans',
-      color: 'Indigo, Black',
-      size: '28, 30, 32, 34, 36',
-      quantity: 4000,
-      unitPrice: 28.50,
-      totalAmount: 114000,
-      deliveryDate: '2024-04-01',
-      status: 'Cutting',
-      priority: 'Medium',
-    },
-    {
-      key: '6',
-      orderId: 'ORD-2024-0006',
-      orderDate: '2024-01-23',
-      customer: 'Sports Active',
-      buyerRef: 'SA-890',
-      style: 'Athletic Shorts',
-      color: 'Blue, Red, Green',
-      size: 'S, M, L, XL',
-      quantity: 6000,
-      unitPrice: 14.00,
-      totalAmount: 84000,
-      deliveryDate: '2024-02-25',
-      status: 'Sewing',
-      priority: 'High',
-    },
-  ];
+  // View modal state
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [viewingOrder, setViewingOrder] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
 
-  const statusColors = {
-    'Pending': { color: 'gold', bg: '#fef3c7' },
-    'In Production': { color: 'blue', bg: '#dbeafe' },
-    'Cutting': { color: 'purple', bg: '#e9d5ff' },
-    'Sewing': { color: 'cyan', bg: '#cffafe' },
-    'Quality Check': { color: 'geekblue', bg: '#c7d2fe' },
-    'Completed': { color: 'green', bg: '#d1fae5' },
-    'Cancelled': { color: 'red', bg: '#fee2e2' },
+  // Handle deep link from push notification (?viewId=X&action=approve)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    const action = searchParams.get('action');
+    if (viewId) {
+      if (action) setPendingAction(action);
+      searchParams.delete('viewId');
+      searchParams.delete('action');
+      setSearchParams(searchParams, { replace: true });
+      // OrderView needs the full order object — fetch by ID
+      getOrderById(parseInt(viewId))
+        .then((orderData) => {
+          setViewingOrder(orderData);
+          setViewModalVisible(true);
+        })
+        .catch(() => message.error('Failed to load order'));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Permissions
+  const canView = hasPermission('orders', 'view');
+  const canAdd = hasPermission('orders', 'add');
+  const canUpdate = hasPermission('orders', 'update');
+  const canDelete = hasPermission('orders', 'delete');
+
+  // Fetch data
+  const fetchData = useCallback(
+    async (page, pageSize, sort, direction) => {
+      setLoading(true);
+      try {
+        const params = {
+          page: (page || pagination.current) - 1,
+          size: pageSize || pagination.pageSize,
+          sort: sort || sortField,
+          direction: direction || sortDirection,
+        };
+        if (debouncedSearch) params.search = debouncedSearch;
+        if (statusFilter) params.status = statusFilter;
+        if (orderDateRange && orderDateRange.length === 2) {
+          params.orderDateStart = orderDateRange[0].format('YYYY-MM-DD');
+          params.orderDateEnd = orderDateRange[1].format('YYYY-MM-DD');
+        }
+
+        const response = await searchOrders(params);
+        setData(response.content || []);
+        setPagination((prev) => ({
+          ...prev,
+          current: page || prev.current,
+          pageSize: pageSize || prev.pageSize,
+          total: response.totalElements || 0,
+        }));
+      } catch {
+        message.error('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderDateRange]
+  );
+
+  // Re-fetch on filter change
+  useEffect(() => {
+    fetchData(1, pagination.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, statusFilter, orderDateRange]);
+
+  // Table change (pagination, sorting)
+  const handleTableChange = (pag, _filters, sorter) => {
+    const newSort = sorter.field || sortField;
+    const newDirection = sorter.order === 'ascend' ? 'asc' : 'desc';
+    setSortField(newSort);
+    setSortDirection(newDirection);
+    fetchData(pag.current, pag.pageSize, newSort, newDirection);
   };
 
-  const priorityColors = {
-    'High': 'red',
-    'Medium': 'orange',
-    'Low': 'green',
+  // Delete
+  const handleDelete = useCallback(async (record) => {
+    setDeletingId(record.id);
+    try {
+      await deleteOrder(record.id);
+      message.success(`${record.orderNo} deleted successfully`);
+      fetchData(pagination.current, pagination.pageSize);
+    } catch {
+      message.error('Failed to delete order');
+    } finally {
+      setDeletingId(null);
+    }
+  }, [fetchData, pagination.current, pagination.pageSize]);
+
+  // View
+  const handleView = useCallback((record) => {
+    setViewingOrder(record);
+    setViewModalVisible(true);
+  }, []);
+
+  const handleStatusActionComplete = () => {
+    setViewModalVisible(false);
+    setViewingOrder(null);
+    fetchData(pagination.current, pagination.pageSize);
   };
 
-  const columns = [
+  const columns = useMemo(() => [
     {
-      title: 'Order ID',
-      dataIndex: 'orderId',
-      key: 'orderId',
+      title: 'Order No',
+      dataIndex: 'orderNo',
+      key: 'orderNo',
       fixed: 'left',
-      width: 140,
-      render: (text) => (
-        <Text strong style={{ color: '#6366f1', cursor: 'pointer' }}>
-          {text}
-        </Text>
+      width: 150,
+      sorter: true,
+      render: (text, record) => (
+        <RecordLink text={text} onClick={() => handleView(record)} />
       ),
     },
     {
       title: 'Order Date',
       dataIndex: 'orderDate',
       key: 'orderDate',
-      width: 110,
-      sorter: (a, b) => new Date(a.orderDate) - new Date(b.orderDate),
-    },
-    {
-      title: 'Customer',
-      dataIndex: 'customer',
-      key: 'customer',
-      width: 160,
-      render: (text) => <Text strong>{text}</Text>,
-    },
-    {
-      title: 'Buyer Ref',
-      dataIndex: 'buyerRef',
-      key: 'buyerRef',
       width: 120,
+      sorter: true,
+      render: (date) => formatDate(date),
     },
     {
-      title: 'Style',
-      dataIndex: 'style',
-      key: 'style',
-      width: 180,
+      title: 'Buyer',
+      dataIndex: 'buyerName',
+      key: 'buyerName',
+      width: 200,
+      ellipsis: true,
+      render: (text) => <Text strong>{text || '-'}</Text>,
     },
     {
-      title: 'Color',
-      dataIndex: 'color',
-      key: 'color',
-      width: 130,
-      render: (text) => (
-        <Tooltip title={text}>
-          <Text ellipsis style={{ maxWidth: 110 }}>{text}</Text>
-        </Tooltip>
-      ),
+      title: 'Lines',
+      key: 'lineCount',
+      width: 70,
+      align: 'center',
+      render: (_, record) => (record.orderLines?.length || 0),
     },
     {
-      title: 'Quantity',
-      dataIndex: 'quantity',
-      key: 'quantity',
+      title: 'Total Qty',
+      dataIndex: 'totalOrderQty',
+      key: 'totalOrderQty',
       width: 100,
       align: 'right',
-      render: (qty) => <Text strong>{qty.toLocaleString()}</Text>,
-      sorter: (a, b) => a.quantity - b.quantity,
+      sorter: true,
+      render: (qty) => <Text strong>{(qty || 0).toLocaleString()}</Text>,
     },
     {
-      title: 'Total Amount',
-      dataIndex: 'totalAmount',
-      key: 'totalAmount',
-      width: 130,
+      title: 'Total Value',
+      dataIndex: 'totalOrderValue',
+      key: 'totalOrderValue',
+      width: 140,
       align: 'right',
-      render: (amount) => (
-        <Text strong style={{ color: '#10b981' }}>
-          ${amount.toLocaleString()}
-        </Text>
+      sorter: true,
+      render: (amount, record) => (
+        <CurrencyDisplay amount={amount} currency={record.currency} />
       ),
-      sorter: (a, b) => a.totalAmount - b.totalAmount,
-    },
-    {
-      title: 'Delivery Date',
-      dataIndex: 'deliveryDate',
-      key: 'deliveryDate',
-      width: 120,
-      sorter: (a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate),
-    },
-    {
-      title: 'Priority',
-      dataIndex: 'priority',
-      key: 'priority',
-      width: 100,
-      render: (priority) => (
-        <Tag color={priorityColors[priority]}>{priority}</Tag>
-      ),
-      filters: [
-        { text: 'High', value: 'High' },
-        { text: 'Medium', value: 'Medium' },
-        { text: 'Low', value: 'Low' },
-      ],
-      onFilter: (value, record) => record.priority === value,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 130,
-      fixed: 'right',
+      width: 160,
       render: (status) => (
-        <Tag
-          color={statusColors[status]?.color}
-          style={{ borderRadius: 20, fontWeight: 500 }}
-        >
-          {status}
-        </Tag>
+        <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />
       ),
-      filters: Object.keys(statusColors).map((s) => ({ text: s, value: s })),
-      onFilter: (value, record) => record.status === value,
     },
     {
       title: 'Actions',
       key: 'actions',
       fixed: 'right',
-      width: 80,
+      width: 120,
       render: (_, record) => (
-        <Dropdown
-          menu={{
-            items: [
-              { key: 'view', icon: <EyeOutlined />, label: 'View Details' },
-              { key: 'edit', icon: <EditOutlined />, label: 'Edit Order' },
-              { type: 'divider' },
-              { key: 'delete', icon: <DeleteOutlined />, label: 'Delete', danger: true },
-            ],
-            onClick: ({ key }) => handleAction(key, record),
-          }}
-          trigger={['click']}
-        >
-          <Button type="text" icon={<MoreOutlined />} />
-        </Dropdown>
+        <Space size="small">
+          {canView && (
+            <ActionButton
+              action="view"
+              size="small"
+              onClick={() => handleView(record)}
+            />
+          )}
+          {EDITABLE_STATUSES.includes(record.status) && canUpdate && (
+            <ActionButton
+              action="edit"
+              size="small"
+              onClick={() => navigate(`/orders/edit/${record.id}`, { state: { orderData: record } })}
+            />
+          )}
+          {DELETABLE_STATUSES.includes(record.status) && canDelete && (
+            <DeleteConfirm
+              title="Delete Order"
+              recordLabel={record.orderNo}
+              onConfirm={() => handleDelete(record)}
+              loading={deletingId === record.id}
+            >
+              <ActionButton
+                action="delete"
+                size="small"
+              />
+            </DeleteConfirm>
+          )}
+        </Space>
       ),
     },
-  ];
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
 
-  const handleAction = (key, record) => {
-    switch (key) {
-      case 'view':
-        message.info(`Viewing order: ${record.orderId}`);
-        break;
-      case 'edit':
-        navigate(`/orders/edit/${record.key}`);
-        break;
-      case 'delete':
-        Modal.confirm({
-          title: 'Delete Order',
-          content: `Are you sure you want to delete order ${record.orderId}?`,
-          okText: 'Delete',
-          okType: 'danger',
-          onOk: () => message.success('Order deleted successfully'),
-        });
-        break;
-      default:
-        break;
-    }
-  };
-
-  const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      message.success('Data refreshed');
-    }, 1000);
-  };
+  // Status filter options
+  const statusOptions = useMemo(() =>
+    Object.keys(ORDER_STATUS_CONFIG).map((s) => ({
+      label: getStatusLabel(s),
+      value: s,
+    })),
+    []
+  );
 
   return (
     <div className="animate-fade-in-up">
-      <div className="page-header">
-        <h1>Order Management</h1>
-        <div className="header-actions">
-          <Button icon={<ExportOutlined />}>Export</Button>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
+      <PageHeader title="Order Management">
+        {canAdd && (
+          <ActionButton
+            action="create"
+            text="New Order"
             onClick={() => navigate('/orders/new')}
-          >
-            New Order
-          </Button>
-        </div>
-      </div>
+          />
+        )}
+      </PageHeader>
 
       <Card>
-        {/* Filters */}
-        <Space wrap style={{ marginBottom: 16, width: '100%' }}>
-          <Input
-            placeholder="Search orders..."
-            prefix={<SearchOutlined />}
-            style={{ width: 250 }}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            allowClear
-          />
-          <Select
-            placeholder="Status"
-            style={{ width: 150 }}
-            allowClear
-            options={Object.keys(statusColors).map((s) => ({ label: s, value: s }))}
-            value={selectedStatus}
-            onChange={setSelectedStatus}
-          />
-          <RangePicker style={{ width: 280 }} />
-          <Button icon={<FilterOutlined />}>More Filters</Button>
-          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-            Refresh
-          </Button>
-        </Space>
+        <SearchFilterBar
+          searchText={searchText}
+          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchPlaceholder="Search order no, buyer, style..."
+          filters={[
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
+                placeholder: 'Status',
+                value: statusFilter,
+                onChange: setStatusFilter,
+                options: statusOptions,
+              },
+            },
+            {
+              type: 'rangePicker',
+              span: { xs: 24, sm: 12, md: 6, lg: 5 },
+              props: {
+                placeholder: ['Order From', 'Order To'],
+                value: orderDateRange,
+                onChange: setOrderDateRange,
+              },
+            },
+          ]}
+          onRefresh={() => fetchData(pagination.current, pagination.pageSize)}
+          style={{ marginBottom: 16 }}
+        />
 
-        {/* Table */}
         <Table
           columns={columns}
-          dataSource={orders}
+          dataSource={data}
           loading={loading}
-          scroll={{ x: 1600 }}
-          pagination={{
-            total: orders.length,
-            pageSize: 10,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} orders`,
-          }}
-          rowSelection={{
-            type: 'checkbox',
-            onChange: (selectedRowKeys) => {
-              console.log('Selected:', selectedRowKeys);
-            },
+          rowKey="id"
+          scroll={{ x: 1200 }}
+          onChange={handleTableChange}
+          pagination={getTablePagination(pagination, 'orders')}
+          locale={{
+            emptyText: (
+              <EmptyState
+                title="No orders found"
+                description="Try adjusting your search or filters"
+              />
+            ),
           }}
         />
       </Card>
+
+      {/* Order View Modal */}
+      <OrderView
+        open={viewModalVisible}
+        orderData={viewingOrder}
+        pendingAction={pendingAction}
+        onClose={() => {
+          setViewModalVisible(false);
+          setViewingOrder(null);
+          setPendingAction(null);
+        }}
+        onStatusChange={handleStatusActionComplete}
+      />
     </div>
   );
 };
