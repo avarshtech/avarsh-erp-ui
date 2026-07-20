@@ -63,7 +63,9 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow }) => {
       // Load roles and users independently — one failure shouldn't block the other
       try {
         const rolesData = await getRoles();
-        setRoles(Array.isArray(rolesData) ? rolesData.filter(r => r.status === 'Active') : []);
+        // Active = anything not explicitly INACTIVE (matches app-wide convention;
+        // roles saved via Role & Access use uppercase 'ACTIVE'/'INACTIVE').
+        setRoles(Array.isArray(rolesData) ? rolesData.filter(r => r.status !== 'INACTIVE') : []);
       } catch (err) {
         console.error('Failed to load roles', err);
       }
