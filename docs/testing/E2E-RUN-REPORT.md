@@ -113,9 +113,59 @@ Session 0 smoke spec with 2 of its 3 variants, and the idempotent skip-if-exists
 works at item level, so the third (`Single Jersey 160 GSM Black`) was never added.
 Harmless for the downstream flow — noted for accuracy.
 
-## Session 2 — Costing
+## Session 2 — Costing (code complete; data needs a backend restart)
 
-_Not started._
+**Goal:** build cost sheets through the real Costing form against the Session 1 masters,
+exercising the variant pickers (B-005) and the process lists unblocked by B-017.
+
+### Result
+
+| Check | Result |
+|-------|--------|
+| `npm run build` | Pass |
+| `./gradlew compileJava` | Pass |
+| ESLint on touched files | No new issues (baseline unchanged) |
+| `02-costing.spec.js` — all 5 tests | Pass |
+| Cost sheets created through the UI | 3 (one per style) |
+
+### Verified
+
+Variant identity round-trips end to end — the B-005 regression is genuinely fixed:
+
+```
+CST/26-27/1006 | HM-TS-2601 | USD
+  FABRIC : KNI-SIN-001-NAVY-180 "Single Jersey 180 GSM Navy Blue"
+           KNI-RIB-001-NAVY-240-32 "Rib 1x1 240 GSM Navy Blue"
+  LOCAL  : "Sewing Thread 40s2 Navy Blue", "Woven Main Label Medium White", …
+  MFG    : Cutting=0.12, Sewing=0.85, Finishing=0.22, Ironing=0.09, Packing=0.07
+  OVH    : Factory Overhead, Administrative Overhead, Financial Cost
+```
+
+Manufacturing and overhead rows both resolve to named master records — impossible
+before B-017 (processes) and B-021 (overheads).
+
+### Outstanding — action required
+
+**B-022 is fixed in code but not yet in the data.** The authoritative total calculation
+lives in the backend, and the running instance has no devtools auto-restart, so the
+three stored sheets still carry the inflated imported-trim totals:
+
+| Sheet | Style | Stored total | Expected after restart |
+|-------|-------|--------------|------------------------|
+| CST/26-27/1006 | HM-TS-2601 | $6.24 | $6.24 (no imported trims — already correct) |
+| CST/26-27/1007 | HM-PL-2602 | $10.95 | ~$7.7 |
+| CST/26-27/1008 | PRK-DN-2603 | $39.14 | ~$9.5 |
+
+To finish: restart the backend, delete the three sheets, and re-run
+`npx playwright test --project=journey --grep "Session 2"`. The spec is idempotent and
+will recreate all three correctly.
+
+### Bugs
+
+2 critical product bugs found and fixed (B-021 overhead FK mismatch, B-022 unconditional
+currency conversion), plus a documented product constraint: approved cost sheets are
+permanently uneditable, undeletable and untransitionable, while only one sheet is allowed
+per style. See [E2E-BUG-LOG.md](./E2E-BUG-LOG.md).
 
 ## Session 3 — BOM
 

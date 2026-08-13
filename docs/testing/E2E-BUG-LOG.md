@@ -63,7 +63,21 @@ the same walls when they are next run.
 
 ## Session 2 — Costing
 
-_Pending._
+| ID | Module | Severity | Symptom | Root cause | Fix | Status |
+|----|--------|----------|---------|------------|-----|--------|
+| B-021 | Costing | **Critical** | Every overhead row saved with a blank description. Saved cost sheets showed three unnamed overhead lines, and the overhead master link was lost entirely (`overheadId: null`). | Cost sheet overhead rows are a FK to the **Overheads** master (`mst_overheads`) and `CostSheetService` resolves the row description from it. But [CostingForm.jsx](../../src/pages/costing/CostingForm.jsx) populated the dropdown from `getActiveProcesses('Overheads')` and sent `processId`. The server never saw `overheadId`, so both it and the description came back null. | Overhead dropdown now loads from `getActiveOverheads()`; rows carry `overheadId`; the quick-add modal creates an Overhead (not a Process) and is gated on `overhead-master` permission. | Fixed |
+| B-022 | Costing | **Critical** | On a USD-costed sheet a $0.28 zipper was counted as **$26.71**, inflating the jeans FOB from ~$9 to $39.14. The final price was simultaneously divided by the same rate, showing $0.41. | `actualRate` is a USD↔costing-currency rate, but it was applied unconditionally with no check that the currencies actually differ. `CostingCalculator.computeSummary` multiplied imported trims by it and divided the total by it even when the sheet was already in USD. The server is authoritative and recomputes on every save, so the UI-side maths alone was not enough. | Added `usdToCostingRate()` / `costingToQuoteRate()` guards in [CostingCalculator.java](../../../erp-purchase/src/main/java/com/avarsh/erp/costing/util/CostingCalculator.java) (summary **and** per-size paths), mirrored in `CostingForm.jsx`. | Fixed in code — **requires a backend restart to take effect** |
+
+### Product constraints discovered (not bugs, but painful)
+
+An approved cost sheet is a **dead end**. It cannot be edited (`EDITABLE_STATUSES` is Draft/Rejected), cannot be deleted (server: *"Only Draft or Rejected cost sheets can be deleted"*), and has no valid transition out (server: *"Invalid status transition from Approved to Rejected"*). Combined with one-cost-sheet-per-style (*"A cost sheet already exists for this style"*), a single bad submit permanently poisons that style with no application-level remedy — the two malformed sheets from this session had to be removed with SQL.
+
+Worth considering a `reopen`/`revise` transition for approved cost sheets.
+
+### Other observations
+
+- Submitting a cost sheet goes straight to **Approved** — no approval flow is configured for the Costing module. Left as-is by decision; the approval engine is a flagged landmine area.
+- Console shows several AntD 6 deprecation warnings in existing code: `dropdownRender` → `popupRender`, `overlayInnerStyle` → `styles.container`, `valueStyle` → `styles.content`, `InputNumber addonAfter` → `Space.Compact`, `destroyOnClose` → `destroyOnHidden`. Not touched (outside session scope), but they will need a sweep.
 
 ## Session 3 — BOM
 

@@ -82,6 +82,7 @@ import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileSe
 import { searchVariants } from '../../services/master/variantService';
 import { getAllCategories } from '../../services/master/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/master/processService';
+import { getActiveOverheads, createOverhead } from '../../services/master/overheadService';
 import { getSuppliers } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
@@ -221,7 +222,8 @@ const CostingForm = () => {
   const [quickAddStyleImageUrl, setQuickAddStyleImageUrl] = useState(null);  // blob preview
   const canAddStyle = hasPermission('style-master', 'add');
   const canAddProcess = hasPermission('process-master', 'add');
-  const canAddOverhead = hasPermission('process-master', 'add');
+  // Quick-add now creates an Overhead master record, so it is gated on that module.
+  const canAddOverhead = hasPermission('overhead-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
@@ -316,7 +318,9 @@ const CostingForm = () => {
         // Fetch processes (Manufacturing), processes (Overheads), and suppliers
         const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
           getActiveProcesses('Manufacturing'),
-          getActiveProcesses('Overheads'),
+          // Overhead rows are a FK to the OVERHEADS master (mst_overheads), not to
+          // processes — CostSheetService resolves the row description from it.
+          getActiveOverheads(),
           getSuppliers(),
         ]);
         if (mfgResult.status === 'fulfilled') {
@@ -325,7 +329,7 @@ const CostingForm = () => {
         }
         if (ovhResult.status === 'fulfilled') {
           const ovhs = Array.isArray(ovhResult.value) ? ovhResult.value : ovhResult.value?.data || [];
-          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.processName, defaultCost: o.defaultCost || 0 })));
+          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.overheadName, defaultCost: o.defaultCost || 0 })));
         }
         if (suppResult.status === 'fulfilled') {
           const supps = Array.isArray(suppResult.value) ? suppResult.value : suppResult.value?.data || [];
@@ -549,9 +553,21 @@ const CostingForm = () => {
     return importedTrims.reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
   }, [importedTrims]);
 
+  // The exchange rate converts between USD and the costing currency. When the sheet is
+  // already costed in USD there is nothing to convert — applying the rate regardless
+  // inflated imported-trim costs by ~95x and shrank the final price by the same factor.
+  const usdToCostingRate = useMemo(
+    () => (currency === 'USD' ? 1 : Number(actualRate) || 1),
+    [currency, actualRate]
+  );
+  const costingToQuoteRate = useMemo(
+    () => (currency === quoteCurrency ? 1 : Number(actualRate) || 1),
+    [currency, quoteCurrency, actualRate]
+  );
+
   const totalAccessoriesCost = useMemo(() => {
-    return totalLocalTrimsCost + totalImportedTrimsCostUsd * actualRate;
-  }, [totalLocalTrimsCost, totalImportedTrimsCostUsd, actualRate]);
+    return totalLocalTrimsCost + totalImportedTrimsCostUsd * usdToCostingRate;
+  }, [totalLocalTrimsCost, totalImportedTrimsCostUsd, usdToCostingRate]);
 
   const totalManufacturingCost = useMemo(() => {
     return manufacturingRows.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
@@ -575,8 +591,8 @@ const CostingForm = () => {
   }, [totalMakingPrice, totalOverheadCharges]);
 
   const finalPrice = useMemo(() => {
-    return calcFinalPrice(totalPrice, actualRate);
-  }, [totalPrice, actualRate]);
+    return calcFinalPrice(totalPrice, costingToQuoteRate);
+  }, [totalPrice, costingToQuoteRate]);
 
   const finalPriceUsd = useMemo(() => {
     if (quoteCurrency === 'USD') return finalPrice;
@@ -608,7 +624,7 @@ const CostingForm = () => {
       const fabCost = fabricRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.netCost) || 0), 0);
       const localCost = localTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.price) || 0), 0);
       const importCostUsd = importedTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
-      const accCost = localCost + importCostUsd * (parseFloat(actualRate) || 1);
+      const accCost = localCost + importCostUsd * usdToCostingRate;
       const mfgCost = manufacturingRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
       const ovhCost = overheadRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
       const makingPrice = calcTotalMakingPrice(fabCost, accCost, mfgCost, ovhCost);
@@ -619,7 +635,7 @@ const CostingForm = () => {
 
       const overheadCharges = calcTotalOverheadCharges(sizeAgent, sizeProfit, makingPrice);
       const sizeTotalPrice = makingPrice + overheadCharges;
-      const sizeFinalPrice = calcFinalPrice(sizeTotalPrice, actualRate);
+      const sizeFinalPrice = calcFinalPrice(sizeTotalPrice, costingToQuoteRate);
       const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
 
       return {
@@ -630,7 +646,8 @@ const CostingForm = () => {
       };
     });
   }, [uniqueSizeKeys, fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows,
-      actualRate, agentCommissionPct, profitPct, syncPercentages, perSizeOverrides, quoteCurrency, usdToInrRate]);
+      actualRate, usdToCostingRate, costingToQuoteRate,
+      agentCommissionPct, profitPct, syncPercentages, perSizeOverrides, quoteCurrency, usdToInrRate]);
 
   // Auto-calculate profit when target price changes
   useEffect(() => {
@@ -1147,7 +1164,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, processId: null, description: '', cost: '', comments: '', sizes: '' },
+      { key: `o_${Date.now()}`, overheadId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1496,7 +1513,7 @@ const CostingForm = () => {
               const sizeFabric = fabricRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.netCost) || 0), 0);
               const sizeLocalTrims = localTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.price) || 0), 0);
               const sizeImportedTrims = importedTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.priceUsd) || 0), 0);
-              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * actualRate;
+              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * usdToCostingRate;
               const sizeMfg = manufacturingRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
               const sizeMarkup = overheadRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
               const sizeMaking = sizeFabric + sizeAccessories + sizeMfg + sizeMarkup;
@@ -1504,7 +1521,7 @@ const CostingForm = () => {
               const sizeProfit = syncPercentages ? profitPct : (perSizeOverrides[sk]?.profitPct ?? profitPct);
               const sizeOverhead = ((sizeAgent + sizeProfit) / 100) * sizeMaking;
               const sizeTotalPrice = sizeMaking + sizeOverhead;
-              const sizeFinalPrice = actualRate ? sizeTotalPrice / actualRate : 0;
+              const sizeFinalPrice = costingToQuoteRate ? sizeTotalPrice / costingToQuoteRate : 0;
               const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
               return {
                 sizes: sk, agentCommissionPct: sizeAgent, profitPct: sizeProfit,
@@ -2068,8 +2085,8 @@ const CostingForm = () => {
   const effectiveOvhOptions = useMemo(() => {
     const apiIds = new Set(overheadItems.map((o) => o.value));
     const extras = overheadRows
-      .filter((r) => r.processId && !apiIds.has(r.processId))
-      .map((r) => ({ value: r.processId, label: r.description || `Overhead #${r.processId}` }));
+      .filter((r) => r.overheadId && !apiIds.has(r.overheadId))
+      .map((r) => ({ value: r.overheadId, label: r.description || `Overhead #${r.overheadId}` }));
     return [...overheadItems, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
   }, [overheadItems, overheadRows]);
 
@@ -2191,11 +2208,11 @@ const CostingForm = () => {
     },
     {
       title: 'Description',
-      dataIndex: 'processId',
+      dataIndex: 'overheadId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={record.processId || undefined}
+          value={record.overheadId || undefined}
           style={{ width: '100%' }}
           options={effectiveOvhOptions}
           showSearch
@@ -2204,7 +2221,7 @@ const CostingForm = () => {
           onChange={(v, opt) => {
             const defaultCost = opt.defaultCost || 0;
             updateOverheadRow(record.key, {
-              processId: v,
+              overheadId: v,
               description: opt.label,
               ...(defaultCost > 0 && !record.cost ? { cost: defaultCost } : {}),
             });
@@ -2691,7 +2708,7 @@ const CostingForm = () => {
               Total Accessories Cost: {formatCurrency(totalAccessoriesCost, currency)}
             </Text>
             <Text type="secondary" style={{ marginLeft: 16, fontSize: 12 }}>
-              (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {actualRate} rate)
+              (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {usdToCostingRate} rate)
             </Text>
           </Card>
           <Input.TextArea
@@ -3386,16 +3403,18 @@ const CostingForm = () => {
         <Form form={quickAddOverheadForm} layout="vertical" onFinish={async (values) => {
           setQuickAddOverheadLoading(true);
           try {
-            const created = await createProcess({ processName: values.processName, defaultCost: values.defaultCost, category: 'Overheads', isActive: true });
-            setOverheadItems((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
+            // Creates an OVERHEAD, not a process — cost sheet overhead rows are a FK
+            // to mst_overheads and the server resolves their description from it.
+            const created = await createOverhead({ overheadName: values.overheadName, defaultCost: values.defaultCost, isActive: true });
+            setOverheadItems((prev) => [...prev, { value: created.id, label: created.overheadName, defaultCost: created.defaultCost || 0 }]);
             if (pendingOvhRowKey) {
               updateOverheadRow(pendingOvhRowKey, {
-                processId: created.id,
-                description: created.processName,
+                overheadId: created.id,
+                description: created.overheadName,
                 ...(values.defaultCost > 0 ? { cost: values.defaultCost } : {}),
               });
             }
-            message.success(`Overhead "${created.processName}" created`);
+            message.success(`Overhead "${created.overheadName}" created`);
             setQuickAddOverheadOpen(false);
             quickAddOverheadForm.resetFields();
           } catch {
@@ -3404,7 +3423,7 @@ const CostingForm = () => {
             setQuickAddOverheadLoading(false);
           }
         }}>
-          <Form.Item name="processName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
+          <Form.Item name="overheadName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
             <Input placeholder="e.g. Testing Fees, Freight, Commission" maxLength={200} />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">

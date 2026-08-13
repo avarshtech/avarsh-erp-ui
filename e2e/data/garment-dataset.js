@@ -451,6 +451,77 @@ export const TRIMS_QC_CRITERIA = [
   { name: 'Rust / Corrosion', description: 'Metal trims free from rust and corrosion' },
 ];
 
+// ── Cost sheets ────────────────────────────────────────────────────
+/**
+ * Two cost sheets, one per garment type, built from the seeded variants.
+ *
+ * Fabric/trim rows reference VARIANT names — the costing pickers query
+ * GET /variants/search and the server reads the row's display name off the variant.
+ * Consumption is expressed in each item's consumption (secondary) UOM, which is what
+ * the row's UOM addon shows: MTR for fabrics and thread, PCS for labels and buttons.
+ */
+export const COST_SHEETS = [
+  {
+    styleNo: 'HM-TS-2601',
+    buyer: 'H&M Hennes & Mauritz AB',
+    garmentName: "Men's Crew Neck T-Shirt",
+    profitPct: 12,
+    fabrics: [
+      { variant: 'Single Jersey 180 GSM Navy Blue', classification: 'Knits', consumption: 1.45, price: 2.1 },
+      { variant: 'Rib 1x1 240 GSM Navy Blue', classification: 'Knits', consumption: 0.08, price: 2.4 },
+    ],
+    localTrims: [
+      { variant: 'Sewing Thread 40s2 Navy Blue', consumption: 150, cost: 0.0015 },
+      { variant: 'Woven Main Label Medium White', consumption: 1, cost: 0.04 },
+      { variant: 'Care Label Standard White', consumption: 1, cost: 0.02 },
+      { variant: 'Hang Tag Recycled Kraft Brown', consumption: 1, cost: 0.05 },
+    ],
+    importedTrims: [],
+    processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
+    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+  },
+  {
+    styleNo: 'HM-PL-2602',
+    buyer: 'H&M Hennes & Mauritz AB',
+    garmentName: 'Ladies Pique Polo Shirt',
+    profitPct: 13,
+    fabrics: [
+      { variant: 'Pique 220 GSM Royal Blue', classification: 'Knits', consumption: 1.65, price: 2.55 },
+      { variant: 'Rib 1x1 240 GSM White', classification: 'Knits', consumption: 0.12, price: 2.4 },
+    ],
+    localTrims: [
+      { variant: 'Sewing Thread 40s2 White', consumption: 160, cost: 0.0015 },
+      { variant: '4-Hole Button 18L White', consumption: 3, cost: 0.012 },
+      { variant: 'Woven Main Label Medium White', consumption: 1, cost: 0.04 },
+      { variant: 'Care Label Standard White', consumption: 1, cost: 0.02 },
+    ],
+    importedTrims: [
+      { variant: 'Fusible Interlining 50 GSM White', consumption: 0.05, costUsd: 0.6 },
+    ],
+    processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
+    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+  },
+  {
+    styleNo: 'PRK-DN-2603',
+    buyer: 'Primark Stores Ltd',
+    garmentName: "Men's Slim Fit Denim Jeans",
+    profitPct: 14,
+    fabrics: [
+      { variant: 'Denim 12 Oz Indigo Blue', classification: 'Woven', consumption: 1.35, price: 3.8 },
+    ],
+    localTrims: [
+      { variant: 'Sewing Thread 60s3 Black', consumption: 200, cost: 0.0018 },
+      { variant: 'Metal Snap Button 20L Antique Brass', consumption: 1, cost: 0.09 },
+      { variant: 'Woven Main Label Large White', consumption: 1, cost: 0.04 },
+    ],
+    importedTrims: [
+      { variant: 'Metal Zipper No5 Antique Brass 16cm', consumption: 1, costUsd: 0.28 },
+    ],
+    processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
+    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+  },
+];
+
 export default {
   UOMS,
   UOM_NAME_BY_SYMBOL,
@@ -470,4 +541,5 @@ export default {
   PARTS,
   DEFECT_TYPES,
   TRIMS_QC_CRITERIA,
+  COST_SHEETS,
 };
