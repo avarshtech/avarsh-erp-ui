@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card, Table, Button, Input, InputNumber, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, App, Divider, Badge, Checkbox, Typography, Empty, Tooltip, Alert,
@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
-import { getItemMetaData, createItem, updateItem, searchItems } from '../../services/master/itemService';
+import { getItemMetaData, getItemById, createItem, updateItem, searchItems } from '../../services/master/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
@@ -191,16 +191,13 @@ const ItemMaster = () => {
   const [variants, setVariants] = useState([]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [duplicateVariantIndex, setDuplicateVariantIndex] = useState(null);
+  // Which rule the highlighted variant broke: 'attributes' | 'name' — drives the inline message.
+  const [duplicateReason, setDuplicateReason] = useState('attributes');
   const [variantImagesLoading, setVariantImagesLoading] = useState(false);
 
   const [selectedItemId, setSelectedItemId] = useState(null);
-
-  // Duplicate-variant highlight reason: 'attributes' | 'name'
-  const [duplicateReason, setDuplicateReason] = useState('attributes');
-
-  // Inline variant-name editing (variant tab header)
-  const [editingVariantIndex, setEditingVariantIndex] = useState(null);
-  const [editingVariantValue, setEditingVariantValue] = useState('');
+  // True while looking up whether an item already exists for the chosen classifier triple.
+  const [existingLookupLoading, setExistingLookupLoading] = useState(false);
 
   const isEditMode = !!selectedItem;
   const isReadOnly = isEditMode ? !canUpdate : !canAdd;
@@ -621,6 +618,105 @@ const ItemMaster = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubcategory, storeItemTypes]);
 
+  // Load an existing item into the form. The server allows one item per
+  // Category + Sub-Category + Item Type, so picking an occupied triple switches
+  // the form into edit mode instead of failing the save with a duplicate error.
+  const doApplySelectedItem = (item) => {
+    if (!item) return;
+
+    setSelectedItem(item);
+    setSelectedItemId(item.id);
+    form.setFieldsValue({
+      categoryId: item.categoryId?.toString(),
+      subCategoryId: item.subCategoryId?.toString(),
+      itemTypeId: item.itemTypeId?.toString(),
+      uomId: item.uomId?.toString(),
+      secondaryUomId: item.secondaryUomId?.toString() || undefined,
+      uomConversionFactor: item.uomConversionFactor != null ? Number(item.uomConversionFactor) : undefined,
+      hsnCode: item.hsnCode || '',
+      description: item.description || '',
+      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
+      isActive: item.isActive ?? true,
+    });
+
+    // Populate cascading dropdowns
+    const categoryId = parseInt(item.categoryId);
+    const subCategoryId = parseInt(item.subCategoryId);
+    const itemTypeId = parseInt(item.itemTypeId);
+
+    const category = metaData.find((c) => c.id === categoryId);
+    if (category) {
+      setFormSubcategories(category.subCategories || []);
+      const subcategory = category.subCategories?.find((sc) => sc.id === subCategoryId);
+      if (subcategory) {
+        setFormItemTypes(subcategory.itemTypes || []);
+        const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
+        if (itemType) {
+          setFormAttributes(itemType.attributes || []);
+          setFormUomOptions(itemType.uoms || []);
+
+          // Load variants
+          if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
+            const loadedVariants = item.variants.map((variant) => {
+              const variantObj = {
+                id: variant.id,
+                itemId: variant.itemId,
+                variantName: variant.variantName || '',
+                variantCode: variant.variantCode || '',
+                isActive: variant.isActive ?? true,
+              };
+              if (variant.attributes && typeof variant.attributes === 'object') {
+                itemType.attributes.forEach((attr) => {
+                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
+                });
+              }
+              return variantObj;
+            });
+            setVariants(loadedVariants);
+            const firstActiveIdx = loadedVariants.findIndex((v) => v.isActive !== false);
+            setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
+          } else {
+            setVariants([{ isActive: true, variantName: '' }]);
+            setActiveVariantIndex(0);
+          }
+        }
+      }
+    }
+
+    setUnsavedChanges(false);
+  };
+
+  // Look up the single item allowed for a Category + Sub-Category + Item Type triple.
+  // Found -> load it for editing; not found -> stay in create mode.
+  const lookupExistingItem = useCallback(
+    async ({ categoryId, subCategoryId, itemTypeId }) => {
+      if (!categoryId || !subCategoryId || !itemTypeId) return;
+      setExistingLookupLoading(true);
+      try {
+        const res = await searchItems({
+          categoryId: parseInt(categoryId),
+          subCategoryId: parseInt(subCategoryId),
+          itemTypeId: parseInt(itemTypeId),
+          size: 1,
+        });
+        const existing = (res?.data?.content || res?.data || res?.content || [])[0];
+        if (existing) {
+          const full = await getItemById(existing.id);
+          doApplySelectedItem(full?.data || full || existing);
+          message.info('An item already exists for this combination — loaded it for editing.');
+        }
+      } catch (error) {
+        console.error('Existing item lookup failed:', error);
+      } finally {
+        setExistingLookupLoading(false);
+      }
+    },
+    // doApplySelectedItem is a stable render-scoped closure over form + metaData;
+    // metaData is the only value that changes what it does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [metaData, form, message]
+  );
+
   // Form Category Change Handler
   const handleFormCategoryChange = useCallback(
     (categoryId) => {
@@ -699,9 +795,17 @@ const ItemMaster = () => {
           setVariants([emptyVariant]);
           setActiveVariantIndex(0);
         }
+        // The classifier triple is now complete. Only one item may exist per
+        // Category + Sub-Category + Item Type, so load the existing one for editing
+        // rather than letting the user fill the form and hit a duplicate error on save.
+        lookupExistingItem({
+          categoryId: form.getFieldValue('categoryId'),
+          subCategoryId: form.getFieldValue('subCategoryId'),
+          itemTypeId,
+        });
       }
     },
-    [formItemTypes, form]
+    [formItemTypes, form, lookupExistingItem]
   );
 
   // Open Add Modal
@@ -788,7 +892,6 @@ const ItemMaster = () => {
   // Initialize form for edit mode
   const initializeEditForm = (item, metaDataList = metaData) => {
     form.setFieldsValue({
-      itemName: item.itemName || '',
       categoryId: item.categoryId?.toString(),
       subCategoryId: item.subCategoryId?.toString(),
       itemTypeId: item.itemTypeId?.toString(),
@@ -823,11 +926,11 @@ const ItemMaster = () => {
               const variantObj = {
                 id: variant.id,
                 itemId: variant.itemId,
+                // The server persists the raw user-entered name (no item-code prefix),
+                // so it is shown as-is. variantCode is a server-generated SKU: read-only.
+                variantName: variant.variantName || '',
+                variantCode: variant.variantCode || '',
                 isActive: variant.isActive ?? true,
-                // Strip the stored "<itemCode>/" prefix for editing/display.
-                variantName: stripVariantPrefix(variant.variantName, item.itemCode),
-                // Server-generated SKU; read-only, shown in edit/view modes.
-                variantCode: variant.variantCode,
               };
 
               // Map attributes from variant.attributes
@@ -874,8 +977,6 @@ const ItemMaster = () => {
     setVariants([]);
     setDuplicateVariantIndex(null);
     setDuplicateReason('attributes');
-    setEditingVariantIndex(null);
-    setEditingVariantValue('');
     setUnsavedChanges(false);
     setFormReady(false);
     setVariantImagesLoading(false);
@@ -904,71 +1005,15 @@ const ItemMaster = () => {
     return empty;
   }, [formAttributes]);
 
-  // Remove a leading "<itemCode>/" prefix from a stored variant name for display/editing.
-  const stripVariantPrefix = useCallback((variantName, itemCode) => {
-    if (!variantName) return '';
-    const name = String(variantName).trim();
-    const prefix = itemCode ? `${itemCode}/` : '';
-    return prefix && name.startsWith(prefix) ? name.slice(prefix.length).trim() : name;
-  }, []);
-
-  // Normalized key for case-insensitive, whitespace-collapsed duplicate checks.
-  const normalizeVariantName = useCallback(
-    (raw) => (raw || '').trim().replace(/\s+/g, ' ').toLowerCase(),
-    [],
-  );
-
-  // Effective display/save name for a variant (falls back to "Variant N" by active position).
-  const effectiveVariantName = useCallback(
-    (variant, activePosition) => (variant?.variantName || '').trim() || `Variant ${activePosition}`,
-    [],
-  );
-
-  // Update a variant's name from the editable tab header.
-  const updateVariantName = useCallback((variantIndex, value) => {
+  // Update a non-attribute field on a variant (currently variantName).
+  const updateVariantField = (variantIndex, field, value) => {
+    setUnsavedChanges(true);
     setVariants((prev) => {
       const updated = [...prev];
-      updated[variantIndex] = { ...updated[variantIndex], variantName: value };
+      updated[variantIndex] = { ...updated[variantIndex], [field]: value };
       return updated;
     });
-    setDuplicateVariantIndex(null);
-    setUnsavedChanges(true);
-  }, []);
-
-  // ── Inline variant-name tab editing ──
-  const startEditVariant = useCallback((index, currentRawName) => {
-    setActiveVariantIndex(index);
-    setDuplicateVariantIndex(null);
-    setEditingVariantIndex(index);
-    setEditingVariantValue(currentRawName || '');
-  }, []);
-
-  const commitEditVariant = useCallback(() => {
-    setEditingVariantIndex((idx) => {
-      if (idx !== null) updateVariantName(idx, editingVariantValue.trim());
-      return null;
-    });
-    setEditingVariantValue('');
-  }, [editingVariantValue, updateVariantName]);
-
-  const cancelEditVariant = useCallback(() => {
-    setEditingVariantIndex(null);
-    setEditingVariantValue('');
-  }, []);
-
-  // Find the first duplicate variant name among active variants (normalized). Returns index or -1.
-  const findDuplicateVariantNameIndex = useCallback(() => {
-    const seen = new Map();
-    let activePosition = 0;
-    for (let i = 0; i < variants.length; i++) {
-      if (variants[i].isActive === false) continue;
-      activePosition += 1;
-      const key = normalizeVariantName(effectiveVariantName(variants[i], activePosition));
-      if (seen.has(key)) return i;
-      seen.set(key, i);
-    }
-    return -1;
-  }, [variants, normalizeVariantName, effectiveVariantName]);
+  };
 
   const handleVariantAttributeChange = (variantIndex, attributeId, value) => {
     setDuplicateVariantIndex(null);
@@ -1071,28 +1116,41 @@ const ItemMaster = () => {
     return cat?.name?.toLowerCase().includes('fabric') || false;
   }, [watchedCategoryId, metaData]);
 
-  // ── UOM conversion (1 primary UOM = N secondary UOM) ──
+  // Item identity is derived server-side as "Category / Sub-Category / Item Type"
+  // (mst_items.item_name was dropped in the Item Master refactor). Mirror it here so the
+  // user sees exactly the name the rest of the system will show.
+  const watchedSubCategoryId = Form.useWatch('subCategoryId', form);
+  const watchedItemTypeId = Form.useWatch('itemTypeId', form);
   const watchedUomId = Form.useWatch('uomId', form);
   const watchedSecondaryUomId = Form.useWatch('secondaryUomId', form);
-  const watchedConversionFactor = Form.useWatch('uomConversionFactor', form);
 
-  const uomConversion = useMemo(() => {
-    const findUom = (id) => (id ? formUomOptions.find((o) => String(o.id) === String(id)) : null);
-    const primary = findUom(watchedUomId);
-    const secondary = findUom(watchedSecondaryUomId);
-    // No secondary UOM, or the same unit on both sides, means nothing to convert.
-    const applicable = Boolean(secondary) && String(watchedUomId) !== String(watchedSecondaryUomId);
-    return {
-      applicable,
-      primarySymbol: primary?.symbol || primary?.name || '',
-      secondarySymbol: secondary?.symbol || secondary?.name || '',
-      label: applicable
-        ? formatConversionLabel(primary?.name, secondary?.name, watchedConversionFactor)
-        : '',
-    };
-  }, [formUomOptions, watchedUomId, watchedSecondaryUomId, watchedConversionFactor]);
+  const derivedItemName = useMemo(() => {
+    const names = [
+      formCategories.find((c) => String(c.id) === String(watchedCategoryId))?.name,
+      formSubcategories.find((s) => String(s.id) === String(watchedSubCategoryId))?.name,
+      formItemTypes.find((t) => String(t.id) === String(watchedItemTypeId))?.name,
+    ];
+    return names.filter(Boolean).join(' / ');
+  }, [watchedCategoryId, watchedSubCategoryId, watchedItemTypeId, formCategories, formSubcategories, formItemTypes]);
 
-  // Suggest the standard factor whenever either UOM changes; the user can always overwrite it.
+  const uomSymbolById = useCallback(
+    (id) => {
+      const opt = formUomOptions.find((o) => String(o.id ?? o.value) === String(id));
+      return opt?.symbol || opt?.name || '';
+    },
+    [formUomOptions]
+  );
+
+  // A UOM conversion only exists when a secondary UOM is set and differs from the primary
+  // (e.g. buy in Gross, consume in Pieces). Mirrors ItemService.resolveConversionFactor.
+  const needsUomConversion = useMemo(
+    () => !!watchedSecondaryUomId && String(watchedSecondaryUomId) !== String(watchedUomId),
+    [watchedSecondaryUomId, watchedUomId]
+  );
+
+  // Suggest the standard factor whenever either UOM changes (1 grs = 144 pcs, 1 m = 100 cm).
+  // Only pairs that are fixed by definition are pre-filled; the user can always overwrite,
+  // and pairs that genuinely vary per supplier (cone > m) are deliberately left blank.
   const handleUomPairChange = useCallback(() => {
     const uomId = form.getFieldValue('uomId');
     const secondaryUomId = form.getFieldValue('secondaryUomId');
@@ -1100,26 +1158,36 @@ const ItemMaster = () => {
       form.setFieldValue('uomConversionFactor', undefined);
       return;
     }
-    const findUom = (id) => formUomOptions.find((o) => String(o.id) === String(id));
-    const preset = getPresetFactor(findUom(uomId)?.symbol, findUom(secondaryUomId)?.symbol);
+    const preset = getPresetFactor(uomSymbolById(uomId), uomSymbolById(secondaryUomId));
     form.setFieldValue('uomConversionFactor', preset ?? undefined);
-  }, [form, formUomOptions]);
+  }, [form, uomSymbolById]);
 
-  // ── Auto-generated item name preview (Category / Sub-Category / Item Type) ──
-  const watchedSubCategoryId = Form.useWatch('subCategoryId', form);
-  const watchedItemTypeId = Form.useWatch('itemTypeId', form);
-  const autoItemName = useMemo(() => {
-    const cat = metaData.find((c) => c.id === parseInt(watchedCategoryId));
-    if (!cat) return '';
-    const sub = (cat.subCategories || []).find((sc) => sc.id === parseInt(watchedSubCategoryId));
-    const type = (sub?.itemTypes || []).find((it) => it.id === parseInt(watchedItemTypeId));
-    return [cat.name, sub?.name, type?.name].filter(Boolean).join(' / ');
-  }, [metaData, watchedCategoryId, watchedSubCategoryId, watchedItemTypeId]);
+  // ── Variant name helpers ──
+  // Server compares names case-insensitively with whitespace collapsed; mirror that exactly.
+  const normalizeVariantName = useCallback(
+    (raw) => (raw || '').trim().replace(/\s+/g, ' ').toLowerCase(),
+    [],
+  );
 
-  // Keep the (disabled) itemName form field in sync with the auto-generated preview.
-  useEffect(() => {
-    form.setFieldsValue({ itemName: autoItemName });
-  }, [autoItemName, form]);
+  // Label used in validation messages; unnamed variants fall back to their tab position.
+  const effectiveVariantName = useCallback(
+    (variant, activePosition) => (variant?.variantName || '').trim() || `Variant ${activePosition}`,
+    [],
+  );
+
+  // Index of the first active variant whose name repeats an earlier one, or -1.
+  const findDuplicateVariantNameIndex = useCallback(() => {
+    const seen = new Map();
+    let activePosition = 0;
+    for (let i = 0; i < variants.length; i++) {
+      if (variants[i].isActive === false) continue;
+      activePosition += 1;
+      const key = normalizeVariantName(effectiveVariantName(variants[i], activePosition));
+      if (seen.has(key)) return i;
+      seen.set(key, i);
+    }
+    return -1;
+  }, [variants, normalizeVariantName, effectiveVariantName]);
 
   // Form Submit
   const handleSubmit = async (values) => {
@@ -1128,6 +1196,18 @@ const ItemMaster = () => {
     if (formAttributes.length > 0 && activeVariants.length === 0) {
       message.error('At least one variant is required');
       return;
+    }
+
+    // Validate variant name length — mirrors the server rule so users get inline feedback
+    // instead of a 400. Uniqueness is checked below, where the offending tab is highlighted.
+    for (let i = 0; i < variants.length; i++) {
+      const variant = variants[i];
+      if (variant.isActive === false) continue;
+      if ((variant.variantName || '').trim().length < 5) {
+        message.error('Variant name is required and must be at least 5 characters');
+        setActiveVariantIndex(i);
+        return;
+      }
     }
 
     // Validate variant attributes
@@ -1201,12 +1281,9 @@ const ItemMaster = () => {
           attributeObject[toCamelCase(attr.attributeName)] = variant[attr.id] || '';
         });
 
+        // variantCode is server-generated and immutable — never sent back.
         const variantObj = {
-          itemName: values.itemName,
-          // Raw variant name (the tab-header label); stored as-is, no item-code prefix.
-          variantName: isActive
-            ? effectiveVariantName(variant, activePosition)
-            : ((variant.variantName || '').trim() || 'Variant'),
+          variantName: (variant.variantName || '').trim(),
           attributes: attributeObject,
           isActive,
         };
@@ -1225,8 +1302,8 @@ const ItemMaster = () => {
         return variantObj;
       });
 
+      // itemName is derived server-side from the classifier triple and ignored on write.
       const payload = {
-        itemName: values.itemName,
         categoryId: parseInt(values.categoryId),
         subCategoryId: parseInt(values.subCategoryId),
         itemTypeId: parseInt(values.itemTypeId),
@@ -1235,8 +1312,8 @@ const ItemMaster = () => {
         secondaryUomName: values.secondaryUomId
           ? formUomOptions.find((opt) => opt.id.toString() === values.secondaryUomId.toString())?.name || null
           : null,
-        // Null unless the secondary UOM is set and actually differs from the primary
-        uomConversionFactor: uomConversion.applicable ? Number(values.uomConversionFactor) : null,
+        // Only meaningful when the secondary UOM differs from the primary; null otherwise.
+        uomConversionFactor: needsUomConversion ? values.uomConversionFactor : null,
         hsnCode: values.hsnCode,
         description: values.description || null,
         defaultAllowance: values.defaultAllowance,
@@ -1665,9 +1742,7 @@ const ItemMaster = () => {
             </div>
           </div>
         ) : (
-          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => {
-            setUnsavedChanges(true);
-          }}>
+          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
@@ -1722,12 +1797,16 @@ const ItemMaster = () => {
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item
-                  name="itemName"
                   label="Item Name"
-                  tooltip="Auto-generated from Category / Sub-Category / Item Type"
-                  extra="Auto-generated from Category, Sub-Category and Item Type."
+                  tooltip="Derived from Category / Sub-Category / Item Type. Only one item may exist per combination."
                 >
-                  <Input placeholder="Auto-generated from classifiers" disabled />
+                  <Input
+                    value={derivedItemName}
+                    readOnly
+                    variant="filled"
+                    placeholder="Select Category, Subcategory and Item Type"
+                    suffix={existingLookupLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -1767,44 +1846,30 @@ const ItemMaster = () => {
                     />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={24} md={10}>
-                <Form.Item
-                  name="uomConversionFactor"
-                  label="Conversion Factor"
-                  tooltip="How many Secondary UOM make one Primary UOM. BOM purchase quantities are converted using this."
-                  extra={uomConversion.applicable ? undefined : 'No conversion — Secondary UOM is blank or same as Primary'}
-                  rules={[
-                    { required: uomConversion.applicable, message: 'Conversion factor is required' },
-                    { type: 'number', min: 0.000001, message: 'Must be greater than zero' },
-                  ]}
-                >
-                  <InputNumber
-                    placeholder={uomConversion.applicable ? 'Enter factor' : '—'}
-                    controls={false}
-                    min={0}
-                    step={1}
-                    disabled={isEditMode || !uomConversion.applicable}
-                    addonBefore={uomConversion.applicable ? `1 ${uomConversion.primarySymbol} =` : undefined}
-                    addonAfter={uomConversion.applicable ? uomConversion.secondarySymbol : undefined}
-                    style={{ width: '100%', height: 40 }}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            {/* Reads the factor back as a full sentence so the number is unambiguous */}
-            {uomConversion.label && (
-              <Alert
-                type="info"
-                showIcon
-                banner
-                message={uomConversion.label}
-                style={{ marginBottom: 16, fontSize: 13 }}
-              />
-            )}
-
-            <Row gutter={16}>
-              <Col xs={24} sm={12} md={12}>
+              {/* A conversion only exists when the secondary UOM differs from the primary
+                  (e.g. buy in Gross, consume in Pieces). The server rejects the save without it. */}
+              {needsUomConversion && (
+                <Col xs={24} sm={12} md={6}>
+                  <Form.Item
+                    name="uomConversionFactor"
+                    label={`1 ${uomSymbolById(watchedUomId) || 'Primary'} = ? ${uomSymbolById(watchedSecondaryUomId) || 'Secondary'}`}
+                    tooltip="How many secondary UOM make up one primary UOM. BOM purchase quantities are converted with this factor."
+                    rules={[
+                      { required: true, message: 'Conversion factor is required' },
+                      { type: 'number', min: 0.000001, message: 'Conversion factor must be greater than zero' },
+                    ]}
+                  >
+                    <InputNumber
+                      placeholder="e.g. 144"
+                      controls={false}
+                      min={0.000001}
+                      precision={6}
+                      style={{ width: '100%', height: 40 }}
+                    />
+                  </Form.Item>
+                </Col>
+              )}
+              <Col xs={24} sm={12} md={6}>
                 <Form.Item
                   name="hsnCode"
                   label="HSN Code"
@@ -1871,96 +1936,34 @@ const ItemMaster = () => {
 
                 {/* Variant Tabs — each chip holds the editable variant name */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                  {activeVariantsWithIndex.map(({ originalIndex, variant }, displayIndex) => {
-                    const isActiveTab = activeVariantIndex === originalIndex;
-                    const isEditing = editingVariantIndex === originalIndex;
-                    const isDup = duplicateVariantIndex === originalIndex;
-                    const displayName = (variant.variantName || '').trim() || `Variant ${displayIndex + 1}`;
-                    const canClose = activeVariantsWithIndex.length > 1 && !isReadOnly;
-
-                    if (isEditing) {
-                      return (
-                        <Input
-                          key={originalIndex}
-                          size="small"
-                          autoFocus
-                          maxLength={100}
-                          value={editingVariantValue}
-                          placeholder={`Variant ${displayIndex + 1}`}
-                          onChange={(e) => setEditingVariantValue(e.target.value)}
-                          onPressEnter={commitEditVariant}
-                          onBlur={commitEditVariant}
-                          onKeyDown={(e) => { if (e.key === 'Escape') cancelEditVariant(); }}
-                          suffix={<CheckOutlined style={{ color: 'var(--primary-color)', fontSize: 12 }} onMouseDown={(e) => { e.preventDefault(); commitEditVariant(); }} />}
-                          style={{ width: 180, height: 34, borderRadius: 8 }}
-                        />
-                      );
-                    }
-
-                    return (
-                      <div
-                        key={originalIndex}
-                        role="button"
-                        tabIndex={0}
-                        title="Click to select · double-click to rename"
-                        onClick={() => { setActiveVariantIndex(originalIndex); setDuplicateVariantIndex(null); }}
-                        onDoubleClick={() => { if (!isReadOnly) startEditVariant(originalIndex, variant.variantName); }}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          height: 34,
-                          padding: '0 6px 0 12px',
-                          borderRadius: 8,
-                          cursor: 'pointer',
-                          userSelect: 'none',
-                          background: isDup
-                            ? 'rgba(255,69,58,0.06)'
-                            : isActiveTab
-                            ? 'rgba(99,102,241,0.08)'
-                            : 'var(--bg-secondary, #f8fafc)',
-                          border: `1px solid ${isDup ? 'var(--error-color)' : isActiveTab ? 'var(--primary-color)' : 'var(--border-color)'}`,
-                          boxShadow: isActiveTab && !isDup ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
-                          transition: 'all 0.15s ease',
-                          maxWidth: 240,
-                        }}
-                      >
-                        <Text
-                          ellipsis={{ tooltip: displayName }}
-                          style={{
-                            maxWidth: 140,
-                            fontSize: 13,
-                            fontWeight: isActiveTab ? 600 : 500,
-                            color: isDup ? 'var(--error-color)' : isActiveTab ? 'var(--primary-color)' : 'var(--text-primary)',
-                          }}
-                        >
-                          {displayName}
-                        </Text>
-                        {!isReadOnly && (
-                          <Tooltip title="Rename">
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<EditOutlined />}
-                              onClick={(e) => { e.stopPropagation(); startEditVariant(originalIndex, variant.variantName); }}
-                              style={{ width: 22, height: 22, minWidth: 22, color: 'var(--text-tertiary)', opacity: isActiveTab ? 1 : 0.6 }}
-                            />
-                          </Tooltip>
-                        )}
-                        {canClose && (
-                          <Tooltip title="Remove variant">
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<CloseOutlined />}
-                              onClick={(e) => { e.stopPropagation(); deleteVariant(originalIndex); }}
-                              style={{ width: 22, height: 22, minWidth: 22, color: 'var(--text-tertiary)' }}
-                            />
-                          </Tooltip>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {activeVariantsWithIndex.map(({ originalIndex }, displayIndex) => (
+                    <Tag
+                      key={originalIndex}
+                      color={activeVariantIndex === originalIndex ? 'blue' : 'default'}
+                      style={{
+                        cursor: 'pointer',
+                        padding: '4px 12px',
+                        fontSize: 14,
+                        border:
+                          duplicateVariantIndex === originalIndex
+                              ? '2px solid var(--error-color)'
+                              : activeVariantIndex === originalIndex
+                              ? '2px solid var(--primary-color)'
+                              : '1px solid var(--border-color)',
+                      }}
+                      onClick={() => {
+                        setActiveVariantIndex(originalIndex);
+                        setDuplicateVariantIndex(null);
+                      }}
+                      closable={activeVariantsWithIndex.length > 1}
+                      onClose={(e) => {
+                        e.preventDefault();
+                        deleteVariant(originalIndex);
+                      }}
+                    >
+                      {variants[originalIndex]?.variantName?.trim() || `Variant ${displayIndex + 1}`}
+                    </Tag>
+                  ))}
                 </div>
 
                 {/* Active Variant Fields */}
@@ -1993,18 +1996,40 @@ const ItemMaster = () => {
                           : 'This variant has duplicate attribute values. Please update at least one attribute.'}
                       </div>
                     )}
-                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Text type="secondary" style={{ fontSize: 12 }}>Variant Code</Text>
-                      {variants[activeVariantIndex]?.variantCode ? (
-                        <Tag color="blue" style={{ fontFamily: 'monospace', margin: 0 }}>
-                          {variants[activeVariantIndex].variantCode}
-                        </Tag>
-                      ) : (
-                        <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
-                          Auto-generated on save
-                        </Text>
-                      )}
-                    </div>
+                    {/* Variant identity. The name is what users see everywhere downstream
+                        (costing, BOM, PO, GRN); the code is a server-generated SKU. */}
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          label={
+                            <span>
+                              Variant Name <span style={{ color: 'var(--error-color, #ff4d4f)' }}>*</span>
+                            </span>
+                          }
+                          help="At least 5 characters, unique within this item"
+                        >
+                          <Input
+                            value={variants[activeVariantIndex]?.variantName || ''}
+                            placeholder="e.g. Single Jersey 180 GSM Navy"
+                            maxLength={255}
+                            onChange={(e) => updateVariantField(activeVariantIndex, 'variantName', e.target.value)}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Variant Code">
+                          {variants[activeVariantIndex]?.variantCode ? (
+                            <Tag style={{ fontFamily: 'monospace', fontSize: 13, padding: '4px 10px' }}>
+                              {variants[activeVariantIndex].variantCode}
+                            </Tag>
+                          ) : (
+                            <Text type="secondary" style={{ fontSize: 13 }}>
+                              Generated automatically on save
+                            </Text>
+                          )}
+                        </Form.Item>
+                      </Col>
+                    </Row>
                     <Row gutter={16}>
                       {formAttributes.map((attr) => (
                         <Col xs={24} md={12} key={attr.id}>
@@ -2214,16 +2239,14 @@ const ItemMaster = () => {
               { key: 'category', label: 'Category', children: viewingItem.categoryName || '-' },
               { key: 'subcategory', label: 'Subcategory', children: viewingItem.subCategoryName || '-' },
               { key: 'itemType', label: 'Item Type', children: viewingItem.itemTypeName || '-' },
-              { key: 'uom', label: 'Primary UOM', children: viewingItem.uomName || '-' },
+              { key: 'uom', label: 'UOM', children: viewingItem.uomName || '-' },
               { key: 'secondaryUom', label: 'Secondary UOM', children: viewingItem.secondaryUomName || '-' },
               {
                 key: 'conversion',
-                label: 'Conversion',
-                children: formatConversionLabel(
-                  viewingItem.uomName,
-                  viewingItem.secondaryUomName,
-                  viewingItem.uomConversionFactor
-                ) || <Text type="secondary">No conversion</Text>,
+                label: 'UOM Conversion',
+                children: viewingItem.uomConversionFactor != null
+                  ? `1 ${viewingItem.uomSymbol || viewingItem.uomName} = ${Number(viewingItem.uomConversionFactor)} ${viewingItem.secondaryUomSymbol || viewingItem.secondaryUomName}`
+                  : '-',
               },
               { key: 'hsn', label: 'HSN Code', children: viewingItem.hsnCode || '-' },
               { key: 'allowance', label: 'Allowance', children: viewingItem.defaultAllowance != null ? `${Number(viewingItem.defaultAllowance)}%` : '-' },
@@ -2244,10 +2267,10 @@ const ItemMaster = () => {
                         background: 'var(--card-bg)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                        <Text strong>{stripVariantPrefix(v.variantName, viewingItem.itemCode) || `Variant ${idx + 1}`}</Text>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <Text strong>{v.variantName?.trim() || `Variant ${idx + 1}`}</Text>
                         {v.variantCode && (
-                          <Tag color="blue" style={{ fontFamily: 'monospace', margin: 0 }}>{v.variantCode}</Tag>
+                          <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{v.variantCode}</Tag>
                         )}
                       </div>
 

@@ -386,6 +386,8 @@ const BOMForm = () => {
                   primaryUomId: item.uomId ?? null,
                   secondaryUom: item.secondaryUomSymbol || '',
                   secondaryUomId: item.secondaryUomId ?? null,
+                  // Editable lines follow the item master's current factor; the saved
+                  // snapshot only survives on locked (PO-generated) lines.
                   uomConversionFactor: item.uomConversionFactor ?? line.uomConversionFactor ?? null,
                   itemTypeId: line.itemTypeId || item.itemTypeId || null,
                 };
@@ -807,43 +809,47 @@ const BOMForm = () => {
   // by the classifier combination, so there is no separate item-name search.
   const populateLineFromItem = useCallback(
     (lineKey, item) => {
-      const line = lines.find((l) => l.key === lineKey);
-      const fabric = isFabricCategory(line);
-      const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
-      let firstVariant = activeVariants.length === 1 ? activeVariants[0] : null;
-      // Check duplicate variant
-      if (firstVariant && isVariantDuplicate(firstVariant.id, lineKey)) {
-        message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
-        firstVariant = null; // force dropdown to show for manual selection
-        setVariantEditLineKey(lineKey); // auto-open variant dropdown
-      }
-      const selectedAttrs = sortAttrs(firstVariant?.attributes);
-      const { valid, errorMsg } = firstVariant ? validateVariantInOrder(selectedAttrs, fabric) : { valid: true };
-      updateLineMulti(lineKey, {
-        itemId: item.id,
-        itemName: item.itemName || '',
-        itemCode: item.itemCode || '',
-        primaryUom: item.uomSymbol || '',
-        primaryUomId: item.uomId || null,
-        secondaryUom: item.secondaryUomSymbol || '',
-        secondaryUomId: item.secondaryUomId || null,
-        // uom is the CONSUMPTION unit — what consumption/garment is entered in
-        uom: item.secondaryUomSymbol || item.uomSymbol || '',
-        uomConversionFactor: item.uomConversionFactor ?? null,
-        availableVariants: activeVariants,
-        variantId: firstVariant?.id || null,
-        variantCode: firstVariant?.variantCode || '',
-        variantName: firstVariant?.variantName || '',
-        variants: firstVariant ? selectedAttrs : {},
-        colorInvalid: firstVariant ? !valid : false,
-        consumptionPerGarment: null,
-        partsName: '',
-        processes: [],
-        processAllowances: [],
-      });
-      if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
+      const doChange = () => {
+        const line = lines.find((l) => l.key === lineKey);
+        const fabric = isFabricCategory(line);
+        const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
+        let firstVariant = activeVariants.length === 1 ? activeVariants[0] : null;
+        // Check duplicate variant
+        if (firstVariant && isVariantDuplicate(firstVariant.id, lineKey)) {
+          message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
+          firstVariant = null; // force dropdown to show for manual selection
+          setVariantEditLineKey(lineKey); // auto-open variant dropdown
+        }
+        const selectedAttrs = sortAttrs(firstVariant?.attributes);
+        const { valid, errorMsg } = firstVariant ? validateVariantInOrder(selectedAttrs, fabric) : { valid: true };
+        updateLineMulti(lineKey, {
+          itemId: item.id,
+          itemName: item.itemName || '',
+          itemCode: item.itemCode || '',
+          primaryUom: item.uomSymbol || '',
+          primaryUomId: item.uomId || null,
+          secondaryUom: item.secondaryUomSymbol || '',
+          secondaryUomId: item.secondaryUomId || null,
+          // uom is the CONSUMPTION unit — what consumption/garment is entered in
+          uom: item.secondaryUomSymbol || item.uomSymbol || '',
+          // Snapshotted at save time so the PO quantity converts to the purchase UOM.
+          uomConversionFactor: item.uomConversionFactor ?? null,
+          availableVariants: activeVariants,
+          variantId: firstVariant?.id || null,
+          variantCode: firstVariant?.variantCode || '',
+          variantName: firstVariant?.variantName || '',
+          variants: firstVariant ? selectedAttrs : {},
+          colorInvalid: firstVariant ? !valid : false,
+          consumptionPerGarment: null,
+          partsName: '',
+          processes: [],
+          processAllowances: [],
+        });
+        if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
+      };
+      confirmIfHasData(lineKey, doChange);
     },
-    [lines, updateLineMulti, validateVariantInOrder, isVariantDuplicate],
+    [lines, updateLineMulti, validateVariantInOrder, isVariantDuplicate, confirmIfHasData],
   );
   populateLineFromItemRef.current = populateLineFromItem;
 
@@ -1777,6 +1783,11 @@ const BOMForm = () => {
                     }}
                     onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                     options={variants.map((v) => {
+                      // Prefer the variant's own identity; fall back to its attributes for
+                      // legacy variants saved before names existed.
+                      if (v.variantName) {
+                        return { value: v.id, label: v.variantCode ? `${v.variantName} (${v.variantCode})` : v.variantName };
+                      }
                       const entries = Object.entries(v.attributes || {});
                       entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
                       return { value: v.id, label: entries.map(([k, val]) => `${k}: ${val}`).join(' | ') };

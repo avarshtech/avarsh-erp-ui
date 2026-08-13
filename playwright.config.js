@@ -127,6 +127,26 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    // ── UI-Driven Journey Suite (Masters → Costing → BOM → Order → PO → GRN) ──
+    // Every record is created through the real screens; no API seeding. Specs are
+    // idempotent (fixed canonical names, skip-if-exists) so re-runs are safe.
+    // Filenames are numbered because they MUST run in dependency order.
+    {
+      name: 'journey',
+      testDir: './e2e/specs/journey',
+      // Generous: a seeding test may create a dozen records through real forms.
+      // Safe because actionTimeout below makes a bad selector fail in seconds.
+      timeout: 900000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+        video: 'on',
+        // A bad selector should fail in seconds, not burn the whole test timeout.
+        actionTimeout: 15000,
+      },
+      dependencies: ['setup'],
+    },
+
     // ── Full Business Flow (Costing → Order → BOM → PO) ─────
     // Single browser window, handles its own login, no setup dependency
     {

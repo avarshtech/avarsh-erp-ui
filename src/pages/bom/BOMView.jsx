@@ -294,6 +294,9 @@ const BOMView = ({ open, bomData, onClose }) => {
             {purchaseQty != null && (
               <div>
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
+                {/* The PO is raised in the purchase UOM. When the item converts (e.g. buy Gross,
+                    consume Pieces) getLinePurchaseQty supplies the converted figure plus the
+                    working ("144 pcs ÷ 12") so the number is auditable on screen. */}
                 <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
                   {formatNumber(purchaseQty.qty, 2)}
                   {' '}<Text type="secondary" style={{ fontSize: 10 }}>{purchaseQty.uom}</Text>

@@ -584,8 +584,8 @@ const POForm = () => {
           0,
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
-        variantCode: item.variantCode || '',
         variantName: item.variantName || '',
+        variantCode: item.variantCode || '',
         variantAttributes: item.variantAttributes || null,
         hsnCode: item.hsnCode || '',
         categoryName: item.categoryName || '',
@@ -731,8 +731,8 @@ const POForm = () => {
               unitPrice,
               gstPercent: gst,
               variantId: variant?.id || null,
-              variantCode: variant?.variantCode || '',
               variantName: variant?.variantName || '',
+              variantCode: variant?.variantCode || '',
               variantAttributes: variant?.attributes || null,
               hsnCode: item.hsnCode || '',
               categoryName: item.categoryName || '',
@@ -944,9 +944,9 @@ const POForm = () => {
       itemId: bomLine.itemId,
       itemCode: bomLine.itemCode,
       itemName: bomLine.itemName || '',
-      variantCode: bomLine.variantCode || '',
-      variantName: bomLine.variantName || '',
       description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
+      // The PO is raised in the BOM line's purchase UOM. When the item defines a UOM
+      // conversion the BOM snapshots the converted quantity; otherwise both are the same.
       qty: String(bomPurchaseQty(bomLine)),
       uom: bomPurchaseUom(bomLine),
       uomId: null,
@@ -958,6 +958,8 @@ const POForm = () => {
       gstPercent: 0,
       amount: 0,
       variantId: bomLine.variantId || null,
+      variantName: bomLine.variantName || '',
+      variantCode: bomLine.variantCode || '',
       variantAttributes: bomLine.variants || null,
       hsnCode: bomLine.hsnCode || '',
       categoryName: bomLine.categoryName || '',
@@ -1668,6 +1670,21 @@ const POForm = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', flex: 1, minWidth: 0 }}>
               {hasMultipleVariants && (
                 <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)', flexShrink: 0 }} />
+              )}
+              {/* Variant identity leads; attributes follow as supporting detail. */}
+              {(record.variantName || record.variantCode) && (
+                <div style={{ width: '100%', minWidth: 0 }}>
+                  {record.variantName && (
+                    <Text strong style={{ fontSize: 11, display: 'block' }} ellipsis={{ tooltip: record.variantName }}>
+                      {record.variantName}
+                    </Text>
+                  )}
+                  {record.variantCode && (
+                    <Text type="secondary" style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      {record.variantCode}
+                    </Text>
+                  )}
+                </div>
               )}
               {Object.entries(attrs).length > 0 ? (
                 Object.entries(attrs).map(([key, val]) => {

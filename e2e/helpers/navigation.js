@@ -8,7 +8,7 @@
 import process from 'process';
 
 const E2E_USERNAME = process.env.E2E_USERNAME || 'superadmin';
-const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin123';
+const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin98';
 
 /**
  * Navigate to a page, re-authenticate if session expired, and retry navigation.

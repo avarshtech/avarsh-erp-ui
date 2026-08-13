@@ -119,6 +119,17 @@ const FabricGRNRollTable = ({ rolls = [], onRollChange, readOnly = false }) => {
         },
       },
       {
+        title: 'Variant',
+        dataIndex: 'variantName',
+        align: 'center',
+        width: 180,
+        ellipsis: true,
+        render: (v, row) => {
+          if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
+          return <ReadOnlyText value={v || row.variantCode} />;
+        },
+      },
+      {
         title: 'Description',
         dataIndex: 'description',
         align: 'center',

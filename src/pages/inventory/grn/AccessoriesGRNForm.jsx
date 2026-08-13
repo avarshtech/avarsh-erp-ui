@@ -164,6 +164,8 @@ const AccessoriesGRNForm = () => {
         return {
           poLineItemId: id,
           variantId: li?.variantId,
+          variantName: li?.variantName,
+          variantCode: li?.variantCode,
           itemCode: li?.itemCode,
           description: li?.description,
           color: v?.color || '—',

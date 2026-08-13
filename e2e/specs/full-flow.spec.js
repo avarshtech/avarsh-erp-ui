@@ -30,7 +30,7 @@ async function goTo(page, path) {
   ]).catch(() => {});
   if (await loginField.isVisible().catch(() => false)) {
     await loginField.fill('superadmin');
-    await page.getByPlaceholder('Password').fill('admin123');
+    await page.getByPlaceholder('Password').fill('admin98');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
       page.getByRole('button', { name: /Sign In/i }).click(),
@@ -69,7 +69,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     await page.waitForLoadState('networkidle');
     await page.getByPlaceholder('Username').fill('superadmin');
     await page.waitForTimeout(600);
-    await page.getByPlaceholder('Password').fill('admin123');
+    await page.getByPlaceholder('Password').fill('admin98');
     await page.waitForTimeout(600);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),

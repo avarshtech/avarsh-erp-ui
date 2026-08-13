@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
 import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Row, Col, Divider, Select, Alert, Segmented } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined, DollarOutlined, PercentageOutlined } from '@ant-design/icons';
@@ -8,19 +8,25 @@ const { Text } = Typography;
 import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/master/processService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
-import { useStore } from '../../context/StoreContext';
 
 const MODULE_ID = 'process-master';
 
+/**
+ * Process categories.
+ *
+ * These are the exact values the cost sheet queries — CostingForm.jsx calls
+ * getActiveProcesses('Manufacturing') and getActiveProcesses('Overheads') to fill its
+ * Manufacturing and Overhead sections. Sourcing this list from the item categories
+ * (Fabric, Local Trims, …) made it impossible to create a process costing could ever
+ * find. BOM loads processes unfiltered, so it is unaffected by this list.
+ */
+const CATEGORY_OPTIONS = [
+  { value: 'Manufacturing', label: 'Manufacturing' },
+  { value: 'Overheads', label: 'Overheads' },
+];
+
 const ProcessMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
-  const { categories } = useStore();
-
-  const categoryOptions = useMemo(() =>
-    (categories || [])
-      .filter((c) => c.isActive !== false)
-      .map((c) => ({ value: c.name, label: c.name })),
-  [categories]);
 
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -266,7 +272,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
                   <Input placeholder="e.g. Fabric Dyeing" maxLength={200} />
                 </Form.Item>
                 <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]}>
-                  <Select placeholder="Select category" options={categoryOptions} showSearch optionFilterProp="label" allowClear />
+                  <Select placeholder="Select category" options={CATEGORY_OPTIONS} allowClear />
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />

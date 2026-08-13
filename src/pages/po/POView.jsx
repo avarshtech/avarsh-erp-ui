@@ -860,6 +860,17 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
               {record.variantCode && (
                 <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.variantCode}</Text>
               )}
+              {/* The variant is what was actually ordered — show it above the free-text description. */}
+              {(record.variantName || record.variantCode) && (
+                <div style={{ marginTop: 2 }}>
+                  {record.variantName && (
+                    <Text style={{ fontSize: 12, display: 'block', lineHeight: 1.3 }}>{record.variantName}</Text>
+                  )}
+                  {record.variantCode && (
+                    <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.variantCode}</Text>
+                  )}
+                </div>
+              )}
               {record.description && (
                 <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2, wordBreak: 'break-word' }}>{record.description}</Text>
               )}

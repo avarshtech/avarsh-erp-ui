@@ -26,7 +26,7 @@ export class ApiClient {
 
   async login(username, password) {
     const user = username || process.env.E2E_USERNAME || 'superadmin';
-    const pass = password || process.env.E2E_PASSWORD || 'admin123';
+    const pass = password || process.env.E2E_PASSWORD || 'admin98';
 
     const response = await this.request.post(`${API_BASE}/auth/login`, {
       data: { username: user, password: pass },

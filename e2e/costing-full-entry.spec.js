@@ -105,7 +105,7 @@ async function navigateWithAuth(page, path) {
 
   if (await loginField.isVisible().catch(() => false)) {
     await loginField.fill(process.env.E2E_USERNAME || 'superadmin');
-    await page.getByPlaceholder('Password').fill(process.env.E2E_PASSWORD || 'admin123');
+    await page.getByPlaceholder('Password').fill(process.env.E2E_PASSWORD || 'admin98');
 
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/auth/login'), { timeout: 30000 }),
