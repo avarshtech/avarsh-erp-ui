@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   App,
   Form,
@@ -105,15 +105,23 @@ const { Dragger } = Upload;
 // per call, which comfortably covers a category's active variants for a dropdown.
 const VARIANT_PICKER_LIMIT = 50;
 
-const fetchVariantsForCategory = async (categoryName) => {
+const fetchVariantsForCategory = async (categoryName, q = '') => {
   if (!categoryName) return [];
   try {
-    const res = await searchVariants({ category: categoryName, limit: VARIANT_PICKER_LIMIT });
+    const res = await searchVariants({ category: categoryName, q, limit: VARIANT_PICKER_LIMIT });
     return res?.data || res || [];
   } catch (error) {
     console.error(`Failed to load variants for category "${categoryName}":`, error);
     return [];
   }
+};
+
+// Merge freshly searched variants into an existing list, keyed by id so a variant
+// already present is refreshed rather than duplicated.
+const mergeVariantsById = (prev, incoming) => {
+  const byId = new Map((prev || []).map((v) => [v.id, v]));
+  (incoming || []).forEach((v) => byId.set(v.id, v));
+  return [...byId.values()];
 };
 
 // Techpack extraction matches at item level; resolve that to a concrete variant.
@@ -204,6 +212,11 @@ const CostingForm = () => {
   const [fabricItemOptions, setFabricItemOptions] = useState([]);
   const [localTrimOptions, setLocalTrimOptions] = useState([]);
   const [importedTrimOptions, setImportedTrimOptions] = useState([]);
+  // Category names behind each picker, kept so the dropdowns can search the server later.
+  const [variantCategories, setVariantCategories] = useState({ fabric: '', localTrim: '', importedTrim: '' });
+  // Per-picker debounce handles for the variant search above.
+  const variantSearchTimers = useRef({});
+  useEffect(() => () => Object.values(variantSearchTimers.current).forEach(clearTimeout), []);
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
@@ -317,6 +330,11 @@ const CostingForm = () => {
         setLocalTrimOptions(toVariantOptions(ltVariants));
         setImportedTrimItemsRaw(itVariants);
         setImportedTrimOptions(toVariantOptions(itVariants));
+        setVariantCategories({
+          fabric: fabricCat?.name || '',
+          localTrim: effectiveLocalTrimCat?.name || '',
+          importedTrim: effectiveImportedTrimCat?.name || '',
+        });
 
         // Fetch processes (Manufacturing), processes (Overheads), and suppliers
         const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
@@ -1676,6 +1694,44 @@ const CostingForm = () => {
     );
   };
 
+  // The variants API returns at most 50 rows per call, so the initial preload alone
+  // leaves larger categories partly unreachable. Searching the server as the user types
+  // keeps every variant selectable; matches are merged into the raw list too, so the
+  // row's onChange can still resolve the picked variant by id.
+  const handleVariantSearch = useCallback(
+    (slot, setRaw, setOptions) => (text) => {
+      const q = (text || '').trim();
+      clearTimeout(variantSearchTimers.current[slot]);
+      const categoryName = variantCategories[slot];
+      if (!categoryName || q.length < 2) return;
+      variantSearchTimers.current[slot] = setTimeout(async () => {
+        const list = await fetchVariantsForCategory(categoryName, q);
+        if (!list.length) return;
+        setRaw((prev) => mergeVariantsById(prev, list));
+        setOptions((prev) => {
+          const byValue = new Map((prev || []).map((o) => [o.value, o]));
+          toVariantOptions(list).forEach((o) => byValue.set(o.value, o));
+          return [...byValue.values()];
+        });
+      }, 300);
+    },
+    [variantCategories],
+  );
+
+  // Stable per-picker search handlers (AntD 6 takes these via showSearch.onSearch).
+  const onFabricVariantSearch = useMemo(
+    () => handleVariantSearch('fabric', setFabricItemsRaw, setFabricItemOptions),
+    [handleVariantSearch],
+  );
+  const onLocalTrimVariantSearch = useMemo(
+    () => handleVariantSearch('localTrim', setLocalTrimItemsRaw, setLocalTrimOptions),
+    [handleVariantSearch],
+  );
+  const onImportedTrimVariantSearch = useMemo(
+    () => handleVariantSearch('importedTrim', setImportedTrimItemsRaw, setImportedTrimOptions),
+    [handleVariantSearch],
+  );
+
   // ==================== COLUMN DEFINITIONS ====================
 
   const fabricColumns = [
@@ -1706,7 +1762,7 @@ const CostingForm = () => {
           value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={fabricItemOptions}
-          showSearch={{ filterOption: variantFilterOption }}
+          showSearch={{ filterOption: variantFilterOption, onSearch: onFabricVariantSearch }}
           placeholder="Select"
           onChange={(v) => handleFabricItemSelect(record.key, v)}
           onFocus={() => loadSuggestions('fabric', record.itemId)}
@@ -1915,7 +1971,7 @@ const CostingForm = () => {
           value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={localTrimOptions}
-          showSearch={{ filterOption: variantFilterOption }}
+          showSearch={{ filterOption: variantFilterOption, onSearch: onLocalTrimVariantSearch }}
           placeholder="Select item"
           onChange={(v) => {
             const variant = localTrimItemsRaw.find((i) => i.id === v);
@@ -2010,7 +2066,7 @@ const CostingForm = () => {
           value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={importedTrimOptions}
-          showSearch={{ filterOption: variantFilterOption }}
+          showSearch={{ filterOption: variantFilterOption, onSearch: onImportedTrimVariantSearch }}
           placeholder="Select item"
           onChange={(v) => {
             const variant = importedTrimItemsRaw.find((i) => i.id === v);
