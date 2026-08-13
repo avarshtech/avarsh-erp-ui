@@ -79,7 +79,7 @@ import { getBuyers } from '../../services/master/buyerService';
 import { getStylesByBuyerId, saveStyle } from '../../services/master/styleService';
 import { uploadFile, deleteFile } from '../../services/core/fileService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
-import { searchItems } from '../../services/master/itemService';
+import { searchVariants } from '../../services/master/variantService';
 import { getAllCategories } from '../../services/master/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/master/processService';
 import { getSuppliers } from '../../services/master/supplierService';
@@ -98,6 +98,33 @@ import BuyerPriceTrendModal from './BuyerPriceTrendModal';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
+
+// Costing fabric/trim rows are picked from item variants. The server returns at most 50
+// per call, which comfortably covers a category's active variants for a dropdown.
+const VARIANT_PICKER_LIMIT = 50;
+
+const fetchVariantsForCategory = async (categoryName) => {
+  if (!categoryName) return [];
+  try {
+    const res = await searchVariants({ category: categoryName, limit: VARIANT_PICKER_LIMIT });
+    return res?.data || res || [];
+  } catch (error) {
+    console.error(`Failed to load variants for category "${categoryName}":`, error);
+    return [];
+  }
+};
+
+// Techpack extraction matches at item level; resolve that to a concrete variant.
+const firstVariantOfItem = (variants, itemId) =>
+  itemId ? (variants || []).find((v) => v.itemId === itemId) || null : null;
+
+// Label with the variant name; the code is the searchable secondary identifier.
+const toVariantOptions = (variants) =>
+  (variants || []).map((v) => ({
+    value: v.id,
+    label: v.variantName || v.variantCode,
+    variantCode: v.variantCode,
+  }));
 
 const CostingForm = () => {
   const { message } = App.useApp();
@@ -271,44 +298,20 @@ const CostingForm = () => {
         // Resolve effective categories
         const effectiveLocalTrimCat = localTrimCat || generalTrimCat;
         const effectiveImportedTrimCat = importedTrimCat || generalTrimCat;
-        // Collect all unique category IDs and fetch items in a single API call
-        const catMap = {};
-        if (fabricCat) catMap.fabric = fabricCat.id;
-        if (effectiveLocalTrimCat) catMap.localTrim = effectiveLocalTrimCat.id;
-        if (effectiveImportedTrimCat) catMap.importedTrim = effectiveImportedTrimCat.id;
+        // Costing rows reference item *variants*, not items — the variant carries the
+        // fabric/trim identity the user picks and everything downstream keys on.
+        const [fabVariants, ltVariants, itVariants] = await Promise.all([
+          fetchVariantsForCategory(fabricCat?.name),
+          fetchVariantsForCategory(effectiveLocalTrimCat?.name),
+          fetchVariantsForCategory(effectiveImportedTrimCat?.name),
+        ]);
 
-        const uniqueCatIds = [...new Set(Object.values(catMap))];
-
-        if (uniqueCatIds.length > 0) {
-          const res = await searchItems({ categoryIds: uniqueCatIds, size: 1000 });
-          const allItems = res.data?.content || res.data || [];
-
-          // Group items by categoryId
-          const byCat = {};
-          for (const item of allItems) {
-            const cid = item.categoryId;
-            if (!byCat[cid]) byCat[cid] = [];
-            byCat[cid].push(item);
-          }
-
-          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName, itemCode: item.itemCode }));
-
-          if (catMap.fabric) {
-            const fabItems = byCat[catMap.fabric] || [];
-            setFabricItemsRaw(fabItems);
-            setFabricItemOptions(toOptions(fabItems));
-          }
-          if (catMap.localTrim) {
-            const ltItems = byCat[catMap.localTrim] || [];
-            setLocalTrimItemsRaw(ltItems);
-            setLocalTrimOptions(toOptions(ltItems));
-          }
-          if (catMap.importedTrim) {
-            const itItems = byCat[catMap.importedTrim] || [];
-            setImportedTrimItemsRaw(itItems);
-            setImportedTrimOptions(toOptions(itItems));
-          }
-        }
+        setFabricItemsRaw(fabVariants);
+        setFabricItemOptions(toVariantOptions(fabVariants));
+        setLocalTrimItemsRaw(ltVariants);
+        setLocalTrimOptions(toVariantOptions(ltVariants));
+        setImportedTrimItemsRaw(itVariants);
+        setImportedTrimOptions(toVariantOptions(itVariants));
 
         // Fetch processes (Manufacturing), processes (Overheads), and suppliers
         const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
@@ -841,16 +844,20 @@ const CostingForm = () => {
     if (result.fabricRows?.length) {
       setFabricRows(
         result.fabricRows.map((r, i) => {
-          const rawItem = r.matchedItemId ? fabricItemsRaw.find((item) => item.id === r.matchedItemId) : null;
+          // Techpack extraction matches at item level; costing rows key on a variant,
+          // so default to the item's first variant and let the user refine it.
+          const variant = firstVariantOfItem(fabricItemsRaw, r.matchedItemId);
           return {
             key:              `f_import_${Date.now()}_${i}`,
             itemId:           r.matchedItemId   || null,
-            fabricType:       r.matchedItemName || r.extractedName || '',
+            variantId:        variant?.id       || null,
+            variantCode:      variant?.variantCode || '',
+            fabricType:       variant?.variantName || r.matchedItemName || r.extractedName || '',
             classification:   r.classification  || 'Woven',
-            description:      r.notes           || '',
+            description:      variant?.description || r.notes || '',
             consumption:      '',
-            uom:              rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
-            uomId:            rawItem?.uomId || null,
+            uom:              variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || '',
+            uomId:            variant?.uomId || null,
             fabricPrice:      '',
             fabricWidthStd:   '',
             fabricWidthVendor: '',
@@ -867,36 +874,44 @@ const CostingForm = () => {
     // 4. Map local trim rows
     if (result.localTrimRows?.length) {
       setLocalTrims(
-        result.localTrimRows.map((r, i) => ({
-          key:         `lt_import_${Date.now()}_${i}`,
-          itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
-          size:        '',
-          consumption: r.quantity || '',
-          uom:         r.uom || 'pcs',
-          cost:        '',
-          price:       0,
-          sizes:       '',
-        }))
+        result.localTrimRows.map((r, i) => {
+          const variant = firstVariantOfItem(localTrimItemsRaw, r.matchedItemId);
+          return {
+            key:         `lt_import_${Date.now()}_${i}`,
+            itemId:      r.matchedItemId   || null,
+            variantId:   variant?.id       || null,
+            item:        variant?.variantName || r.matchedItemName || r.extractedName || '',
+            code:        variant?.variantCode || '',
+            size:        '',
+            consumption: r.quantity || '',
+            uom:         variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || 'pcs',
+            cost:        '',
+            price:       0,
+            sizes:       '',
+          };
+        })
       );
     }
 
     // 5. Map imported trim rows
     if (result.importedTrimRows?.length) {
       setImportedTrims(
-        result.importedTrimRows.map((r, i) => ({
-          key:         `it_import_${Date.now()}_${i}`,
-          itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
-          size:        '',
-          consumption: r.quantity || '',
-          uom:         r.uom || 'pcs',
-          costUsd:     '',
-          priceUsd:    0,
-          sizes:       '',
-        }))
+        result.importedTrimRows.map((r, i) => {
+          const variant = firstVariantOfItem(importedTrimItemsRaw, r.matchedItemId);
+          return {
+            key:         `it_import_${Date.now()}_${i}`,
+            itemId:      r.matchedItemId   || null,
+            variantId:   variant?.id       || null,
+            item:        variant?.variantName || r.matchedItemName || r.extractedName || '',
+            code:        variant?.variantCode || '',
+            size:        '',
+            consumption: r.quantity || '',
+            uom:         variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || 'pcs',
+            costUsd:     '',
+            priceUsd:    0,
+            sizes:       '',
+          };
+        })
       );
     }
 
@@ -939,6 +954,8 @@ const CostingForm = () => {
       {
         key: `f_${Date.now()}`,
         itemId: null,
+        variantId: null,
+        variantCode: '',
         fabricType: '',
         classification: 'Woven',
         description: '',
@@ -958,26 +975,29 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
-  const handleFabricItemSelect = (key, itemId, option) => {
-    // Set itemId and fabricType from the selected item
-    const rawItem = fabricItemsRaw.find((item) => item.id === itemId);
+  const handleFabricItemSelect = (key, variantId) => {
+    // The row is identified by the variant; itemId is carried along for PO/BOM linkage.
+    const variant = fabricItemsRaw.find((v) => v.id === variantId);
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = {
           ...r,
-          itemId,
-          fabricType: option.label,
+          variantId,
+          variantCode: variant?.variantCode || '',
+          itemId: variant?.itemId ?? null,
+          // The fabric name shown to the user is the variant's name (server reads it back from the variant).
+          fabricType: variant?.variantName || variant?.variantCode || '',
           // Auto-populate description from the item master (CR C-6); keep any existing text otherwise
-          description: rawItem?.description || r.description || '',
+          description: variant?.description || r.description || '',
           // Set UOM from item's secondary UOM (fallback to primary)
-          uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
-          uomId: rawItem?.uomId || r.uomId || null,
-          primaryUom: rawItem?.uomSymbol || '',
+          uom: variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || '',
+          uomId: variant?.uomId || r.uomId || null,
+          primaryUom: variant?.uomSymbol || '',
         };
         // Auto-set classification from subcategory
-        if (rawItem?.subCategoryName) {
-          const subName = rawItem.subCategoryName.toLowerCase();
+        if (variant?.subCategoryName) {
+          const subName = variant.subCategoryName.toLowerCase();
           if (subName.includes('knit')) updated.classification = 'Knits';
           else if (subName.includes('woven')) updated.classification = 'Woven';
         }
@@ -1020,7 +1040,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', cost: '', price: 0, sizes: '' },
+      { key: `lt_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', cost: '', price: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1058,7 +1078,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', costUsd: '', priceUsd: 0, sizes: '' },
+      { key: `it_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', costUsd: '', priceUsd: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1619,10 +1639,19 @@ const CostingForm = () => {
 
   // ==================== HELPERS ====================
 
-  const getConsumptionUom = (record, rawItems) => {
-    if (!record.itemId) return '';
-    const item = rawItems?.find((i) => i.id === record.itemId);
-    return item?.secondaryUomSymbol || item?.uomSymbol || '';
+  const getConsumptionUom = (record, rawVariants) => {
+    if (!record.variantId) return '';
+    const variant = rawVariants?.find((v) => v.id === record.variantId);
+    return variant?.secondaryUomSymbol || variant?.uomSymbol || '';
+  };
+
+  // Match on both variant name and code so users can search either.
+  const variantFilterOption = (input, option) => {
+    const needle = String(input).toLowerCase();
+    return (
+      String(option?.label ?? '').toLowerCase().includes(needle) ||
+      String(option?.variantCode ?? '').toLowerCase().includes(needle)
+    );
   };
 
   // ==================== COLUMN DEFINITIONS ====================
@@ -1648,17 +1677,16 @@ const CostingForm = () => {
     },
     {
       title: 'Fabric Name',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       width: 240,
       render: (val, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={fabricItemOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption }}
           placeholder="Select"
-          onChange={(v, opt) => handleFabricItemSelect(record.key, v, opt)}
+          onChange={(v) => handleFabricItemSelect(record.key, v)}
           onFocus={() => loadSuggestions('fabric', record.itemId)}
           size="small"
         />
@@ -1859,18 +1887,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={localTrimOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption }}
           placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = localTrimItemsRaw.find((i) => i.id === v);
-            updateLocalTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
+          onChange={(v) => {
+            const variant = localTrimItemsRaw.find((i) => i.id === v);
+            updateLocalTrim(record.key, {
+              variantId: v,
+              itemId: variant?.itemId ?? null,
+              item: variant?.variantName || variant?.variantCode || '',
+              code: variant?.variantCode || '',
+              uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+            });
           }}
           size="small"
         />
@@ -1949,18 +1982,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={importedTrimOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption }}
           placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = importedTrimItemsRaw.find((i) => i.id === v);
-            updateImportedTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
+          onChange={(v) => {
+            const variant = importedTrimItemsRaw.find((i) => i.id === v);
+            updateImportedTrim(record.key, {
+              variantId: v,
+              itemId: variant?.itemId ?? null,
+              item: variant?.variantName || variant?.variantCode || '',
+              code: variant?.variantCode || '',
+              uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+            });
           }}
           size="small"
         />

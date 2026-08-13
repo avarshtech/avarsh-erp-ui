@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card, Table, Button, Input, InputNumber, Select, Tag, Space, Modal, Form, Row, Col,
   Spin, App, Divider, Badge, Checkbox, Typography, Empty,
@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
-import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/master/itemService';
+import { getItemMetaData, getItemById, createItem, updateItem, searchItems } from '../../services/master/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
@@ -192,16 +192,9 @@ const ItemMaster = () => {
   const [duplicateVariantIndex, setDuplicateVariantIndex] = useState(null);
   const [variantImagesLoading, setVariantImagesLoading] = useState(false);
 
-  // Suggestion State (for item name autocomplete)
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const nonItemNameChangesRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
-  const debounceRef = useRef(null);
-  const lastQueryRef = useRef('');
-  const suppressSuggestionsRef = useRef(false);
-  const noResultPrefixRef = useRef('');
+  // True while looking up whether an item already exists for the chosen classifier triple.
+  const [existingLookupLoading, setExistingLookupLoading] = useState(false);
 
   const isEditMode = !!selectedItem;
 
@@ -354,7 +347,6 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
-      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -421,7 +413,6 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
-      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -623,6 +614,105 @@ const ItemMaster = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubcategory, storeItemTypes]);
 
+  // Load an existing item into the form. The server allows one item per
+  // Category + Sub-Category + Item Type, so picking an occupied triple switches
+  // the form into edit mode instead of failing the save with a duplicate error.
+  const doApplySelectedItem = (item) => {
+    if (!item) return;
+
+    setSelectedItem(item);
+    setSelectedItemId(item.id);
+    form.setFieldsValue({
+      categoryId: item.categoryId?.toString(),
+      subCategoryId: item.subCategoryId?.toString(),
+      itemTypeId: item.itemTypeId?.toString(),
+      uomId: item.uomId?.toString(),
+      secondaryUomId: item.secondaryUomId?.toString() || undefined,
+      uomConversionFactor: item.uomConversionFactor != null ? Number(item.uomConversionFactor) : undefined,
+      hsnCode: item.hsnCode || '',
+      description: item.description || '',
+      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
+      isActive: item.isActive ?? true,
+    });
+
+    // Populate cascading dropdowns
+    const categoryId = parseInt(item.categoryId);
+    const subCategoryId = parseInt(item.subCategoryId);
+    const itemTypeId = parseInt(item.itemTypeId);
+
+    const category = metaData.find((c) => c.id === categoryId);
+    if (category) {
+      setFormSubcategories(category.subCategories || []);
+      const subcategory = category.subCategories?.find((sc) => sc.id === subCategoryId);
+      if (subcategory) {
+        setFormItemTypes(subcategory.itemTypes || []);
+        const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
+        if (itemType) {
+          setFormAttributes(itemType.attributes || []);
+          setFormUomOptions(itemType.uoms || []);
+
+          // Load variants
+          if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
+            const loadedVariants = item.variants.map((variant) => {
+              const variantObj = {
+                id: variant.id,
+                itemId: variant.itemId,
+                variantName: variant.variantName || '',
+                variantCode: variant.variantCode || '',
+                isActive: variant.isActive ?? true,
+              };
+              if (variant.attributes && typeof variant.attributes === 'object') {
+                itemType.attributes.forEach((attr) => {
+                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
+                });
+              }
+              return variantObj;
+            });
+            setVariants(loadedVariants);
+            const firstActiveIdx = loadedVariants.findIndex((v) => v.isActive !== false);
+            setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
+          } else {
+            setVariants([{ isActive: true, variantName: '' }]);
+            setActiveVariantIndex(0);
+          }
+        }
+      }
+    }
+
+    setUnsavedChanges(false);
+  };
+
+  // Look up the single item allowed for a Category + Sub-Category + Item Type triple.
+  // Found -> load it for editing; not found -> stay in create mode.
+  const lookupExistingItem = useCallback(
+    async ({ categoryId, subCategoryId, itemTypeId }) => {
+      if (!categoryId || !subCategoryId || !itemTypeId) return;
+      setExistingLookupLoading(true);
+      try {
+        const res = await searchItems({
+          categoryId: parseInt(categoryId),
+          subCategoryId: parseInt(subCategoryId),
+          itemTypeId: parseInt(itemTypeId),
+          size: 1,
+        });
+        const existing = (res?.data?.content || res?.data || res?.content || [])[0];
+        if (existing) {
+          const full = await getItemById(existing.id);
+          doApplySelectedItem(full?.data || full || existing);
+          message.info('An item already exists for this combination — loaded it for editing.');
+        }
+      } catch (error) {
+        console.error('Existing item lookup failed:', error);
+      } finally {
+        setExistingLookupLoading(false);
+      }
+    },
+    // doApplySelectedItem is a stable render-scoped closure over form + metaData;
+    // metaData is the only value that changes what it does.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [metaData, form, message]
+  );
+
   // Form Category Change Handler
   const handleFormCategoryChange = useCallback(
     (categoryId) => {
@@ -631,6 +721,7 @@ const ItemMaster = () => {
         itemTypeId: undefined,
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormSubcategories([]);
       setFormItemTypes([]);
@@ -656,6 +747,7 @@ const ItemMaster = () => {
         itemTypeId: undefined,
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormItemTypes([]);
       setFormAttributes([]);
@@ -679,6 +771,7 @@ const ItemMaster = () => {
       form.setFieldsValue({
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormAttributes([]);
       setFormUomOptions([]);
@@ -691,16 +784,24 @@ const ItemMaster = () => {
           setFormAttributes(itemType.attributes || []);
           setFormUomOptions(itemType.uoms || []);
           // Initialize with one empty variant
-          const emptyVariant = { isActive: true };
+          const emptyVariant = { isActive: true, variantName: '' };
           (itemType.attributes || []).forEach((attr) => {
             emptyVariant[attr.id] = '';
           });
           setVariants([emptyVariant]);
           setActiveVariantIndex(0);
         }
+        // The classifier triple is now complete. Only one item may exist per
+        // Category + Sub-Category + Item Type, so load the existing one for editing
+        // rather than letting the user fill the form and hit a duplicate error on save.
+        lookupExistingItem({
+          categoryId: form.getFieldValue('categoryId'),
+          subCategoryId: form.getFieldValue('subCategoryId'),
+          itemTypeId,
+        });
       }
     },
-    [formItemTypes, form]
+    [formItemTypes, form, lookupExistingItem]
   );
 
   // Open Add Modal
@@ -720,15 +821,9 @@ const ItemMaster = () => {
     setVariants([]);
     setActiveVariantIndex(0);
     setDuplicateVariantIndex(null);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    suppressSuggestionsRef.current = false;
-    lastQueryRef.current = '';
-    noResultPrefixRef.current = '';
     setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     fetchMetaData().then(() => setFormReady(true));
   };
 
@@ -740,14 +835,9 @@ const ItemMaster = () => {
     }
     setSelectedItem(item);
     setSelectedItemId(item.id);
-    suppressSuggestionsRef.current = true;
-    lastQueryRef.current = (item.itemName || '').trim();
-    setSuggestions([]);
-    setShowSuggestions(false);
     setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     fetchMetaData().then((metaDataList) => {
       initializeEditForm(item, metaDataList);
       setFormReady(true);
@@ -798,12 +888,12 @@ const ItemMaster = () => {
   // Initialize form for edit mode
   const initializeEditForm = (item, metaDataList = metaData) => {
     form.setFieldsValue({
-      itemName: item.itemName || '',
       categoryId: item.categoryId?.toString(),
       subCategoryId: item.subCategoryId?.toString(),
       itemTypeId: item.itemTypeId?.toString(),
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
+      uomConversionFactor: item.uomConversionFactor != null ? Number(item.uomConversionFactor) : undefined,
       hsnCode: item.hsnCode || '',
       description: item.description || '',
       defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
@@ -832,6 +922,8 @@ const ItemMaster = () => {
               const variantObj = {
                 id: variant.id,
                 itemId: variant.itemId,
+                variantName: variant.variantName || '',
+                variantCode: variant.variantCode || '',
                 isActive: variant.isActive ?? true,
               };
 
@@ -849,7 +941,7 @@ const ItemMaster = () => {
             setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
           } else {
             // No variants, create one from item attributes (legacy)
-            const defaultVariant = { isActive: true };
+            const defaultVariant = { isActive: true, variantName: '' };
             itemType.attributes.forEach((attr) => {
               defaultVariant[attr.id] = resolveAttributeValue(item.attributes, attr);
             });
@@ -877,11 +969,8 @@ const ItemMaster = () => {
     setSelectedItemId(null);
     form.resetFields();
     setVariants([]);
-    setSuggestions([]);
-    setShowSuggestions(false);
     setDuplicateVariantIndex(null);
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     setFormReady(false);
     setVariantImagesLoading(false);
   };
@@ -902,17 +991,26 @@ const ItemMaster = () => {
 
   // Variant Management
   const createEmptyVariant = useCallback(() => {
-    const empty = { isActive: true };
+    const empty = { isActive: true, variantName: '' };
     formAttributes.forEach((attr) => {
       empty[attr.id] = '';
     });
     return empty;
   }, [formAttributes]);
 
+  // Update a non-attribute field on a variant (currently variantName).
+  const updateVariantField = (variantIndex, field, value) => {
+    setUnsavedChanges(true);
+    setVariants((prev) => {
+      const updated = [...prev];
+      updated[variantIndex] = { ...updated[variantIndex], [field]: value };
+      return updated;
+    });
+  };
+
   const handleVariantAttributeChange = (variantIndex, attributeId, value) => {
     setDuplicateVariantIndex(null);
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
     setVariants((prev) => {
       const updated = [...prev];
       updated[variantIndex] = { ...updated[variantIndex], [attributeId]: value };
@@ -936,7 +1034,6 @@ const ItemMaster = () => {
     setVariants((prev) => [...prev, newVariant]);
     setActiveVariantIndex(variants.length);
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
   };
 
   const deleteVariant = (indexToDelete) => {
@@ -966,7 +1063,6 @@ const ItemMaster = () => {
     }
 
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
 
     setDuplicateVariantIndex(null);
 
@@ -1013,173 +1109,38 @@ const ItemMaster = () => {
     return cat?.name?.toLowerCase().includes('fabric') || false;
   }, [watchedCategoryId, metaData]);
 
-  // Item Name Suggestions
-  const itemNameValue = Form.useWatch('itemName', form);
-  
-  useEffect(() => {
-    const query = (itemNameValue || '').trim();
+  // Item identity is derived server-side as "Category / Sub-Category / Item Type"
+  // (mst_items.item_name was dropped in the Item Master refactor). Mirror it here so the
+  // user sees exactly the name the rest of the system will show.
+  const watchedSubCategoryId = Form.useWatch('subCategoryId', form);
+  const watchedItemTypeId = Form.useWatch('itemTypeId', form);
+  const watchedUomId = Form.useWatch('uomId', form);
+  const watchedSecondaryUomId = Form.useWatch('secondaryUomId', form);
 
-    if (suppressSuggestionsRef.current) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
+  const derivedItemName = useMemo(() => {
+    const names = [
+      formCategories.find((c) => String(c.id) === String(watchedCategoryId))?.name,
+      formSubcategories.find((s) => String(s.id) === String(watchedSubCategoryId))?.name,
+      formItemTypes.find((t) => String(t.id) === String(watchedItemTypeId))?.name,
+    ];
+    return names.filter(Boolean).join(' / ');
+  }, [watchedCategoryId, watchedSubCategoryId, watchedItemTypeId, formCategories, formSubcategories, formItemTypes]);
 
-    // Reset no-result prefix on backspace/shortening
-    const isShortening = query.length < lastQueryRef.current.length;
-    if (isShortening && noResultPrefixRef.current) {
-      if (query.length < noResultPrefixRef.current.length ||
-          !query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        noResultPrefixRef.current = '';
-      }
-    }
+  const uomSymbolById = useCallback(
+    (id) => {
+      const opt = formUomOptions.find((o) => String(o.id ?? o.value) === String(id));
+      return opt?.symbol || opt?.name || '';
+    },
+    [formUomOptions]
+  );
 
-    if (query.length >= 3) {
-      if (noResultPrefixRef.current && query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        setSuggestionsLoading(false);
-        lastQueryRef.current = query;
-        return;
-      }
+  // A UOM conversion only exists when a secondary UOM is set and differs from the primary
+  // (e.g. buy in Gross, consume in Pieces). Mirrors ItemService.resolveConversionFactor.
+  const needsUomConversion = useMemo(
+    () => !!watchedSecondaryUomId && String(watchedSecondaryUomId) !== String(watchedUomId),
+    [watchedSecondaryUomId, watchedUomId]
+  );
 
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      setSuggestionsLoading(true);
-      debounceRef.current = setTimeout(async () => {
-        try {
-          if (lastQueryRef.current === query) {
-            setSuggestionsLoading(false);
-            return;
-          }
-          const res = await autocompleteItems(query);
-          let results = [];
-          if (Array.isArray(res)) results = res;
-          else if (res?.data) results = res.data;
-          else if (res?.content) results = res.content;
-
-          setSuggestions(results || []);
-          setShowSuggestions((results || []).length > 0);
-          lastQueryRef.current = query;
-
-          if (!results || results.length === 0) {
-            noResultPrefixRef.current = query;
-          } else {
-            noResultPrefixRef.current = '';
-          }
-        } catch (error) {
-          console.error('Item search failed:', error);
-          setSuggestions([]);
-          setShowSuggestions(false);
-        } finally {
-          setSuggestionsLoading(false);
-        }
-      }, 300);
-    } else {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setSuggestionsLoading(false);
-      lastQueryRef.current = '';
-      noResultPrefixRef.current = '';
-    }
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [itemNameValue]);
-
-  // Apply selected item from suggestions (internal — skips confirmation)
-  const doApplySelectedItem = (item) => {
-    if (!item) return;
-
-    setSelectedItem(item);
-    setSelectedItemId(item.id);
-    form.setFieldsValue({
-      itemName: item.itemName || '',
-      categoryId: item.categoryId?.toString(),
-      subCategoryId: item.subCategoryId?.toString(),
-      itemTypeId: item.itemTypeId?.toString(),
-      uomId: item.uomId?.toString(),
-      secondaryUomId: item.secondaryUomId?.toString() || undefined,
-      hsnCode: item.hsnCode || '',
-      description: item.description || '',
-      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
-      isActive: item.isActive ?? true,
-    });
-
-    // Populate cascading dropdowns
-    const categoryId = parseInt(item.categoryId);
-    const subCategoryId = parseInt(item.subCategoryId);
-    const itemTypeId = parseInt(item.itemTypeId);
-
-    const category = metaData.find((c) => c.id === categoryId);
-    if (category) {
-      setFormSubcategories(category.subCategories || []);
-      const subcategory = category.subCategories?.find((sc) => sc.id === subCategoryId);
-      if (subcategory) {
-        setFormItemTypes(subcategory.itemTypes || []);
-        const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
-        if (itemType) {
-          setFormAttributes(itemType.attributes || []);
-          setFormUomOptions(itemType.uoms || []);
-
-          // Load variants
-          if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
-            const loadedVariants = item.variants.map((variant) => {
-              const variantObj = {
-                id: variant.id,
-                itemId: variant.itemId,
-                isActive: variant.isActive ?? true,
-              };
-              if (variant.attributes && typeof variant.attributes === 'object') {
-                itemType.attributes.forEach((attr) => {
-                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
-                });
-              }
-              return variantObj;
-            });
-            setVariants(loadedVariants);
-            const firstActiveIdx = loadedVariants.findIndex((v) => v.isActive !== false);
-            setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
-          } else {
-            setVariants([{ isActive: true }]);
-            setActiveVariantIndex(0);
-          }
-        }
-      }
-    }
-
-    setSuggestions([]);
-    setShowSuggestions(false);
-    suppressSuggestionsRef.current = true;
-    setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
-  };
-
-  // Apply selected item with unsaved changes guard (ignores itemName-only changes)
-  const applySelectedItem = (item) => {
-    if (!item) return;
-
-    if (nonItemNameChangesRef.current) {
-      modal.confirm({
-        title: 'Unsaved changes',
-        content: 'You have unsaved changes. Selecting a different item will discard them. Continue?',
-        okText: 'Discard & Continue',
-        cancelText: 'Cancel',
-        onOk: () => doApplySelectedItem(item),
-        onCancel: () => {
-          // Restore the previous item name in the input
-          setSuggestions([]);
-          setShowSuggestions(false);
-          suppressSuggestionsRef.current = true;
-          form.setFieldsValue({ itemName: selectedItem?.itemName || '' });
-        },
-      });
-      return;
-    }
-
-    doApplySelectedItem(item);
-  };
 
   // Form Submit
   const handleSubmit = async (values) => {
@@ -1188,6 +1149,27 @@ const ItemMaster = () => {
     if (formAttributes.length > 0 && activeVariants.length === 0) {
       message.error('At least one variant is required');
       return;
+    }
+
+    // Validate variant names — mirrors the server rules so users get inline feedback
+    // instead of a 400 (non-blank, >= 5 chars, unique within the item).
+    const seenNames = new Set();
+    for (let i = 0; i < variants.length; i++) {
+      const variant = variants[i];
+      if (variant.isActive === false) continue;
+      const name = (variant.variantName || '').trim();
+      if (name.length < 5) {
+        message.error('Variant name is required and must be at least 5 characters');
+        setActiveVariantIndex(i);
+        return;
+      }
+      const key = name.replace(/\s+/g, ' ').toLowerCase();
+      if (seenNames.has(key)) {
+        message.error(`Duplicate variant name "${name}". Variant names must be unique within an item.`);
+        setActiveVariantIndex(i);
+        return;
+      }
+      seenNames.add(key);
     }
 
     // Validate variant attributes
@@ -1233,8 +1215,9 @@ const ItemMaster = () => {
           attributeObject[toCamelCase(attr.attributeName)] = variant[attr.id] || '';
         });
 
+        // variantCode is server-generated and immutable — never sent back.
         const variantObj = {
-          itemName: values.itemName,
+          variantName: (variant.variantName || '').trim(),
           attributes: attributeObject,
           isActive: variant.isActive ?? true,
         };
@@ -1253,8 +1236,8 @@ const ItemMaster = () => {
         return variantObj;
       });
 
+      // itemName is derived server-side from the classifier triple and ignored on write.
       const payload = {
-        itemName: values.itemName,
         categoryId: parseInt(values.categoryId),
         subCategoryId: parseInt(values.subCategoryId),
         itemTypeId: parseInt(values.itemTypeId),
@@ -1263,6 +1246,8 @@ const ItemMaster = () => {
         secondaryUomName: values.secondaryUomId
           ? formUomOptions.find((opt) => opt.id.toString() === values.secondaryUomId.toString())?.name || null
           : null,
+        // Only meaningful when the secondary UOM differs from the primary; null otherwise.
+        uomConversionFactor: needsUomConversion ? values.uomConversionFactor : null,
         hsnCode: values.hsnCode,
         description: values.description || null,
         defaultAllowance: values.defaultAllowance,
@@ -1682,13 +1667,7 @@ const ItemMaster = () => {
             </div>
           </div>
         ) : (
-          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={(changedValues) => {
-            setUnsavedChanges(true);
-            const changedKeys = Object.keys(changedValues);
-            if (changedKeys.some((key) => key !== 'itemName')) {
-              nonItemNameChangesRef.current = true;
-            }
-          }}>
+          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => setUnsavedChanges(true)}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
@@ -1743,65 +1722,16 @@ const ItemMaster = () => {
               </Col>
               <Col xs={24} md={12}>
                 <Form.Item
-                  name="itemName"
                   label="Item Name"
-                  rules={[{ required: true, message: 'Item Name is required' }]}
+                  tooltip="Derived from Category / Sub-Category / Item Type. Only one item may exist per combination."
                 >
-                  <div style={{ position: 'relative' }}>
-                    <Input
-                      placeholder="Enter Item Name"
-                      value={form.getFieldValue('itemName')}
-                      allowClear
-                      disabled={isEditMode}
-                      suffix={suggestionsLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
-                      onChange={(e) => {
-                        form.setFieldsValue({ itemName: e.target.value });
-                        suppressSuggestionsRef.current = false;
-                        lastQueryRef.current = '';
-                      }}
-                      onFocus={() => {
-                        if (!suppressSuggestionsRef.current && suggestions.length > 0) {
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          zIndex: 2000,
-                          background: 'var(--card-bg)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 8,
-                          boxShadow: 'var(--shadow-md)',
-                          maxHeight: 200,
-                          overflowY: 'auto',
-                          marginTop: 4,
-                        }}
-                      >
-                        {suggestions.map((s, idx) => (
-                          <div
-                            key={s.id ?? idx}
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              borderBottom: idx < suggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
-                            }}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applySelectedItem(s)}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--card-bg)')}
-                          >
-                            {s.itemName}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <Input
+                    value={derivedItemName}
+                    readOnly
+                    variant="filled"
+                    placeholder="Select Category, Subcategory and Item Type"
+                    suffix={existingLookupLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
+                  />
                 </Form.Item>
               </Col>
             </Row>
@@ -1846,6 +1776,29 @@ const ItemMaster = () => {
                     />
                 </Form.Item>
               </Col>
+              {/* A conversion only exists when the secondary UOM differs from the primary
+                  (e.g. buy in Gross, consume in Pieces). The server rejects the save without it. */}
+              {needsUomConversion && (
+                <Col xs={24} sm={12} md={6}>
+                  <Form.Item
+                    name="uomConversionFactor"
+                    label={`1 ${uomSymbolById(watchedUomId) || 'Primary'} = ? ${uomSymbolById(watchedSecondaryUomId) || 'Secondary'}`}
+                    tooltip="How many secondary UOM make up one primary UOM. BOM purchase quantities are converted with this factor."
+                    rules={[
+                      { required: true, message: 'Conversion factor is required' },
+                      { type: 'number', min: 0.000001, message: 'Conversion factor must be greater than zero' },
+                    ]}
+                  >
+                    <InputNumber
+                      placeholder="e.g. 144"
+                      controls={false}
+                      min={0.000001}
+                      precision={6}
+                      style={{ width: '100%', height: 40 }}
+                    />
+                  </Form.Item>
+                </Col>
+              )}
               <Col xs={24} sm={12} md={6}>
                 <Form.Item
                   name="hsnCode"
@@ -1938,7 +1891,7 @@ const ItemMaster = () => {
                         deleteVariant(originalIndex);
                       }}
                     >
-                      Variant {displayIndex + 1}
+                      {variants[originalIndex]?.variantName?.trim() || `Variant ${displayIndex + 1}`}
                     </Tag>
                   ))}
                 </div>
@@ -1971,6 +1924,40 @@ const ItemMaster = () => {
                         This variant has duplicate attribute values. Please update at least one attribute.
                       </div>
                     )}
+                    {/* Variant identity. The name is what users see everywhere downstream
+                        (costing, BOM, PO, GRN); the code is a server-generated SKU. */}
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item
+                          label={
+                            <span>
+                              Variant Name <span style={{ color: 'var(--error-color, #ff4d4f)' }}>*</span>
+                            </span>
+                          }
+                          help="At least 5 characters, unique within this item"
+                        >
+                          <Input
+                            value={variants[activeVariantIndex]?.variantName || ''}
+                            placeholder="e.g. Single Jersey 180 GSM Navy"
+                            maxLength={255}
+                            onChange={(e) => updateVariantField(activeVariantIndex, 'variantName', e.target.value)}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Variant Code">
+                          {variants[activeVariantIndex]?.variantCode ? (
+                            <Tag style={{ fontFamily: 'monospace', fontSize: 13, padding: '4px 10px' }}>
+                              {variants[activeVariantIndex].variantCode}
+                            </Tag>
+                          ) : (
+                            <Text type="secondary" style={{ fontSize: 13 }}>
+                              Generated automatically on save
+                            </Text>
+                          )}
+                        </Form.Item>
+                      </Col>
+                    </Row>
                     <Row gutter={16}>
                       {formAttributes.map((attr) => (
                         <Col xs={24} md={12} key={attr.id}>
@@ -2169,6 +2156,14 @@ const ItemMaster = () => {
               { key: 'subcategory', label: 'Subcategory', children: viewingItem.subCategoryName || '-' },
               { key: 'itemType', label: 'Item Type', children: viewingItem.itemTypeName || '-' },
               { key: 'uom', label: 'UOM', children: viewingItem.uomName || '-' },
+              { key: 'secondaryUom', label: 'Secondary UOM', children: viewingItem.secondaryUomName || '-' },
+              {
+                key: 'conversion',
+                label: 'UOM Conversion',
+                children: viewingItem.uomConversionFactor != null
+                  ? `1 ${viewingItem.uomSymbol || viewingItem.uomName} = ${Number(viewingItem.uomConversionFactor)} ${viewingItem.secondaryUomSymbol || viewingItem.secondaryUomName}`
+                  : '-',
+              },
               { key: 'hsn', label: 'HSN Code', children: viewingItem.hsnCode || '-' },
               { key: 'allowance', label: 'Allowance', children: viewingItem.defaultAllowance != null ? `${Number(viewingItem.defaultAllowance)}%` : '-' },
             ]} />
@@ -2188,8 +2183,11 @@ const ItemMaster = () => {
                         background: 'var(--card-bg)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text strong>Variant {idx + 1}</Text>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                        <Text strong>{v.variantName?.trim() || `Variant ${idx + 1}`}</Text>
+                        {v.variantCode && (
+                          <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{v.variantCode}</Tag>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>

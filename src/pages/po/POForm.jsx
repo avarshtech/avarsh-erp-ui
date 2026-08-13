@@ -584,6 +584,8 @@ const POForm = () => {
           0,
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
+        variantName: item.variantName || '',
+        variantCode: item.variantCode || '',
         variantAttributes: item.variantAttributes || null,
         hsnCode: item.hsnCode || '',
         categoryName: item.categoryName || '',
@@ -729,6 +731,8 @@ const POForm = () => {
               unitPrice,
               gstPercent: gst,
               variantId: variant?.id || null,
+              variantName: variant?.variantName || '',
+              variantCode: variant?.variantCode || '',
               variantAttributes: variant?.attributes || null,
               hsnCode: item.hsnCode || '',
               categoryName: item.categoryName || '',
@@ -936,8 +940,10 @@ const POForm = () => {
       itemCode: bomLine.itemCode,
       itemName: bomLine.itemName || '',
       description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
-      qty: String(bomLine.purchaseQty || 0),
-      uom: bomLine.uom || '',
+      // The PO is raised in the BOM line's purchase UOM. When the item defines a UOM
+      // conversion the BOM snapshots the converted quantity; otherwise both are the same.
+      qty: String(bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0),
+      uom: bomLine.purchaseUom || bomLine.uom || '',
       uomId: null,
       primaryUom: '',
       primaryUomId: null,
@@ -947,6 +953,8 @@ const POForm = () => {
       gstPercent: 0,
       amount: 0,
       variantId: bomLine.variantId || null,
+      variantName: bomLine.variantName || '',
+      variantCode: bomLine.variantCode || '',
       variantAttributes: bomLine.variants || null,
       hsnCode: bomLine.hsnCode || '',
       categoryName: bomLine.categoryName || '',
@@ -961,10 +969,10 @@ const POForm = () => {
       // Merge duplicate item+variant+uom lines
       const mergeMap = new Map();
       selectedLines.forEach(({ bomLine, bomId }) => {
-        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.uom || ''}`;
+        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.purchaseUom || bomLine.uom || ''}`;
         if (mergeMap.has(key)) {
           const existing = mergeMap.get(key);
-          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQty || 0));
+          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0));
           existing.bomLineSources.push({ bomId, lineId: bomLine.id });
         } else {
           mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
@@ -1656,6 +1664,21 @@ const POForm = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', flex: 1, minWidth: 0 }}>
               {hasMultipleVariants && (
                 <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)', flexShrink: 0 }} />
+              )}
+              {/* Variant identity leads; attributes follow as supporting detail. */}
+              {(record.variantName || record.variantCode) && (
+                <div style={{ width: '100%', minWidth: 0 }}>
+                  {record.variantName && (
+                    <Text strong style={{ fontSize: 11, display: 'block' }} ellipsis={{ tooltip: record.variantName }}>
+                      {record.variantName}
+                    </Text>
+                  )}
+                  {record.variantCode && (
+                    <Text type="secondary" style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      {record.variantCode}
+                    </Text>
+                  )}
+                </div>
               )}
               {Object.entries(attrs).length > 0 ? (
                 Object.entries(attrs).map(([key, val]) => {

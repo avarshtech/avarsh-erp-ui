@@ -170,6 +170,8 @@ const FabricGRNForm = () => {
         return {
           poLineItemId: id,
           variantId: li?.variantId,
+          variantName: li?.variantName,
+          variantCode: li?.variantCode,
           itemCode: li?.itemCode,
           description: li?.description,
           width: v?.attributes?.width ?? '—',

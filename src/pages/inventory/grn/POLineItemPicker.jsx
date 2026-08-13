@@ -22,6 +22,20 @@ const POLineItemPicker = memo(function POLineItemPicker({
   const columns = useMemo(
     () => [
       { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 170, render: (v) => <span style={{ whiteSpace: 'nowrap' }}>{v ?? '—'}</span> },
+      {
+        title: 'Variant',
+        dataIndex: 'variantName',
+        align: 'center',
+        width: 200,
+        render: (v, record) => (
+          <div style={{ lineHeight: 1.3 }}>
+            <div>{v || '—'}</div>
+            {record.variantCode && (
+              <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.variantCode}</Text>
+            )}
+          </div>
+        ),
+      },
       { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
       { title: 'UOM', dataIndex: 'uom', align: 'center', width: 70 },
       { title: 'PO Qty', dataIndex: 'orderedQty', align: 'center', width: 100, render: (v) => formatNumber(v, 1) },

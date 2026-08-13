@@ -255,10 +255,24 @@ const BOMView = ({ open, bomData, onClose }) => {
             {purchaseQty != null && (
               <div>
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
-                <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
-                  {formatNumber(purchaseQty, 2)}
-                  {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
-                </Text>
+                {/* The PO is raised in purchaseUom. When the item converts (e.g. buy Gross,
+                    consume Pieces) show the purchase figure first and the consumption figure below. */}
+                {line.purchaseQtyPrimary != null && line.purchaseUom ? (
+                  <>
+                    <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
+                      {formatNumber(line.purchaseQtyPrimary, 2)}
+                      {' '}<Text type="secondary" style={{ fontSize: 10 }}>{line.purchaseUom.toUpperCase()}</Text>
+                    </Text>
+                    <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
+                      = {formatNumber(purchaseQty, 2)} {(line.uom || '').toUpperCase()}
+                    </Text>
+                  </>
+                ) : (
+                  <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
+                    {formatNumber(purchaseQty, 2)}
+                    {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
+                  </Text>
+                )}
               </div>
             )}
             {/* CAD download for fabric lines */}

@@ -53,6 +53,8 @@ const adaptPO = (po) => {
       itemName: li.itemName,
       description: li.description || li.itemName,
       variantId: li.variantId,
+      variantName: li.variantName || '',
+      variantCode: li.variantCode || '',
       orderedQty: Number(li.quantity || 0),
       receivedQty: 0, // populated by enrichPOWithReceipts
       pendingQty: Number(li.quantity || 0),

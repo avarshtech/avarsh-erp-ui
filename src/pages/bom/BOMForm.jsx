@@ -443,6 +443,8 @@ const BOMForm = () => {
               secondaryUom: '',
               secondaryUomId: null,
               uom: l.uom || '',
+              // Restored from the item master below; the saved snapshot is only re-sent on save.
+              uomConversionFactor: l.uomConversionFactor ?? null,
               partsName: l.partsName || [],
               consumptionPerGarment: l.consumptionPerGarment,
               processes: Array.isArray(l.processes) ? l.processes.map((p) => (typeof p === 'object' ? p.id : p)) : [],
@@ -476,6 +478,7 @@ const BOMForm = () => {
                   availableVariants: activeVariants,
                   primaryUom: item.uomSymbol || line.primaryUom,
                   secondaryUom: item.secondaryUomSymbol || '',
+                  uomConversionFactor: line.uomConversionFactor ?? item.uomConversionFactor ?? null,
                   itemTypeId: line.itemTypeId || item.itemTypeId || null,
                 };
               });
@@ -897,6 +900,8 @@ const BOMForm = () => {
           secondaryUom: item.secondaryUomSymbol || '',
           secondaryUomId: item.secondaryUomId || null,
           uom: item.secondaryUomSymbol || item.uomSymbol || '',
+          // Snapshotted at save time so the PO quantity converts to the purchase UOM.
+          uomConversionFactor: item.uomConversionFactor ?? null,
           availableVariants: activeVariants,
           variantId: firstVariant?.id || null,
           variants: firstVariant ? selectedAttrs : {},
@@ -1335,21 +1340,10 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
-      ...rest,
-      // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
-      variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
-      baseQty: (() => {
-        const line = lines[idx];
-        if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
-          return computeMatrixTotalQty(line);
-        }
-        const { qty } = getColorQty(line);
-        return qty || 0;
-      })(),
-      totalQty: computeTotalQty(lines[idx]),
-      purchaseQty: (() => {
-        const line = lines[idx];
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => {
+      const line = lines[idx];
+
+      const purchaseQty = (() => {
         const tq = computeTotalQty(line);
         if (!tq) return 0;
         const allowances = rest.processAllowances || [];
@@ -1378,13 +1372,38 @@ const BOMForm = () => {
         const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
         const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
         return calcPurchaseQty(tq, loss, rej + ship);
-      })(),
-      // Convert process IDs to objects for JSONB storage
-      processes: (rest.processes || []).map((pid) => {
-        const proc = processesList.find((p) => p.id === pid);
-        return proc ? { id: proc.id, processName: proc.processName } : { id: pid };
-      }),
-    }));
+      })();
+
+      // purchaseQty is in the consumption UOM (the item's secondary UOM when it has one).
+      // When the item defines a conversion, the PO is raised in the primary UOM instead,
+      // so snapshot the factor and the converted quantity — a later edit to the item master
+      // must never retroactively change this BOM or a PO generated from it.
+      const factor = Number(line.uomConversionFactor) || null;
+      const hasConversion = !!factor && !!primaryUom && primaryUom !== rest.uom;
+
+      return {
+        ...rest,
+        // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
+        variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
+        baseQty: (() => {
+          if (line.consumptionMode === CONSUMPTION_MODE.SIZE_WISE || line.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+            return computeMatrixTotalQty(line);
+          }
+          const { qty } = getColorQty(line);
+          return qty || 0;
+        })(),
+        totalQty: computeTotalQty(line),
+        purchaseQty,
+        purchaseUom: hasConversion ? primaryUom : rest.uom,
+        uomConversionFactor: hasConversion ? factor : null,
+        purchaseQtyPrimary: hasConversion ? Math.round((purchaseQty / factor) * 10000) / 10000 : null,
+        // Convert process IDs to objects for JSONB storage
+        processes: (rest.processes || []).map((pid) => {
+          const proc = processesList.find((p) => p.id === pid);
+          return proc ? { id: proc.id, processName: proc.processName } : { id: pid };
+        }),
+      };
+    });
 
     return {
       version: entityVersion,
@@ -1875,6 +1894,11 @@ const BOMForm = () => {
                     }}
                     onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                     options={variants.map((v) => {
+                      // Prefer the variant's own identity; fall back to its attributes for
+                      // legacy variants saved before names existed.
+                      if (v.variantName) {
+                        return { value: v.id, label: v.variantCode ? `${v.variantName} (${v.variantCode})` : v.variantName };
+                      }
                       const entries = Object.entries(v.attributes || {});
                       entries.sort(([a], [b]) => a.toLowerCase() === 'color' ? -1 : b.toLowerCase() === 'color' ? 1 : 0);
                       return { value: v.id, label: entries.map(([k, val]) => `${k}: ${val}`).join(' | ') };
