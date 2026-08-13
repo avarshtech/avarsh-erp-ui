@@ -47,7 +47,19 @@ the same walls when they are next run.
 
 ## Session 1 — Masters
 
-_Pending._
+| ID | Module | Severity | Symptom | Root cause | Fix | Status |
+|----|--------|----------|---------|------------|-----|--------|
+| B-017 | Process Master | **Critical** | A process created through the UI can never appear in a cost sheet. The Manufacturing and Overhead sections of every cost sheet stay permanently empty. | [ProcessMaster.jsx](../../src/pages/master/ProcessMaster.jsx) sourced its Category dropdown from the **item** categories in StoreContext (Fabric, Local Trims, …), but [CostingForm.jsx:318-319](../../src/pages/costing/CostingForm.jsx#L318-L319) queries `getActiveProcesses('Manufacturing')` and `getActiveProcesses('Overheads')`. The two lists had no values in common. BOM is unaffected — it loads processes unfiltered. | Replaced the dynamic list with the fixed `CATEGORY_OPTIONS` the cost sheet actually queries. | Fixed |
+| B-018 | E2E harness | Major | Selecting any option beyond roughly the 8th in an AntD `Select` times out — e.g. sub-category "Interlining" (9th of 10) was unreachable even though the record existed. | AntD renders options in an `rc-virtual-list` capped at `max-height: 256px`; options below the fold are not in the DOM at all. | `chooseOption()` in [ui-master.js](../../e2e/helpers/ui-master.js) now filters by typing when the Select is searchable, and otherwise scrolls the virtual list until the option renders. | Fixed |
+| B-019 | E2E harness | Major | Re-running the masters spec tried to re-create items that already existed, so the suite was not idempotent. | Two causes stacked: (a) the exists-check searched the **derived** item name, which `ItemSpecification` can never match (B-014); (b) the Items list filters server-side, so sampling the table 400 ms after typing raced the response. | Item exists-check now searches the first **variant** name and waits for the row (6 s) instead of sampling immediately. | Fixed |
+| B-020 | E2E harness | Minor | A full 25-test run intermittently dies with "Target page, context or browser has been closed" around the 14-minute mark. | Chromium session exhaustion over a very long single-worker run; not reproducible when the same tests run in a shorter batch. | Not fixed — reruns cleanly. Watch it; if it recurs, split the journey run per module. | Open |
+
+### Requirements discovered while seeding (not bugs)
+
+- **Buyer** needs at least one shipping location, captured in a nested modal (Location Label, Address, Country, Postal Code, City, State/Province).
+- **Supplier** requires a 10-digit phone with no country code, plus Pincode, PAN and GSTIN.
+- **Terms & Conditions** content is a Quill rich-text editor, not an `Input` — it needs click-and-type, not `fill()`.
+- **Size Presets** renders a "Clear All" button inside its `Sizes` label, so the label's text is `SizesClear All`.
 
 ## Session 2 — Costing
 

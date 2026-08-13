@@ -134,9 +134,9 @@ export default defineConfig({
     {
       name: 'journey',
       testDir: './e2e/specs/journey',
-      // Generous enough for a multi-record seeding test, but individual actions carry
-      // their own short timeouts so a bad selector fails in seconds, not minutes.
-      timeout: 240000,
+      // Generous: a seeding test may create a dozen records through real forms.
+      // Safe because actionTimeout below makes a bad selector fail in seconds.
+      timeout: 900000,
       use: {
         browserName: 'chromium',
         storageState: './e2e/.auth/user.json',

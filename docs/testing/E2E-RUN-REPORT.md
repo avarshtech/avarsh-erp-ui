@@ -52,10 +52,66 @@ UI at all**, and **no fabric item could be created by any means**.
 
 ---
 
-## Session 1 — Masters
+## Session 1 — Masters (complete)
 
-_Not started._ Seeds the full canonical dataset from `e2e/data/garment-dataset.js`
-across all 17 master screens.
+**Goal:** populate all 17 master screens with the canonical garment dataset, driven
+entirely through the real UI.
+
+### Result
+
+| Check | Result |
+|-------|--------|
+| `npm run build` | Pass |
+| ESLint on all touched files | Clean |
+| Deprecated AntD prop scan | Clean |
+| `01-masters.spec.js` — all 21 tests | **Pass** |
+| Idempotent re-run | Pass — every test reports `0 created, N already present` |
+
+### Data seeded (verified via API)
+
+| Entity | Count | Entity | Count |
+|--------|-------|--------|-------|
+| Categories | 4 | Payment Terms | 2 |
+| Sub-Categories | 10 | Terms & Conditions | 2 |
+| Item Types | 19 | Overheads | 3 |
+| Attributes | 7 | Processes | 8 |
+| UOMs | 7 | Parts | 6 |
+| **Items** | **19** | Defect Types | 5 |
+| **Item Variants** | **31** | Trims QC Criteria | 4 |
+| Buyers | 2 | Suppliers | 3 |
+| Styles | 3 | Size Presets | 2 |
+
+10 of the 19 items carry a UOM conversion factor (fabric KG→MTR, buttons GRS→PCS,
+thread CON→MTR) — the input for the BOM purchase-quantity conversion in Session 3.
+
+Sample of the generated variant SKUs:
+
+```
+KNI-SIN-001 | Fabric / Knits / Single Jersey | factor: 3.2
+   KNI-SIN-001-NAVY-180 | Single Jersey 180 GSM Navy Blue
+KNI-PIQ-001 | Fabric / Knits / Pique        | factor: 2.8
+   KNI-PIQ-001-ROYA-220-66 | Pique 220 GSM Royal Blue
+```
+
+Costing can now resolve its process lists, which was impossible before B-017:
+
+```
+/processes/active?category=Manufacturing -> Cutting, Sewing, Finishing, Ironing, Packing
+/processes/active?category=Overheads     -> Factory, Administrative, Financial
+```
+
+### Bugs
+
+1 critical product bug (**B-017** — Process Master's category dropdown made cost-sheet
+processes uncreatable), 3 harness bugs (B-018…B-020), and 4 form requirements
+discovered. See [E2E-BUG-LOG.md](./E2E-BUG-LOG.md).
+
+### Known deviation
+
+The dataset defines 32 variants but 31 exist: `Single Jersey` was created by the
+Session 0 smoke spec with 2 of its 3 variants, and the idempotent skip-if-exists rule
+works at item level, so the third (`Single Jersey 160 GSM Black`) was never added.
+Harmless for the downstream flow — noted for accuracy.
 
 ## Session 2 — Costing
 

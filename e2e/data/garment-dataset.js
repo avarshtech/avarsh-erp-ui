@@ -278,57 +278,81 @@ export const ITEMS = [
 ];
 
 // ── Business partners ──────────────────────────────────────────────
+// The buyer form requires at least one shipping location, captured in a nested modal.
 export const BUYERS = [
   {
     name: 'H&M Hennes & Mauritz AB',
     code: 'HM',
-    country: 'Sweden',
     currency: 'USD',
     email: 'sourcing@hm-buying.example.com',
     phone: '+46812345678',
-    address: 'Master Samuelsgatan 46A, Stockholm 106 38',
+    location: {
+      label: 'Stockholm DC',
+      address: 'Master Samuelsgatan 46A',
+      country: 'Sweden',
+      postalCode: '10638',
+      city: 'Stockholm',
+      state: 'Stockholm County',
+    },
   },
   {
     name: 'Primark Stores Ltd',
     code: 'PRIMARK',
-    country: 'United Kingdom',
     currency: 'GBP',
     email: 'orders@primark-buying.example.com',
     phone: '+442071234567',
-    address: '22-24 Parnell Street, Dublin 1',
+    location: {
+      label: 'Dublin DC',
+      address: '22-24 Parnell Street',
+      country: 'Ireland',
+      postalCode: 'D01 E7P6',
+      city: 'Dublin',
+      state: 'Leinster',
+    },
   },
 ];
 
+// Phone must be exactly 10 digits (no country code); Pincode, PAN and GSTIN are all
+// mandatory on the supplier form.
 export const SUPPLIERS = [
   {
     name: 'Arvind Mills Ltd',
     code: 'ARVIND',
     supplies: 'Fabric',
     gstin: '24AABCA1234M1Z5',
-    state: 'Gujarat',
+    pan: 'AABCA1234M',
     email: 'sales@arvind-mills.example.com',
-    phone: '+919876543210',
-    address: 'Naroda Road, Ahmedabad, Gujarat 380025',
+    phone: '9876543210',
+    address: 'Naroda Road, Ahmedabad',
+    city: 'Ahmedabad',
+    state: 'Gujarat',
+    pincode: '380025',
   },
   {
     name: 'Coats India Pvt Ltd',
     code: 'COATS',
     supplies: 'Local Trims',
     gstin: '33AAACC5678N1Z2',
-    state: 'Tamil Nadu',
+    pan: 'AAACC5678N',
     email: 'orders@coats-india.example.com',
-    phone: '+919845012345',
-    address: 'Ambattur Industrial Estate, Chennai, Tamil Nadu 600058',
+    phone: '9845012345',
+    address: 'Ambattur Industrial Estate, Chennai',
+    city: 'Chennai',
+    state: 'Tamil Nadu',
+    pincode: '600058',
   },
   {
     name: 'YKK India Pvt Ltd',
     code: 'YKK',
     supplies: 'Imported Trims',
     gstin: '06AAACY9012P1Z8',
-    state: 'Haryana',
+    pan: 'AAACY9012P',
     email: 'export@ykk-india.example.com',
-    phone: '+919812345678',
-    address: 'Bawal Industrial Area, Rewari, Haryana 123501',
+    phone: '9812345678',
+    address: 'Bawal Industrial Area, Rewari',
+    city: 'Rewari',
+    state: 'Haryana',
+    pincode: '123501',
   },
 ];
 
@@ -338,21 +362,25 @@ export const SIZE_PRESETS = [
   { name: 'Bottoms 28-38', sizes: ['28', '30', '32', '34', '36', '38'] },
 ];
 
+// Season is two fields on the form: a code Select (labelled with the full season
+// name, e.g. "Spring/Summer") and a year Select.
 export const STYLES = [
   {
     styleNo: 'HM-TS-2601',
     name: "Men's Crew Neck T-Shirt",
     buyer: 'H&M Hennes & Mauritz AB',
     sizePreset: 'Tops S-XXL',
-    season: 'SS26',
+    seasonLabel: 'Spring/Summer',
+    seasonYear: '2026',
     description: 'Short sleeve crew neck tee, single jersey, side seamed',
   },
   {
     styleNo: 'HM-PL-2602',
-    name: "Ladies Pique Polo Shirt",
+    name: 'Ladies Pique Polo Shirt',
     buyer: 'H&M Hennes & Mauritz AB',
     sizePreset: 'Tops S-XXL',
-    season: 'SS26',
+    seasonLabel: 'Spring/Summer',
+    seasonYear: '2026',
     description: 'Short sleeve pique polo with rib collar and 3-button placket',
   },
   {
@@ -360,7 +388,8 @@ export const STYLES = [
     name: "Men's Slim Fit Denim Jeans",
     buyer: 'Primark Stores Ltd',
     sizePreset: 'Bottoms 28-38',
-    season: 'AW26',
+    seasonLabel: 'Autumn/Winter',
+    seasonYear: '2026',
     description: '5-pocket slim fit jeans, 12 oz stretch denim',
   },
 ];

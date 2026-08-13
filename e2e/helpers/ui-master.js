@@ -69,11 +69,25 @@ export async function masterRecordExists(page, name) {
 
 // ── Form field helpers ─────────────────────────────────────────────
 
-/** The .ant-form-item wrapping the field with this label. */
+/**
+ * The .ant-form-item wrapping the field with this label.
+ *
+ * Matches the label exactly, or as a prefix. The prefix form is needed because some
+ * labels embed extra controls: Size Presets renders a "Clear All" button inside its
+ * Sizes label and JSX drops the whitespace between them, so the text is "SizesClear All".
+ *
+ * Prefix matching assumes labels are prefix-unique within a single form, which holds
+ * across all master screens. Pass the fuller label when two could collide
+ * (e.g. "State / Province" rather than "State").
+ */
 export function formField(page, label, scope = page) {
-  return scope
-    .locator('.ant-form-item')
-    .filter({ has: page.locator('.ant-form-item-label label').filter({ hasText: labelPattern(label) }) })
+  const byPattern = (pattern) =>
+    scope
+      .locator('.ant-form-item')
+      .filter({ has: page.locator('.ant-form-item-label label').filter({ hasText: pattern }) });
+
+  return byPattern(labelPattern(label))
+    .or(byPattern(new RegExp(`^\\s*${escapeRe(label)}`)))
     .first();
 }
 
@@ -84,12 +98,43 @@ export async function fillByLabel(page, label, value, scope = page) {
   await input.fill(String(value), { timeout: ACTION_TIMEOUT });
 }
 
+/**
+ * Click an option in the open dropdown.
+ *
+ * AntD renders options in an `rc-virtual-list` capped at 256px, so with more than
+ * ~8 options the rest are simply not in the DOM. Two ways past that: filter by typing
+ * when the Select is searchable, otherwise scroll the virtual list until the option
+ * materialises.
+ */
+async function chooseOption(page, field, optionText) {
+  const input = field.locator('input').first();
+  const searchable = (await input.getAttribute('readonly')) === null;
+
+  if (searchable) {
+    await input.fill('');
+    await input.type(String(optionText), { delay: 10 });
+    await page.waitForTimeout(300);
+  }
+
+  let option = visibleOption(page, optionText);
+  if ((await option.count()) === 0) {
+    const holder = page.locator('.ant-select-dropdown:visible .rc-virtual-list-holder').first();
+    for (let i = 0; i < 15 && (await option.count()) === 0; i++) {
+      await holder.evaluate((el) => { el.scrollTop += 180; }).catch(() => {});
+      await page.waitForTimeout(120);
+      option = visibleOption(page, optionText);
+    }
+  }
+
+  await option.click({ timeout: ACTION_TIMEOUT });
+}
+
 /** Pick one option from an AntD Select identified by its form label. */
 export async function selectByLabel(page, label, optionText, scope = page) {
   const field = formField(page, label, scope);
   await field.locator('.ant-select').first().click({ timeout: ACTION_TIMEOUT });
   await page.waitForTimeout(200);
-  await visibleOption(page, optionText).click({ timeout: ACTION_TIMEOUT });
+  await chooseOption(page, field, optionText);
   await page.waitForTimeout(200);
 }
 
@@ -99,11 +144,50 @@ export async function multiSelectByLabel(page, label, optionTexts, scope = page)
   await field.locator('.ant-select').first().click({ timeout: ACTION_TIMEOUT });
   await page.waitForTimeout(200);
   for (const text of optionTexts) {
-    await visibleOption(page, text).click({ timeout: ACTION_TIMEOUT });
+    await chooseOption(page, field, text);
     await page.waitForTimeout(150);
   }
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);
+}
+
+/**
+ * Fill a `mode="tags"` Select — free-text values committed with Enter
+ * (e.g. the Sizes field on Size Presets).
+ */
+export async function fillTagsByLabel(page, label, values, scope = page) {
+  const field = formField(page, label, scope);
+  const input = field.locator('input').first();
+  await input.click({ timeout: ACTION_TIMEOUT });
+  for (const value of values) {
+    await input.fill(String(value));
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(120);
+  }
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+}
+
+/**
+ * Type into a Quill rich-text editor (Terms & Conditions content).
+ * Quill is a contenteditable div, so `fill()` does not apply — click and type.
+ */
+export async function fillRichText(page, text, scope = page) {
+  const editor = scope.locator('.rich-text-editor-wrapper .ql-editor').first();
+  await editor.click({ timeout: ACTION_TIMEOUT });
+  await page.keyboard.type(text, { delay: 5 });
+  await page.waitForTimeout(200);
+}
+
+/** Tick a checkbox by its visible label text, if not already ticked. */
+export async function checkByText(page, text, scope = page) {
+  const box = scope
+    .locator('.ant-checkbox-wrapper')
+    .filter({ hasText: new RegExp(`^${escapeRe(text)}$`) })
+    .first();
+  if ((await box.locator('input:checked').count()) === 0) {
+    await box.click({ timeout: ACTION_TIMEOUT });
+  }
 }
 
 /**
