@@ -584,6 +584,8 @@ const POForm = () => {
           0,
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
+        variantCode: item.variantCode || '',
+        variantName: item.variantName || '',
         variantAttributes: item.variantAttributes || null,
         hsnCode: item.hsnCode || '',
         categoryName: item.categoryName || '',
@@ -729,6 +731,8 @@ const POForm = () => {
               unitPrice,
               gstPercent: gst,
               variantId: variant?.id || null,
+              variantCode: variant?.variantCode || '',
+              variantName: variant?.variantName || '',
               variantAttributes: variant?.attributes || null,
               hsnCode: item.hsnCode || '',
               categoryName: item.categoryName || '',
@@ -930,14 +934,21 @@ const POForm = () => {
 
   // BOM Line Selection confirm handler
   const handleBomLineSelectionConfirm = useCallback((selectedLines) => {
+    // The PO is raised in the item's purchase (primary) UOM. BOM lines saved before UOM
+    // conversion existed have no converted figure, so they fall back to the consumption UOM.
+    const bomPurchaseQty = (bomLine) => bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0;
+    const bomPurchaseUom = (bomLine) => bomLine.purchaseUom || bomLine.uom || '';
+
     const createPoLineFromBom = (bomLine, bomId) => ({
       key: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       itemId: bomLine.itemId,
       itemCode: bomLine.itemCode,
       itemName: bomLine.itemName || '',
+      variantCode: bomLine.variantCode || '',
+      variantName: bomLine.variantName || '',
       description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
-      qty: String(bomLine.purchaseQty || 0),
-      uom: bomLine.uom || '',
+      qty: String(bomPurchaseQty(bomLine)),
+      uom: bomPurchaseUom(bomLine),
       uomId: null,
       primaryUom: '',
       primaryUomId: null,
@@ -961,10 +972,11 @@ const POForm = () => {
       // Merge duplicate item+variant+uom lines
       const mergeMap = new Map();
       selectedLines.forEach(({ bomLine, bomId }) => {
-        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.uom || ''}`;
+        // Group by the unit actually being purchased, so quantities only merge when comparable
+        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomPurchaseUom(bomLine)}`;
         if (mergeMap.has(key)) {
           const existing = mergeMap.get(key);
-          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQty || 0));
+          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomPurchaseQty(bomLine)));
           existing.bomLineSources.push({ bomId, lineId: bomLine.id });
         } else {
           mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
@@ -1566,17 +1578,17 @@ const POForm = () => {
         if (record._fromBom) {
           return (
             <div>
-              <Text strong style={{ fontSize: 13 }}>{record.itemCode}</Text>
+              <Text strong style={{ fontSize: 13 }}>{record.variantCode}</Text>
               <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>{record.itemName}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.variantName}</Text>
             </div>
           );
         }
         return (
           <ItemSearchInput
             value={
-              record.itemCode || record.itemName
-                ? `${record.itemCode || ''} - ${record.itemName || ''}`
+              record.variantCode || record.variantName
+                ? `${record.variantCode || ''} - ${record.variantName || ''}`
                 : ''
             }
             onSelect={(item) => handleItemSelect(item, record.key)}
@@ -2363,8 +2375,8 @@ const POForm = () => {
             stages={lineItem.processingStages}
             poDate={form.getFieldValue('poDate')}
             deliveryDate={form.getFieldValue('deliveryDate')}
-            itemName={lineItem.itemName}
-            itemCode={lineItem.itemCode}
+            itemName={lineItem.variantName}
+            itemCode={lineItem.variantCode}
             variantAttributes={lineItem.variantAttributes}
           />
         ) : null;

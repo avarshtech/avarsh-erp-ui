@@ -130,6 +130,9 @@ const FabricQCInspection = () => {
       const newRolls = (lineItem.rolls || []).map((r) => ({
         rollNumber: r.rollNumber,
         itemCode: lineItem.itemCode,
+        // Snapshot the variant identity (from the GRN line) so QC/return/debit records keep it.
+        variantCode: lineItem.variantCode || v?.variantCode || '',
+        variantName: lineItem.variantName || v?.variantName || '',
         description: lineItem.description,
         qty: r.receivingQty || r.qty || 0,
         uom: lineItem.uom || v?.primaryUom || '',
@@ -187,7 +190,7 @@ const FabricQCInspection = () => {
   // ─── Derived data ──────────────────────────────────────────────────────────
   const lineItemOptions = useMemo(() => {
     const lineItems = selectedGRN?.lineItems || [];
-    return lineItems.map((li) => ({ label: `${li.itemCode} — ${li.description}`, value: li.poLineItemId || li.id }));
+    return lineItems.map((li) => ({ label: `${li.variantCode || li.itemCode || '—'} — ${li.variantName || li.description}`, value: li.poLineItemId || li.id }));
   }, [selectedGRN]);
 
   const defectTypeOptions = useMemo(

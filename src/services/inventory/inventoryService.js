@@ -10,10 +10,11 @@ import axiosInstance from '../core/axiosInstance';
 import {
   MOCK_FABRIC_STOCK, MOCK_ACCESSORIES_STOCK, MOCK_FABRIC_ISSUES, MOCK_ACCESSORIES_ISSUES,
   MOCK_ADJUSTMENTS, MOCK_PRODUCTION_ORDERS, MOCK_DASHBOARD_STATS,
-  MOCK_ITEM_VARIANTS, MOCK_PURCHASE_ORDERS_FOR_GRN,
+  MOCK_PURCHASE_ORDERS_FOR_GRN,
   MOCK_FABRIC_GRNS, MOCK_ACCESSORIES_GRNS, MOCK_FABRIC_QC, MOCK_TRIMS_QC,
   MOCK_APPROVED_CUTTING_POS, MOCK_APPROVED_WORK_ORDERS,
 } from './inventoryMockData';
+import { getVariantsByIds } from '../master/variantService';
 import { getActiveDefectTypes as fetchActiveDefectTypes } from '../master/defectTypeService';
 import { getActiveTrimsQCCriteria as fetchActiveTrimsQCCriteria } from '../master/trimsQCCriteriaService';
 import { getItemMetaData } from '../master/itemService';
@@ -333,9 +334,56 @@ export const getAllGRNsForValidation = async () => {
   return [];
 };
 
-// Variant lookup — still mock until item master variant API lands.
-export const getItemVariant = async (variantId) => { await delay(50); return MOCK_ITEM_VARIANTS[variantId] || null; };
-export const getItemVariantsBulk = (variantIds = []) => variantIds.map((id) => MOCK_ITEM_VARIANTS[id] || null);
+// ─── Variant lookup (real API) ───────────────────────────────────────────────
+// Adapts ItemVariantDTO to the shape GRN/QC screens consume (attributes.width/gsm,
+// primaryUom/secondaryUom, color/size, category).
+const adaptVariant = (v) => {
+  if (!v) return null;
+  const attrs = v.attributes || {};
+  const attrCI = (name) => {
+    const key = Object.keys(attrs).find((k) => k.toLowerCase() === name);
+    return key ? attrs[key] : undefined;
+  };
+  return {
+    id: v.id,
+    itemId: v.itemId,
+    itemCode: v.itemCode,
+    itemName: v.variantName || v.itemName,
+    variantCode: v.variantCode,
+    variantName: v.variantName,
+    color: attrCI('color') ?? attrCI('colour') ?? '-',
+    size: attrCI('size') ?? '-',
+    primaryUom: v.uomSymbol || '',
+    secondaryUom: v.secondaryUomSymbol || '',
+    category: v.categoryName || '',
+    attributes: attrs,
+  };
+};
+
+export const getItemVariant = async (variantId) => {
+  if (variantId == null) return null;
+  try {
+    const res = await getVariantsByIds([variantId]);
+    const list = res?.data || res || [];
+    return adaptVariant(list[0] || null);
+  } catch {
+    return null;
+  }
+};
+
+/** Bulk variant lookup. Preserves positional order of the input ids (nulls for misses). */
+export const getItemVariantsBulk = async (variantIds = []) => {
+  const ids = (variantIds || []).filter((id) => id != null);
+  if (ids.length === 0) return (variantIds || []).map(() => null);
+  try {
+    const res = await getVariantsByIds(ids);
+    const list = res?.data || res || [];
+    const byId = new Map(list.map((v) => [v.id, adaptVariant(v)]));
+    return (variantIds || []).map((id) => byId.get(id) || null);
+  } catch {
+    return (variantIds || []).map(() => null);
+  }
+};
 
 // ─── GRN write operations ────────────────────────────────────────────────────
 

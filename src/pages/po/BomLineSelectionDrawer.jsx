@@ -269,8 +269,8 @@ const BomLineSelectionDrawer = ({
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Text strong style={{ fontSize: 13 }}>{line.itemCode}</Text>
-            <Text type="secondary" style={{ fontSize: 13 }}>{line.itemName}</Text>
+            <Text strong style={{ fontSize: 13 }}>{line.variantCode || line.itemCode}</Text>
+            <Text type="secondary" style={{ fontSize: 13 }}>{line.variantName || line.itemName}</Text>
             {isLocked && (
               <Tag color="warning" icon={<LockOutlined />} style={{ fontSize: 11 }}>
                 PO Placed
@@ -305,12 +305,22 @@ const BomLineSelectionDrawer = ({
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', minWidth: 90, flexShrink: 0 }}>
+        <div style={{ textAlign: 'right', minWidth: 110, flexShrink: 0 }}>
+          {/* Quantity the PO will be raised in; lines saved before UOM conversion fall back */}
           <Text strong style={{ fontSize: 13 }}>
-            {line.purchaseQty != null ? Number(line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-'}
+            {(line.purchaseQtyPrimary ?? line.purchaseQty) != null
+              ? Number(line.purchaseQtyPrimary ?? line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+              : '-'}
           </Text>
           <br />
-          <Text type="secondary" style={{ fontSize: 11 }}>{line.uom || ''}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>{line.purchaseUom || line.uom || ''}</Text>
+          {line.purchaseQtyPrimary != null && Number(line.uomConversionFactor) > 0 && (
+            <div>
+              <Text type="secondary" style={{ fontSize: 10 }}>
+                {Number(line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })} {line.uom}
+              </Text>
+            </div>
+          )}
         </div>
       </div>
     );

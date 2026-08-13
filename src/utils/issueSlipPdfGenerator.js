@@ -69,8 +69,8 @@ const buildFabricRows = (issue) => {
 const buildAccessoryRows = (issue) =>
   (issue.items || []).map((it, i) => ({
     sl: i + 1,
-    primary: it.description || it.itemCode || 'Item',
-    itemCode: it.itemCode || '—',
+    primary: it.variantName || it.description || it.variantCode || 'Item',
+    itemCode: it.variantCode || '—',
     color: it.color || '',
     size: it.size || '',
     bomQty: Number(it.bomQty) || 0,

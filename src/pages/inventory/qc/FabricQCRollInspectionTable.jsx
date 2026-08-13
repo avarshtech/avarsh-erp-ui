@@ -22,7 +22,7 @@ const FabricQCRollInspectionTable = memo(function FabricQCRollInspectionTable({
     () => [
       { title: '#', key: 'idx', align: 'center', width: 50, render: (_, __, i) => i + 1 },
       { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 100, render: (v) => <Text strong>{v}</Text> },
-      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text> },
+      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => <Text code style={{ fontSize: 12 }}>{r.variantCode || v || '—'}</Text> },
       { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
       {
         title: 'Qty',

@@ -53,7 +53,7 @@ const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase',
 
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v) => <Text code style={{ fontSize: 12 }}>{v || '—'}</Text> },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => <Text code style={{ fontSize: 12 }}>{r.variantCode || v || '—'}</Text> },
   { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
   { title: 'Width', dataIndex: 'stdWidth', align: 'center', width: 100 },
   { title: 'GSM', dataIndex: 'stdGsm', align: 'center', width: 100 },

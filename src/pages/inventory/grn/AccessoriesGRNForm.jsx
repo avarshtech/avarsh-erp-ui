@@ -144,17 +144,23 @@ const AccessoriesGRNForm = () => {
   // Carton #, and Quantity for line items that remain selected.
   useEffect(() => {
     if (!selectedPO) return;
+    let cancelled = false;
+    // Resolve variant identity up front (async API), then reconcile items + cartons.
+    const variantIds = selectedLineItemIds.map(
+      (id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId,
+    );
+    getItemVariantsBulk(variantIds).then((variants) => {
+      if (cancelled) return;
+      const variantByLineId = new Map(selectedLineItemIds.map((id, i) => [id, variants[i]]));
 
     setItems((prevItems) => {
       const kept = prevItems.filter((it) => selectedLineItemIds.includes(it.poLineItemId));
       const existingIds = new Set(prevItems.map((it) => it.poLineItemId));
       const newIds = selectedLineItemIds.filter((id) => !existingIds.has(id));
       if (newIds.length === 0 && kept.length === prevItems.length) return prevItems;
-      const newVariantIds = newIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshItems = newIds.map((id, idx) => {
+      const freshItems = newIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           variantId: li?.variantId,
@@ -181,11 +187,9 @@ const AccessoriesGRNForm = () => {
       const existingLineItemIds = new Set(prevCartons.map((c) => c.poLineItemId));
       const newLineIds = selectedLineItemIds.filter((id) => !existingLineItemIds.has(id));
       if (newLineIds.length === 0 && kept.length === prevCartons.length) return prevCartons;
-      const newVariantIds = newLineIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshCartons = newLineIds.map((id, idx) => {
+      const freshCartons = newLineIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           cartonNumber: '',
@@ -209,6 +213,8 @@ const AccessoriesGRNForm = () => {
       });
       return result;
     });
+    });
+    return () => { cancelled = true; };
   }, [selectedPO, selectedLineItemIds]);
 
   const handleItemChange = useCallback((idx, field, value) => {
@@ -474,6 +480,7 @@ const AccessoriesGRNForm = () => {
                       compact
                       placeholder="Upload DC image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
                         setDcImage((prev) => ({
@@ -511,6 +518,7 @@ const AccessoriesGRNForm = () => {
                       compact
                       placeholder="Upload invoice image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
                         setSupplierInvoice((prev) => ({

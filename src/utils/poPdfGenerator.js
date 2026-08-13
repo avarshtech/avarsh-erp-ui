@@ -231,9 +231,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
 
     // Description with item details
     let descParts = [];
-    if (item.itemName) descParts.push(`<strong>${item.itemName}</strong>`);
+    const lineName = item.variantName;
+    const lineCode = item.variantCode;
+    if (lineName) descParts.push(`<strong>${lineName}</strong>`);
     if (item.description) descParts.push(item.description);
-    if (item.itemCode) descParts.push(`<span class="item-code">Code: ${item.itemCode}</span>`);
+    if (lineCode) descParts.push(`<span class="item-code">Code: ${lineCode}</span>`);
 
     // Variant attributes (excluding color which shows as swatch)
     const colorSwatches = extractColorSwatches(item);

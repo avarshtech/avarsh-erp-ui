@@ -47,11 +47,12 @@ import {
   QTY_CALC_BASIS,
   CONSUMPTION_MODE,
   CONSUMPTION_MODE_OPTIONS,
-  calcPurchaseQty,
+  calcLinePurchaseQty,
   calcTrimsTotal,
   buildOrderQtyGrid,
   calcMatrixTotal,
 } from '../../utils/bomConstants';
+import { conversionApplies, convertToPrimary, formatConversionLabel } from '../../utils/uomConversions';
 import ProcessAllowanceModal from './ProcessAllowanceModal';
 import ConsumptionMatrixDialog from './ConsumptionMatrixDialog';
 import ConsumptionCalcModal from '../costing/ConsumptionCalcModal';
@@ -84,6 +85,8 @@ const createEmptyLine = () => ({
   secondaryUom: '',
   secondaryUomId: null,
   uom: '',
+  uomConversionFactor: null,
+  purchaseUom: '',
   partsName: '',
   consumptionPerGarment: null,
   colorInvalid: false, // true when variant color not found in order lines
@@ -146,107 +149,6 @@ const variantsToTags = (variants) => {
   return Object.entries(variants)
     .filter(([, v]) => v !== '' && v != null)
     .map(([k, v]) => `${k}:${v}`);
-};
-
-// ==================== ITEM SEARCH (Debounced AutoComplete) ====================
-
-const BomItemSearch = ({ value, onSelect, onClear, disabled, categoryId, subCategoryId, itemTypeId }) => {
-  const [searchText, setSearchText] = useState(value || '');
-  const [options, setOptions] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const debounceRef = useRef(null);
-  const noResultPrefixRef = useRef('');
-  const lastQueryRef = useRef('');
-
-  useEffect(() => { setSearchText(value || ''); }, [value]);
-
-  const handleSearch = (text) => {
-    setSearchText(text);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!text || text.length < 3) {
-      setOptions([]);
-      lastQueryRef.current = '';
-      noResultPrefixRef.current = '';
-      return;
-    }
-    const isShortening = text.length < lastQueryRef.current.length;
-    if (isShortening && noResultPrefixRef.current) {
-      if (text.length < noResultPrefixRef.current.length ||
-          !text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        noResultPrefixRef.current = '';
-      }
-    }
-    if (noResultPrefixRef.current && text.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-      setOptions([]);
-      lastQueryRef.current = text;
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const response = await searchItems({
-          search: text,
-          categoryId,
-          subCategoryId,
-          itemTypeId,
-          size: 20,
-        });
-        const payload = response?.data || response || {};
-        const items = Array.isArray(payload) ? payload : Array.isArray(payload?.content) ? payload.content : [];
-        lastQueryRef.current = text;
-        if (items.length === 0) { noResultPrefixRef.current = text; } else { noResultPrefixRef.current = ''; }
-        setOptions(items.map((item) => {
-          const displayText = `${item.itemCode || ''} - ${item.itemName || ''}`;
-          return {
-            // value must match what handleSelect sets on searchText
-            // so that onChange (which fires after onSelect) doesn't overwrite it
-            value: item.itemName || '',
-            key: item.id,
-            label: (
-              <Tooltip title={displayText} placement="right" mouseEnterDelay={0.4}>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 12 }}>
-                  {displayText}
-                </div>
-              </Tooltip>
-            ),
-            item,
-          };
-        }));
-      } catch { setOptions([]); }
-      finally { setSearching(false); }
-    }, 300);
-  };
-
-  const handleSelect = (_, option) => {
-    setSearchText(option.item.itemName || '');
-    setOptions([]);
-    if (onSelect) onSelect(option.item);
-  };
-
-  const handleChange = (text) => {
-    setSearchText(text || '');
-    if (!text) {
-      setOptions([]);
-      if (onClear) onClear();
-    }
-  };
-
-  return (
-    <AutoComplete
-      value={searchText}
-      options={options}
-      onSearch={handleSearch}
-      onSelect={handleSelect}
-      onChange={handleChange}
-      placeholder={!itemTypeId ? 'Select item type first' : 'Search items (min 3 chars)...'}
-      disabled={disabled}
-      style={{ width: '100%' }}
-      size="small"
-      allowClear
-      popupMatchSelectWidth={true}
-      notFoundContent={searching ? <Spin size="small" /> : null}
-    />
-  );
 };
 
 // ==================== COMPONENT ====================
@@ -437,12 +339,18 @@ const BOMForm = () => {
               itemTypeName: l.itemTypeName || '',
               variants: l.variants || {},
               variantId: l.variantId || null,
+              variantCode: l.variantCode || '',
+              variantName: l.variantName || '',
               availableVariants: [],
               primaryUom: l.uom || '',
               primaryUomId: null,
               secondaryUom: '',
               secondaryUomId: null,
               uom: l.uom || '',
+              // Saved snapshot — kept so PO-generated/untouched lines still render their
+              // original conversion; refreshed from the item master just below when editable.
+              uomConversionFactor: l.uomConversionFactor ?? null,
+              purchaseUom: l.purchaseUom || '',
               partsName: l.partsName || [],
               consumptionPerGarment: l.consumptionPerGarment,
               processes: Array.isArray(l.processes) ? l.processes.map((p) => (typeof p === 'object' ? p.id : p)) : [],
@@ -475,7 +383,10 @@ const BOMForm = () => {
                   ...line,
                   availableVariants: activeVariants,
                   primaryUom: item.uomSymbol || line.primaryUom,
+                  primaryUomId: item.uomId ?? null,
                   secondaryUom: item.secondaryUomSymbol || '',
+                  secondaryUomId: item.secondaryUomId ?? null,
+                  uomConversionFactor: item.uomConversionFactor ?? line.uomConversionFactor ?? null,
                   itemTypeId: line.itemTypeId || item.itemTypeId || null,
                 };
               });
@@ -721,11 +632,15 @@ const BOMForm = () => {
   const resetItemFields = {
     itemId: null, itemName: '', itemCode: '',
     variants: {}, variantId: null, availableVariants: [],
-    primaryUom: '', secondaryUom: '', uom: '',
+    primaryUom: '', secondaryUom: '', uom: '', uomConversionFactor: null, purchaseUom: '',
     consumptionPerGarment: null, colorInvalid: false,
     partsName: '', processes: [], processAllowances: [],
     consumptionMode: 'SIMPLE', consumptionMatrix: null, variantMapping: null,
   };
+
+  // Holds the latest populateLineFromItem so the earlier-defined handleItemTypeChange
+  // can call it without a temporal-dead-zone reference.
+  const populateLineFromItemRef = useRef(null);
 
   const handleCategoryChange = useCallback(
     (lineKey, categoryId) => {
@@ -767,7 +682,7 @@ const BOMForm = () => {
 
   const handleItemTypeChange = useCallback(
     (lineKey, itemTypeId, categoryId, subCategoryId) => {
-      const doChange = () => {
+      const doChange = async () => {
         const cat = metaData.find((c) => c.id === categoryId);
         const sub = (cat?.subCategories || []).find((sc) => sc.id === subCategoryId);
         const it = (sub?.itemTypes || []).find((t) => t.id === itemTypeId);
@@ -775,10 +690,24 @@ const BOMForm = () => {
           itemTypeId, itemTypeName: it?.name || '',
           ...resetItemFields,
         });
+        // The Category + Sub-Category + Item Type combination uniquely identifies one item.
+        // Resolve it and load its variants into the Variant dropdown.
+        try {
+          const res = await searchItems({ categoryId, subCategoryId, itemTypeId, page: 0, size: 1, isActive: true });
+          const payload = res?.data || res || {};
+          const item = Array.isArray(payload) ? payload[0] : payload?.content?.[0];
+          if (item) {
+            populateLineFromItemRef.current?.(lineKey, item);
+          } else {
+            message.warning('No item exists for this Category / Sub-Category / Item Type. Create it in Item Master first.');
+          }
+        } catch {
+          message.error('Failed to load the item for the selected classifiers.');
+        }
       };
       confirmIfHasData(lineKey, doChange);
     },
-    [metaData, updateLineMulti, confirmIfHasData],
+    [metaData, updateLineMulti, confirmIfHasData, message],
   );
 
   /**
@@ -873,58 +802,63 @@ const BOMForm = () => {
   };
 
   // ── Item selection from autocomplete ────────────────────────────
-  const handleBomItemSelect = useCallback(
+  // Populate a BOM line from the item resolved for its Category + Sub-Category + Item Type,
+  // loading the item's active variants into the Variant dropdown. Item is uniquely identified
+  // by the classifier combination, so there is no separate item-name search.
+  const populateLineFromItem = useCallback(
     (lineKey, item) => {
-      const doChange = () => {
-        const line = lines.find((l) => l.key === lineKey);
-        const fabric = isFabricCategory(line);
-        const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
-        let firstVariant = activeVariants.length === 1 ? activeVariants[0] : null;
-        // Check duplicate variant
-        if (firstVariant && isVariantDuplicate(firstVariant.id, lineKey)) {
-          message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
-          firstVariant = null; // force dropdown to show for manual selection
-          setVariantEditLineKey(lineKey); // auto-open variant dropdown
-        }
-        const selectedAttrs = sortAttrs(firstVariant?.attributes);
-        const { valid, errorMsg } = firstVariant ? validateVariantInOrder(selectedAttrs, fabric) : { valid: true };
-        updateLineMulti(lineKey, {
-          itemId: item.id,
-          itemName: item.itemName || '',
-          itemCode: item.itemCode || '',
-          primaryUom: item.uomSymbol || '',
-          primaryUomId: item.uomId || null,
-          secondaryUom: item.secondaryUomSymbol || '',
-          secondaryUomId: item.secondaryUomId || null,
-          uom: item.secondaryUomSymbol || item.uomSymbol || '',
-          availableVariants: activeVariants,
-          variantId: firstVariant?.id || null,
-          variants: firstVariant ? selectedAttrs : {},
-          colorInvalid: firstVariant ? !valid : false,
-          consumptionPerGarment: null,
-          partsName: '',
-          processes: [],
-          processAllowances: [],
-        });
-        if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
-      };
-      confirmIfHasData(lineKey, doChange);
+      const line = lines.find((l) => l.key === lineKey);
+      const fabric = isFabricCategory(line);
+      const activeVariants = (item.variants || []).filter((v) => v.isActive !== false);
+      let firstVariant = activeVariants.length === 1 ? activeVariants[0] : null;
+      // Check duplicate variant
+      if (firstVariant && isVariantDuplicate(firstVariant.id, lineKey)) {
+        message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
+        firstVariant = null; // force dropdown to show for manual selection
+        setVariantEditLineKey(lineKey); // auto-open variant dropdown
+      }
+      const selectedAttrs = sortAttrs(firstVariant?.attributes);
+      const { valid, errorMsg } = firstVariant ? validateVariantInOrder(selectedAttrs, fabric) : { valid: true };
+      updateLineMulti(lineKey, {
+        itemId: item.id,
+        itemName: item.itemName || '',
+        itemCode: item.itemCode || '',
+        primaryUom: item.uomSymbol || '',
+        primaryUomId: item.uomId || null,
+        secondaryUom: item.secondaryUomSymbol || '',
+        secondaryUomId: item.secondaryUomId || null,
+        // uom is the CONSUMPTION unit — what consumption/garment is entered in
+        uom: item.secondaryUomSymbol || item.uomSymbol || '',
+        uomConversionFactor: item.uomConversionFactor ?? null,
+        availableVariants: activeVariants,
+        variantId: firstVariant?.id || null,
+        variantCode: firstVariant?.variantCode || '',
+        variantName: firstVariant?.variantName || '',
+        variants: firstVariant ? selectedAttrs : {},
+        colorInvalid: firstVariant ? !valid : false,
+        consumptionPerGarment: null,
+        partsName: '',
+        processes: [],
+        processAllowances: [],
+      });
+      if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
     },
-    [lines, updateLineMulti, validateVariantInOrder, confirmIfHasData, isVariantDuplicate],
+    [lines, updateLineMulti, validateVariantInOrder, isVariantDuplicate],
   );
+  populateLineFromItemRef.current = populateLineFromItem;
 
   // ── Variant selection (when item has multiple variants) ─────────
   const handleVariantSelect = useCallback(
     (lineKey, variantId) => {
       if (variantId === null) {
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
         return;
       }
       // Check duplicate
       if (isVariantDuplicate(variantId, lineKey)) {
         message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
         // Clear selection and keep dropdown open
-        updateLineMulti(lineKey, { variantId: null, variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
         setVariantEditLineKey(lineKey);
         return;
       }
@@ -936,7 +870,7 @@ const BOMForm = () => {
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
         if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
-          l.key === lineKey ? { ...l, variantId, variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, consumptionMatrix: null, variantMapping: null } : l,
+          l.key === lineKey ? { ...l, variantId, variantCode: variant?.variantCode || '', variantName: variant?.variantName || '', variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, consumptionMatrix: null, variantMapping: null } : l,
         );
       });
       setIsDirty(true);
@@ -1273,37 +1207,11 @@ const BOMForm = () => {
       return true;
     }).length;
     const totalPurchaseQty = lines.reduce((sum, l) => {
-      const tq = computeTotalQty(l);
-      if (!tq) return sum;
-      const allowances = l.processAllowances || [];
-      if (!allowances.length) return sum + tq;
-      const cMode = l.consumptionMode || 'SIMPLE';
-      const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-      if (isMatrixMode && l.consumptionMatrix) {
-        const oqg = buildOrderQtyGrid(orderLineSummary);
-        let total = 0;
-        allSizes.forEach((size) => {
-          let sizeReq = 0;
-          Object.entries(l.consumptionMatrix).forEach(([color, szMap]) => {
-            sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-          });
-          let rejTotal = 0, shipTotal = 0;
-          allowances.forEach((a) => {
-            const sa = a.sizeAllowances?.[size];
-            rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-            shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-          });
-          total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-        });
-        return sum + total;
-      }
-      const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-      const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-      const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-      return sum + calcPurchaseQty(tq, loss, rej + ship);
+      const qty = calcLinePurchaseQty(l, computeTotalQty(l), buildOrderQtyGrid(orderLineSummary), allSizes);
+      return sum + (qty || 0);
     }, 0);
     return { total, fabricLines, trimLines, completedLines, totalPurchaseQty };
-  }, [lines, computeTotalQty]);
+  }, [lines, computeTotalQty, orderLineSummary, allSizes]);
 
   // ==================== AI CONSUMPTION CALCULATOR ====================
 
@@ -1348,36 +1256,25 @@ const BOMForm = () => {
         return qty || 0;
       })(),
       totalQty: computeTotalQty(lines[idx]),
-      purchaseQty: (() => {
+      // purchaseQty stays in the consumption (secondary) UOM; purchaseQtyPrimary is the
+      // converted figure the PO is raised in. The factor is snapshotted onto the line so a
+      // later edit to the item master never rewrites this BOM or a PO generated from it.
+      ...(() => {
         const line = lines[idx];
-        const tq = computeTotalQty(line);
-        if (!tq) return 0;
-        const allowances = rest.processAllowances || [];
-        if (!allowances.length) return tq;
-        const cMode = line.consumptionMode || 'SIMPLE';
-        const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-        if (isMatrixMode && line.consumptionMatrix) {
-          const oqg = buildOrderQtyGrid(orderLineSummary);
-          let total = 0;
-          allSizes.forEach((size) => {
-            let sizeReq = 0;
-            Object.entries(line.consumptionMatrix).forEach(([color, szMap]) => {
-              sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-            });
-            let rejTotal = 0, shipTotal = 0;
-            allowances.forEach((a) => {
-              const sa = a.sizeAllowances?.[size];
-              rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-              shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-            });
-            total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-          });
-          return total;
-        }
-        const loss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-        const rej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-        const ship = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-        return calcPurchaseQty(tq, loss, rej + ship);
+        const qty = calcLinePurchaseQty(
+          line,
+          computeTotalQty(line),
+          buildOrderQtyGrid(orderLineSummary),
+          allSizes
+        ) ?? 0;
+        const factor = line.uomConversionFactor;
+        const applies = conversionApplies(line.primaryUomId, line.secondaryUomId, factor);
+        return {
+          purchaseQty: qty,
+          purchaseUom: applies ? line.primaryUom : line.uom,
+          uomConversionFactor: applies ? Number(factor) : null,
+          purchaseQtyPrimary: applies ? convertToPrimary(qty, factor) : qty,
+        };
       })(),
       // Convert process IDs to objects for JSONB storage
       processes: (rest.processes || []).map((pid) => {
@@ -1743,32 +1640,32 @@ const BOMForm = () => {
           );
         },
       },
-      // 5. Item Name (autocomplete search)
-      {
-        title: 'Item Name',
-        dataIndex: 'itemName',
-        width: 280,
-        render: (value, record) => (
-          <BomItemSearch
-            value={value || ''}
-            onSelect={(item) => handleBomItemSelect(record.key, item)}
-            onClear={() => {
-              updateLineMulti(record.key, { ...resetItemFields });
-            }}
-            disabled={!record.itemTypeId}
-            categoryId={record.categoryId}
-            subCategoryId={record.subCategoryId}
-            itemTypeId={record.itemTypeId}
-          />
-        ),
-      },
-      // 6. Item Code (read-only)
+      // 5. Item Code (read-only). Item is resolved from Category + Sub-Category + Item Type.
+      //    Shows the selected variant's code for single-variant modes (SIMPLE/SIZE_WISE); for
+      //    VARIANT_PER_SIZE the line spans many variants, so it falls back to the parent item code.
       {
         title: 'Item Code',
         dataIndex: 'itemCode',
-        width: 100,
+        width: 150,
         align: 'center',
-        render: (value) => <Text type="secondary" style={{ fontSize: 12 }}>{value || '-'}</Text>,
+        render: (value, record) => {
+          const isPerSize = (record.consumptionMode || 'SIMPLE') === CONSUMPTION_MODE.VARIANT_PER_SIZE;
+          const display = isPerSize
+            ? (record.itemCode || '-')
+            : (record.variantCode || '-');
+          // Surface the conversion at the point of item choice, before the qty columns
+          const conversion = conversionApplies(record.primaryUomId, record.secondaryUomId, record.uomConversionFactor)
+            ? formatConversionLabel(record.primaryUom, record.secondaryUom, record.uomConversionFactor)
+            : '';
+          return (
+            <div style={{ lineHeight: 1.3 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>{display || '-'}</Text>
+              {conversion && (
+                <div><Text type="secondary" style={{ fontSize: 10 }}>{conversion}</Text></div>
+              )}
+            </div>
+          );
+        },
       },
       // 7. Variant (resizable)
       {
@@ -1836,7 +1733,10 @@ const BOMForm = () => {
                     onChange={(v) => {
                       const updates = { consumptionMode: v };
                       if (v === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
+                        // Line now spans many size-variants; no single variant identity.
                         updates.variantId = null;
+                        updates.variantCode = '';
+                        updates.variantName = '';
                         updates.variants = {};
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = updates.consumptionMatrix || null;
@@ -1853,6 +1753,8 @@ const BOMForm = () => {
                       // Restore single variant when switching back from VARIANT_PER_SIZE
                       if (v !== CONSUMPTION_MODE.VARIANT_PER_SIZE && !record.variantId && variants.length === 1) {
                         updates.variantId = variants[0].id;
+                        updates.variantCode = variants[0].variantCode || '';
+                        updates.variantName = variants[0].variantName || '';
                         updates.variants = sortAttrs(variants[0].attributes || {});
                       }
                       updateLineMulti(record.key, updates);
@@ -2128,55 +2030,64 @@ const BOMForm = () => {
         align: 'center',
         render: (_, record) => {
           const total = computeTotalQty(record);
-          const uom = (record.primaryUom || record.uom || '').toUpperCase();
+          // Total Qty is a multiple of consumption, so it carries the CONSUMPTION unit
+          const uom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
           return total != null
             ? <Text style={{ fontSize: 12 }}>{total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
             : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
         },
       },
-      // 15. Purchase Qty (Total Qty + allowances)
+      // 15. Purchase Qty (Total Qty + allowances, converted into the item's purchase UOM)
       {
         title: 'Purchase Qty',
-        width: 110,
+        width: 130,
         align: 'center',
         render: (_, record) => {
           const totalQty = computeTotalQty(record);
           if (!totalQty) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-          const allowances = record.processAllowances || [];
-          if (allowances.length === 0) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
-
-          const cMode = record.consumptionMode || 'SIMPLE';
-          const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
-
-          let purchaseQty;
-          if (isMatrixMode && record.consumptionMatrix) {
-            // Per-size allowance calculation
-            const oqg = buildOrderQtyGrid(orderLineSummary);
-            let total = 0;
-            allSizes.forEach((size) => {
-              let sizeReq = 0;
-              Object.entries(record.consumptionMatrix).forEach(([color, szMap]) => {
-                sizeReq += (Number(szMap?.[size]) || 0) * (oqg[color]?.[size] || 0);
-              });
-              let rejTotal = 0, shipTotal = 0;
-              allowances.forEach((a) => {
-                const sa = a.sizeAllowances?.[size];
-                rejTotal += Number(sa?.rejectionPercent ?? a.rejectionPercent) || 0;
-                shipTotal += Number(sa?.shipmentAllowancePercent ?? a.shipmentAllowancePercent) || 0;
-              });
-              total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-            });
-            purchaseQty = total;
-          } else {
-            // Flat allowance calculation
-            const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
-            const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
-            const totalShipment = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-            purchaseQty = calcPurchaseQty(totalQty, totalLoss, totalRej + totalShipment);
+          if (!(record.processAllowances || []).length) {
+            return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
           }
-          const uom = (record.primaryUom || record.uom || '').toUpperCase();
+
+          const purchaseQty = calcLinePurchaseQty(
+            record,
+            totalQty,
+            buildOrderQtyGrid(orderLineSummary),
+            allSizes
+          );
+          if (purchaseQty == null) return <div style={{ textAlign: 'center' }}><Text type="secondary">—</Text></div>;
+
+          const consumptionUom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
+          const factor = record.uomConversionFactor;
+          const applies = conversionApplies(record.primaryUomId, record.secondaryUomId, factor);
+
+          // No conversion (trim with no secondary UOM, or both units the same) — render
+          // exactly as before so the majority of lines stay visually quiet.
+          if (!applies) {
+            return (
+              <Text style={{ fontSize: 12 }}>
+                {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{consumptionUom}</Text>
+              </Text>
+            );
+          }
+
+          const converted = convertToPrimary(purchaseQty, factor);
+          const purchaseUom = (record.primaryUom || '').toUpperCase();
           return (
-            <Text style={{ fontSize: 12 }}>{purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
+            <Tooltip title={formatConversionLabel(record.primaryUom, record.secondaryUom, factor)}>
+              <div style={{ lineHeight: 1.3 }}>
+                <Text style={{ fontSize: 12 }}>
+                  {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                  <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
+                </Text>
+                <div>
+                  <Text type="secondary" style={{ fontSize: 10 }}>
+                    {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} {consumptionUom} ÷ {Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                  </Text>
+                </div>
+              </div>
+            </Tooltip>
           );
         },
       },

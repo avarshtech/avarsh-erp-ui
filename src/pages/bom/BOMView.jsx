@@ -6,6 +6,7 @@ import {
   AppstoreOutlined, ScissorOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { getStatusLabel, calcPurchaseQty } from '../../utils/bomConstants';
+import { formatConversionLabel } from '../../utils/uomConversions';
 import { getBomById } from '../../services/bom/bomService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 
@@ -140,8 +141,31 @@ const BOMView = ({ open, bomData, onClose }) => {
     }
   };
 
-  // Compute purchase qty for a line
+  /**
+   * Purchase qty for a line, in the UOM the PO is actually raised in.
+   *
+   * Prefers the values snapshotted at save time so a later change to the item master
+   * conversion never rewrites what this BOM was approved with. Lines saved before UOM
+   * conversion existed have no snapshot, so they fall back to the original recompute
+   * in the consumption UOM.
+   *
+   * @returns {{ qty: number, uom: string, working: string }|null}
+   */
   const getLinePurchaseQty = (record) => {
+    const consumptionUom = (record.uom || '').toUpperCase();
+
+    if (record.purchaseQtyPrimary != null) {
+      const factor = record.uomConversionFactor;
+      const converted = Number(factor) > 0 && record.purchaseQty != null;
+      return {
+        qty: Number(record.purchaseQtyPrimary),
+        uom: (record.purchaseUom || record.uom || '').toUpperCase(),
+        working: converted
+          ? `${formatNumber(record.purchaseQty, 2)} ${consumptionUom} ÷ ${Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}`
+          : '',
+      };
+    }
+
     const totalQty = record.totalQty;
     if (!totalQty) return null;
     const allowances = record.processAllowances || [];
@@ -149,7 +173,11 @@ const BOMView = ({ open, bomData, onClose }) => {
     const totalLoss = allowances.reduce((s, a) => s + (Number(a.processLossPercent) || 0), 0);
     const totalRej = allowances.reduce((s, a) => s + (Number(a.rejectionPercent) || 0), 0);
     const totalShip = allowances.reduce((s, a) => s + (Number(a.shipmentAllowancePercent) || 0), 0);
-    return calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip);
+    return {
+      qty: calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip),
+      uom: consumptionUom,
+      working: '',
+    };
   };
 
   // Render a single BOM line card
@@ -157,7 +185,13 @@ const BOMView = ({ open, bomData, onClose }) => {
     const fabric = isFabricLine(line);
     const cMode = line.consumptionMode || 'SIMPLE';
     const isMatrix = !fabric && (cMode === 'SIZE_WISE' || cMode === 'VARIANT_PER_SIZE');
+    // VARIANT_PER_SIZE lines span many variants — no single variant identity, so show the parent item.
+    const isPerSize = cMode === 'VARIANT_PER_SIZE';
+    const lineName = isPerSize ? (line.itemName || '-') : (line.variantName || '-');
+    const lineCode = isPerSize ? line.itemCode : line.variantCode;
     const purchaseQty = getLinePurchaseQty(line);
+    // Conversion snapshotted on the line: "1 Cone = 5000 M". Empty when nothing converts.
+    const conversionLabel = formatConversionLabel(line.purchaseUom, line.uom, line.uomConversionFactor);
     const parts = line.partsName ? (Array.isArray(line.partsName) ? line.partsName : [line.partsName]) : [];
     const processes = line.processes || [];
     const variantTags = variantsToTags(line.variants);
@@ -181,8 +215,8 @@ const BOMView = ({ open, bomData, onClose }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <Text strong style={{ fontSize: 14 }}>{line.itemName || '-'}</Text>
-                {line.itemCode && <Text type="secondary" style={{ fontSize: 11 }}>({line.itemCode})</Text>}
+                <Text strong style={{ fontSize: 14 }}>{lineName}</Text>
+                {lineCode && <Text type="secondary" style={{ fontSize: 11 }}>({lineCode})</Text>}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <Tag style={{ margin: 0, fontSize: 10 }}>{line.categoryName || '-'}</Tag>
@@ -192,6 +226,11 @@ const BOMView = ({ open, bomData, onClose }) => {
                   <Tag color="cyan" style={{ margin: 0, fontSize: 10 }}>
                     {cMode === 'SIZE_WISE' ? 'Size-wise' : cMode === 'VARIANT_PER_SIZE' ? 'Variant/size' : 'Simple'}
                   </Tag>
+                )}
+                {conversionLabel && (
+                  <Tooltip title="Purchase quantity is converted from the consumption unit using this factor">
+                    <Tag color="gold" style={{ margin: 0, fontSize: 10 }}>{conversionLabel}</Tag>
+                  </Tooltip>
                 )}
               </div>
             </div>
@@ -256,9 +295,12 @@ const BOMView = ({ open, bomData, onClose }) => {
               <div>
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
                 <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
-                  {formatNumber(purchaseQty, 2)}
-                  {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
+                  {formatNumber(purchaseQty.qty, 2)}
+                  {' '}<Text type="secondary" style={{ fontSize: 10 }}>{purchaseQty.uom}</Text>
                 </Text>
+                {purchaseQty.working && (
+                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{purchaseQty.working}</Text>
+                )}
               </div>
             )}
             {/* CAD download for fabric lines */}

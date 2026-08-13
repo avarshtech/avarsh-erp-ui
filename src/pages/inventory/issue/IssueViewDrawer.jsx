@@ -33,7 +33,7 @@ const fabricRollColumns = [
 ];
 
 const buildAccessoryItemColumns = () => [
-  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center' },
+  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center', render: (v, r) => r.variantCode || v || '—' },
   { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true, align: 'center' },
   { title: 'BOM Qty', dataIndex: 'bomQty', key: 'bomQty', align: 'center', render: (v) => formatNumber(v) },
   { title: 'Issue Qty', dataIndex: 'issuedQty', key: 'issuedQty', align: 'center', render: (v) => formatNumber(v) },

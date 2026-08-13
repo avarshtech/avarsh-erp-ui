@@ -128,8 +128,8 @@ const buildRows = (grn, poLineItemsByPli) => {
 
     return {
       sl: idx + 1,
-      itemCode: li.itemCode || poLi.itemCode || '',
-      description: li.description || poLi.description || poLi.itemName || '',
+      itemCode: li.variantCode || poLi.variantCode || '',
+      description: li.variantName || poLi.variantName || li.description || poLi.description || '',
       color: li.color || '',
       size: li.size || '',
       hsn,

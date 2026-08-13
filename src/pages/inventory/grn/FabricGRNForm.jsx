@@ -154,7 +154,15 @@ const FabricGRNForm = () => {
   // - maintain selection order; group rolls per line item
   useEffect(() => {
     if (!selectedPO) return;
-    setRolls((prevRolls) => {
+    let cancelled = false;
+    // Resolve variant identity up front (async API), then reconcile rolls.
+    const variantIds = selectedLineItemIds.map(
+      (id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId,
+    );
+    getItemVariantsBulk(variantIds).then((variants) => {
+      if (cancelled) return;
+      const variantByLineId = new Map(selectedLineItemIds.map((id, i) => [id, variants[i]]));
+      setRolls((prevRolls) => {
       const kept = prevRolls.filter((r) => selectedLineItemIds.includes(r.poLineItemId));
       const existingLineItemIds = new Set(prevRolls.map((r) => r.poLineItemId));
       const newLineIds = selectedLineItemIds.filter((id) => !existingLineItemIds.has(id));
@@ -162,11 +170,9 @@ const FabricGRNForm = () => {
         // No structural change — bail out to avoid unnecessary re-renders
         return prevRolls;
       }
-      const newVariantIds = newLineIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshRows = newLineIds.map((id, idx) => {
+      const freshRows = newLineIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           variantId: li?.variantId,
@@ -198,7 +204,9 @@ const FabricGRNForm = () => {
         }
       });
       return result;
+      });
     });
+    return () => { cancelled = true; };
   }, [selectedPO, selectedLineItemIds]);
 
   const handleRollChange = useCallback((idx, field, value) => {
@@ -470,6 +478,7 @@ const FabricGRNForm = () => {
                       compact
                       placeholder="Upload DC image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
                         setDcImage((prev) => ({
@@ -508,6 +517,7 @@ const FabricGRNForm = () => {
                       compact
                       placeholder="Upload invoice image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
                         setSupplierInvoice((prev) => ({

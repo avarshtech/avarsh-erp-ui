@@ -40,7 +40,7 @@ const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase',
 
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 130 },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 130, render: (v, r) => r.variantCode || '—' },
   { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
   { title: 'Width', dataIndex: 'width', align: 'center', width: 70 },
   { title: 'GSM', dataIndex: 'gsm', align: 'center', width: 70 },
@@ -50,7 +50,7 @@ const fabricRollColumns = [
 ];
 
 const accItemColumns = [
-  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140 },
+  { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => r.variantCode || '—' },
   { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
   { title: 'Color', dataIndex: 'color', align: 'center', width: 90 },
   { title: 'Size', dataIndex: 'size', align: 'center', width: 80 },

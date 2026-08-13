@@ -91,7 +91,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
         width: 170,
         render: (v, row) => {
           if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
-          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{v ?? '—'}</Text>;
+          return <Text style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{row.variantCode || '—'}</Text>;
         },
       },
       {

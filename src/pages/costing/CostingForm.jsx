@@ -25,6 +25,7 @@ import {
   Segmented,
   Alert,
   Progress,
+  Spin,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -80,6 +81,7 @@ import { getStylesByBuyerId, saveStyle } from '../../services/master/styleServic
 import { uploadFile, deleteFile } from '../../services/core/fileService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import { searchItems } from '../../services/master/itemService';
+import { searchVariants } from '../../services/master/variantService';
 import { getAllCategories } from '../../services/master/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/master/processService';
 import { getSuppliers } from '../../services/master/supplierService';
@@ -98,6 +100,59 @@ import BuyerPriceTrendModal from './BuyerPriceTrendModal';
 
 const { Text } = Typography;
 const { Dragger } = Upload;
+
+/**
+ * Searchable variant dropdown for costing fabric/trim rows. Loads the 10 latest variants for the
+ * given category ("Fabric" / "Trims") on open, and searches by variant code or name as the user
+ * types. Calls onSelect with the full variant object.
+ */
+const VariantSelect = ({ value, valueLabel, category, onSelect, placeholder = 'Search variant', disabled }) => {
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef(null);
+
+  const load = async (q) => {
+    setLoading(true);
+    try {
+      const res = await searchVariants({ category, q: q || '', limit: 10 });
+      const list = res?.data || res || [];
+      setOptions(
+        list.map((v) => ({
+          value: v.variantId,
+          label: `${v.variantName || ''}${v.variantCode ? ` (${v.variantCode})` : ''}`,
+          variant: v,
+        })),
+      );
+    } catch {
+      setOptions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = (q) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => load(q), 300);
+  };
+
+  return (
+    <Select
+      showSearch
+      labelInValue
+      filterOption={false}
+      value={value ? { value, label: valueLabel || value } : undefined}
+      options={options}
+      onSearch={handleSearch}
+      onDropdownVisibleChange={(open) => { if (open && options.length === 0) load(''); }}
+      onChange={(_, opt) => { if (opt?.variant) onSelect(opt.variant); }}
+      notFoundContent={loading ? <Spin size="small" /> : null}
+      placeholder={placeholder}
+      style={{ width: '100%' }}
+      size="small"
+      disabled={disabled}
+    />
+  );
+};
 
 const CostingForm = () => {
   const { message } = App.useApp();
@@ -167,12 +222,10 @@ const CostingForm = () => {
   // API-fetched dropdown options
   const [buyerOptions, setBuyerOptions] = useState([]);
   const [styleOptions, setStyleOptions] = useState([]);
-  const [fabricItemOptions, setFabricItemOptions] = useState([]);
+  // Raw item lists per category — used for consumption-UOM display and techpack matching.
   const [fabricItemsRaw, setFabricItemsRaw] = useState([]);
   const [localTrimItemsRaw, setLocalTrimItemsRaw] = useState([]);
   const [importedTrimItemsRaw, setImportedTrimItemsRaw] = useState([]);
-  const [localTrimOptions, setLocalTrimOptions] = useState([]);
-  const [importedTrimOptions, setImportedTrimOptions] = useState([]);
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
@@ -291,22 +344,14 @@ const CostingForm = () => {
             byCat[cid].push(item);
           }
 
-          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName, itemCode: item.itemCode }));
-
           if (catMap.fabric) {
-            const fabItems = byCat[catMap.fabric] || [];
-            setFabricItemsRaw(fabItems);
-            setFabricItemOptions(toOptions(fabItems));
+            setFabricItemsRaw(byCat[catMap.fabric] || []);
           }
           if (catMap.localTrim) {
-            const ltItems = byCat[catMap.localTrim] || [];
-            setLocalTrimItemsRaw(ltItems);
-            setLocalTrimOptions(toOptions(ltItems));
+            setLocalTrimItemsRaw(byCat[catMap.localTrim] || []);
           }
           if (catMap.importedTrim) {
-            const itItems = byCat[catMap.importedTrim] || [];
-            setImportedTrimItemsRaw(itItems);
-            setImportedTrimOptions(toOptions(itItems));
+            setImportedTrimItemsRaw(byCat[catMap.importedTrim] || []);
           }
         }
 
@@ -845,7 +890,9 @@ const CostingForm = () => {
           return {
             key:              `f_import_${Date.now()}_${i}`,
             itemId:           r.matchedItemId   || null,
-            fabricType:       r.matchedItemName || r.extractedName || '',
+            variantId:        r.matchedVariantId   || null,
+            variantCode:      r.matchedVariantCode || '',
+            fabricType:       r.matchedVariantName || r.matchedItemName || r.extractedName || '',
             classification:   r.classification  || 'Woven',
             description:      r.notes           || '',
             consumption:      '',
@@ -870,8 +917,10 @@ const CostingForm = () => {
         result.localTrimRows.map((r, i) => ({
           key:         `lt_import_${Date.now()}_${i}`,
           itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
+          variantId:   r.matchedVariantId   || null,
+          variantCode: r.matchedVariantCode || '',
+          item:        r.matchedVariantName || r.matchedItemName || r.extractedName || '',
+          code:        r.matchedVariantCode || '',
           size:        '',
           consumption: r.quantity || '',
           uom:         r.uom || 'pcs',
@@ -888,8 +937,10 @@ const CostingForm = () => {
         result.importedTrimRows.map((r, i) => ({
           key:         `it_import_${Date.now()}_${i}`,
           itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
+          variantId:   r.matchedVariantId   || null,
+          variantCode: r.matchedVariantCode || '',
+          item:        r.matchedVariantName || r.matchedItemName || r.extractedName || '',
+          code:        r.matchedVariantCode || '',
           size:        '',
           consumption: r.quantity || '',
           uom:         r.uom || 'pcs',
@@ -958,32 +1009,32 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
-  const handleFabricItemSelect = (key, itemId, option) => {
-    // Set itemId and fabricType from the selected item
-    const rawItem = fabricItemsRaw.find((item) => item.id === itemId);
+  // Variant-based fabric selection (searchable variant dropdown).
+  const handleFabricVariantSelect = (key, variant) => {
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = {
           ...r,
-          itemId,
-          fabricType: option.label,
-          // Auto-populate description from the item master (CR C-6); keep any existing text otherwise
-          description: rawItem?.description || r.description || '',
-          // Set UOM from item's secondary UOM (fallback to primary)
-          uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
-          uomId: rawItem?.uomId || r.uomId || null,
-          primaryUom: rawItem?.uomSymbol || '',
+          itemId: variant.itemId,
+          variantId: variant.variantId,
+          variantCode: variant.variantCode || '',
+          fabricType: variant.variantName || '',
+          description: variant.description || r.description || '',
+          uom: variant.secondaryUomSymbol || variant.uomSymbol || r.uom || '',
+          uomId: variant.uomId || r.uomId || null,
+          primaryUom: variant.uomSymbol || '',
         };
-        // Auto-set classification from subcategory
-        if (rawItem?.subCategoryName) {
-          const subName = rawItem.subCategoryName.toLowerCase();
+        if (variant.subCategoryName) {
+          const subName = variant.subCategoryName.toLowerCase();
           if (subName.includes('knit')) updated.classification = 'Knits';
           else if (subName.includes('woven')) updated.classification = 'Woven';
         }
         return updated;
-      })
+      }),
     );
+    // Preserve past-PO price suggestions keyed by the parent item.
+    if (variant.itemId) loadSuggestions('fabric', variant.itemId);
     setIsDirty(true);
   };
 
@@ -1648,19 +1699,15 @@ const CostingForm = () => {
     },
     {
       title: 'Fabric Name',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       width: 240,
       render: (val, record) => (
-        <Select
-          value={record.itemId || undefined}
-          style={{ width: '100%' }}
-          options={fabricItemOptions}
-          showSearch
-          optionFilterProp="label"
-          placeholder="Select"
-          onChange={(v, opt) => handleFabricItemSelect(record.key, v, opt)}
-          onFocus={() => loadSuggestions('fabric', record.itemId)}
-          size="small"
+        <VariantSelect
+          value={record.variantId}
+          valueLabel={record.fabricType}
+          category="Fabric"
+          placeholder="Search fabric variant"
+          onSelect={(variant) => handleFabricVariantSelect(record.key, variant)}
         />
       ),
     },
@@ -1859,20 +1906,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
-        <Select
-          value={record.itemId || undefined}
-          style={{ width: '100%' }}
-          options={localTrimOptions}
-          showSearch
-          optionFilterProp="label"
-          placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = localTrimItemsRaw.find((i) => i.id === v);
-            updateLocalTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
-          }}
-          size="small"
+        <VariantSelect
+          value={record.variantId}
+          valueLabel={record.item}
+          category="Trims"
+          placeholder="Search trim variant"
+          onSelect={(variant) =>
+            updateLocalTrim(record.key, {
+              itemId: variant.itemId,
+              variantId: variant.variantId,
+              variantCode: variant.variantCode || '',
+              item: variant.variantName || '',
+              code: variant.variantCode || '',
+              uom: variant.secondaryUomSymbol || variant.uomSymbol || '',
+            })
+          }
         />
       ),
     },
@@ -1949,20 +1999,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
-        <Select
-          value={record.itemId || undefined}
-          style={{ width: '100%' }}
-          options={importedTrimOptions}
-          showSearch
-          optionFilterProp="label"
-          placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = importedTrimItemsRaw.find((i) => i.id === v);
-            updateImportedTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
-          }}
-          size="small"
+        <VariantSelect
+          value={record.variantId}
+          valueLabel={record.item}
+          category="Trims"
+          placeholder="Search trim variant"
+          onSelect={(variant) =>
+            updateImportedTrim(record.key, {
+              itemId: variant.itemId,
+              variantId: variant.variantId,
+              variantCode: variant.variantCode || '',
+              item: variant.variantName || '',
+              code: variant.variantCode || '',
+              uom: variant.secondaryUomSymbol || variant.uomSymbol || '',
+            })
+          }
         />
       ),
     },
@@ -2453,6 +2506,11 @@ const CostingForm = () => {
               loading={garmentImageUploading || garmentImageLoading}
               compact
               placeholder="Add garment image"
+              infoMessage={
+                isEdit && id
+                  ? 'Image changes are saved immediately and independently of the other cost sheet fields.'
+                  : 'The image will be uploaded automatically when you save the cost sheet.'
+              }
             />
           </div>
         </div>
@@ -3508,12 +3566,8 @@ const CostingForm = () => {
               compact
               placeholder="Click or drag to upload style image"
               hint="PNG, JPG up to 10 MB"
+              infoMessage="The image will be uploaded automatically when the style is created."
             />
-            {quickAddStyleImage && (
-              <Typography.Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
-                Will upload on create
-              </Typography.Text>
-            )}
           </div>
         </Form>
       </Modal>

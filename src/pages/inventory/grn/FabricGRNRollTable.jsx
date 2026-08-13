@@ -115,7 +115,7 @@ const FabricGRNRollTable = ({ rolls = [], onRollChange, readOnly = false }) => {
         width: 140,
         render: (v, row) => {
           if (row.__type === 'notice') return { children: null, props: { colSpan: 0 } };
-          return <ReadOnlyText value={v} />;
+          return <ReadOnlyText value={row.variantCode} />;
         },
       },
       {

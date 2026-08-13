@@ -518,7 +518,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       // Find stage name and item name for the activity log
       const lineItem = (po?.lineItems || []).find((li) => li.id === lineItemId);
       const stageName = lineItem?.processingStages?.[stageIndex]?.stageName || `Stage ${stageIndex + 1}`;
-      const itemLabel = lineItem?.itemName || lineItem?.itemCode || 'Item';
+      const itemLabel = lineItem?.variantName || lineItem?.variantCode || 'Item';
 
       setPo((prev) => {
         if (!prev) return prev;
@@ -590,7 +590,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       const userName = currentUser?.name || '';
       const activityComment = JSON.stringify({
         type: 'stages_added',
-        itemLabel: lineItem.itemName || lineItem.itemCode || 'Item',
+        itemLabel: lineItem.variantName || lineItem.variantCode || 'Item',
         count: newStages.length,
         stageNames: newStages.map((s) => s.stageName).join(', '),
         by: userName,
@@ -855,10 +855,10 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
             {/* Item name, code, variant attrs */}
             <div style={{ minWidth: 0, flex: 1 }}>
               <Text strong style={{ fontSize: 14, display: 'block', lineHeight: 1.3 }}>
-                {record.itemName || 'Unknown Item'}
+                {record.variantName || 'Unknown Item'}
               </Text>
-              {record.itemCode && (
-                <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.itemCode}</Text>
+              {record.variantCode && (
+                <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{record.variantCode}</Text>
               )}
               {record.description && (
                 <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 2, wordBreak: 'break-word' }}>{record.description}</Text>

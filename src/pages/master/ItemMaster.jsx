@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Card, Table, Button, Input, InputNumber, Select, Tag, Space, Modal, Form, Row, Col,
-  Spin, App, Divider, Badge, Checkbox, Typography, Empty,
-  Drawer, Descriptions, Alert, Skeleton,
+  Spin, App, Divider, Badge, Checkbox, Typography, Empty, Tooltip, Alert,
+  Drawer, Descriptions, Skeleton,
 } from 'antd';
 import {
   PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined,
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
-  ClearOutlined, AppstoreOutlined, FileImageOutlined, LoadingOutlined,
+  ClearOutlined, AppstoreOutlined, FileImageOutlined, CheckOutlined,
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
-import { getItemMetaData, createItem, updateItem, autocompleteItems, searchItems } from '../../services/master/itemService';
+import { getItemMetaData, createItem, updateItem, searchItems } from '../../services/master/itemService';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
+import { getPresetFactor, formatConversionLabel } from '../../utils/uomConversions';
 import PantoneColorInput from '../../components/PantoneColorInput';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
 import { isPantoneCode } from '../../services/core/pantoneService';
@@ -192,18 +193,17 @@ const ItemMaster = () => {
   const [duplicateVariantIndex, setDuplicateVariantIndex] = useState(null);
   const [variantImagesLoading, setVariantImagesLoading] = useState(false);
 
-  // Suggestion State (for item name autocomplete)
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
-  const nonItemNameChangesRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
-  const debounceRef = useRef(null);
-  const lastQueryRef = useRef('');
-  const suppressSuggestionsRef = useRef(false);
-  const noResultPrefixRef = useRef('');
+
+  // Duplicate-variant highlight reason: 'attributes' | 'name'
+  const [duplicateReason, setDuplicateReason] = useState('attributes');
+
+  // Inline variant-name editing (variant tab header)
+  const [editingVariantIndex, setEditingVariantIndex] = useState(null);
+  const [editingVariantValue, setEditingVariantValue] = useState('');
 
   const isEditMode = !!selectedItem;
+  const isReadOnly = isEditMode ? !canUpdate : !canAdd;
 
   // Resolve attribute value from variant/item attributes object
   const resolveAttributeValue = (attributesObj, attr) => {
@@ -354,7 +354,6 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
-      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -421,7 +420,6 @@ const ItemMaster = () => {
         return updated;
       });
       setUnsavedChanges(true);
-      nonItemNameChangesRef.current = true;
     }
   };
 
@@ -631,6 +629,7 @@ const ItemMaster = () => {
         itemTypeId: undefined,
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormSubcategories([]);
       setFormItemTypes([]);
@@ -656,6 +655,7 @@ const ItemMaster = () => {
         itemTypeId: undefined,
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormItemTypes([]);
       setFormAttributes([]);
@@ -679,6 +679,7 @@ const ItemMaster = () => {
       form.setFieldsValue({
         uomId: undefined,
         secondaryUomId: undefined,
+        uomConversionFactor: undefined,
       });
       setFormAttributes([]);
       setFormUomOptions([]);
@@ -691,7 +692,7 @@ const ItemMaster = () => {
           setFormAttributes(itemType.attributes || []);
           setFormUomOptions(itemType.uoms || []);
           // Initialize with one empty variant
-          const emptyVariant = { isActive: true };
+          const emptyVariant = { isActive: true, variantName: '' };
           (itemType.attributes || []).forEach((attr) => {
             emptyVariant[attr.id] = '';
           });
@@ -720,15 +721,9 @@ const ItemMaster = () => {
     setVariants([]);
     setActiveVariantIndex(0);
     setDuplicateVariantIndex(null);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    suppressSuggestionsRef.current = false;
-    lastQueryRef.current = '';
-    noResultPrefixRef.current = '';
     setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     fetchMetaData().then(() => setFormReady(true));
   };
 
@@ -740,14 +735,9 @@ const ItemMaster = () => {
     }
     setSelectedItem(item);
     setSelectedItemId(item.id);
-    suppressSuggestionsRef.current = true;
-    lastQueryRef.current = (item.itemName || '').trim();
-    setSuggestions([]);
-    setShowSuggestions(false);
     setFormReady(false);
     setModalOpen(true);
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     fetchMetaData().then((metaDataList) => {
       initializeEditForm(item, metaDataList);
       setFormReady(true);
@@ -804,6 +794,7 @@ const ItemMaster = () => {
       itemTypeId: item.itemTypeId?.toString(),
       uomId: item.uomId?.toString(),
       secondaryUomId: item.secondaryUomId?.toString() || undefined,
+      uomConversionFactor: item.uomConversionFactor != null ? Number(item.uomConversionFactor) : undefined,
       hsnCode: item.hsnCode || '',
       description: item.description || '',
       defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
@@ -833,6 +824,10 @@ const ItemMaster = () => {
                 id: variant.id,
                 itemId: variant.itemId,
                 isActive: variant.isActive ?? true,
+                // Strip the stored "<itemCode>/" prefix for editing/display.
+                variantName: stripVariantPrefix(variant.variantName, item.itemCode),
+                // Server-generated SKU; read-only, shown in edit/view modes.
+                variantCode: variant.variantCode,
               };
 
               // Map attributes from variant.attributes
@@ -849,7 +844,7 @@ const ItemMaster = () => {
             setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
           } else {
             // No variants, create one from item attributes (legacy)
-            const defaultVariant = { isActive: true };
+            const defaultVariant = { isActive: true, variantName: '' };
             itemType.attributes.forEach((attr) => {
               defaultVariant[attr.id] = resolveAttributeValue(item.attributes, attr);
             });
@@ -877,11 +872,11 @@ const ItemMaster = () => {
     setSelectedItemId(null);
     form.resetFields();
     setVariants([]);
-    setSuggestions([]);
-    setShowSuggestions(false);
     setDuplicateVariantIndex(null);
+    setDuplicateReason('attributes');
+    setEditingVariantIndex(null);
+    setEditingVariantValue('');
     setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
     setFormReady(false);
     setVariantImagesLoading(false);
   };
@@ -902,17 +897,82 @@ const ItemMaster = () => {
 
   // Variant Management
   const createEmptyVariant = useCallback(() => {
-    const empty = { isActive: true };
+    const empty = { isActive: true, variantName: '' };
     formAttributes.forEach((attr) => {
       empty[attr.id] = '';
     });
     return empty;
   }, [formAttributes]);
 
+  // Remove a leading "<itemCode>/" prefix from a stored variant name for display/editing.
+  const stripVariantPrefix = useCallback((variantName, itemCode) => {
+    if (!variantName) return '';
+    const name = String(variantName).trim();
+    const prefix = itemCode ? `${itemCode}/` : '';
+    return prefix && name.startsWith(prefix) ? name.slice(prefix.length).trim() : name;
+  }, []);
+
+  // Normalized key for case-insensitive, whitespace-collapsed duplicate checks.
+  const normalizeVariantName = useCallback(
+    (raw) => (raw || '').trim().replace(/\s+/g, ' ').toLowerCase(),
+    [],
+  );
+
+  // Effective display/save name for a variant (falls back to "Variant N" by active position).
+  const effectiveVariantName = useCallback(
+    (variant, activePosition) => (variant?.variantName || '').trim() || `Variant ${activePosition}`,
+    [],
+  );
+
+  // Update a variant's name from the editable tab header.
+  const updateVariantName = useCallback((variantIndex, value) => {
+    setVariants((prev) => {
+      const updated = [...prev];
+      updated[variantIndex] = { ...updated[variantIndex], variantName: value };
+      return updated;
+    });
+    setDuplicateVariantIndex(null);
+    setUnsavedChanges(true);
+  }, []);
+
+  // ── Inline variant-name tab editing ──
+  const startEditVariant = useCallback((index, currentRawName) => {
+    setActiveVariantIndex(index);
+    setDuplicateVariantIndex(null);
+    setEditingVariantIndex(index);
+    setEditingVariantValue(currentRawName || '');
+  }, []);
+
+  const commitEditVariant = useCallback(() => {
+    setEditingVariantIndex((idx) => {
+      if (idx !== null) updateVariantName(idx, editingVariantValue.trim());
+      return null;
+    });
+    setEditingVariantValue('');
+  }, [editingVariantValue, updateVariantName]);
+
+  const cancelEditVariant = useCallback(() => {
+    setEditingVariantIndex(null);
+    setEditingVariantValue('');
+  }, []);
+
+  // Find the first duplicate variant name among active variants (normalized). Returns index or -1.
+  const findDuplicateVariantNameIndex = useCallback(() => {
+    const seen = new Map();
+    let activePosition = 0;
+    for (let i = 0; i < variants.length; i++) {
+      if (variants[i].isActive === false) continue;
+      activePosition += 1;
+      const key = normalizeVariantName(effectiveVariantName(variants[i], activePosition));
+      if (seen.has(key)) return i;
+      seen.set(key, i);
+    }
+    return -1;
+  }, [variants, normalizeVariantName, effectiveVariantName]);
+
   const handleVariantAttributeChange = (variantIndex, attributeId, value) => {
     setDuplicateVariantIndex(null);
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
     setVariants((prev) => {
       const updated = [...prev];
       updated[variantIndex] = { ...updated[variantIndex], [attributeId]: value };
@@ -936,7 +996,6 @@ const ItemMaster = () => {
     setVariants((prev) => [...prev, newVariant]);
     setActiveVariantIndex(variants.length);
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
   };
 
   const deleteVariant = (indexToDelete) => {
@@ -966,7 +1025,6 @@ const ItemMaster = () => {
     }
 
     setUnsavedChanges(true);
-    nonItemNameChangesRef.current = true;
 
     setDuplicateVariantIndex(null);
 
@@ -1013,173 +1071,55 @@ const ItemMaster = () => {
     return cat?.name?.toLowerCase().includes('fabric') || false;
   }, [watchedCategoryId, metaData]);
 
-  // Item Name Suggestions
-  const itemNameValue = Form.useWatch('itemName', form);
-  
-  useEffect(() => {
-    const query = (itemNameValue || '').trim();
+  // ── UOM conversion (1 primary UOM = N secondary UOM) ──
+  const watchedUomId = Form.useWatch('uomId', form);
+  const watchedSecondaryUomId = Form.useWatch('secondaryUomId', form);
+  const watchedConversionFactor = Form.useWatch('uomConversionFactor', form);
 
-    if (suppressSuggestionsRef.current) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-
-    // Reset no-result prefix on backspace/shortening
-    const isShortening = query.length < lastQueryRef.current.length;
-    if (isShortening && noResultPrefixRef.current) {
-      if (query.length < noResultPrefixRef.current.length ||
-          !query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        noResultPrefixRef.current = '';
-      }
-    }
-
-    if (query.length >= 3) {
-      if (noResultPrefixRef.current && query.toLowerCase().startsWith(noResultPrefixRef.current.toLowerCase())) {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        setSuggestionsLoading(false);
-        lastQueryRef.current = query;
-        return;
-      }
-
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      setSuggestionsLoading(true);
-      debounceRef.current = setTimeout(async () => {
-        try {
-          if (lastQueryRef.current === query) {
-            setSuggestionsLoading(false);
-            return;
-          }
-          const res = await autocompleteItems(query);
-          let results = [];
-          if (Array.isArray(res)) results = res;
-          else if (res?.data) results = res.data;
-          else if (res?.content) results = res.content;
-
-          setSuggestions(results || []);
-          setShowSuggestions((results || []).length > 0);
-          lastQueryRef.current = query;
-
-          if (!results || results.length === 0) {
-            noResultPrefixRef.current = query;
-          } else {
-            noResultPrefixRef.current = '';
-          }
-        } catch (error) {
-          console.error('Item search failed:', error);
-          setSuggestions([]);
-          setShowSuggestions(false);
-        } finally {
-          setSuggestionsLoading(false);
-        }
-      }, 300);
-    } else {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      setSuggestions([]);
-      setShowSuggestions(false);
-      setSuggestionsLoading(false);
-      lastQueryRef.current = '';
-      noResultPrefixRef.current = '';
-    }
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+  const uomConversion = useMemo(() => {
+    const findUom = (id) => (id ? formUomOptions.find((o) => String(o.id) === String(id)) : null);
+    const primary = findUom(watchedUomId);
+    const secondary = findUom(watchedSecondaryUomId);
+    // No secondary UOM, or the same unit on both sides, means nothing to convert.
+    const applicable = Boolean(secondary) && String(watchedUomId) !== String(watchedSecondaryUomId);
+    return {
+      applicable,
+      primarySymbol: primary?.symbol || primary?.name || '',
+      secondarySymbol: secondary?.symbol || secondary?.name || '',
+      label: applicable
+        ? formatConversionLabel(primary?.name, secondary?.name, watchedConversionFactor)
+        : '',
     };
-  }, [itemNameValue]);
+  }, [formUomOptions, watchedUomId, watchedSecondaryUomId, watchedConversionFactor]);
 
-  // Apply selected item from suggestions (internal — skips confirmation)
-  const doApplySelectedItem = (item) => {
-    if (!item) return;
-
-    setSelectedItem(item);
-    setSelectedItemId(item.id);
-    form.setFieldsValue({
-      itemName: item.itemName || '',
-      categoryId: item.categoryId?.toString(),
-      subCategoryId: item.subCategoryId?.toString(),
-      itemTypeId: item.itemTypeId?.toString(),
-      uomId: item.uomId?.toString(),
-      secondaryUomId: item.secondaryUomId?.toString() || undefined,
-      hsnCode: item.hsnCode || '',
-      description: item.description || '',
-      defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
-      isActive: item.isActive ?? true,
-    });
-
-    // Populate cascading dropdowns
-    const categoryId = parseInt(item.categoryId);
-    const subCategoryId = parseInt(item.subCategoryId);
-    const itemTypeId = parseInt(item.itemTypeId);
-
-    const category = metaData.find((c) => c.id === categoryId);
-    if (category) {
-      setFormSubcategories(category.subCategories || []);
-      const subcategory = category.subCategories?.find((sc) => sc.id === subCategoryId);
-      if (subcategory) {
-        setFormItemTypes(subcategory.itemTypes || []);
-        const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
-        if (itemType) {
-          setFormAttributes(itemType.attributes || []);
-          setFormUomOptions(itemType.uoms || []);
-
-          // Load variants
-          if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
-            const loadedVariants = item.variants.map((variant) => {
-              const variantObj = {
-                id: variant.id,
-                itemId: variant.itemId,
-                isActive: variant.isActive ?? true,
-              };
-              if (variant.attributes && typeof variant.attributes === 'object') {
-                itemType.attributes.forEach((attr) => {
-                  variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
-                });
-              }
-              return variantObj;
-            });
-            setVariants(loadedVariants);
-            const firstActiveIdx = loadedVariants.findIndex((v) => v.isActive !== false);
-            setActiveVariantIndex(firstActiveIdx >= 0 ? firstActiveIdx : 0);
-          } else {
-            setVariants([{ isActive: true }]);
-            setActiveVariantIndex(0);
-          }
-        }
-      }
-    }
-
-    setSuggestions([]);
-    setShowSuggestions(false);
-    suppressSuggestionsRef.current = true;
-    setUnsavedChanges(false);
-    nonItemNameChangesRef.current = false;
-  };
-
-  // Apply selected item with unsaved changes guard (ignores itemName-only changes)
-  const applySelectedItem = (item) => {
-    if (!item) return;
-
-    if (nonItemNameChangesRef.current) {
-      modal.confirm({
-        title: 'Unsaved changes',
-        content: 'You have unsaved changes. Selecting a different item will discard them. Continue?',
-        okText: 'Discard & Continue',
-        cancelText: 'Cancel',
-        onOk: () => doApplySelectedItem(item),
-        onCancel: () => {
-          // Restore the previous item name in the input
-          setSuggestions([]);
-          setShowSuggestions(false);
-          suppressSuggestionsRef.current = true;
-          form.setFieldsValue({ itemName: selectedItem?.itemName || '' });
-        },
-      });
+  // Suggest the standard factor whenever either UOM changes; the user can always overwrite it.
+  const handleUomPairChange = useCallback(() => {
+    const uomId = form.getFieldValue('uomId');
+    const secondaryUomId = form.getFieldValue('secondaryUomId');
+    if (!secondaryUomId || String(uomId) === String(secondaryUomId)) {
+      form.setFieldValue('uomConversionFactor', undefined);
       return;
     }
+    const findUom = (id) => formUomOptions.find((o) => String(o.id) === String(id));
+    const preset = getPresetFactor(findUom(uomId)?.symbol, findUom(secondaryUomId)?.symbol);
+    form.setFieldValue('uomConversionFactor', preset ?? undefined);
+  }, [form, formUomOptions]);
 
-    doApplySelectedItem(item);
-  };
+  // ── Auto-generated item name preview (Category / Sub-Category / Item Type) ──
+  const watchedSubCategoryId = Form.useWatch('subCategoryId', form);
+  const watchedItemTypeId = Form.useWatch('itemTypeId', form);
+  const autoItemName = useMemo(() => {
+    const cat = metaData.find((c) => c.id === parseInt(watchedCategoryId));
+    if (!cat) return '';
+    const sub = (cat.subCategories || []).find((sc) => sc.id === parseInt(watchedSubCategoryId));
+    const type = (sub?.itemTypes || []).find((it) => it.id === parseInt(watchedItemTypeId));
+    return [cat.name, sub?.name, type?.name].filter(Boolean).join(' / ');
+  }, [metaData, watchedCategoryId, watchedSubCategoryId, watchedItemTypeId]);
+
+  // Keep the (disabled) itemName form field in sync with the auto-generated preview.
+  useEffect(() => {
+    form.setFieldsValue({ itemName: autoItemName });
+  }, [autoItemName, form]);
 
   // Form Submit
   const handleSubmit = async (values) => {
@@ -1191,25 +1131,50 @@ const ItemMaster = () => {
     }
 
     // Validate variant attributes
+    let attrActivePosition = 0;
     for (let i = 0; i < variants.length; i++) {
       const variant = variants[i];
       if (variant.isActive === false) continue;
+      attrActivePosition += 1;
+      const variantLabel = effectiveVariantName(variant, attrActivePosition);
       for (const attr of formAttributes) {
         if (!variant[attr.id] || variant[attr.id].toString().trim() === '') {
-          const displayIdx = activeVariants.findIndex((_, idx) => variants.indexOf(activeVariants[idx]) === i) + 1;
-          message.error(`${attr.attributeName} is required in Variant ${displayIdx || i + 1}`);
+          message.error(`${attr.attributeName} is required in "${variantLabel}"`);
           setActiveVariantIndex(i);
           return;
         }
       }
     }
 
-    // Check for duplicate variants
+    // Validate variant name length: at least 5 characters (special chars allowed).
+    for (let i = 0; i < variants.length; i++) {
+      const variant = variants[i];
+      if (variant.isActive === false) continue;
+      const enteredName = (variant.variantName || '').trim();
+      if (enteredName.length < 5) {
+        message.error('Variant name must be at least 5 characters');
+        setActiveVariantIndex(i);
+        return;
+      }
+    }
+
+    // Check for duplicate variants (attributes)
     const duplicateCheck = checkDuplicateVariants();
     if (duplicateCheck.isDuplicate) {
+      setDuplicateReason('attributes');
       setDuplicateVariantIndex(duplicateCheck.index2);
       setActiveVariantIndex(duplicateCheck.index2);
       message.error('Duplicate variant detected. Please update at least one attribute.');
+      return;
+    }
+
+    // Check for duplicate variant names (case-insensitive, whitespace-normalized)
+    const dupNameIndex = findDuplicateVariantNameIndex();
+    if (dupNameIndex !== -1) {
+      setDuplicateReason('name');
+      setDuplicateVariantIndex(dupNameIndex);
+      setActiveVariantIndex(dupNameIndex);
+      message.error('Duplicate variant name. Each variant must have a unique name.');
       return;
     }
 
@@ -1227,7 +1192,10 @@ const ItemMaster = () => {
     setSubmitting(true);
     try {
       // Build variants payload
+      let activePosition = 0;
       const variantsPayload = variants.map((variant) => {
+        const isActive = variant.isActive ?? true;
+        if (isActive) activePosition += 1;
         const attributeObject = {};
         formAttributes.forEach((attr) => {
           attributeObject[toCamelCase(attr.attributeName)] = variant[attr.id] || '';
@@ -1235,8 +1203,12 @@ const ItemMaster = () => {
 
         const variantObj = {
           itemName: values.itemName,
+          // Raw variant name (the tab-header label); stored as-is, no item-code prefix.
+          variantName: isActive
+            ? effectiveVariantName(variant, activePosition)
+            : ((variant.variantName || '').trim() || 'Variant'),
           attributes: attributeObject,
-          isActive: variant.isActive ?? true,
+          isActive,
         };
 
         if (variant.id !== undefined && variant.id !== null) {
@@ -1263,6 +1235,8 @@ const ItemMaster = () => {
         secondaryUomName: values.secondaryUomId
           ? formUomOptions.find((opt) => opt.id.toString() === values.secondaryUomId.toString())?.name || null
           : null,
+        // Null unless the secondary UOM is set and actually differs from the primary
+        uomConversionFactor: uomConversion.applicable ? Number(values.uomConversionFactor) : null,
         hsnCode: values.hsnCode,
         description: values.description || null,
         defaultAllowance: values.defaultAllowance,
@@ -1393,12 +1367,6 @@ const ItemMaster = () => {
       ),
     },
     {
-      title: 'Item Name',
-      dataIndex: 'itemName',
-      sorter: true,
-      ellipsis: true,
-    },
-    {
       title: 'Category',
       dataIndex: 'categoryName',
       width: 150,
@@ -1419,7 +1387,22 @@ const ItemMaster = () => {
     {
       title: 'UOM',
       dataIndex: 'uomName',
-      width: 80,
+      width: 140,
+      render: (uomName, record) => {
+        const conversion = formatConversionLabel(
+          record.uomSymbol || uomName,
+          record.secondaryUomSymbol,
+          record.uomConversionFactor
+        );
+        return (
+          <div>
+            <div>{uomName || '-'}</div>
+            {conversion && (
+              <Text type="secondary" style={{ fontSize: 11 }}>{conversion}</Text>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: 'Status',
@@ -1682,12 +1665,8 @@ const ItemMaster = () => {
             </div>
           </div>
         ) : (
-          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={(changedValues) => {
+          <Form form={form} layout="vertical" onFinish={handleSubmit} onValuesChange={() => {
             setUnsavedChanges(true);
-            const changedKeys = Object.keys(changedValues);
-            if (changedKeys.some((key) => key !== 'itemName')) {
-              nonItemNameChangesRef.current = true;
-            }
           }}>
             <Row gutter={16}>
               <Col xs={24} md={12}>
@@ -1745,108 +1724,87 @@ const ItemMaster = () => {
                 <Form.Item
                   name="itemName"
                   label="Item Name"
-                  rules={[{ required: true, message: 'Item Name is required' }]}
+                  tooltip="Auto-generated from Category / Sub-Category / Item Type"
+                  extra="Auto-generated from Category, Sub-Category and Item Type."
                 >
-                  <div style={{ position: 'relative' }}>
-                    <Input
-                      placeholder="Enter Item Name"
-                      value={form.getFieldValue('itemName')}
-                      allowClear
-                      disabled={isEditMode}
-                      suffix={suggestionsLoading ? <LoadingOutlined spin style={{ color: 'var(--text-tertiary)' }} /> : null}
-                      onChange={(e) => {
-                        form.setFieldsValue({ itemName: e.target.value });
-                        suppressSuggestionsRef.current = false;
-                        lastQueryRef.current = '';
-                      }}
-                      onFocus={() => {
-                        if (!suppressSuggestionsRef.current && suggestions.length > 0) {
-                          setShowSuggestions(true);
-                        }
-                      }}
-                      onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    />
-                    {showSuggestions && suggestions.length > 0 && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '100%',
-                          left: 0,
-                          right: 0,
-                          zIndex: 2000,
-                          background: 'var(--card-bg)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 8,
-                          boxShadow: 'var(--shadow-md)',
-                          maxHeight: 200,
-                          overflowY: 'auto',
-                          marginTop: 4,
-                        }}
-                      >
-                        {suggestions.map((s, idx) => (
-                          <div
-                            key={s.id ?? idx}
-                            style={{
-                              padding: '8px 12px',
-                              cursor: 'pointer',
-                              borderBottom: idx < suggestions.length - 1 ? '1px solid var(--border-color)' : 'none',
-                            }}
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applySelectedItem(s)}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-secondary)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--card-bg)')}
-                          >
-                            {s.itemName}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <Input placeholder="Auto-generated from classifiers" disabled />
                 </Form.Item>
               </Col>
             </Row>
 
+            {/* UOM group — purchase unit, consumption unit, and the factor that links them */}
             <Row gutter={16}>
-              <Col xs={24} sm={12} md={6}>
+              <Col xs={24} sm={12} md={7}>
                 <Form.Item
                   name="uomId"
                   label="Primary UOM"
+                  tooltip="The unit this item is purchased and stocked in"
                   rules={[{ required: true, message: 'UOM is required' }]}
                 >
                   <Select
                     placeholder="Select Primary UOM"
                     disabled={isEditMode || !form.getFieldValue('itemTypeId')}
+                    onChange={handleUomPairChange}
                     options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
-                    onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
                   />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12} md={6}>
+              <Col xs={24} sm={12} md={7}>
                 <Form.Item
                   name="secondaryUomId"
                   label="Secondary UOM"
+                  tooltip="The lower unit this item is consumed in, used for BOM consumption"
                   rules={[
                     { required: isFabricCategory, message: 'Secondary UOM is required for fabric items' },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        if (value && value === getFieldValue('uomId')) {
-                          return Promise.reject('Primary and Secondary UOM cannot be the same');
-                        }
-                        return Promise.resolve();
-                      },
-                    }),
                   ]}
                 >
                     <Select
                       placeholder={isFabricCategory ? 'Select Secondary UOM (required)' : 'Select Secondary UOM (optional)'}
                       allowClear={!isFabricCategory}
                       disabled={isEditMode || !form.getFieldValue('itemTypeId')}
+                      onChange={handleUomPairChange}
                       options={formUomOptions.map(opt => ({ value: String(opt.id ?? opt.value ?? ''), label: opt.symbol || opt.name || '' }))}
-                      onChange={() => form.validateFields(['secondaryUomId']).catch(() => {})}
                     />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12} md={6}>
+              <Col xs={24} sm={24} md={10}>
+                <Form.Item
+                  name="uomConversionFactor"
+                  label="Conversion Factor"
+                  tooltip="How many Secondary UOM make one Primary UOM. BOM purchase quantities are converted using this."
+                  extra={uomConversion.applicable ? undefined : 'No conversion — Secondary UOM is blank or same as Primary'}
+                  rules={[
+                    { required: uomConversion.applicable, message: 'Conversion factor is required' },
+                    { type: 'number', min: 0.000001, message: 'Must be greater than zero' },
+                  ]}
+                >
+                  <InputNumber
+                    placeholder={uomConversion.applicable ? 'Enter factor' : '—'}
+                    controls={false}
+                    min={0}
+                    step={1}
+                    disabled={isEditMode || !uomConversion.applicable}
+                    addonBefore={uomConversion.applicable ? `1 ${uomConversion.primarySymbol} =` : undefined}
+                    addonAfter={uomConversion.applicable ? uomConversion.secondarySymbol : undefined}
+                    style={{ width: '100%', height: 40 }}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Reads the factor back as a full sentence so the number is unambiguous */}
+            {uomConversion.label && (
+              <Alert
+                type="info"
+                showIcon
+                banner
+                message={uomConversion.label}
+                style={{ marginBottom: 16, fontSize: 13 }}
+              />
+            )}
+
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={12}>
                 <Form.Item
                   name="hsnCode"
                   label="HSN Code"
@@ -1855,7 +1813,7 @@ const ItemMaster = () => {
                   <Input placeholder="Enter HSN Code" disabled={isEditMode} />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12} md={6}>
+              <Col xs={24} sm={12} md={12}>
                 <Form.Item
                   name="defaultAllowance"
                   label="Allowance"
@@ -1911,36 +1869,98 @@ const ItemMaster = () => {
                   </Button>
                 </div>
 
-                {/* Variant Tabs */}
+                {/* Variant Tabs — each chip holds the editable variant name */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
-                  {activeVariantsWithIndex.map(({ originalIndex }, displayIndex) => (
-                    <Tag
-                      key={originalIndex}
-                      color={activeVariantIndex === originalIndex ? 'blue' : 'default'}
-                      style={{
-                        cursor: 'pointer',
-                        padding: '4px 12px',
-                        fontSize: 14,
-                        border:
-                          duplicateVariantIndex === originalIndex
-                              ? '2px solid var(--error-color)'
-                              : activeVariantIndex === originalIndex
-                              ? '2px solid var(--primary-color)'
-                              : '1px solid var(--border-color)',
-                      }}
-                      onClick={() => {
-                        setActiveVariantIndex(originalIndex);
-                        setDuplicateVariantIndex(null);
-                      }}
-                      closable={activeVariantsWithIndex.length > 1}
-                      onClose={(e) => {
-                        e.preventDefault();
-                        deleteVariant(originalIndex);
-                      }}
-                    >
-                      Variant {displayIndex + 1}
-                    </Tag>
-                  ))}
+                  {activeVariantsWithIndex.map(({ originalIndex, variant }, displayIndex) => {
+                    const isActiveTab = activeVariantIndex === originalIndex;
+                    const isEditing = editingVariantIndex === originalIndex;
+                    const isDup = duplicateVariantIndex === originalIndex;
+                    const displayName = (variant.variantName || '').trim() || `Variant ${displayIndex + 1}`;
+                    const canClose = activeVariantsWithIndex.length > 1 && !isReadOnly;
+
+                    if (isEditing) {
+                      return (
+                        <Input
+                          key={originalIndex}
+                          size="small"
+                          autoFocus
+                          maxLength={100}
+                          value={editingVariantValue}
+                          placeholder={`Variant ${displayIndex + 1}`}
+                          onChange={(e) => setEditingVariantValue(e.target.value)}
+                          onPressEnter={commitEditVariant}
+                          onBlur={commitEditVariant}
+                          onKeyDown={(e) => { if (e.key === 'Escape') cancelEditVariant(); }}
+                          suffix={<CheckOutlined style={{ color: 'var(--primary-color)', fontSize: 12 }} onMouseDown={(e) => { e.preventDefault(); commitEditVariant(); }} />}
+                          style={{ width: 180, height: 34, borderRadius: 8 }}
+                        />
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={originalIndex}
+                        role="button"
+                        tabIndex={0}
+                        title="Click to select · double-click to rename"
+                        onClick={() => { setActiveVariantIndex(originalIndex); setDuplicateVariantIndex(null); }}
+                        onDoubleClick={() => { if (!isReadOnly) startEditVariant(originalIndex, variant.variantName); }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          height: 34,
+                          padding: '0 6px 0 12px',
+                          borderRadius: 8,
+                          cursor: 'pointer',
+                          userSelect: 'none',
+                          background: isDup
+                            ? 'rgba(255,69,58,0.06)'
+                            : isActiveTab
+                            ? 'rgba(99,102,241,0.08)'
+                            : 'var(--bg-secondary, #f8fafc)',
+                          border: `1px solid ${isDup ? 'var(--error-color)' : isActiveTab ? 'var(--primary-color)' : 'var(--border-color)'}`,
+                          boxShadow: isActiveTab && !isDup ? '0 1px 2px rgba(0,0,0,0.06)' : 'none',
+                          transition: 'all 0.15s ease',
+                          maxWidth: 240,
+                        }}
+                      >
+                        <Text
+                          ellipsis={{ tooltip: displayName }}
+                          style={{
+                            maxWidth: 140,
+                            fontSize: 13,
+                            fontWeight: isActiveTab ? 600 : 500,
+                            color: isDup ? 'var(--error-color)' : isActiveTab ? 'var(--primary-color)' : 'var(--text-primary)',
+                          }}
+                        >
+                          {displayName}
+                        </Text>
+                        {!isReadOnly && (
+                          <Tooltip title="Rename">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<EditOutlined />}
+                              onClick={(e) => { e.stopPropagation(); startEditVariant(originalIndex, variant.variantName); }}
+                              style={{ width: 22, height: 22, minWidth: 22, color: 'var(--text-tertiary)', opacity: isActiveTab ? 1 : 0.6 }}
+                            />
+                          </Tooltip>
+                        )}
+                        {canClose && (
+                          <Tooltip title="Remove variant">
+                            <Button
+                              type="text"
+                              size="small"
+                              icon={<CloseOutlined />}
+                              onClick={(e) => { e.stopPropagation(); deleteVariant(originalIndex); }}
+                              style={{ width: 22, height: 22, minWidth: 22, color: 'var(--text-tertiary)' }}
+                            />
+                          </Tooltip>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Active Variant Fields */}
@@ -1968,9 +1988,23 @@ const ItemMaster = () => {
                         }}
                       >
                         <ExclamationCircleOutlined style={{ marginRight: 8 }} />
-                        This variant has duplicate attribute values. Please update at least one attribute.
+                        {duplicateReason === 'name'
+                          ? 'This variant name is already used by another variant. Please enter a unique name.'
+                          : 'This variant has duplicate attribute values. Please update at least one attribute.'}
                       </div>
                     )}
+                    <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>Variant Code</Text>
+                      {variants[activeVariantIndex]?.variantCode ? (
+                        <Tag color="blue" style={{ fontFamily: 'monospace', margin: 0 }}>
+                          {variants[activeVariantIndex].variantCode}
+                        </Tag>
+                      ) : (
+                        <Text type="secondary" style={{ fontSize: 12, fontStyle: 'italic' }}>
+                          Auto-generated on save
+                        </Text>
+                      )}
+                    </div>
                     <Row gutter={16}>
                       {formAttributes.map((attr) => (
                         <Col xs={24} md={12} key={attr.id}>
@@ -2008,16 +2042,12 @@ const ItemMaster = () => {
                         }
                         compact
                         placeholder="Click or drag to upload variant image"
+                        infoMessage={
+                          variants[activeVariantIndex]?.id
+                            ? 'Image changes are saved immediately and independently of the other variant fields.'
+                            : 'The image will be uploaded automatically after you save the item.'
+                        }
                       />
-                      {/* Info message for new variants (no ID yet) */}
-                      {!variants[activeVariantIndex]?.id && variants[activeVariantIndex]?._imageFile && (
-                        <Alert
-                          type="info"
-                          showIcon
-                          style={{ marginTop: 8, fontSize: 12 }}
-                          message="Image will be uploaded automatically after saving the item."
-                        />
-                      )}
                     </div>
                   </div>
                 )}
@@ -2040,6 +2070,22 @@ const ItemMaster = () => {
                           width: 50,
                           align: 'center',
                           render: (_, __, idx) => <Badge count={idx + 1} style={{ backgroundColor: 'var(--primary-color)' }} />,
+                        },
+                        {
+                          title: 'Variant Name',
+                          align: 'left',
+                          render: (_, record, idx) =>
+                            (record.variant?.variantName || '').trim() || `Variant ${idx + 1}`,
+                        },
+                        {
+                          title: 'Variant Code',
+                          align: 'left',
+                          render: (_, record) =>
+                            record.variant?.variantCode ? (
+                              <Tag style={{ fontFamily: 'monospace', margin: 0 }}>{record.variant.variantCode}</Tag>
+                            ) : (
+                              <Text type="secondary" style={{ fontSize: 12 }}>—</Text>
+                            ),
                         },
                         ...formAttributes.map((attr) => {
                           const attrNameLower = (attr.attributeName || '').toLowerCase();
@@ -2168,7 +2214,17 @@ const ItemMaster = () => {
               { key: 'category', label: 'Category', children: viewingItem.categoryName || '-' },
               { key: 'subcategory', label: 'Subcategory', children: viewingItem.subCategoryName || '-' },
               { key: 'itemType', label: 'Item Type', children: viewingItem.itemTypeName || '-' },
-              { key: 'uom', label: 'UOM', children: viewingItem.uomName || '-' },
+              { key: 'uom', label: 'Primary UOM', children: viewingItem.uomName || '-' },
+              { key: 'secondaryUom', label: 'Secondary UOM', children: viewingItem.secondaryUomName || '-' },
+              {
+                key: 'conversion',
+                label: 'Conversion',
+                children: formatConversionLabel(
+                  viewingItem.uomName,
+                  viewingItem.secondaryUomName,
+                  viewingItem.uomConversionFactor
+                ) || <Text type="secondary">No conversion</Text>,
+              },
               { key: 'hsn', label: 'HSN Code', children: viewingItem.hsnCode || '-' },
               { key: 'allowance', label: 'Allowance', children: viewingItem.defaultAllowance != null ? `${Number(viewingItem.defaultAllowance)}%` : '-' },
             ]} />
@@ -2188,8 +2244,11 @@ const ItemMaster = () => {
                         background: 'var(--card-bg)',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text strong>Variant {idx + 1}</Text>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                        <Text strong>{stripVariantPrefix(v.variantName, viewingItem.itemCode) || `Variant ${idx + 1}`}</Text>
+                        {v.variantCode && (
+                          <Tag color="blue" style={{ fontFamily: 'monospace', margin: 0 }}>{v.variantCode}</Tag>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>

@@ -13,14 +13,15 @@
 import { useState, useEffect } from 'react';
 import {
   App, Modal, Upload, Button, Spin, Alert, Tag, Select, Divider,
-  Row, Col, Typography, Space, Table, Form, Input, Card,
+  Row, Col, Typography, Space, Table, Form, Input, InputNumber, Card,
 } from 'antd';
 import {
   CheckCircleFilled, WarningFilled, FileTextOutlined,
   ImportOutlined, PlusOutlined,
 } from '@ant-design/icons';
 import { extractTechpackForCosting } from '../../services/costing/costingService';
-import { searchItems, getItemMetaData, createItem } from '../../services/master/itemService';
+import { searchItems, getItemMetaData, createItem, updateItem, getItemById } from '../../services/master/itemService';
+import { searchVariants } from '../../services/master/variantService';
 import { createBuyer, getBuyers } from '../../services/master/buyerService';
 import { saveStyle } from '../../services/master/styleService';
 import { SEASON_CODES, SEASON_YEARS } from '../../utils/costingConstants';
@@ -43,39 +44,60 @@ const ROW_TYPE_CATEGORY = {
   MANUFACTURING: 'manufactur',
 };
 
-// ── ItemSearchSelect ──────────────────────────────────────────────────────────
+/** Master category to search variants within, per section. Manufacturing has no item variants. */
+const SECTION_VARIANT_CATEGORY = {
+  fabric:       'Fabric',
+  localTrim:    'Trims',
+  importedTrim: 'Trims',
+  manufacturing: null,
+};
 
-function ItemSearchSelect({ value, onChange }) {
+// ── ItemSearchSelect ──────────────────────────────────────────────────────────
+// When `category` is set (Fabric / Trims) this searches item VARIANTS by variant code/name and
+// shows the variant name. Otherwise it falls back to an item search (used for manufacturing rows).
+
+function ItemSearchSelect({ value, valueLabel, category, onChange }) {
   const [options, setOptions]   = useState([]);
   const [fetching, setFetching] = useState(false);
 
-  const handleSearch = async (q) => {
-    if (!q || q.length < 2) { setOptions([]); return; }
+  const load = async (q) => {
     setFetching(true);
     try {
-      const res   = await searchItems({ search: q, size: 10 });
-      const items = res.data?.content || res.data || [];
-      setOptions(items.map((i) => ({ value: i.id, label: i.itemName, categoryName: i.categoryName })));
+      if (category) {
+        const res  = await searchVariants({ category, q: q || '', limit: 10 });
+        const list = res?.data || res || [];
+        setOptions(list.map((v) => ({ value: v.variantId, label: v.variantName, sub: v.variantCode, variant: v })));
+      } else {
+        const res   = await searchItems({ search: q, size: 10 });
+        const items = res.data?.content || res.data || [];
+        setOptions(items.map((i) => ({ value: i.id, label: i.itemName, sub: i.categoryName, item: i })));
+      }
     } catch { setOptions([]); }
     finally  { setFetching(false); }
   };
 
+  const handleSearch = (q) => {
+    if (!category && (!q || q.length < 2)) { setOptions([]); return; }
+    load(q);
+  };
+
   return (
     <Select
-      showSearch allowClear
-      value={value}
-      onChange={onChange}
+      showSearch allowClear labelInValue
+      value={value ? { value, label: valueLabel } : undefined}
+      onChange={(opt) => onChange(opt || null)}
       onSearch={handleSearch}
+      onDropdownVisibleChange={(open) => { if (open && category && options.length === 0) load(''); }}
       filterOption={false}
       notFoundContent={fetching ? <Spin size="small" /> : 'No results — use Create Item below'}
-      placeholder="Search existing items…"
+      placeholder={category ? 'Search variant (code or name)…' : 'Search existing items…'}
       style={{ width: '100%' }}
       options={options}
       optionRender={(opt) => (
         <Space direction="vertical" size={0}>
-          <Text>{opt.label}</Text>
-          {opt.data.categoryName && (
-            <Text type="secondary" style={{ fontSize: 11 }}>{opt.data.categoryName}</Text>
+          <Text>{opt.data.label}</Text>
+          {opt.data.sub && (
+            <Text type="secondary" style={{ fontSize: 11 }}>{opt.data.sub}</Text>
           )}
         </Space>
       )}
@@ -85,6 +107,15 @@ function ItemSearchSelect({ value, onChange }) {
 
 // ── QuickCreateItemModal ──────────────────────────────────────────────────────
 
+/** camelCase an attribute name so variant attribute keys match the Item Master payload shape. */
+const toCamelCase = (str) =>
+  (str || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9 ]/g, '')
+    .split(/\s+/)
+    .map((w, i) => (i === 0 ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+    .join('');
+
 function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
   const { message }           = App.useApp();
   const [form]                = Form.useForm();
@@ -92,6 +123,8 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
   const [subs, setSubs]       = useState([]);
   const [types, setTypes]     = useState([]);
   const [uoms, setUoms]       = useState([]);
+  const [attributes, setAttributes] = useState([]);
+  const [existingItem, setExistingItem] = useState(null); // item already present for this classifier combo
   const [categorySelected, setCategorySelected]       = useState(false);
   const [subcategorySelected, setSubcategorySelected] = useState(false);
   const [itemTypeSelected, setItemTypeSelected]       = useState(false);
@@ -102,28 +135,29 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
   const noUomsForItemType    = itemTypeSelected    && uoms.length  === 0;
   const hasDeadEnd = noSubsForCategory || noTypesForSubcategory || noUomsForItemType;
 
-  const hydrateFromCategory = (catId, source) => {
-    const cat = source.find((c) => String(c.id) === String(catId));
-    setSubs(cat?.subCategories || []);
+  const resetDependent = () => {
     setTypes([]);
     setUoms([]);
-    setCategorySelected(!!catId);
+    setAttributes([]);
+    setExistingItem(null);
   };
 
   useEffect(() => {
     if (!open) return;
-    form.setFieldsValue({ itemName: extractedRow?.extractedName || '', isActive: true });
+    form.setFieldsValue({ isActive: true });
     getItemMetaData()
       .then((res) => {
         const data = Array.isArray(res) ? res : (res?.data || res?.content || []);
         setMeta(data);
-
         const keyword = ROW_TYPE_CATEGORY[extractedRow?.rowType] || '';
         const cat = data.find((c) => c.name?.toLowerCase().includes(keyword));
         if (cat) {
           form.setFieldValue('categoryId', String(cat.id));
-          hydrateFromCategory(String(cat.id), data);
+          setSubs(cat.subCategories || []);
+          setCategorySelected(true);
         }
+        // Pre-seed the variant name with the extracted material name.
+        if (extractedRow?.extractedName) form.setFieldValue('variantName', extractedRow.extractedName);
       })
       .catch(() => {});
   }, [open, extractedRow]);
@@ -132,8 +166,7 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
     form.setFieldsValue({ subCategoryId: undefined, itemTypeId: undefined, uomId: undefined });
     const cat = meta.find((c) => String(c.id) === String(catId));
     setSubs(cat?.subCategories || []);
-    setTypes([]);
-    setUoms([]);
+    resetDependent();
     setCategorySelected(!!catId);
     setSubcategorySelected(false);
     setItemTypeSelected(false);
@@ -146,11 +179,13 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
     const sub   = cat?.subCategories?.find((s) => String(s.id) === String(subId));
     setTypes(sub?.itemTypes || []);
     setUoms([]);
+    setAttributes([]);
+    setExistingItem(null);
     setSubcategorySelected(!!subId);
     setItemTypeSelected(false);
   };
 
-  const handleItemTypeChange = (typeId) => {
+  const handleItemTypeChange = async (typeId) => {
     form.setFieldValue('uomId', undefined);
     const catId = form.getFieldValue('categoryId');
     const subId = form.getFieldValue('subCategoryId');
@@ -158,29 +193,87 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
     const sub   = cat?.subCategories?.find((s) => String(s.id) === String(subId));
     const type  = sub?.itemTypes?.find((t) => String(t.id) === String(typeId));
     setUoms(type?.uoms || []);
+    setAttributes(type?.attributes || []);
     setItemTypeSelected(!!typeId);
+    // The Category + Sub-Category + Item Type combination is unique. If an item already exists,
+    // we'll add the new variant to it (find-or-create) and show its existing variant names.
+    setExistingItem(null);
+    if (catId && subId && typeId) {
+      try {
+        const res  = await searchItems({ categoryId: parseInt(catId), subCategoryId: parseInt(subId), itemTypeId: parseInt(typeId), page: 0, size: 1 });
+        const item = res?.data?.content?.[0] || res?.content?.[0] || (Array.isArray(res?.data) ? res.data[0] : null);
+        if (item) {
+          setExistingItem(item);
+          // Prefill UOM/HSN/allowance from the existing item so the new variant stays consistent.
+          form.setFieldsValue({
+            uomId: item.uomId != null ? String(item.uomId) : undefined,
+            hsnCode: item.hsnCode || '',
+            defaultAllowance: item.defaultAllowance != null ? Number(item.defaultAllowance) : undefined,
+          });
+        }
+      } catch { /* ignore lookup failure */ }
+    }
   };
 
   const handleSave = async () => {
     try {
       const v = await form.validateFields();
       setSaving(true);
-      const res     = await createItem({
-        itemName:      v.itemName,
-        categoryId:    parseInt(v.categoryId),
-        subCategoryId: parseInt(v.subCategoryId),
-        itemTypeId:    parseInt(v.itemTypeId),
-        uomId:         parseInt(v.uomId),
-        hsnCode:       v.hsnCode || '',
-        isActive:      true,
-        variants:      [],
+
+      const attributeObject = {};
+      attributes.forEach((attr) => {
+        attributeObject[toCamelCase(attr.attributeName)] = (v[`attr_${attr.id}`] || '').toString().trim();
       });
-      const created = res.data || res;
-      message.success(`Item "${created.itemName}" created`);
-      onCreated({ id: created.id, name: created.itemName });
+      const newVariant = { variantName: v.variantName.trim(), attributes: attributeObject, isActive: true };
+
+      let savedItem;
+      if (existingItem) {
+        // Append the new variant to the existing item (keep its existing variants).
+        const full = (await getItemById(existingItem.id));
+        const item = full?.data || full || existingItem;
+        const payload = {
+          ...item,
+          categoryId:    item.categoryId,
+          subCategoryId: item.subCategoryId,
+          itemTypeId:    item.itemTypeId,
+          uomId:         parseInt(v.uomId),
+          hsnCode:       v.hsnCode || item.hsnCode || '',
+          defaultAllowance: v.defaultAllowance,
+          isActive:      true,
+          version:       item.version,
+          variants:      [...(item.variants || []), newVariant],
+        };
+        const res = await updateItem(item.id, payload);
+        savedItem = res?.data || res;
+      } else {
+        const res = await createItem({
+          categoryId:    parseInt(v.categoryId),
+          subCategoryId: parseInt(v.subCategoryId),
+          itemTypeId:    parseInt(v.itemTypeId),
+          uomId:         parseInt(v.uomId),
+          hsnCode:       v.hsnCode || '',
+          defaultAllowance: v.defaultAllowance,
+          isActive:      true,
+          variants:      [newVariant],
+        });
+        savedItem = res?.data || res;
+      }
+
+      // Locate the just-added variant by name to return its id.
+      const created = (savedItem?.variants || []).find(
+        (vr) => (vr.variantName || '').trim().toLowerCase() === newVariant.variantName.toLowerCase(),
+      );
+      message.success(`Variant "${newVariant.variantName}" ${existingItem ? 'added to existing item' : 'created'}`);
+      onCreated({
+        itemId:      savedItem?.id,
+        itemName:    savedItem?.itemName,
+        variantId:   created?.id ?? null,
+        variantName: newVariant.variantName,
+      });
       form.resetFields();
+      setExistingItem(null);
     } catch (err) {
-      if (!err?.errorFields) message.error(err?.errorMessage || 'Failed to create item');
+      if (!err?.errorFields) message.error(err?.errorMessage || err?.response?.data?.message || 'Failed to save item');
     } finally {
       setSaving(false);
     }
@@ -190,12 +283,12 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={() => form.resetFields()}
+      afterClose={() => { form.resetFields(); resetDependent(); setCategorySelected(false); setSubcategorySelected(false); setItemTypeSelected(false); }}
       title={<span style={{ fontSize: 18, fontWeight: 600 }}>Quick Create Item</span>}
       width={640}
       centered
       onOk={handleSave}
-      okText="Create Item"
+      okText={existingItem ? 'Add Variant' : 'Create Item'}
       okButtonProps={{ loading: saving, disabled: hasDeadEnd }}
       destroyOnClose
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
@@ -203,73 +296,67 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
       <Alert
         type="info" showIcon
         style={{ marginBottom: 16 }}
-        message={`Creating item for: "${extractedRow?.extractedName}"`}
+        message={`Creating a variant for: "${extractedRow?.extractedName}"`}
+        description="Item name is derived from Category / Sub-Category / Item Type. Enter a variant name and its attributes."
       />
       {noSubsForCategory && (
-        <Alert
-          type="warning" showIcon
-          style={{ marginBottom: 16 }}
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
           message="No Subcategory configured for this Category"
-          description="Please open the Subcategory master screen and add at least one subcategory under this category before creating this item."
-        />
+          description="Add a subcategory under this category in the master screen first." />
       )}
       {noTypesForSubcategory && (
-        <Alert
-          type="warning" showIcon
-          style={{ marginBottom: 16 }}
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
           message="No Item Type configured for this Subcategory"
-          description="Please open the Item Type master screen and add at least one item type under this subcategory before creating this item."
-        />
+          description="Add an item type under this subcategory in the master screen first." />
       )}
       {noUomsForItemType && (
-        <Alert
-          type="warning" showIcon
-          style={{ marginBottom: 16 }}
+        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
           message="No UOM configured for this Item Type"
-          description="Please open the Item Type master screen and assign at least one UOM before creating this item."
-        />
+          description="Assign at least one UOM to this item type first." />
+      )}
+      {existingItem && (
+        <Alert type="success" showIcon style={{ marginBottom: 16 }}
+          message="This item already exists — your variant will be added to it"
+          description={
+            (existingItem.variants || []).length > 0
+              ? <>Existing variants: {(existingItem.variants || []).map((vr) => vr.variantName).filter(Boolean).join(', ') || '—'}</>
+              : 'This item currently has no variants.'
+          } />
       )}
       <Form form={form} layout="vertical">
-        <Form.Item name="itemName" label="Item Name" rules={[{ required: true }]}>
-          <Input />
-        </Form.Item>
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item name="categoryId" label="Category" rules={[{ required: true }]}>
-              <Select
-                placeholder="Category" showSearch optionFilterProp="label"
+              <Select placeholder="Category" showSearch optionFilterProp="label"
                 options={meta.map((c) => ({ value: String(c.id), label: c.name }))}
-                onChange={handleCategoryChange}
-              />
+                onChange={handleCategoryChange} />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="subCategoryId" label="Subcategory" rules={[{ required: true }]}>
-              <Select
-                placeholder="Subcategory" showSearch optionFilterProp="label"
+              <Select placeholder="Subcategory" showSearch optionFilterProp="label"
                 disabled={subs.length === 0}
                 options={subs.map((s) => ({ value: String(s.id), label: s.name }))}
-                onChange={handleSubcategoryChange}
-              />
+                onChange={handleSubcategoryChange} />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="itemTypeId" label="Item Type" rules={[{ required: true }]}>
-              <Select
-                placeholder="Item Type" showSearch optionFilterProp="label"
+              <Select placeholder="Item Type" showSearch optionFilterProp="label"
                 disabled={types.length === 0}
                 options={types.map((t) => ({ value: String(t.id), label: t.name }))}
-                onChange={handleItemTypeChange}
-              />
+                onChange={handleItemTypeChange} />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="uomId" label="Unit of Measure" rules={[{ required: true }]}>
-              <Select
-                placeholder="UOM"
-                disabled={uoms.length === 0}
-                options={uoms.map((u) => ({ value: String(u.id), label: u.symbol || u.name }))}
-              />
+              <Select placeholder="UOM" disabled={uoms.length === 0}
+                options={uoms.map((u) => ({ value: String(u.id), label: u.symbol || u.name }))} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="defaultAllowance" label="Allowance %" rules={[{ required: true, message: 'Required' }]}>
+              <InputNumber min={0} step={0.5} style={{ width: '100%' }} placeholder="e.g. 3" />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -278,6 +365,33 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
             </Form.Item>
           </Col>
         </Row>
+
+        <Divider style={{ margin: '4px 0 12px' }}>Variant</Divider>
+        <Form.Item
+          name="variantName"
+          label="Variant Name"
+          rules={[
+            { required: true, message: 'Variant name is required' },
+            { min: 5, message: 'At least 5 characters' },
+          ]}
+        >
+          <Input placeholder="e.g. Black 180 GSM" maxLength={100} />
+        </Form.Item>
+        {attributes.length > 0 && (
+          <Row gutter={16}>
+            {attributes.map((attr) => (
+              <Col span={12} key={attr.id}>
+                <Form.Item
+                  name={`attr_${attr.id}`}
+                  label={attr.attributeName}
+                  rules={[{ required: true, message: `${attr.attributeName} is required` }]}
+                >
+                  <Input placeholder={attr.attributeName} />
+                </Form.Item>
+              </Col>
+            ))}
+          </Row>
+        )}
       </Form>
     </Modal>
   );
@@ -285,7 +399,7 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
 
 // ── RowsSection ───────────────────────────────────────────────────────────────
 
-function RowsSection({ title, rows, overrides, onOverride, onCreateItem }) {
+function RowsSection({ title, rows, overrides, onOverride, onCreateItem, category }) {
   if (!rows?.length) return null;
 
   const columns = [
@@ -301,12 +415,15 @@ function RowsSection({ title, rows, overrides, onOverride, onCreateItem }) {
       ),
     },
     {
-      title: 'Linked Master Item',
+      title: category ? 'Linked Variant' : 'Linked Master Item',
       width: 310,
       render: (_, row) => {
         const ov            = overrides[row._idx];
-        const effectiveId   = ov?.itemId   ?? row.matchedItemId;
-        const effectiveName = ov?.itemName ?? row.matchedItemName;
+        // For fabric/trims the linkage is a variant; for manufacturing it stays an item.
+        const effectiveId   = category
+          ? (ov?.variantId ?? row.matchedVariantId)
+          : (ov?.itemId ?? row.matchedItemId);
+        const effectiveName = ov?.variantName ?? ov?.itemName ?? row.matchedVariantName ?? row.matchedItemName;
         return (
           <Space direction="vertical" size={4} style={{ width: '100%' }}>
             <Space size={4}>
@@ -314,8 +431,10 @@ function RowsSection({ title, rows, overrides, onOverride, onCreateItem }) {
               {effectiveName && <Text style={{ fontSize: 12 }}>{effectiveName}</Text>}
             </Space>
             <ItemSearchSelect
+              category={category}
               value={effectiveId || undefined}
-              onChange={(id, opt) => onOverride(row._idx, id, opt?.label)}
+              valueLabel={effectiveName}
+              onChange={(opt) => onOverride(row._idx, opt)}
             />
             {!effectiveId && (
               <Button size="small" type="dashed" icon={<PlusOutlined />}
@@ -448,17 +567,25 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
 
   // ── Quick Create: Item (callback from sub-modal) ───────────────────────────
 
-  const handleItemCreated = ({ id, name }) => {
+  const handleItemCreated = ({ itemId, itemName, variantId, variantName }) => {
     const { section, idx } = itemCreate;
     setOverrides((prev) => ({
       ...prev,
-      [section]: { ...prev[section], [idx]: { itemId: id, itemName: name } },
+      [section]: { ...prev[section], [idx]: { itemId, itemName, variantId, variantName } },
     }));
     setItemCreate({ open: false, row: null, section: null, idx: null });
   };
 
-  const setRowOverride = (section) => (idx, itemId, itemName) => {
-    setOverrides((prev) => ({ ...prev, [section]: { ...prev[section], [idx]: { itemId, itemName } } }));
+  const setRowOverride = (section) => (idx, opt) => {
+    // opt is the selected AntD option (labelInValue) carrying the full variant/item, or null on clear.
+    const variant = opt?.variant;
+    const item = opt?.item;
+    const value = !opt
+      ? {}
+      : variant
+        ? { itemId: variant.itemId, itemName: variant.variantName, variantId: variant.variantId, variantName: variant.variantName, variantCode: variant.variantCode }
+        : { itemId: item?.id, itemName: item?.itemName };
+    setOverrides((prev) => ({ ...prev, [section]: { ...prev[section], [idx]: value } }));
   };
 
   // ── Apply to Form ─────────────────────────────────────────────────────────
@@ -467,8 +594,11 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
     const resolveRow = (row, idx, sectionKey) => {
       const ov = overrides[sectionKey]?.[idx];
       return {
-        matchedItemId:   ov?.itemId   ?? row.matchedItemId   ?? null,
-        matchedItemName: ov?.itemName ?? row.matchedItemName ?? null,
+        matchedItemId:      ov?.itemId      ?? row.matchedItemId   ?? null,
+        matchedItemName:    ov?.itemName    ?? row.matchedItemName ?? null,
+        matchedVariantId:   ov?.variantId   ?? row.matchedVariantId   ?? null,
+        matchedVariantName: ov?.variantName ?? row.matchedVariantName ?? null,
+        matchedVariantCode: ov?.variantCode ?? row.matchedVariantCode ?? null,
         extractedName:   row.extractedName,
         classification:  row.classification,
         quantity:        row.quantity,
@@ -678,22 +808,22 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
             {/* ── Row Sections ── */}
             <div>
               <RowsSection
-                title="Fabric" rows={extracted.fabricRows}
+                title="Fabric" rows={extracted.fabricRows} category={SECTION_VARIANT_CATEGORY.fabric}
                 overrides={overrides.fabric} onOverride={setRowOverride('fabric')}
                 onCreateItem={(row, idx) => setItemCreate({ open: true, row, section: 'fabric', idx })}
               />
               <RowsSection
-                title="Local Trims" rows={extracted.localTrimRows}
+                title="Local Trims" rows={extracted.localTrimRows} category={SECTION_VARIANT_CATEGORY.localTrim}
                 overrides={overrides.localTrim} onOverride={setRowOverride('localTrim')}
                 onCreateItem={(row, idx) => setItemCreate({ open: true, row, section: 'localTrim', idx })}
               />
               <RowsSection
-                title="Imported Trims" rows={extracted.importedTrimRows}
+                title="Imported Trims" rows={extracted.importedTrimRows} category={SECTION_VARIANT_CATEGORY.importedTrim}
                 overrides={overrides.importedTrim} onOverride={setRowOverride('importedTrim')}
                 onCreateItem={(row, idx) => setItemCreate({ open: true, row, section: 'importedTrim', idx })}
               />
               <RowsSection
-                title="Manufacturing Processes" rows={extracted.manufacturingRows}
+                title="Manufacturing Processes" rows={extracted.manufacturingRows} category={SECTION_VARIANT_CATEGORY.manufacturing}
                 overrides={overrides.manufacturing} onOverride={setRowOverride('manufacturing')}
                 onCreateItem={(row, idx) => setItemCreate({ open: true, row, section: 'manufacturing', idx })}
               />

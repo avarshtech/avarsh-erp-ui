@@ -43,8 +43,8 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
   }, [rows, onChange]);
 
   const columns = useMemo(() => [
-    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v) => <Text strong>{v}</Text> },
-    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true },
+    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v, r) => <Text strong>{r.variantCode || v}</Text> },
+    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true, render: (v, r) => r.variantName || v },
     { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
     { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 110, align: 'right',
       render: (v) => <Text type="secondary">{(v || 0).toFixed(3)}</Text> },
