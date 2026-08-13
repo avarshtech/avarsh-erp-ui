@@ -21,12 +21,27 @@ Found by analysis before any test run. The backend `Item Master Refactor` (`erp-
 | B-007 | PO / GRN | Minor | PO and GRN lines showed raw attribute tags (`Color:Navy`) with no variant name or SKU, so users could not tell which variant a line referred to. | `variantName` / `variantCode` were added to `PoLineItemDTO` and `GRNLineItemDTO` but never rendered. | Added variant name + code to the PO line table, PO view, the GRN PO-line picker, and both GRN line tables. `src/pages/po/POForm.jsx`, `src/pages/po/POView.jsx`, `src/pages/inventory/grn/*`, `src/services/inventory/inventoryService.js` | Fixed |
 | B-008 | E2E harness | Minor | Every spec would have failed at login — the suite defaulted to password `admin123` while the actual superadmin password is `admin98`. | Stale default in the E2E helpers. | Updated the superadmin default across `e2e/global-setup.js`, `e2e/helpers/navigation.js`, `e2e/helpers/api-client.js` and the legacy specs. The separate `e2e-viewer` RBAC fixture is unchanged. | Fixed |
 
+### Test-harness findings (AntD 6 upgrade fallout)
+
+Discovered while getting the journey suite green. These break **any** existing spec
+written against Ant Design 5 selectors — the legacy suites in `e2e/specs/*` will hit
+the same walls when they are next run.
+
+| ID | Severity | Symptom | Root cause | Fix |
+|----|----------|---------|------------|-----|
+| B-009 | Major | `getByRole('button', { name: /^Add/ })` matches nothing on every master screen. | AntD renders icons as `<span role="img" aria-label="plus">`, so the button's accessible name is `"plus Add UOM"` — an anchored `^Add` never matches. | Match buttons by **visible text** (`locator('button').filter({ hasText })`), not by role name. |
+| B-010 | Major | Every `Select` interaction times out. | AntD 6.2.2 renamed the Select internals: `.ant-select-selector` → `.ant-select-content`, `.ant-select-selection-item` → `.ant-select-content-value`. | Click the stable `.ant-select` wrapper. Dropdown classes (`.ant-select-dropdown`, `.ant-select-item-option`) are unchanged. |
+| B-011 | Major | `.ant-modal-content` never appears, so modal-scoped specs fail. | AntD 6 dropped the class. `.ant-modal` and `[role="dialog"]` still exist. | Added a `dialog(page)` helper. |
+| B-012 | Minor | `getByPlaceholder('Select data type')` finds nothing. | An AntD `Select` renders its placeholder inside a div, not as an `input[placeholder]`. | Locate Selects by their **form label** instead. |
+| B-013 | Minor | A bad selector burned the full 8-minute test timeout before reporting. | No per-action timeout on the journey project. | Set `actionTimeout: 15000`; failures now surface in ~20s. |
+
 ### Known follow-ups (not blocking)
 
 | ID | Module | Severity | Note |
 |----|--------|----------|------|
-| B-009 | Item Master | Minor | `ItemSpecification` now matches **only** variant code/name. Searching the item list by category or item-type name silently returns nothing. Item code still matches because the variant code embeds it. Worth widening server-side if users complain. |
-| B-010 | Costing | Minor | Techpack import matches at item level (`matchedItemId`); costing rows need a variant. The UI defaults to the item's first variant and lets the user refine it. A variant-aware matcher server-side would be better. |
+| B-014 | Item Master | Minor | `ItemSpecification` now matches **only** variant code/name. Searching the item list by category or item-type name silently returns nothing. Item code still matches because the variant code embeds it. Worth widening server-side if users complain. |
+| B-015 | Costing | Minor | Techpack import matches at item level (`matchedItemId`); costing rows need a variant. The UI defaults to the item's first variant and lets the user refine it. A variant-aware matcher server-side would be better. |
+| B-016 | Masters | Minor | UOM labelling is inconsistent between screens: **Item Types** lists UOMs by `name` ("Kilogram"), **Item Master** lists them by `symbol` ("KG"). Confusing for users; specs work around it with `UOM_NAME_BY_SYMBOL`. |
 
 ---
 
