@@ -43,19 +43,10 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
   }, [rows, onChange]);
 
   const columns = useMemo(() => [
-    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v) => <Text strong>{v}</Text> },
-    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true },
-    // Variant is the purchasable identity — shown alongside the item rather than
-    // replacing it, so the item code stays available for cross-referencing.
-    { title: 'Variant', dataIndex: 'variantName', width: 200, ellipsis: true,
-      render: (v, r) => (
-        <div style={{ lineHeight: 1.3 }}>
-          <div>{v || '—'}</div>
-          {r.variantCode && (
-            <Text type="secondary" style={{ fontSize: 11, fontFamily: 'monospace' }}>{r.variantCode}</Text>
-          )}
-        </div>
-      ) },
+    // The variant is the purchasable identity, so it stands in for the item across
+    // these columns rather than being shown beside it.
+    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v, r) => <Text strong>{r.variantCode || v}</Text> },
+    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true, render: (v, r) => r.variantName || v },
     { title: 'PO No', dataIndex: 'poNumber', width: 150, render: (v) => v || '—' },
     { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
     { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 110, align: 'right',
