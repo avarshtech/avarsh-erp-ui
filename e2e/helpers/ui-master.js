@@ -161,8 +161,18 @@ export async function fillTagsByLabel(page, label, values, scope = page) {
   await input.click({ timeout: ACTION_TIMEOUT });
   for (const value of values) {
     await input.fill(String(value));
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(120);
+    await page.waitForTimeout(200);
+    // When the tags Select also has preset options, typing filters them and Enter
+    // commits whichever option is *highlighted* — typing "S" against an S/M/L/XS list
+    // silently yielded "XS". Click the exact option when one exists; only fall back to
+    // Enter for genuinely free-text values (e.g. numeric waist sizes).
+    const exact = visibleOption(page, value);
+    if (await exact.count()) {
+      await exact.click({ timeout: ACTION_TIMEOUT });
+    } else {
+      await page.keyboard.press('Enter');
+    }
+    await page.waitForTimeout(150);
   }
   await page.keyboard.press('Escape');
   await page.waitForTimeout(200);

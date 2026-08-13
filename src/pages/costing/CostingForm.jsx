@@ -2476,7 +2476,11 @@ const CostingForm = () => {
                 </Form.Item>
               </Col>
               <Col xs={16}>
-                <Form.Item label="Sizes" name="sizes">
+                <Form.Item
+                  label="Sizes"
+                  name="sizes"
+                  rules={[{ required: true, message: 'At least one size is required' }]}
+                >
                   <Select
                     mode="tags"
                     placeholder="Select or type sizes (e.g. S, M, L, XL)"

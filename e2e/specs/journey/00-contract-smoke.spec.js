@@ -20,7 +20,6 @@ import {
   fillByLabel,
   selectByLabel,
   multiSelectByLabel,
-  visibleOption,
   formField,
   dialog,
 } from '../../helpers/ui-master.js';

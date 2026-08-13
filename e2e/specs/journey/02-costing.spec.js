@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigateWithAuth, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
-import { selectByLabel, formField } from '../../helpers/ui-master.js';
+import { selectByLabel, formField, fillTagsByLabel } from '../../helpers/ui-master.js';
 import { section, addRow, pickInRow, typeInRow } from '../../helpers/ui-costing.js';
 import { COST_SHEETS } from '../../data/garment-dataset.js';
 
@@ -70,6 +70,10 @@ test.describe('Session 2 — Costing', () => {
       // cost in the dataset is a USD per-garment figure. Quoting in the costing
       // currency keeps the sheet totals meaningful.
       await selectByLabel(page, 'Costing Currency', 'USD - US Dollar');
+
+      // Sizes drive the per-size cost summaries and every downstream size-wise
+      // breakdown, and are now mandatory on both layers.
+      await fillTagsByLabel(page, 'Sizes', sheet.sizes);
 
       // ── Section B — fabric (variant picker) ──
       const fabricSection = section(page, SECTIONS.fabric);

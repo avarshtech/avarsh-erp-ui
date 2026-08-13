@@ -465,6 +465,7 @@ export const COST_SHEETS = [
     styleNo: 'HM-TS-2601',
     buyer: 'H&M Hennes & Mauritz AB',
     garmentName: "Men's Crew Neck T-Shirt",
+    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     profitPct: 12,
     fabrics: [
       { variant: 'Single Jersey 180 GSM Navy Blue', classification: 'Knits', consumption: 1.45, price: 2.1 },
@@ -484,6 +485,7 @@ export const COST_SHEETS = [
     styleNo: 'HM-PL-2602',
     buyer: 'H&M Hennes & Mauritz AB',
     garmentName: 'Ladies Pique Polo Shirt',
+    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     profitPct: 13,
     fabrics: [
       { variant: 'Pique 220 GSM Royal Blue', classification: 'Knits', consumption: 1.65, price: 2.55 },
@@ -505,6 +507,7 @@ export const COST_SHEETS = [
     styleNo: 'PRK-DN-2603',
     buyer: 'Primark Stores Ltd',
     garmentName: "Men's Slim Fit Denim Jeans",
+    sizes: ['28', '30', '32', '34', '36', '38'],
     profitPct: 14,
     fabrics: [
       { variant: 'Denim 12 Oz Indigo Blue', classification: 'Woven', consumption: 1.35, price: 3.8 },
@@ -519,6 +522,49 @@ export const COST_SHEETS = [
     ],
     processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
     overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+  },
+];
+
+// ── Buyer orders ───────────────────────────────────────────────────
+/**
+ * Orders are raised against an approved cost sheet: entering the Costing ID auto-fills
+ * buyer, style, garment name, currency and fabric description. Everything below is what
+ * the merchandiser still has to supply.
+ *
+ * `destination` must match a shipping location on the buyer (see BUYERS.location.label).
+ * Quantities are a colour x size matrix; `price` is applied to every size via "Apply All".
+ */
+export const ORDERS = [
+  {
+    styleNo: 'HM-TS-2601',
+    material: 'Knit',
+    component: 'Single',
+    paymentTerms: 'TT 30 Days',
+    paymentDays: 30,
+    buyerPoNo: 'HM-PO-880412',
+    destination: 'Stockholm DC',
+    dispatchInDays: 75,
+    sizePreset: 'Tops S-XXL',
+    price: 6.95,
+    colors: [
+      { name: 'Navy Blue', quantities: { S: 600, M: 1200, L: 1200, XL: 800, XXL: 400 } },
+      { name: 'White', quantities: { S: 400, M: 800, L: 800, XL: 600, XXL: 200 } },
+    ],
+  },
+  {
+    styleNo: 'PRK-DN-2603',
+    material: 'Woven',
+    component: 'Single',
+    paymentTerms: 'LC at Sight 60 Days',
+    paymentDays: 60,
+    buyerPoNo: 'PRK-PO-551207',
+    destination: 'Dublin DC',
+    dispatchInDays: 95,
+    sizePreset: 'Bottoms 28-38',
+    price: 10.4,
+    colors: [
+      { name: 'Indigo Blue', quantities: { 28: 300, 30: 700, 32: 900, 34: 900, 36: 500, 38: 200 } },
+    ],
   },
 ];
 
@@ -542,4 +588,5 @@ export default {
   DEFECT_TYPES,
   TRIMS_QC_CRITERIA,
   COST_SHEETS,
+  ORDERS,
 };
