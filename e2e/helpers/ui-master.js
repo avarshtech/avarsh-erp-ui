@@ -59,25 +59,51 @@ export function dialog(page) {
 /** Type into the MasterSplitView search box and wait for the list to filter. */
 export async function searchMasterList(page, term) {
   const search = masterListCard(page).getByPlaceholder(/Search/i).first();
-  await search.fill('', { timeout: ACTION_TIMEOUT });
+  // Snapshot the rows BEFORE typing. Server-side lists (Items) debounce by 400ms and then
+  // fetch, leaving the previous query's rows on screen meanwhile — a full table of the
+  // wrong records, which reads as "the one I want is absent". Waiting for the table to
+  // merely stop changing cannot tell "the answer arrived" from "nothing has happened
+  // yet"; waiting for it to CHANGE is positive evidence the query was applied.
+  //
+  // The term is typed straight over whatever is there. Clearing to '' first would restore
+  // the UNFILTERED list, and that restoration is itself a change — which the detector
+  // below would read as "the new results arrived", settling on the full table before the
+  // real results land. `fill` replaces the whole value, so the clear was redundant anyway.
+  const before = await tableSignature(page);
   await search.fill(term, { timeout: ACTION_TIMEOUT });
-  // Server-side lists (Items) debounce the term by 400ms and then fetch, so the filtered
-  // rows land ~1.5s after typing. Until they do, the PREVIOUS query's rows are still on
-  // screen — a full table of the wrong records, which reads as "the record I want is not
-  // here". Wait past the debounce before judging, then wait for the rows to hold steady.
+
   await page.waitForTimeout(SEARCH_DEBOUNCE_MS);
   await waitForTableSettled(page);
+  await waitForTableChanged(page, before);
   await waitForTableStable(page);
+}
+
+/** The rendered contents of every list row, as one comparable string. */
+async function tableSignature(page) {
+  return (await page.locator('.ant-table-row').allInnerTexts()).join('|');
+}
+
+/**
+ * Wait until the table's contents differ from `before`.
+ *
+ * Returns quietly on timeout: a search whose results happen to equal the previous view
+ * (few records, or the same term searched twice) legitimately produces no change, and
+ * the caller's own assertion is the real check. This only buys certainty when a change
+ * does occur — which is the common case and the one that used to race.
+ */
+async function waitForTableChanged(page, before, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if ((await tableSignature(page)) !== before) return;
+    await page.waitForTimeout(250);
+  }
 }
 
 /**
  * Wait until the table's contents stop changing.
  *
- * `waitForTableSettled` only answers "are there rows yet?", which is not enough after a
- * server-side search: the PREVIOUS query's rows are still on screen while the new request
- * is in flight, so a caller reads a full table of the wrong records and concludes the one
- * it wanted is absent. Sampling the row contents until they hold steady distinguishes
- * "results for this search" from "results for the last one".
+ * Pairs with waitForTableChanged: that one proves the new results arrived, this one
+ * proves they have finished arriving.
  */
 export async function waitForTableStable(page, timeout = 10000) {
   const rows = page.locator('.ant-table-row');

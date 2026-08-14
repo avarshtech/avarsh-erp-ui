@@ -318,6 +318,26 @@ function itemRowExists(page, item) {
     .catch(() => false);
 }
 
+/**
+ * Search for the item and report whether it is already listed, retrying the search once.
+ *
+ * The Items list is fetched from the server, and a slow or failed request leaves the
+ * PREVIOUS query's rows on screen — ItemMaster's fetch catch leaves `filteredItems`
+ * untouched, so a failure looks exactly like "no match", only behind an error toast.
+ * Concluding "absent" from one attempt therefore risks creating a duplicate; a second
+ * search costs a few seconds only when the item genuinely is not there.
+ */
+async function itemAlreadyListed(page, item) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Re-typing the same term changes nothing and triggers no refetch, so the retry has
+    // to clear the box first to actually ask the server again.
+    if (attempt > 0) await searchMasterList(page, '');
+    await searchMasterList(page, item.variants[0].name);
+    if (await itemRowExists(page, item)) return true;
+  }
+  return false;
+}
+
 async function createItem(page, item) {
   await goToMasterEntity(page, 'Items');
   await waitForPageReady(page);
@@ -327,9 +347,7 @@ async function createItem(page, item) {
   //
   // Unlike the split-view screens (which filter client-side), the Items list queries
   // the server, so wait for the row rather than sampling immediately.
-  await searchMasterList(page, item.variants[0].name);
-  const alreadyExists = await itemRowExists(page, item);
-  if (alreadyExists) return 'skipped';
+  if (await itemAlreadyListed(page, item)) return 'skipped';
 
   await openAddForm(page);
   const modal = dialog(page);

@@ -110,11 +110,7 @@ test.describe('Session 0 — Item/Variant contract', () => {
     // Search by the first VARIANT name, not the derived item name: ItemSpecification
     // matches only variant code/name, so a derived-name search always returns nothing
     // and this would wrongly re-create an existing item (bug B-014).
-    await searchMasterList(page, item.variants[0].name);
-    const alreadyExists = await itemRow(page)
-      .waitFor({ state: 'visible', timeout: 6000 })
-      .then(() => true)
-      .catch(() => false);
+    const alreadyExists = await itemAlreadyListed(page, item.variants[0].name);
     if (alreadyExists) {
       console.log(`Item ${item.derivedName}: skipped (already exists)`);
       return;
@@ -201,6 +197,29 @@ function itemRow(page) {
     .filter({ hasText: FIXTURE.subCategory.name })
     .filter({ hasText: FIXTURE.itemType.name })
     .first();
+}
+
+/**
+ * Search for the item and report whether it is already listed, retrying the search once.
+ *
+ * The Items list is fetched from the server, and a slow or failed request leaves the
+ * PREVIOUS query's rows on screen — ItemMaster's fetch catch leaves its rows untouched,
+ * so a failure looks exactly like "no match". Concluding "absent" from a single attempt
+ * risks creating a duplicate.
+ */
+async function itemAlreadyListed(page, searchTerm) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    // Re-typing the same term changes nothing and triggers no refetch, so the retry has
+    // to clear the box first to actually ask the server again.
+    if (attempt > 0) await searchMasterList(page, '');
+    await searchMasterList(page, searchTerm);
+    const found = await itemRow(page)
+      .waitFor({ state: 'visible', timeout: 6000 })
+      .then(() => true)
+      .catch(() => false);
+    if (found) return true;
+  }
+  return false;
 }
 
 /** Fill the active variant tab: name first, then each attribute field. */
