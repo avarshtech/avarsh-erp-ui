@@ -61,6 +61,27 @@ export async function searchMasterList(page, term) {
   await page.waitForTimeout(SETTLE_MS);
 }
 
+/**
+ * Wait until a list table has actually rendered — either rows are present or the empty
+ * state is showing.
+ *
+ * Sampling `.ant-table-row` straight after `waitForPageReady()` races the server-side
+ * fetch: the check reports "not present", the spec creates a duplicate, and the save is
+ * rejected. Individually the specs passed because the page was warm; in a long suite
+ * run they raced. Always settle the table before an exists-check.
+ */
+export async function waitForTableSettled(page, timeout = 15000) {
+  const rows = page.locator('.ant-table-row');
+  const empty = page.locator('.ant-empty, .ant-table-placeholder');
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    if ((await rows.count()) > 0) return true;
+    if (await empty.first().isVisible().catch(() => false)) return false;
+    await page.waitForTimeout(250);
+  }
+  return (await rows.count()) > 0;
+}
+
 /** Does a row with this text already exist? Searches first so it works past page 1. */
 export async function masterRecordExists(page, name) {
   await searchMasterList(page, name);

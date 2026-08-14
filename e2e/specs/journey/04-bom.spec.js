@@ -15,7 +15,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigateWithAuth, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
-import { visibleOption } from '../../helpers/ui-master.js';
+import { visibleOption, waitForTableSettled } from '../../helpers/ui-master.js';
 import { BOMS } from '../../data/garment-dataset.js';
 
 test.describe.configure({ mode: 'serial' });
@@ -29,6 +29,7 @@ test.describe('Session 4 — BOM', () => {
     test(`BOM — ${bom.styleNo}`, async ({ page }) => {
       await navigateWithAuth(page, '/bom/list');
       await waitForPageReady(page);
+      await waitForTableSettled(page);
       if (await page.locator('.ant-table-row').filter({ hasText: bom.styleNo }).count()) {
         console.log(`BOM ${bom.styleNo}: skipped (already exists)`);
         return;

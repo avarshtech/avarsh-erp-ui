@@ -14,7 +14,6 @@ import { test, expect } from '@playwright/test';
 import { goToMasterEntity, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
 import {
   ensureMasterRecord,
-  masterRecordExists,
   searchMasterList,
   openAddForm,
   fillByLabel,
@@ -108,7 +107,18 @@ test.describe('Session 0 — Item/Variant contract', () => {
     await goToMasterEntity(page, 'Items');
     await waitForPageReady(page);
 
-    if (await masterRecordExists(page, item.derivedName)) {
+    // Search by the first VARIANT name, not the derived item name: ItemSpecification
+    // matches only variant code/name, so a derived-name search always returns nothing
+    // and this would wrongly re-create an existing item (bug B-014).
+    await searchMasterList(page, item.variants[0].name);
+    const alreadyExists = await page
+      .locator('.ant-table-row')
+      .filter({ hasText: item.derivedName })
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 })
+      .then(() => true)
+      .catch(() => false);
+    if (alreadyExists) {
       console.log(`Item ${item.derivedName}: skipped (already exists)`);
       return;
     }

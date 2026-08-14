@@ -13,7 +13,7 @@
 
 import { test, expect } from '@playwright/test';
 import { navigateWithAuth, waitForPageReady, ensureSessionActive } from '../../helpers/navigation.js';
-import { selectByLabel, formField, fillTagsByLabel } from '../../helpers/ui-master.js';
+import { selectByLabel, formField, fillTagsByLabel, waitForTableSettled } from '../../helpers/ui-master.js';
 import { section, addRow, pickInRow, typeInRow } from '../../helpers/ui-costing.js';
 import { COST_SHEETS } from '../../data/garment-dataset.js';
 
@@ -181,6 +181,7 @@ function styleRows(page, styleNo) {
  * matches every sheet. The check must be scoped to the Total Price cell.
  */
 async function usdRow(page, styleNo) {
+  await waitForTableSettled(page);
   const heads = page.locator('.ant-table-thead th');
   const headCount = await heads.count();
   let totalPriceIdx = -1;
