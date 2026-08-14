@@ -643,6 +643,48 @@ export const BOMS = [
   },
 ];
 
+// ── Purchase Orders ────────────────────────────────────────────────
+/**
+ * A PO is raised on ONE supplier and pulls its lines from a BOM, so the BOM's lines are
+ * split across suppliers by material: fabric from the mill, threads and labels from the
+ * trims supplier, zippers from the zip maker.
+ *
+ * `lines` names the variants to pick from that BOM, with the agreed unit price. The
+ * quantity comes from the BOM's purchaseQtyPrimary — i.e. in the PURCHASE UOM (KG,
+ * Cones, Gross), which is the whole point of the UOM conversion chain.
+ */
+export const PURCHASE_ORDERS = [
+  {
+    supplier: 'Arvind Mills Ltd',
+    orderNo: 'SG/26-27/1001',
+    deliveryInDays: 30,
+    terms: 'Fabric Delivery Terms',
+    lines: [
+      { variant: 'Single Jersey 180 GSM Navy Blue', unitPrice: 6.7 },
+      { variant: 'Rib 1x1 240 GSM Navy Blue', unitPrice: 7.2 },
+    ],
+  },
+  {
+    supplier: 'Coats India Pvt Ltd',
+    orderNo: 'SG/26-27/1001',
+    deliveryInDays: 25,
+    terms: 'Standard Purchase Terms',
+    lines: [
+      { variant: 'Sewing Thread 40s2 Navy Blue', unitPrice: 7.5 },
+      { variant: 'Woven Main Label Medium White', unitPrice: 0.04 },
+    ],
+  },
+  {
+    supplier: 'YKK India Pvt Ltd',
+    orderNo: 'SG/26-27/1002',
+    deliveryInDays: 35,
+    terms: 'Standard Purchase Terms',
+    lines: [
+      { variant: 'Metal Zipper No5 Antique Brass 16cm', unitPrice: 0.28 },
+    ],
+  },
+];
+
 export default {
   UOMS,
   UOM_NAME_BY_SYMBOL,
@@ -665,4 +707,5 @@ export default {
   COST_SHEETS,
   ORDERS,
   BOMS,
+  PURCHASE_ORDERS,
 };
