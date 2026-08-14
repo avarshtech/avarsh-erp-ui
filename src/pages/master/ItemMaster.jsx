@@ -7,7 +7,7 @@ import {
 import {
   PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined,
   CloseOutlined, SaveOutlined, ExclamationCircleOutlined, EyeOutlined,
-  ClearOutlined, AppstoreOutlined, FileImageOutlined, CheckOutlined,
+  ClearOutlined, AppstoreOutlined, FileImageOutlined, CheckOutlined, LoadingOutlined,
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';

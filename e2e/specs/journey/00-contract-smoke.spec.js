@@ -111,10 +111,7 @@ test.describe('Session 0 — Item/Variant contract', () => {
     // matches only variant code/name, so a derived-name search always returns nothing
     // and this would wrongly re-create an existing item (bug B-014).
     await searchMasterList(page, item.variants[0].name);
-    const alreadyExists = await page
-      .locator('.ant-table-row')
-      .filter({ hasText: item.derivedName })
-      .first()
+    const alreadyExists = await itemRow(page)
       .waitFor({ state: 'visible', timeout: 6000 })
       .then(() => true)
       .catch(() => false);
@@ -163,11 +160,10 @@ test.describe('Session 0 — Item/Variant contract', () => {
       page.locator('.ant-message-notice').filter({ hasText: /Item (created|updated) successfully/i })
     ).toBeVisible({ timeout: 20000 });
 
-    // Round-trip: the item lists under its derived name.
+    // Round-trip: the item is listed under its classifier triple.
     await waitForPageReady(page);
     await searchMasterList(page, item.variants[0].name);
-    await expect(page.locator('.ant-table-row').filter({ hasText: item.derivedName }).first())
-      .toBeVisible({ timeout: 15000 });
+    await expect(itemRow(page)).toBeVisible({ timeout: 15000 });
   });
 
   test('shows server-generated variant codes and the conversion on the saved item', async ({ page }) => {
@@ -176,7 +172,7 @@ test.describe('Session 0 — Item/Variant contract', () => {
     await waitForPageReady(page);
     await searchMasterList(page, item.variants[0].name);
 
-    const row = page.locator('.ant-table-row').filter({ hasText: item.derivedName }).first();
+    const row = itemRow(page);
     await expect(row).toBeVisible({ timeout: 15000 });
     await row.locator('button').first().click();
 
@@ -188,6 +184,24 @@ test.describe('Session 0 — Item/Variant contract', () => {
     await expect(drawer.getByText(new RegExp(`1 ${item.uom} = ${item.conversionFactor}`))).toBeVisible();
   });
 });
+
+/**
+ * The fixture item's row in the Items list.
+ *
+ * The list has no "Item Name" column — it renders Category, Subcategory and Item Type as
+ * separate cells, so a row never contains the literal derived name "Fabric / Knits /
+ * Single Jersey". Matching on that string always found nothing, which made the
+ * exists-check report "not present" for an item that was already there. The derived name
+ * IS shown in the form (asserted above), just not in the list.
+ */
+function itemRow(page) {
+  return page
+    .locator('.ant-table-row')
+    .filter({ hasText: FIXTURE.category.name })
+    .filter({ hasText: FIXTURE.subCategory.name })
+    .filter({ hasText: FIXTURE.itemType.name })
+    .first();
+}
 
 /** Fill the active variant tab: name first, then each attribute field. */
 async function fillVariant(page, modal, variant) {

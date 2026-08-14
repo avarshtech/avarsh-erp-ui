@@ -28,6 +28,9 @@ import { goToMasterEntity, waitForPageReady } from './navigation.js';
 
 /** AntD table/dropdown re-render needs a tick to settle. */
 const SETTLE_MS = 400;
+// Covers the Items list's 400ms search debounce plus the server round-trip that follows.
+// Measured: the filtered rows replace the previous ones between 0.5s and 1.5s after typing.
+const SEARCH_DEBOUNCE_MS = 900;
 /** Fail fast on a bad selector instead of burning the whole test timeout. */
 const ACTION_TIMEOUT = 15000;
 
@@ -58,11 +61,42 @@ export async function searchMasterList(page, term) {
   const search = masterListCard(page).getByPlaceholder(/Search/i).first();
   await search.fill('', { timeout: ACTION_TIMEOUT });
   await search.fill(term, { timeout: ACTION_TIMEOUT });
-  // A fixed pause is not enough on a debounced, server-side search: it can elapse before
-  // the request even leaves. Settle the table so callers counting rows afterwards are
-  // reading the filtered result rather than a mid-flight empty state.
-  await page.waitForTimeout(SETTLE_MS);
+  // Server-side lists (Items) debounce the term by 400ms and then fetch, so the filtered
+  // rows land ~1.5s after typing. Until they do, the PREVIOUS query's rows are still on
+  // screen — a full table of the wrong records, which reads as "the record I want is not
+  // here". Wait past the debounce before judging, then wait for the rows to hold steady.
+  await page.waitForTimeout(SEARCH_DEBOUNCE_MS);
   await waitForTableSettled(page);
+  await waitForTableStable(page);
+}
+
+/**
+ * Wait until the table's contents stop changing.
+ *
+ * `waitForTableSettled` only answers "are there rows yet?", which is not enough after a
+ * server-side search: the PREVIOUS query's rows are still on screen while the new request
+ * is in flight, so a caller reads a full table of the wrong records and concludes the one
+ * it wanted is absent. Sampling the row contents until they hold steady distinguishes
+ * "results for this search" from "results for the last one".
+ */
+export async function waitForTableStable(page, timeout = 10000) {
+  const rows = page.locator('.ant-table-row');
+  const signature = async () => (await rows.allInnerTexts()).join('|');
+  const deadline = Date.now() + timeout;
+  let previous = await signature();
+  let steady = 0;
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(400);
+    const current = await signature();
+    // Two consecutive matching samples, not one: a single match proves nothing when the
+    // request has not come back yet and the table simply has not changed *yet*.
+    if (current === previous) {
+      if (++steady >= 2) return;
+    } else {
+      steady = 0;
+    }
+    previous = current;
+  }
 }
 
 /**

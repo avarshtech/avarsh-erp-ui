@@ -297,9 +297,28 @@ test.describe('Session 1 — Master data', () => {
  * Create one item with all its variants through the Item modal.
  * The item's display name is derived server-side, so the exists-check uses that.
  */
-async function createItem(page, item) {
-  const derivedName = `${item.category} / ${item.subCategory} / ${item.itemType}`;
+/**
+ * Is this item already in the list?
+ *
+ * The Items list has no "Item Name" column — it renders Category, Subcategory and Item
+ * Type as separate cells. Matching a row against the derived "Category / Sub / Type"
+ * string therefore never matched anything, so the check always reported "not present"
+ * and every run tried to re-create items that already existed. Match the three cells
+ * the list actually renders instead.
+ */
+function itemRowExists(page, item) {
+  return page
+    .locator('.ant-table-row')
+    .filter({ hasText: item.category })
+    .filter({ hasText: item.subCategory })
+    .filter({ hasText: item.itemType })
+    .first()
+    .waitFor({ state: 'visible', timeout: 6000 })
+    .then(() => true)
+    .catch(() => false);
+}
 
+async function createItem(page, item) {
   await goToMasterEntity(page, 'Items');
   await waitForPageReady(page);
   // Search by the first VARIANT name, not the derived item name: ItemSpecification
@@ -309,11 +328,7 @@ async function createItem(page, item) {
   // Unlike the split-view screens (which filter client-side), the Items list queries
   // the server, so wait for the row rather than sampling immediately.
   await searchMasterList(page, item.variants[0].name);
-  const existing = page.locator('.ant-table-row').filter({ hasText: derivedName }).first();
-  const alreadyExists = await existing
-    .waitFor({ state: 'visible', timeout: 6000 })
-    .then(() => true)
-    .catch(() => false);
+  const alreadyExists = await itemRowExists(page, item);
   if (alreadyExists) return 'skipped';
 
   await openAddForm(page);
