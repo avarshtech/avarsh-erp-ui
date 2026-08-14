@@ -180,7 +180,11 @@ const FabricGRNRollTable = ({ rolls = [], onRollChange, readOnly = false }) => {
             <InputNumber
               size="small"
               min={0}
-              precision={2}
+              // Quantities are numeric(15,3) everywhere — and a purchase quantity derived
+              // from a UOM conversion genuinely lands on 3 decimals (6,090 MTR / 3.2 =
+              // 1,903.125 KG). Rounding to 2 here pushed the receipt ABOVE the PO balance,
+              // so such a line could never be received in full.
+              precision={3}
               value={val}
               placeholder="Qty"
               controls={false}

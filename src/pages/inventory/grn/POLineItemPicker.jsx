@@ -2,20 +2,22 @@ import { memo, useMemo, useEffect } from 'react';
 import { Card, Table, Empty, Tag, Space, Typography, Tooltip } from 'antd';
 import { ProfileOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { formatNumber } from '../../../utils/formatters';
+import { matchesGrnCategory } from '../../../utils/inventoryConstants';
 
 const { Text } = Typography;
 
 const POLineItemPicker = memo(function POLineItemPicker({
-  category, // 'Fabric' | 'Trims'
+  category, // GRN_CATEGORY.FABRIC | GRN_CATEGORY.ACCESSORIES
   poLineItems = [],
   selectedIds = [],
   onSelectionChange,
   readOnly = false,
 }) {
-  // Auto-filter by category — categoryName is the exact mst_categories.name
-  // denormalized onto each PO line item (see adaptPO in inventoryService.js).
+  // Fabric lines are received as rolls, everything else as cartons. Categories are
+  // user-defined master data ("Local Trims", "Imported Trims", "Packing Materials"),
+  // so this classifies rather than exact-matching one name.
   const filtered = useMemo(
-    () => poLineItems.filter((li) => li.categoryName === category),
+    () => poLineItems.filter((li) => matchesGrnCategory(li.categoryName, category)),
     [poLineItems, category],
   );
 

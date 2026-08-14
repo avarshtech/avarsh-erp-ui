@@ -938,6 +938,17 @@ const POForm = () => {
     // conversion existed have no converted figure, so they fall back to the consumption UOM.
     const bomPurchaseQty = (bomLine) => bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0;
     const bomPurchaseUom = (bomLine) => bomLine.purchaseUom || bomLine.uom || '';
+    // The BOM line carries the purchase UOM as a symbol only. Resolve it to the master
+    // record so the saved line has a real uomId — without it the server persists no UOM
+    // and every downstream read (PO view, GRN) shows a blank unit.
+    const bomPurchaseUomId = (bomLine) => {
+      const symbol = bomPurchaseUom(bomLine).trim().toLowerCase();
+      if (!symbol) return null;
+      const match = (uoms || []).find(
+        (u) => (u.symbol || '').trim().toLowerCase() === symbol || (u.name || '').trim().toLowerCase() === symbol
+      );
+      return match?.id ?? null;
+    };
 
     const createPoLineFromBom = (bomLine, bomId) => ({
       key: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -949,7 +960,7 @@ const POForm = () => {
       // conversion the BOM snapshots the converted quantity; otherwise both are the same.
       qty: String(bomPurchaseQty(bomLine)),
       uom: bomPurchaseUom(bomLine),
-      uomId: null,
+      uomId: bomPurchaseUomId(bomLine),
       primaryUom: '',
       primaryUomId: null,
       secondaryUom: '',
@@ -996,7 +1007,7 @@ const POForm = () => {
 
     setLineItems(newLines);
     setIsDirty(true);
-  }, [poType]);
+  }, [poType, uoms]);
 
   // Calculate totals
   const totals = useMemo(() => {

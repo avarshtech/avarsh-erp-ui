@@ -18,7 +18,8 @@ import {
 import { getFilesByEntity } from '../../../services/core/fileService';
 import { processGrnAttachments } from './grnAttachments';
 import { validateTrimsGRN } from '../../../utils/grnValidation';
-import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { GRN_STATUS, GRN_CATEGORY, matchesGrnCategory, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
 import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -32,11 +33,10 @@ const { TextArea } = Input;
 
 const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
-// Exact mst_categories.name denormalized onto each PO line item as categoryName.
-// The UI labels this form/category "Accessories", but the master-data category
-// for buttons/zippers/elastic/etc. is named "Trims" — keep these in sync with
-// the POLineItemPicker category prop below.
-const PO_CATEGORY = 'Trims';
+// Everything that is not fabric is received here as cartons — trims (local and
+// imported), packing materials, and any other user-defined category. See
+// matchesGrnCategory in utils/inventoryConstants.
+const PO_CATEGORY = GRN_CATEGORY.ACCESSORIES;
 
 const AccessoriesGRNForm = () => {
   const { message } = App.useApp();
@@ -71,7 +71,7 @@ const AccessoriesGRNForm = () => {
   // belongs to the Trims category.
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => li.categoryName === PO_CATEGORY))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => matchesGrnCategory(li.categoryName, PO_CATEGORY)))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
@@ -378,6 +378,7 @@ const AccessoriesGRNForm = () => {
                   <Col xs={24} md={12}>
                     <Form.Item label="GRN Date">
                       <DatePicker
+                        format={DATE_FORMAT}
                         style={{ width: '100%' }}
                         value={grnRecord?.grnDate ? dayjs(grnRecord.grnDate) : null}
                         disabled
@@ -415,6 +416,7 @@ const AccessoriesGRNForm = () => {
                     rules={[{ required: true, message: 'Invoice Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {
@@ -435,6 +437,7 @@ const AccessoriesGRNForm = () => {
                     rules={[{ required: true, message: 'Delivery Challan Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {

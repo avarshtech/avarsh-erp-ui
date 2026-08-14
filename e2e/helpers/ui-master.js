@@ -58,7 +58,11 @@ export async function searchMasterList(page, term) {
   const search = masterListCard(page).getByPlaceholder(/Search/i).first();
   await search.fill('', { timeout: ACTION_TIMEOUT });
   await search.fill(term, { timeout: ACTION_TIMEOUT });
+  // A fixed pause is not enough on a debounced, server-side search: it can elapse before
+  // the request even leaves. Settle the table so callers counting rows afterwards are
+  // reading the filtered result rather than a mid-flight empty state.
   await page.waitForTimeout(SETTLE_MS);
+  await waitForTableSettled(page);
 }
 
 /**
@@ -73,10 +77,23 @@ export async function searchMasterList(page, term) {
 export async function waitForTableSettled(page, timeout = 15000) {
   const rows = page.locator('.ant-table-row');
   const empty = page.locator('.ant-empty, .ant-table-placeholder');
+  const spinning = page.locator('.ant-spin-spinning');
   const deadline = Date.now() + timeout;
+
+  // The empty state is NOT a reliable "this list has no rows" signal on its own: AntD
+  // renders the placeholder for the initially-empty dataSource while the fetch is still
+  // in flight. Treating that as an answer is what made exists-checks report "missing"
+  // for records that did exist, so specs tried to create duplicates and failed on a
+  // downstream guard (a locked BOM line, a rejected save). Wait out the spinner first,
+  // and require the empty state to survive a re-check before believing it.
   while (Date.now() < deadline) {
     if ((await rows.count()) > 0) return true;
-    if (await empty.first().isVisible().catch(() => false)) return false;
+    if (!(await spinning.first().isVisible().catch(() => false))
+        && (await empty.first().isVisible().catch(() => false))) {
+      await page.waitForTimeout(SETTLE_MS);
+      if ((await rows.count()) > 0) return true;
+      if (!(await spinning.first().isVisible().catch(() => false))) return false;
+    }
     await page.waitForTimeout(250);
   }
   return (await rows.count()) > 0;

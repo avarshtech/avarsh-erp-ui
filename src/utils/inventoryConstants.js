@@ -164,3 +164,24 @@ export const INVENTORY_UOMS = [
 // ─── DOC NUMBER PREFIXES ───────────────────────────────────────────────────────
 export const GRN_DOC_PREFIX = 'GRN';
 export const QC_DOC_PREFIX = 'QC';
+
+// ─── GRN CATEGORY CLASSIFICATION ───────────────────────────────────────────────
+// A GRN is raised in one of two shapes: fabric is received as ROLLS, everything else
+// (trims, packing materials) is received as CARTONS. Which shape applies is decided by
+// the PO line's category.
+//
+// This used to be an exact match against a single category named "Trims", which meant a
+// line in "Local Trims", "Imported Trims" or "Packing Materials" matched neither form and
+// was unreceivable. Categories are user-defined master data, so the only safe rule is:
+// fabric is fabric, and anything that is not fabric is an accessory.
+export const GRN_CATEGORY = { FABRIC: 'Fabric', ACCESSORIES: 'Accessories' };
+
+/** True when a PO line's category is a fabric category. */
+export const isFabricCategory = (categoryName) =>
+  String(categoryName || '').trim().toLowerCase().includes('fabric');
+
+/** True when a PO line belongs in a GRN of the given kind (GRN_CATEGORY.*). */
+export const matchesGrnCategory = (categoryName, grnCategory) =>
+  grnCategory === GRN_CATEGORY.FABRIC
+    ? isFabricCategory(categoryName)
+    : Boolean(categoryName) && !isFabricCategory(categoryName);

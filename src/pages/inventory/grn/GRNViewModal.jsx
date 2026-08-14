@@ -38,10 +38,15 @@ const HERO_ACCENT = {
 
 const labelStyle = { fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 };
 
+// The variant is the purchasable identity, so it names the line. `description` alone is
+// the item's derived "Category - Sub-Category", which reads identically for every
+// variant of the same item and tells a store keeper nothing about what arrived.
+const variantLabel = (r) => r.variantName || r.description || '—';
+
 const fabricRollColumns = [
   { title: 'Roll #', dataIndex: 'rollNumber', align: 'center', width: 90 },
   { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 130, render: (v, r) => r.variantCode || '—' },
-  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
+  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true, render: (v, r) => variantLabel(r) },
   { title: 'Width', dataIndex: 'width', align: 'center', width: 70 },
   { title: 'GSM', dataIndex: 'gsm', align: 'center', width: 70 },
   { title: 'Receiving Qty', dataIndex: 'receivingQty', align: 'center', width: 110, render: (v) => formatNumber(v, 2) },
@@ -51,7 +56,7 @@ const fabricRollColumns = [
 
 const accItemColumns = [
   { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 140, render: (v, r) => r.variantCode || '—' },
-  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
+  { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true, render: (v, r) => variantLabel(r) },
   { title: 'Color', dataIndex: 'color', align: 'center', width: 90 },
   { title: 'Size', dataIndex: 'size', align: 'center', width: 80 },
   { title: 'Receiving Qty', dataIndex: 'receivingQty', align: 'center', width: 110, render: (v) => formatNumber(v) },
@@ -60,7 +65,7 @@ const accItemColumns = [
 
 const cartonColumns = [
   { title: 'Carton #', dataIndex: 'cartonNumber', align: 'center', width: 100 },
-  { title: 'Item', dataIndex: 'itemDescription', align: 'center', ellipsis: true },
+  { title: 'Item', dataIndex: 'itemDescription', align: 'center', ellipsis: true, render: (v, r) => r.variantName || v || '—' },
   { title: 'Quantity', dataIndex: 'quantity', align: 'center', width: 100, render: (v) => formatNumber(v) },
   { title: 'UOM', dataIndex: 'uom', align: 'center', width: 80 },
 ];

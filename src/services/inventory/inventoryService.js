@@ -75,9 +75,28 @@ const adaptPO = (po) => {
  */
 const adaptGRN = (grn) => {
   if (!grn) return null;
+  const lineItems = grn.lineItems || [];
+  // The API nests rolls and cartons under each line item and exposes no totalRolls /
+  // totalAmount / items fields. The GRN screens were built around a flat shape — the view
+  // modal reads grn.items/grn.cartons, the forms hydrate from grn.rolls/grn.cartons, and
+  // the list columns read grn.totalRolls/grn.totalAmount. Without this flattening they all
+  // silently render 0 and edit mode loads with no rolls at all.
+  //
+  // The server already stamps each roll and carton with its parent line's snapshot
+  // (item code, description, rate, uom, variantCode, variantName), so the flattened rows
+  // stand on their own.
+  const rolls = lineItems.flatMap((li) => li.rolls || []);
+  const cartons = lineItems.flatMap((li) => li.cartons || []);
   return {
     ...grn,
     type: (grn.type === 'Trims' || grn.grnType === 'Trims') ? 'Accessories' : 'Fabric',
+    items: grn.items || lineItems,
+    rolls: grn.rolls || rolls,
+    cartons: grn.cartons || cartons,
+    totalRolls: grn.totalRolls ?? rolls.length,
+    totalAmount:
+      grn.totalAmount ??
+      lineItems.reduce((sum, li) => sum + Number(li.receivingQty || 0) * Number(li.rate || 0), 0),
   };
 };
 

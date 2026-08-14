@@ -685,6 +685,52 @@ export const PURCHASE_ORDERS = [
   },
 ];
 
+/**
+ * Session 6 — goods receipt against the POs above.
+ *
+ * Fabric is received as ROLLS (roll number + shade lot are the mill's identity for a
+ * cut of fabric, and shade lot is what stops two dye batches being mixed in one
+ * garment). Everything else — trims, packing — is received as CARTONS.
+ *
+ * `receivingQty` is expressed in the PURCHASE UOM, matching the PO: KG for fabric,
+ * Cones for thread, Pieces for labels and zippers. The carton quantity mirrors the
+ * received quantity because these GRNs pack the full receipt.
+ */
+export const GRNS = [
+  {
+    type: 'Fabric',
+    supplier: 'Arvind Mills Ltd',
+    challanNo: 'ARV/DC/2026-0451',
+    vehicleNumber: 'TN-38-BQ-7712',
+    transporter: 'Sharma Roadlines',
+    lines: [
+      { variant: 'Single Jersey 180 GSM Navy Blue', rollNumber: 'ARV-SJ-NB-001', receivingQty: 1903.125, shadeLot: 'SL-NB-2601' },
+      { variant: 'Rib 1x1 240 GSM Navy Blue', rollNumber: 'ARV-RB-NB-001', receivingQty: 140, shadeLot: 'SL-NB-2601' },
+    ],
+  },
+  {
+    type: 'Accessories',
+    supplier: 'Coats India Pvt Ltd',
+    challanNo: 'COATS/DC/2026-1187',
+    vehicleNumber: 'TN-11-CH-3390',
+    transporter: 'VRL Logistics',
+    lines: [
+      { variant: 'Sewing Thread 40s2 Navy Blue', cartonNumber: 'CTN-THR-001', receivingQty: 210 },
+      { variant: 'Woven Main Label Medium White', cartonNumber: 'CTN-LBL-001', receivingQty: 7000 },
+    ],
+  },
+  {
+    type: 'Accessories',
+    supplier: 'YKK India Pvt Ltd',
+    challanNo: 'YKK/DC/2026-0902',
+    vehicleNumber: 'KA-05-MJ-6624',
+    transporter: 'Blue Dart Surface',
+    lines: [
+      { variant: 'Metal Zipper No5 Antique Brass 16cm', cartonNumber: 'CTN-ZIP-001', receivingQty: 3500 },
+    ],
+  },
+];
+
 export default {
   UOMS,
   UOM_NAME_BY_SYMBOL,
@@ -708,4 +754,5 @@ export default {
   ORDERS,
   BOMS,
   PURCHASE_ORDERS,
+  GRNS,
 };
