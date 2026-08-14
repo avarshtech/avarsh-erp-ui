@@ -61,7 +61,10 @@ const adaptPO = (po) => {
       pendingQty: Number(li.quantity || 0),
       fullyReceived: false,
       rate: Number(li.unitPrice || 0),
-      uom: li.uomName || '',
+      // Symbol, not name: GRN/PO documents and the narrow UOM columns show "KG", and
+      // screens that source a UOM from the variant already snapshot the symbol. Falling
+      // back to the name keeps older POs readable rather than blank.
+      uom: li.uomSymbol || li.uomName || '',
       color: li.variantAttributes?.color || '',
       size: li.variantAttributes?.size || '',
       categoryName: li.categoryName || '',

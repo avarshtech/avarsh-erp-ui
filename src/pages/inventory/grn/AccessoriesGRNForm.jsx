@@ -200,7 +200,11 @@ const AccessoriesGRNForm = () => {
           color: v?.color || '—',
           size: v?.size || '—',
           quantity: null,
-          uom: v?.secondaryUom || v?.primaryUom || li?.uom,
+          // A carton's quantity is part of the receipt — validation requires the cartons
+          // to add up to the received quantity — so it is counted in the SAME unit the
+          // line was received in. Preferring the secondary UOM labelled 210 cones of
+          // thread as metres.
+          uom: v?.primaryUom || li?.uom,
         };
       });
       // Preserve multiple cartons per line item (for edit mode)
