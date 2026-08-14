@@ -1180,14 +1180,24 @@ const BOMForm = () => {
       }));
   }, [processesList]);
 
-  /** Filtered process options per line category */
+  /**
+   * Filtered process options per line category.
+   *
+   * `Process.category` serves two consumers with different taxonomies: the cost sheet
+   * queries it for 'Manufacturing' / 'Overheads', while this filter was written for a
+   * material-based tagging ('fabric' / 'trims' / 'general'). Since a process can only
+   * carry one category, manufacturing processes — cutting, sewing, finishing — are
+   * applicable to fabric and trim lines alike and must be offered on both; without this
+   * the dropdown is empty for every BOM line. Overheads are excluded: an overhead is a
+   * cost-sheet concept, not a BOM line process.
+   */
   const getProcessOptionsForLine = useCallback((line) => {
     const fabric = isFabricCategory(line);
     const matchCategory = fabric ? 'fabric' : 'trims';
     return allProcessOptions.filter((opt) => {
       const cat = (opt.process.category || '').toLowerCase();
-      // Show if: category matches, or is "general", or no category set
-      return !cat || cat === 'general' || cat === matchCategory;
+      if (cat === 'overheads') return false;
+      return !cat || cat === 'general' || cat === 'manufacturing' || cat === matchCategory;
     });
   }, [allProcessOptions]);
 

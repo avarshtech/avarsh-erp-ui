@@ -30,7 +30,11 @@ test.describe('Session 3 — Orders', () => {
       await navigateWithAuth(page, '/orders/list');
       await waitForPageReady(page);
 
-      if (await page.locator('.ant-table-row').filter({ hasText: order.buyerPoNo }).count()) {
+      // The list columns are Order No / Date / Buyer / Lines / Total Qty / Value / Status
+      // — no style or buyer-PO column — so search by style (the search box covers
+      // "order no, buyer, style") rather than filtering rows on a value that is never
+      // rendered.
+      if (await orderExistsForStyle(page, order.styleNo)) {
         console.log(`Order ${order.styleNo} (${order.buyerPoNo}): skipped (already exists)`);
         return;
       }
@@ -103,14 +107,14 @@ test.describe('Session 3 — Orders', () => {
     });
   }
 
-  test('orders carry their style, buyer PO and total quantity', async ({ page }) => {
-    await navigateWithAuth(page, '/orders/list');
-    await waitForPageReady(page);
-
+  test('orders are confirmed and carry their full order quantity', async ({ page }) => {
     for (const order of ORDERS) {
-      const row = page.locator('.ant-table-row').filter({ hasText: order.buyerPoNo }).first();
+      await navigateWithAuth(page, '/orders/list');
+      await waitForPageReady(page);
+      await searchOrders(page, order.styleNo);
+
+      const row = page.locator('.ant-table-row').first();
       await expect(row).toBeVisible({ timeout: 15000 });
-      await expect(row).toContainText(order.styleNo);
 
       const expectedQty = order.colors.reduce(
         (sum, c) => sum + Object.values(c.quantities).reduce((a, b) => a + b, 0),
@@ -118,9 +122,24 @@ test.describe('Session 3 — Orders', () => {
       );
       // Quantity is rendered with thousands separators.
       await expect(row).toContainText(expectedQty.toLocaleString());
+      await expect(row).toContainText(/Confirmed/i);
     }
   });
 });
+
+/** Type into the order list search box (covers order no, buyer and style). */
+async function searchOrders(page, term) {
+  const search = page.getByPlaceholder(/Search order no, buyer, style/i).first();
+  await search.fill('');
+  await search.fill(term);
+  await page.waitForTimeout(900);
+}
+
+/** Does the list already hold an order for this style? */
+async function orderExistsForStyle(page, styleNo) {
+  await searchOrders(page, styleNo);
+  return (await page.locator('.ant-table-row').count()) > 0;
+}
 
 /** The Costing ID of the approved cost sheet for a style, read off the costing list. */
 async function costingIdForStyle(page, styleNo) {

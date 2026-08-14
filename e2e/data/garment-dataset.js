@@ -568,6 +568,81 @@ export const ORDERS = [
   },
 ];
 
+// ── Bills of Materials ─────────────────────────────────────────────
+/**
+ * A BOM is built against a confirmed ORDER (not a cost sheet): BOMForm looks the order
+ * up by number and derives quantities and colours from its lines.
+ *
+ * Each line is identified by the Category / Sub-Category / Item Type triple — that
+ * combination resolves to exactly one item, whose variants then populate the Variant
+ * dropdown. Only Fabric and Trims categories are accepted by the BOM.
+ *
+ * `consumption` is per garment, in the item's consumption (secondary) UOM. Items with a
+ * UOM conversion (fabric KG↔MTR, buttons GRS↔PCS, thread CON↔MTR) are the ones that
+ * exercise purchaseQtyPrimary.
+ */
+export const BOMS = [
+  {
+    styleNo: 'HM-TS-2601',
+    lines: [
+      {
+        category: 'Fabric', subCategory: 'Knits', itemType: 'Single Jersey',
+        variant: 'Single Jersey 180 GSM Navy Blue',
+        parts: ['Front Panel', 'Back Panel', 'Sleeve'],
+        consumption: 1.45,
+        processes: ['Cutting', 'Sewing'],
+      },
+      {
+        category: 'Fabric', subCategory: 'Knits', itemType: 'Rib 1x1',
+        variant: 'Rib 1x1 240 GSM Navy Blue',
+        parts: ['Collar'],
+        consumption: 0.08,
+        processes: ['Cutting', 'Sewing'],
+      },
+      {
+        category: 'Local Trims', subCategory: 'Sewing Threads', itemType: 'Spun Polyester Thread',
+        variant: 'Sewing Thread 40s2 Navy Blue',
+        parts: ['Front Panel'],
+        consumption: 150,
+        processes: ['Sewing'],
+      },
+      {
+        category: 'Local Trims', subCategory: 'Labels & Tags', itemType: 'Woven Main Label',
+        variant: 'Woven Main Label Medium White',
+        parts: ['Back Panel'],
+        consumption: 1,
+        processes: ['Sewing'],
+      },
+    ],
+  },
+  {
+    styleNo: 'PRK-DN-2603',
+    lines: [
+      {
+        category: 'Fabric', subCategory: 'Denim', itemType: 'Denim 3x1 RHT',
+        variant: 'Denim 12 Oz Indigo Blue',
+        parts: ['Front Panel', 'Back Panel', 'Pocket'],
+        consumption: 1.35,
+        processes: ['Cutting', 'Sewing'],
+      },
+      {
+        category: 'Local Trims', subCategory: 'Buttons & Fasteners', itemType: 'Metal Snap Button',
+        variant: 'Metal Snap Button 20L Antique Brass',
+        parts: ['Front Panel'],
+        consumption: 1,
+        processes: ['Sewing'],
+      },
+      {
+        category: 'Imported Trims', subCategory: 'Zippers', itemType: 'Metal Zipper',
+        variant: 'Metal Zipper No5 Antique Brass 16cm',
+        parts: ['Front Panel'],
+        consumption: 1,
+        processes: ['Sewing'],
+      },
+    ],
+  },
+];
+
 export default {
   UOMS,
   UOM_NAME_BY_SYMBOL,
@@ -589,4 +664,5 @@ export default {
   TRIMS_QC_CRITERIA,
   COST_SHEETS,
   ORDERS,
+  BOMS,
 };
