@@ -3,9 +3,10 @@ import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm } from 'an
 import { PlusOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getAllLoans, closeLoan, cancelLoan } from '../../../services/hr/loanService';
+import { searchLoans, closeLoan, cancelLoan } from '../../../services/hr/loanService';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { getTablePagination } from '../../../utils/paginationConfig';
 import PageHeader from '../../../components/PageHeader';
 import LoanDrawer from './LoanDrawer';
 
@@ -21,25 +22,42 @@ const LoanList = () => {
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
 
   const canAdd = hasPermission('hr-loans', 'add');
   const canUpdate = hasPermission('hr-loans', 'update');
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);
     try {
-      const result = await getAllLoans();
-      setData(Array.isArray(result) ? result : result?.content || []);
+      const result = await searchLoans({
+        status: statusFilter,
+        page: (page || pagination.current) - 1,
+        size: pageSize || pagination.pageSize,
+        sort: 'loanDate',
+        direction: 'desc',
+      });
+      setData(result.content);
+      setPagination((prev) => ({
+        ...prev,
+        current: (result.number ?? 0) + 1,
+        pageSize: result.size,
+        total: result.totalElements,
+      }));
     } catch {
       message.error('Failed to load loans');
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [statusFilter, pagination.current, pagination.pageSize, message]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(1, pagination.pageSize);
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTableChange = (pag) => {
+    fetchData(pag.current, pag.pageSize);
+  };
 
   const handleClose = useCallback(async (id) => {
     try {
@@ -61,11 +79,6 @@ const LoanList = () => {
     }
   }, [message, fetchData]);
 
-  const filteredData = useMemo(() => {
-    if (!statusFilter) return data;
-    return data.filter((r) => r.status === statusFilter);
-  }, [data, statusFilter]);
-
   const columns = useMemo(
     () => [
       { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100 },
@@ -75,8 +88,9 @@ const LoanList = () => {
         dataIndex: 'loanDate',
         key: 'loanDate',
         width: 110,
+        // Server returns newest-first; a client-side sorter would only reorder
+        // the current page, so sorting is left to the API.
         render: (val) => val ? dayjs(val).format('DD-MMM-YYYY') : '-',
-        sorter: (a, b) => dayjs(a.loanDate).unix() - dayjs(b.loanDate).unix(),
       },
       { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatCurrency },
       { title: 'EMI', dataIndex: 'emiAmount', key: 'emiAmount', width: 100, align: 'right', render: formatCurrency },
@@ -143,10 +157,11 @@ const LoanList = () => {
       <Table
         rowKey="id"
         loading={loading}
-        dataSource={filteredData}
+        dataSource={data}
         columns={columns}
         scroll={{ x: 1100 }}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} loans` }}
+        pagination={getTablePagination(pagination, 'loans')}
+        onChange={handleTableChange}
       />
       <LoanDrawer
         open={drawerOpen}
