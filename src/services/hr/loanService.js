@@ -3,12 +3,37 @@ import axiosInstance from '../core/axiosInstance';
 const BASE_URL = '/hr/loans';
 
 /**
- * Get all loans.
+ * Search loans with filters and pagination.
  * GET /api/v1/hr/loans
+ *
+ * Every filter is optional; calling with no params returns the full register.
  */
-export const getAllLoans = async () => {
-  const response = await axiosInstance.get(BASE_URL);
-  return response.data;
+export const searchLoans = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  if (params.search) queryParams.append('search', params.search);
+  if (params.employeeId) queryParams.append('employeeId', params.employeeId);
+  if (params.status) queryParams.append('status', params.status);
+  if (params.fromDate) queryParams.append('fromDate', params.fromDate);
+  if (params.toDate) queryParams.append('toDate', params.toDate);
+  if (params.page !== undefined) queryParams.append('page', params.page);
+  if (params.size !== undefined) queryParams.append('size', params.size);
+  if (params.sort) queryParams.append('sort', params.sort);
+  if (params.direction) queryParams.append('direction', params.direction);
+
+  const queryString = queryParams.toString();
+  const url = `${BASE_URL}${queryString ? `?${queryString}` : ''}`;
+  const response = await axiosInstance.get(url);
+  const data = response.data;
+
+  // Normalize pagination fields for frontend compatibility
+  return {
+    content: data.content || [],
+    totalElements: data.totalElements || 0,
+    totalPages: data.totalPages || 0,
+    size: data.pageSize ?? data.size ?? 25,
+    number: data.pageNumber ?? data.number ?? 0,
+    last: data.last,
+  };
 };
 
 /**
