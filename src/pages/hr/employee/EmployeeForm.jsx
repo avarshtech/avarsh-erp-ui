@@ -21,6 +21,50 @@ import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 
 const { TextArea } = Input;
 
+/**
+ * Maps each validated field to the tab that renders it.
+ *
+ * Antd mounts a tab pane only once it has been visited, so a Form.Item on an
+ * unvisited tab never registers and validateFields() silently skips it. Every
+ * pane is now force-rendered (see tabItems), which means validation can fail on
+ * a field the user cannot see - this map lets us jump them to the right tab.
+ */
+const FIELD_TAB = {
+  fullName: 'personal',
+  gender: 'personal',
+  dateOfBirth: 'personal',
+  maritalStatus: 'personal',
+  mobileNumber: 'personal',
+  presentAddress: 'personal',
+  aadharNumber: 'personal',
+  panNumber: 'personal',
+  employeeNo: 'employment',
+  departmentId: 'employment',
+  designationId: 'employment',
+  factoryId: 'employment',
+  shiftId: 'employment',
+  category: 'employment',
+  employeeType: 'employment',
+  dateOfJoining: 'employment',
+  ifscCode: 'bank',
+};
+
+const TAB_LABEL = {
+  personal: 'Personal',
+  employment: 'Employment',
+  statutory: 'Statutory',
+  bank: 'Bank & Nominees',
+  documents: 'Documents',
+};
+
+// Indian mobile, optionally prefixed with +91.
+const MOBILE_PATTERN = /^(\+91[-\s]?)?[6-9]\d{9}$/;
+const PAN_PATTERN = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+const AADHAAR_PATTERN = /^\d{12}$/;
+const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+
+const MIN_WORKING_AGE = 14;
+
 const EmployeeForm = () => {
   const { message } = App.useApp();
   const { id } = useParams();
@@ -29,6 +73,7 @@ const EmployeeForm = () => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const [activeTab, setActiveTab] = useState('personal');
   const { clearDirty } = useUnsavedChanges(isDirty);
   const isEdit = Boolean(id);
 
@@ -78,9 +123,48 @@ const EmployeeForm = () => {
     } catch { /* ignore */ }
   }, [id]);
 
+  /** Nominees live in local state, not the Form, so they need checking by hand. */
+  const validateNominees = () => {
+    if (!nominees.length) return null;
+
+    const incomplete = nominees.findIndex((n) => !n.nomineeName?.trim() || !n.relationship);
+    if (incomplete !== -1) {
+      return `Nominee ${incomplete + 1}: name and relationship are required`;
+    }
+
+    const minorWithoutGuardian = nominees.findIndex((n) => n.isMinor && !n.guardianName?.trim());
+    if (minorWithoutGuardian !== -1) {
+      return `Nominee ${minorWithoutGuardian + 1}: a guardian is required for a minor`;
+    }
+
+    const totalShare = nominees.reduce((sum, n) => sum + (Number(n.sharePercentage) || 0), 0);
+    if (Math.round(totalShare * 100) / 100 !== 100) {
+      return `Nominee shares must total 100% (currently ${totalShare}%)`;
+    }
+
+    return null;
+  };
+
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+
+      const nomineeError = validateNominees();
+      if (nomineeError) {
+        setActiveTab('bank');
+        message.error(nomineeError);
+        return;
+      }
+
+      const documentError = documents.some((d) => !d.documentType)
+        ? 'Every document row needs a type. Remove blank rows or pick a type.'
+        : null;
+      if (documentError) {
+        setActiveTab('documents');
+        message.error(documentError);
+        return;
+      }
+
       setSaving(true);
 
       const payload = {
@@ -124,7 +208,18 @@ const EmployeeForm = () => {
       clearDirty();
       navigate('/hr/employees');
     } catch (err) {
-      if (err?.errorFields) return; // form validation
+      // Form validation failure: jump to the tab holding the first bad field
+      // and say what is wrong. Previously this returned silently, so clicking
+      // Save with an error on a hidden tab appeared to do nothing at all.
+      if (err?.errorFields?.length) {
+        const first = err.errorFields[0];
+        const fieldName = Array.isArray(first.name) ? first.name[0] : first.name;
+        const tab = FIELD_TAB[fieldName];
+        if (tab) setActiveTab(tab);
+        const reason = first.errors?.[0] || 'This field is required';
+        message.error(tab ? `${reason} (${TAB_LABEL[tab]} tab)` : reason);
+        return;
+      }
       message.error(err?.response?.data?.message || 'Failed to save employee');
     } finally {
       setSaving(false);
@@ -163,14 +258,74 @@ const EmployeeForm = () => {
         <Row gutter={[16, 0]}>
           <Col xs={24} sm={12} md={8}><Form.Item label="Full Name" name="fullName" rules={[{ required: true, message: 'Full name is required' }]}><Input /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Father/Husband Name" name="fatherHusbandName"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Gender" name="gender" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={GENDER_OPTIONS} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Date of Birth" name="dateOfBirth"><DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus"><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} allowClear /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Gender" name="gender" rules={[{ required: true, message: 'Gender is required' }]}><Select showSearch optionFilterProp="label" options={GENDER_OPTIONS} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Date of Birth"
+              name="dateOfBirth"
+              rules={[
+                { required: true, message: 'Date of birth is required' },
+                {
+                  validator: (_, value) => {
+                    if (!value) return Promise.resolve();
+                    if (value.isAfter(dayjs(), 'day')) {
+                      return Promise.reject(new Error('Date of birth cannot be in the future'));
+                    }
+                    if (dayjs().diff(value, 'year') < MIN_WORKING_AGE) {
+                      return Promise.reject(new Error(`Employee must be at least ${MIN_WORKING_AGE} years old`));
+                    }
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus" rules={[{ required: true, message: 'Marital status is required' }]}><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Blood Group" name="bloodGroup"><Select showSearch optionFilterProp="label" options={BLOOD_GROUPS.map((b) => ({ value: b, label: b }))} allowClear /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Mobile Number" name="mobileNumber" rules={[{ required: true, message: 'Mobile is required' }]}><Input /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Mobile Number"
+              name="mobileNumber"
+              rules={[
+                { required: true, message: 'Mobile number is required' },
+                { pattern: MOBILE_PATTERN, message: 'Enter a valid 10-digit mobile number' },
+              ]}
+            >
+              <Input maxLength={15} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Aadhaar Number"
+              name="aadharNumber"
+              rules={[{ pattern: AADHAAR_PATTERN, message: 'Aadhaar must be exactly 12 digits' }]}
+            >
+              <Input maxLength={12} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="PAN"
+              name="panNumber"
+              getValueFromEvent={(e) => e.target.value.toUpperCase()}
+              rules={[{ pattern: PAN_PATTERN, message: 'PAN must look like ABCDE1234F' }]}
+            >
+              <Input maxLength={10} />
+            </Form.Item>
+          </Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Emergency Contact Name" name="emergencyContactName"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Emergency Contact Phone" name="emergencyContactPhone"><Input /></Form.Item></Col>
-          <Col xs={24} sm={12}><Form.Item label="Present Address" name="presentAddress"><TextArea rows={2} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Emergency Contact Phone"
+              name="emergencyContactPhone"
+              rules={[{ pattern: MOBILE_PATTERN, message: 'Enter a valid 10-digit mobile number' }]}
+            >
+              <Input maxLength={15} />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12}><Form.Item label="Present Address" name="presentAddress" rules={[{ required: true, message: 'Present address is required' }]}><TextArea rows={2} /></Form.Item></Col>
           <Col xs={24} sm={12}><Form.Item label="Permanent Address" name="permanentAddress"><TextArea rows={2} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Migrant Worker" name="isMigrantWorker" valuePropName="checked"><Switch /></Form.Item></Col>
         </Row>
@@ -181,13 +336,13 @@ const EmployeeForm = () => {
       label: 'Employment',
       children: (
         <Row gutter={[16, 0]}>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo"><Input disabled={isEdit} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Department" name="departmentId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={departments.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Designation" name="designationId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={designations.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={factoryOptions(factories)} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId"><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} allowClear /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo" rules={[{ required: true, message: 'Employee number is required' }, { max: 50, message: 'Employee number cannot exceed 50 characters' }]}><Input disabled={isEdit} maxLength={50} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Department" name="departmentId" rules={[{ required: true, message: 'Department is required' }]}><Select showSearch optionFilterProp="label" options={departments.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Designation" name="designationId" rules={[{ required: true, message: 'Designation is required' }]}><Select showSearch optionFilterProp="label" options={designations.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true, message: 'Factory is required' }]}><Select showSearch optionFilterProp="label" options={factoryOptions(factories)} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Grade" name="grade"><Select showSearch optionFilterProp="label" options={EMPLOYEE_GRADE.map((g) => ({ value: g, label: g.replace('_', '+') }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}>
             <Form.Item label="Reporting Manager" name="reportingManagerId">
@@ -202,7 +357,31 @@ const EmployeeForm = () => {
               />
             </Form.Item>
           </Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Date of Joining" name="dateOfJoining" rules={[{ required: true }]}><DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Date of Joining"
+              name="dateOfJoining"
+              dependencies={['dateOfBirth']}
+              rules={[
+                { required: true, message: 'Date of joining is required' },
+                ({ getFieldValue }) => ({
+                  validator: (_, value) => {
+                    const dob = getFieldValue('dateOfBirth');
+                    if (!value || !dob) return Promise.resolve();
+                    if (value.isBefore(dob, 'day')) {
+                      return Promise.reject(new Error('Date of joining cannot precede date of birth'));
+                    }
+                    if (value.diff(dob, 'year') < MIN_WORKING_AGE) {
+                      return Promise.reject(new Error(`Employee would be under ${MIN_WORKING_AGE} on the joining date`));
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            </Form.Item>
+          </Col>
           {isEdit && (
             <Col xs={24} sm={12} md={8}><Form.Item label="Status" name="status"><Select showSearch optionFilterProp="label" options={EMPLOYEE_STATUS} /></Form.Item></Col>
           )}
@@ -233,7 +412,16 @@ const EmployeeForm = () => {
           <Card title="Bank Details" size="small" style={{ marginBottom: 16 }}>
             <Row gutter={[16, 0]}>
               <Col xs={24} sm={12} md={8}><Form.Item label="Account Number" name="accountNumber"><Input /></Form.Item></Col>
-              <Col xs={24} sm={12} md={8}><Form.Item label="IFSC Code" name="ifscCode"><Input /></Form.Item></Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="IFSC Code"
+                  name="ifscCode"
+                  getValueFromEvent={(e) => e.target.value.toUpperCase()}
+                  rules={[{ pattern: IFSC_PATTERN, message: 'IFSC must look like HDFC0001234' }]}
+                >
+                  <Input maxLength={11} />
+                </Form.Item>
+              </Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Bank Name" name="bankName"><Input /></Form.Item></Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Branch Name" name="branchName"><Input /></Form.Item></Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Payment Mode" name="paymentMode"><Select showSearch optionFilterProp="label" options={PAYMENT_MODES} allowClear /></Form.Item></Col>
@@ -274,7 +462,17 @@ const EmployeeForm = () => {
         onValuesChange={() => setIsDirty(true)}
         initialValues={{ status: 'ACTIVE', employeeType: 'PERMANENT', isMigrantWorker: false, pfApplicable: false, esiApplicable: false, ptApplicable: false, lwfApplicable: false, tdsApplicable: false }}
       >
-        <Tabs items={tabItems} />
+        {/*
+          forceRender mounts every pane up front. Without it Antd only mounts a
+          pane once visited, so Form.Items on unvisited tabs never register and
+          validateFields() skips them - letting an incomplete record reach the
+          server and fail there instead of failing here.
+        */}
+        <Tabs
+          items={tabItems.map((tab) => ({ ...tab, forceRender: true }))}
+          activeKey={activeTab}
+          onChange={setActiveTab}
+        />
       </Form>
     </>
   );
