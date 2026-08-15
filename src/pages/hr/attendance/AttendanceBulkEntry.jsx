@@ -6,6 +6,7 @@ import { getAttendanceByDate, bulkMarkAttendance } from '../../../services/hr/at
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { hasPermission } from '../../../utils/permissions';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusOptions = ATTENDANCE_STATUS.map((s) => ({ value: s.value, label: s.label }));
@@ -208,7 +209,7 @@ const AttendanceBulkEntry = () => {
             style={{ width: '100%' }}
             value={factoryId}
             onChange={setFactoryId}
-            options={factories.map((f) => ({ value: f.id, label: f.name }))}
+            options={factoryOptions(factories)}
           />
         </Col>
         {locked && (

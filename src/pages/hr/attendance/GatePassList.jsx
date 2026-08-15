@@ -6,6 +6,7 @@ import { createGatePass, getGatePassByStatus, approveGatePass, rejectGatePass } 
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { hasPermission } from '../../../utils/permissions';
 import { LEAVE_STATUS, GATE_PASS_TYPE } from '../../../utils/hrConstants';
+import { employeeOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(LEAVE_STATUS.map((s) => [s.value, s]));
@@ -201,7 +202,7 @@ const GatePassList = () => {
               showSearch
               optionFilterProp="label"
               placeholder="Select Employee"
-              options={employees.map((e) => ({ value: e.id, label: `${e.employeeNo} - ${e.name}` }))}
+              options={employeeOptions(employees)}
             />
           </Form.Item>
           <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>

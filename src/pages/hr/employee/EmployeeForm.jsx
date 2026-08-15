@@ -16,6 +16,7 @@ import {
   EMPLOYEE_CATEGORY, EMPLOYEE_GRADE,
 } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
+import { factoryOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 
 const { TextArea } = Input;
@@ -183,7 +184,7 @@ const EmployeeForm = () => {
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo"><Input disabled={isEdit} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Department" name="departmentId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={departments.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Designation" name="designationId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={designations.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={factories.map((f) => ({ value: f.id, label: f.name }))} /></Form.Item></Col>
+          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={factoryOptions(factories)} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId"><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} allowClear /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>

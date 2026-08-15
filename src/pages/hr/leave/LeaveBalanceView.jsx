@@ -5,6 +5,7 @@ import { getLeaveBalances } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
@@ -78,7 +79,7 @@ const LeaveBalanceView = () => {
         const row = {
           key: employee.id,
           employeeNo: employee.employeeNo,
-          employeeName: employee.name,
+          employeeName: employee.fullName,
         };
         balances.forEach((b) => {
           row[`lt_${b.leaveTypeId}`] = b.balance;
@@ -140,7 +141,7 @@ const LeaveBalanceView = () => {
             style={{ width: '100%' }}
             value={factoryId}
             onChange={setFactoryId}
-            options={factories.map((f) => ({ value: f.id, label: f.name }))}
+            options={factoryOptions(factories)}
           />
         </Col>
         <Col xs={24} sm={8} md={6}>
