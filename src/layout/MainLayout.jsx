@@ -35,6 +35,7 @@ import {
   BarChartOutlined,
   TeamOutlined,
   AuditOutlined,
+  ScissorOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -355,6 +356,18 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/production",
+      icon: <ScissorOutlined />,
+      label: "Production",
+      moduleId: "production",
+      children: [
+        { key: "/production/cutting", label: "Cutting" },
+        { key: "/production/sewing", label: "Sewing" },
+        { key: "/production/finishing", label: "Finishing" },
+        // Packing arrives in the next design session.
+      ],
+    },
+    {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
@@ -501,6 +514,9 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/production/cutting')) return ['/production/cutting'];
+    if (path.startsWith('/production/sewing')) return ['/production/sewing'];
+    if (path.startsWith('/production/finishing')) return ['/production/finishing'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
@@ -519,6 +535,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
+    if (path.startsWith("/production")) return ["/production"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];

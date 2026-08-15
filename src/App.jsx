@@ -48,6 +48,18 @@ const WorkOrderForm = lazy(() => import('./pages/po/workorder/WorkOrderForm'));
 const FinishingPoList = lazy(() => import('./pages/po/finishing/FinishingPoList'));
 const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/FinishingPoGenerateWizard'));
 const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
+const CuttingWorkspace = lazy(() => import('./pages/production/cutting/CuttingWorkspace'));
+const CutOrderPlanForm = lazy(() => import('./pages/production/cutting/CutOrderPlanForm'));
+const LayAuditForm = lazy(() => import('./pages/production/cutting/LayAuditForm'));
+const TmbCheckForm = lazy(() => import('./pages/production/cutting/TmbCheckForm'));
+const PanelCheckForm = lazy(() => import('./pages/production/cutting/PanelCheckForm'));
+const SewingWorkspace = lazy(() => import('./pages/production/sewing/SewingWorkspace'));
+const SewingPlanForm = lazy(() => import('./pages/production/sewing/SewingPlanForm'));
+const MeasurementReportForm = lazy(() => import('./pages/production/sewing/MeasurementReportForm'));
+const TopseForm = lazy(() => import('./pages/production/sewing/TopseForm'));
+const FinishingWorkspace = lazy(() => import('./pages/production/finishing/FinishingWorkspace'));
+const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
+const FinishingMeasurementForm = lazy(() => import('./pages/production/finishing/FinishingMeasurementForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -198,6 +210,31 @@ const ThemedApp = () => {
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="production" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
+            {/* Production — Cutting (UI mock phase) */}
+            <Route path="production/cutting" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><CuttingWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/cop/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/cop/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/lay-audit/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/lay-audit/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/tmb/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><TmbCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/tmb/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><TmbCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/panel-check/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><PanelCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/panel-check/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><PanelCheckForm /></Suspense></PermissionRoute>} />
+            {/* Production — Sewing (UI mock phase) */}
+            <Route path="production/sewing" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><SewingWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/plan/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><SewingPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/plan/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><SewingPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/measurement/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><MeasurementReportForm /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/measurement/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><MeasurementReportForm /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/topse/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><TopseForm /></Suspense></PermissionRoute>} />
+            <Route path="production/sewing/topse/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><TopseForm /></Suspense></PermissionRoute>} />
+
+            {/* Production — Finishing (UI mock phase) */}
+            <Route path="production/finishing" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><FinishingWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/checking/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/measurement/new" element={<PermissionRoute module="production" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingMeasurementForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/measurement/:id" element={<PermissionRoute module="production"><Suspense fallback={<PageSkeleton />}><FinishingMeasurementForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
