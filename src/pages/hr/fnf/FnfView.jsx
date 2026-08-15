@@ -115,7 +115,7 @@ const FnfView = () => {
       <Card style={{ marginBottom: 16 }}>
         <Descriptions column={{ xs: 1, sm: 2, md: 3 }} bordered size="small">
           <Descriptions.Item label="Employee Name">{data.employeeName || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Employee Code">{data.employeeCode || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Employee Code">{data.employeeNo || '-'}</Descriptions.Item>
           <Descriptions.Item label="Department">{data.departmentName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Designation">{data.designationName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Date of Joining">

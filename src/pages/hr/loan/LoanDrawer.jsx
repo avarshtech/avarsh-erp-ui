@@ -3,6 +3,7 @@ import { App, Drawer, Form, Select, DatePicker, InputNumber, Input, Button, Spac
 import dayjs from 'dayjs';
 import { createLoan } from '../../../services/hr/loanService';
 import { searchEmployees } from '../../../services/hr/employeeService';
+import { employeeOptions } from '../../../utils/hrLabels';
 
 const LoanDrawer = ({ open, onClose, onSuccess }) => {
   const { message } = App.useApp();
@@ -74,10 +75,7 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
-            options={employees.map((e) => ({
-              value: e.id,
-              label: `${e.employeeNo} - ${e.firstName} ${e.lastName || ''}`.trim(),
-            }))}
+            options={employeeOptions(employees)}
           />
         </Form.Item>
         <Form.Item name="loanDate" label="Loan Date" rules={[{ required: true, message: 'Select loan date' }]}>

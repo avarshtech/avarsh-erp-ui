@@ -6,6 +6,7 @@ import { getAllPtReturns, generatePtReturn, filePtReturn, getPtReturnRecords } f
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
@@ -195,7 +196,7 @@ const PtReturnList = () => {
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
             <Select
               placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              options={factoryOptions(factories)}
               showSearch
               optionFilterProp="label"
             />

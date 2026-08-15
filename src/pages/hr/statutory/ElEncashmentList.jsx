@@ -5,6 +5,7 @@ import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
@@ -197,7 +198,7 @@ const ElEncashmentList = () => {
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
             <Select
               placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              options={factoryOptions(factories)}
               showSearch
               optionFilterProp="label"
             />

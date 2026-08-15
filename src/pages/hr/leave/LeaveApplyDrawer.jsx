@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { applyLeave, getLeaveBalances } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { HALF_DAY_TYPE } from '../../../utils/hrConstants';
+import { employeeOptions } from '../../../utils/hrLabels';
 
 const { Text } = Typography;
 
@@ -103,7 +104,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
             showSearch
             optionFilterProp="label"
             placeholder="Select Employee"
-            options={employees.map((e) => ({ value: e.id, label: `${e.employeeNo} - ${e.name}` }))}
+            options={employeeOptions(employees)}
           />
         </Form.Item>
         <Form.Item name="leaveTypeId" label="Leave Type" rules={[{ required: true, message: 'Please select leave type' }]}>

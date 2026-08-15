@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutl
 import { useNavigate } from 'react-router-dom';
 import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords } from '../../../services/hr/payrollService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const MONTH_OPTIONS = [
@@ -120,7 +121,7 @@ const PayrollWizard = () => {
             style={{ width: '100%' }}
             value={factoryId}
             onChange={setFactoryId}
-            options={factories.map((f) => ({ value: f.id, label: f.name }))}
+            options={factoryOptions(factories)}
           />
         </div>
         <Row gutter={16}>

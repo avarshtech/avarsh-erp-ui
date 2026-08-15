@@ -55,8 +55,8 @@ const FnfList = () => {
       },
       {
         title: 'Code',
-        dataIndex: 'employeeCode',
-        key: 'employeeCode',
+        dataIndex: 'employeeNo',
+        key: 'employeeNo',
         width: 100,
       },
       {

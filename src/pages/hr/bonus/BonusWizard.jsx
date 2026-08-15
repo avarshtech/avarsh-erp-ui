@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutl
 import { useNavigate } from 'react-router-dom';
 import { processBonus, approveBonus, getBonusRecords } from '../../../services/hr/bonusService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const formatCurrency = (val) =>
@@ -69,7 +70,7 @@ const BonusWizard = () => {
   const recordColumns = useMemo(
     () => [
       { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 200, ellipsis: true },
-      { title: 'Employee Code', dataIndex: 'employeeCode', key: 'employeeCode', width: 120 },
+      { title: 'Employee Code', dataIndex: 'employeeNo', key: 'employeeNo', width: 120 },
       { title: 'Total Salary', dataIndex: 'totalSalary', key: 'totalSalary', width: 140, align: 'right', render: formatCurrency },
       { title: 'Bonus Amount', dataIndex: 'bonusAmount', key: 'bonusAmount', width: 140, align: 'right', render: formatCurrency },
     ],
@@ -103,7 +104,7 @@ const BonusWizard = () => {
                   placeholder="Select factory"
                   value={factoryId}
                   onChange={setFactoryId}
-                  options={factories.map((f) => ({ value: f.id, label: f.name }))}
+                  options={factoryOptions(factories)}
                   style={{ width: '100%' }}
                   showSearch
                   optionFilterProp="label"

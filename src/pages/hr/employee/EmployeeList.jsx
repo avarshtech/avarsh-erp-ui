@@ -13,6 +13,7 @@ import SearchFilterBar from '../../../components/SearchFilterBar';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
+import { factoryOptions } from '../../../utils/hrLabels';
 
 const EmployeeList = () => {
   const { message } = App.useApp();
@@ -139,7 +140,7 @@ const EmployeeList = () => {
         placeholder: 'Factory',
         value: factoryFilter,
         onChange: setFactoryFilter,
-        options: factories.map((f) => ({ value: f.id, label: f.name })),
+        options: factoryOptions(factories),
       },
     },
     {

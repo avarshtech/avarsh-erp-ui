@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { calculateFnf, approveFnf } from '../../../services/hr/fnfService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { SEPARATION_REASONS, FNF_STATUS } from '../../../utils/hrConstants';
+import { employeeOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const formatCurrency = (val) =>
@@ -110,10 +111,7 @@ const FnfForm = () => {
                     filterOption={false}
                     onSearch={handleEmployeeSearch}
                     loading={searchLoading}
-                    options={employees.map((e) => ({
-                      value: e.id,
-                      label: `${e.employeeCode} - ${e.firstName} ${e.lastName || ''}`.trim(),
-                    }))}
+                    options={employeeOptions(employees)}
                   />
                 </Form.Item>
               </Col>
