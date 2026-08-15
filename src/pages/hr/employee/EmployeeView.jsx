@@ -179,14 +179,28 @@ const EmployeeView = () => {
             pagination={false}
             size="small"
             columns={[
+              {
+                title: 'Status', dataIndex: 'isCurrent', key: 'isCurrent', width: 110,
+                render: (isCurrent) => isCurrent
+                  ? <Tag color="success">Active</Tag>
+                  : <Tag>Superseded</Tag>,
+              },
               { title: 'Effective From', dataIndex: 'effectiveFrom', key: 'effectiveFrom', render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '-' },
+              {
+                title: 'Effective To', dataIndex: 'effectiveTo', key: 'effectiveTo',
+                render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '—',
+              },
               { title: 'Basic', dataIndex: 'basic', key: 'basic', render: (v) => v?.toLocaleString('en-IN') },
               { title: 'DA', dataIndex: 'da', key: 'da', render: (v) => v?.toLocaleString('en-IN') || '0' },
               { title: 'HRA', dataIndex: 'hra', key: 'hra', render: (v) => v?.toLocaleString('en-IN') || '0' },
               { title: 'Gross', dataIndex: 'grossSalary', key: 'grossSalary', render: (v) => v?.toLocaleString('en-IN') },
               ...(canUpdate ? [{
+                // Superseded rows are closed history - editing them would break the
+                // effectiveFrom/effectiveTo chain, so only the active row is editable.
                 title: 'Action', key: 'action', width: 80,
-                render: (_, rec) => <Button type="link" size="small" onClick={() => { setEditSalary(rec); setSalaryDrawerOpen(true); }}>Edit</Button>,
+                render: (_, rec) => rec.isCurrent
+                  ? <Button type="link" size="small" onClick={() => { setEditSalary(rec); setSalaryDrawerOpen(true); }}>Edit</Button>
+                  : null,
               }] : []),
             ]}
           />
@@ -224,6 +238,7 @@ const EmployeeView = () => {
         onClose={() => { setSalaryDrawerOpen(false); setEditSalary(null); }}
         employeeId={Number(id)}
         employeeName={employee.fullName}
+        currentStructure={salaryHistory.find((s) => s.isCurrent) || null}
         editData={editSalary}
         onSuccess={() => { setSalaryDrawerOpen(false); setEditSalary(null); loadSalaryHistory(); }}
       />
