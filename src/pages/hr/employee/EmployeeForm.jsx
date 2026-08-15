@@ -7,7 +7,9 @@ import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/hr/employeeService';
-import { getActiveDepartments, getActiveDesignations, getActiveShifts } from '../../../services/master/hrMasterService';
+import {
+  getActiveDepartmentsByFactory, getActiveDesignationsByDepartment, getActiveShifts,
+} from '../../../services/master/hrMasterService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import {
@@ -86,13 +88,33 @@ const EmployeeForm = () => {
   const [nominees, setNominees] = useState([]);
   const [documents, setDocuments] = useState([]);
 
-  // Load dropdown options
+  // Departments belong to a factory and designations to a department. Loading
+  // all of them let a user pick a department from another factory, which saves
+  // fine but leaves the employee unfindable by department on the attendance
+  // calendar. Each level is now scoped to its parent.
+  const watchedFactoryId = Form.useWatch('factoryId', form);
+  const watchedDepartmentId = Form.useWatch('departmentId', form);
+
   useEffect(() => {
-    getActiveDepartments().then(setDepartments).catch(() => {});
-    getActiveDesignations().then(setDesignations).catch(() => {});
     getActiveFactories().then(setFactories).catch(() => {});
     getActiveShifts().then(setShifts).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!watchedFactoryId) {
+      setDepartments([]);
+      return;
+    }
+    getActiveDepartmentsByFactory(watchedFactoryId).then(setDepartments).catch(() => setDepartments([]));
+  }, [watchedFactoryId]);
+
+  useEffect(() => {
+    if (!watchedDepartmentId) {
+      setDesignations([]);
+      return;
+    }
+    getActiveDesignationsByDepartment(watchedDepartmentId).then(setDesignations).catch(() => setDesignations([]));
+  }, [watchedDepartmentId]);
 
   // Load employee for edit
   useEffect(() => {
@@ -337,9 +359,50 @@ const EmployeeForm = () => {
       children: (
         <Row gutter={[16, 0]}>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee No" name="employeeNo" rules={[{ required: true, message: 'Employee number is required' }, { max: 50, message: 'Employee number cannot exceed 50 characters' }]}><Input disabled={isEdit} maxLength={50} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Department" name="departmentId" rules={[{ required: true, message: 'Department is required' }]}><Select showSearch optionFilterProp="label" options={departments.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Designation" name="designationId" rules={[{ required: true, message: 'Designation is required' }]}><Select showSearch optionFilterProp="label" options={designations.map((d) => ({ value: d.id, label: d.name }))} /></Form.Item></Col>
-          <Col xs={24} sm={12} md={8}><Form.Item label="Factory" name="factoryId" rules={[{ required: true, message: 'Factory is required' }]}><Select showSearch optionFilterProp="label" options={factoryOptions(factories)} /></Form.Item></Col>
+          {/* Factory -> Department -> Designation. Changing a parent clears its
+              children, otherwise a stale child from the previous parent would
+              stay selected and fail server-side validation. */}
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item label="Factory" name="factoryId" rules={[{ required: true, message: 'Factory is required' }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={factoryOptions(factories)}
+                onChange={() => form.setFieldsValue({ departmentId: undefined, designationId: undefined })}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Department"
+              name="departmentId"
+              rules={[{ required: true, message: 'Department is required' }]}
+              extra={!watchedFactoryId ? 'Select a factory first' : undefined}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                disabled={!watchedFactoryId}
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                onChange={() => form.setFieldsValue({ designationId: undefined })}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} sm={12} md={8}>
+            <Form.Item
+              label="Designation"
+              name="designationId"
+              rules={[{ required: true, message: 'Designation is required' }]}
+              extra={!watchedDepartmentId ? 'Select a department first' : undefined}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                disabled={!watchedDepartmentId}
+                options={designations.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </Form.Item>
+          </Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Shift" name="shiftId" rules={[{ required: true, message: 'Shift is required' }]}><Select showSearch optionFilterProp="label" options={shifts.map((s) => ({ value: s.id, label: s.name }))} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Category" name="category" rules={[{ required: true, message: 'Category is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_CATEGORY} /></Form.Item></Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Employee Type" name="employeeType" rules={[{ required: true, message: 'Employee type is required' }]}><Select showSearch optionFilterProp="label" options={EMPLOYEE_TYPE} /></Form.Item></Col>
