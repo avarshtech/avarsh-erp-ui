@@ -12,6 +12,9 @@ export const ENTITY_TYPES = [
   { value: 'BONUS_RUN', label: 'Bonus Run' },
   { value: 'FNF_SETTLEMENT', label: 'F&F Settlement' },
   { value: 'EL_ENCASHMENT', label: 'EL Encashment' },
+  { value: 'CUTTING_PO', label: 'Cutting PO' },
+  { value: 'WORK_ORDER', label: 'Work Order (Sewing)' },
+  { value: 'FINISHING_PO', label: 'Finishing PO' },
 ];
 
 export const ENTITY_TYPE_COLORS = {
@@ -28,6 +31,9 @@ export const ENTITY_TYPE_COLORS = {
   BONUS_RUN: 'lime',
   FNF_SETTLEMENT: 'red',
   EL_ENCASHMENT: 'cyan',
+  CUTTING_PO: 'blue',
+  WORK_ORDER: 'purple',
+  FINISHING_PO: 'cyan',
 };
 
 /** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
@@ -46,6 +52,9 @@ export const entityActionUrl = (entityType, entityId) => {
     case 'BONUS_RUN': return `/hr/bonus?viewId=${entityId}`;
     case 'FNF_SETTLEMENT': return `/hr/fnf/${entityId}`;
     case 'EL_ENCASHMENT': return `/hr/statutory/el?viewId=${entityId}`;
+    case 'CUTTING_PO': return `/purchase-orders/cutting-po/list?viewId=${entityId}`;
+    case 'WORK_ORDER': return `/purchase-orders/work-order/list?viewId=${entityId}`;
+    case 'FINISHING_PO': return `/purchase-orders/finishing-po/list?viewId=${entityId}`;
     default: return '/';
   }
 };
@@ -114,5 +123,16 @@ export const CONDITION_FIELDS = {
   ],
   EL_ENCASHMENT: [
     { value: 'amount', label: 'Encashment Amount', type: 'number' },
+  ],
+  CUTTING_PO: [
+    { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
+    { value: 'processingUnitType', label: 'Processing By', type: 'select', options: ['UNIT', 'VENDOR'] },
+  ],
+  WORK_ORDER: [
+    { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
+    { value: 'processingUnitType', label: 'Processing By', type: 'select', options: ['UNIT', 'VENDOR'] },
+  ],
+  FINISHING_PO: [
+    { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
   ],
 };

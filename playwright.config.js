@@ -88,6 +88,18 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Production POs (Cutting / Work Order / Finishing) — specs are ordered
+      // 01→03 because each stage needs the previous one approved.
+      name: 'production-po',
+      testDir: './e2e/specs/production-po',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'hr',
       testDir: './e2e/specs/hr',
       use: {

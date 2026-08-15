@@ -10,7 +10,7 @@
 import {
   PROD_PO_STATUS, PP_SAMPLE_STATUS, PROCESSING_UNIT_TYPE,
   FINISHING_PROCESS, computePlannedQty,
-} from '../../utils/productionConstants';
+} from '../../../utils/productionConstants';
 
 // ─── Size-color matrix helper ──────────────────────────────────────────────────
 const SIZES = ['S', 'M', 'L', 'XL'];

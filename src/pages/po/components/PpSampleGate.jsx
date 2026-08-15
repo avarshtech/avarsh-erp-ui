@@ -1,4 +1,5 @@
-import { Alert, Tag } from 'antd';
+import { useState } from 'react';
+import { Alert, Tag, Button } from 'antd';
 import { CheckCircleOutlined, ExclamationCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { isPpApproved, isPpRevoked } from '../../../utils/productionConstants';
 
@@ -7,8 +8,11 @@ import { isPpApproved, isPpRevoked } from '../../../utils/productionConstants';
  * selected order's PP sample is not yet approved, a compliance banner when it
  * was revoked after approval, or a subtle confirmation tag when cleared.
  * `compact` shows just the tag (for list/table/title contexts).
+ * `onMarkApproved` (optional) adds a "Mark PP Approved" action to the
+ * pending banner for users with the authority to clear the gate here.
  */
-const PpSampleGate = ({ status, compact = false }) => {
+const PpSampleGate = ({ status, compact = false, onMarkApproved }) => {
+  const [marking, setMarking] = useState(false);
   if (!status) return null;
   const approved = isPpApproved(status);
   const revoked = isPpRevoked(status);
@@ -52,6 +56,19 @@ const PpSampleGate = ({ status, compact = false }) => {
       banner
       message="PP Sample not yet approved for this order"
       description="The PO can be saved as a draft but cannot be submitted for approval until the Pre-Production sample is approved in the T&A calendar."
+      action={onMarkApproved ? (
+        <Button
+          size="small"
+          type="primary"
+          loading={marking}
+          onClick={async () => {
+            setMarking(true);
+            try { await onMarkApproved(); } finally { setMarking(false); }
+          }}
+        >
+          Mark PP Approved
+        </Button>
+      ) : undefined}
       style={{ marginBottom: 16 }}
     />
   );

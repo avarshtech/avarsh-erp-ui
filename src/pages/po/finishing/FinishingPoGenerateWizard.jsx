@@ -8,8 +8,10 @@ import ProcessAssignmentTable from './ProcessAssignmentTable';
 import PpSampleGate from '../components/PpSampleGate';
 import { FINISHING_PROCESSES, getProcessLabel, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getApprovedWorkOrders, getPpApprovalStatus, getVendors, generateFinishingPos,
-} from '../../../services/po/productionService';
+  getConfirmedOrders, getPpApprovalStatus, getVendors,
+} from '../../../services/po/production/productionLookupService';
+import { getApprovedWorkOrders } from '../../../services/po/production/workOrderService';
+import { generateFinishingPos } from '../../../services/po/production/finishingPoService';
 
 const { Text, Title } = Typography;
 const initAssignments = () => FINISHING_PROCESSES.map((p) => ({ processKey: p.key, mode: 'INHOUSE', vendorId: null }));

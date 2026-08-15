@@ -6,8 +6,8 @@
  * behind USE_MOCK_PRODUCTION_DATA so flipping the flag switches to the live API
  * with no UI changes once the backend lands.
  */
-import axiosInstance from '../core/axiosInstance';
-import { PROD_PO_STATUS, PO_TYPE, PO_ACTION, FINISHING_PROCESSES } from '../../utils/productionConstants';
+import axiosInstance from '../../core/axiosInstance';
+import { PROD_PO_STATUS, PO_TYPE, PO_ACTION, FINISHING_PROCESSES } from '../../../utils/productionConstants';
 import {
   cuttingPos, workOrders, finishingPos, CONFIRMED_ORDERS, PROCESSING_UNITS, VENDORS, SEWING_LINES,
   genPoNumber, nextId, nowIso, deepClone, matchPoFilters, paginate, buildStockRows, buildConsumptionRows,

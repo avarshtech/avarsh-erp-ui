@@ -4,7 +4,9 @@ import { SendOutlined, CheckCircleOutlined, CloseCircleOutlined, RollbackOutline
 import { ActionButton } from '../../../components/buttons';
 import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
 import { PROD_PO_STATUS, PO_ACTION, PO_TYPE_META } from '../../../utils/productionConstants';
-import { changeCuttingPoStatus, changeWorkOrderStatus, changeFinishingPoStatus } from '../../../services/po/productionService';
+import { changeCuttingPoStatus } from '../../../services/po/production/cuttingPoService';
+import { changeWorkOrderStatus } from '../../../services/po/production/workOrderService';
+import { changeFinishingPoStatus } from '../../../services/po/production/finishingPoService';
 
 const CHANGE_FN = {
   CUTTING: changeCuttingPoStatus,

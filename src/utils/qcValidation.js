@@ -3,10 +3,12 @@ import { FABRIC_QC_DEFECT_FAIL_THRESHOLD, FABRIC_QC_TOLERANCE_PCT, FABRIC_QC_PAR
 
 /**
  * Returns true if `actual` is within ±tolerance% of `std` (inclusive boundary).
- * Returns false if std is null/0 (no standard set on item).
+ * When the item has no standard (std null/0) the parameter is not applicable —
+ * treated as passing, so items without a width/GSM standard can still clear QC.
  */
 export const isWithinTolerance = (actual, std, tolerancePct = FABRIC_QC_TOLERANCE_PCT) => {
-  if (actual == null || std == null || std === 0) return false;
+  if (actual == null) return false;
+  if (std == null || std === 0) return true;
   const allowed = std * (tolerancePct / 100);
   return Math.abs(actual - std) <= allowed;
 };

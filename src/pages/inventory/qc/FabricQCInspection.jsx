@@ -15,7 +15,7 @@ import {
   computePOLineItemReceipts,
   getFabricGRN,
 } from '../../../services/inventory/inventoryService';
-import { validateFabricQC } from '../../../utils/qcValidation';
+import { validateFabricQC, computeFabricRollResult } from '../../../utils/qcValidation';
 import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatNumber } from '../../../utils/formatters';
@@ -241,10 +241,10 @@ const FabricQCInspection = () => {
     () =>
       rolls.filter((r) => {
         if (r.actualWidth == null || r.actualGsm == null) return false;
-        const widthOk = r.stdWidth && Math.abs(r.actualWidth - r.stdWidth) <= r.stdWidth * 0.05;
-        const gsmOk = r.stdGsm && Math.abs(r.actualGsm - r.stdGsm) <= r.stdGsm * 0.05;
         const dc = (defectsByRoll.get(r.rollNumber) || []).reduce((s, d) => s + (Number(d.count) || 0), 0);
-        return widthOk && gsmOk && dc <= 3;
+        // Shared rule (missing std ⇒ parameter not applicable) — keeps the
+        // panel consistent with the roll table's PASS/FAIL column.
+        return computeFabricRollResult(r, dc).result === 'PASS';
       }).length,
     [rolls, defectsByRoll],
   );

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Table, Card, Space } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -14,7 +14,7 @@ import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   PROD_PO_STATUS, getStatusLabel, EDITABLE_STATUSES, PROCESSING_UNIT_OPTIONS, PO_TYPE,
 } from '../../../utils/productionConstants';
-import { listWorkOrders } from '../../../services/po/productionService';
+import { listWorkOrders, getWorkOrder } from '../../../services/po/production/workOrderService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
@@ -49,6 +49,18 @@ const WorkOrderList = () => {
   }, [debouncedSearch, status, unitType, buyer, dateRange, message]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Deep link from My Approvals (?viewId=X) — GRNList pattern.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getWorkOrder(viewId)
+      .then((wo) => wo && setView({ open: true, record: wo }))
+      .catch(() => message.error('Work Order not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
 

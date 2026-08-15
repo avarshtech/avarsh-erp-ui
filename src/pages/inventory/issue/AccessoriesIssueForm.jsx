@@ -7,9 +7,10 @@ import { hasPermission, getCurrentUser } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import {
-  getApprovedWorkOrders,
-  getAccessoriesIssueById,
-} from '../../../services/inventory/inventoryService';
+  getIssueWorkOrders,
+  getIssue,
+  createAccessoriesIssue,
+} from '../../../services/inventory/materialIssueService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { formatNumber } from '../../../utils/formatters';
 import AccessoriesIssueItemTable from './AccessoriesIssueItemTable';
@@ -47,7 +48,7 @@ const AccessoriesIssueForm = () => {
   const { clearDirty } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
-    getApprovedWorkOrders()
+    getIssueWorkOrders()
       .then((res) => setWorkOrders(res.content || []))
       .catch(() => message.error('Failed to load approved Work Orders'));
   }, [message]);
@@ -59,7 +60,7 @@ const AccessoriesIssueForm = () => {
     let cancelled = false;
     (async () => {
       try {
-        const record = await getAccessoriesIssueById(id);
+        const record = await getIssue(id);
         if (cancelled || !record) return;
         setEditRecord(record);
         setLoadingEdit(false);
@@ -107,18 +108,44 @@ const AccessoriesIssueForm = () => {
     setIsDirty(true);
   }, []);
 
+  const [saving, setSaving] = useState(false);
+
   const handleSubmit = useCallback(() => {
-    form.validateFields().then(() => {
+    // Issues are physical stock movements — once COMPLETED they cannot be
+    // amended, only viewed (a cancel/reversal flow is a future enhancement).
+    if (isEdit) {
+      message.info('Completed issues cannot be amended — create a new issue instead');
+      return;
+    }
+    form.validateFields().then(async (values) => {
       const withQty = items.filter((it) => (it.issueQty || 0) > 0);
       if (!withQty.length) {
         message.warning('Enter Issue Qty for at least one BOM item');
         return;
       }
-      message.success('Accessories issue issued successfully');
-      clearDirty();
-      navigate('/inventory/issue/accessories');
+      setSaving(true);
+      try {
+        const saved = await createAccessoriesIssue({
+          workOrderId: selectedWO.id,
+          receivedBy: values.receivedBy,
+          issueDate: values.issueDate?.format('YYYY-MM-DD'),
+          remarks: values.remarks,
+          items: withQty.map((it) => ({
+            itemId: it.id,
+            itemCode: it.itemCode,
+            issueQty: it.issueQty,
+          })),
+        });
+        message.success(`${saved.issueNumber} issued — stock cleared from inventory`);
+        clearDirty();
+        navigate('/inventory/issue');
+      } catch (e) {
+        message.error(e.errorMessage || e.message || 'Failed to save issue');
+      } finally {
+        setSaving(false);
+      }
     }).catch(() => message.warning('Please fill all required fields'));
-  }, [form, message, navigate, clearDirty, items]);
+  }, [form, message, navigate, clearDirty, items, selectedWO, isEdit]);
 
   const woOptions = useMemo(
     () => workOrders.map((wo) => ({ label: `${wo.workOrderNumber} — ${wo.style}`, value: wo.id })),
@@ -175,7 +202,7 @@ const AccessoriesIssueForm = () => {
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
         {hasPermission('inventory-issue', isEdit ? 'update' : 'add') && (
-          <ActionButton action="save" text="Issue" onClick={handleSubmit} />
+          <ActionButton action="save" text="Issue" loading={saving} onClick={handleSubmit} />
         )}
       </PageHeader>
       {isEdit && loadingEdit ? (

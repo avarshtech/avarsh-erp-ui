@@ -20,7 +20,7 @@
     "test:e2e:bom": "npx playwright test --project=bom",
     "test:e2e:po": "npx playwright test --project=po",
     "test:e2e:production-po": "npx playwright test --project=production-po",
-    "test:e2e:work-orders": "npx playwright test --project=work-orders",
+    "test:e2e:work-orders": "npx playwright test --project=production-po --grep \"Work Order\"",
     "test:e2e:admin": "npx playwright test --project=admin",
     "test:e2e:validation": "npx playwright test --project=validation",
     "test:e2e:legacy": "npx playwright test --project=legacy",

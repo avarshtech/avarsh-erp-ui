@@ -10,7 +10,7 @@ import StatCard from '../../../components/StatCard';
 import RecordLink from '../../../components/RecordLink';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { getAccessoriesIssueList, getApprovedWorkOrders } from '../../../services/inventory/inventoryService';
+import { listIssues, getIssueWorkOrders } from '../../../services/inventory/materialIssueService';
 import { formatNumber } from '../../../utils/formatters';
 import { generateAccessoriesIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
@@ -32,7 +32,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getAccessoriesIssueList({ search: searchText });
+      const res = await listIssues('ACCESSORY', { search: searchText });
       setData(res.content || []);
       setTotalElements(res.totalElements ?? (res.content || []).length);
     } catch {
@@ -45,7 +45,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    getApprovedWorkOrders()
+    getIssueWorkOrders()
       .then((res) => setPendingWOCount(res.totalElements ?? (res.content || []).length))
       .catch(() => { /* non-blocking */ });
   }, []);

@@ -10,7 +10,7 @@ import StatCard from '../../../components/StatCard';
 import RecordLink from '../../../components/RecordLink';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { getFabricIssueList, getApprovedCuttingPOs } from '../../../services/inventory/inventoryService';
+import { listIssues, getIssueCuttingPos } from '../../../services/inventory/materialIssueService';
 import { formatNumber } from '../../../utils/formatters';
 import { generateFabricIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
@@ -32,7 +32,7 @@ const FabricIssueList = ({ embedded = false }) => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getFabricIssueList({ search: searchText });
+      const res = await listIssues('FABRIC', { search: searchText });
       setData(res.content || []);
       setTotalElements(res.totalElements ?? (res.content || []).length);
     } catch {
@@ -45,7 +45,7 @@ const FabricIssueList = ({ embedded = false }) => {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    getApprovedCuttingPOs()
+    getIssueCuttingPos()
       .then((res) => setPendingCuttingPOCount(res.totalElements ?? (res.content || []).length))
       .catch(() => { /* non-blocking */ });
   }, []);

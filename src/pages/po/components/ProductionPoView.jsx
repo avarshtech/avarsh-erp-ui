@@ -13,7 +13,7 @@ import {
   getStatusLabel, PO_TYPE, PO_TYPE_META, getProcessLabel, PROD_PO_STATUS,
   computeVariancePercent, getVarianceStatus, isPpApproved,
 } from '../../../utils/productionConstants';
-import { getStockByBom, getPpApprovalStatus } from '../../../services/po/productionService';
+import { getStockByBom, getPpApprovalStatus } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const { Text } = Typography;
@@ -31,7 +31,7 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
   useEffect(() => {
     if (!open || !record?.orderId) return;
     let active = true;
-    getStockByBom(record.orderId, KIND[poType], { cadPerPc: record.cadConsumptionPerPc })
+    getStockByBom(record, KIND[poType], { cadPerPc: record.cadConsumptionPerPc, plannedQty: record.totalPlannedQty })
       .then((rows) => active && setStockRows(rows));
     getPpApprovalStatus(record.orderId).then((s) => active && setPpStatus(s));
     return () => { active = false; };
