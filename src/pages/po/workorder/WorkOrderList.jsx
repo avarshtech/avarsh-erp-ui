@@ -83,7 +83,7 @@ const WorkOrderList = () => {
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.WORK_ORDER)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="work-order" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/work-order/edit/${r.id}`)} />
             </PermissionGuard>
           )}
@@ -94,7 +94,7 @@ const WorkOrderList = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Work Orders (Sewing)">
-        <PermissionGuard module="production" operation="add">
+        <PermissionGuard module="work-order" operation="add">
           <ActionButton action="create" text="New Work Order" onClick={() => navigate('/purchase-orders/work-order/new')} />
         </PermissionGuard>
       </PageHeader>

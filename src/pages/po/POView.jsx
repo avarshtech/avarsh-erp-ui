@@ -1203,7 +1203,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
             </Space>
             <Space>
               {po && (po.status === PO_STATUS.DRAFT || po.status === PO_STATUS.REFERRED_BACK || po.status === PO_STATUS.REJECTED) && hasPermission('purchase-orders', 'update') && (
-                <ActionButton action="edit" text="Edit" onClick={() => { onClose(); navigate(`/purchase-orders/edit/${po.id}`); }} />
+                <ActionButton action="edit" text="Edit" onClick={() => { onClose(); navigate(`/purchase-orders/supplier-po/edit/${po.id}`); }} />
               )}
               <ActionButton action="close" text="Close" onClick={onClose} />
             </Space>

@@ -39,7 +39,7 @@ export const ENTITY_TYPE_COLORS = {
 /** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
 export const entityActionUrl = (entityType, entityId) => {
   switch (entityType) {
-    case 'PURCHASE_ORDER': return `/purchase-orders/list?viewId=${entityId}`;
+    case 'PURCHASE_ORDER': return `/purchase-orders/supplier-po/list?viewId=${entityId}`;
     case 'COST_SHEET': return `/costing/${entityId}`;
     case 'ORDER': return `/orders/list?viewId=${entityId}`;
     case 'GRN':

@@ -25,7 +25,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('PO — List & Filters', () => {
   test('List loads with the key columns', async ({ page }) => {
-    await goToListPage(page, '/purchase-orders/list');
+    await goToListPage(page, '/purchase-orders/supplier-po/list');
     await antTableWaitForData(page);
     await expect(page.locator('.ant-table').first()).toBeVisible();
     for (const col of ['PO Number', 'Supplier', 'PO Type', 'Grand Total', 'Status']) {
@@ -34,7 +34,7 @@ test.describe('PO — List & Filters', () => {
   });
 
   test('Status filter fires a search request carrying status=', async ({ page }) => {
-    await goToListPage(page, '/purchase-orders/list');
+    await goToListPage(page, '/purchase-orders/supplier-po/list');
     await antTableWaitForData(page);
 
     const statusSelect = page.locator('.ant-select').filter({ hasText: 'Status' }).first();
@@ -56,7 +56,7 @@ test.describe('PO — List & Filters', () => {
 
 test.describe('PO — General PO form & create', () => {
   test('New form renders; "Add Item" is gated until a supplier is chosen', async ({ page }) => {
-    await navigateWithAuth(page, '/purchase-orders/new');
+    await navigateWithAuth(page, '/purchase-orders/supplier-po/new');
     await page.locator('#supplierId').waitFor({ state: 'visible', timeout: 15000 });
 
     // PO Type defaults to General; the General add control is "Add Item", disabled pre-supplier.
@@ -65,7 +65,7 @@ test.describe('PO — General PO form & create', () => {
   });
 
   test('Create a General PO via the form: tax computes live → Save as Draft → list', async ({ page }) => {
-    await navigateWithAuth(page, '/purchase-orders/new');
+    await navigateWithAuth(page, '/purchase-orders/supplier-po/new');
     await page.locator('#supplierId').waitFor({ state: 'visible', timeout: 15000 });
 
     // 1) Pick the first supplier

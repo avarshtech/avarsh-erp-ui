@@ -622,7 +622,7 @@ const RoleAccess = () => {
             )}
           </div>
           {isPOApproval && (
-            <Tooltip title="Requires Purchase Orders access to be enabled">
+            <Tooltip title="Requires Supplier PO access to be enabled">
               <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
@@ -738,8 +738,8 @@ const RoleAccess = () => {
         {/* PO Approval dependency notice */}
         {permissions['purchase-orders']?.access && (
           <Alert
-            message="PO Approval Actions are linked to Purchase Orders access"
-            description="Approve, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
+            message="PO Approval Actions are linked to Supplier PO access"
+            description="Approve, Reject, Cancel, and Refer Back operations require the Supplier PO module to be enabled."
             type="info"
             showIcon
             icon={<LinkOutlined />}

@@ -346,24 +346,23 @@ const MainLayoutInner = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: ["purchase-orders", "production"],
+      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po"],
       children: [
-        { key: "/purchase-orders/list", label: "PO List", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/new", label: "New PO", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/cutting-po/list", label: "Cutting POs", moduleId: "production" },
-        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "production" },
-        { key: "/purchase-orders/finishing-po/list", label: "Finishing POs", moduleId: "production" },
+        { key: "/purchase-orders/supplier-po/list", label: "Supplier PO", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/cutting-po/list", label: "Cutting PO", moduleId: "cutting-po" },
+        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "work-order" },
+        { key: "/purchase-orders/finishing-po/list", label: "Finishing PO", moduleId: "finishing-po" },
       ],
     },
     {
       key: "/production",
       icon: <ScissorOutlined />,
       label: "Production",
-      moduleId: "production",
+      moduleId: ["production-cutting", "production-sewing", "production-finishing"],
       children: [
-        { key: "/production/cutting", label: "Cutting" },
-        { key: "/production/sewing", label: "Sewing" },
-        { key: "/production/finishing", label: "Finishing" },
+        { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
+        { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
+        { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
         // Packing arrives in the next design session.
       ],
     },
@@ -517,6 +516,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/cutting')) return ['/production/cutting'];
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
+    if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];

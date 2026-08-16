@@ -82,7 +82,7 @@ const CuttingPoList = () => {
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.CUTTING)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="cutting-po" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/cutting-po/edit/${r.id}`)} />
             </PermissionGuard>
           )}
@@ -92,8 +92,8 @@ const CuttingPoList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Cutting POs">
-        <PermissionGuard module="production" operation="add">
+      <PageHeader title="Cutting PO">
+        <PermissionGuard module="cutting-po" operation="add">
           <ActionButton action="create" text="New Cutting PO" onClick={() => navigate('/purchase-orders/cutting-po/new')} />
         </PermissionGuard>
       </PageHeader>

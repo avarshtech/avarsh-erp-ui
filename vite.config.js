@@ -54,9 +54,9 @@ export default defineConfig({
             icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
           },
           {
-            name: 'Purchase Orders',
-            short_name: 'POs',
-            url: '/purchase-orders/list',
+            name: 'Supplier PO',
+            short_name: 'Supplier PO',
+            url: '/purchase-orders/supplier-po/list',
             icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }],
           },
         ],

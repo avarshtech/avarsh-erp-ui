@@ -14,11 +14,11 @@ import {
 
 export const MODULE_CONFIG = {
   PO: {
-    label: 'Purchase Order',
+    label: 'Supplier PO',
     color: '#4f46e5',
     bg: 'rgba(79, 70, 229, 0.08)',
     icon: ShoppingCartOutlined,
-    route: (id) => `/purchase-orders/list?viewId=${id}`,
+    route: (id) => `/purchase-orders/supplier-po/list?viewId=${id}`,
   },
   GRN: {
     label: 'GRN',

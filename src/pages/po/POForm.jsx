@@ -598,7 +598,7 @@ const POForm = () => {
       setLineItems(mappedItems.length > 0 ? mappedItems : [createEmptyLineItem()]);
     } catch {
       message.error('Failed to load purchase order');
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } finally {
       // Defer so React paints the form with populated values before hiding the skeleton
       requestAnimationFrame(() => setPageLoading(false));
@@ -1376,7 +1376,7 @@ const POForm = () => {
       }
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } catch {
       message.error('Failed to save purchase order');
     } finally {
@@ -1532,7 +1532,7 @@ const POForm = () => {
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } catch {
       message.error('Failed to submit purchase order');
     } finally {
@@ -1549,10 +1549,10 @@ const POForm = () => {
         content: 'You have unsaved changes. Are you sure you want to leave?',
         okText: 'Leave',
         cancelText: 'Stay',
-        onOk: () => navigate('/purchase-orders/list'),
+        onOk: () => navigate('/purchase-orders/supplier-po/list'),
       });
     } else {
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     }
   };
 

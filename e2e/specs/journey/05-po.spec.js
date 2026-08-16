@@ -26,7 +26,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('Session 5 — Purchase Orders', () => {
   for (const po of PURCHASE_ORDERS) {
     test(`PO — ${po.supplier} / ${po.orderNo}`, async ({ page }) => {
-      await navigateWithAuth(page, '/purchase-orders/list');
+      await navigateWithAuth(page, '/purchase-orders/supplier-po/list');
       await waitForPageReady(page);
       await waitForTableSettled(page);
 
@@ -39,7 +39,7 @@ test.describe('Session 5 — Purchase Orders', () => {
         return;
       }
 
-      await navigateWithAuth(page, '/purchase-orders/new');
+      await navigateWithAuth(page, '/purchase-orders/supplier-po/new');
       await waitForPageReady(page);
 
       // "Regular" pulls its lines from a single order's BOM; "General" is manual entry.
@@ -113,7 +113,7 @@ test.describe('Session 5 — Purchase Orders', () => {
   test('PO quantities are in the purchase UOM, not the consumption UOM', async ({ page }) => {
     // Regression guard for B-006 carried through to the PO: the fabric line must be
     // ordered in KG (≈1,903) rather than the 6,090 MTR it is consumed in.
-    await navigateWithAuth(page, '/purchase-orders/list');
+    await navigateWithAuth(page, '/purchase-orders/supplier-po/list');
     await waitForPageReady(page);
     await waitForTableSettled(page);
 

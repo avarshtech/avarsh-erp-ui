@@ -339,7 +339,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PHASE 4: PURCHASE ORDER — Supplier, Dates, T&C, Line Item
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PHASE 4: NEW PURCHASE ORDER ────────────────');
-    await goTo(page, '/purchase-orders/new');
+    await goTo(page, '/purchase-orders/supplier-po/new');
     await dismissModals(page);
     await page.waitForTimeout(2000);
 
@@ -384,7 +384,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PO LIST
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PO LIST ────────────────────────────────────');
-    await goTo(page, '/purchase-orders/list');
+    await goTo(page, '/purchase-orders/supplier-po/list');
     await page.waitForTimeout(2500);
     console.log('  ✓ PO List loaded');
 

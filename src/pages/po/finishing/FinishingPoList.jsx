@@ -94,7 +94,7 @@ const FinishingPoList = () => {
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.FINISHING)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="finishing-po" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/finishing-po/edit/${r.id}`)} />
             </PermissionGuard>
           )}
@@ -104,8 +104,8 @@ const FinishingPoList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Finishing POs">
-        <PermissionGuard module="production" operation="add">
+      <PageHeader title="Finishing PO">
+        <PermissionGuard module="finishing-po" operation="add">
           <ActionButton action="create" text="Generate Finishing POs" onClick={() => navigate('/purchase-orders/finishing-po/new')} />
         </PermissionGuard>
       </PageHeader>
