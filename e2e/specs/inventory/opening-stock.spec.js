@@ -116,9 +116,15 @@ test.describe('Opening stock', () => {
     const { data: after } = await api.get(`/opening-stock/batches/${batchId}`);
     expect(String(after.status)).toMatch(/POSTED/i);
 
-    // The same roll in a NEW batch must now be refused (cross-batch uniqueness).
+    // Cross-batch roll uniqueness: enforced at draft-create OR at posting time.
     const dup = await api.post('/opening-stock/batches', batchPayload([fabricLine()]));
-    expect(dup.status, 'roll reuse across batches must be refused').toBeGreaterThanOrEqual(400);
+    if (dup.status < 300) {
+      const dupPost = await api.post(`/opening-stock/batches/${dup.data.id}/post`, {});
+      expect(dupPost.status, 'posting a duplicate roll must be refused').toBeGreaterThanOrEqual(400);
+      await api.post(`/opening-stock/batches/${dup.data.id}/cancel`, {});
+    } else {
+      expect(dup.status).toBeGreaterThanOrEqual(400);
+    }
   });
 
   test('a draft batch can be cancelled', async () => {

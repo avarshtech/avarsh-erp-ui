@@ -38,7 +38,7 @@ test.describe.serial('BOM — line locking and guards', () => {
   test('B2a — marking lines PO-generated locks them', async () => {
     const lineIds = bom.lines.map((l) => l.id);
     const res = await api.patch(`/boms/${bom.id}/lines/po-status`, {
-      lineIds, isPoGenerated: true,
+      lineIds, poGenerated: true, // DTO field is poGenerated (boolean), not isPoGenerated
     });
     expect(res.status, JSON.stringify(res.data).slice(0, 200)).toBeLessThan(300);
 
@@ -68,7 +68,7 @@ test.describe.serial('BOM — line locking and guards', () => {
   test('B2c — un-generating restores the lines', async () => {
     const lineIds = bom.lines.map((l) => l.id);
     const res = await api.patch(`/boms/${bom.id}/lines/po-status`, {
-      lineIds, isPoGenerated: false,
+      lineIds, poGenerated: false,
     });
     expect(res.status).toBeLessThan(300);
 

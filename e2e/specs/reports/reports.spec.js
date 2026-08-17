@@ -91,10 +91,9 @@ test.describe('Reports — definition-driven pipeline', () => {
         format,
       });
       expect(res.status, `${format} export failed`).toBeLessThan(300);
-      const size = typeof res.data === 'string'
-        ? res.data.length
-        : (res.data?.byteLength ?? JSON.stringify(res.data ?? '').length);
-      expect(size, `${format} export must not be empty`).toBeGreaterThan(50);
+      // Exports are raw bytes (CSV/XLSX/PDF) — read the body, not the JSON-parsed field.
+      const body = await res.response.body();
+      expect(body.length, `${format} export must not be empty`).toBeGreaterThan(50);
     }
   });
 
