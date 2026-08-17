@@ -398,6 +398,12 @@ const MainLayoutInner = () => {
         { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
         { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
         { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
+        // These screens existed with working routes but no navigation entry, so
+        // they were unreachable unless the URL was typed by hand.
+        { key: "/hr/attendance/entry", label: "Mark Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/import", label: "Import Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
         { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
@@ -504,6 +510,12 @@ const MainLayoutInner = () => {
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
+    // Each attendance screen has its own menu entry, so highlight the specific
+    // one rather than always falling back to the calendar.
+    if (path.startsWith('/hr/attendance/entry') || path.startsWith('/hr/attendance/bulk')) return ['/hr/attendance/entry'];
+    if (path.startsWith('/hr/attendance/import')) return ['/hr/attendance/import'];
+    if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
+    if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];

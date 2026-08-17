@@ -74,6 +74,8 @@ const EmployeeView = lazy(() => import('./pages/hr/employee/EmployeeView'));
 // Attendance & Leave (lazy-loaded)
 const AttendanceCalendar = lazy(() => import('./pages/hr/attendance/AttendanceCalendar'));
 const AttendanceBulkEntry = lazy(() => import('./pages/hr/attendance/AttendanceBulkEntry'));
+const AttendanceEntry = lazy(() => import('./pages/hr/attendance/AttendanceEntry'));
+const AttendanceImport = lazy(() => import('./pages/hr/attendance/AttendanceImport'));
 const MissPunchList = lazy(() => import('./pages/hr/attendance/MissPunchList'));
 const GatePassList = lazy(() => import('./pages/hr/attendance/GatePassList'));
 const LeaveApplicationList = lazy(() => import('./pages/hr/leave/LeaveApplicationList'));
@@ -250,6 +252,8 @@ const ThemedApp = () => {
             {/* Attendance */}
             <Route path="hr/attendance/calendar" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><AttendanceCalendar /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/bulk" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceBulkEntry /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/entry" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceEntry /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/import" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceImport /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/miss-punch" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><MissPunchList /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/gate-pass" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><GatePassList /></Suspense></PermissionRoute>} />
             {/* Leave */}
