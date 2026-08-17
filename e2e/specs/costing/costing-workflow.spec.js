@@ -18,6 +18,7 @@
 
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { stylePayload } from '../../helpers/test-data.js';
 
 const FK = { buyerId: 1, styleId: 3, fabricItemId: 1, processId: 20, overheadId: 1 };
 
@@ -30,11 +31,11 @@ test.afterAll(async () => {
   await api.dispose();
 });
 
-function basePayload(status = 'Draft') {
+async function basePayload(status = 'Draft') {
   return {
     status,
     date: new Date().toISOString().split('T')[0],
-    buyerId: FK.buyerId, styleId: FK.styleId, garmentName: 'WF Garment',
+    buyerId: FK.buyerId, styleId: (await api.post('/styles', stylePayload(FK.buyerId))).data.id, garmentName: 'WF Garment',
     season: 'SS26', currency: 'INR', quoteCurrency: 'USD', actualRate: 83.5, todaysRate: 83.5,
     sizes: ['M'], costingType: 'FOB', pricingUnit: 'PIECE', scenarioName: 'WF',
     agentCommissionPct: 5, profitPct: 10, targetPrice: 0,
@@ -46,7 +47,7 @@ function basePayload(status = 'Draft') {
 }
 
 async function createSheet(status = 'Draft') {
-  const res = await api.post('/cost-sheets', basePayload(status));
+  const res = await api.post('/cost-sheets', await basePayload(status));
   expect(res.status).toBe(200);
   created.push(res.data.id);
   return res.data;

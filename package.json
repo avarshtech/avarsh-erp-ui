@@ -25,7 +25,10 @@
     "test:e2e:validation": "npx playwright test --project=validation",
     "test:e2e:legacy": "npx playwright test --project=legacy",
     "test:e2e:grn-qc": "npx playwright test --project=grn-qc",
-    "test:e2e:journey": "npx playwright test --project=journey"
+    "test:e2e:journey": "npx playwright test --project=journey",
+    "test:e2e:approvals": "playwright test --project=approvals",
+    "test:e2e:inventory": "playwright test --project=inventory",
+    "test:e2e:reports": "playwright test --project=reports"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

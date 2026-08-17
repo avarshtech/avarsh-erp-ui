@@ -46,12 +46,24 @@ export class ApiClient {
     return { Authorization: `Bearer ${this.token}` };
   }
 
+  /**
+   * Parse the body whether or not the response is 2xx: error bodies carry the
+   * error/message contract (REFERENCE_CONSTRAINT, OPTIMISTIC_LOCK_CONFLICT, …) that
+   * the validation suites assert on. Discarding them made every such assertion a
+   * TypeError instead of a meaningful failure.
+   */
+  async #result(response) {
+    let data = null;
+    try { data = await response.json(); } catch { /* non-JSON response */ }
+    return { response, data, status: response.status() };
+  }
+
   async get(path, params) {
     const url = params
       ? `${API_BASE}${path}?${new URLSearchParams(params)}`
       : `${API_BASE}${path}`;
     const response = await this.request.get(url, { headers: this.headers() });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    return this.#result(response);
   }
 
   async post(path, data) {
@@ -59,9 +71,7 @@ export class ApiClient {
       headers: this.headers(),
       data,
     });
-    let resData = null;
-    try { resData = await response.json(); } catch { /* non-JSON response */ }
-    return { response, data: resData, status: response.status() };
+    return this.#result(response);
   }
 
   async put(path, data) {
@@ -69,7 +79,7 @@ export class ApiClient {
       headers: this.headers(),
       data,
     });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    return this.#result(response);
   }
 
   async patch(path, data) {
@@ -77,14 +87,14 @@ export class ApiClient {
       headers: this.headers(),
       data,
     });
-    return { response, data: response.ok() ? await response.json() : null, status: response.status() };
+    return this.#result(response);
   }
 
   async delete(path) {
     const response = await this.request.delete(`${API_BASE}${path}`, {
       headers: this.headers(),
     });
-    return { response, status: response.status() };
+    return this.#result(response);
   }
 
   /**

@@ -118,6 +118,43 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Approval engine deep suite: multi-level routing, conditions, My Approvals
+      // inbox, bypass guards. Specs are numbered — 01 creates the e2e-manager user
+      // that 02/04 authenticate as.
+      name: 'approvals',
+      testDir: './e2e/specs/approvals',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      // Inventory beyond GRN/QC: allowance, stock register, opening stock, material
+      // issue, stock adjustment, return-to-supplier + debit notes.
+      name: 'inventory',
+      testDir: './e2e/specs/inventory',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      // Definition-driven reporting: definitions are authored via API at test start
+      // (none are seeded), then the builder/saved/export/log surfaces are exercised.
+      name: 'reports',
+      testDir: './e2e/specs/reports',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'validation',
       testDir: './e2e/specs/validation',
       use: {

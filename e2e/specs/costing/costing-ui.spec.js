@@ -19,6 +19,8 @@ import { test, expect } from '@playwright/test';
 import { antSelect, antTableWaitForData } from '../../helpers/antd-helpers.js';
 import { ensureSessionActive, goToListPage, navigateWithAuth } from '../../helpers/navigation.js';
 import { formatCurrency } from '../../../src/utils/costingConstants.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { stylePayload } from '../../helpers/test-data.js';
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -87,7 +89,7 @@ test.describe('Costing — Form: Section A & Calculations', () => {
 
     // Fill Qty / Price / Allowance / Wastage (the two "%" inputs are allowance then wastage)
     await fabricRow.locator('input[placeholder="Qty"]').fill('2');
-    await fabricRow.locator('input[placeholder="Price"]').fill('100');
+    await fabricRow.locator('input[placeholder="Rate"]').fill('100');
     const pctInputs = fabricRow.locator('input[placeholder="%"]');
     await pctInputs.nth(0).fill('10');   // allowance
     await pctInputs.nth(1).fill('5');    // wastage
@@ -125,13 +127,19 @@ async function setSummaryPct(page, labelText, value) {
 
 test.describe('Costing — Create & Validation (UI)', () => {
   test('Create a Draft via the form → POST 200 → returns to list', async ({ page }) => {
+    // One cost sheet per style (rule added 2026-08): the first style in the dropdown
+    // is usually taken, so mint a fresh style for buyer 1 and pick it by name.
+    const api = await createAuthenticatedClient();
+    const { data: style } = await api.post('/styles', stylePayload(1));
+    await api.dispose();
+
     await navigateWithAuth(page, '/costing/new');
     await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
 
-    // Select a buyer, then a style (styles load after the buyer is chosen)
+    // Select a buyer, then the fresh style (styles load after the buyer is chosen)
     await pickFormSelect(page, '#buyerId', null);
     await page.waitForTimeout(800);
-    await pickFormSelect(page, '#styleNo', null);
+    await pickFormSelect(page, '#styleNo', style.styleNo);
     await page.waitForTimeout(500);
 
     const [resp] = await Promise.all([
