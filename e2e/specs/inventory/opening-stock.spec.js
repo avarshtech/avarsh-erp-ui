@@ -65,8 +65,10 @@ test.describe('Opening stock', () => {
     for (const kind of ['fabric', 'accessories']) {
       const res = await api.get(`/opening-stock/template/${kind}.csv`);
       expect(res.status).toBeLessThan(300);
-      const text = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+      // CSV is not JSON — read the raw body, not the parsed-data field.
+      const text = await res.response.text();
       expect(text.length, `${kind} template must not be empty`).toBeGreaterThan(10);
+      expect(text).toMatch(/,/);
     }
   });
 
