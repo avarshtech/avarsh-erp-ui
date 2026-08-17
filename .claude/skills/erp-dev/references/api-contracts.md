@@ -34,6 +34,18 @@
 | activityLogService.js | UserActivityLogController | `/api/v1/activity-logs` |
 | aiService.js | AiExtractionController | `/api/v1/ai` |
 | organisationService.js | OrganisationInfoController | `/api/v1/organisation-info` |
+| inventoryService.js | GRNController, QCController, FabricStockController, AccessoriesStockController, StockAdjustmentController, InventoryDashboardController | `/api/v1/grns`, `/api/v1/qc`, `/api/v1/inventory/stock/*`, `/api/v1/stock-adjustments`, `/api/v1/dashboard/inventory` |
+| materialIssueService.js | MaterialIssueController | `/api/v1/material-issues` (incl. `POST /{id}/cancel`) |
+| openingStockService.js | OpeningStockController | `/api/v1/opening-stock` |
+| returnToSupplierService.js | ReturnToSupplierController, DebitNoteController | `/api/v1/inventory/returns-to-supplier`, `/api/v1/inventory/debit-notes` |
+
+> Backend package note (2026-08-17): all inventory controllers/services/domain live under
+> `com.avarsh.erp.inventory.{grn,qc,stock,openingstock,returns,issue,adjustment,dashboard}` —
+> feature-first packages mirroring the production module. URLs were NOT changed by the move.
+> Stock Adjustment: POST applies immediately (no approval), adjustments are immutable, fabric
+> adjusts per roll (fabric_stock_id), accessories aggregate per variant with FIFO lot application.
+> Material Issue cancel: restores exact source lots, blocks if a lot was Returned, reinstates the
+> soft allocation only while the production PO is still APPROVED.
 
 ---
 

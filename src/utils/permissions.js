@@ -80,6 +80,20 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
+  GRN_APPROVAL: {
+    id: 'grn-approval',
+    name: 'GRN Refer-Back Approval',
+    path: '/inventory/grn', // Integrated within GRN module
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  GRN_REVERSAL: {
+    id: 'grn-reversal',
+    name: 'GRN Reversal Approval',
+    path: '/inventory/grn', // Integrated within GRN module
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
   CUTTING_PO: {
     id: 'cutting-po',
     name: 'Cutting PO',
@@ -348,6 +362,11 @@ export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reje
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
+// GRN approval-action operations — mirror exactly what the GRN helpers check:
+// canApproveGRNReferBack → grn-approval.refer_back, canApproveGRNReversal → grn-reversal.approve
+export const GRN_APPROVAL_OPERATIONS = ['refer_back'];
+export const GRN_REVERSAL_OPERATIONS = ['approve'];
+
 // Costing Approval operations
 export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 
@@ -382,6 +401,8 @@ export const PERMISSION_GROUPS = [
       { id: 'production-sewing', name: 'Production — Sewing', operations: STANDARD_OPERATIONS, path: '/production/sewing' },
       { id: 'production-finishing', name: 'Production — Finishing', operations: STANDARD_OPERATIONS, path: '/production/finishing' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
+      { id: 'grn-approval', name: 'GRN Refer-Back Approval', operations: GRN_APPROVAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
+      { id: 'grn-reversal', name: 'GRN Reversal Approval', operations: GRN_REVERSAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
       { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
@@ -456,6 +477,8 @@ export const getSidebarModules = () =>
 export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
+  if (moduleId === 'grn-approval')    return GRN_APPROVAL_OPERATIONS;
+  if (moduleId === 'grn-reversal')    return GRN_REVERSAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
   if (moduleId === 'reports')              return ['view'];

@@ -17,7 +17,14 @@ const EDITABLE_STATUSES = new Set([
   GRN_STATUS.REVERSED,
 ]);
 
-const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
+// Cancel is a pre-QC action: Draft or QC_Pending (server also blocks once any
+// QC inspection exists against the GRN).
+const CANCELLABLE_STATUSES = new Set([
+  GRN_STATUS.DRAFT,
+  GRN_STATUS.QC_PENDING,
+]);
+
+const getGRNListColumns = ({ onView, onEdit, onDelete, onCancel, canCancel = false }) => [
   {
     title: 'GRN Number',
     dataIndex: 'grnNumber',
@@ -107,6 +114,9 @@ const getGRNListColumns = ({ onView, onEdit, onDelete }) => [
             >
               <ActionButton action="delete" />
             </Popconfirm>
+          )}
+          {canCancel && CANCELLABLE_STATUSES.has(record.status) && (
+            <ActionButton action="cancel" onClick={() => onCancel?.(record)} />
           )}
         </Space>
       );

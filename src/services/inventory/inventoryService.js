@@ -61,6 +61,11 @@ const adaptPO = (po) => {
       pendingQty: Number(li.quantity || 0),
       fullyReceived: false,
       rate: Number(li.unitPrice || 0),
+      // Tax %s survive the reshape — the GRN print reads poLi.sgst/cgst/igst
+      // to compute tax rows (they rendered as 0 when this mapping dropped them).
+      cgst: li.cgst,
+      sgst: li.sgst,
+      igst: li.igst,
       // Symbol, not name: GRN/PO documents and the narrow UOM columns show "KG", and
       // screens that source a UOM from the variant already snapshot the symbol. Falling
       // back to the name keeps older POs readable rather than blank.
@@ -190,8 +195,10 @@ const buildFabricOffendingLines = (grn) =>
     const rolls = li.rolls || [];
     const sample = rolls[0] || {};
     const balance = Number(sample.balance);
-    const receivedQty = rolls.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0)
-                      + Number(li.receivingQty || 0);
+    // The server persists the line's receivingQty as the SUM of its rolls, so
+    // adding both double-counted every fabric receipt (the "2X" allowance bug).
+    const rollsQty = rolls.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0);
+    const receivedQty = Number(li.receivingQty) > 0 ? Number(li.receivingQty) : rollsQty;
     const allowedPct = Number.isFinite(Number(sample.defaultAllowance)) ? Number(sample.defaultAllowance) : 0;
     if (!Number.isFinite(balance) || balance <= 0 || receivedQty <= balance) return null;
     const overPct = ((receivedQty - balance) / balance) * 100;
@@ -256,9 +263,11 @@ const detectGRNCategory = (g) => {
 export const getAllowanceExceedGRNs = async ({ dateStart, dateEnd } = {}) => {
   if (!dateStart || !dateEnd) return [];
   const { content } = await getGRNList({ dateStart, dateEnd });
+  // Reversed / Cancelled receipts are dead — never flag them as excess.
+  const live = (content || []).filter((g) => g.status !== 'Reversed' && g.status !== 'Cancelled');
   // If the list endpoint doesn't embed line items (live API), hydrate detail.
   const hydrated = await Promise.all(
-    (content || []).map(async (g) => {
+    live.map(async (g) => {
       const hasFabricLines = Array.isArray(g.lineItems)
         && g.lineItems.some((li) => li && typeof li === 'object' && Array.isArray(li.rolls));
       if (hasFabricLines || (Array.isArray(g.items) && g.items.length > 0)) return g;
@@ -503,6 +512,15 @@ export const submitTrimsGRN = (data) => submitGrn(data, 'Trims');
 export const deleteDraftGRN = async (grnId /* , type */) => {
   await axiosInstance.delete(`${GRN_ENDPOINT}/${grnId}`);
   return true;
+};
+
+/**
+ * Direct pre-QC cancellation — Draft / QC_Pending only, blocked once any QC
+ * inspection exists. Terminal; receipts drop out of the PO balance.
+ */
+export const cancelGRN = async (grnId, reason, version) => {
+  const response = await axiosInstance.post(`${GRN_ENDPOINT}/${grnId}/cancel`, { reason, version });
+  return adaptGRN(response.data ?? response);
 };
 
 // PO ↔ GRN status interlock runs server-side inside GRNService.
@@ -947,6 +965,15 @@ export const getAdjustmentList = async () => {
   };
 };
 
+export const getAdjustmentById = async (id) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay(50);
+    return MOCK_ADJUSTMENTS.find((a) => a.id === Number(id)) || null;
+  }
+  const response = await axiosInstance.get(`${ADJUSTMENT_ENDPOINT}/${id}`);
+  return response.data ?? response;
+};
+
 // Nested metadata tree shaped like /items/meta so the filter card can
 // cascade Cat → SubCat → ItemType the same way the ItemMaster dialog does.
 const ADJUSTMENT_META_DATA = [
@@ -979,7 +1006,6 @@ export const getAdjustmentMetaData = async () => {
   // Reuse ItemMaster's metadata call — same endpoint, same auth path — so
   // whichever shape the backend returns, we handle it exactly like ItemMaster.
   const response = await getItemMetaData();
-  console.log(response);
   if (Array.isArray(response)) return response;
   if (response?.data && Array.isArray(response.data)) return response.data;
   if (response?.content && Array.isArray(response.content)) return response.content;
@@ -1092,5 +1118,9 @@ export const saveAdjustment = async (payload) => {
   return record;
 };
 
-// ─── DASHBOARD (mock) ──────────────────────────────────────────────────────────
-export const getDashboardStats = async () => { await delay(); return MOCK_DASHBOARD_STATS; };
+// ─── DASHBOARD ─────────────────────────────────────────────────────────────────
+export const getDashboardStats = async () => {
+  if (USE_MOCK_INVENTORY_DATA) { await delay(); return MOCK_DASHBOARD_STATS; }
+  const response = await axiosInstance.get('/dashboard/inventory');
+  return response.data ?? response;
+};

@@ -100,7 +100,7 @@ const AdjustmentCountTable = memo(function AdjustmentCountTable({ items = [], on
 
   return (
     <Table
-      rowKey={(r) => `${r.itemCode}-${r.variantLabel}-${r.rollNumber ?? 'norol'}`}
+      rowKey={(r) => r.rowId ?? r.id ?? `${r.itemCode}-${r.variantLabel}-${r.rollNumber ?? 'norol'}`}
       columns={columns}
       dataSource={items}
       pagination={false}

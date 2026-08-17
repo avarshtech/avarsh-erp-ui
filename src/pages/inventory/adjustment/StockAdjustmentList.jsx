@@ -3,7 +3,6 @@ import { App, Table, Card, Space, Input, Select, DatePicker, Row, Col, Typograph
 import { SearchOutlined, FileTextOutlined, SwapOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
@@ -148,13 +147,10 @@ const StockAdjustmentList = () => {
       render: (_, record) => (
         <Space size="small">
           <ActionButton action="view" onClick={() => setViewDrawer({ open: true, record })} />
-          {hasPermission('inventory-adjustment', 'update') && (
-            <ActionButton action="edit" onClick={() => navigate(`/inventory/adjustment/${record.id}`)} />
-          )}
         </Space>
       ),
     },
-  ], [navigate]);
+  ], []);
 
   return (
     <div className="animate-fade-in-up">

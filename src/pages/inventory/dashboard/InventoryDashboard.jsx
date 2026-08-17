@@ -79,7 +79,7 @@ const InventoryDashboard = () => {
         <Col xs={24} sm={8}>
           <StatCard
             title="QC Pass Rate"
-            value={stats.qcPassRate ?? 92}
+            value={stats.qcPassRate ?? 0}
             suffix="%"
             color="var(--success-color)"
             loading={loading}

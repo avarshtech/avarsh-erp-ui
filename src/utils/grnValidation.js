@@ -97,26 +97,12 @@ const validateRollRows = ({ rolls, errors, isSubmit }) => {
       if (!r.receivingQty || Number(r.receivingQty) <= 0) errors.push(`Row ${i + 1}: Quantity must be > 0`);
       if (!r.shadeLot || !String(r.shadeLot).trim()) errors.push(`Row ${i + 1}: Shade Lot is required`);
     }
-    // Per-row: a single roll can't exceed the line balance on its own
-    if (r.receivingQty != null && r.balance != null && Number(r.receivingQty) > Number(r.balance)) {
-      errors.push(`Row ${i + 1}: Quantity (${r.receivingQty}) exceeds balance (${r.balance})`);
-    }
   });
 
-  // Group check: sum of Quantity across rolls of the same line item must not exceed balance.
-  // Catches the case where each individual roll is within balance but the total spills over.
-  const totalsByLine = new Map();
-  rolls.forEach((r) => {
-    if (r.poLineItemId == null) return;
-    totalsByLine.set(r.poLineItemId, (totalsByLine.get(r.poLineItemId) || 0) + (Number(r.receivingQty) || 0));
-  });
-  totalsByLine.forEach((total, lineId) => {
-    const sample = rolls.find((r) => r.poLineItemId === lineId);
-    const balance = Number(sample?.balance);
-    if (Number.isFinite(balance) && total > balance) {
-      errors.push(`${sample?.itemCode || `Line ${lineId}`}: Total Quantity (${total}) exceeds balance (${balance})`);
-    }
-  });
+  // Excess vs PO balance is ALLOWED (business decision 2026-08-17): suppliers
+  // over-ship routinely. The roll table's inline notice surfaces the excess %
+  // against the item's allowance %, and the GRN Allowance screen flags
+  // beyond-allowance receipts for review — no blocking validation here.
 
   // Within-GRN duplicate check is enforced on Submit. Cross-GRN check runs server-side.
   if (isSubmit) {
@@ -181,13 +167,11 @@ export const validateTrimsGRN = (data, isSubmit = false, ctx = {}) => {
   baseHeaderValidations({ data, po, errors });
   validateSupplierInvoice({ data, errors, isSubmit });
 
-  // Items: quantity checks
+  // Items: quantity checks. Excess vs PO balance is ALLOWED (see fabric note) —
+  // the item table's inline notice + the Allowance screen handle over-receipts.
   (data.items || []).forEach((item, i) => {
     if (isSubmit && (!item.receivingQty || Number(item.receivingQty) <= 0)) {
       errors.push(`Item row ${i + 1}: Quantity must be > 0`);
-    }
-    if (item.receivingQty != null && item.balance != null && Number(item.receivingQty) > Number(item.balance)) {
-      errors.push(`${item.itemCode || `Item row ${i + 1}`}: Quantity (${item.receivingQty}) exceeds balance (${item.balance})`);
     }
   });
 

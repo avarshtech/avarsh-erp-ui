@@ -44,3 +44,9 @@ export const createAccessoriesIssue = async (payload) => {
   const { data } = await axiosInstance.post(`${BASE}/accessories`, payload);
   return data;
 };
+
+/** Cancel a COMPLETED issue — server restores every consumed slice to its source lot. */
+export const cancelIssue = async (id, reason) => {
+  const { data } = await axiosInstance.post(`${BASE}/${id}/cancel`, { reason });
+  return data;
+};

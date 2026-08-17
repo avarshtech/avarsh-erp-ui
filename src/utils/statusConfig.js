@@ -67,6 +67,7 @@ export const GRN_STATUS_CONFIG = {
   [GRN_STATUS.PENDING_REVERSAL]: { color: 'gold',     icon: ExclamationCircleOutlined },
   [GRN_STATUS.REVERSED]:         { color: 'purple',   icon: UndoOutlined },
   [GRN_STATUS.CLOSED]:           { color: 'green',    icon: CheckCircleOutlined },
+  [GRN_STATUS.CANCELLED]:        { color: 'default',  icon: StopOutlined },
 };
 
 // ==================== QC STATUS CONFIG ====================

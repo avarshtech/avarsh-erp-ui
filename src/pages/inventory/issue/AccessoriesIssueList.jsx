@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Space, Input, DatePicker, Row, Col } from 'antd';
+import { App, Table, Card, Space, Input, DatePicker, Row, Col, Tag } from 'antd';
 import { SearchOutlined, AppstoreOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -14,6 +14,7 @@ import { listIssues, getIssueWorkOrders } from '../../../services/inventory/mate
 import { formatNumber } from '../../../utils/formatters';
 import { generateAccessoriesIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
+import CancelIssueModal from './CancelIssueModal';
 
 const { RangePicker } = DatePicker;
 
@@ -28,6 +29,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, record: null });
+  const [cancelModal, setCancelModal] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -91,26 +93,42 @@ const AccessoriesIssueList = ({ embedded = false }) => {
       },
     },
     {
-      title: 'Actions', key: 'actions', width: 110, fixed: 'right', align: 'center',
+      title: 'Status', dataIndex: 'status', key: 'status', width: 110, align: 'center',
+      render: (s) => s === 'CANCELLED'
+        ? <Tag color="default" style={{ textDecoration: 'line-through' }}>Cancelled</Tag>
+        : <Tag color="success">Completed</Tag>,
+    },
+    {
+      title: 'Actions', key: 'actions', width: 120, fixed: 'right', align: 'center',
       render: (_, record) => (
         <Space size={4}>
           <ActionButton action="view" size="small" onClick={() => setViewDrawer({ open: true, record })} />
-          {hasPermission('inventory-issue', 'update') && (
-            <ActionButton action="edit" size="small" onClick={() => navigate(`/inventory/issue/accessories/${record.id}`)} />
+          {record.status !== 'CANCELLED' && (
+            <ActionButton action="print" size="small" onClick={() => generateAccessoriesIssueSlipPdf(record)} />
           )}
-          <ActionButton action="print" size="small" onClick={() => generateAccessoriesIssueSlipPdf(record)} />
+          {record.status !== 'CANCELLED' && hasPermission('inventory-issue', 'update') && (
+            <ActionButton action="cancel" size="small" onClick={() => setCancelModal({ open: true, record })} />
+          )}
         </Space>
       ),
     },
-  ], [navigate]);
+  ], []);
 
   const drawer = (
-    <IssueViewDrawer
-      open={viewDrawer.open}
-      onClose={() => setViewDrawer({ open: false, record: null })}
-      record={viewDrawer.record}
-      type="accessories"
-    />
+    <>
+      <IssueViewDrawer
+        open={viewDrawer.open}
+        onClose={() => setViewDrawer({ open: false, record: null })}
+        record={viewDrawer.record}
+        type="accessories"
+      />
+      <CancelIssueModal
+        open={cancelModal.open}
+        record={cancelModal.record}
+        onClose={() => setCancelModal({ open: false, record: null })}
+        onCancelled={loadData}
+      />
+    </>
   );
 
   const content = (

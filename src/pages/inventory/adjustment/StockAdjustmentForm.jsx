@@ -7,7 +7,7 @@ import { ActionButton } from '../../../components/buttons';
 import { getCurrentUser } from '../../../utils/permissions';
 import { formatDate } from '../../../utils/formatters';
 import {
-  getAdjustmentList,
+  getAdjustmentById,
   getAdjustmentMetaData,
   getAdjustableVariants,
   saveAdjustment,
@@ -60,30 +60,16 @@ const StockAdjustmentForm = () => {
       .finally(() => setMetaLoading(false));
   }, [message]);
 
+  // Applied adjustments are immutable — the :id route is a read-only view.
   useEffect(() => {
     if (!isEdit) return;
     setLoadingEdit(true);
     (async () => {
       try {
-        const res = await getAdjustmentList();
-        const adj = (res.content || []).find((a) => a.id === Number(id));
+        const adj = await getAdjustmentById(id);
         if (!adj) return;
         setRecord(adj);
-        setFilter({ categoryId: adj.categoryId, subCategoryId: adj.subCategoryId, itemTypeId: adj.itemTypeId });
-
-        // Hydrate saved items with availableRolls so the roll dropdown can render
-        // for fabric variants with multiple rolls. Match by itemCode + variantLabel.
-        const variants = await getAdjustableVariants({
-          categoryId: adj.categoryId,
-          subCategoryId: adj.subCategoryId,
-          itemTypeId: adj.itemTypeId,
-        });
-        const variantMap = new Map(variants.map((v) => [`${v.itemCode}__${v.variantLabel}`, v]));
-        const hydrated = (adj.items || []).map((i) => {
-          const match = variantMap.get(`${i.itemCode}__${i.variantLabel}`);
-          return { ...i, availableRolls: match?.availableRolls || [] };
-        });
-        setItems(hydrated);
+        setItems(adj.items || []);
       } catch {
         message.error('Failed to load adjustment');
       } finally {
@@ -169,7 +155,7 @@ const StockAdjustmentForm = () => {
     if (!isEdit) return 'New Stock Adjustment';
     return (
       <Space size={12} wrap>
-        <span>Edit Stock Adjustment</span>
+        <span>Stock Adjustment</span>
         {record?.adjustmentNumber && (
           <Tag color="processing" style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 10px', fontSize: 13, margin: 0 }}>
             {record.adjustmentNumber}
@@ -213,7 +199,7 @@ const StockAdjustmentForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={headerTitle} backPath="/inventory/adjustment" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
-        <ActionButton action="save" text="Save" loading={saving} onClick={handleSave} disabled={showSkeleton} />
+        {!isEdit && <ActionButton action="save" text="Save" loading={saving} onClick={handleSave} />}
       </PageHeader>
 
       {showSkeleton ? (
@@ -242,7 +228,7 @@ const StockAdjustmentForm = () => {
             {items.length === 0 ? (
               <Empty description={isEdit ? 'No items in this adjustment' : 'Select category to load items'} />
             ) : (
-              <AdjustmentCountTable items={items} onItemChange={handleItemChange} readOnly={false} loading={itemsLoading} />
+              <AdjustmentCountTable items={items} onItemChange={handleItemChange} readOnly={isEdit} loading={itemsLoading} />
             )}
           </Card>
         </>

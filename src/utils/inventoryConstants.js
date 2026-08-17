@@ -26,6 +26,7 @@ export const GRN_STATUS = {
   PENDING_REVERSAL: 'Pending_Reversal',
   REVERSED: 'Reversed',
   CLOSED: 'Closed',
+  CANCELLED: 'Cancelled',
 };
 
 export const GRN_STATUS_LABELS = {
@@ -34,6 +35,7 @@ export const GRN_STATUS_LABELS = {
   [GRN_STATUS.PENDING_REVERSAL]: 'Pending Reversal',
   [GRN_STATUS.REVERSED]: 'Reversed',
   [GRN_STATUS.CLOSED]: 'Closed',
+  [GRN_STATUS.CANCELLED]: 'Cancelled',
 };
 
 // ─── QC STATUS ─────────────────────────────────────────────────────────────────
@@ -180,8 +182,14 @@ export const GRN_CATEGORY = { FABRIC: 'Fabric', ACCESSORIES: 'Accessories' };
 export const isFabricCategory = (categoryName) =>
   String(categoryName || '').trim().toLowerCase().includes('fabric');
 
-/** True when a PO line belongs in a GRN of the given kind (GRN_CATEGORY.*). */
+/**
+ * True when a PO line belongs in a GRN of the given kind (GRN_CATEGORY.*).
+ * A line whose item has NO category counts as an accessory rather than
+ * disappearing from both forms — requiring a truthy category made every PO
+ * containing an uncategorised trim silently vanish from the Accessories
+ * dropdown.
+ */
 export const matchesGrnCategory = (categoryName, grnCategory) =>
   grnCategory === GRN_CATEGORY.FABRIC
     ? isFabricCategory(categoryName)
-    : Boolean(categoryName) && !isFabricCategory(categoryName);
+    : !isFabricCategory(categoryName);

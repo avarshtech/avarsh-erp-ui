@@ -219,6 +219,32 @@ const FabricGRNForm = () => {
     setIsDirty(true);
   }, []);
 
+  // Add another physical roll for a PO line — clones the line's static fields,
+  // blanks the roll-specific entries. `id` must NOT carry over: edit-mode rolls
+  // hold server row ids and a duplicated id would collide on save.
+  const handleAddRoll = useCallback((poLineItemId) => {
+    setRolls((prev) => {
+      const lastIdx = prev.map((r) => r.poLineItemId).lastIndexOf(poLineItemId);
+      if (lastIdx < 0) return prev;
+      const fresh = { ...prev[lastIdx], id: undefined, rollNumber: '', receivingQty: null, shadeLot: '' };
+      const next = [...prev];
+      next.splice(lastIdx + 1, 0, fresh);
+      return next;
+    });
+    setIsDirty(true);
+  }, []);
+
+  // Removing the line's last roll is not allowed — deselect the line item instead.
+  const handleRemoveRoll = useCallback((idx) => {
+    setRolls((prev) => {
+      const row = prev[idx];
+      if (!row) return prev;
+      if (prev.filter((r) => r.poLineItemId === row.poLineItemId).length <= 1) return prev;
+      return prev.filter((_, i) => i !== idx);
+    });
+    setIsDirty(true);
+  }, []);
+
   const buildPayload = () => {
     const values = form.getFieldsValue();
     return {
@@ -568,7 +594,13 @@ const FabricGRNForm = () => {
         )}
 
         <Card title={<Space><BranchesOutlined /><span>Roll Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
-          <FabricGRNRollTable rolls={rolls} onRollChange={handleRollChange} readOnly={readOnly} />
+          <FabricGRNRollTable
+            rolls={rolls}
+            onRollChange={handleRollChange}
+            onAddRoll={handleAddRoll}
+            onRemoveRoll={handleRemoveRoll}
+            readOnly={readOnly}
+          />
         </Card>
 
         <Card size="small">
