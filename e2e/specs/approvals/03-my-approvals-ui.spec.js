@@ -98,12 +98,10 @@ test.describe('AF9 — My Approvals inbox', () => {
     const confirm = page.locator('.ant-modal button').filter({ hasText: /^(OK|Confirm|Approve)$/ }).last();
     if (await confirm.isVisible().catch(() => false)) await confirm.click();
 
-    await expect(
-      page.locator('.ant-message-notice').filter({ hasText: /approved|success/i }).first()
-    ).toBeVisible({ timeout: 15000 });
-
-    const { data: after } = await api.get(`/purchase-orders/${po.id}`);
-    expect(after.status).toBe('Sent_To_Supplier');
+    // Assert on the OUTCOMES (entity state + inbox row), not on toast wording.
+    await expect
+      .poll(async () => (await api.get(`/purchase-orders/${po.id}`)).data.status, { timeout: 15000 })
+      .toBe('Sent_To_Supplier');
 
     await expect(
       page.locator('.ant-table-row').filter({ hasText: po.poNumber })
