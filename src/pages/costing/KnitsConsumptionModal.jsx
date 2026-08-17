@@ -232,7 +232,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts, targetUo
           </Button>
         </Space>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 12 }}>
         <Text type="secondary" style={{ fontSize: 13 }}>
