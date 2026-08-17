@@ -1198,9 +1198,15 @@ const ItemMaster = () => {
       return;
     }
 
+    // Variant validations apply only when the item type defines attributes — that is
+    // the same condition that renders the variants section. Without it, the default
+    // empty variant kept in state failed the name rule and silently blocked the save
+    // of every attribute-less item, with an error about a field the user cannot see.
+    const hasVariantSection = formAttributes.length > 0;
+
     // Validate variant name length — mirrors the server rule so users get inline feedback
     // instead of a 400. Uniqueness is checked below, where the offending tab is highlighted.
-    for (let i = 0; i < variants.length; i++) {
+    for (let i = 0; hasVariantSection && i < variants.length; i++) {
       const variant = variants[i];
       if (variant.isActive === false) continue;
       if ((variant.variantName || '').trim().length < 5) {
@@ -1227,7 +1233,7 @@ const ItemMaster = () => {
     }
 
     // Validate variant name length: at least 5 characters (special chars allowed).
-    for (let i = 0; i < variants.length; i++) {
+    for (let i = 0; hasVariantSection && i < variants.length; i++) {
       const variant = variants[i];
       if (variant.isActive === false) continue;
       const enteredName = (variant.variantName || '').trim();
@@ -1318,7 +1324,9 @@ const ItemMaster = () => {
         description: values.description || null,
         defaultAllowance: values.defaultAllowance,
         isActive: values.isActive,
-        variants: variantsPayload,
+        // No attributes → no variants section → nothing to send. Without this gate the
+        // default empty variant leaked into the payload and the server 400ed on its name.
+        variants: formAttributes.length > 0 ? variantsPayload : [],
       };
 
       let response;
@@ -1326,8 +1334,9 @@ const ItemMaster = () => {
         response = await updateItem(parseInt(selectedItemId || selectedItem?.id), { ...payload, version: selectedItem?.version });
         message.success('Item updated successfully');
       } else {
-        // Remove itemCode/itemId from variants for new items
-        payload.variants = variantsPayload.map((v) => {
+        // Remove itemCode/itemId from variants for new items. Built from
+        // payload.variants (not the raw array) so the no-attributes gate above holds.
+        payload.variants = payload.variants.map((v) => {
           const { itemCode, itemId, ...rest } = v;
           return rest;
         });
