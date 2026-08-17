@@ -289,7 +289,7 @@ test.describe('Fabric QC — Validation (API)', () => {
 
   test('future inspectionDate → error', async () => {
     const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate() + 2);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
     const payload = fabricQcPayload(validationGrn, validationLineId);

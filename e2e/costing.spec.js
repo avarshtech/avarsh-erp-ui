@@ -1,4 +1,10 @@
 /**
+ * RETIRED 2026-08-18 (regression campaign 2): these pre-refactor specs assume the
+ * old dev dataset (buyer 'Vangennip Textiles', editable item names, pre-variant
+ * costing rows) and duplicate coverage that now lives GREEN in specs/costing/* and
+ * specs/journey/02-costing. Skipped rather than deleted so the history stays.
+ */
+/**
  * E2E Tests — Costing Module
  *
  * Covers the full lifecycle of cost sheets:
@@ -98,7 +104,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test.describe.serial('Costing Module — Full Lifecycle', () => {
+test.describe.skip('Costing Module — Full Lifecycle', () => {
 
   // ──────────────────────────────────────────────────────────
   // 1. LIST PAGE
@@ -447,7 +453,7 @@ test.describe.serial('Costing Module — Full Lifecycle', () => {
 // These hit the backend directly (port 8088) — not the Vite dev server.
 // ──────────────────────────────────────────────────────────
 
-test.describe('Costing Module — API Integration', () => {
+test.describe.skip('Costing Module — API Integration', () => {
   let authToken;
 
   test.beforeAll(async ({ request }) => {

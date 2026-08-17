@@ -330,7 +330,11 @@ test.describe('Fabric GRN — Validation (API)', () => {
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 
-  test('submit: receivingQty > balance → 4xx error', async () => {
+  test('submit: receivingQty > balance is ACCEPTED (over-receipt allowed, warn-only)', async () => {
+    // Business decision 2026-08-17: excess receipt no longer rejects — the server only
+    // warns, and the UI surfaces it against the item's allowance %. The GRN is
+    // cancelled afterwards so the inflated receipt cannot exhaust the PO balance for
+    // the tests that follow.
     await refreshPO(api, validPO);
     const freshItem = validPO.items.find((i) => i.pendingQty > 0) || validItem;
     const payload = fabricGrnPayload(validPO, [freshItem], {
@@ -341,7 +345,15 @@ test.describe('Fabric GRN — Validation (API)', () => {
       }],
     });
     const res = await api.post('/grns/submit', payload);
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status, JSON.stringify(res.data).slice(0, 200)).toBeLessThan(300);
+    const grnId = res.data?.id;
+    expect(grnId).toBeTruthy();
+
+    const cancel = await api.post(`/grns/${grnId}/cancel`, {
+      reason: 'E2E cleanup: restoring PO balance after the over-receipt check.',
+      version: res.data.version,
+    });
+    expect(cancel.status).toBeLessThan(300);
   });
 
   test('submit: duplicate rollNumber within GRN → 4xx error', async () => {

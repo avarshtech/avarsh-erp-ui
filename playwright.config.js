@@ -33,7 +33,9 @@ export default defineConfig({
     // ── Legacy (existing costing tests) ────────────────────
     {
       name: 'legacy',
-      testMatch: /costing\.spec\.js|costing-full-entry\.spec\.js/,
+      // Anchored to the e2e ROOT files: the old pattern also swallowed
+      // specs/journey/02-costing.spec.js and double-ran it under this project.
+      testMatch: /e2e[\\/]costing(-full-entry)?\.spec\.js$/,
       use: {
         browserName: 'chromium',
         storageState: './e2e/.auth/user.json',
