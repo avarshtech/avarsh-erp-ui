@@ -56,7 +56,10 @@ test.describe('Approval engine — per-entity listeners', () => {
     await director?.dispose();
   });
 
-  test('ORDER — engine approval confirms the order', async () => {
+  test('ORDER — engine approval completes a cancel request', async () => {
+    // The ORDER approval points are REFER_BACK_REQUESTED and CANCEL_REQUESTED —
+    // plain DRAFT→CONFIRMED goes straight through with no engine involvement
+    // (OrderService submits to the engine only for those two request types).
     const flowId = await makeFlow('ORDER', { allowReferBack: false });
     try {
       const costing = await seedApprovedCosting(api);
@@ -65,22 +68,26 @@ test.describe('Approval engine — per-entity listeners', () => {
       expect(created.status).toBeLessThan(300);
       const orderId = created.data.id;
 
-      const { data: cur } = await api.get(`/orders/${orderId}`);
-      const submit = await api.put(`/orders/${orderId}/status`, {
-        status: 'CONFIRMED', version: cur.version,
+      let { data: cur } = await api.get(`/orders/${orderId}`);
+      await api.put(`/orders/${orderId}/status`, { status: 'CONFIRMED', version: cur.version });
+      ({ data: cur } = await api.get(`/orders/${orderId}`));
+      expect(cur.status, 'confirm is direct — never engine-gated').toBe('CONFIRMED');
+
+      // Cancel request IS engine-gated when a flow exists.
+      const cancelReq = await api.put(`/orders/${orderId}/status`, {
+        status: 'CANCEL_REQUESTED', version: cur.version,
+        reason: 'E2E engine cancel: buyer withdrew the order.',
       });
-      expect(submit.status).toBeLessThan(300);
+      expect(cancelReq.status).toBeLessThan(300);
 
       const req = await findPendingRequest(api, 'ORDER', orderId);
-      expect(req, 'active ORDER flow must intercept the confirm').toBeTruthy();
-      const { data: held } = await api.get(`/orders/${orderId}`);
-      expect(held.status, 'order must not confirm before the engine decides').not.toBe('CONFIRMED');
+      expect(req, 'active ORDER flow must intercept the cancel request').toBeTruthy();
 
       const approver = director || api;
-      await actOnRequest(approver, req.id, 'APPROVE', 'Order confirmed via engine (AF13).');
+      await actOnRequest(approver, req.id, 'APPROVE', 'Cancellation approved via engine (AF13).');
 
       const { data: after } = await api.get(`/orders/${orderId}`);
-      expect(after.status).toBe('CONFIRMED');
+      expect(after.status).toBe('CANCELLED');
     } finally {
       await retireFlow(flowId);
     }

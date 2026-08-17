@@ -89,7 +89,7 @@ test.describe('AF9 — My Approvals inbox', () => {
     await expect(row).toBeVisible({ timeout: 15000 });
     await row.locator('button').filter({ hasText: /Review/i }).first().click();
 
-    const drawer = page.locator('.ant-drawer').first();
+    const drawer = page.locator('.ant-drawer:visible, .ant-drawer-open').last();
     await expect(drawer).toBeVisible({ timeout: 10000 });
     await expect(drawer.getByText(/Approval level 1 of 1|Inbox level/).first()).toBeVisible();
 
@@ -120,7 +120,7 @@ test.describe('AF9 — My Approvals inbox', () => {
     await expect(row).toBeVisible({ timeout: 15000 });
     await row.locator('button').filter({ hasText: /Review/i }).first().click();
 
-    const drawer = page.locator('.ant-drawer').first();
+    const drawer = page.locator('.ant-drawer:visible, .ant-drawer-open').last();
     await expect(drawer).toBeVisible({ timeout: 10000 });
     await drawer.locator('button').filter({ hasText: /^Reject$/ }).first().click();
 
@@ -183,7 +183,7 @@ test.describe('AF1 — approval flow admin UI', () => {
     await waitForPageReady(page);
 
     await page.locator('button').filter({ hasText: /New|Add|Create/i }).first().click();
-    const drawer = page.locator('.ant-drawer').first();
+    const drawer = page.locator('.ant-drawer:visible, .ant-drawer-open').last();
     await expect(drawer).toBeVisible({ timeout: 10000 });
 
     await drawer.locator('input#name, input[id$="name"]').first().fill(uiFlowName);

@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { findPendingRequest, actOnRequest } from '../../helpers/approval.js';
 import { loadPoRefs, buildGeneralPo } from '../../helpers/po-seed.js';
-import { costSheetPayload } from '../../helpers/test-data.js';
+import { costSheetPayload, stylePayload } from '../../helpers/test-data.js';
 
 const MANAGER = { username: 'e2e-manager', password: 'Manager@123' };
 
@@ -217,10 +217,10 @@ test.describe('Approval engine — multi-level PO flow', () => {
       // Real cost sheet: Draft → submit as Final. With the flow active it must stay
       // Final with a PENDING request (not auto-approve).
       const { data: buyers } = await superadmin.get('/buyers');
-      const { data: styles } = await superadmin.get('/styles');
+      const { data: style } = await superadmin.post('/styles', stylePayload(buyers[0].id));
       const draft = await superadmin.post(
         '/cost-sheets',
-        costSheetPayload(buyers[0].id, styles[0].id, { styleNo: `E2E-AF5-${Date.now()}` }),
+        costSheetPayload(buyers[0].id, style.id),
       );
       expect(draft.status).toBeLessThan(300);
       const sheetId = draft.data.id;

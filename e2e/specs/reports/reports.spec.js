@@ -40,16 +40,17 @@ test.describe('Reports — definition-driven pipeline', () => {
       reportCode: REPORT_CODE,
       displayName: REPORT_NAME,
       description: 'Orders with buyer and status, authored by the regression suite',
-      baseQuery: 'SELECT o.order_no, o.buyer_name, o.style_no, o.status, o.total_quantity FROM ord_orders o',
+      // baseQuery is a FROM-fragment: the executor renders SELECT <sqlExpression AS code> FROM <baseQuery>.
+      baseQuery: 'ord_orders o',
       defaultSortColumn: 'order_no',
       defaultSortDir: 'ASC',
       isActive: true,
       fields: [
-        { fieldCode: 'order_no', displayName: 'Order No', fieldType: 'STRING', isDefault: true, isSortable: true, displayOrder: 1 },
-        { fieldCode: 'buyer_name', displayName: 'Buyer', fieldType: 'STRING', isDefault: true, isSortable: true, displayOrder: 2 },
-        { fieldCode: 'style_no', displayName: 'Style', fieldType: 'STRING', isDefault: true, displayOrder: 3 },
-        { fieldCode: 'status', displayName: 'Status', fieldType: 'STRING', isDefault: true, isFilterable: true, displayOrder: 4 },
-        { fieldCode: 'total_quantity', displayName: 'Total Qty', fieldType: 'NUMBER', isDefault: false, displayOrder: 5 },
+        { fieldCode: 'order_no', displayName: 'Order No', fieldType: 'STRING', sqlExpression: 'o.order_no', isDefault: true, isSortable: true, displayOrder: 1 },
+        { fieldCode: 'buyer_name', displayName: 'Buyer', fieldType: 'STRING', sqlExpression: 'o.buyer_name', isDefault: true, isSortable: true, displayOrder: 2 },
+        { fieldCode: 'style_no', displayName: 'Style', fieldType: 'STRING', sqlExpression: 'o.style_no', isDefault: true, displayOrder: 3 },
+        { fieldCode: 'status', displayName: 'Status', fieldType: 'STRING', sqlExpression: 'o.status', isDefault: true, isFilterable: true, displayOrder: 4 },
+        { fieldCode: 'total_quantity', displayName: 'Total Qty', fieldType: 'NUMBER', sqlExpression: 'o.total_quantity', isDefault: false, displayOrder: 5 },
       ],
       filters: [],
     });
@@ -158,9 +159,9 @@ test.describe('Reports — definition-driven pipeline', () => {
       moduleName: 'ORDER',
       reportCode: `E2E_BROKEN_${Date.now()}`,
       displayName: 'E2E Broken Report',
-      baseQuery: 'SELECT o.no_such_column FROM ord_orders o',
+      baseQuery: 'ord_orders o',
       isActive: true,
-      fields: [{ fieldCode: 'no_such_column', displayName: 'Ghost', fieldType: 'STRING', isDefault: true, displayOrder: 1 }],
+      fields: [{ fieldCode: 'no_such_column', displayName: 'Ghost', fieldType: 'STRING', sqlExpression: 'o.no_such_column', isDefault: true, displayOrder: 1 }],
       filters: [],
     });
     expect(bad.status).toBeLessThan(300);

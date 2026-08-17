@@ -15,7 +15,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { findPendingRequest, actOnRequest } from '../../helpers/approval.js';
 import { loadPoRefs, buildGeneralPo } from '../../helpers/po-seed.js';
-import { costSheetPayload } from '../../helpers/test-data.js';
+import { costSheetPayload, stylePayload } from '../../helpers/test-data.js';
 
 let api;
 let manager;
@@ -72,10 +72,10 @@ test.describe('Approval engine — guards', () => {
 
     try {
       const { data: buyers } = await api.get('/buyers');
-      const { data: styles } = await api.get('/styles');
+      const { data: style } = await api.post('/styles', stylePayload(buyers[0].id));
       const draft = await api.post(
         '/cost-sheets',
-        costSheetPayload(buyers[0].id, styles[0].id, { styleNo: `E2E-AF12-${Date.now()}` }),
+        costSheetPayload(buyers[0].id, style.id),
       );
       const sheetId = draft.data.id;
 

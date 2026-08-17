@@ -13,11 +13,12 @@ import { seedConfirmedOrder, loadBomRefs, buildBomPayload } from '../../helpers/
 
 let api;
 let bom;
+let order;
 
 test.describe.serial('BOM — line locking and guards', () => {
   test.beforeAll(async () => {
     api = await createAuthenticatedClient();
-    const order = await seedConfirmedOrder(api);
+    ({ order } = await seedConfirmedOrder(api));
     const refs = await loadBomRefs(api);
     const res = await api.post('/boms', buildBomPayload(order, refs));
     expect(res.status, JSON.stringify(res.data).slice(0, 300)).toBeLessThan(300);
@@ -29,9 +30,7 @@ test.describe.serial('BOM — line locking and guards', () => {
 
   test('B3 — a second BOM for the same order is refused', async () => {
     const refs = await loadBomRefs(api);
-    const res = await api.post('/boms', buildBomPayload(
-      { orderNo: bom.orderNo, id: bom.orderId, styleId: bom.styleId }, refs,
-    ));
+    const res = await api.post('/boms', buildBomPayload(order, refs));
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(JSON.stringify(res.data)).toMatch(/already exists/i);
   });

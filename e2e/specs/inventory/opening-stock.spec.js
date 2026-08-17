@@ -72,17 +72,29 @@ test.describe('Opening stock', () => {
     }
   });
 
-  test('a batch requires at least one line', async () => {
+  test('an empty batch can be drafted but not POSTED', async () => {
+    // The at-least-one-line rule fires at posting time, not at draft creation.
     const res = await api.post('/opening-stock/batches', batchPayload([]));
-    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(300);
+    const post = await api.post(`/opening-stock/batches/${res.data.id}/post`, {});
+    expect(post.status, 'posting an empty batch must be refused').toBeGreaterThanOrEqual(400);
+    await api.post(`/opening-stock/batches/${res.data.id}/cancel`, {});
   });
 
   test('a line UOM must be the item primary or secondary UOM', async () => {
     test.skip(!wrongUom, 'no third UOM available to provoke the mismatch');
+    // The rule may fire at draft-create or at posting time — either is a pass; both
+    // succeeding would mean mismatched units can reach stock.
     const res = await api.post('/opening-stock/batches', batchPayload([
-      fabricLine({ uomId: wrongUom.id, uomSymbol: wrongUom.symbol }),
+      fabricLine({ rollNumber: `OS-UOM-${Date.now()}`, uomId: wrongUom.id, uomSymbol: wrongUom.symbol }),
     ]));
-    expect(res.status, 'mismatched UOM must be refused').toBeGreaterThanOrEqual(400);
+    if (res.status < 300) {
+      const post = await api.post(`/opening-stock/batches/${res.data.id}/post`, {});
+      expect(post.status, 'mismatched UOM must be refused at post').toBeGreaterThanOrEqual(400);
+      await api.post(`/opening-stock/batches/${res.data.id}/cancel`, {});
+    } else {
+      expect(res.status).toBeGreaterThanOrEqual(400);
+    }
   });
 
   test('duplicate roll numbers within one batch are refused', async () => {
