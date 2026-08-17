@@ -136,11 +136,35 @@ test.describe('Costing — Create & Validation (UI)', () => {
     await navigateWithAuth(page, '/costing/new');
     await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
 
-    // Select a buyer, then the fresh style (styles load after the buyer is chosen)
+    // Select a buyer, then the fresh style (styles load after the buyer is chosen).
+    // The style list is virtualized and long by now — type to filter before clicking.
     await pickFormSelect(page, '#buyerId', null);
     await page.waitForTimeout(800);
-    await pickFormSelect(page, '#styleNo', style.styleNo);
+    await page.locator('#styleNo').click();
+    await page.keyboard.type(style.styleNo, { delay: 20 });
+    await page.waitForTimeout(400);
+    await page
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .last()
+      .locator('.ant-select-item-option')
+      .filter({ hasText: style.styleNo })
+      .first()
+      .click({ timeout: 10000 });
     await page.waitForTimeout(500);
+
+    // Sizes are mandatory server-side (@NotEmpty) even for drafts — pick one.
+    await page.locator('#sizes').click();
+    await page.keyboard.type('M', { delay: 30 });
+    await page.waitForTimeout(300);
+    const sizeOption = page
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .last()
+      .locator('.ant-select-item-option')
+      .first();
+    if (await sizeOption.isVisible().catch(() => false)) await sizeOption.click();
+    else await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
 
     const [resp] = await Promise.all([
       page.waitForResponse(

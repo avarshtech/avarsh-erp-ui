@@ -21,8 +21,10 @@ test.describe('Optimistic Locking — API Tests', () => {
     const { data: buyer } = await api.get('/buyers/1');
     expect(buyer).toHaveProperty('version');
 
-    // Update buyer (increments version on server)
-    await api.post('/buyers', { ...buyer, contactPerson: 'Updated by E2E' });
+    // Update buyer (increments version on server). The value must be unique per run:
+    // a repeated identical value is a no-op save that does NOT bump the version, which
+    // silently turns the "stale" write below into a current one.
+    await api.post('/buyers', { ...buyer, contactPerson: `Updated by E2E ${Date.now()}` });
 
     // Try updating with stale version (old version number)
     const res = await api.post('/buyers', { ...buyer, contactPerson: 'Stale update' });
@@ -34,7 +36,7 @@ test.describe('Optimistic Locking — API Tests', () => {
     const { data: supplier } = await api.get('/suppliers/1');
     expect(supplier).toHaveProperty('version');
 
-    await api.post('/suppliers', { ...supplier, contactPerson: 'Updated by E2E' });
+    await api.post('/suppliers', { ...supplier, contactPerson: `Updated by E2E ${Date.now()}` });
 
     const res = await api.post('/suppliers', { ...supplier, contactPerson: 'Stale update' });
     expect(res.status).toBe(409);
@@ -45,7 +47,7 @@ test.describe('Optimistic Locking — API Tests', () => {
     const { data: category } = await api.get('/categories/1');
     expect(category).toHaveProperty('version');
 
-    await api.post('/categories', { ...category, name: `${category.name} updated` });
+    await api.post('/categories', { ...category, name: `${category.name} u${Date.now() % 100000}` });
 
     const res = await api.post('/categories', { ...category, name: `${category.name} stale` });
     expect(res.status).toBe(409);
@@ -56,9 +58,11 @@ test.describe('Optimistic Locking — API Tests', () => {
     const { data: item } = await api.get('/items/1');
     expect(item).toHaveProperty('version');
 
-    await api.post('/items', { ...item, description: 'Updated by E2E' });
+    // Items update via PUT /items/{id} — POST is create-only and trips the duplicate
+    // classifier-triple guard instead of ever reaching the version check.
+    await api.put(`/items/${item.id}`, { ...item, description: `Updated by E2E ${Date.now()}` });
 
-    const res = await api.post('/items', { ...item, description: 'Stale update' });
+    const res = await api.put(`/items/${item.id}`, { ...item, description: 'Stale update' });
     expect(res.status).toBe(409);
     expect(res.data.error).toBe('OPTIMISTIC_LOCK_CONFLICT');
   });
@@ -104,7 +108,7 @@ test.describe('Optimistic Locking — API Tests', () => {
       return;
     }
 
-    await api.put(`/orders/${order.id}`, { ...order, remarks: 'Updated by E2E' });
+    await api.put(`/orders/${order.id}`, { ...order, remarks: `Updated by E2E ${Date.now()}` });
 
     const res = await api.put(`/orders/${order.id}`, { ...order, remarks: 'Stale update' });
     expect(res.status).toBe(409);
@@ -127,7 +131,7 @@ test.describe('Optimistic Locking — API Tests', () => {
       return;
     }
 
-    await api.put(`/purchase-orders/${po.id}`, { ...po, remarks: 'Updated by E2E' });
+    await api.put(`/purchase-orders/${po.id}`, { ...po, remarks: `Updated by E2E ${Date.now()}` });
 
     const res = await api.put(`/purchase-orders/${po.id}`, { ...po, remarks: 'Stale update' });
     expect(res.status).toBe(409);

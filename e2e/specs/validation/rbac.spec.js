@@ -71,16 +71,27 @@ test.describe('RBAC — API Tests (Restricted User)', () => {
 });
 
 test.describe('RBAC — UI Tests (Restricted User)', () => {
-  test('Login as viewer — admin menu items not visible in sidebar', async ({ page }) => {
-    // Login as the restricted viewer user
-    await navigateWithAuth(page, '/', 'e2e-viewer', 'admin123');
+  // The project's storage state is SUPERADMIN's session; these tests must run in a
+  // clean context or the login form never appears and the assertions test the wrong
+  // user (which is exactly the bug the old positional-credentials call had).
+  let viewerContext;
+  let viewerPage;
+
+  test.beforeAll(async ({ browser }) => {
+    viewerContext = await browser.newContext({ storageState: undefined });
+    viewerPage = await viewerContext.newPage();
+    await navigateWithAuth(viewerPage, '/', { username: 'e2e-viewer', password: 'admin123' });
+  });
+
+  test.afterAll(async () => { await viewerContext?.close(); });
+
+  test('Login as viewer — admin menu items not visible in sidebar', async () => {
+    const page = viewerPage;
     await page.waitForTimeout(1000);
 
-    // Verify sidebar is visible
     const sidebar = page.locator('.ant-layout-sider, .ant-menu').first();
     await expect(sidebar).toBeVisible();
 
-    // Admin menu items should NOT be visible
     const adminMenu = page.locator('.ant-menu-item:has-text("Admin"), .ant-menu-submenu-title:has-text("Admin")');
     const usersMenu = page.locator('.ant-menu-item:has-text("Users")');
     const rolesMenu = page.locator('.ant-menu-item:has-text("Roles")');
@@ -90,14 +101,21 @@ test.describe('RBAC — UI Tests (Restricted User)', () => {
     await expect(rolesMenu).not.toBeVisible();
   });
 
-  test('Navigate directly to /admin/users — access denied or redirected', async ({ page }) => {
-    await navigateWithAuth(page, '/admin/users', 'e2e-viewer', 'admin123');
+  test('Navigate directly to /admin/users — access denied or redirected', async () => {
+    const page = viewerPage;
+    await page.goto('/admin/users');
     await page.waitForTimeout(1500);
 
-    // Should either redirect away from admin page or show access denied
+    // Should either redirect away from admin page or show access denied.
+    // Match the exact guard text — a broad /Permission/i regex found a HIDDEN element
+    // first and made a passing page look like a failure.
     const currentUrl = page.url();
     const isRedirected = !currentUrl.includes('/admin/users');
-    const hasAccessDenied = await page.locator('text=Access Denied, text=Unauthorized, text=403, text=Permission').isVisible().catch(() => false);
+    const hasAccessDenied = await page
+      .getByText('Access Denied', { exact: true })
+      .first()
+      .isVisible()
+      .catch(() => false);
 
     expect(isRedirected || hasAccessDenied).toBeTruthy();
   });

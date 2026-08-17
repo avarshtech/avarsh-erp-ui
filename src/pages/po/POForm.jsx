@@ -238,23 +238,26 @@ const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
               }}
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                {Object.entries(attrs).length > 0 ? (
-                  Object.entries(attrs).map(([key, val]) => {
-                    const kLower = key.toLowerCase();
-                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                    const showSwatch = isColorAttr && isPantoneCode(val);
-                    return (
-                      <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        {showSwatch && <PantoneColorSwatch value={val} size={16} />}
-                        <Text style={{ fontSize: 12 }}>
-                          {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
-                        </Text>
-                      </Tag>
-                    );
-                  })
-                ) : (
-                  <Text type="secondary">Default variant</Text>
-                )}
+                {/* The variant NAME is the identity since the item/variant refactor —
+                    labelling by attributes alone rendered every attribute-less variant
+                    as an indistinguishable "Default variant". */}
+                <Text strong style={{ fontSize: 13 }}>
+                  {variant.variantName || 'Default variant'}
+                </Text>
+                {variant.variantCode && <Tag color="blue">{variant.variantCode}</Tag>}
+                {Object.entries(attrs).map(([key, val]) => {
+                  const kLower = key.toLowerCase();
+                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                  const showSwatch = isColorAttr && isPantoneCode(val);
+                  return (
+                    <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {showSwatch && <PantoneColorSwatch value={val} size={16} />}
+                      <Text style={{ fontSize: 12 }}>
+                        {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
+                      </Text>
+                    </Tag>
+                  );
+                })}
                 {isCurrent && (
                   <Tag color="green" style={{ marginLeft: 'auto', fontWeight: 600 }}>
                     Current

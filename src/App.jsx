@@ -282,11 +282,13 @@ const ThemedApp = () => {
             <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><CostingForm /></PermissionRoute>} />
             <Route path="costing/compare" element={<PermissionRoute module="costing"><CostComparison /></PermissionRoute>} />
             <Route path="costing/:id" element={<PermissionRoute module="costing"><CostingView /></PermissionRoute>} />
-            {/* Admin — access controlled by role, not module permissions */}
+            {/* Admin — the sidebar hides these by module access, but without a route
+                guard any user could still deep-link straight in (found by the RBAC
+                regression suite). Gate them on the same module keys the menu uses. */}
             <Route path="admin/dashboard" element={<AdminDashboard />} />
-            <Route path="admin/users" element={<UserManagement />} />
-            <Route path="admin/roles" element={<RoleAccess />} />
-            <Route path="admin/approval-flows" element={<ApprovalFlowList />} />
+            <Route path="admin/users" element={<PermissionRoute module="users"><UserManagement /></PermissionRoute>} />
+            <Route path="admin/roles" element={<PermissionRoute module="roles"><RoleAccess /></PermissionRoute>} />
+            <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows"><ApprovalFlowList /></PermissionRoute>} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}

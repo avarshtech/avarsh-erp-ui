@@ -66,7 +66,7 @@ test.describe('Role Management — API Tests', () => {
     expect(createdRoleId).toBeDefined();
 
     const res = await api.delete(`/roles/${createdRoleId}`);
-    expect(res.status).toBe(200);
+    expect([200, 204]).toContain(res.status); // controller returns 204 No Content
     createdRoleId = null;
   });
 
@@ -90,9 +90,11 @@ test.describe('Role Management — UI Tests', () => {
     await goToListPage(page, '/admin/roles');
     await antTableWaitForData(page);
 
-    // Click on first role row or edit button
-    const editBtn = page.locator('.ant-table-tbody tr').first().locator('button, a').first();
-    await editBtn.click();
+    // Open the first role: rows may expose an action button, or be click-to-open.
+    const firstRow = page.locator('.ant-table-tbody tr.ant-table-row').first();
+    const editBtn = firstRow.locator('button, a').first();
+    if (await editBtn.isVisible({ timeout: 2000 }).catch(() => false)) await editBtn.click();
+    else await firstRow.click();
     await page.waitForTimeout(1000);
 
     // Verify permission checkboxes are rendered

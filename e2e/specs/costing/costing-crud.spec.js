@@ -38,8 +38,28 @@ const round = (n, dp = 4) => Math.round(n * 10 ** dp) / 10 ** dp;
 
 let api;
 const created = [];
+// Variant-first contract: costing rows resolve their display names from the VARIANT,
+// not the item. The seeds carry no variants, so mint one per costing item up front.
+let fabricVariant;
+let trimVariant;
 
-test.beforeAll(async () => { api = await createAuthenticatedClient(); });
+async function ensureVariant(itemId, variantName) {
+  const { data: item } = await api.get(`/items/${itemId}`);
+  const existing = (item.variants || []).find((v) => v.variantName === variantName);
+  if (existing) return existing;
+  const res = await api.put(`/items/${itemId}`, {
+    ...item,
+    variants: [...(item.variants || []), { variantName, attributes: {}, isActive: true }],
+  });
+  if (res.status >= 300) throw new Error(`variant seed failed: ${res.status} ${JSON.stringify(res.data).slice(0, 200)}`);
+  return (res.data.variants || []).find((v) => v.variantName === variantName);
+}
+
+test.beforeAll(async () => {
+  api = await createAuthenticatedClient();
+  fabricVariant = await ensureVariant(FK.fabricItemId, 'Regression Fabric Variant');
+  trimVariant = await ensureVariant(FK.localTrimItemId, 'Regression Button Variant');
+});
 test.afterAll(async () => {
   for (const id of created) { try { await api.delete(`/cost-sheets/${id}`); } catch { /* already gone */ } }
   await api.dispose();
@@ -72,13 +92,14 @@ async function fullPayload(overrides = {}) {
     profitPct: 12,
     targetPrice: 0,
     fabricRows: [{
-      itemId: FK.fabricItemId, classification: 'Woven', description: 'Body fabric',
+      itemId: FK.fabricItemId, variantId: fabricVariant?.id,
+      classification: 'Woven', description: 'Body fabric',
       consumption: 1.5, fabricPrice: 200, fabricWidthStd: '58', fabricWidthVendor: '56',
       allowancePct: 5, wastagePct: 3, sizes: '',
       netCost: round(1.5 * 200 * 1.05 * 1.03),
     }],
     localTrims: [{
-      itemId: FK.localTrimItemId, code: 'BTN-1', size: '20L',
+      itemId: FK.localTrimItemId, variantId: trimVariant?.id, code: 'BTN-1', size: '20L',
       consumption: 6, cost: 2, sizes: '', price: 12,
     }],
     importedTrims: [{
@@ -133,7 +154,8 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
     // ----- fabric row -----
     const f = got.fabricRows[0];
     expect(f.itemId).toBe(FK.fabricItemId);
-    expect(f.fabricType).toBe('Cotton Single Jersey 180 GSM');  // resolved
+    // Resolved from the VARIANT since the item/variant refactor (B-005 direction).
+    expect(f.fabricType).toBe('Regression Fabric Variant');
     expect(f.classification).toBe('Woven');
     expect(f.description).toBe('Body fabric');
     expect(f.consumption).toBe(1.5);
@@ -147,7 +169,7 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
     // ----- local trim -----
     const lt = got.localTrims[0];
     expect(lt.itemId).toBe(FK.localTrimItemId);
-    expect(lt.item).toBe('4-Hole Polyester Button 20L');       // resolved
+    expect(lt.item).toBe('Regression Button Variant');         // resolved from the variant
     expect(lt.code).toBe('BTN-1');
     expect(lt.size).toBe('20L');
     expect(lt.consumption).toBe(6);

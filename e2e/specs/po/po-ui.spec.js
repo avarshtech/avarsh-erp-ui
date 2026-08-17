@@ -17,6 +17,26 @@
 import { test, expect } from '@playwright/test';
 import { antSelect, antTableWaitForData } from '../../helpers/antd-helpers.js';
 import { ensureSessionActive, goToListPage, navigateWithAuth } from '../../helpers/navigation.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+
+// Item search/autocomplete matches VARIANT identity only since the refactor (B-014),
+// and the seeds carry no variants — so the create test seeds one to search for.
+const PO_VARIANT_NAME = 'PO Cotton Variant';
+
+async function ensurePoVariant() {
+  const api = await createAuthenticatedClient();
+  try {
+    const { data: item } = await api.get('/items/1');
+    if (!(item.variants || []).some((v) => v.variantName === PO_VARIANT_NAME)) {
+      await api.put('/items/1', {
+        ...item,
+        variants: [...(item.variants || []), { variantName: PO_VARIANT_NAME, attributes: {}, isActive: true }],
+      });
+    }
+  } finally {
+    await api.dispose();
+  }
+}
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -65,6 +85,7 @@ test.describe('PO — General PO form & create', () => {
   });
 
   test('Create a General PO via the form: tax computes live → Save as Draft → list', async ({ page }) => {
+    await ensurePoVariant();
     await navigateWithAuth(page, '/purchase-orders/supplier-po/new');
     await page.locator('#supplierId').waitFor({ state: 'visible', timeout: 15000 });
 
@@ -91,7 +112,7 @@ test.describe('PO — General PO form & create', () => {
     //    so select via KEYBOARD (ArrowDown+Enter) to avoid the click-detach race.
     const itemSelect = row.locator('.ant-select').first();
     await itemSelect.click(); // focus the AutoComplete (the inner search input has no width)
-    await page.keyboard.type('Cotton', { delay: 60 }); // types into the focused search input
+    await page.keyboard.type('PO Cotton', { delay: 60 }); // matches the seeded variant name
     await page.waitForResponse((r) => r.url().includes('/items/autocomplete'), { timeout: 12000 }).catch(() => {});
     const itemDd = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
     await itemDd.locator('.ant-select-item-option').first().waitFor({ state: 'visible', timeout: 12000 });
@@ -99,7 +120,19 @@ test.describe('PO — General PO form & create', () => {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
 
-    // Qty becomes editable once an item is chosen — confirms the selection took.
+    // Multi-variant items open a "Select Variant" modal (variant-first refactor):
+    // the row stays disabled until a variant is chosen.
+    const variantModal = page.locator('.ant-modal:visible').filter({ hasText: 'Select Variant' });
+    if (await variantModal.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await variantModal
+        .getByText(PO_VARIANT_NAME, { exact: false })
+        .first()
+        .or(variantModal.locator('.ant-table-row, .ant-list-item, .ant-card').first())
+        .click();
+      await variantModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+
+    // Qty becomes editable once an item (+variant) is chosen — confirms the selection took.
     const nums = row.locator('input.ant-input-number-input');
     await expect(nums.first()).toBeEnabled({ timeout: 8000 });
 
@@ -127,6 +160,6 @@ test.describe('PO — General PO form & create', () => {
     ]);
     expect(resp.status()).toBeGreaterThanOrEqual(200);
     expect(resp.status()).toBeLessThan(300);
-    await expect(page).toHaveURL(/\/purchase-orders\/list/, { timeout: 15000 });
+    await expect(page).toHaveURL(/\/purchase-orders\/(supplier-po\/)?list/, { timeout: 15000 });
   });
 });

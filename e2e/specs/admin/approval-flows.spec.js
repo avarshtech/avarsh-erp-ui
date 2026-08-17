@@ -25,25 +25,26 @@ test.describe('Approval Flows — API Tests', () => {
 
   test('Create approval flow with levels', async () => {
     const timestamp = Date.now();
+    // Current engine contract: levelNumber + approverType (+ role/user id) per level.
     const payload = {
       name: `E2E Approval Flow ${timestamp}`,
       entityType: 'PURCHASE_ORDER',
+      active: false, // never let this CRUD fixture intercept real PO submits
+      priority: 0,
       levels: [
         {
-          level: 1,
-          approverRoleId: 1,
-          description: 'Manager approval',
+          levelNumber: 1, levelName: 'Manager approval', approverType: 'ROLE',
+          approverRoleId: 1, allowReferBack: true, allowReject: true,
         },
         {
-          level: 2,
-          approverRoleId: 2,
-          description: 'Director approval',
+          levelNumber: 2, levelName: 'Director approval', approverType: 'ROLE',
+          approverRoleId: 2, allowReferBack: true, allowReject: true,
         },
       ],
     };
 
     const res = await api.post('/approval-flows', payload);
-    expect(res.status).toBe(200);
+    expect(res.status, JSON.stringify(res.data).slice(0, 200)).toBeLessThan(300);
     expect(res.data).toHaveProperty('id');
     createdFlowId = res.data.id;
     expect(res.data.name).toBe(payload.name);
@@ -73,7 +74,7 @@ test.describe('Approval Flows — API Tests', () => {
     expect(createdFlowId).toBeDefined();
 
     const res = await api.delete(`/approval-flows/${createdFlowId}`);
-    expect(res.status).toBe(200);
+    expect([200, 204]).toContain(res.status);
     createdFlowId = null;
   });
 
