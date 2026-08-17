@@ -259,14 +259,29 @@ const CostingView = () => {
     return <span>{arr[0]} <Tag style={{ marginLeft: 2 }}>+{arr.length - 1}</Tag></span>;
   };
 
+  // Unit `consumption` is expressed in — the item's secondary UOM. Prefer the symbol
+  // ("GMS") over uomName, which renders as the full word ("KILOGRAMS") and previously made
+  // the view disagree with the form.
+  const consumptionUomOf = (record) =>
+    String(record.uomSymbol || record.uom || record.uomName || '').toUpperCase();
+
+  /** Rate plus the purchase unit it is quoted per: "₹ 600.00 / kg". */
+  const rateWithUom = (value, record, currency) => {
+    const rateUom = record.primaryUomSymbol || record.primaryUom || '';
+    const amount = formatCurrency(value, currency);
+    return rateUom ? `${amount} / ${rateUom}` : amount;
+  };
+
   const fabricColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
     { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Fabric Name', dataIndex: 'fabricType', width: 240, align: 'center' },
     { title: 'Classification', dataIndex: 'classification', width: 120, align: 'center' },
     { title: 'Description', dataIndex: 'description', align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${(record.uomSymbol || record.uom || record.uomName || '').toUpperCase()}`.trim() : '-' },
-    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${consumptionUomOf(record)}`.trim() : '-' },
+    // The rate is quoted per PURCHASE unit while consumption is in the secondary unit, so
+    // spell the unit out — an unlabelled ₹600 beside 59.33 GMS reads as an error otherwise.
+    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, data.currency) },
     { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 100, align: 'center' },
     { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 110, align: 'center' },
     { title: 'Vendor', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
@@ -281,8 +296,8 @@ const CostingView = () => {
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
-    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${consumptionUomOf(record)}`.trim() : '-' },
+    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, data.currency) },
     { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'price', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, data.currency)}</Text> },
   ];
 
@@ -292,8 +307,8 @@ const CostingView = () => {
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
-    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 120, align: 'center', render: (v) => formatCurrency(v, 'USD') },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${consumptionUomOf(record)}`.trim() : '-' },
+    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, 'USD') },
     { title: 'Price ($ USD)', dataIndex: 'priceUsd', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, 'USD')}</Text> },
   ];
 

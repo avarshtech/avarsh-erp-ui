@@ -75,6 +75,12 @@ import {
   calcAutoProfit,
   formatCurrency,
 } from '../../utils/costingConstants';
+import {
+  conversionApplies,
+  convertGramsTo,
+  formatConversionLabel,
+  normaliseUomSymbol,
+} from '../../utils/uomConversions';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { getBuyers } from '../../services/master/buyerService';
 import { getStylesByBuyerId, saveStyle } from '../../services/master/styleService';
@@ -135,6 +141,35 @@ const toVariantOptions = (variants) =>
     label: v.variantName || v.variantCode,
     variantCode: v.variantCode,
   }));
+
+/**
+ * The UOM fields a costing row inherits from its variant.
+ *
+ * Quantities are captured in the SECONDARY (consumption) UOM while rates are quoted per
+ * PRIMARY (purchase) UOM, so a row must carry both plus the factor bridging them. The
+ * "does a conversion actually apply?" question is answered once, here — the factor is
+ * stored only when it genuinely applies, leaving every downstream formula free to treat
+ * null as "pass the quantity through".
+ *
+ * Note `uomId` takes the SECONDARY id: it is the unit `consumption` is expressed in, and
+ * persisting the primary id there is what made saved sheets read "0.0590 KILOGRAMS" for a
+ * row the form displayed as GMS.
+ */
+const variantUomFields = (variant) => {
+  const factorApplies = conversionApplies(
+    variant?.uomId,
+    variant?.secondaryUomId,
+    variant?.uomConversionFactor,
+  );
+  return {
+    uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+    uomId: variant?.secondaryUomId ?? variant?.uomId ?? null,
+    primaryUom: variant?.uomSymbol || '',
+    primaryUomId: variant?.uomId ?? null,
+    secondaryUomId: variant?.secondaryUomId ?? null,
+    uomConversionFactor: factorApplies ? Number(variant.uomConversionFactor) : null,
+  };
+};
 
 const CostingForm = () => {
   const { message } = App.useApp();
@@ -263,6 +298,9 @@ const CostingForm = () => {
   const [knitsModalOpen, setKnitsModalOpen] = useState(false);
   const [knitsRowKey, setKnitsRowKey] = useState(null);
   const [knitsParts, setKnitsParts] = useState([]);
+  // Consumption UOM of the row the knits calculator is open for — the modal shows its
+  // total in this unit so what the user approves is what lands in the row.
+  const [knitsTargetUom, setKnitsTargetUom] = useState('');
 
   // Techpack import modal
   const [techpackModalOpen, setTechpackModalOpen] = useState(false);
@@ -452,13 +490,20 @@ const CostingForm = () => {
       // and the Table + update/delete functions depend on `key` for row identity.
       const withKeys = (rows, prefix) =>
         (rows || []).map((r, i) => ({ ...r, key: r.key || `${prefix}_${Date.now()}_${i}` }));
-      // Normalise UOM: API returns uomId + uomName; set uom (symbol) for display/conversion
-      setFabricRows(withKeys(cs.fabricRows, 'f').map((r) => ({
-        ...r,
-        uom: r.uom || r.uomSymbol || r.uomName || '',
-      })));
-      setLocalTrims(withKeys(cs.localTrims, 'lt'));
-      setImportedTrims(withKeys(cs.importedTrims, 'it'));
+      // Normalise UOM: the API returns uomId/uomName/uomSymbol for the consumption unit plus
+      // the snapshotted purchase unit and factor. Reading them off the row (rather than
+      // re-resolving from the variant) keeps a saved sheet priced exactly as it was saved,
+      // and keeps working when the row's variant falls outside the 50-row picker window.
+      const withUom = (rows, prefix) =>
+        withKeys(rows, prefix).map((r) => ({
+          ...r,
+          uom: r.uom || r.uomSymbol || r.uomName || '',
+          primaryUom: r.primaryUom || r.primaryUomSymbol || '',
+          uomConversionFactor: r.uomConversionFactor ?? null,
+        }));
+      setFabricRows(withUom(cs.fabricRows, 'f'));
+      setLocalTrims(withUom(cs.localTrims, 'lt'));
+      setImportedTrims(withUom(cs.importedTrims, 'it'));
       setManufacturingRows(withKeys(cs.manufacturingRows, 'm'));
       setOverheadRows(withKeys(cs.overheadRows, 'o'));
       setAgentCommissionPct(cs.agentCommissionPct || 0);
@@ -978,7 +1023,10 @@ const CostingForm = () => {
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = { ...r, [field]: value };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
       })
     );
@@ -1000,6 +1048,10 @@ const CostingForm = () => {
         consumption: '',
         uom: '',
         uomId: null,
+        primaryUom: '',
+        primaryUomId: null,
+        secondaryUomId: null,
+        uomConversionFactor: null,
         fabricPrice: '',
         fabricWidthStd: '',
         fabricWidthVendor: '',
@@ -1028,10 +1080,8 @@ const CostingForm = () => {
           fabricType: variant?.variantName || variant?.variantCode || '',
           // Auto-populate description from the item master (CR C-6); keep any existing text otherwise
           description: variant?.description || r.description || '',
-          // Set UOM from item's secondary UOM (fallback to primary)
-          uom: variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || '',
-          uomId: variant?.uomId || r.uomId || null,
-          primaryUom: variant?.uomSymbol || '',
+          // Consumption UOM, purchase UOM and the factor bridging them
+          ...variantUomFields(variant),
         };
         // Auto-set classification from subcategory
         if (variant?.subCategoryName) {
@@ -1039,6 +1089,11 @@ const CostingForm = () => {
           if (subName.includes('knit')) updated.classification = 'Knits';
           else if (subName.includes('woven')) updated.classification = 'Woven';
         }
+        // Switching fabric can change the conversion factor, which re-prices the row.
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
       }),
     );
@@ -1070,7 +1125,7 @@ const CostingForm = () => {
         const updated = typeof fieldOrObj === 'object'
           ? { ...r, ...fieldOrObj }
           : { ...r, [fieldOrObj]: value };
-        updated.price = calcTrimPrice(updated.consumption, updated.cost);
+        updated.price = calcTrimPrice(updated.consumption, updated.cost, updated.uomConversionFactor);
         return updated;
       })
     );
@@ -1080,7 +1135,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', cost: '', price: 0, sizes: '' },
+      { key: `lt_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', uomId: null, primaryUom: '', primaryUomId: null, secondaryUomId: null, uomConversionFactor: null, cost: '', price: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1108,7 +1163,7 @@ const CostingForm = () => {
         const updated = typeof fieldOrObj === 'object'
           ? { ...r, ...fieldOrObj }
           : { ...r, [fieldOrObj]: value };
-        updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd);
+        updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd, updated.uomConversionFactor);
         return updated;
       })
     );
@@ -1118,7 +1173,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', costUsd: '', priceUsd: 0, sizes: '' },
+      { key: `it_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', uomId: null, primaryUom: '', primaryUomId: null, secondaryUomId: null, uomConversionFactor: null, costUsd: '', priceUsd: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1214,20 +1269,35 @@ const CostingForm = () => {
     setKnitsRowKey(rowKey);
     const row = fabricRows.find((r) => r.key === rowKey);
     setKnitsParts(row?.knitsParts || []);
+    // The modal shows its total in the row's consumption UOM, so it needs that symbol.
+    setKnitsTargetUom(row ? getConsumptionUom(row, fabricItemsRaw) : '');
     setKnitsModalOpen(true);
   };
 
-  const handleKnitsApply = (totalConsumption, parts) => {
+  /**
+   * The calculator returns GRAMS (what its formula produces). Restate that in the row's
+   * consumption UOM before storing, so a 59.33 g garment lands as 59.33 in a GMS row and
+   * as 0.0593 in a KG row — rather than always as kilograms regardless of the label.
+   */
+  const handleKnitsApply = (totalGrams, parts) => {
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== knitsRowKey) return r;
-        const finalConsumption = Math.round(totalConsumption * 10000) / 10000;
+        const targetUom = getConsumptionUom(r, fabricItemsRaw);
+        const converted = convertGramsTo(totalGrams, targetUom) ?? 0;
+        const finalConsumption = Math.round(converted * 10000) / 10000;
         const updated = { ...r, consumption: finalConsumption, knitsParts: parts };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
       })
     );
     setKnitsModalOpen(false);
+    // Without this, applying the calculator then saving reported "No changes detected"
+    // and silently discarded the result.
+    setIsDirty(true);
   };
 
   // AI Consumption modal handlers
@@ -1238,6 +1308,17 @@ const CostingForm = () => {
   };
 
   const handleConsumptionApply = (result) => {
+    // The AI reports its own UOM (kg for knits, m for woven). The row's consumption UOM
+    // comes from the item master and may disagree — applying the number regardless is how
+    // a kilogram figure ends up in a GMS field, so say so instead of hiding it.
+    const targetRow = fabricRows.find((r) => r.key === consumptionRowKey);
+    const rowUom = targetRow ? getConsumptionUom(targetRow, fabricItemsRaw) : '';
+    if (rowUom && result.uom && normaliseUomSymbol(rowUom) !== normaliseUomSymbol(result.uom)) {
+      message.warning(
+        `AI calculated in ${String(result.uom).toUpperCase()} but this fabric is consumed in ` +
+        `${rowUom.toUpperCase()}. Check the value — it was applied as-is.`,
+      );
+    }
     if (result.splitBySizes) {
       // Replace the source row with one row per size, each with its specific consumption
       setFabricRows((prev) => {
@@ -1251,7 +1332,10 @@ const CostingForm = () => {
             sizes:       size,
             consumption: c,
             uom:         source.uom || result.uom,
-            netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct, source.wastagePct),
+            netCost:     calcFabricNetCost(
+              c, source.fabricPrice, source.allowancePct, source.wastagePct,
+              source.uomConversionFactor,
+            ),
           };
         });
         return [...prev.filter((r) => r.key !== consumptionRowKey), ...newRows];
@@ -1261,7 +1345,10 @@ const CostingForm = () => {
         prev.map((r) => {
           if (r.key !== consumptionRowKey) return r;
           const updated = { ...r, consumption: result.consumption, uom: r.uom || result.uom };
-          updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+          updated.netCost = calcFabricNetCost(
+            updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+            updated.uomConversionFactor,
+          );
           return updated;
         })
       );
@@ -1292,6 +1379,8 @@ const CostingForm = () => {
     setConsumptionModalOpen(false);
     setKnitsRowKey(consumptionRowKey);
     setKnitsParts(preparedParts);
+    const row = fabricRows.find((r) => r.key === consumptionRowKey);
+    setKnitsTargetUom(row ? getConsumptionUom(row, fabricItemsRaw) : '');
     setKnitsModalOpen(true);
   };
 
@@ -1679,10 +1768,63 @@ const CostingForm = () => {
 
   // ==================== HELPERS ====================
 
+  /**
+   * Unit that `consumption` is expressed in: the item's secondary UOM when it has one.
+   *
+   * Prefers the row's own snapshot over the variant list, because the picker holds only 50
+   * variants per category — a reloaded row whose variant falls outside that window would
+   * otherwise lose its unit entirely. The snapshot is written on every variant select, so
+   * it is never staler than the list.
+   */
   const getConsumptionUom = (record, rawVariants) => {
+    if (record.uom) return record.uom;
     if (!record.variantId) return '';
     const variant = rawVariants?.find((v) => v.id === record.variantId);
     return variant?.secondaryUomSymbol || variant?.uomSymbol || '';
+  };
+
+  /** Unit the row's rate is quoted per — the item's primary (purchase) UOM. */
+  const getRateUom = (record, rawVariants) => {
+    if (record.primaryUom) return record.primaryUom;
+    if (!record.variantId) return '';
+    const variant = rawVariants?.find((v) => v.id === record.variantId);
+    return variant?.uomSymbol || '';
+  };
+
+  /**
+   * Rate input for fabric price / trim cost, annotated with the PURCHASE unit it is quoted
+   * per ("/kg", "/cone").
+   *
+   * The unit is per-row rather than per-column — one table can hold a fabric bought by the
+   * kilo and another bought by the metre — so it belongs on the input, exactly as the
+   * Consumption column already annotates its own secondary unit. Where the two units differ
+   * a tooltip spells out the bridge ("1 kg = 1000 GMS"), so a ₹600/kg rate sitting beside a
+   * 59.33 GMS quantity reads as deliberate instead of inconsistent.
+   */
+  const renderRateInput = ({ value, record, rawVariants, onChange, placeholder = 'Rate' }) => {
+    const rateUom = getRateUom(record, rawVariants);
+    const consumptionUom = getConsumptionUom(record, rawVariants);
+    const factor = record.uomConversionFactor;
+    const input = (
+      <InputNumber
+        value={value}
+        min={0}
+        step={0.01}
+        controls={false}
+        placeholder={placeholder}
+        onChange={onChange}
+        size="small"
+        style={{ width: '100%' }}
+        addonAfter={rateUom ? `/${rateUom}` : undefined}
+        {...numericInputProps}
+      />
+    );
+    if (!(Number(factor) > 0) || !rateUom || !consumptionUom) return input;
+    return (
+      <Tooltip title={formatConversionLabel(rateUom, consumptionUom, factor)}>
+        {input}
+      </Tooltip>
+    );
   };
 
   // Match on both variant name and code so users can search either.
@@ -1799,7 +1941,9 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 160,
+      // Holds the quantity, its unit addon and two calculator buttons. Sized for the unit
+      // rendering as a full word ("KILOGRAMS") when only uomName is available.
+      width: 210,
       render: (val, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <InputNumber
@@ -1840,20 +1984,14 @@ const CostingForm = () => {
     {
       title: `Price (${getCurrencySymbol(currency)})`,
       dataIndex: 'fabricPrice',
-      width: 130,
-      render: (val, record) => (
-        <InputNumber
-          value={val}
-          min={0}
-          step={0.01}
-          controls={false}
-          placeholder="Price"
-          onChange={(v) => updateFabricRow(record.key, 'fabricPrice', v)}
-          size="small"
-          style={{ width: '100%' }}
-          {...numericInputProps}
-        />
-      ),
+      // Wide enough for a 5-figure rate plus the "/kg" unit addon without truncating.
+      width: 200,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: fabricItemsRaw,
+        onChange: (v) => updateFabricRow(record.key, 'fabricPrice', v),
+      }),
     },
     {
       title: 'Width (Std)',
@@ -1980,7 +2118,7 @@ const CostingForm = () => {
               itemId: variant?.itemId ?? null,
               item: variant?.variantName || variant?.variantCode || '',
               code: variant?.variantCode || '',
-              uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+              ...variantUomFields(variant),
             });
           }}
           size="small"
@@ -2014,10 +2152,14 @@ const CostingForm = () => {
     {
       title: `Cost (${getCurrencySymbol(currency)})`,
       dataIndex: 'cost',
-      width: 120,
-      render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateLocalTrim(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
-      ),
+      width: 190,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: localTrimItemsRaw,
+        onChange: (v) => updateLocalTrim(record.key, 'cost', v),
+        placeholder: 'Cost',
+      }),
     },
     {
       title: `Price (${getCurrencySymbol(currency)})`,
@@ -2075,7 +2217,7 @@ const CostingForm = () => {
               itemId: variant?.itemId ?? null,
               item: variant?.variantName || variant?.variantCode || '',
               code: variant?.variantCode || '',
-              uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+              ...variantUomFields(variant),
             });
           }}
           size="small"
@@ -2109,10 +2251,14 @@ const CostingForm = () => {
     {
       title: 'Cost ($ USD)',
       dataIndex: 'costUsd',
-      width: 120,
-      render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateImportedTrim(record.key, 'costUsd', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
-      ),
+      width: 190,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: importedTrimItemsRaw,
+        onChange: (v) => updateImportedTrim(record.key, 'costUsd', v),
+        placeholder: 'Cost',
+      }),
     },
     {
       title: 'Price ($ USD)',
@@ -3327,6 +3473,7 @@ const CostingForm = () => {
         onApply={handleKnitsApply}
         onCancel={() => setKnitsModalOpen(false)}
         initialParts={knitsParts}
+        targetUom={knitsTargetUom}
       />
 
       {/* Techpack AI Import Modal */}
@@ -3351,6 +3498,17 @@ const CostingForm = () => {
         onCancel={() => setWovenModalOpen(false)}
         onApply={(consumption) => {
           if (wovenRowKey) {
+            // This calculator always works in METRES. If the row is consumed in some other
+            // unit the figure is not comparable, so flag it rather than applying silently.
+            const row = fabricRows.find((r) => r.key === wovenRowKey);
+            const rowUom = row ? getConsumptionUom(row, fabricItemsRaw) : '';
+            if (rowUom && !['m', 'mtr', 'mtrs', 'meter', 'meters', 'metre', 'metres']
+              .includes(normaliseUomSymbol(rowUom))) {
+              message.warning(
+                `Calculated in METRES but this fabric is consumed in ${rowUom.toUpperCase()}. ` +
+                'Check the value — it was applied as-is.',
+              );
+            }
             updateFabricRow(wovenRowKey, 'consumption', consumption);
           }
           setWovenModalOpen(false);

@@ -6,7 +6,7 @@ import {
   AppstoreOutlined, ScissorOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import { getStatusLabel, calcPurchaseQty } from '../../utils/bomConstants';
-import { formatConversionLabel } from '../../utils/uomConversions';
+import { convertToPrimary, formatConversionLabel } from '../../utils/uomConversions';
 import { getBomById } from '../../services/bom/bomService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 
@@ -149,20 +149,15 @@ const BOMView = ({ open, bomData, onClose }) => {
    * conversion existed have no snapshot, so they fall back to the original recompute
    * in the consumption UOM.
    *
-   * @returns {{ qty: number, uom: string, working: string }|null}
+   * @returns {{ qty: number, uom: string }|null}
    */
   const getLinePurchaseQty = (record) => {
     const consumptionUom = (record.uom || '').toUpperCase();
 
     if (record.purchaseQtyPrimary != null) {
-      const factor = record.uomConversionFactor;
-      const converted = Number(factor) > 0 && record.purchaseQty != null;
       return {
         qty: Number(record.purchaseQtyPrimary),
         uom: (record.purchaseUom || record.uom || '').toUpperCase(),
-        working: converted
-          ? `${formatNumber(record.purchaseQty, 2)} ${consumptionUom} ÷ ${Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}`
-          : '',
       };
     }
 
@@ -176,7 +171,32 @@ const BOMView = ({ open, bomData, onClose }) => {
     return {
       qty: calcPurchaseQty(totalQty, totalLoss, totalRej + totalShip),
       uom: consumptionUom,
-      working: '',
+    };
+  };
+
+  /**
+   * Total qty (the requirement BEFORE allowances) in the item's primary/purchase UOM,
+   * with the working that produced it. The conversion is spelled out here rather than
+   * on Purchase Qty because this is the step where the consumption unit becomes the
+   * purchase unit — Purchase Qty only adds allowances to an already-converted figure.
+   *
+   * @returns {{ qty: number, uom: string, working: string }|null}
+   */
+  const getLineTotalQty = (record) => {
+    const totalQty = Number(record.totalQty) || 0;
+    if (!totalQty) return null;
+
+    const consumptionUom = (record.uom || '').toUpperCase();
+    const factor = Number(record.uomConversionFactor);
+    // Lines with no conversion snapshot (trims, or saved before conversions existed)
+    // are already stated in the purchase unit.
+    if (!(factor > 0) || !record.purchaseUom || record.purchaseUom === record.uom) {
+      return { qty: totalQty, uom: consumptionUom, working: '' };
+    }
+    return {
+      qty: convertToPrimary(totalQty, factor),
+      uom: (record.purchaseUom || '').toUpperCase(),
+      working: `${formatNumber(totalQty, 2)} ${consumptionUom} ÷ ${factor.toLocaleString(undefined, { maximumFractionDigits: 6 })}`,
     };
   };
 
@@ -190,6 +210,7 @@ const BOMView = ({ open, bomData, onClose }) => {
     const lineName = isPerSize ? (line.itemName || '-') : (line.variantName || '-');
     const lineCode = isPerSize ? line.itemCode : line.variantCode;
     const purchaseQty = getLinePurchaseQty(line);
+    const totalQty = getLineTotalQty(line);
     // Conversion snapshotted on the line: "1 Cone = 5000 M". Empty when nothing converts.
     const conversionLabel = formatConversionLabel(line.purchaseUom, line.uom, line.uomConversionFactor);
     const parts = line.partsName ? (Array.isArray(line.partsName) ? line.partsName : [line.partsName]) : [];
@@ -228,7 +249,7 @@ const BOMView = ({ open, bomData, onClose }) => {
                   </Tag>
                 )}
                 {conversionLabel && (
-                  <Tooltip title="Purchase quantity is converted from the consumption unit using this factor">
+                  <Tooltip title="Total and purchase quantities are converted from the consumption unit using this factor">
                     <Tag color="gold" style={{ margin: 0, fontSize: 10 }}>{conversionLabel}</Tag>
                   </Tooltip>
                 )}
@@ -286,24 +307,26 @@ const BOMView = ({ open, bomData, onClose }) => {
             </div>
             <div>
               <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Total Qty</Text>
+              {/* Requirement before allowances, in the purchase UOM. When the item converts
+                  (e.g. buy Gross, consume Pieces) the working sits beneath it so the number
+                  stays auditable on screen. */}
               <Text strong style={{ fontSize: 14, color: 'var(--primary-color, #6366f1)' }}>
-                {line.totalQty ? formatNumber(line.totalQty, 2) : '\u2014'}
-                {' '}<Text type="secondary" style={{ fontSize: 10 }}>{(line.uom || '').toUpperCase()}</Text>
+                {totalQty ? formatNumber(totalQty.qty, 2) : '\u2014'}
+                {' '}<Text type="secondary" style={{ fontSize: 10 }}>{totalQty?.uom || (line.uom || '').toUpperCase()}</Text>
               </Text>
+              {totalQty?.working && (
+                <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{totalQty.working}</Text>
+              )}
             </div>
             {purchaseQty != null && (
               <div>
                 <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Purchase Qty</Text>
-                {/* The PO is raised in the purchase UOM. When the item converts (e.g. buy Gross,
-                    consume Pieces) getLinePurchaseQty supplies the converted figure plus the
-                    working ("144 pcs ÷ 12") so the number is auditable on screen. */}
+                {/* Total Qty plus allowances, in the same purchase UOM the PO is raised in.
+                    The conversion working is shown once, on Total Qty. */}
                 <Text strong style={{ fontSize: 14, color: 'var(--color-success, #10b981)' }}>
                   {formatNumber(purchaseQty.qty, 2)}
                   {' '}<Text type="secondary" style={{ fontSize: 10 }}>{purchaseQty.uom}</Text>
                 </Text>
-                {purchaseQty.working && (
-                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{purchaseQty.working}</Text>
-                )}
               </div>
             )}
             {/* CAD download for fabric lines */}

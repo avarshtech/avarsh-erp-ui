@@ -68,3 +68,48 @@ export const formatConversionLabel = (primaryName, secondaryName, factor) => {
 /** Compact symbol form for dense table cells: "1 grs = 144 pcs". */
 export const formatConversionShort = (primarySymbol, secondarySymbol, factor) =>
   formatConversionLabel(primarySymbol, secondarySymbol, factor);
+
+// ─── Mass units ──────────────────────────────────────────────────────────────
+// The knits consumption formula (L x W x NOP x GSM / 10000) inherently produces GRAMS,
+// but the row it feeds stores consumption in the item's own secondary UOM — which may be
+// grams, kilograms or pounds. These helpers restate a grams figure in that unit.
+
+/**
+ * Grams in one unit, keyed by NORMALISED symbol. Deliberately alias-based rather than
+ * matched against the seeded symbols: the seed ships 'g'/'kg' but live tenants create
+ * their own UOM rows and use 'GMS', 'KGS', 'Grams' — all of which must resolve.
+ */
+const GRAMS_PER_MASS_UNIT = {
+  g: 1, gm: 1, gms: 1, gram: 1, grams: 1,
+  kg: 1000, kgs: 1000, kilo: 1000, kilos: 1000, kilogram: 1000, kilograms: 1000,
+  lb: 453.59237, lbs: 453.59237, pound: 453.59237, pounds: 453.59237,
+  oz: 28.349523125, ozs: 28.349523125, ounce: 28.349523125, ounces: 28.349523125,
+};
+
+/** Lowercase, trim, drop a trailing period — 'GMS. ' and 'gms' must match the same key. */
+export const normaliseUomSymbol = (symbol) =>
+  String(symbol ?? '').trim().toLowerCase().replace(/\.+$/, '');
+
+/** Grams per one unit of `symbol`, or null when it is not a unit of mass. */
+export const gramsPerUnitOf = (symbol) =>
+  GRAMS_PER_MASS_UNIT[normaliseUomSymbol(symbol)] ?? null;
+
+/** Whether `symbol` denotes a unit of mass (and so can carry a grams-based figure). */
+export const isMassUom = (symbol) => gramsPerUnitOf(symbol) != null;
+
+/**
+ * Restate a grams figure in `symbol`. A non-mass or unknown symbol returns the grams
+ * unchanged — callers warn rather than silently emitting a figure in the wrong unit.
+ */
+export const convertGramsTo = (grams, symbol) => {
+  const g = Number(grams);
+  if (!Number.isFinite(g)) return null;
+  const per = gramsPerUnitOf(symbol);
+  return per == null ? g : g / per;
+};
+
+/**
+ * Sensible decimal places for a mass figure: gram-scale units need 2 (59.33 GMS),
+ * kilogram-scale units need 4 to hold the same precision (0.0593 KG).
+ */
+export const massDecimalPlaces = (symbol) => ((gramsPerUnitOf(symbol) ?? 1) >= 1000 ? 4 : 2);

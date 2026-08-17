@@ -48,6 +48,17 @@ const getStatusColor = (status) => {
   return colors[status] || '#64748b';
 };
 
+// Unit `consumption` is expressed in — the item's secondary UOM. Prefer the symbol ("GMS")
+// over uomName, which prints as the full word ("KILOGRAMS").
+const consumptionUomOf = (row) =>
+  String(row.uomSymbol || row.uom || row.uomName || '').toUpperCase();
+
+/** The purchase unit a rate is quoted per, as a " / kg" suffix (blank when unknown). */
+const rateUomSuffix = (row) => {
+  const rateUom = row.primaryUomSymbol || row.primaryUom || '';
+  return rateUom ? ` / ${esc(rateUom)}` : '';
+};
+
 // ─── Build HTML ────────────────────────────────────────────────────────────────
 
 const buildCostingHtml = (cs, org) => {
@@ -67,8 +78,8 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.fabricType)}</td>
       <td class="center">${esc(row.classification)}</td>
       <td>${esc(row.description) || '-'}</td>
-      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption, 4)} ${(row.uomSymbol || row.uom || row.uomName || '').toUpperCase()}`.trim() : '-'}</td>
-      <td class="num">${fmtNum(row.fabricPrice)}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption, 4)} ${consumptionUomOf(row)}`.trim() : '-'}</td>
+      <td class="num">${fmtNum(row.fabricPrice)}${rateUomSuffix(row)}</td>
       <td class="center">${row.fabricWidthStd || '-'}</td>
       <td class="center">${row.fabricWidthVendor || '-'}</td>
       <td>${esc(row.vendorName) || '-'}</td>
@@ -87,8 +98,8 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.item)}</td>
       <td>${esc(row.code) || '-'}</td>
       <td class="center">${esc(row.size) || '-'}</td>
-      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${(row.uom || '').toUpperCase()}`.trim() : '-'}</td>
-      <td class="num">${fmtNum(row.cost)}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${consumptionUomOf(row)}`.trim() : '-'}</td>
+      <td class="num">${fmtNum(row.cost)}${rateUomSuffix(row)}</td>
       <td class="num highlight-cell">${fmtNum(row.price)}</td>
     </tr>`;
   });
@@ -103,8 +114,8 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.item)}</td>
       <td>${esc(row.code) || '-'}</td>
       <td class="center">${esc(row.size) || '-'}</td>
-      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${(row.uom || '').toUpperCase()}`.trim() : '-'}</td>
-      <td class="num">${fmtNum(row.costUsd)}</td>
+      <td class="num">${row.consumption != null ? `${fmtNum(row.consumption)} ${consumptionUomOf(row)}`.trim() : '-'}</td>
+      <td class="num">${fmtNum(row.costUsd)}${rateUomSuffix(row)}</td>
       <td class="num highlight-cell">${fmtNum(row.priceUsd)}</td>
     </tr>`;
   });

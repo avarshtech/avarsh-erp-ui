@@ -91,6 +91,7 @@ const createEmptyLine = () => ({
   consumptionPerGarment: null,
   colorInvalid: false, // true when variant color not found in order lines
   overrideBaseQty: null, // manual base qty when variant color not in order (fabric only)
+  overrideBaseQtyColor: null, // order color the override was picked from — disambiguates colors sharing a qty
   qtyCalcBasis: 'TOTAL', // per-line calc basis
   consumptionMode: 'SIMPLE', // 'SIMPLE', 'SIZE_WISE', 'VARIANT_PER_SIZE'
   consumptionMatrix: null, // { color: { size: consumption } }
@@ -103,6 +104,13 @@ const createEmptyLine = () => ({
   isPoGenerated: false,
   remarks: '',
 });
+
+/**
+ * Sentinel option value for a base qty restored from a saved BOM whose source colour
+ * can no longer be identified — only the number is persisted, so when several order
+ * colours share that quantity the origin is genuinely unknowable.
+ */
+const SAVED_BASE_QTY = '__saved_base_qty__';
 
 /** Check if a BOM line's category is Fabric */
 const isFabricCategory = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
@@ -857,14 +865,14 @@ const BOMForm = () => {
   const handleVariantSelect = useCallback(
     (lineKey, variantId) => {
       if (variantId === null) {
-        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, overrideBaseQtyColor: null, consumptionMatrix: null, variantMapping: null });
         return;
       }
       // Check duplicate
       if (isVariantDuplicate(variantId, lineKey)) {
         message.error({ content: 'This variant is already added to another BOM line. Please select a different variant.', key: 'variant-duplicate' });
         // Clear selection and keep dropdown open
-        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, consumptionMatrix: null, variantMapping: null });
+        updateLineMulti(lineKey, { variantId: null, variantCode: '', variantName: '', variants: {}, colorInvalid: false, overrideBaseQty: null, overrideBaseQtyColor: null, consumptionMatrix: null, variantMapping: null });
         setVariantEditLineKey(lineKey);
         return;
       }
@@ -876,7 +884,7 @@ const BOMForm = () => {
         const { valid, errorMsg } = validateVariantInOrder(sorted, fabric);
         if (!valid) message.warning({ content: errorMsg, key: 'variant-validation' });
         return prev.map((l) =>
-          l.key === lineKey ? { ...l, variantId, variantCode: variant?.variantCode || '', variantName: variant?.variantName || '', variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, consumptionMatrix: null, variantMapping: null } : l,
+          l.key === lineKey ? { ...l, variantId, variantCode: variant?.variantCode || '', variantName: variant?.variantName || '', variants: sorted, colorInvalid: !valid, overrideBaseQty: !valid ? l.overrideBaseQty : null, overrideBaseQtyColor: !valid ? l.overrideBaseQtyColor : null, consumptionMatrix: null, variantMapping: null } : l,
         );
       });
       setIsDirty(true);
@@ -1259,7 +1267,7 @@ const BOMForm = () => {
   // ==================== SAVE / SUBMIT ====================
 
   const buildPayload = (status) => {
-    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
+    const cleanLines = lines.filter((l) => !l.isPoGenerated).map(({ key, availableVariants, primaryUom, primaryUomId, secondaryUom, secondaryUomId, itemName: _in, categoryName: _cn, subCategoryName: _sn, itemTypeName: _itn, colorInvalid: _ci, overrideBaseQty: _obq, overrideBaseQtyColor: _obqc, _savedBaseQty, cadPreviewUrl: _cpu, _cadUploading, _cadFileName, _cadFileId, _cadStagedFile, _cadToDelete, variants: _v, categoryId: _cid, subCategoryId: _scid, isPoGenerated: _ipg, ...rest }, idx) => ({
       ...rest,
       // For VARIANT_PER_SIZE, clear variantId (variants come from variantMapping)
       variantId: rest.consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE ? null : rest.variantId,
@@ -1759,6 +1767,7 @@ const BOMForm = () => {
                         updates.variantMapping = updates.variantMapping || {};
                         updates.colorInvalid = false;
                         updates.overrideBaseQty = null;
+                        updates.overrideBaseQtyColor = null;
                       } else if (v === CONSUMPTION_MODE.SIZE_WISE) {
                         updates.consumptionPerGarment = null;
                         updates.consumptionMatrix = record.consumptionMatrix || null;
@@ -1947,13 +1956,25 @@ const BOMForm = () => {
                       }
                     });
                   });
+                  // Keyed by COLOUR, not by quantity: two order colours routinely carry the
+                  // same qty (Ivory 800 / Lilac 800), and a shared option value makes AntD
+                  // treat them as one — both highlight as selected and the wrong label shows.
                   const colorOptions = Object.entries(colorQtyMap).map(([name, total]) => ({
-                    value: total,
+                    value: name,
+                    qty: total,
                     label: `${name} — ${total.toLocaleString()}`,
                   }));
-                  const currentOverride = record.overrideBaseQty ?? (record._savedBaseQty ? Number(record._savedBaseQty) : null);
-                  // Find matching option for current value (handle duplicate qty values)
-                  const hasMatch = currentOverride != null && colorOptions.some((o) => o.value === currentOverride);
+
+                  // A saved BOM persists only the number. Resolve it back to a colour when
+                  // exactly one matches; otherwise surface the figure itself rather than
+                  // silently attribute it to whichever colour happens to sort first.
+                  const savedQty = Number(record._savedBaseQty) || 0;
+                  const qtyMatches = savedQty > 0 ? colorOptions.filter((o) => o.qty === savedQty) : [];
+                  const resolvedColor = record.overrideBaseQtyColor || (qtyMatches.length === 1 ? qtyMatches[0].value : null);
+                  const showSaved = !resolvedColor && savedQty > 0;
+                  const options = showSaved
+                    ? [{ value: SAVED_BASE_QTY, qty: savedQty, label: `Saved — ${savedQty.toLocaleString()}` }, ...colorOptions]
+                    : colorOptions;
 
                   return (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -1961,9 +1982,15 @@ const BOMForm = () => {
                         size="small"
                         style={{ flex: 1, minWidth: 0 }}
                         placeholder="Pick base qty"
-                        value={hasMatch ? currentOverride : undefined}
-                        onChange={(v) => updateLine(record.key, 'overrideBaseQty', v || null)}
-                        options={colorOptions}
+                        value={resolvedColor || (showSaved ? SAVED_BASE_QTY : undefined)}
+                        onChange={(name) => {
+                          const opt = options.find((o) => o.value === name);
+                          updateLineMulti(record.key, {
+                            overrideBaseQty: opt?.qty ?? null,
+                            overrideBaseQtyColor: opt && opt.value !== SAVED_BASE_QTY ? opt.value : null,
+                          });
+                        }}
+                        options={options}
                         status="warning"
                         popupMatchSelectWidth={false}
                       />
@@ -2044,18 +2071,53 @@ const BOMForm = () => {
         ),
       },
       // 13. Calc Basis — REMOVED (moved into consumption matrix dialog for trims, inline for fabric)
-      // 14. Total Qty
+      // 14. Total Qty — the requirement BEFORE allowances, stated in the item's primary
+      // (purchase) UOM. The conversion working lives here rather than on Purchase Qty
+      // because this is the step where the consumption unit becomes the purchase unit;
+      // Purchase Qty only layers allowances on top of an already-converted figure.
       {
         title: 'Total Qty',
-        width: 100,
+        width: 130,
         align: 'center',
         render: (_, record) => {
           const total = computeTotalQty(record);
-          // Total Qty is a multiple of consumption, so it carries the CONSUMPTION unit
-          const uom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
-          return total != null
-            ? <Text style={{ fontSize: 12 }}>{total.toLocaleString(undefined, { maximumFractionDigits: 2 })} <Text type="secondary" style={{ fontSize: 10 }}>{uom}</Text></Text>
-            : <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+          if (total == null) return <Text type="secondary" style={{ fontSize: 12 }}>-</Text>;
+
+          // Total Qty is a multiple of consumption, so it starts in the CONSUMPTION unit
+          const consumptionUom = (record.secondaryUom || record.primaryUom || record.uom || '').toUpperCase();
+          const factor = record.uomConversionFactor;
+          const applies = conversionApplies(record.primaryUomId, record.secondaryUomId, factor);
+
+          // No conversion (trim with no secondary UOM, or both units the same) — the
+          // consumption unit already IS the primary unit, so render it plainly.
+          if (!applies) {
+            return (
+              <Text style={{ fontSize: 12 }}>
+                {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{consumptionUom}</Text>
+              </Text>
+            );
+          }
+
+          const converted = convertToPrimary(total, factor);
+          const purchaseUom = (record.primaryUom || '').toUpperCase();
+          return (
+            <Tooltip title={formatConversionLabel(record.primaryUom, record.secondaryUom, factor)}>
+              <div style={{ lineHeight: 1.3 }}>
+                <Text style={{ fontSize: 12 }}>
+                  {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                  <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
+                </Text>
+                {total > 0 && (
+                  <div>
+                    <Text type="secondary" style={{ fontSize: 10 }}>
+                      {total.toLocaleString(undefined, { maximumFractionDigits: 2 })} {consumptionUom} ÷ {Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                    </Text>
+                  </div>
+                )}
+              </div>
+            </Tooltip>
+          );
         },
       },
       // 15. Purchase Qty (Total Qty + allowances, converted into the item's purchase UOM)
@@ -2093,21 +2155,16 @@ const BOMForm = () => {
             );
           }
 
+          // The conversion working is shown once, on Total Qty — repeating it here would
+          // only restate the same factor against a slightly larger number.
           const converted = convertToPrimary(purchaseQty, factor);
           const purchaseUom = (record.primaryUom || '').toUpperCase();
           return (
             <Tooltip title={formatConversionLabel(record.primaryUom, record.secondaryUom, factor)}>
-              <div style={{ lineHeight: 1.3 }}>
-                <Text style={{ fontSize: 12 }}>
-                  {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
-                  <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
-                </Text>
-                <div>
-                  <Text type="secondary" style={{ fontSize: 10 }}>
-                    {purchaseQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} {consumptionUom} ÷ {Number(factor).toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                  </Text>
-                </div>
-              </div>
+              <Text style={{ fontSize: 12 }}>
+                {converted.toLocaleString(undefined, { maximumFractionDigits: 2 })}{' '}
+                <Text type="secondary" style={{ fontSize: 10 }}>{purchaseUom}</Text>
+              </Text>
             </Tooltip>
           );
         },
