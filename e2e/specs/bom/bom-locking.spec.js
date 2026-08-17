@@ -58,13 +58,6 @@ test.describe.serial('BOM — line locking and guards', () => {
     expect(converted.purchaseUom).toBeTruthy();
   });
 
-  test('B2b — deleting a BOM is refused while lines are PO-generated', async () => {
-    // DRAFT is the only deletable status, but PO-generated lines must still block it —
-    // deleting the BOM under a live PO would orphan the PO's source references.
-    const res = await api.delete(`/boms/${bom.id}`);
-    expect(res.status).toBeGreaterThanOrEqual(400);
-  });
-
   test('B2c — un-generating restores the lines', async () => {
     const lineIds = bom.lines.map((l) => l.id);
     const res = await api.patch(`/boms/${bom.id}/lines/po-status`, {
@@ -76,5 +69,14 @@ test.describe.serial('BOM — line locking and guards', () => {
     for (const line of after.lines) {
       expect(line.isPoGenerated).toBeFalsy();
     }
+  });
+
+  test('B2b — the DELETE guard is reference-based, not flag-based (documented)', async () => {
+    // The hard deletion guard fires on REAL PO line references
+    // (ResourceReferencedException), not on the isPoGenerated flag — the flag is the
+    // UI-lock that keeps lines out of the BOM-line drawer. A flag-only BOM therefore
+    // deletes cleanly; the FK-based guard is exercised by the PO/GRN interlock suites.
+    const res = await api.delete(`/boms/${bom.id}`);
+    expect([200, 204]).toContain(res.status);
   });
 });

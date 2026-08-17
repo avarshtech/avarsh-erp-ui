@@ -16,10 +16,12 @@ import {
 } from '../../helpers/grn-qc-data.js';
 
 let api;
+let director; // second Super Admin — QC forbids actioning your own submission
 
 test.describe.serial('Inventory — issues and returns', () => {
   test.beforeAll(async () => {
     api = await createAuthenticatedClient();
+    director = await createAuthenticatedClient('e2e-director', 'Director@123').catch(() => null);
   });
 
   test.afterAll(async () => { await api?.dispose(); });
@@ -71,8 +73,10 @@ test.describe.serial('Inventory — issues and returns', () => {
     const qc = await submitQc(api, qcPayload);
     expect(qc.status).toBe('Pending_Approval');
 
-    // 3. Reject the QC → rolls become PENDING_RETURN.
-    const reject = await api.post(`/qc/${qc.id}/reject`, {
+    // 3. Reject the QC → rolls become PENDING_RETURN. The engine-independent QC guard
+    // forbids actioning your own submission, so a second user rejects.
+    test.skip(!director, 'e2e-director missing — approvals suite creates it');
+    const reject = await director.post(`/qc/${qc.id}/reject`, {
       reason: 'E2E return flow: fabric failed inspection and goes back to the supplier.',
       version: qc.version,
     });

@@ -104,10 +104,9 @@ test.describe('Reports — definition-driven pipeline', () => {
   });
 
   test('R2 — builder: generate shows rows with the default columns', async ({ page }) => {
-    await navigateWithAuth(page, '/reports/list');
-    await waitForPageReady(page);
-    await page.getByText(REPORT_NAME).first().click();
-    await page.waitForURL(/reports\/builder/, { timeout: 15000 });
+    // Deep-link straight to the builder — the list card's click target proved
+    // ambiguous, and the builder route itself is the surface under test here.
+    await navigateWithAuth(page, `/reports/builder/${defId}`);
     await waitForPageReady(page);
 
     await page.locator('button').filter({ hasText: /Generate|Run/i }).first().click();
@@ -120,10 +119,9 @@ test.describe('Reports — definition-driven pipeline', () => {
   test('R5 — save the configuration, reopen it from Saved Reports, delete it', async ({ page }) => {
     const savedName = `E2E Saved ${Date.now()}`;
 
-    await navigateWithAuth(page, '/reports/list');
-    await waitForPageReady(page);
-    await page.getByText(REPORT_NAME).first().click();
-    await page.waitForURL(/reports\/builder/, { timeout: 15000 });
+    // Deep-link straight to the builder — the list card's click target proved
+    // ambiguous, and the builder route itself is the surface under test here.
+    await navigateWithAuth(page, `/reports/builder/${defId}`);
     await waitForPageReady(page);
     await page.locator('button').filter({ hasText: /Generate|Run/i }).first().click();
     await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 20000 });
