@@ -44,18 +44,89 @@ export const getAttendanceByDate = async (date, factoryId) => {
 
 /**
  * Lock attendance for a month (prevent further edits).
- * POST /api/v1/hr/attendance/lock
+ * POST /api/v1/hr/attendance/lock?factoryId=&month=&year=
+ *
+ * The API takes query parameters, not a body. This previously POSTed a JSON
+ * body, so the call always failed with "Required request parameter 'factoryId'
+ * is not present".
  */
-export const lockAttendanceMonth = async (data) => {
-  const response = await axiosInstance.post(`${BASE_URL}/lock`, data);
+export const lockAttendanceMonth = async ({ factoryId, month, year }) => {
+  const response = await axiosInstance.post(`${BASE_URL}/lock`, null, {
+    params: { factoryId, month, year },
+  });
   return response.data;
 };
 
 /**
  * Unlock attendance for a month (allow edits again).
- * POST /api/v1/hr/attendance/unlock
+ * POST /api/v1/hr/attendance/unlock?factoryId=&month=&year=
  */
-export const unlockAttendanceMonth = async (data) => {
-  const response = await axiosInstance.post(`${BASE_URL}/unlock`, data);
+export const unlockAttendanceMonth = async ({ factoryId, month, year }) => {
+  const response = await axiosInstance.post(`${BASE_URL}/unlock`, null, {
+    params: { factoryId, month, year },
+  });
   return response.data;
+};
+
+/**
+ * Attendance totals for one employee over any range.
+ * GET /api/v1/hr/attendance/summary?employeeId=&fromDate=&toDate=
+ */
+export const getAttendanceSummary = async (employeeId, fromDate, toDate) => {
+  const response = await axiosInstance.get(`${BASE_URL}/summary`, {
+    params: { employeeId, fromDate, toDate },
+  });
+  return response.data;
+};
+
+// ----- spreadsheet import -----
+
+/**
+ * Downloads a workbook pre-filled with the factory's active employees.
+ * GET /api/v1/hr/attendance/import/template
+ */
+export const downloadAttendanceTemplate = async ({ factoryId, periodFrom, periodTo }) => {
+  const response = await axiosInstance.get(`${BASE_URL}/import/template`, {
+    params: { factoryId, periodFrom, periodTo },
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+/**
+ * Uploads a file for validation. Nothing is written by this call.
+ * POST /api/v1/hr/attendance/import/parse
+ */
+export const parseAttendanceFile = async ({ file, factoryId, periodFrom, periodTo }) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await axiosInstance.post(`${BASE_URL}/import/parse`, formData, {
+    params: { factoryId, periodFrom, periodTo },
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+/**
+ * Writes the reviewed rows.
+ * POST /api/v1/hr/attendance/import/commit
+ */
+export const commitAttendanceImport = async (rows, overwriteExisting = false) => {
+  const response = await axiosInstance.post(`${BASE_URL}/import/commit`, rows, {
+    params: { overwriteExisting },
+  });
+  return response.data;
+};
+
+/** Saves a blob the browser has already received. */
+export const triggerBrowserDownload = (blob, filename) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };

@@ -81,8 +81,10 @@ const GatePassList = () => {
       setSubmitting(true);
       const payload = {
         employeeId: values.employeeId,
-        date: values.date.format('YYYY-MM-DD'),
-        type: values.type,
+        // The API fields are entryDate and entryType. Sending date/type left
+        // both null, and entry_date is NOT NULL.
+        entryDate: values.date.format('YYYY-MM-DD'),
+        entryType: values.type,
         fromTime: values.fromTime.format('HH:mm'),
         toTime: values.toTime.format('HH:mm'),
         reason: values.reason,
@@ -106,15 +108,15 @@ const GatePassList = () => {
     { title: 'Employee Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
     {
       title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
+      dataIndex: 'entryDate',
+      key: 'entryDate',
       width: 120,
       render: (val) => val ? dayjs(val).format('DD MMM YYYY') : '-',
     },
     {
       title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
+      dataIndex: 'entryType',
+      key: 'entryType',
       width: 110,
       render: (val) => GATE_PASS_TYPE.find((g) => g.value === val)?.label || val,
     },
