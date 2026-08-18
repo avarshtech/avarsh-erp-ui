@@ -89,6 +89,7 @@ import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileSe
 import { searchVariants } from '../../services/master/variantService';
 import { getAllCategories } from '../../services/master/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/master/processService';
+import { getAllSizePresets } from '../../services/master/sizePresetService';
 import { getActiveOverheads, createOverhead } from '../../services/master/overheadService';
 import { getSuppliers } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
@@ -183,6 +184,34 @@ const CostingForm = () => {
   // Watch Section A fields for display
   const watchedSeasonCode = Form.useWatch('seasonCode', form);
   const watchedSeasonYear = Form.useWatch('seasonYear', form);
+
+  // Sizes are picked from the Size Presets master, grouped by preset. A size that
+  // appears in several presets is offered once, under the first preset that carries
+  // it — duplicate values across option groups break AntD's multi-select.
+  const [sizePresetGroups, setSizePresetGroups] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    getAllSizePresets()
+      .then((res) => {
+        if (cancelled) return;
+        const presets = (res?.data ?? res ?? []).filter((p) => p.isActive !== false);
+        const seen = new Set();
+        const groups = presets
+          .map((p) => ({
+            label: p.name,
+            options: (p.sizes || [])
+              .map((s) => String(s).trim().toUpperCase())
+              .filter((s) => s && !seen.has(s) && seen.add(s))
+              .map((s) => ({ value: s, label: s })),
+          }))
+          .filter((g) => g.options.length > 0);
+        setSizePresetGroups(groups);
+      })
+      .catch(() => {
+        // Leave the options empty — the field's placeholder points at the master.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -1473,6 +1502,16 @@ const CostingForm = () => {
       message.error('Please select Buyer, Style and Garment before saving a draft.');
       return;
     }
+    // Sizes are mandatory even for drafts: the server enforces @NotEmpty(sizes) on
+    // every save, so blocking here shows the inline field error instead of letting
+    // the draft die on a server 400 (B-052).
+    try {
+      await form.validateFields(['sizes']);
+    } catch {
+      form.scrollToField('sizes');
+      message.error('At least one size is required — select sizes from a size preset.');
+      return;
+    }
     // For draft, validate but allow save even with warnings for optional fields
     let values;
     try {
@@ -2627,17 +2666,16 @@ const CostingForm = () => {
                   rules={[{ required: true, message: 'At least one size is required' }]}
                 >
                   <Select
-                    mode="tags"
-                    placeholder="Select or type sizes (e.g. S, M, L, XL)"
+                    // Selection-only from the Size Presets master — free-typed sizes
+                    // drifted from the presets the order matrix is built on (B-052).
+                    mode="multiple"
+                    showSearch
+                    placeholder={sizePresetGroups.length
+                      ? 'Select sizes from a size preset'
+                      : 'No size presets defined — add one in Size Presets master'}
                     style={{ width: '100%' }}
-                    tokenSeparators={[',']}
-                    options={['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'].map((s) => ({ value: s, label: s }))}
-                    onChange={(vals) => {
-                      // Normalise to upper-case + de-duplicate so "s" and "S" never coexist (CR C-15)
-                      const norm = [...new Set((vals || []).map((v) => String(v).trim().toUpperCase()).filter(Boolean))];
-                      form.setFieldsValue({ sizes: norm });
-                      setIsDirty(true);
-                    }}
+                    options={sizePresetGroups}
+                    onChange={() => setIsDirty(true)}
                   />
                 </Form.Item>
               </Col>

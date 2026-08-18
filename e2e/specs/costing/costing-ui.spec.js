@@ -178,6 +178,49 @@ test.describe('Costing — Create & Validation (UI)', () => {
     await expect(page).toHaveURL(/\/costing\/list/, { timeout: 15000 });
   });
 
+  test('Draft save without sizes is blocked inline; sizes offer preset options only (B-052)', async ({ page }) => {
+    // Sizes became preset-driven and mandatory for DRAFTS too: the client must block
+    // with the inline field error instead of letting the server 400 the save.
+    const api = await createAuthenticatedClient();
+    const { data: style } = await api.post('/styles', stylePayload(1));
+    await api.dispose();
+
+    await navigateWithAuth(page, '/costing/new');
+    await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
+
+    await pickFormSelect(page, '#buyerId', null);
+    await page.waitForTimeout(800);
+    await page.locator('#styleNo').click();
+    await page.keyboard.type(style.styleNo, { delay: 20 });
+    await page.waitForTimeout(400);
+    await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+      .locator('.ant-select-item-option').filter({ hasText: style.styleNo }).first()
+      .click({ timeout: 10000 });
+    await page.waitForTimeout(400);
+
+    // Attempt the draft save with sizes EMPTY — must be refused with no POST fired.
+    let posted = false;
+    page.on('request', (r) => {
+      if (r.url().includes('/cost-sheets') && r.method() === 'POST') posted = true;
+    });
+    await page.getByRole('button', { name: /Save as Draft/i }).click();
+    await expect(page.getByText('At least one size is required').first()).toBeVisible({ timeout: 8000 });
+    expect(posted, 'no save request may leave the browser').toBe(false);
+
+    // The sizes dropdown offers ONLY preset-master options (grouped) — no free typing.
+    await page.locator('#sizes').click();
+    const dd = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    await expect(dd.locator('.ant-select-item-group').first()).toBeVisible({ timeout: 8000 });
+    await page.keyboard.type('ZZZ-NOT-A-SIZE');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter'); // tags mode would commit this; multiple mode must not
+    await page.keyboard.press('Escape');
+    const chosen = await page.locator('#sizes').evaluate(
+      (el) => el.closest('.ant-select')?.innerText || '',
+    );
+    expect(chosen).not.toContain('ZZZ-NOT-A-SIZE');
+  });
+
   test('Submitting an empty form surfaces required-field validation', async ({ page }) => {
     await navigateWithAuth(page, '/costing/new');
     await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
