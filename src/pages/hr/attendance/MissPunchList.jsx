@@ -81,7 +81,9 @@ const MissPunchList = () => {
       setSubmitting(true);
       const payload = {
         employeeId: values.employeeId,
-        date: values.date.format('YYYY-MM-DD'),
+        // The API field is requestDate. Sending `date` left request_date null,
+        // which the NOT NULL column rejected.
+        requestDate: values.date.format('YYYY-MM-DD'),
         punchType: values.punchType,
         correctedTime: values.correctedTime.format('HH:mm'),
         reason: values.reason,
@@ -104,8 +106,8 @@ const MissPunchList = () => {
     { title: 'Employee Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
     {
       title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
+      dataIndex: 'requestDate',
+      key: 'requestDate',
       width: 120,
       render: (val) => val ? dayjs(val).format('DD MMM YYYY') : '-',
     },
