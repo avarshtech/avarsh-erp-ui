@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Button, Card, Drawer, Empty, Select, Space, Table, Tag, Typography,
+  Button, Card, Drawer, Empty, Input, Space, Table, Tag, Typography,
 } from 'antd';
 import { EyeOutlined, ReloadOutlined, AuditOutlined } from '@ant-design/icons';
 import { getPendingApprovals, getApprovalHistory } from '../../services/core/approvalFlowService';
@@ -16,6 +16,16 @@ const { Title, Text } = Typography;
 const entityLabel = (value) =>
   ENTITY_TYPES.find((t) => t.value === value)?.label || value;
 
+const AGING_WARN_HOURS = 48;
+
+/** Compact "how long has this been waiting" label, e.g. "3h" / "2d 5h". */
+const waitingFor = (submittedAt) => {
+  if (!submittedAt) return null;
+  const hours = Math.max(0, Math.floor((Date.now() - new Date(submittedAt).getTime()) / 3600000));
+  const label = hours < 1 ? '<1h' : hours < 24 ? `${hours}h` : `${Math.floor(hours / 24)}d ${hours % 24}h`;
+  return { hours, label };
+};
+
 /**
  * "My Approvals" inbox — all pending approval requests across modules
  * that the current user can act on (server-filtered by user/role level match).
@@ -25,8 +35,16 @@ const MyApprovals = () => {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
   const [typeFilter, setTypeFilter] = useState(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(null);
   const [selectedHistory, setSelectedHistory] = useState([]);
+
+  // Debounce free-text search (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => setSearch(searchInput.trim().toLowerCase()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,14 +74,20 @@ const MyApprovals = () => {
   }, []);
 
   const dataSource = useMemo(
-    () => (typeFilter ? requests.filter((r) => r.entityType === typeFilter) : requests),
-    [requests, typeFilter],
+    () => requests.filter((r) =>
+      (!typeFilter || r.entityType === typeFilter) &&
+      (!search
+        || r.entityReference?.toLowerCase().includes(search)
+        || r.approvalFlowName?.toLowerCase().includes(search)
+        || r.submittedByName?.toLowerCase().includes(search))),
+    [requests, typeFilter, search],
   );
 
-  const presentTypes = useMemo(
-    () => [...new Set(requests.map((r) => r.entityType))],
-    [requests],
-  );
+  const presentTypes = useMemo(() => {
+    const counts = new Map();
+    requests.forEach((r) => counts.set(r.entityType, (counts.get(r.entityType) || 0) + 1));
+    return [...counts.entries()].map(([type, count]) => ({ type, count }));
+  }, [requests]);
 
   const columns = useMemo(() => [
     {
@@ -88,7 +112,23 @@ const MyApprovals = () => {
       title: 'Submitted At',
       dataIndex: 'submittedAt',
       key: 'submittedAt',
+      sorter: (a, b) => new Date(a.submittedAt) - new Date(b.submittedAt),
       render: (ts) => (ts ? new Date(ts).toLocaleString() : '—'),
+    },
+    {
+      title: 'Waiting',
+      key: 'waiting',
+      width: 100,
+      sorter: (a, b) => new Date(a.submittedAt) - new Date(b.submittedAt),
+      render: (_, r) => {
+        const aging = waitingFor(r.submittedAt);
+        if (!aging) return '—';
+        return (
+          <Tag color={aging.hours >= AGING_WARN_HOURS ? 'warning' : 'default'}>
+            {aging.label}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Waiting At',
@@ -122,20 +162,35 @@ const MyApprovals = () => {
 
   return (
     <div style={{ padding: '0 4px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
         <Title level={4} style={{ margin: 0 }}>My Approvals</Title>
         <Space>
-          <Select
+          <Input.Search
             allowClear
-            placeholder="Filter by type"
-            style={{ width: 200 }}
-            value={typeFilter}
-            onChange={setTypeFilter}
-            options={presentTypes.map((t) => ({ value: t, label: entityLabel(t) }))}
+            placeholder="Search reference, flow, submitter"
+            style={{ width: 260 }}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
           <Button icon={<ReloadOutlined />} onClick={load}>Refresh</Button>
         </Space>
       </div>
+      {presentTypes.length > 1 && (
+        <Space wrap size={4} style={{ marginBottom: 12 }}>
+          <Tag.CheckableTag checked={!typeFilter} onChange={() => setTypeFilter(null)}>
+            All ({requests.length})
+          </Tag.CheckableTag>
+          {presentTypes.map(({ type, count }) => (
+            <Tag.CheckableTag
+              key={type}
+              checked={typeFilter === type}
+              onChange={(checked) => setTypeFilter(checked ? type : null)}
+            >
+              {entityLabel(type)} ({count})
+            </Tag.CheckableTag>
+          ))}
+        </Space>
+      )}
 
       <Card styles={{ body: { padding: 0 } }}>
         <Table
@@ -145,7 +200,7 @@ const MyApprovals = () => {
           columns={columns}
           dataSource={dataSource}
           scroll={{ x: 900 }}
-          pagination={{ pageSize: 10, showSizeChanger: false }}
+          pagination={{ defaultPageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50] }}
           locale={{
             emptyText: (
               <Empty

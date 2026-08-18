@@ -1,13 +1,16 @@
 import { memo } from 'react';
-import { Card, Tag, Button, Typography } from 'antd';
-import { getModuleColor, getModuleIcon } from '../../../utils/reportConstants';
+import { Card, Tag, Button, Typography, Space, Tooltip } from 'antd';
+import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { getModuleColor, getModuleIcon, getModuleLabel } from '../../../utils/reportConstants';
+import PermissionGuard from '../../../components/PermissionGuard';
+import { DeleteConfirm } from '../../../components/buttons';
 
 const { Paragraph } = Typography;
 
 // Re-export for backward compatibility
 export { getModuleColor };
 
-const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
+const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen, onEdit, onDelete }) {
   const Icon = getModuleIcon(report.module);
   const color = getModuleColor(report.module);
 
@@ -72,7 +75,7 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
 
       {report.module && (
         <Tag color={color} style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-          {report.module.replace(/_/g, ' ')}
+          {getModuleLabel(report.module)}
         </Tag>
       )}
 
@@ -84,9 +87,33 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen }) {
         {report.description || 'No description available.'}
       </Paragraph>
 
-      <Button type="primary" block onClick={() => onOpen(report.id)}>
-        Open Report
-      </Button>
+      <Space.Compact block>
+        {/* flex:1 rather than `block` — `block` forces 100% width inside a compact
+            group and squeezes the edit/delete buttons out of view entirely. */}
+        <Button type="primary" style={{ flex: 1 }} onClick={() => onOpen(report.id)}>
+          Open Report
+        </Button>
+        {onEdit && (
+          <PermissionGuard module="reports" operation="update">
+            <Tooltip title="Edit report">
+              <Button icon={<EditOutlined />} onClick={() => onEdit(report)} />
+            </Tooltip>
+          </PermissionGuard>
+        )}
+        {onDelete && (
+          <PermissionGuard module="reports" operation="delete">
+            <DeleteConfirm
+              title="Delete Report"
+              recordLabel={report.displayName}
+              onConfirm={() => onDelete(report)}
+            >
+              {/* Native title rather than <Tooltip>: nesting Tooltip inside Popconfirm
+                  interferes with the trigger that opens the confirmation. */}
+              <Button danger icon={<DeleteOutlined />} title="Delete report" />
+            </DeleteConfirm>
+          </PermissionGuard>
+        )}
+      </Space.Compact>
     </Card>
   );
 });

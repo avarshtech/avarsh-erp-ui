@@ -5,6 +5,7 @@ import {
   CloseCircleOutlined,
   RollbackOutlined,
   ClockCircleOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import { APPROVAL_STATUS_CONFIG } from '../../utils/approvalFlowConstants';
 
@@ -14,6 +15,7 @@ const ACTION_META = {
   APPROVE: { color: 'green', icon: <CheckCircleOutlined />, label: 'Approved' },
   REJECT: { color: 'red', icon: <CloseCircleOutlined />, label: 'Rejected' },
   REFER_BACK: { color: 'orange', icon: <RollbackOutlined />, label: 'Referred Back' },
+  CANCEL: { color: 'gray', icon: <StopOutlined />, label: 'Cancelled' },
 };
 
 const formatTs = (ts) => (ts ? new Date(ts).toLocaleString() : '');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { App, Space } from 'antd';
-import { SendOutlined, CheckCircleOutlined, CloseCircleOutlined, RollbackOutlined, StopOutlined } from '@ant-design/icons';
+import { SendOutlined, StopOutlined } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
 import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
 import { PROD_PO_STATUS, PO_ACTION, PO_TYPE_META } from '../../../utils/productionConstants';
@@ -14,25 +14,23 @@ const CHANGE_FN = {
   FINISHING: changeFinishingPoStatus,
 };
 
-// Dialog config per action.
+// Dialog config per action. Approve/Reject/Refer-Back are NOT offered here —
+// pending-approval decisions go through the shared level-aware ApprovalActionBar
+// (centralised approval engine); this bar only handles submit and cancel.
 const DIALOGS = {
-  [PO_ACTION.SUBMIT]:     { label: 'Submit', color: '#1677ff', icon: <SendOutlined />, title: 'Submit for Approval', subtitle: 'Sends this PO to the Production Manager for approval.', btnText: 'Submit', requiresReason: false },
-  [PO_ACTION.APPROVE]:    { label: 'Approve', color: '#389e0d', icon: <CheckCircleOutlined />, title: 'Approve PO', subtitle: 'Approves the PO and soft-allocates material in Inventory.', btnText: 'Approve', requiresReason: false },
-  [PO_ACTION.REFER_BACK]: { label: 'Refer Back', color: '#d48806', icon: <RollbackOutlined />, title: 'Refer Back to Draft', subtitle: 'Returns the PO to the creator for changes.', btnText: 'Refer Back', requiresReason: true, minChars: 10 },
-  [PO_ACTION.REJECT]:     { label: 'Reject', color: '#cf1322', icon: <CloseCircleOutlined />, title: 'Reject PO', subtitle: 'Rejects this PO. This is terminal.', btnText: 'Reject', requiresReason: true, danger: true, minChars: 10 },
-  [PO_ACTION.CANCEL]:     { label: 'Cancel', color: '#cf1322', icon: <StopOutlined />, title: 'Cancel PO', subtitle: 'Cancels the PO and reverses any inventory allocation.', btnText: 'Cancel PO', requiresReason: true, danger: true, minChars: 10 },
+  [PO_ACTION.SUBMIT]: { label: 'Submit', color: '#1677ff', icon: <SendOutlined />, title: 'Submit for Approval', subtitle: 'Sends this PO into the approval workflow.', btnText: 'Submit', requiresReason: false },
+  [PO_ACTION.CANCEL]: { label: 'Cancel', color: '#cf1322', icon: <StopOutlined />, title: 'Cancel PO', subtitle: 'Cancels the PO and reverses any inventory allocation.', btnText: 'Cancel PO', requiresReason: true, danger: true, minChars: 10 },
 };
 
 const actionsForStatus = (status) => {
   switch (status) {
-    case PROD_PO_STATUS.DRAFT:            return [PO_ACTION.SUBMIT, PO_ACTION.CANCEL];
-    case PROD_PO_STATUS.PENDING_APPROVAL: return [PO_ACTION.APPROVE, PO_ACTION.REFER_BACK, PO_ACTION.REJECT];
-    case PROD_PO_STATUS.APPROVED:         return [PO_ACTION.CANCEL];
-    default:                              return [];
+    case PROD_PO_STATUS.DRAFT:    return [PO_ACTION.SUBMIT, PO_ACTION.CANCEL];
+    case PROD_PO_STATUS.APPROVED: return [PO_ACTION.CANCEL];
+    default:                      return [];
   }
 };
 
-const BTN_ACTION = { SUBMIT: 'send', APPROVE: 'approve', REFER_BACK: 'refer-back', REJECT: 'reject', CANCEL: 'cancel' };
+const BTN_ACTION = { SUBMIT: 'send', CANCEL: 'cancel' };
 
 /** Status workflow action bar (PRD §7.1) + reason dialog. */
 const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) => {

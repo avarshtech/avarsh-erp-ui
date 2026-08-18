@@ -410,7 +410,7 @@ export const PERMISSION_GROUPS = [
       { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
-      { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
+      { id: 'reports', name: 'Reports & Analytics', operations: STANDARD_OPERATIONS, path: '/reports/list' },
       { id: 'ai-assistant', name: 'AI Assistant', operations: ['view'], linkedTo: 'reports', path: '/reports/ai-chat' },
     ],
   },
@@ -481,7 +481,8 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'grn-reversal')    return GRN_REVERSAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
-  if (moduleId === 'reports')              return ['view'];
+  // Admins design reports in-app (create/edit/delete definitions); everyone else runs them
+  if (moduleId === 'reports')              return STANDARD_OPERATIONS;
   if (moduleId === 'ai-assistant')        return ['view'];
   if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];

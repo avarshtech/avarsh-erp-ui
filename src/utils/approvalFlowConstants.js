@@ -17,6 +17,21 @@ export const ENTITY_TYPES = [
   { value: 'FINISHING_PO', label: 'Finishing PO' },
 ];
 
+/**
+ * Entity-type options for flow creation. GRN is disabled: it has no approval
+ * hooks in the backend (submit goes straight to QC), so a GRN flow would
+ * collect decisions that never apply to the document.
+ */
+export const FLOW_ENTITY_TYPE_OPTIONS = ENTITY_TYPES.map((t) =>
+  t.value === 'GRN'
+    ? {
+        ...t,
+        disabled: true,
+        title: 'GRN approval happens through QC — a flow on GRN would have no effect. Use QC or GRN Reversal instead.',
+      }
+    : t,
+);
+
 export const ENTITY_TYPE_COLORS = {
   PURCHASE_ORDER: 'blue',
   COST_SHEET: 'purple',
@@ -88,6 +103,10 @@ export const CONDITION_OPERATORS = [
   { value: 'EQ', label: '=' },
   { value: 'NEQ', label: '!=' },
 ];
+
+/** Definition of a condition field (label/type/options) for an entity type. */
+export const getConditionField = (entityType, field) =>
+  (CONDITION_FIELDS[entityType] || []).find((f) => f.value === field);
 
 export const CONDITION_FIELDS = {
   PURCHASE_ORDER: [

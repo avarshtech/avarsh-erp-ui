@@ -7,15 +7,17 @@ import {
   Switch,
   Badge,
   Select,
-  message,
+  Input,
+  Popover,
   Tooltip,
   App,
 } from 'antd';
 import {
   PlusOutlined,
   ApartmentOutlined,
-  ExclamationCircleOutlined,
   CopyOutlined,
+  LockOutlined,
+  ArrowRightOutlined,
 } from '@ant-design/icons';
 import {
   getApprovalFlows,
@@ -33,12 +35,13 @@ import { getTablePagination } from '../../utils/paginationConfig';
 import ApprovalFlowForm from './ApprovalFlowForm';
 
 const ApprovalFlowList = () => {
-  const { modal } = App.useApp();
+  const { message } = App.useApp();
   const [flows, setFlows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editingFlow, setEditingFlow] = useState(null);
   const [entityTypeFilter, setEntityTypeFilter] = useState(null);
+  const [search, setSearch] = useState('');
   const [togglingIds, setTogglingIds] = useState(new Set());
 
   const fetchFlows = useCallback(async () => {
@@ -118,9 +121,11 @@ const ApprovalFlowList = () => {
   }, [handleDrawerClose, fetchFlows]);
 
   const filteredFlows = useMemo(() => {
-    if (!entityTypeFilter) return flows;
-    return flows.filter(f => f.entityType === entityTypeFilter);
-  }, [flows, entityTypeFilter]);
+    const term = search.trim().toLowerCase();
+    return flows.filter(f =>
+      (!entityTypeFilter || f.entityType === entityTypeFilter) &&
+      (!term || f.name?.toLowerCase().includes(term) || f.description?.toLowerCase().includes(term)));
+  }, [flows, entityTypeFilter, search]);
 
   const columns = useMemo(() => [
     {
@@ -132,6 +137,11 @@ const ApprovalFlowList = () => {
         <Space>
           <ApartmentOutlined style={{ color: '#6366f1' }} />
           <a onClick={() => handleEdit(record)}>{text}</a>
+          {record.hasHistory && (
+            <Tooltip title="Levels locked — documents were already routed through this flow. Clone to restructure.">
+              <LockOutlined style={{ color: '#faad14' }} />
+            </Tooltip>
+          )}
         </Space>
       ),
     },
@@ -151,7 +161,25 @@ const ApprovalFlowList = () => {
       key: 'levelsCount',
       width: 90,
       align: 'center',
-      render: (count) => <Badge count={count} showZero color="#6366f1" />,
+      render: (count, record) => (
+        <Popover
+          title="Approval chain"
+          content={
+            <Space wrap size={6}>
+              {(record.levels || []).map((level, index) => (
+                <Space key={level.levelNumber} size={6}>
+                  {index > 0 && <ArrowRightOutlined style={{ color: '#d9d9d9', fontSize: 10 }} />}
+                  <Tag style={{ marginInlineEnd: 0 }}>
+                    {level.levelNumber}. {level.levelName || level.approverRoleName || level.approverUserName || `Level ${level.levelNumber}`}
+                  </Tag>
+                </Space>
+              ))}
+            </Space>
+          }
+        >
+          <Badge count={count} showZero color="#6366f1" style={{ cursor: 'pointer' }} />
+        </Popover>
+      ),
     },
     {
       title: 'Priority',
@@ -205,7 +233,9 @@ const ApprovalFlowList = () => {
       render: (_, record) => (
         <Space size="small">
           <PermissionGuard module="approval-flows" operation="update">
-            <ActionButton type="edit" onClick={() => handleEdit(record)} />
+            <Tooltip title={record.hasHistory ? 'Edit (levels locked — clone to restructure)' : undefined}>
+              <ActionButton type="edit" onClick={() => handleEdit(record)} />
+            </Tooltip>
           </PermissionGuard>
           <PermissionGuard module="approval-flows" operation="add">
             <Tooltip title="Clone as a new inactive flow (use this to change levels of a flow with history)">
@@ -215,11 +245,11 @@ const ApprovalFlowList = () => {
           <PermissionGuard module="approval-flows" operation="delete">
             <DeleteConfirm
               title="Delete Approval Flow"
-              description={record.pendingRequestsCount > 0
-                ? 'This flow has pending requests and cannot be deleted.'
+              description={record.hasHistory || record.pendingRequestsCount > 0
+                ? 'This flow has approval requests and cannot be deleted. Deactivate it instead.'
                 : `Are you sure you want to delete "${record.name}"?`}
               onConfirm={() => handleDelete(record.id)}
-              disabled={record.pendingRequestsCount > 0}
+              disabled={record.hasHistory || record.pendingRequestsCount > 0}
             />
           </PermissionGuard>
         </Space>
@@ -235,14 +265,23 @@ const ApprovalFlowList = () => {
       />
       <Card>
         <Space style={{ marginBottom: 16, width: '100%', justifyContent: 'space-between' }} wrap>
-          <Select
-            placeholder="Filter by Entity Type"
-            allowClear
-            style={{ width: 200 }}
-            value={entityTypeFilter}
-            onChange={setEntityTypeFilter}
-            options={ENTITY_TYPES}
-          />
+          <Space wrap>
+            <Input.Search
+              placeholder="Search flows"
+              allowClear
+              style={{ width: 220 }}
+              onSearch={setSearch}
+              onChange={(e) => !e.target.value && setSearch('')}
+            />
+            <Select
+              placeholder="Filter by Entity Type"
+              allowClear
+              style={{ width: 200 }}
+              value={entityTypeFilter}
+              onChange={setEntityTypeFilter}
+              options={ENTITY_TYPES}
+            />
+          </Space>
           <PermissionGuard module="approval-flows" operation="add">
             <ActionButton
               type="add"
@@ -276,6 +315,7 @@ const ApprovalFlowList = () => {
         onClose={handleDrawerClose}
         onSuccess={handleSaveSuccess}
         editingFlow={editingFlow}
+        onSwitchFlow={(clone) => { fetchFlows(); setEditingFlow(clone); }}
       />
     </>
   );

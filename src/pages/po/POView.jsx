@@ -66,6 +66,7 @@ import {
   cancelPurchaseOrder,
 } from '../../services/po/purchaseOrderService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import { updateBomLinePoStatus } from '../../services/bom/bomService';
 import PermissionGuard from '../../components/PermissionGuard';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -1259,6 +1260,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
 
             {/* ===== BODY CONTENT (scrollable) ===== */}
             <div style={{ padding: '20px 32px 24px', flex: 1, overflowY: 'auto', minHeight: 0 }}>
+              <ApprovalHistoryPanel entityType="PURCHASE_ORDER" entityId={po.id} style={{ marginBottom: 16 }} />
               {/* Detail Cards Row */}
               <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
                 <Col xs={24} md={16}>

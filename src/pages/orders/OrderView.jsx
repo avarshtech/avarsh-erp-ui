@@ -20,6 +20,7 @@ import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import { changeOrderStatus } from '../../services/orders/orderService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import {
   hasPermission,
@@ -562,6 +563,8 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             size="small"
           />
         </div>
+
+        <ApprovalHistoryPanel entityType="ORDER" entityId={orderData.id} style={{ marginBottom: 16 }} />
 
         {/* ── Refer-back request input ── */}
         {showReferBackInput && (

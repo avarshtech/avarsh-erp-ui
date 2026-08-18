@@ -29,6 +29,7 @@ import {
   rejectCostSheet,
 } from '../../services/costing/costingService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import {
   COSTING_STATUS,
   EDITABLE_STATUSES,
@@ -72,13 +73,18 @@ const CostingView = () => {
   const canApprove = hasPermission('costing-approval', 'approve');
   const canRevise = canReviseCostSheet();
 
-  // Handle deep link from push notification (?action=approve)
+  // Handle deep link from push notification (?action=approve).
+  // Never auto-approve: highlight the approval bar so the decision stays with
+  // the user and goes through the approval engine's level checks.
   const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightApproval, setHighlightApproval] = useState(false);
   useEffect(() => {
     const action = searchParams.get('action');
     if (action && data && !loading) {
-      if (action === 'approve' && data.status === COSTING_STATUS.FINAL && canApprove) {
-        handleApprove();
+      if (action === 'approve' && data.status === COSTING_STATUS.FINAL) {
+        setHighlightApproval(true);
+        message.info('Review this cost sheet and use the Approve action above.');
+        setTimeout(() => setHighlightApproval(false), 4000);
       }
       searchParams.delete('action');
       setSearchParams(searchParams, { replace: true });
@@ -619,19 +625,26 @@ const CostingView = () => {
           {/* Approve/Reject route through the centralized approval engine when a flow
               is configured; legacy direct buttons are the no-flow fallback. */}
           {data.status === COSTING_STATUS.FINAL && (
-            <ApprovalActionBar
-              entityType="COST_SHEET"
-              entityId={data.id}
-              docLabel="Cost Sheet"
-              docNumber={data.costingId}
-              onActionComplete={() => loadData()}
-              fallback={canApprove ? (
-                <Space>
-                  <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
-                  <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
-                </Space>
-              ) : null}
-            />
+            <span style={{
+              display: 'inline-block',
+              borderRadius: 8,
+              transition: 'box-shadow 0.3s',
+              boxShadow: highlightApproval ? '0 0 0 3px var(--primary-color, #1677ff)' : 'none',
+            }}>
+              <ApprovalActionBar
+                entityType="COST_SHEET"
+                entityId={data.id}
+                docLabel="Cost Sheet"
+                docNumber={data.costingId}
+                onActionComplete={() => loadData()}
+                fallback={canApprove ? (
+                  <Space>
+                    <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
+                    <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
+                  </Space>
+                ) : null}
+              />
+            </span>
           )}
           {data.status === COSTING_STATUS.FINAL && canRevise && (
             <ActionButton
@@ -651,6 +664,8 @@ const CostingView = () => {
         size="small"
         style={{ marginBottom: 16 }}
       />
+
+      <ApprovalHistoryPanel entityType="COST_SHEET" entityId={data.id} style={{ marginBottom: 16 }} />
 
       <Collapse
         defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
