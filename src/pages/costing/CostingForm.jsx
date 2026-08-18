@@ -255,7 +255,6 @@ const CostingForm = () => {
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
-  const [categoryOptions, setCategoryOptions] = useState([]);
 
   // Quick Add modal state
   const [quickAddProcessOpen, setQuickAddProcessOpen] = useState(false);
@@ -273,7 +272,7 @@ const CostingForm = () => {
   const [quickAddStyleImageUrl, setQuickAddStyleImageUrl] = useState(null);  // blob preview
   const canAddStyle = hasPermission('style-master', 'add');
   const canAddProcess = hasPermission('process-master', 'add');
-  // Quick-add now creates an Overhead master record, so it is gated on that module.
+  // Section E quick-add creates an Overhead master record, so it is gated on that module.
   const canAddOverhead = hasPermission('overhead-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -338,7 +337,6 @@ const CostingForm = () => {
         // Fetch categories to find Fabric, Local Trims, Imported Trims
         const catRes = await getAllCategories();
         const categories = catRes.data || catRes || [];
-        setCategoryOptions(categories.filter((c) => c.isActive !== false).map((c) => ({ value: c.name, label: c.name })));
 
         const fabricCat = categories.find((c) => c.name === 'Fabric');
         const localTrimCat = categories.find((c) => c.name?.toLowerCase().includes('local trim'));
@@ -374,11 +372,12 @@ const CostingForm = () => {
           importedTrim: effectiveImportedTrimCat?.name || '',
         });
 
-        // Fetch processes (Manufacturing), processes (Overheads), and suppliers
+        // The two sections read different masters: Section D takes Manufacturing
+        // processes from the PROCESS master, Section E takes rows from the OVERHEAD
+        // master (mst_overheads) — overhead rows are a FK to it and CostSheetService
+        // resolves their description from it.
         const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
           getActiveProcesses('Manufacturing'),
-          // Overhead rows are a FK to the OVERHEADS master (mst_overheads), not to
-          // processes — CostSheetService resolves the row description from it.
           getActiveOverheads(),
           getSuppliers(),
         ]);
@@ -3581,7 +3580,9 @@ const CostingForm = () => {
         <Form form={quickAddProcessForm} layout="vertical" onFinish={async (values) => {
           setQuickAddProcessLoading(true);
           try {
-            const created = await createProcess({ ...values, isActive: true });
+            // Section D only ever lists 'Manufacturing' processes, so the category
+            // is implied — asking for it could only produce an unusable record.
+            const created = await createProcess({ ...values, category: 'Manufacturing', isActive: true });
             setManufacturingProcesses((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
             if (pendingMfgRowKey) {
               updateManufacturingRow(pendingMfgRowKey, {
@@ -3601,14 +3602,6 @@ const CostingForm = () => {
         }}>
           <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
             <Input placeholder="e.g. Cutting, Sewing, Washing" maxLength={200} />
-          </Form.Item>
-          <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]} initialValue="Manufacturing">
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Select category"
-              options={categoryOptions}
-            />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">
             <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />

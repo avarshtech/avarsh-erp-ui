@@ -278,11 +278,18 @@ const BOMForm = () => {
     if (dropdownFetchedRef.current) return;
     dropdownFetchedRef.current = true;
     const loadData = async () => {
-      const [processResult, metaResult, partsResult] = await Promise.allSettled([getActiveProcesses(), getItemMetaData(), getActiveParts()]);
-      if (processResult.status === 'fulfilled') {
-        const res = processResult.value;
-        setProcessesList(Array.isArray(res) ? res : res?.data || []);
-      }
+      // BOM only ever offers Fabric and Trims processes — the cost categories
+      // (Manufacturing / Overheads) belong to the cost sheet. Ask the server for
+      // just those two rather than pulling every process and filtering client-side.
+      const [fabricResult, trimResult, metaResult, partsResult] = await Promise.allSettled([
+        getActiveProcesses('Fabric'), getActiveProcesses('Trims'), getItemMetaData(), getActiveParts(),
+      ]);
+      const unwrap = (r) => {
+        if (r.status !== 'fulfilled') return [];
+        const res = r.value;
+        return Array.isArray(res) ? res : res?.data || [];
+      };
+      setProcessesList([...unwrap(fabricResult), ...unwrap(trimResult)]);
       if (metaResult.status === 'fulfilled') {
         const res = metaResult.value;
         setMetaData(Array.isArray(res) ? res : res?.data || []);
@@ -1191,22 +1198,17 @@ const BOMForm = () => {
   /**
    * Filtered process options per line category.
    *
-   * `Process.category` serves two consumers with different taxonomies: the cost sheet
-   * queries it for 'Manufacturing' / 'Overheads', while this filter was written for a
-   * material-based tagging ('fabric' / 'trims' / 'general'). Since a process can only
-   * carry one category, manufacturing processes — cutting, sewing, finishing — are
-   * applicable to fabric and trim lines alike and must be offered on both; without this
-   * the dropdown is empty for every BOM line. Overheads are excluded: an overhead is a
-   * cost-sheet concept, not a BOM line process.
+   * `Process.category` routes a process to exactly one consumer: 'Manufacturing'
+   * belongs to cost sheet Section D and carries a default cost, while 'Fabric' and
+   * 'Trims' belong here and carry the allowance defaults that ProcessAllowanceModal
+   * seeds. A fabric line therefore offers only Fabric processes and a trims line only
+   * Trims processes — Manufacturing processes never appear in BOM.
    */
   const getProcessOptionsForLine = useCallback((line) => {
-    const fabric = isFabricCategory(line);
-    const matchCategory = fabric ? 'fabric' : 'trims';
-    return allProcessOptions.filter((opt) => {
-      const cat = (opt.process.category || '').toLowerCase();
-      if (cat === 'overheads') return false;
-      return !cat || cat === 'general' || cat === 'manufacturing' || cat === matchCategory;
-    });
+    const matchCategory = isFabricCategory(line) ? 'fabric' : 'trims';
+    return allProcessOptions.filter(
+      (opt) => (opt.process.category || '').toLowerCase() === matchCategory,
+    );
   }, [allProcessOptions]);
 
   // Backward-compat: flat list used in other places (allowance dialog, payload builder)
