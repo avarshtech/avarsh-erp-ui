@@ -59,13 +59,16 @@ const AttendanceCalendar = () => {
     setLoading(true);
     try {
       const data = await getAttendanceCalendar(employeeId, currentMonth.year(), currentMonth.month() + 1);
+      // The API returns an AttendanceCalendarDTO object, not a bare array - the
+      // days live under `days`. Treating the response itself as an array threw
+      // a TypeError that the empty catch below reported as a load failure.
       const map = {};
-      (data || []).forEach((item) => {
+      (data?.days || []).forEach((item) => {
         map[item.date] = item;
       });
       setCalendarData(map);
-    } catch {
-      message.error('Failed to load attendance calendar');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to load attendance calendar');
     } finally {
       setLoading(false);
     }
