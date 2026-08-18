@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findOrCreateTestPO, fabricGrnPayload, trimsGrnPayload, fabricQcPayload, trimsQcPayload,
-  submitGrn, submitQc, getTrimsQCCriteria,
+  submitGrn, submitQc, getTrimsQCCriteria, approveQc,
 } from '../../helpers/grn-qc-data.js';
 
 let api;
@@ -57,7 +57,7 @@ test.describe('Inventory — Stock Population from QC approval', () => {
 
     // 2) submit fabric QC, then 3) approve it
     const qc = await submitQc(api, fabricQcPayload(grn, item.id, { inspector: 'E2E Stock Inspector' }));
-    const approved = await api.post(`/qc/${qc.id}/approve`, { reason: 'Stock-population check' });
+    const approved = { data: await approveQc(api, qc.id, 'Stock-population check'), status: 200 };
     expect(approved.status).toBeGreaterThanOrEqual(200);
     expect(approved.status).toBeLessThan(300);
 
@@ -95,7 +95,7 @@ test.describe('Inventory — Stock Population from QC approval', () => {
       id: c.id, criteria: c.criteriaName || c.name, ok: true, notOk: false, remarks: '',
     }));
     const qc = await submitQc(api, trimsQcPayload(grn, item.id, criteriaRows, { inspector: 'E2E Stock Inspector', qtyVerdict: 'MATCHED' }));
-    const approved = await api.post(`/qc/${qc.id}/approve`, { reason: 'Stock-population check' });
+    const approved = { data: await approveQc(api, qc.id, 'Stock-population check'), status: 200 };
     expect(approved.status).toBeGreaterThanOrEqual(200);
     expect(approved.status).toBeLessThan(300);
 
@@ -121,7 +121,7 @@ test.describe('Inventory — Stock Population from QC approval', () => {
       [item.id]: [{ rollNumber: `R-CP-${s}`, receivingQty: qty, shadeLot: `SL-${s}` }],
     }));
     const qc = await submitQc(api, fabricQcPayload(grn, item.id, { inspector: 'E2E CP Inspector' }));
-    const approved = await api.post(`/qc/${qc.id}/approve`, { reason: 'Conditional', conditionalPass: true });
+    const approved = { data: await approveQc(api, qc.id, 'Conditional', { conditionalPass: true }), status: 200 };
     expect(approved.status).toBeGreaterThanOrEqual(200);
     expect(approved.status).toBeLessThan(300);
     expect(approved.data.status).toBe('Conditional_Pass');
