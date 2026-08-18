@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createMissPunch, getMissPunchByStatus, approveMissPunch, rejectMissPunch } from '../../../services/hr/missPunchService';
@@ -21,6 +21,10 @@ const MissPunchList = () => {
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // Detail view for a single request, opened by clicking its row.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+
   const canAdd = hasPermission('hr-attendance', 'add');
   const canApprove = hasPermission('hr-attendance', 'approve');
 
@@ -36,8 +40,8 @@ const MissPunchList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getMissPunchByStatus(status);
       setData(result || []);
-    } catch {
-      message.error('Failed to load miss punch requests');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to load miss punch requests');
     } finally {
       setLoading(false);
     }
@@ -51,25 +55,46 @@ const MissPunchList = () => {
     try {
       await approveMissPunch(id);
       message.success('Miss punch approved');
+      setDetailOpen(false);
       fetchData();
-    } catch {
-      message.error('Failed to approve');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to approve');
     }
   }, [fetchData, message]);
 
+  const openDetail = useCallback((record) => {
+    setSelected(record);
+    setDetailOpen(true);
+  }, []);
+
   const handleReject = useCallback(async (id) => {
+    let reason = '';
     modal.confirm({
       title: 'Reject Miss Punch Request?',
-      content: 'Are you sure you want to reject this request?',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>The requester will see this reason.</p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Why is this being rejected?"
+            onChange={(e) => { reason = e.target.value; }}
+          />
+        </div>
+      ),
       okText: 'Reject',
       okButtonProps: { danger: true },
       onOk: async () => {
+        if (!reason.trim()) {
+          message.error('A reason is required to reject');
+          return Promise.reject(new Error('reason required'));
+        }
         try {
-          await rejectMissPunch(id);
+          await rejectMissPunch(id, reason.trim());
           message.success('Miss punch rejected');
+          setDetailOpen(false);
           fetchData();
-        } catch {
-          message.error('Failed to reject');
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to reject');
         }
       },
     });
@@ -138,11 +163,19 @@ const MissPunchList = () => {
       render: (_, record) => {
         if (record.status !== 'PENDING' || !canApprove) return null;
         return (
+          // stopPropagation, otherwise clicking an action also opens the
+          // detail drawer behind the confirmation.
           <Space size="small">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
+            <Button
+              type="link" size="small" icon={<CheckOutlined />}
+              onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}
+            >
               Approve
             </Button>
-            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
+            <Button
+              type="link" size="small" danger icon={<CloseOutlined />}
+              onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}
+            >
               Reject
             </Button>
           </Space>
@@ -179,7 +212,80 @@ const MissPunchList = () => {
         scroll={{ x: 1100 }}
         size="small"
         pagination={{ pageSize: 25, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => openDetail(record),
+          style: { cursor: 'pointer' },
+        })}
       />
+
+      {/* Full detail for one request, with the actions available on it. The
+          inline row buttons only appear on pending rows, so without this there
+          was no way to read a request's full reason or see who approved it. */}
+      <Drawer
+        title="Miss Punch Request"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        width={460}
+        extra={
+          selected?.status === 'PENDING' && canApprove && (
+            <Space>
+              <Button
+                danger
+                icon={<CloseOutlined />}
+                onClick={() => handleReject(selected.id)}
+              >
+                Reject
+              </Button>
+              <Button
+                type="primary"
+                icon={<CheckOutlined />}
+                onClick={() => handleApprove(selected.id)}
+              >
+                Approve
+              </Button>
+            </Space>
+          )
+        }
+      >
+        {selected && (
+          <>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="Status">
+                {statusMap[selected.status]
+                  ? <Tag color={statusMap[selected.status].color}>{statusMap[selected.status].label}</Tag>
+                  : selected.status}
+              </Descriptions.Item>
+              <Descriptions.Item label="Employee No">{selected.employeeNo || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Employee">{selected.employeeName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Date">
+                {selected.requestDate ? dayjs(selected.requestDate).format('DD MMM YYYY') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Punch Type">
+                {PUNCH_TYPE.find((p) => p.value === selected.punchType)?.label || selected.punchType || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Corrected Time">{selected.correctedTime || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Raised On">
+                {selected.createdAt ? dayjs(selected.createdAt).format('DD MMM YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              {selected.status !== 'PENDING' && (
+                <Descriptions.Item label="Actioned On">
+                  {selected.approvedAt ? dayjs(selected.approvedAt).format('DD MMM YYYY HH:mm') : '-'}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {selected.status === 'PENDING' && !canApprove && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginTop: 16 }}
+                message="You do not have permission to approve or reject requests."
+              />
+            )}
+          </>
+        )}
+      </Drawer>
 
       <Drawer
         title="New Miss Punch Request"
