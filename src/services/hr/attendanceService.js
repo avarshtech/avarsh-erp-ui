@@ -68,6 +68,17 @@ export const unlockAttendanceMonth = async ({ factoryId, month, year }) => {
   return response.data;
 };
 
+/**
+ * Attendance totals for one employee over any range.
+ * GET /api/v1/hr/attendance/summary?employeeId=&fromDate=&toDate=
+ */
+export const getAttendanceSummary = async (employeeId, fromDate, toDate) => {
+  const response = await axiosInstance.get(`${BASE_URL}/summary`, {
+    params: { employeeId, fromDate, toDate },
+  });
+  return response.data;
+};
+
 // ----- spreadsheet import -----
 
 /**
