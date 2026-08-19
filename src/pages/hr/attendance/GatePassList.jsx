@@ -41,6 +41,7 @@ const GatePassList = () => {
       const result = await getGatePassByStatus(status);
       setData(result || []);
     } catch (err) {
+      setData([]); // don't leave the previous tab's rows looking like a success
       message.error(err?.response?.data?.message || 'Failed to load gate pass requests');
     } finally {
       setLoading(false);

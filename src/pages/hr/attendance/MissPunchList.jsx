@@ -41,6 +41,7 @@ const MissPunchList = () => {
       const result = await getMissPunchByStatus(status);
       setData(result || []);
     } catch (err) {
+      setData([]); // don't leave the previous tab's rows looking like a success
       message.error(err?.response?.data?.message || 'Failed to load miss punch requests');
     } finally {
       setLoading(false);

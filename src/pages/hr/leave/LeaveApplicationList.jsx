@@ -36,8 +36,12 @@ const LeaveApplicationList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getLeavesByStatus(status);
       setData(result || []);
-    } catch {
-      message.error('Failed to load leave applications');
+    } catch (err) {
+      // Clear on failure. Leaving the previous tab's rows on screen made a
+      // failed load look like a successful one, which is why switching tabs
+      // and back appeared to "fix" it.
+      setData([]);
+      message.error(err?.response?.data?.message || 'Failed to load leave applications');
     } finally {
       setLoading(false);
     }
@@ -52,8 +56,8 @@ const LeaveApplicationList = () => {
       await approveLeave(id);
       message.success('Leave approved');
       fetchData();
-    } catch {
-      message.error('Failed to approve leave');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to approve leave');
     }
   }, [fetchData, message]);
 
@@ -72,11 +76,15 @@ const LeaveApplicationList = () => {
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await rejectLeave(id, rejectReason);
+          if (!rejectReason.trim()) {
+            message.error('A reason is required to reject');
+            return Promise.reject(new Error('reason required'));
+          }
+          await rejectLeave(id, rejectReason.trim());
           message.success('Leave rejected');
           fetchData();
-        } catch {
-          message.error('Failed to reject leave');
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to reject leave');
         }
       },
     });
