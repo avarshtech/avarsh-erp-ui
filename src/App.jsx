@@ -48,6 +48,13 @@ const WorkOrderForm = lazy(() => import('./pages/po/workorder/WorkOrderForm'));
 const FinishingPoList = lazy(() => import('./pages/po/finishing/FinishingPoList'));
 const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/FinishingPoGenerateWizard'));
 const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
+// TNA (Time & Action) module — mock-data design phase (lazy-loaded)
+const TnaControlTower = lazy(() => import('./pages/tna/control-tower/ControlTower'));
+const TnaPlanPage = lazy(() => import('./pages/tna/plan/TnaPlanPage'));
+const TnaMyActivities = lazy(() => import('./pages/tna/MyActivities'));
+const TnaReplanInbox = lazy(() => import('./pages/tna/replan/ReplanInbox'));
+const TnaMastersPage = lazy(() => import('./pages/tna/masters/TnaMastersPage'));
+const TnaAnalytics = lazy(() => import('./pages/tna/analytics/TnaAnalytics'));
 const CuttingWorkspace = lazy(() => import('./pages/production/cutting/CuttingWorkspace'));
 const CutOrderPlanForm = lazy(() => import('./pages/production/cutting/CutOrderPlanForm'));
 const LayAuditForm = lazy(() => import('./pages/production/cutting/LayAuditForm'));
@@ -224,6 +231,13 @@ const ThemedApp = () => {
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
             {/* Production — Cutting (UI mock phase) */}
+            {/* TNA (Time & Action) module */}
+            <Route path="tna/control-tower" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
+            <Route path="tna/plan/:planId" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />
+            <Route path="tna/my-activities" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaMyActivities /></Suspense></PermissionRoute>} />
+            <Route path="tna/replans" element={<PermissionRoute module="tna-replan-approval"><Suspense fallback={<PageSkeleton />}><TnaReplanInbox /></Suspense></PermissionRoute>} />
+            <Route path="tna/masters" element={<PermissionRoute module="tna-masters"><Suspense fallback={<PageSkeleton />}><TnaMastersPage /></Suspense></PermissionRoute>} />
+            <Route path="tna/analytics" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaAnalytics /></Suspense></PermissionRoute>} />
             <Route path="production/cutting" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><CuttingWorkspace /></Suspense></PermissionRoute>} />
             <Route path="production/cutting/cop/new" element={<PermissionRoute module="production-cutting" operation="add"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
             <Route path="production/cutting/cop/:id" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />

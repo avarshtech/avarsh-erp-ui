@@ -36,6 +36,7 @@ import {
   TeamOutlined,
   AuditOutlined,
   ScissorOutlined,
+  FieldTimeOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -333,6 +334,19 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/tna",
+      icon: <FieldTimeOutlined />,
+      label: "Time & Action",
+      moduleId: ["tna", "tna-masters", "tna-replan-approval"],
+      children: [
+        { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
+        { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
+        { key: "/tna/replans", label: "Re-plan Approvals", moduleId: "tna-replan-approval" },
+        { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
+        { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
+      ],
+    },
+    {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
@@ -513,6 +527,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];
     if (path.startsWith('/production/cutting')) return ['/production/cutting'];
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
@@ -535,6 +550,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
+    if (path.startsWith("/tna")) return ["/tna"];
     if (path.startsWith("/production")) return ["/production"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
