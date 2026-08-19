@@ -24,10 +24,11 @@ export const approveLeave = async (id) => {
  * Reject a leave application with reason.
  * PUT /api/v1/hr/leaves/{id}/reject?reason=
  */
+// The API reads the reason from the request body. Sending it as a query
+// parameter left the body empty, and the endpoint rejected the call outright
+// with "Required request body is missing".
 export const rejectLeave = async (id, reason) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, null, {
-    params: { reason },
-  });
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, { reason });
   return response.data;
 };
 

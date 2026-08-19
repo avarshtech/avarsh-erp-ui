@@ -108,7 +108,8 @@ const LeaveApplicationList = () => {
       width: 120,
       render: (val) => val ? dayjs(val).format('DD MMM YYYY') : '-',
     },
-    { title: 'Days', dataIndex: 'totalDays', key: 'totalDays', width: 70, align: 'center' },
+    // The API field is `days`, not `totalDays` - this column was always blank.
+    { title: 'Days', dataIndex: 'days', key: 'days', width: 70, align: 'center' },
     {
       title: 'Half Day',
       dataIndex: 'isHalfDay',
