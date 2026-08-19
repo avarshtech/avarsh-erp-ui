@@ -42,6 +42,7 @@ import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
+import { consumeBuildChange, getDisplayVersion } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
@@ -175,7 +176,7 @@ const SidebarVersion = () => (
 );
 
 const MainLayoutInner = () => {
-  const { message } = App.useApp();
+  const { message, notification } = App.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -189,6 +190,25 @@ const MainLayoutInner = () => {
   // Auto-focus first input on route change + global keyboard shortcuts
   useFocusManagement();
   useKeyboardShortcuts();
+
+  // ── "You're on a new version" ──
+  // This layout only mounts once the user is signed in, so this fires on the
+  // first authenticated load of a build this browser has not run before — the
+  // first login after a deploy, for PWA and browser alike. consumeBuildChange()
+  // records the build, so it announces once per deploy and not again.
+  useEffect(() => {
+    if (!consumeBuildChange()) return;
+
+    const version = getDisplayVersion();
+    notification.success({
+      message: "Avarsh ERP Updated",
+      description: version
+        ? `You are now running version ${version}.`
+        : "You are now running the latest version.",
+      placement: "bottomRight",
+      duration: 6,
+    });
+  }, [notification]);
 
   // ── Pending approvals badge (refreshes on navigation + every 2 minutes) ──
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);

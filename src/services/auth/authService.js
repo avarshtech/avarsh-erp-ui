@@ -15,6 +15,7 @@ import {
   clearAll,
   executeTokenRefresh,
 } from './sessionStore';
+import { applyUpdate, checkForUpdate } from '../../utils/swRegistration';
 
 // ── PWA Detection ───────────────────────────────────────────────────────────
 
@@ -160,6 +161,11 @@ export const getToken = () => getAccessToken();
  * Calls the backend logout endpoint to revoke the refresh token and clear the HttpOnly cookie,
  * then clears the client-side session. Errors from the backend call are handled silently
  * to ensure the client-side cleanup always runs.
+ *
+ * Logout is also the update boundary for browser tabs: if a new build is waiting in
+ * the service worker it is activated here, so the next login always runs the latest
+ * code. When that happens the browser navigates to /login and nothing after the
+ * applyUpdate() call runs — callers must not rely on this resolving.
  */
 export const logoutUser = async () => {
   // Attempt server-side logout to revoke refresh token and clear the HttpOnly cookie.
@@ -171,6 +177,12 @@ export const logoutUser = async () => {
 
   clearAll();
   window.dispatchEvent(new Event('authChange'));
+
+  // Ask the server one last time rather than trusting the background check —
+  // a build deployed minutes ago may not have been picked up yet.
+  if (await checkForUpdate()) {
+    applyUpdate('/login');
+  }
 };
 
 // ── Session State Checks ────────────────────────────────────────────────────

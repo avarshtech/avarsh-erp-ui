@@ -1,6 +1,27 @@
+# ── Service worker ──────────────────────────────────────────────────────────
+# Never cache. This file gates every update: a stale copy means the browser
+# cannot tell that a new build exists at all.
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
 
+# ── App shell ───────────────────────────────────────────────────────────────
+# index.html names the content-hashed bundles, so a stale copy pins the whole
+# app to an old build. Netlify already defaults HTML to max-age=0,
+# must-revalidate — these make it explicit and survive a default change.
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# ── Web app manifest ────────────────────────────────────────────────────────
 /manifest.webmanifest
   Content-Type: application/manifest+json
   Cache-Control: no-cache
+
+# ── Build output ────────────────────────────────────────────────────────────
+# Vite fingerprints these filenames, so the content behind a given URL never
+# changes. Netlify's default (max-age=0) makes browsers revalidate every chunk
+# on every load, which is pure latency for immutable files.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

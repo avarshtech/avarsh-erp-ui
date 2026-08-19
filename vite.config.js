@@ -1,9 +1,31 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+
+// Identifies the build so the app can tell "this is a different deploy" apart
+// from "same deploy, new page load" — independent of whether releases have been
+// given real version numbers yet. Netlify sets COMMIT_REF on every build.
+const resolveBuildId = () => {
+  if (process.env.COMMIT_REF) return process.env.COMMIT_REF.slice(0, 7)
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim()
+  } catch {
+    return String(Date.now())
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_ID__: JSON.stringify(resolveBuildId()),
+  },
   plugins: [
     react(),
     VitePWA({
