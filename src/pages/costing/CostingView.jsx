@@ -27,8 +27,10 @@ import {
   updateCostSheet,
   approveCostSheet,
   rejectCostSheet,
+  revertCostSheetApproval,
 } from '../../services/costing/costingService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalReasonDialog from '../../components/ApprovalReasonDialog';
 import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import {
   COSTING_STATUS,
@@ -50,6 +52,22 @@ import { COSTING_STATUS_CONFIG, COSTING_STATUS_FLOW } from '../../utils/statusCo
 
 const { Text, Title } = Typography;
 
+// Post-approval reversal: sends an Approved sheet back to Draft so it can be edited.
+// Only offered while no order has been raised against the costing id.
+const REVERT_ACTION = {
+  key: 'revert-approval',
+  label: 'Revert Approval',
+  title: 'Revert Cost Sheet Approval',
+  subtitle: 'Reopen this approved cost sheet for editing. It moves back to Draft and must be re-submitted for approval after the changes.',
+  flowLabel: 'Approved → Draft',
+  btnText: 'Revert Approval',
+  icon: <RollbackOutlined />,
+  color: 'var(--warning-color, #faad14)',
+  requiresReason: true,
+  minChars: 50,
+  placeholder: 'Explain what needs to change on this approved costing — pricing, consumption, trims, or other corrections that justify reopening it...',
+};
+
 const CostingView = () => {
   const { message } = App.useApp();
   const { id } = useParams();
@@ -67,6 +85,9 @@ const CostingView = () => {
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertReason, setRevertReason] = useState('');
+  const [reverting, setReverting] = useState(false);
 
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
@@ -150,6 +171,20 @@ const CostingView = () => {
       message.error('Failed to revise cost sheet');
     } finally {
       setRevising(false);
+    }
+  };
+
+  const handleRevertApproval = async (reason) => {
+    setReverting(true);
+    try {
+      await revertCostSheetApproval(id, reason);
+      message.success('Approval reverted — cost sheet is back in Draft for editing');
+      setRevertOpen(false);
+      loadData();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to revert approval');
+    } finally {
+      setReverting(false);
     }
   };
 
@@ -653,6 +688,23 @@ const CostingView = () => {
               onClick={() => { setReviseReason(''); setReviseModalOpen(true); }}
             />
           )}
+          {/* Post-approval refer-back. Withdrawn entirely once an order consumes the
+              costing id — that order's prices are locked to this sheet. */}
+          {data.status === COSTING_STATUS.APPROVED && canRevise && !data.linkedOrderNo && (
+            <ActionButton
+              action="refer-back"
+              text="Revert Approval"
+              tooltip="Send this approved cost sheet back to Draft so it can be edited"
+              onClick={() => { setRevertReason(''); setRevertOpen(true); }}
+            />
+          )}
+          {data.status === COSTING_STATUS.APPROVED && canRevise && data.linkedOrderNo && (
+            <Tooltip title={`Order ${data.linkedOrderNo} has been raised against this costing — the approval can no longer be reverted`}>
+              <Tag color="default" style={{ borderRadius: 20, padding: '2px 12px' }}>
+                Locked by {data.linkedOrderNo}
+              </Tag>
+            </Tooltip>
+          )}
         </Space>
       </PageHeader>
 
@@ -786,6 +838,19 @@ const CostingView = () => {
           );
         })()}
       </Modal>
+
+      {/* Revert Approval Dialog */}
+      <ApprovalReasonDialog
+        open={revertOpen}
+        onCancel={() => setRevertOpen(false)}
+        onConfirm={handleRevertApproval}
+        loading={reverting}
+        action={REVERT_ACTION}
+        docLabel="Cost Sheet"
+        docNumber={data.costingId}
+        reason={revertReason}
+        onReasonChange={setRevertReason}
+      />
 
       {/* PDF Preview Modal */}
       <CostingPdfPreviewModal

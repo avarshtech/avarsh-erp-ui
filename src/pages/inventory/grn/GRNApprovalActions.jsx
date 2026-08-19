@@ -96,7 +96,10 @@ const GRNApprovalActions = ({ grn, onUpdated }) => {
       icon: <CheckCircleOutlined />,
       color: WARNING,
       danger: false,
-      requiresReason: false,
+      // The API requires a non-blank reason on every reversal action (GRNActionRequest.reason)
+      requiresReason: true,
+      minChars: 20,
+      placeholder: 'Record why the reversal is being approved — what needs correcting and any agreement with the creator...',
       successMsg: 'Reversal approved — GRN is editable',
     },
     'reject-reversal': {
@@ -110,7 +113,9 @@ const GRNApprovalActions = ({ grn, onUpdated }) => {
       icon: <CloseCircleOutlined />,
       color: ERROR,
       danger: true,
-      requiresReason: false,
+      requiresReason: true,
+      minChars: 20,
+      placeholder: 'Explain why the reversal request is being declined — why the GRN should stay as recorded...',
       successMsg: 'Reversal request rejected',
     },
   };
