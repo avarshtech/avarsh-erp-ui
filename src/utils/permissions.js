@@ -383,8 +383,8 @@ export const PERMISSION_GROUPS = [
     modules: [
       { id: 'hr-masters', name: 'HR Masters', operations: STANDARD_OPERATIONS, path: '/hr/masters' },
       { id: 'hr-employees', name: 'Employees', operations: STANDARD_OPERATIONS, path: '/hr/employees' },
-      { id: 'hr-attendance', name: 'Attendance', operations: STANDARD_OPERATIONS, path: '/hr/attendance' },
-      { id: 'hr-leave', name: 'Leave Management', operations: STANDARD_OPERATIONS, path: '/hr/leaves' },
+      { id: 'hr-attendance', name: 'Attendance', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/attendance' },
+      { id: 'hr-leave', name: 'Leave Management', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/leaves' },
       { id: 'hr-payroll', name: 'Payroll', operations: STANDARD_OPERATIONS, path: '/hr/payroll' },
       { id: 'hr-loans', name: 'Loans & Advances', operations: STANDARD_OPERATIONS, path: '/hr/loans' },
       { id: 'hr-bonus', name: 'Bonus', operations: STANDARD_OPERATIONS, path: '/hr/bonus' },
@@ -423,6 +423,12 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
   if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
+  // Attendance (miss punch, gate pass) and leave both have approve/reject
+  // actions. Without declaring the operations here the permission keys are
+  // never generated, so hasPermission(...,'approve') was undefined for every
+  // role including admin, and the buttons could never appear for anyone.
+  if (moduleId === 'hr-attendance')   return [...STANDARD_OPERATIONS, 'approve', 'reject'];
+  if (moduleId === 'hr-leave')        return [...STANDARD_OPERATIONS, 'approve', 'reject'];
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;

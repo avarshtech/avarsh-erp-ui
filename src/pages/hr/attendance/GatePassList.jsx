@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createGatePass, getGatePassByStatus, approveGatePass, rejectGatePass } from '../../../services/hr/gatePassService';
@@ -21,6 +21,10 @@ const GatePassList = () => {
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // Detail view for a single pass, opened by clicking its row.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+
   const canAdd = hasPermission('hr-attendance', 'add');
   const canApprove = hasPermission('hr-attendance', 'approve');
 
@@ -36,8 +40,8 @@ const GatePassList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getGatePassByStatus(status);
       setData(result || []);
-    } catch {
-      message.error('Failed to load gate pass requests');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to load gate pass requests');
     } finally {
       setLoading(false);
     }
@@ -51,11 +55,17 @@ const GatePassList = () => {
     try {
       await approveGatePass(id);
       message.success('Gate pass approved');
+      setDetailOpen(false);
       fetchData();
-    } catch {
-      message.error('Failed to approve');
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to approve');
     }
   }, [fetchData, message]);
+
+  const openDetail = useCallback((record) => {
+    setSelected(record);
+    setDetailOpen(true);
+  }, []);
 
   const handleReject = useCallback(async (id) => {
     modal.confirm({
@@ -67,9 +77,10 @@ const GatePassList = () => {
         try {
           await rejectGatePass(id);
           message.success('Gate pass rejected');
+          setDetailOpen(false);
           fetchData();
-        } catch {
-          message.error('Failed to reject');
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to reject');
         }
       },
     });
@@ -143,10 +154,10 @@ const GatePassList = () => {
         if (record.status !== 'PENDING' || !canApprove) return null;
         return (
           <Space size="small">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
+            <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}>
               Approve
             </Button>
-            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
+            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}>
               Reject
             </Button>
           </Space>
@@ -183,7 +194,72 @@ const GatePassList = () => {
         scroll={{ x: 1200 }}
         size="small"
         pagination={{ pageSize: 25, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => openDetail(record),
+          style: { cursor: 'pointer' },
+        })}
       />
+
+      {/* Full detail for one pass, with its available actions. */}
+      <Drawer
+        title="Gate Pass"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        width={460}
+        extra={
+          selected?.status === 'PENDING' && canApprove && (
+            <Space>
+              <Button danger icon={<CloseOutlined />} onClick={() => handleReject(selected.id)}>
+                Reject
+              </Button>
+              <Button type="primary" icon={<CheckOutlined />} onClick={() => handleApprove(selected.id)}>
+                Approve
+              </Button>
+            </Space>
+          )
+        }
+      >
+        {selected && (
+          <>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="Status">
+                {statusMap[selected.status]
+                  ? <Tag color={statusMap[selected.status].color}>{statusMap[selected.status].label}</Tag>
+                  : selected.status}
+              </Descriptions.Item>
+              <Descriptions.Item label="Employee No">{selected.employeeNo || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Employee">{selected.employeeName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Date">
+                {selected.entryDate ? dayjs(selected.entryDate).format('DD MMM YYYY') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Type">
+                {GATE_PASS_TYPE.find((g) => g.value === selected.entryType)?.label || selected.entryType || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="From">{selected.fromTime || '-'}</Descriptions.Item>
+              <Descriptions.Item label="To">{selected.toTime || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Destination">{selected.destination || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Raised On">
+                {selected.createdAt ? dayjs(selected.createdAt).format('DD MMM YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              {selected.status !== 'PENDING' && (
+                <Descriptions.Item label="Actioned On">
+                  {selected.approvedAt ? dayjs(selected.approvedAt).format('DD MMM YYYY HH:mm') : '-'}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {selected.status === 'PENDING' && !canApprove && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginTop: 16 }}
+                message="You do not have permission to approve or reject requests."
+              />
+            )}
+          </>
+        )}
+      </Drawer>
 
       <Drawer
         title="New Gate Pass"
