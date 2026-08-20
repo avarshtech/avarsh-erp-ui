@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Space, Tabs, Input } from 'antd';
-import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
+import { PlusOutlined, CheckOutlined, CloseOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getLeavesByStatus, approveLeave, rejectLeave } from '../../../services/hr/leaveService';
+import { getLeavesByStatus, approveLeave, rejectLeave, cancelLeave } from '../../../services/hr/leaveService';
 import { hasPermission } from '../../../utils/permissions';
 import { LEAVE_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -20,6 +20,7 @@ const LeaveApplicationList = () => {
 
   const canAdd = hasPermission('hr-leave', 'add');
   const canApprove = hasPermission('hr-leave', 'approve');
+  const canUpdate = hasPermission('hr-leave', 'update');
 
   // Load leave types for the drawer
   useEffect(() => {
@@ -90,6 +91,30 @@ const LeaveApplicationList = () => {
     });
   }, [fetchData, message, modal]);
 
+  // Cancel withdraws an application. cancelLeave existed in the service layer
+  // and the API, but nothing ever called it, so there was no way to reach the
+  // Cancelled state from the UI at all.
+  const handleCancel = useCallback(async (record) => {
+    modal.confirm({
+      title: 'Cancel this leave application?',
+      content: record.status === 'APPROVED'
+        ? 'This leave is already approved. Cancelling returns the days to the employee’s balance.'
+        : 'The application will be withdrawn.',
+      okText: 'Cancel Leave',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      onOk: async () => {
+        try {
+          await cancelLeave(record.id);
+          message.success('Leave cancelled');
+          fetchData();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to cancel leave');
+        }
+      },
+    });
+  }, [fetchData, message, modal]);
+
   const columns = useMemo(() => [
     { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100 },
     { title: 'Employee Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
@@ -133,20 +158,33 @@ const LeaveApplicationList = () => {
       width: 140,
       fixed: 'right',
       render: (_, record) => {
-        if (record.status !== 'PENDING' || !canApprove) return null;
+        // Cancel stays available on an approved leave that has not started yet,
+        // which is the usual reason someone withdraws one.
+        const cancellable = record.status === 'PENDING'
+          || (record.status === 'APPROVED' && dayjs(record.fromDate).isAfter(dayjs(), 'day'));
+
         return (
           <Space size="small">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
-              Approve
-            </Button>
-            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
-              Reject
-            </Button>
+            {record.status === 'PENDING' && canApprove && (
+              <>
+                <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
+                  Approve
+                </Button>
+                <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
+                  Reject
+                </Button>
+              </>
+            )}
+            {cancellable && canUpdate && (
+              <Button type="link" size="small" icon={<StopOutlined />} onClick={() => handleCancel(record)}>
+                Cancel
+              </Button>
+            )}
           </Space>
         );
       },
     },
-  ], [canApprove, handleApprove, handleReject]);
+  ], [canApprove, canUpdate, handleApprove, handleReject, handleCancel]);
 
   const tabItems = useMemo(() => [
     { key: 'ALL', label: 'All' },
