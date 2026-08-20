@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Descriptions, Table, Tag, Card, Spin } from 'antd';
+import { App, Descriptions, Table, Tag, Card, Spin, Button, Modal, Form, InputNumber, DatePicker, Input, Alert } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getLoanById } from '../../../services/hr/loanService';
+import { getLoanById, recordLoanRecovery } from '../../../services/hr/loanService';
+import { hasPermission } from '../../../utils/permissions';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 
@@ -17,6 +18,11 @@ const LoanView = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [loan, setLoan] = useState(null);
+  const [payOpen, setPayOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [payForm] = Form.useForm();
+
+  const canUpdate = hasPermission('hr-loans', 'update');
 
   const fetchLoan = useCallback(async () => {
     setLoading(true);
@@ -56,6 +62,27 @@ const LoanView = () => {
   if (loading) return <Spin style={{ display: 'block', margin: '100px auto' }} />;
   if (!loan) return null;
 
+  const handleRecordRepayment = useCallback(async () => {
+    try {
+      const values = await payForm.validateFields();
+      setSaving(true);
+      await recordLoanRecovery(id, {
+        amount: values.amount,
+        recoveryDate: values.recoveryDate.format('YYYY-MM-DD'),
+        remarks: values.remarks,
+      });
+      message.success('Repayment recorded');
+      setPayOpen(false);
+      payForm.resetFields();
+      fetchData();
+    } catch (err) {
+      if (err?.errorFields) return;
+      message.error(err?.response?.data?.message || 'Could not record the repayment');
+    } finally {
+      setSaving(false);
+    }
+  }, [id, payForm, message, fetchData]);
+
   return (
     <>
       <PageHeader
@@ -77,7 +104,21 @@ const LoanView = () => {
         </Descriptions>
       </Card>
 
-      <Card title="Repayment Schedule">
+      <Card
+        title="Repayment Schedule"
+        extra={loan.status === 'ACTIVE' && canUpdate && (
+          <Button type="primary" size="small" onClick={() => setPayOpen(true)}>Record Repayment</Button>
+        )}
+      >
+        {(!loan.recoveries || loan.recoveries.length === 0) && (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            message="No repayments yet"
+            description="Instalments are recorded automatically when a payroll run covering this loan's EMI start date is approved. Use Record Repayment for anything paid outside payroll — cash, an early settlement, or a correction."
+          />
+        )}
         <Table
           rowKey={(r, idx) => r.id || idx}
           dataSource={loan.recoveries || []}
@@ -87,6 +128,50 @@ const LoanView = () => {
           locale={{ emptyText: 'No recoveries recorded yet' }}
         />
       </Card>
+
+      <Modal
+        title="Record Repayment"
+        open={payOpen}
+        onCancel={() => setPayOpen(false)}
+        onOk={handleRecordRepayment}
+        confirmLoading={saving}
+        okText="Record"
+        destroyOnHidden
+      >
+        <p style={{ color: 'rgba(0,0,0,0.55)', marginTop: 0 }}>
+          For repayments made outside payroll. Payroll records its own EMI deductions automatically.
+        </p>
+        <Descriptions size="small" column={1} style={{ marginBottom: 16 }}>
+          <Descriptions.Item label="Outstanding">{formatCurrency(loan.balance)}</Descriptions.Item>
+        </Descriptions>
+        <Form form={payForm} layout="vertical" initialValues={{ recoveryDate: dayjs(), amount: loan.emiAmount }}>
+          <Form.Item
+            name="amount"
+            label="Amount"
+            rules={[
+              { required: true, message: 'Amount is required' },
+              {
+                validator: (_, value) => {
+                  if (value == null) return Promise.resolve();
+                  if (value <= 0) return Promise.reject(new Error('Must be greater than zero'));
+                  if (Number(value) > Number(loan.balance)) {
+                    return Promise.reject(new Error(`Cannot exceed the outstanding ${formatCurrency(loan.balance)}`));
+                  }
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <InputNumber style={{ width: '100%' }} min={0} prefix={'₹'} />
+          </Form.Item>
+          <Form.Item name="recoveryDate" label="Date" rules={[{ required: true, message: 'Date is required' }]}>
+            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          </Form.Item>
+          <Form.Item name="remarks" label="Remarks" extra="e.g. cash repayment, early settlement">
+            <Input.TextArea rows={2} maxLength={300} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 };

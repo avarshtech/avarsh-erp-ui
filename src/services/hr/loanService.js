@@ -82,3 +82,15 @@ export const cancelLoan = async (id) => {
   const response = await axiosInstance.put(`${BASE_URL}/${id}/cancel`);
   return response.data;
 };
+
+/**
+ * Records a repayment made outside payroll — cash, early settlement or a
+ * correction. Payroll creates its own recovery rows for the monthly EMI.
+ * POST /api/v1/hr/loans/{id}/recoveries
+ */
+export const recordLoanRecovery = async (loanId, { amount, recoveryDate, remarks }) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${loanId}/recoveries`, {
+    amount, recoveryDate, remarks,
+  });
+  return response.data;
+};
