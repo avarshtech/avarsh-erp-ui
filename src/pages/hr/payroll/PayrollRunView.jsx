@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Card, Row, Col, Statistic, Button } from 'antd';
+import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPayrollRunById, getPayrollRecords } from '../../../services/hr/payrollService';
+import { getPayrollRunById, getPayrollRecords, markPayrollPaid } from '../../../services/hr/payrollService';
+import { PAYMENT_MODES } from '../../../utils/hrConstants';
+import { hasPermission } from '../../../utils/permissions';
+import dayjs from 'dayjs';
 import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 
@@ -23,6 +26,11 @@ const PayrollRunView = () => {
   const [loading, setLoading] = useState(false);
   const [run, setRun] = useState(null);
   const [records, setRecords] = useState([]);
+  const [payOpen, setPayOpen] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [payForm] = Form.useForm();
+
+  const canUpdate = hasPermission('hr-payroll', 'update');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -81,12 +89,40 @@ const PayrollRunView = () => {
   const statusInfo = statusMap[run?.status];
   const monthYear = run ? `${MONTH_NAMES[(run.month || 1) - 1]} ${run.year}` : '';
 
+  const handleMarkPaid = useCallback(async () => {
+    try {
+      const values = await payForm.validateFields();
+      setPaying(true);
+      await markPayrollPaid(id, {
+        paymentDate: values.paymentDate.format('YYYY-MM-DD'),
+        reference: values.reference,
+        mode: values.mode,
+      });
+      message.success('Payroll marked as paid');
+      setPayOpen(false);
+      payForm.resetFields();
+      fetchData();
+    } catch (err) {
+      if (err?.errorFields) return;
+      message.error(err?.response?.data?.message || 'Could not mark this run as paid');
+    } finally {
+      setPaying(false);
+    }
+  }, [id, payForm, message, fetchData]);
+
   return (
     <>
       <PageHeader
         title={`Payroll Run — ${monthYear}`}
         onBack={() => navigate('/hr/payroll')}
-        extra={statusInfo && <Tag color={statusInfo.color}>{statusInfo.label}</Tag>}
+        extra={
+          <Space>
+            {statusInfo && <Tag color={statusInfo.color}>{statusInfo.label}</Tag>}
+            {run?.status === 'APPROVED' && canUpdate && (
+              <Button type="primary" onClick={() => setPayOpen(true)}>Mark as Paid</Button>
+            )}
+          </Space>
+        }
       />
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
@@ -123,6 +159,31 @@ const PayrollRunView = () => {
           </Table.Summary>
         )}
       />
+
+      <Modal
+        title="Mark Payroll as Paid"
+        open={payOpen}
+        onCancel={() => setPayOpen(false)}
+        onOk={handleMarkPaid}
+        confirmLoading={paying}
+        okText="Confirm Payment"
+        destroyOnHidden
+      >
+        <p style={{ color: 'rgba(0,0,0,0.55)', marginTop: 0 }}>
+          Records that the money has actually been transferred. A paid run cannot be changed afterwards.
+        </p>
+        <Form form={payForm} layout="vertical" initialValues={{ paymentDate: dayjs(), mode: 'BANK_TRANSFER' }}>
+          <Form.Item name="paymentDate" label="Payment Date" rules={[{ required: true, message: 'Payment date is required' }]}>
+            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          </Form.Item>
+          <Form.Item name="mode" label="Payment Mode" rules={[{ required: true, message: 'Payment mode is required' }]}>
+            <Select options={PAYMENT_MODES} />
+          </Form.Item>
+          <Form.Item name="reference" label="Reference" extra="Bank transaction or cheque number, for reconciliation">
+            <Input maxLength={100} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </>
   );
 };

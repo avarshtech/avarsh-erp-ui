@@ -64,3 +64,24 @@ export const getSalarySlip = async (recordId) => {
   const response = await axiosInstance.get(`${BASE_URL}/records/${recordId}/slip`);
   return response.data;
 };
+
+/**
+ * Pre-processing check. Reports employees who would be skipped or mispaid,
+ * before anything is calculated. Read only.
+ * GET /api/v1/hr/payroll/{id}/validate
+ */
+export const validatePayrollRun = async (runId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/${runId}/validate`);
+  return response.data;
+};
+
+/**
+ * Records that an approved run has actually been paid.
+ * POST /api/v1/hr/payroll/{id}/mark-paid
+ */
+export const markPayrollPaid = async (runId, { paymentDate, reference, mode } = {}) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${runId}/mark-paid`, null, {
+    params: { paymentDate, reference, mode },
+  });
+  return response.data;
+};
