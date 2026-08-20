@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Result } from 'antd';
+import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Result, Alert, Tag, Collapse } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords } from '../../../services/hr/payrollService';
+import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords, validatePayrollRun } from '../../../services/hr/payrollService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
@@ -22,6 +22,8 @@ const PayrollWizard = () => {
   const navigate = useNavigate();
 
   const [current, setCurrent] = useState(0);
+  const [validation, setValidation] = useState(null);
+  const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
@@ -43,6 +45,18 @@ const PayrollWizard = () => {
       setRunData(result);
       setCurrent(1);
       message.success('Payroll run initiated');
+
+      // Check the inputs straight away. Processing silently skips anyone
+      // without a salary structure, so problems are worth surfacing before
+      // any numbers are calculated.
+      setValidating(true);
+      try {
+        setValidation(await validatePayrollRun(result.id));
+      } catch {
+        setValidation(null);
+      } finally {
+        setValidating(false);
+      }
     } catch (err) {
       message.error(err?.response?.data?.message || 'Failed to initiate payroll run');
     } finally {
@@ -53,6 +67,10 @@ const PayrollWizard = () => {
   // Step 2 — Process
   const handleProcess = useCallback(async () => {
     if (!runData?.id) return;
+    if (validation && validation.blockingCount > 0) {
+      message.error(`${validation.blockingCount} employee(s) cannot be paid. Resolve the blocking issues first.`);
+      return;
+    }
     setLoading(true);
     try {
       const result = await processPayrollRun(runData.id);
@@ -66,7 +84,7 @@ const PayrollWizard = () => {
     } finally {
       setLoading(false);
     }
-  }, [runData, message]);
+  }, [runData, validation, message]);
 
   // Step 4 — Approve
   const handleApprove = useCallback(async () => {
@@ -141,11 +159,78 @@ const PayrollWizard = () => {
     </Card>,
 
     // Step 1 — Process
-    <Card key="process" style={{ maxWidth: 500 }}>
+    <Card key="process" style={{ maxWidth: 720 }}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Statistic title="Factory" value={runData?.factoryName || '-'} />
-        <Statistic title="Employees" value={runData?.totalEmployees || 0} />
-        <Button type="primary" loading={loading} onClick={handleProcess} block icon={loading ? <LoadingOutlined /> : undefined}>
+        <Row gutter={16}>
+          <Col span={8}><Statistic title="Factory" value={runData?.factoryName || '-'} /></Col>
+          <Col span={8}><Statistic title="Employees" value={validation?.totalEmployees ?? 0} /></Col>
+          <Col span={8}>
+            <Statistic
+              title="Would Be Paid"
+              value={validation?.payableEmployees ?? 0}
+              valueStyle={{ color: validation && validation.blockingCount > 0 ? '#ff4d4f' : '#52c41a' }}
+            />
+          </Col>
+        </Row>
+
+        <Spin spinning={validating}>
+          {validation && validation.blockingCount > 0 && (
+            <Alert
+              type="error"
+              showIcon
+              message={`${validation.blockingCount} employee(s) cannot be paid`}
+              description="Processing skips these employees silently, so they would simply not be paid. Fix them before processing."
+            />
+          )}
+          {validation && validation.blockingCount === 0 && validation.warningCount > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`${validation.warningCount} thing(s) worth checking`}
+              description="Processing can continue, but review these first."
+            />
+          )}
+          {validation && validation.blockingCount === 0 && validation.warningCount === 0 && (
+            <Alert type="success" showIcon message="All checks passed" />
+          )}
+
+          {validation?.issues?.length > 0 && (
+            <Collapse
+              size="small"
+              style={{ marginTop: 12 }}
+              items={[{
+                key: 'issues',
+                label: `Details (${validation.issues.length})`,
+                children: (
+                  <Table
+                    rowKey={(r, i) => `${r.employeeId ?? 'run'}-${r.code}-${i}`}
+                    dataSource={validation.issues}
+                    size="small"
+                    pagination={{ pageSize: 8, showSizeChanger: false }}
+                    columns={[
+                      {
+                        title: '', dataIndex: 'severity', key: 'severity', width: 96,
+                        render: (v) => <Tag color={v === 'BLOCKING' ? 'error' : 'warning'}>{v}</Tag>,
+                      },
+                      { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100, render: (v) => v || '—' },
+                      { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 160, ellipsis: true, render: (v) => v || '—' },
+                      { title: 'Problem', dataIndex: 'message', key: 'message' },
+                    ]}
+                  />
+                ),
+              }]}
+            />
+          )}
+        </Spin>
+
+        <Button
+          type="primary"
+          loading={loading}
+          onClick={handleProcess}
+          block
+          disabled={validating || (validation && validation.blockingCount > 0)}
+          icon={loading ? <LoadingOutlined /> : undefined}
+        >
           Process Salaries
         </Button>
       </Space>
