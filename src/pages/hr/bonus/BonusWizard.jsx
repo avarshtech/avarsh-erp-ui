@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, DatePicker } from 'antd';
+import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Alert } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { processBonus, approveBonus, getBonusRecords } from '../../../services/hr/bonusService';
@@ -18,8 +18,12 @@ const BonusWizard = () => {
   const [loading, setLoading] = useState(false);
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
-  const [yearFrom, setYearFrom] = useState(null);
-  const [yearTo, setYearTo] = useState(null);
+  // The API takes the accounting year as two integers: April of yearFrom to
+  // March of yearTo. yearTo is therefore always yearFrom + 1, so only the start
+  // year is asked for and the pair is derived.
+  const [yearFrom, setYearFrom] = useState(new Date().getMonth() + 1 >= 4
+    ? new Date().getFullYear()
+    : new Date().getFullYear() - 1);
   const [bonusPercentage, setBonusPercentage] = useState(8.33);
   const [runData, setRunData] = useState(null);
   const [records, setRecords] = useState([]);
@@ -31,14 +35,18 @@ const BonusWizard = () => {
   // Step 1 - Calculate Bonus
   const handleCalculate = useCallback(async () => {
     if (!factoryId) { message.warning('Please select a factory'); return; }
-    if (!yearFrom || !yearTo) { message.warning('Please select year period'); return; }
+    if (!yearFrom) { message.warning('Please select the accounting year'); return; }
     setLoading(true);
     try {
       const result = await processBonus({
         factoryId,
-        yearFrom: yearFrom.format('YYYY-MM-DD'),
-        yearTo: yearTo.format('YYYY-MM-DD'),
-        bonusPercentage,
+        // Integers, not dates. Sending "2026-08-01" produced
+        // "Cannot deserialize value of type Integer from String".
+        yearFrom,
+        yearTo: yearFrom + 1,
+        // The request field is `percentage`; sending `bonusPercentage` left it
+        // null and the server silently fell back to the 8.33% statutory minimum.
+        percentage: bonusPercentage,
       });
       setRunData(result);
       const recs = await getBonusRecords(result.id);
@@ -50,7 +58,7 @@ const BonusWizard = () => {
     } finally {
       setLoading(false);
     }
-  }, [factoryId, yearFrom, yearTo, bonusPercentage, message]);
+  }, [factoryId, yearFrom, bonusPercentage, message]);
 
   // Step 2 - Approve
   const handleApprove = useCallback(async () => {
@@ -111,21 +119,15 @@ const BonusWizard = () => {
                 />
               </Col>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ marginBottom: 8, fontWeight: 500 }}>Year From</div>
-                <DatePicker
+                <div style={{ marginBottom: 8, fontWeight: 500 }}>Accounting Year</div>
+                <Select
                   value={yearFrom}
                   onChange={setYearFrom}
                   style={{ width: '100%' }}
-                  placeholder="Select start date"
-                />
-              </Col>
-              <Col xs={24} sm={12} md={8}>
-                <div style={{ marginBottom: 8, fontWeight: 500 }}>Year To</div>
-                <DatePicker
-                  value={yearTo}
-                  onChange={setYearTo}
-                  style={{ width: '100%' }}
-                  placeholder="Select end date"
+                  options={Array.from({ length: 6 }, (_, i) => {
+                    const y = new Date().getFullYear() - i;
+                    return { value: y, label: `${y}-${String(y + 1).slice(2)} (Apr ${y} to Mar ${y + 1})` };
+                  })}
                 />
               </Col>
               <Col xs={24} sm={12} md={8}>
