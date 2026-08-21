@@ -108,7 +108,7 @@ const BonusList = () => {
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/hr/bonus`, { state: { viewId: r.id } })}
+            onClick={(e) => { e.stopPropagation(); navigate(`/hr/bonus/${r.id}`); }}
           >
             View
           </Button>
@@ -147,6 +147,7 @@ const BonusList = () => {
         loading={loading}
         scroll={{ x: 900 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} runs` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/bonus/${r.id}`), style: { cursor: 'pointer' } })}
       />
     </>
   );

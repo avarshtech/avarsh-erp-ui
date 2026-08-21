@@ -46,3 +46,12 @@ export const getBonusRecords = async (runId) => {
   const response = await axiosInstance.get(`${BASE_URL}/${runId}/records`);
   return response.data;
 };
+
+/**
+ * Records that an approved bonus run has been paid.
+ * POST /api/v1/hr/bonus/{id}/mark-paid
+ */
+export const markBonusPaid = async (runId) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${runId}/mark-paid`);
+  return response.data;
+};
