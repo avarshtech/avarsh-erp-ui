@@ -107,7 +107,7 @@ const PayrollList = () => {
             icon={<EyeOutlined />}
             onClick={(e) => { e.stopPropagation(); navigate(`/hr/payroll/${r.id}`); }}
           >
-            View
+            {['DRAFT', 'PROCESSED'].includes(r.status) ? 'Resume' : 'View'}
           </Button>
         ),
       },

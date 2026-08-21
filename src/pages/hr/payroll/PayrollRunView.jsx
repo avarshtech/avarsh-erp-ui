@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space } from 'antd';
+import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space, Alert } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPayrollRunById, getPayrollRecords, markPayrollPaid } from '../../../services/hr/payrollService';
+import {
+  getPayrollRunById, getPayrollRecords, markPayrollPaid,
+  processPayrollRun, approvePayrollRun, validatePayrollRun,
+} from '../../../services/hr/payrollService';
 import { PAYMENT_MODES } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import dayjs from 'dayjs';
@@ -20,7 +23,7 @@ const formatCurrency = (val) =>
   val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const PayrollRunView = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -31,6 +34,9 @@ const PayrollRunView = () => {
   const [payForm] = Form.useForm();
 
   const canUpdate = hasPermission('hr-payroll', 'update');
+
+  const [advancing, setAdvancing] = useState(false);
+  const [validation, setValidation] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -89,6 +95,56 @@ const PayrollRunView = () => {
   const statusInfo = statusMap[run?.status];
   const monthYear = run ? `${MONTH_NAMES[(run.month || 1) - 1]} ${run.year}` : '';
 
+  // A run left at DRAFT or PROCESSED used to be stranded: the wizard refuses to
+  // re-initiate an existing period, and this page had no way to move it on. The
+  // lifecycle is now driven from here so a run can be picked up at any point.
+  const loadValidation = useCallback(async () => {
+    if (!id) return;
+    try {
+      setValidation(await validatePayrollRun(id));
+    } catch {
+      setValidation(null);
+    }
+  }, [id]);
+
+  const handleProcess = useCallback(async () => {
+    if (validation && validation.blockingCount > 0) {
+      message.error(`${validation.blockingCount} employee(s) cannot be paid. Resolve the blocking issues first.`);
+      return;
+    }
+    setAdvancing(true);
+    try {
+      await processPayrollRun(id);
+      message.success('Salaries processed');
+      fetchData();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to process payroll');
+    } finally {
+      setAdvancing(false);
+    }
+  }, [id, validation, message, fetchData]);
+
+  const handleApprove = useCallback(async () => {
+    modal.confirm({
+      title: 'Approve this payroll run?',
+      content: 'Approving commits the run: loan balances are reduced and advances are marked recovered.',
+      okText: 'Approve',
+      onOk: async () => {
+        try {
+          await approvePayrollRun(id);
+          message.success('Payroll approved');
+          fetchData();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Failed to approve payroll');
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
+
+  useEffect(() => {
+    if (run?.status === 'DRAFT') loadValidation();
+  }, [run?.status, loadValidation]);
+
   const handleMarkPaid = useCallback(async () => {
     try {
       const values = await payForm.validateFields();
@@ -118,12 +174,56 @@ const PayrollRunView = () => {
         extra={
           <Space>
             {statusInfo && <Tag color={statusInfo.color}>{statusInfo.label}</Tag>}
+            {run?.status === 'DRAFT' && canUpdate && (
+              <Button
+                type="primary"
+                loading={advancing}
+                onClick={handleProcess}
+                disabled={validation ? validation.blockingCount > 0 : false}
+              >
+                Process Salaries
+              </Button>
+            )}
+            {run?.status === 'PROCESSED' && canUpdate && (
+              <>
+                <Button loading={advancing} onClick={handleProcess}>Re-process</Button>
+                <Button type="primary" onClick={handleApprove}>Approve</Button>
+              </>
+            )}
             {run?.status === 'APPROVED' && canUpdate && (
               <Button type="primary" onClick={() => setPayOpen(true)}>Mark as Paid</Button>
             )}
           </Space>
         }
       />
+      {run?.status === 'DRAFT' && (
+        <Alert
+          type={validation && validation.blockingCount > 0 ? 'error' : 'info'}
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={
+            validation && validation.blockingCount > 0
+              ? `${validation.blockingCount} employee(s) cannot be paid`
+              : 'This run has not been processed yet'
+          }
+          description={
+            validation && validation.blockingCount > 0
+              ? 'Processing skips these employees silently, so they would not be paid. Fix them, then process.'
+              : validation
+                ? `${validation.payableEmployees} of ${validation.totalEmployees} employees are ready. Process when you are.`
+                : 'No salaries have been calculated. Process the run to continue.'
+          }
+        />
+      )}
+      {run?.status === 'PROCESSED' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Processed but not approved"
+          description="Nothing is committed yet. Loan balances and advances update only on approval, so this run can still be re-processed."
+        />
+      )}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
           <Card size="small"><Statistic title="Employees" value={run?.totalEmployees || records.length} /></Card>
