@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 import { getAllBonusRuns } from '../../../services/hr/bonusService';
 import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
@@ -49,14 +48,12 @@ const BonusList = () => {
         title: 'Year Period',
         key: 'yearPeriod',
         width: 180,
-        render: (_, r) => {
-          const from = r.yearFrom || r.periodFrom;
-          const to = r.yearTo || r.periodTo;
-          return from && to
-            ? `${dayjs(from).format('MMM YYYY')} - ${dayjs(to).format('MMM YYYY')}`
-            : `${r.yearFrom || '-'} - ${r.yearTo || '-'}`;
-        },
-        sorter: (a, b) => (a.yearFrom || '').localeCompare(b.yearFrom || ''),
+        // yearFrom and yearTo are plain years, not dates. Passing them through
+        // dayjs treated 2025 as a millisecond timestamp and rendered "Jan 1970".
+        render: (_, r) => (r.yearFrom && r.yearTo
+          ? `${r.yearFrom}-${String(r.yearTo).slice(2)} (Apr ${r.yearFrom} to Mar ${r.yearTo})`
+          : '-'),
+        sorter: (a, b) => (a.yearFrom || 0) - (b.yearFrom || 0),
         defaultSortOrder: 'descend',
       },
       {
