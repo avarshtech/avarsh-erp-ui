@@ -11,23 +11,26 @@
 
 ## Naming Conventions
 
-### File Naming
+### File Naming (PostgreSQL — `db/migration`)
 ```
-V{major}.{minor}.{patch}__{description}.sql
+V<yyyyMMddHHmmss>__{description}.sql
 ```
 
-- `major`: Module group version (1 = initial schema)
-- `minor`: Module within group
-- `patch`: Incremental changes within module
+- Version = **authoring timestamp** (`date +V%Y%m%d%H%M%S`), NEVER a sequence number —
+  parallel branches collide on "the next number" (V36 incident, 2026-08-22)
 - Description: snake_case, verb_noun format
+- Legacy sequence V1–V37 is frozen and retired; timestamps sort after it numerically
+- Full rules: `erp-purchase/src/main/resources/db/migration/README.md`
 
 Examples:
 ```
-V1.0.0__create_common_tables.sql
-V1.2.0__create_style_techpack.sql
-V1.2.1__add_style_image_url.sql         # Patch to existing module
-V2.0.0__add_wash_tracking_module.sql     # Major new feature
+V20260822150000__add_tna_activity_master.sql
+V20260901093000__add_style_image_url.sql
 ```
+
+### File Naming (H2 e2e — `db/h2migration`)
+Sequential, and MUST stay below V100 (seeds occupy V100+ and must run last;
+the H2 DB is in-memory per boot, so there is no collision risk there).
 
 ### Table Naming
 - Plural snake_case: `styles`, `bom_items`, `cut_plans`, `order_items`
@@ -612,8 +615,8 @@ INSERT INTO roles (name) VALUES
 
 When the user asks to add or modify schema:
 
-1. **Never modify existing migration files.** Always create a new file.
-2. **Version numbering:** Find the latest version and increment patch. If adding a new module, increment minor.
+1. **Never modify existing migration files.** Always create a new file. Editing a file already applied to the shared dev DB breaks everyone with a checksum mismatch.
+2. **Version numbering:** current timestamp — `V<yyyyMMddHHmmss>__desc.sql` for PG; next sequential number below V100 for the H2 mirror.
 3. **Include rollback comments:** Add a comment block at the top showing what would reverse the migration (for documentation, Flyway doesn't auto-rollback).
 4. **Always add indexes** for foreign keys and commonly filtered columns.
 5. **Use `ALTER TABLE` for additions** to existing tables:
