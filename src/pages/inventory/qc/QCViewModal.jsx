@@ -16,7 +16,7 @@ import {
 import StatusTag from '../../../components/StatusTag';
 import { ActionButton } from '../../../components/buttons';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { QC_STATUS, ROLL_RESULT, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { formatNumber, formatDate } from '../../../utils/formatters';
 import { generateFabricQCPdf } from '../../../utils/fabricQCPdfGenerator';
 import { generateTrimsQCPdf } from '../../../utils/trimsQCPdfGenerator';
@@ -59,6 +59,18 @@ const fabricRollColumns = [
   { title: 'GSM', dataIndex: 'stdGsm', align: 'center', width: 100 },
   { title: 'Actual Width', dataIndex: 'actualWidth', align: 'center', width: 110 },
   { title: 'Actual GSM', dataIndex: 'actualGsm', align: 'center', width: 110 },
+  {
+    // Recorded verdict. Inspections saved before the result became a stored field
+    // have none — shown as a dash rather than guessed at.
+    title: 'Result',
+    dataIndex: 'result',
+    align: 'center',
+    width: 100,
+    render: (v) =>
+      v === ROLL_RESULT.PASS ? <Tag color="success">PASS</Tag>
+        : v === ROLL_RESULT.FAIL ? <Tag color="error">FAIL</Tag>
+        : <Text type="secondary">—</Text>,
+  },
 ];
 
 const fabricDefectColumns = [
@@ -95,22 +107,9 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
     if (isFabric) {
       const rolls = qc.rolls || [];
       const defects = qc.defects || [];
-      const defectsByRoll = new Map();
-      defects.forEach((d) => {
-        const arr = defectsByRoll.get(d.rollNumber) || [];
-        arr.push(d);
-        defectsByRoll.set(d.rollNumber, arr);
-      });
-      let passed = 0;
-      let failed = 0;
-      rolls.forEach((r) => {
-        const widthOk = r.stdWidth && r.actualWidth != null && Math.abs(r.actualWidth - r.stdWidth) <= r.stdWidth * 0.05;
-        const gsmOk = r.stdGsm && r.actualGsm != null && Math.abs(r.actualGsm - r.stdGsm) <= r.stdGsm * 0.05;
-        const dc = (defectsByRoll.get(r.rollNumber) || []).reduce((s, d) => s + (Number(d.count) || 0), 0);
-        if (r.actualWidth == null || r.actualGsm == null) return;
-        if (widthOk && gsmOk && dc <= 3) passed += 1;
-        else failed += 1;
-      });
+      // Read back the inspector's recorded verdict rather than re-deriving one.
+      const passed = rolls.filter((r) => r.result === ROLL_RESULT.PASS).length;
+      const failed = rolls.filter((r) => r.result === ROLL_RESULT.FAIL).length;
       return { rolls: rolls.length, passed, failed, defects: defects.length, criteria: 0, ok: 0, notOk: 0 };
     }
     const criteria = qc.criteriaRows || qc.criteriaChecks || [];

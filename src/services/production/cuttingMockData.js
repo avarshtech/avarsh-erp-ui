@@ -65,24 +65,26 @@ export const seedRelaxations = [
 ];
 
 /**
- * CR-CUT-2026-001 — Marker Plan is the single planning screen: Cut Order
- * header + repeatable markers. MK-002 deliberately over-cuts the remainder
- * so the Size Jump alert/table has data (Rules 1-4).
+ * CR-CUT-2026-001 (rev per CAD marker sheet) — Marker Plan mirrors the cutting
+ * room Excel: widths + cut allowance live on the plan header; each marker is
+ * ONE row (height + ratio per size). MK-002 over-cuts past the +5% allowance
+ * so the Size Jump alert/table has data.
  */
 export const seedMarkerPlans = [
   {
     id: 1, planNo: 'MP-2026-0001', factory: 'Unit-1 Tirupur', cutPoId: 1, date: day(-7),
     planStartDate: day(-4), planEndDate: day(6), status: 'IN_PROGRESS',
+    fabricWidthRaw: 59.5, cuttableWidth: 57, allowancePct: 5,
     markers: [
       {
-        id: 1, markerNo: 'MK-001', fabricWidthRaw: 59.5, cuttableWidth: 57, markerLength: 6.2,
-        markerHeight: 250, efficiencyPct: 86, layPlanDate: day(-4), cutPlanDate: day(-3),
-        layTableNo: 1, cadFile: 'HM-TS-2601-M1.cut', ratio: { S: 1, M: 2, L: 2, XL: 1 },
+        id: 1, markerNo: 'MK-001', markerLength: 6.2, markerHeight: 250, efficiencyPct: 86,
+        layPlanDate: day(-4), cutPlanDate: day(-3), layTableNo: 1, cadFile: 'HM-TS-2601-M1.cut',
+        ratio: { S: 1, M: 2, L: 2, XL: 1 },
       },
       {
-        id: 2, markerNo: 'MK-002', fabricWidthRaw: 59.5, cuttableWidth: 57, markerLength: 6.4,
-        markerHeight: 60, efficiencyPct: 83, layPlanDate: day(2), cutPlanDate: day(3),
-        layTableNo: 2, cadFile: null, ratio: { S: 1, M: 2, L: 2, XL: 1 },
+        id: 2, markerNo: 'MK-002', markerLength: 6.4, markerHeight: 70, efficiencyPct: 83,
+        layPlanDate: day(2), cutPlanDate: day(3), layTableNo: 2, cadFile: null,
+        ratio: { S: 1, M: 2, L: 2, XL: 1 },
       },
     ],
   },

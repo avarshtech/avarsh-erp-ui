@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { FABRIC_QC_DEFECT_FAIL_THRESHOLD, FABRIC_QC_TOLERANCE_PCT, FABRIC_QC_PARAMETERS } from './inventoryConstants';
+import { FABRIC_QC_TOLERANCE_PCT, FABRIC_QC_PARAMETERS } from './inventoryConstants';
 
 /**
  * Returns true if `actual` is within ±tolerance% of `std` (inclusive boundary).
@@ -11,23 +11,6 @@ export const isWithinTolerance = (actual, std, tolerancePct = FABRIC_QC_TOLERANC
   if (std == null || std === 0) return true;
   const allowed = std * (tolerancePct / 100);
   return Math.abs(actual - std) <= allowed;
-};
-
-/**
- * Compute per-roll PASS/FAIL given std width/gsm and number of defects.
- * - Width within ±5% AND GSM within ±5% AND defectCount <= threshold → PASS
- * - Otherwise → FAIL
- */
-export const computeFabricRollResult = (roll, defectCount = 0, threshold = FABRIC_QC_DEFECT_FAIL_THRESHOLD) => {
-  const widthOk = isWithinTolerance(roll.actualWidth, roll.stdWidth);
-  const gsmOk = isWithinTolerance(roll.actualGsm, roll.stdGsm);
-  const defectsOk = defectCount <= threshold;
-  return {
-    widthOk,
-    gsmOk,
-    defectsOk,
-    result: widthOk && gsmOk && defectsOk ? 'PASS' : 'FAIL',
-  };
 };
 
 /**
@@ -79,6 +62,10 @@ export const validateFabricQC = (data, isSubmit = false, ctx = {}) => {
         errors.push(`Roll ${label}: Actual GSM is required`);
       } else if (Number(r.actualGsm) <= 0) {
         errors.push(`Roll ${label}: Actual GSM must be greater than 0`);
+      }
+      // The verdict is the inspector's call, so it cannot be inferred — it has to be set.
+      if (!r.result) {
+        errors.push(`Roll ${label}: select Pass or Fail`);
       }
     });
 

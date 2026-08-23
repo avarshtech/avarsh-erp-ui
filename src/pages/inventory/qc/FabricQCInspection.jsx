@@ -15,8 +15,8 @@ import {
   computePOLineItemReceipts,
   getFabricGRN,
 } from '../../../services/inventory/inventoryService';
-import { validateFabricQC, computeFabricRollResult } from '../../../utils/qcValidation';
-import { QC_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { validateFabricQC } from '../../../utils/qcValidation';
+import { QC_STATUS, ROLL_RESULT, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { QC_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatNumber } from '../../../utils/formatters';
 import StatusTag from '../../../components/StatusTag';
@@ -140,6 +140,7 @@ const FabricQCInspection = () => {
         stdGsm,
         actualWidth: null,
         actualGsm: null,
+        result: null,   // inspector selects PASS / FAIL per roll
       }));
       setRolls(newRolls);
     });
@@ -227,38 +228,23 @@ const FabricQCInspection = () => {
     return null;
   }, [selectedLineItem, poReceipts, poLineItemId]);
 
-  const defectsByRoll = useMemo(() => {
-    const map = new Map();
-    defects.forEach((d) => {
-      if (!d.rollNumber) return;
-      if (!map.has(d.rollNumber)) map.set(d.rollNumber, []);
-      map.get(d.rollNumber).push(d);
-    });
-    return map;
-  }, [defects]);
-
+  // Counts follow the inspector's per-roll selection — nothing is inferred from
+  // the width/GSM tolerance or the defect count any more.
   const passCount = useMemo(
-    () =>
-      rolls.filter((r) => {
-        if (r.actualWidth == null || r.actualGsm == null) return false;
-        const dc = (defectsByRoll.get(r.rollNumber) || []).reduce((s, d) => s + (Number(d.count) || 0), 0);
-        // Shared rule (missing std ⇒ parameter not applicable) — keeps the
-        // panel consistent with the roll table's PASS/FAIL column.
-        return computeFabricRollResult(r, dc).result === 'PASS';
-      }).length,
-    [rolls, defectsByRoll],
+    () => rolls.filter((r) => r.result === ROLL_RESULT.PASS).length,
+    [rolls],
+  );
+  const failCount = useMemo(
+    () => rolls.filter((r) => r.result === ROLL_RESULT.FAIL).length,
+    [rolls],
   );
 
-  const inspectedCount = rolls.filter((r) => r.actualWidth != null && r.actualGsm != null).length;
-  const failCount = inspectedCount - passCount;
   const overallResult =
-    rolls.length === 0 || inspectedCount === 0
-      ? 'Pending'
-      : failCount === 0 && passCount === rolls.length
-      ? 'Pass'
+    rolls.length === 0 || passCount + failCount < rolls.length
+      ? 'Pending'   // at least one roll still undecided
       : failCount > 0
       ? 'Fail'
-      : 'Pending';
+      : 'Pass';
 
   // ─── Payload + save/submit ────────────────────────────────────────────────
   const buildPayload = () => {
@@ -531,7 +517,6 @@ const FabricQCInspection = () => {
           >
             <FabricQCRollInspectionTable
               rolls={rolls}
-              defectsByRoll={defectsByRoll}
               onRollChange={handleRollChange}
               readOnly={readOnly}
             />

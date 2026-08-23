@@ -1,24 +1,28 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, Alert, Button, DatePicker, Tag, Descriptions, Table } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { App, Card, Space, Spin, Alert, Button, DatePicker, InputNumber, Descriptions } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { FACTORIES } from '../../../utils/cuttingConstants';
-import { getMarkerPlan, saveMarkerPlan, relaxedCutPos, setSizeSetStatus } from '../../../services/production/cuttingService';
+import { getMarkerPlan, saveMarkerPlan, relaxedCutPos, setSizeSetStatus, allowanceQty, sizeJumps } from '../../../services/production/cuttingService';
 import CuttingStatusTag from './CuttingStatusTag';
-import MarkerCard from './MarkerCard';
+import MarkerMatrix from './MarkerMatrix';
+import SizeJumpAlert from './SizeJumpAlert';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
 );
 
-const blankMarker = () => ({ markerNo: '', fabricWidthRaw: null, cuttableWidth: null, markerLength: null, markerHeight: null, efficiencyPct: null, layPlanDate: null, cutPlanDate: null, layTableNo: null, cadFile: '', ratio: {} });
+const blankMarker = () => ({ markerNo: '', markerLength: null, markerHeight: null, efficiencyPct: null, layPlanDate: null, cutPlanDate: null, layTableNo: null, cadFile: '', ratio: {} });
 const renumber = (markers) => markers.map((m, i) => ({ ...m, markerNo: `MK-${String(i + 1).padStart(3, '0')}` }));
 
-/** CR-CUT-2026-001 — single planning screen: Cut Order header + repeatable markers. */
+/**
+ * CR-CUT-2026-001 (rev) — single planning screen shaped like the CAD marker
+ * sheet: header (buyer/style/widths/allowance) + marker rows in one matrix.
+ * The imported CAD Excel populates the whole matrix.
+ */
 const MarkerPlanForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -36,6 +40,7 @@ const MarkerPlanForm = () => {
         setPlan(record || {
           factory: FACTORIES[0], cutPoId: pos[0]?.id, date: dayjs().format('YYYY-MM-DD'),
           planStartDate: dayjs().format('YYYY-MM-DD'), planEndDate: dayjs().add(10, 'day').format('YYYY-MM-DD'),
+          fabricWidthRaw: null, cuttableWidth: null, allowancePct: 5,
           status: 'DRAFT', markers: renumber([blankMarker()]),
         });
       } catch { message.error('Failed to load marker plan'); }
@@ -46,41 +51,43 @@ const MarkerPlanForm = () => {
   const patchMarker = useCallback((idx, p) => setPlan((prev) => ({
     ...prev, markers: prev.markers.map((m, i) => (i === idx ? { ...m, ...p } : m)),
   })), []);
-  const addMarkerAfter = useCallback((idx) => setPlan((prev) => {
-    const markers = [...prev.markers];
-    markers.splice(idx + 1, 0, blankMarker());
-    return { ...prev, markers: renumber(markers) };
-  }), []);
+  const addMarker = useCallback(() => setPlan((prev) => ({ ...prev, markers: renumber([...prev.markers, blankMarker()]) })), []);
   const removeMarker = useCallback((idx) => setPlan((prev) => (
     { ...prev, markers: renumber(prev.markers.filter((_, i) => i !== idx)) }
   )), []);
-  const importExcel = useCallback((idx) => {
-    setPlan((prev) => ({
-      ...prev,
-      markers: prev.markers.map((m, i) => (i === idx ? {
-        ...m, fabricWidthRaw: 59.5, cuttableWidth: 57, markerLength: 6.2, efficiencyPct: 88,
-        cadFile: 'HM-TS-2601-M1.xlsx', ratio: Object.fromEntries((cutPos.find((p) => p.id === prev.cutPoId)?.sizes || []).map((s, si) => [s, si === 1 || si === 2 ? 2 : 1])),
-      } : m)),
-    }));
-    message.success('Marker imported from CAD/Excel — widths, length, efficiency and size ratios loaded');
-  }, [cutPos, message]);
 
   const po = useMemo(() => cutPos.find((p) => p.id === plan?.cutPoId), [cutPos, plan?.cutPoId]);
 
-  const summary = useMemo(() => {
-    if (!po || !plan) return null;
-    const perSize = po.sizes.map((size) => {
-      const planned = plan.markers.reduce((s, m) => s + (m.markerHeight || 0) * (m.ratio?.[size] || 0), 0);
-      return { size, orderQty: po.sizeQty[size] || 0, planned, balance: (po.sizeQty[size] || 0) - planned };
+  /** Mock CAD Excel import — fills widths, allowance and marker rows like cutting_marker.png. */
+  const importExcel = useCallback(() => {
+    if (!po) return;
+    const [s1, s2, s3, s4] = po.sizes;
+    setPlan((prev) => ({
+      ...prev,
+      fabricWidthRaw: 59.5, cuttableWidth: 57, allowancePct: 5,
+      markers: renumber([
+        { ...blankMarker(), markerHeight: 100, markerLength: 6.2, efficiencyPct: 88, cadFile: `${po.styleNo}-M1.xlsx`, ratio: { [s1]: 1, [s2]: 2, [s3]: 2, [s4]: 1 } },
+        { ...blankMarker(), markerHeight: 66, markerLength: 4.1, efficiencyPct: 86, cadFile: `${po.styleNo}-M2.xlsx`, ratio: { [s2]: 1, [s3]: 1 } },
+        { ...blankMarker(), markerHeight: 40, markerLength: 2.8, efficiencyPct: 84, cadFile: `${po.styleNo}-M3.xlsx`, ratio: { [s1]: 1, [s4]: 1 } },
+      ]),
+    }));
+    message.success('CAD marker Excel imported — widths, allowance and 3 marker rows populated');
+  }, [po, message]);
+
+  const jumps = useMemo(() => {
+    if (!po || !plan) return [];
+    const rows = po.sizes.map((size) => {
+      const cutQty = plan.markers.reduce((s, m) => s + (m.markerHeight || 0) * (m.ratio?.[size] || 0), 0);
+      const orderQty = allowanceQty(po.sizeQty[size], plan.allowancePct);
+      return { size, cutQty, orderQty, balance: orderQty - cutQty };
     });
-    const totalPlanned = perSize.reduce((s, r) => s + r.planned, 0);
-    return { perSize, totalPlanned };
+    return sizeJumps(po, rows);
   }, [po, plan]);
 
   const handleSave = async () => {
     if (!plan.cutPoId) return message.warning('Select a Cut PO (relaxation-complete)');
     if (!plan.markers.some((m) => m.markerHeight && Object.values(m.ratio || {}).some(Boolean))) {
-      return message.warning('At least one marker needs a height and a size ratio');
+      return message.warning('At least one marker row needs a height and a size ratio');
     }
     setSaving(true);
     try {
@@ -136,6 +143,18 @@ const MarkerPlanForm = () => {
             <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(plan.planEndDate)}
               onChange={(d) => patch({ planEndDate: d.format('YYYY-MM-DD') })} />
           </div>
+          <div>
+            <FieldLabel>Fabric Width — Raw Edge (in)</FieldLabel>
+            <InputNumber min={20} step={0.5} value={plan.fabricWidthRaw} style={{ width: 100 }} onChange={(v) => patch({ fabricWidthRaw: v })} />
+          </div>
+          <div>
+            <FieldLabel>Cuttable Width (in)</FieldLabel>
+            <InputNumber min={20} step={0.5} value={plan.cuttableWidth} style={{ width: 100 }} onChange={(v) => patch({ cuttableWidth: v })} />
+          </div>
+          <div>
+            <FieldLabel>Cut Allowance %</FieldLabel>
+            <InputNumber min={0} max={15} value={plan.allowancePct} style={{ width: 80 }} onChange={(v) => patch({ allowancePct: v })} />
+          </div>
         </Space>
         {po && (
           <Descriptions size="small" column={{ xs: 1, md: 3 }}
@@ -143,9 +162,9 @@ const MarkerPlanForm = () => {
               { key: 'b', label: 'Buyer', children: po.buyer },
               { key: 's', label: 'Style #', children: po.styleNo },
               { key: 'd', label: 'Date', children: dayjs(plan.date).format('DD-MMM-YYYY') },
-              { key: 'f', label: 'Fabric Details', children: `${po.fabricType} · ${po.width}" · ${po.consumption} ${po.consumptionUom}` },
+              { key: 'f', label: 'Fabric Details', children: `${po.fabricType} · ${po.color}` },
               { key: 'q', label: 'Plan Qty (order)', children: po.orderQty },
-              { key: 't', label: 'Total Cut Qty (markers)', children: <strong>{summary?.totalPlanned ?? 0}</strong> },
+              { key: 'a', label: `Cut Qty (+${plan.allowancePct || 0}%)`, children: <strong>{allowanceQty(po.orderQty, plan.allowancePct)}</strong> },
             ]} />
         )}
       </Card>
@@ -156,30 +175,9 @@ const MarkerPlanForm = () => {
           action={<Button size="small" type="primary" onClick={approveSizeSet}>Mark Size-Set Approved</Button>} />
       )}
 
-      {plan.markers.map((marker, idx) => (
-        <MarkerCard key={marker.markerNo || idx} marker={marker} idx={idx} po={po} markers={plan.markers}
-          onPatch={patchMarker} onAddAfter={addMarkerAfter} onImportExcel={importExcel} onRemove={removeMarker} />
-      ))}
-      <Button type="primary" ghost icon={<PlusOutlined />} block style={{ marginBottom: 16 }}
-        onClick={() => addMarkerAfter(plan.markers.length - 1)}>
-        Add Marker
-      </Button>
-
-      {summary && (
-        <Card title="Plan Balance Summary (all markers)" size="small">
-          <Table rowKey="size" size="small" pagination={false} dataSource={summary.perSize}
-            columns={[
-              { title: 'Size', dataIndex: 'size', width: 80, align: 'center', render: (v) => <strong>{v}</strong> },
-              { title: 'Order Qty', dataIndex: 'orderQty', width: 110, align: 'right' },
-              { title: 'Planned (all markers)', dataIndex: 'planned', width: 150, align: 'right' },
-              {
-                title: 'Balance', dataIndex: 'balance', width: 130, align: 'right',
-                render: (v) => (v === 0 ? <Tag color="green">Covered</Tag>
-                  : v > 0 ? <Tag color="orange">{v} to cut</Tag> : <Tag color="red">{-v} excess</Tag>),
-              },
-            ]} />
-        </Card>
-      )}
+      <MarkerMatrix po={po} plan={plan} onPatchMarker={patchMarker}
+        onAddMarker={addMarker} onRemoveMarker={removeMarker} onImportExcel={importExcel} />
+      <SizeJumpAlert jumps={jumps} />
     </div>
   );
 };

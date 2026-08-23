@@ -109,11 +109,20 @@ export const FABRIC_QC_PARAMETERS = [
   { key: 'tensileStrength', label: 'Tensile Strength', unit: 'N', type: 'number' },
 ];
 
-// ─── FABRIC QC — per-roll defect-count threshold (default; per item later) ─────
+// ─── FABRIC QC — per-roll defect-count threshold (guidance only) ──────────────
+// Shown to the inspector as a reference point. It does NOT decide the roll result —
+// that is selected by hand on the Pre-Roll Inspection grid.
 export const FABRIC_QC_DEFECT_FAIL_THRESHOLD = 3;
 
-// ─── FABRIC QC — width / GSM tolerance (±5%) ───────────────────────────────────
+// ─── FABRIC QC — width / GSM tolerance (±5%, guidance only) ───────────────────
 export const FABRIC_QC_TOLERANCE_PCT = 5;
+
+// ─── FABRIC QC — per-roll verdict, chosen by the inspector ────────────────────
+// Values match the backend RollResult enum so they round-trip without translation.
+export const ROLL_RESULT = {
+  PASS: 'PASS',
+  FAIL: 'FAIL',
+};
 
 // ─── FABRIC QC FAILED ROLL DISPOSITIONS (kept for legacy mock data) ────────────
 export const FABRIC_QC_DISPOSITIONS = [

@@ -79,7 +79,10 @@ export const generateRelaxationReport = async (id) => {
 export const minRelaxHours = (fabricType) => FABRIC_TYPES.find((f) => f.value === fabricType)?.minRelaxHrs ?? 24;
 
 // ── ENH-01 Marker Plan (CR-CUT-2026-001: single planning screen) ────────────
-const allMarkers = () => db.markerPlans.flatMap((p) => p.markers.map((m) => ({ ...m, planId: p.id, planNo: p.planNo, cutPoId: p.cutPoId })));
+const allMarkers = () => db.markerPlans.flatMap((p) => p.markers.map((m) => ({
+  ...m, planId: p.id, planNo: p.planNo, cutPoId: p.cutPoId,
+  fabricWidthRaw: p.fabricWidthRaw, cuttableWidth: p.cuttableWidth, // plan-level per CAD sheet header
+})));
 
 export const listMarkerPlans = async () => { await delay(); return clone(db.markerPlans); };
 export const getMarkerPlan = async (id) => { await delay(); return clone(db.markerPlans.find((p) => p.id === Number(id))); };
@@ -126,22 +129,8 @@ export const setSizeSetStatus = async (cutPoId, status) => {
   return clone(po);
 };
 
-/**
- * CR Section C — size/ratio rows for marker at `idx`: Order Qty is the
- * remainder after earlier markers; Cut Qty = Marker Height × Ratio;
- * Balance = Order − Cut (positive = short carries forward, negative = excess).
- */
-export const sizeRatioRows = (po, markers, idx) => {
-  if (!po) return [];
-  return po.sizes.map((size) => {
-    const planned = markers.slice(0, idx).reduce(
-      (s, m) => s + (m.markerHeight || 0) * (m.ratio?.[size] || 0), 0);
-    const orderQty = Math.max(0, (po.sizeQty[size] || 0) - planned);
-    const marker = markers[idx];
-    const cutQty = (marker.markerHeight || 0) * (marker.ratio?.[size] || 0);
-    return { size, ratio: marker.ratio?.[size] || 0, orderQty, cutQty, balance: orderQty - cutQty };
-  });
-};
+/** Cut allowance per CAD sheet (order qty + N%, the "5%" row). */
+export const allowanceQty = (orderQty, pct) => Math.round((orderQty || 0) * (1 + (pct || 0) / 100));
 
 /**
  * CR Change 2A Rules 1-4 — excess per size jumps to the previous (smaller)

@@ -28,7 +28,7 @@ export const relaxedCutPos = (...a) => impl.relaxedCutPos(...a);
 export const listMarkersForPo = (...a) => impl.listMarkersForPo(...a);
 export const nextLayNo = (...a) => impl.nextLayNo(...a);
 export const setSizeSetStatus = (...a) => impl.setSizeSetStatus(...a);
-export const sizeRatioRows = mockApi.sizeRatioRows;
+export const allowanceQty = mockApi.allowanceQty;
 export const sizeJumps = mockApi.sizeJumps;
 
 export const listLayAudits = (...a) => impl.listLayAudits(...a);
