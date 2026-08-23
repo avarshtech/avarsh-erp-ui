@@ -56,7 +56,7 @@ const TnaReplanInbox = lazy(() => import('./pages/tna/replan/ReplanInbox'));
 const TnaMastersPage = lazy(() => import('./pages/tna/masters/TnaMastersPage'));
 const TnaAnalytics = lazy(() => import('./pages/tna/analytics/TnaAnalytics'));
 const CuttingWorkspace = lazy(() => import('./pages/production/cutting/CuttingWorkspace'));
-const CutOrderPlanForm = lazy(() => import('./pages/production/cutting/CutOrderPlanForm'));
+const MarkerPlanForm = lazy(() => import('./pages/production/cutting/MarkerPlanForm'));
 const LayAuditForm = lazy(() => import('./pages/production/cutting/LayAuditForm'));
 const TmbCheckForm = lazy(() => import('./pages/production/cutting/TmbCheckForm'));
 const PanelCheckForm = lazy(() => import('./pages/production/cutting/PanelCheckForm'));
@@ -239,8 +239,10 @@ const ThemedApp = () => {
             <Route path="tna/masters" element={<PermissionRoute module="tna-masters"><Suspense fallback={<PageSkeleton />}><TnaMastersPage /></Suspense></PermissionRoute>} />
             <Route path="tna/analytics" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaAnalytics /></Suspense></PermissionRoute>} />
             <Route path="production/cutting" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><CuttingWorkspace /></Suspense></PermissionRoute>} />
-            <Route path="production/cutting/cop/new" element={<PermissionRoute module="production-cutting" operation="add"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
-            <Route path="production/cutting/cop/:id" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><CutOrderPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/marker-plan/new" element={<PermissionRoute module="production-cutting" operation="add"><Suspense fallback={<PageSkeleton />}><MarkerPlanForm /></Suspense></PermissionRoute>} />
+            <Route path="production/cutting/marker-plan/:id" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><MarkerPlanForm /></Suspense></PermissionRoute>} />
+            {/* CR-CUT-2026-001: Cut Order Plan merged into Marker Plan — old URLs redirect */}
+            <Route path="production/cutting/cop/*" element={<Navigate to="/production/cutting?tab=planning" replace />} />
             <Route path="production/cutting/lay-audit/new" element={<PermissionRoute module="production-cutting" operation="add"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
             <Route path="production/cutting/lay-audit/:id" element={<PermissionRoute module="production-cutting"><Suspense fallback={<PageSkeleton />}><LayAuditForm /></Suspense></PermissionRoute>} />
             <Route path="production/cutting/tmb/new" element={<PermissionRoute module="production-cutting" operation="add"><Suspense fallback={<PageSkeleton />}><TmbCheckForm /></Suspense></PermissionRoute>} />

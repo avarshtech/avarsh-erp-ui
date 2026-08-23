@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import CuttingDashboard from './CuttingDashboard';
 import FabricInTab from './FabricInTab';
-import CutPlanningTab from './CutPlanningTab';
+import MarkerPlanTab from './MarkerPlanTab';
 import LayAuditList from './LayAuditList';
 import TmbCheckList from './TmbCheckList';
 import CuttingReportTab from './CuttingReportTab';
@@ -29,7 +29,7 @@ const CuttingWorkspace = () => {
   const items = useMemo(() => [
     { key: 'dashboard', label: 'Dashboard', children: <CuttingDashboard onNavigateTab={handleTabChange} /> },
     { key: 'fabric-in', label: 'Fabric In', children: <FabricInTab /> },
-    { key: 'planning', label: 'Planning', children: <CutPlanningTab /> },
+    { key: 'planning', label: 'Marker Plan', children: <MarkerPlanTab /> },
     { key: 'lay-audit', label: 'Lay Audit', children: <LayAuditList /> },
     { key: 'tmb', label: 'TMB Check', children: <TmbCheckList /> },
     { key: 'report', label: 'Cutting Report', children: <CuttingReportTab /> },

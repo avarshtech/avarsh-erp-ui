@@ -18,8 +18,7 @@ const db = {
   cutPos: clone(seed.seedCutPos),
   receipts: clone(seed.seedFabricReceipts),
   relaxations: clone(seed.seedRelaxations),
-  markers: clone(seed.seedMarkers),
-  cops: clone(seed.seedCops),
+  markerPlans: clone(seed.seedMarkerPlans),
   layAudits: clone(seed.seedLayAudits),
   tmbChecks: clone(seed.seedTmbChecks),
   reportLays: clone(seed.seedReportLays),
@@ -79,32 +78,84 @@ export const generateRelaxationReport = async (id) => {
 };
 export const minRelaxHours = (fabricType) => FABRIC_TYPES.find((f) => f.value === fabricType)?.minRelaxHrs ?? 24;
 
-// ── ENH-01 Marker / ENH-02 COP ──────────────────────────────────────────────
-export const listMarkers = async () => { await delay(); return clone(db.markers); };
-export const saveMarker = async (payload) => {
+// ── ENH-01 Marker Plan (CR-CUT-2026-001: single planning screen) ────────────
+const allMarkers = () => db.markerPlans.flatMap((p) => p.markers.map((m) => ({ ...m, planId: p.id, planNo: p.planNo, cutPoId: p.cutPoId })));
+
+export const listMarkerPlans = async () => { await delay(); return clone(db.markerPlans); };
+export const getMarkerPlan = async (id) => { await delay(); return clone(db.markerPlans.find((p) => p.id === Number(id))); };
+export const saveMarkerPlan = async (payload) => {
   await delay();
-  const existing = payload.id && db.markers.find((m) => m.id === payload.id);
-  if (existing) { Object.assign(existing, payload); return clone(existing); }
-  const row = { id: nextId(db.markers), markerNo: docNo('MKR', db.markers), status: 'DRAFT', ...payload };
-  db.markers.push(row);
+  const nextMarkerId = Math.max(0, ...allMarkers().map((m) => m.id || 0)) + 1;
+  const markers = (payload.markers || []).map((m, i) => ({
+    ...m, id: m.id || nextMarkerId + i, markerNo: `MK-${String(i + 1).padStart(3, '0')}`,
+  }));
+  const existing = payload.id && db.markerPlans.find((p) => p.id === payload.id);
+  if (existing) { Object.assign(existing, payload, { markers }); return clone(existing); }
+  const row = {
+    id: nextId(db.markerPlans), status: 'DRAFT', ...payload, markers,
+    planNo: `MP-${dayjs().format('YYYY')}-${String(db.markerPlans.length + 1).padStart(4, '0')}`,
+  };
+  db.markerPlans.push(row);
   return clone(row);
 };
-export const listCops = async () => { await delay(); return clone(db.cops); };
-export const getCop = async (id) => { await delay(); return clone(db.cops.find((c) => c.id === Number(id))); };
-export const saveCop = async (payload) => {
-  await delay();
-  const existing = payload.id && db.cops.find((c) => c.id === payload.id);
-  if (existing) { Object.assign(existing, payload); return clone(existing); }
-  const row = { id: nextId(db.cops), copNo: docNo('COP', db.cops), status: 'DRAFT', sizeSetStatus: 'PENDING', ...payload };
-  db.cops.push(row);
-  return clone(row);
+
+/** TC-01 — only Cut POs whose fabric completed relaxation can be marker-planned. */
+export const relaxedCutPos = async () => {
+  await delay(60);
+  const relaxedIds = new Set(db.relaxations.filter((r) => r.status === 'REPORT_GENERATED').map((r) => r.cutPoId));
+  return clone(db.cutPos.filter((p) => relaxedIds.has(p.id)));
 };
-export const setCopStatus = async (id, patch) => {
+
+/** Markers of a Cut PO across all plans (Lay Audit dropdown, CR Change 3). */
+export const listMarkersForPo = async (cutPoId) => {
+  await delay(60);
+  return clone(allMarkers().filter((m) => m.cutPoId === Number(cutPoId)));
+};
+
+/** Next lay sequence for a marker — Lay # auto-generated per marker (LAY-001…). */
+export const nextLayNo = async (markerId) => {
+  await delay(30);
+  return db.layAudits.filter((l) => l.markerId === Number(markerId)).length + 1;
+};
+
+/** Size-set/pilot gate lives on the Cut PO; approval action moved to Marker Plan. */
+export const setSizeSetStatus = async (cutPoId, status) => {
   await delay();
-  const row = db.cops.find((c) => c.id === Number(id));
-  Object.assign(row, patch);
-  if (patch.sizeSetStatus) { const po = cutPo(row.cutPoId); if (po) po.sizeSetStatus = patch.sizeSetStatus; }
-  return clone(row);
+  const po = cutPo(cutPoId);
+  if (po) po.sizeSetStatus = status;
+  return clone(po);
+};
+
+/**
+ * CR Section C — size/ratio rows for marker at `idx`: Order Qty is the
+ * remainder after earlier markers; Cut Qty = Marker Height × Ratio;
+ * Balance = Order − Cut (positive = short carries forward, negative = excess).
+ */
+export const sizeRatioRows = (po, markers, idx) => {
+  if (!po) return [];
+  return po.sizes.map((size) => {
+    const planned = markers.slice(0, idx).reduce(
+      (s, m) => s + (m.markerHeight || 0) * (m.ratio?.[size] || 0), 0);
+    const orderQty = Math.max(0, (po.sizeQty[size] || 0) - planned);
+    const marker = markers[idx];
+    const cutQty = (marker.markerHeight || 0) * (marker.ratio?.[size] || 0);
+    return { size, ratio: marker.ratio?.[size] || 0, orderQty, cutQty, balance: orderQty - cutQty };
+  });
+};
+
+/**
+ * CR Change 2A Rules 1-4 — excess per size jumps to the previous (smaller)
+ * size; the smallest size has nowhere to jump and is flagged as wastage.
+ */
+export const sizeJumps = (po, rows) => {
+  if (!po) return [];
+  return rows.filter((r) => r.balance < 0).map((r) => {
+    const pos = po.sizes.indexOf(r.size);
+    return {
+      size: r.size, cutQty: r.cutQty, orderQty: r.orderQty, excess: -r.balance,
+      action: 'Size Jump', jumpTo: pos > 0 ? po.sizes[pos - 1] : null,
+    };
+  });
 };
 
 // ── FR-03 Lay Audit ─────────────────────────────────────────────────────────

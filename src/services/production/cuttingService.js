@@ -20,12 +20,16 @@ export const saveRelaxation = (...a) => impl.saveRelaxation(...a);
 export const generateRelaxationReport = (...a) => impl.generateRelaxationReport(...a);
 export const minRelaxHours = (...a) => mockApi.minRelaxHours(...a);
 
-export const listMarkers = (...a) => impl.listMarkers(...a);
-export const saveMarker = (...a) => impl.saveMarker(...a);
-export const listCops = (...a) => impl.listCops(...a);
-export const getCop = (...a) => impl.getCop(...a);
-export const saveCop = (...a) => impl.saveCop(...a);
-export const setCopStatus = (...a) => impl.setCopStatus(...a);
+// CR-CUT-2026-001 — Marker Plan is the single planning screen (COP removed).
+export const listMarkerPlans = (...a) => impl.listMarkerPlans(...a);
+export const getMarkerPlan = (...a) => impl.getMarkerPlan(...a);
+export const saveMarkerPlan = (...a) => impl.saveMarkerPlan(...a);
+export const relaxedCutPos = (...a) => impl.relaxedCutPos(...a);
+export const listMarkersForPo = (...a) => impl.listMarkersForPo(...a);
+export const nextLayNo = (...a) => impl.nextLayNo(...a);
+export const setSizeSetStatus = (...a) => impl.setSizeSetStatus(...a);
+export const sizeRatioRows = mockApi.sizeRatioRows;
+export const sizeJumps = mockApi.sizeJumps;
 
 export const listLayAudits = (...a) => impl.listLayAudits(...a);
 export const getLayAudit = (...a) => impl.getLayAudit(...a);

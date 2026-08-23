@@ -7,7 +7,7 @@ import EmptyState from '../../../components/EmptyState';
 import RecordLink from '../../../components/RecordLink';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { formatNumber } from '../../../utils/formatters';
-import { listLayAudits, getCutPos } from '../../../services/production/cuttingService';
+import { listLayAudits, getCutPos, listMarkerPlans } from '../../../services/production/cuttingService';
 import CuttingStatusTag from './CuttingStatusTag';
 
 /** FR-03 — spreading records: rolls used, plies, weight per lay and variance. */
@@ -16,13 +16,15 @@ const LayAuditList = () => {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [cutPos, setCutPos] = useState([]);
+  const [markerNames, setMarkerNames] = useState({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [lays, pos] = await Promise.all([listLayAudits(), getCutPos()]);
+      const [lays, pos, plans] = await Promise.all([listLayAudits(), getCutPos(), listMarkerPlans()]);
       setRows(lays); setCutPos(pos);
+      setMarkerNames(Object.fromEntries(plans.flatMap((p) => p.markers.map((m) => [m.id, m.markerNo]))));
     } catch { message.error('Failed to load lay audits'); } finally { setLoading(false); }
   }, [message]);
 
@@ -31,7 +33,8 @@ const LayAuditList = () => {
   const poNo = useCallback((id) => cutPos.find((p) => p.id === id)?.cutPoNo || '—', [cutPos]);
 
   const columns = useMemo(() => [
-    { title: 'Lay #', dataIndex: 'layNo', width: 80, align: 'center', render: (v, r) => <RecordLink text={`Lay ${v}`} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} /> },
+    { title: 'Lay #', dataIndex: 'layNo', width: 100, align: 'center', render: (v, r) => <RecordLink text={`LAY-${String(v).padStart(3, '0')}`} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} /> },
+    { title: 'Marker #', dataIndex: 'markerId', width: 100, align: 'center', render: (v) => (markerNames[v] ? <code>{markerNames[v]}</code> : '—') },
     { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
     { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Length (m)', dataIndex: 'layLength', width: 100, align: 'right' },
@@ -56,7 +59,7 @@ const LayAuditList = () => {
       title: 'Actions', key: 'act', width: 90, fixed: 'right', align: 'center',
       render: (_, r) => <ActionButton action="edit" size="small" onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} />,
     },
-  ], [poNo, navigate]);
+  ], [poNo, markerNames, navigate]);
 
   return (
     <Card>

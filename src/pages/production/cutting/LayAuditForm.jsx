@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, Alert, InputNumber, DatePicker, Descriptions } from 'antd';
+import { App, Card, Space, Spin, Alert, Input, InputNumber, DatePicker, Descriptions } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import { getLayAudit, saveLayAudit, listLayAudits, getCutPos, getRolls } from '../../../services/production/cuttingService';
+import { getLayAudit, saveLayAudit, getCutPos, getRolls, listMarkersForPo, nextLayNo } from '../../../services/production/cuttingService';
 import LayAuditRollGrid from './LayAuditRollGrid';
 
 const FieldLabel = ({ children }) => (
@@ -21,21 +21,19 @@ const LayAuditForm = () => {
   const [lay, setLay] = useState(null);
   const [cutPos, setCutPos] = useState([]);
   const [availableRolls, setAvailableRolls] = useState([]);
-  const [existingLayNos, setExistingLayNos] = useState([]);
+  const [markers, setMarkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([isEdit ? getLayAudit(id) : Promise.resolve(null), getCutPos(), listLayAudits()])
-      .then(([record, pos, lays]) => {
+    Promise.all([isEdit ? getLayAudit(id) : Promise.resolve(null), getCutPos()])
+      .then(([record, pos]) => {
         setCutPos(pos);
-        const base = record || {
-          cutPoId: pos[0]?.id, layNo: null, date: dayjs().format('YYYY-MM-DD'),
+        setLay(record || {
+          cutPoId: pos[0]?.id, markerId: null, layNo: null, date: dayjs().format('YYYY-MM-DD'),
           layLength: null, layHeight: null, width: null, startTime: null, endTime: null, rolls: [],
-        };
-        setLay(base);
-        setExistingLayNos(lays.filter((l) => l.cutPoId === base.cutPoId && l.id !== record?.id).map((l) => l.layNo));
+        });
       })
       .catch(() => message.error('Failed to load lay audit'))
       .finally(() => setLoading(false));
@@ -44,10 +42,23 @@ const LayAuditForm = () => {
   useEffect(() => {
     if (!lay?.cutPoId) return;
     getRolls(lay.cutPoId).then(setAvailableRolls).catch(() => {});
+    listMarkersForPo(lay.cutPoId).then(setMarkers).catch(() => {});
   }, [lay?.cutPoId]);
 
   const po = useMemo(() => cutPos.find((p) => p.id === lay?.cutPoId), [cutPos, lay]);
-  const layNoTaken = lay?.layNo != null && existingLayNos.includes(lay.layNo);
+  const marker = useMemo(() => markers.find((m) => m.id === lay?.markerId), [markers, lay?.markerId]);
+
+  /** CR Change 3 — marker selected: Lay # auto per marker; length/plies/width pre-fill. */
+  const handleMarkerSelect = useCallback(async (markerId) => {
+    const m = markers.find((x) => x.id === markerId);
+    const seq = await nextLayNo(markerId);
+    setLay((prev) => ({
+      ...prev, markerId, layNo: prev.id && prev.markerId === markerId ? prev.layNo : seq,
+      layLength: m?.markerLength ?? prev.layLength,
+      plies: m?.markerHeight ?? prev.plies,
+      width: m?.cuttableWidth ?? prev.width,
+    }));
+  }, [markers]);
   const shadeLots = useMemo(() => new Set(
     (lay?.rolls || []).map((r) => availableRolls.find((a) => a.rollNo === r.rollNo)?.shadeLot).filter(Boolean),
   ), [lay?.rolls, availableRolls]);
@@ -55,13 +66,12 @@ const LayAuditForm = () => {
   const patch = useCallback((p) => setLay((prev) => ({ ...prev, ...p })), []);
 
   const handleSave = async () => {
-    if (!lay.layNo) return message.warning('Enter the Lay #');
-    if (layNoTaken) return message.error(`Lay ${lay.layNo} already exists for this Cut PO`);
+    if (!lay.markerId) return message.warning('Marker # is mandatory — lays are planned per marker');
     if (!lay.rolls.length) return message.warning('Add at least one roll to the lay');
     setSaving(true);
     try {
       await saveLayAudit({ ...lay, id: lay.id });
-      message.success(`Lay ${lay.layNo} saved`);
+      message.success(`LAY-${String(lay.layNo).padStart(3, '0')} saved`);
       navigate('/production/cutting?tab=lay-audit');
     } catch { message.error('Failed to save lay audit'); } finally { setSaving(false); }
   };
@@ -71,7 +81,7 @@ const LayAuditForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title={isEdit ? `Lay Audit — Lay ${lay.layNo}` : 'New Lay Audit'}
+        title={isEdit ? `Lay Audit — LAY-${String(lay.layNo).padStart(3, '0')}` : 'New Lay Audit'}
         backPath="/production/cutting?tab=lay-audit"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
@@ -84,27 +94,38 @@ const LayAuditForm = () => {
             <FieldLabel>Cut PO #</FieldLabel>
             <FormSelect value={lay.cutPoId} style={{ width: 240 }} disabled={isEdit}
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-              onChange={(v) => patch({ cutPoId: v, rolls: [] })} />
+              onChange={(v) => patch({ cutPoId: v, markerId: null, layNo: null, rolls: [] })} />
+          </div>
+          <div>
+            <FieldLabel>Marker # (mandatory)</FieldLabel>
+            <FormSelect value={lay.markerId} style={{ width: 190 }} placeholder="Select marker" disabled={isEdit}
+              status={!lay.markerId ? 'warning' : undefined}
+              options={markers.map((m) => ({ value: m.id, label: `${m.markerNo} · ${m.planNo}` }))}
+              onChange={handleMarkerSelect} />
           </div>
           <div>
             <FieldLabel>Date</FieldLabel>
             <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(lay.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
           </div>
           <div>
-            <FieldLabel>Lay #</FieldLabel>
-            <InputNumber min={1} value={lay.layNo} status={layNoTaken ? 'error' : undefined} onChange={(v) => patch({ layNo: v })} />
+            <FieldLabel>Lay # (auto per marker)</FieldLabel>
+            <Input readOnly value={lay.layNo ? `LAY-${String(lay.layNo).padStart(3, '0')}` : '—'} style={{ width: 110 }} />
           </div>
           <div>
-            <FieldLabel>Lay Length (m)</FieldLabel>
+            <FieldLabel>Lay Length (m) — from marker</FieldLabel>
             <InputNumber min={0} step={0.1} value={lay.layLength} onChange={(v) => patch({ layLength: v })} />
+          </div>
+          <div>
+            <FieldLabel>Plies — from marker height</FieldLabel>
+            <InputNumber min={0} value={lay.plies} onChange={(v) => patch({ plies: v })} />
           </div>
           <div>
             <FieldLabel>Lay Height (m)</FieldLabel>
             <InputNumber min={0} step={0.01} value={lay.layHeight} onChange={(v) => patch({ layHeight: v })} />
           </div>
           <div>
-            <FieldLabel>End-to-End Width (m)</FieldLabel>
-            <InputNumber min={0} step={0.01} value={lay.width} onChange={(v) => patch({ width: v })} />
+            <FieldLabel>Lay Width (in) — marker tab width</FieldLabel>
+            <InputNumber readOnly value={lay.width} style={{ width: 110 }} />
           </div>
           <div>
             <FieldLabel>Lay Start</FieldLabel>
@@ -127,6 +148,12 @@ const LayAuditForm = () => {
             ]} />
         )}
       </Card>
+
+      <Alert type="info" showIcon style={{ marginBottom: 16 }}
+        title="Lays are planned based on the selected Marker #"
+        description={marker
+          ? `${marker.markerNo} (${marker.planNo}): length ${marker.markerLength} m · height ${marker.markerHeight} plies · cuttable width ${marker.cuttableWidth}" — lay fields pre-fill from the marker and stay editable except width.`
+          : 'Select the marker this lay executes; Lay #, length, plies and width auto-populate from it.'} />
 
       {po?.sizeSetStatus !== 'APPROVED' && (
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}

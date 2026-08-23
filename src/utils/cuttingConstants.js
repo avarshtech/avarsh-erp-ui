@@ -66,6 +66,15 @@ export const SEWING_LINES = ['Line-A', 'Line-B', 'B-1', 'B-2'];
 
 export const CUTTING_TABLES = ['Table-1', 'Table-2', 'Table-3'];
 
+/** CR-CUT-2026-001 — Marker Plan header factory selector. */
+export const FACTORIES = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
+
+/** CR-CUT-2026-001 — marker efficiency target (auto-calc from CAD; >= 85%). */
+export const MARKER_EFFICIENCY_TARGET = 85;
+
+/** CR-CUT-2026-001 — Lay Table # dropdown (1/2/3). */
+export const LAY_TABLES = [1, 2, 3];
+
 /** Cutting labour mode — Indian SME practice: cutting is often piece-rated to a contractor. */
 export const CUTTING_BY_OPTIONS = ['In-house', 'Contractor'];
 

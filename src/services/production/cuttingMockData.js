@@ -64,41 +64,33 @@ export const seedRelaxations = [
   },
 ];
 
-export const seedMarkers = [
+/**
+ * CR-CUT-2026-001 — Marker Plan is the single planning screen: Cut Order
+ * header + repeatable markers. MK-002 deliberately over-cuts the remainder
+ * so the Size Jump alert/table has data (Rules 1-4).
+ */
+export const seedMarkerPlans = [
   {
-    id: 1, markerNo: 'MKR-20260811-001', cutPoId: 1, length: 6.2, width: 150, efficiencyPct: 84,
-    sizes: ['S', 'M', 'L', 'XL'], ratio: { S: 1, M: 2, L: 2, XL: 1 },
-    tableNo: 'Table-1', cadFile: 'HM-TS-2601-M1.cut', status: 'APPROVED',
-  },
-  {
-    id: 2, markerNo: 'MKR-20260813-002', cutPoId: 2, length: 8.4, width: 148, efficiencyPct: 72,
-    sizes: ['30', '32', '34', '36'], ratio: { 30: 2, 32: 2, 34: 2, 36: 1 },
-    tableNo: 'Table-3', cadFile: null, status: 'DRAFT',
-  },
-];
-
-export const seedCops = [
-  {
-    id: 1, copNo: 'COP-20260808-001', cutPoId: 1, orderNo: 'SG/26-27/1001', styleNo: 'HM-TS-2601',
-    buyer: 'H&M Hennes & Mauritz AB', deliveryDate: day(40), status: 'IN_PROGRESS', sizeSetStatus: 'APPROVED',
-    matrix: [{ color: 'Navy Blue', qty: { S: 300, M: 600, L: 600, XL: 300 } }],
-    schedule: [
-      { date: day(-4), table: 'Table-1', color: 'Navy Blue', markerRef: 'MKR-20260811-001', plannedPlies: 54, plannedQty: 324 },
-      { date: day(0), table: 'Table-1', color: 'Navy Blue', markerRef: 'MKR-20260811-001', plannedPlies: 30, plannedQty: 180 },
-      { date: day(3), table: 'Table-2', color: 'Navy Blue', markerRef: 'MKR-20260811-001', plannedPlies: 110, plannedQty: 660 },
+    id: 1, planNo: 'MP-2026-0001', factory: 'Unit-1 Tirupur', cutPoId: 1, date: day(-7),
+    planStartDate: day(-4), planEndDate: day(6), status: 'IN_PROGRESS',
+    markers: [
+      {
+        id: 1, markerNo: 'MK-001', fabricWidthRaw: 59.5, cuttableWidth: 57, markerLength: 6.2,
+        markerHeight: 250, efficiencyPct: 86, layPlanDate: day(-4), cutPlanDate: day(-3),
+        layTableNo: 1, cadFile: 'HM-TS-2601-M1.cut', ratio: { S: 1, M: 2, L: 2, XL: 1 },
+      },
+      {
+        id: 2, markerNo: 'MK-002', fabricWidthRaw: 59.5, cuttableWidth: 57, markerLength: 6.4,
+        markerHeight: 60, efficiencyPct: 83, layPlanDate: day(2), cutPlanDate: day(3),
+        layTableNo: 2, cadFile: null, ratio: { S: 1, M: 2, L: 2, XL: 1 },
+      },
     ],
-  },
-  {
-    id: 2, copNo: 'COP-20260813-002', cutPoId: 2, orderNo: 'SG/26-27/1002', styleNo: 'PRK-DN-2603',
-    buyer: 'Primark Stores Ltd', deliveryDate: day(55), status: 'DRAFT', sizeSetStatus: 'PENDING',
-    matrix: [{ color: 'Indigo', qty: { 30: 400, 32: 500, 34: 400, 36: 200 } }],
-    schedule: [],
   },
 ];
 
 export const seedLayAudits = [
   {
-    id: 1, cutPoId: 1, layNo: 1, date: day(-4), layLength: 6.2, layHeight: 0.35, width: 1.5,
+    id: 1, cutPoId: 1, markerId: 1, layNo: 1, date: day(-4), layLength: 6.2, layHeight: 0.35, width: 1.5,
     startTime: d(-4, '09:15'), endTime: d(-4, '11:40'), status: 'APPROVED',
     rolls: [
       { rollNo: 'R-01', weight: 18.5, weightPerLay: 0.7, numLays: 24, remarks: 'PRD example roll' },
@@ -106,7 +98,7 @@ export const seedLayAudits = [
     ],
   },
   {
-    id: 2, cutPoId: 1, layNo: 2, date: day(0), layLength: 6.2, layHeight: 0.22, width: 1.5,
+    id: 2, cutPoId: 1, markerId: 1, layNo: 2, date: day(0), layLength: 6.2, layHeight: 0.22, width: 1.5,
     startTime: d(0, '08:30'), endTime: d(0, '10:05'), status: 'AUDITED',
     rolls: [
       { rollNo: 'R-03', weight: 21.8, weightPerLay: 0.71, numLays: 30, remarks: '' },
