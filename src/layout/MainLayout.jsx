@@ -408,7 +408,10 @@ const MainLayoutInner = () => {
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
         { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
-        { key: "/hr/statutory/pt", label: "Statutory", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
       ],
     },
@@ -521,6 +524,9 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
     if (path.startsWith('/hr/loans')) return ['/hr/loans'];
     if (path.startsWith('/hr/bonus')) return ['/hr/bonus'];
+    if (path.startsWith('/hr/statutory/pf')) return ['/hr/statutory/pf'];
+    if (path.startsWith('/hr/statutory/esi')) return ['/hr/statutory/esi'];
+    if (path.startsWith('/hr/statutory/el')) return ['/hr/statutory/el'];
     if (path.startsWith('/hr/statutory')) return ['/hr/statutory/pt'];
     if (path.startsWith('/hr/fnf')) return ['/hr/fnf'];
     return [path];
