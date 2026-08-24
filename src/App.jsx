@@ -93,6 +93,7 @@ const BonusWizard = lazy(() => import('./pages/hr/bonus/BonusWizard'));
 const BonusRunView = lazy(() => import('./pages/hr/bonus/BonusRunView'));
 const PtReturnList = lazy(() => import('./pages/hr/statutory/PtReturnList'));
 const ElEncashmentList = lazy(() => import('./pages/hr/statutory/ElEncashmentList'));
+const ContributionFiling = lazy(() => import('./pages/hr/statutory/ContributionFiling'));
 const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
@@ -275,6 +276,8 @@ const ThemedApp = () => {
             {/* Statutory */}
             <Route path="hr/statutory/pt" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><PtReturnList /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/el" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ElEncashmentList /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/pf" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ContributionFiling scheme="PF" /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/esi" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ContributionFiling scheme="ESI" /></Suspense></PermissionRoute>} />
             {/* F&F Settlement */}
             <Route path="hr/fnf" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfList /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/new" element={<PermissionRoute module="hr-fnf" operation="add"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
