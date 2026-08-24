@@ -4,7 +4,7 @@ import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getPayrollRunById, getPayrollRecords, markPayrollPaid,
-  processPayrollRun, approvePayrollRun, validatePayrollRun,
+  processPayrollRun, approvePayrollRun, validatePayrollRun, cancelPayrollRun,
 } from '../../../services/hr/payrollService';
 import { PAYMENT_MODES } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
@@ -34,6 +34,8 @@ const PayrollRunView = () => {
   const [payForm] = Form.useForm();
 
   const canUpdate = hasPermission('hr-payroll', 'update');
+  const canApprove = hasPermission('hr-payroll', 'approve');
+  const canCancel = hasPermission('hr-payroll', 'cancel');
 
   const [advancing, setAdvancing] = useState(false);
   const [validation, setValidation] = useState(null);
@@ -145,6 +147,40 @@ const PayrollRunView = () => {
     if (run?.status === 'DRAFT') loadValidation();
   }, [run?.status, loadValidation]);
 
+  // Only a draft or processed run can be cancelled. After approval the run has
+  // already reduced loan balances and marked advances recovered, so discarding
+  // it would need those reversed rather than simply dropped.
+  const handleCancel = useCallback(() => {
+    let reason = '';
+    modal.confirm({
+      title: 'Cancel this payroll run?',
+      content: (
+        <>
+          <p style={{ marginTop: 0 }}>
+            The calculated salaries are discarded and the period becomes free to start again.
+          </p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Reason (optional)"
+            onChange={(e) => { reason = e.target.value; }}
+          />
+        </>
+      ),
+      okText: 'Cancel Run',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      onOk: async () => {
+        try {
+          await cancelPayrollRun(id, reason.trim() || undefined);
+          message.success('Payroll run cancelled');
+          fetchData();
+        } catch (err) {
+          message.error(err?.response?.data?.message || 'Could not cancel the run');
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
+
   const handleMarkPaid = useCallback(async () => {
     try {
       const values = await payForm.validateFields();
@@ -184,7 +220,7 @@ const PayrollRunView = () => {
                 Process Salaries
               </Button>
             )}
-            {run?.status === 'PROCESSED' && canUpdate && (
+            {run?.status === 'PROCESSED' && (canApprove || canUpdate) && (
               <>
                 <Button loading={advancing} onClick={handleProcess}>Re-process</Button>
                 <Button type="primary" onClick={handleApprove}>Approve</Button>
@@ -192,6 +228,9 @@ const PayrollRunView = () => {
             )}
             {run?.status === 'APPROVED' && canUpdate && (
               <Button type="primary" onClick={() => setPayOpen(true)}>Mark as Paid</Button>
+            )}
+            {['DRAFT', 'PROCESSED'].includes(run?.status) && canCancel && (
+              <Button danger onClick={handleCancel}>Cancel Run</Button>
             )}
           </Space>
         }

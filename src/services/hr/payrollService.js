@@ -85,3 +85,14 @@ export const markPayrollPaid = async (runId, { paymentDate, reference, mode } = 
   });
   return response.data;
 };
+
+/**
+ * Abandons a draft or processed run so the period can be started again.
+ * POST /api/v1/hr/payroll/{id}/cancel
+ */
+export const cancelPayrollRun = async (runId, reason) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${runId}/cancel`, null, {
+    params: { reason },
+  });
+  return response.data;
+};
