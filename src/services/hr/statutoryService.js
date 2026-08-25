@@ -41,6 +41,24 @@ export const getElEncashmentRecords = async (runId) => {
 // ── PT Returns ──
 
 /**
+ * One EL encashment run.
+ * GET /api/v1/hr/el-encashment/{id}
+ */
+export const getElEncashmentRunById = async (id) => {
+  const response = await axiosInstance.get(`/hr/el-encashment/${id}`);
+  return response.data;
+};
+
+/**
+ * Records that an approved encashment run has been paid.
+ * POST /api/v1/hr/el-encashment/{id}/mark-paid
+ */
+export const markElEncashmentPaid = async (id) => {
+  const response = await axiosInstance.post(`/hr/el-encashment/${id}/mark-paid`);
+  return response.data;
+};
+
+/**
  * Generate a PT return for a factory/period.
  * POST /api/v1/hr/pt-returns/generate
  */
