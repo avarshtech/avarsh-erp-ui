@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, DatePicker } from 'antd';
-import { PlusOutlined, CheckOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAllPtReturns, generatePtReturn, filePtReturn, getPtReturnRecords } from '../../../services/hr/statutoryService';
+import { getAllPtReturns, generatePtReturn, filePtReturn } from '../../../services/hr/statutoryService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
@@ -16,6 +17,7 @@ const formatCurrency = (val) =>
 
 const PtReturnList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -141,7 +143,7 @@ const PtReturnList = () => {
         render: (_, r) => (
           <Space>
             {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleMarkFiled(r.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleMarkFiled(r.id); }}>
                 Mark Filed
               </Button>
             )}
@@ -181,6 +183,7 @@ const PtReturnList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} returns` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/pt/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
