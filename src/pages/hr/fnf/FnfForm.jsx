@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { App, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Spin, Descriptions, Tag } from 'antd';
 import { CalculatorOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -20,19 +20,46 @@ const FnfForm = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [fnfData, setFnfData] = useState(null);
 
-  const handleEmployeeSearch = useCallback(async (search) => {
-    if (!search || search.length < 2) return;
+  /**
+   * Loads employees for the picker.
+   *
+   * This used to return early unless at least two characters had been typed, so
+   * the dropdown was empty on open and looked as though no employees existed.
+   * It now preloads, and a search narrows server side. Failures are shown
+   * rather than swallowed - a failed search was indistinguishable from an empty
+   * result.
+   *
+   * No status filter: F&F is settled for people who are leaving or have left,
+   * so restricting to ACTIVE would hide exactly the ones being settled.
+   */
+  const loadEmployees = useCallback(async (search) => {
     setSearchLoading(true);
     try {
-      const result = await searchEmployees({ search, size: 20 });
-      const list = Array.isArray(result) ? result : result?.content || [];
-      setEmployees(list);
-    } catch {
-      // silent
+      const result = await searchEmployees({
+        search: search && search.trim() ? search.trim() : undefined,
+        size: 200,
+      });
+      setEmployees(Array.isArray(result) ? result : result?.content || []);
+    } catch (err) {
+      setEmployees([]);
+      message.error(err?.response?.data?.message || 'Could not load employees');
     } finally {
       setSearchLoading(false);
     }
-  }, []);
+  }, [message]);
+
+  // onSearch fires on every keystroke, so hold off until typing pauses rather
+  // than firing a request per character.
+  const searchTimer = useRef(null);
+  const handleEmployeeSearch = useCallback((search) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => loadEmployees(search), 300);
+  }, [loadEmployees]);
+
+  useEffect(() => {
+    loadEmployees();
+    return () => clearTimeout(searchTimer.current);
+  }, [loadEmployees]);
 
   const handleCalculate = useCallback(async () => {
     try {
@@ -112,6 +139,7 @@ const FnfForm = () => {
                     onSearch={handleEmployeeSearch}
                     loading={searchLoading}
                     options={employeeOptions(employees)}
+                    notFoundContent={searchLoading ? 'Searching…' : 'No matching employee'}
                   />
                 </Form.Item>
               </Col>
