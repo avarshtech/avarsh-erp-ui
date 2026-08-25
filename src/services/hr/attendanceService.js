@@ -130,3 +130,17 @@ export const triggerBrowserDownload = (blob, filename) => {
   link.remove();
   window.URL.revokeObjectURL(url);
 };
+
+/**
+ * Lock state for a factory-month.
+ * GET /api/v1/hr/attendance/lock?factoryId=&month=&year=
+ *
+ * Returns an unlocked shape when the period has never been locked, so callers
+ * get an answer rather than a 404.
+ */
+export const getAttendanceLock = async (factoryId, month, year) => {
+  const response = await axiosInstance.get(`${BASE_URL}/lock`, {
+    params: { factoryId, month, year },
+  });
+  return response.data;
+};
