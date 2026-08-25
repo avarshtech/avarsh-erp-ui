@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Button, Select, DatePicker, TimePicker, InputNumber, Input, Row, Col, Space } from 'antd';
-import { SaveOutlined } from '@ant-design/icons';
+import { Alert, App, Table, Button, Select, DatePicker, TimePicker, InputNumber, Input, Row, Col, Space } from 'antd';
+import { SaveOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAttendanceByDate, bulkMarkAttendance } from '../../../services/hr/attendanceService';
+import {
+  getAttendanceByDate, bulkMarkAttendance,
+  getAttendanceLock, lockAttendanceMonth, unlockAttendanceMonth,
+} from '../../../services/hr/attendanceService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { hasPermission } from '../../../utils/permissions';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
@@ -12,16 +15,19 @@ import PageHeader from '../../../components/PageHeader';
 const statusOptions = ATTENDANCE_STATUS.map((s) => ({ value: s.value, label: s.label }));
 
 const AttendanceBulkEntry = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [data, setData] = useState([]);
-  const [locked, setLocked] = useState(false);
+  const [lock, setLock] = useState(null);
+
+  const locked = Boolean(lock?.isLocked);
 
   const canEdit = hasPermission('hr-attendance', 'update');
+  const canLock = hasPermission('hr-attendance', 'lock');
 
   useEffect(() => {
     getActiveFactories().then(setFactories).catch(() => {});
@@ -32,10 +38,13 @@ const AttendanceBulkEntry = () => {
     setLoading(true);
     try {
       const result = await getAttendanceByDate(selectedDate.format('YYYY-MM-DD'), factoryId);
-      setData((result.records || []).map((r, i) => ({ ...r, _key: r.id || i })));
-      setLocked(result.locked || false);
-    } catch {
-      message.error('Failed to load attendance data');
+      // The endpoint returns a plain list. This read result.records, which does
+      // not exist, so the grid was empty on every load.
+      const records = Array.isArray(result) ? result : result?.records || [];
+      setData(records.map((r, i) => ({ ...r, _key: r.id || i })));
+    } catch (err) {
+      setData([]);
+      message.error(err?.response?.data?.message || 'Failed to load attendance data');
     } finally {
       setLoading(false);
     }
@@ -44,6 +53,43 @@ const AttendanceBulkEntry = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const fetchLock = useCallback(async () => {
+    if (!selectedDate || !factoryId) { setLock(null); return; }
+    try {
+      setLock(await getAttendanceLock(factoryId, selectedDate.month() + 1, selectedDate.year()));
+    } catch {
+      // A missing lock state must not block the grid; treat it as unlocked and
+      // let the server refuse the write if it disagrees.
+      setLock(null);
+    }
+  }, [factoryId, selectedDate]);
+
+  useEffect(() => { fetchLock(); }, [fetchLock]);
+
+  const toggleLock = useCallback(() => {
+    const period = selectedDate.format('MMMM YYYY');
+    modal.confirm({
+      title: locked ? `Reopen ${period}?` : `Lock ${period}?`,
+      content: locked
+        ? 'Attendance for this month becomes editable again. This is refused if payroll for the month has already been processed.'
+        : 'Attendance for this month can no longer be changed by anyone, through this screen, the import, or a regularisation. Payroll expects the period to be locked before it runs.',
+      okText: locked ? 'Reopen' : 'Lock',
+      okButtonProps: locked ? { danger: true } : undefined,
+      onOk: async () => {
+        try {
+          const fn = locked ? unlockAttendanceMonth : lockAttendanceMonth;
+          await fn({ factoryId, month: selectedDate.month() + 1, year: selectedDate.year() });
+          message.success(locked ? `${period} reopened` : `${period} locked`);
+          fetchLock();
+          fetchData();
+        } catch (err) {
+          message.error(err?.response?.data?.message
+            || `Could not ${locked ? 'reopen' : 'lock'} the period`);
+        }
+      },
+    });
+  }, [locked, factoryId, selectedDate, modal, message, fetchLock, fetchData]);
 
   const handleFieldChange = useCallback((index, field, value) => {
     setData((prev) => {
@@ -180,17 +226,28 @@ const AttendanceBulkEntry = () => {
       <PageHeader
         title="Bulk Attendance Entry"
         extra={
-          canEdit && (
-            <Button
-              type="primary"
-              icon={<SaveOutlined />}
-              onClick={handleSaveAll}
-              loading={saving}
-              disabled={locked || data.length === 0}
-            >
-              Save All
-            </Button>
-          )
+          <Space>
+            {canLock && factoryId && (
+              <Button
+                icon={locked ? <UnlockOutlined /> : <LockOutlined />}
+                onClick={toggleLock}
+                danger={locked}
+              >
+                {locked ? 'Reopen Month' : 'Lock Month'}
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                type="primary"
+                icon={<SaveOutlined />}
+                onClick={handleSaveAll}
+                loading={saving}
+                disabled={locked || data.length === 0}
+              >
+                Save All
+              </Button>
+            )}
+          </Space>
         }
       />
       <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -212,14 +269,30 @@ const AttendanceBulkEntry = () => {
             options={factoryOptions(factories)}
           />
         </Col>
-        {locked && (
-          <Col xs={24} sm={8} md={6}>
-            <Space>
-              <span style={{ color: '#ff4d4f', fontWeight: 600 }}>Month is locked - editing disabled</span>
-            </Space>
-          </Col>
-        )}
       </Row>
+
+      {factoryId && locked && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`${selectedDate.format('MMMM YYYY')} is locked`}
+          description={
+            lock?.lockedAt
+              ? `Locked on ${dayjs(lock.lockedAt).format('DD-MMM-YYYY HH:mm')}. Attendance for this month cannot be changed until it is reopened.`
+              : 'Attendance for this month cannot be changed until it is reopened.'
+          }
+        />
+      )}
+      {factoryId && !locked && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={`${selectedDate.format('MMMM YYYY')} is open`}
+          description="Attendance can still be edited. Lock the month once it is final - payroll expects a locked period before it runs."
+        />
+      )}
       <Table
         columns={columns}
         dataSource={data}

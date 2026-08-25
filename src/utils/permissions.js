@@ -383,7 +383,7 @@ export const PERMISSION_GROUPS = [
     modules: [
       { id: 'hr-masters', name: 'HR Masters', operations: STANDARD_OPERATIONS, path: '/hr/masters' },
       { id: 'hr-employees', name: 'Employees', operations: STANDARD_OPERATIONS, path: '/hr/employees' },
-      { id: 'hr-attendance', name: 'Attendance', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/attendance' },
+      { id: 'hr-attendance', name: 'Attendance', operations: [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'], path: '/hr/attendance' },
       { id: 'hr-leave', name: 'Leave Management', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/leaves' },
       { id: 'hr-payroll', name: 'Payroll', operations: [...STANDARD_OPERATIONS, 'approve', 'cancel'], path: '/hr/payroll' },
       { id: 'hr-loans', name: 'Loans & Advances', operations: STANDARD_OPERATIONS, path: '/hr/loans' },
@@ -427,7 +427,7 @@ export const getOperationsForModule = (moduleId) => {
   // actions. Without declaring the operations here the permission keys are
   // never generated, so hasPermission(...,'approve') was undefined for every
   // role including admin, and the buttons could never appear for anyone.
-  if (moduleId === 'hr-attendance')   return [...STANDARD_OPERATIONS, 'approve', 'reject'];
+  if (moduleId === 'hr-attendance')   return [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'];
   if (moduleId === 'hr-leave')        return [...STANDARD_OPERATIONS, 'approve', 'reject'];
   // Payroll and bonus move money, so approving and cancelling a run are gated
   // separately from ordinary editing. Without declaring them the keys are never
