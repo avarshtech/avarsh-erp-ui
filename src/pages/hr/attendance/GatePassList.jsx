@@ -27,6 +27,10 @@ const GatePassList = () => {
 
   const canAdd = hasPermission('hr-attendance', 'add');
   const canApprove = hasPermission('hr-attendance', 'approve');
+  const canReject = hasPermission('hr-attendance', 'reject');
+  // Either right is enough to act on a pending request; the buttons
+  // themselves are gated separately below.
+  const canDecide = canApprove || canReject;
 
   useEffect(() => {
     searchEmployees({ status: 'ACTIVE', size: 500 })
@@ -152,20 +156,24 @@ const GatePassList = () => {
       width: 140,
       fixed: 'right',
       render: (_, record) => {
-        if (record.status !== 'PENDING' || !canApprove) return null;
+        if (record.status !== 'PENDING' || !canDecide) return null;
         return (
           <Space size="small">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}>
-              Approve
-            </Button>
-            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}>
-              Reject
-            </Button>
+            {canApprove && (
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}>
+                Approve
+              </Button>
+            )}
+            {canReject && (
+              <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}>
+                Reject
+              </Button>
+            )}
           </Space>
         );
       },
     },
-  ], [canApprove, handleApprove, handleReject]);
+  ], [canApprove, canReject, canDecide, handleApprove, handleReject]);
 
   const tabItems = useMemo(() => [
     { key: 'ALL', label: 'All' },
@@ -208,14 +216,18 @@ const GatePassList = () => {
         onClose={() => setDetailOpen(false)}
         width={460}
         extra={
-          selected?.status === 'PENDING' && canApprove && (
+          selected?.status === 'PENDING' && canDecide && (
             <Space>
-              <Button danger icon={<CloseOutlined />} onClick={() => handleReject(selected.id)}>
-                Reject
-              </Button>
-              <Button type="primary" icon={<CheckOutlined />} onClick={() => handleApprove(selected.id)}>
-                Approve
-              </Button>
+              {canReject && (
+                <Button danger icon={<CloseOutlined />} onClick={() => handleReject(selected.id)}>
+                  Reject
+                </Button>
+              )}
+              {canApprove && (
+                <Button type="primary" icon={<CheckOutlined />} onClick={() => handleApprove(selected.id)}>
+                  Approve
+                </Button>
+              )}
             </Space>
           )
         }
@@ -250,7 +262,7 @@ const GatePassList = () => {
               )}
             </Descriptions>
 
-            {selected.status === 'PENDING' && !canApprove && (
+            {selected.status === 'PENDING' && !canDecide && (
               <Alert
                 type="info"
                 showIcon
