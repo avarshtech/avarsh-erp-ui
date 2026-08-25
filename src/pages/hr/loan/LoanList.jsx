@@ -45,7 +45,7 @@ const LoanList = () => {
         total: result.totalElements,
       }));
     } catch {
-      message.error('Failed to load loans');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ const LoanList = () => {
       message.success('Loan closed successfully');
       fetchData();
     } catch {
-      message.error('Failed to close loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [message, fetchData]);
 
@@ -75,7 +75,7 @@ const LoanList = () => {
       message.success('Loan cancelled');
       fetchData();
     } catch {
-      message.error('Failed to cancel loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [message, fetchData]);
 

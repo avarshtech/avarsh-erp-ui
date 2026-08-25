@@ -35,11 +35,11 @@ const FnfView = () => {
       const result = await getFnfById(id);
       setData(result);
     } catch {
-      message.error('Failed to load F&F settlement');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
@@ -51,8 +51,8 @@ const FnfView = () => {
       await approveFnf(id);
       message.success('F&F settlement approved');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setActionLoading(false);
     }
@@ -64,8 +64,8 @@ const FnfView = () => {
       await settleFnf(id);
       message.success('F&F settlement finalized');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to settle');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setActionLoading(false);
     }

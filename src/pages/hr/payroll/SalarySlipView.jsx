@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Row, Col, Descriptions, Divider, Button, Spin, Typography } from 'antd';
+import { Card, Row, Col, Descriptions, Divider, Button, Spin, Typography } from 'antd';
 import { PrinterOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSalarySlip } from '../../../services/hr/payrollService';
@@ -29,7 +29,6 @@ const DeductionRow = ({ label, value }) => (
 );
 
 const SalarySlipView = () => {
-  const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -41,11 +40,11 @@ const SalarySlipView = () => {
       const result = await getSalarySlip(id);
       setSlip(result);
     } catch {
-      message.error('Failed to load salary slip');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => {
     fetchSlip();

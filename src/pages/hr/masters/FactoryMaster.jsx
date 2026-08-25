@@ -38,7 +38,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load factories');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

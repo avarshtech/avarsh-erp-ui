@@ -55,7 +55,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
       onSuccess?.();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to save salary structure');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   };
 

@@ -60,7 +60,7 @@ const EmployeeList = () => {
         total: result.totalElements,
       }));
     } catch {
-      message.error('Failed to load employees');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

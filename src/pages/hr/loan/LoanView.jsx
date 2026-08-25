@@ -29,13 +29,13 @@ const LoanView = () => {
     try {
       const result = await getLoanById(id);
       setLoan(result);
-    } catch (err) {
+    } catch {
       setLoan(null);
-      message.error(err?.response?.data?.message || 'Failed to load loan details');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => {
     fetchLoan();
@@ -75,7 +75,7 @@ const LoanView = () => {
       fetchLoan();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Could not record the repayment');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSaving(false);
     }

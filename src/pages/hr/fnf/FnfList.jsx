@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col } from 'antd';
+import { Table, Tag, Button, Select, Space, Row, Col } from 'antd';
 import { PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -15,7 +15,6 @@ const formatCurrency = (val) =>
   val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const FnfList = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -29,11 +28,11 @@ const FnfList = () => {
       const result = await getAllFnfSettlements();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load F&F settlements');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();

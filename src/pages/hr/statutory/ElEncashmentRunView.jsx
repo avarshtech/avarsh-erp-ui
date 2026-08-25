@@ -42,12 +42,12 @@ const ElEncashmentRunView = () => {
       ]);
       setRun(runResult);
       setRecords(Array.isArray(recsResult) ? recsResult : recsResult?.content || []);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to load the encashment run');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

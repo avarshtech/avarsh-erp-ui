@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Select, Row, Col, Spin } from 'antd';
+import { Table, Select, Row, Col, Spin } from 'antd';
 import dayjs from 'dayjs';
 import { getLeaveBalancesBulk } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
@@ -9,7 +9,6 @@ import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
-  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [year, setYear] = useState(dayjs().year());
   const [factories, setFactories] = useState([]);
@@ -82,14 +81,14 @@ const LeaveBalanceView = () => {
         });
         return row;
       }));
-    } catch (err) {
+    } catch {
       setBalanceData([]);
       setLeaveTypeNames([]);
-      message.error(err?.response?.data?.message || 'Failed to load leave balances');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [employees, year, message]);
+  }, [employees, year]);
 
   useEffect(() => {
     fetchBalances();

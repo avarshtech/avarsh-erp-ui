@@ -44,13 +44,13 @@ const GatePassList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getGatePassByStatus(status);
       setData(result || []);
-    } catch (err) {
+    } catch {
       setData([]); // don't leave the previous tab's rows looking like a success
-      message.error(err?.response?.data?.message || 'Failed to load gate pass requests');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [activeTab, message]);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -62,8 +62,8 @@ const GatePassList = () => {
       message.success('Gate pass approved');
       setDetailOpen(false);
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [fetchData, message]);
 
@@ -84,8 +84,8 @@ const GatePassList = () => {
           message.success('Gate pass rejected');
           setDetailOpen(false);
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to reject');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -113,7 +113,7 @@ const GatePassList = () => {
       fetchData();
     } catch (err) {
       if (err.errorFields) return;
-      message.error('Failed to create gate pass');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }

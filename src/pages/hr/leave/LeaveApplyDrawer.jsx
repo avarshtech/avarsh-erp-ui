@@ -77,7 +77,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
       onClose?.();
     } catch (err) {
       if (err.errorFields) return;
-      message.error('Failed to apply leave');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }

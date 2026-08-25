@@ -37,7 +37,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load PT slabs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error('Failed to save PT slab');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }
@@ -137,7 +137,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
           handleClose();
           fetchData();
         } catch {
-          message.error('Failed to delete PT slab');
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });

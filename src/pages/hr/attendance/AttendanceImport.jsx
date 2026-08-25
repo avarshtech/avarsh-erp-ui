@@ -51,9 +51,9 @@ const AttendanceImport = () => {
       const blob = await downloadAttendanceTemplate(params);
       triggerBrowserDownload(blob, 'attendance-template.xlsx');
     } catch {
-      message.error('Could not download the template');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
-  }, [params, message]);
+  }, [params]);
 
   const handleParse = useCallback(async () => {
     if (!file) return;
@@ -67,8 +67,8 @@ const AttendanceImport = () => {
       } else {
         message.success(`${parsed.validRows} row(s) ready to import`);
       }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Could not read the file');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setParsing(false);
     }
@@ -82,8 +82,8 @@ const AttendanceImport = () => {
       message.success(`Imported ${saved.length} attendance record(s)`);
       setResult(null);
       setFile(null);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Import failed. Nothing was saved.');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setCommitting(false);
     }

@@ -37,16 +37,16 @@ const LeaveApplicationList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getLeavesByStatus(status);
       setData(result || []);
-    } catch (err) {
+    } catch {
       // Clear on failure. Leaving the previous tab's rows on screen made a
       // failed load look like a successful one, which is why switching tabs
       // and back appeared to "fix" it.
       setData([]);
-      message.error(err?.response?.data?.message || 'Failed to load leave applications');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [activeTab, message]);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -57,8 +57,8 @@ const LeaveApplicationList = () => {
       await approveLeave(id);
       message.success('Leave approved');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve leave');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [fetchData, message]);
 
@@ -84,8 +84,8 @@ const LeaveApplicationList = () => {
           await rejectLeave(id, rejectReason.trim());
           message.success('Leave rejected');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to reject leave');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -108,8 +108,8 @@ const LeaveApplicationList = () => {
           await cancelLeave(record.id);
           message.success('Leave cancelled');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to cancel leave');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });

@@ -42,13 +42,13 @@ const AttendanceBulkEntry = () => {
       // not exist, so the grid was empty on every load.
       const records = Array.isArray(result) ? result : result?.records || [];
       setData(records.map((r, i) => ({ ...r, _key: r.id || i })));
-    } catch (err) {
+    } catch {
       setData([]);
-      message.error(err?.response?.data?.message || 'Failed to load attendance data');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, factoryId, message]);
+  }, [selectedDate, factoryId]);
 
   useEffect(() => {
     fetchData();
@@ -122,7 +122,7 @@ const AttendanceBulkEntry = () => {
       message.success('Attendance saved successfully');
       fetchData();
     } catch {
-      message.error('Failed to save attendance');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSaving(false);
     }

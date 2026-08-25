@@ -50,11 +50,11 @@ const PayrollRunView = () => {
       setRun(runResult);
       setRecords(Array.isArray(recsResult) ? recsResult : recsResult?.content || []);
     } catch {
-      message.error('Failed to load payroll run');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
@@ -119,8 +119,8 @@ const PayrollRunView = () => {
       await processPayrollRun(id);
       message.success('Salaries processed');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to process payroll');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setAdvancing(false);
     }
@@ -136,8 +136,8 @@ const PayrollRunView = () => {
           await approvePayrollRun(id);
           message.success('Payroll approved');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to approve payroll');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -174,8 +174,8 @@ const PayrollRunView = () => {
           await cancelPayrollRun(id, reason.trim() || undefined);
           message.success('Payroll run cancelled');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Could not cancel the run');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -196,7 +196,7 @@ const PayrollRunView = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Could not mark this run as paid');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setPaying(false);
     }

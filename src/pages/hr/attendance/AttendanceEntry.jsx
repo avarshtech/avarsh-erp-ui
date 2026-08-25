@@ -89,7 +89,7 @@ const AttendanceEntry = () => {
       });
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Could not save attendance');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSaving(false);
     }

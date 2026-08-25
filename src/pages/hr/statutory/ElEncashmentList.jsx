@@ -33,11 +33,11 @@ const ElEncashmentList = () => {
       const result = await getAllElEncashmentRuns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load EL encashment runs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -64,7 +64,7 @@ const ElEncashmentList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to process EL encashment');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setProcessing(false);
     }
@@ -80,8 +80,8 @@ const ElEncashmentList = () => {
             await approveElEncashment(id);
             message.success('EL encashment approved');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to approve EL encashment');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });
