@@ -36,11 +36,11 @@ const EmployeeView = () => {
       const emp = await getEmployeeById(id);
       setEmployee(emp);
     } catch {
-      message.error('Failed to load employee');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   const loadSalaryHistory = useCallback(async () => {
     try {
@@ -57,7 +57,7 @@ const EmployeeView = () => {
       message.success(`Status changed to ${getLabel(EMPLOYEE_STATUS, status)}`);
       loadEmployee();
     } catch {
-      message.error('Failed to change status');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   };
 

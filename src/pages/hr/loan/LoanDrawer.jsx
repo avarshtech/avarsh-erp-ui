@@ -25,11 +25,11 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       const result = await searchEmployees({ status: 'ACTIVE', size: 1000 });
       setEmployees(result?.content || []);
     } catch {
-      message.error('Failed to load employees');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setEmpLoading(false);
     }
-  }, [message]);
+  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -46,7 +46,7 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       onSuccess?.();
     } catch (err) {
       if (err?.errorFields) return; // validation error
-      message.error(err?.response?.data?.message || 'Failed to create loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }

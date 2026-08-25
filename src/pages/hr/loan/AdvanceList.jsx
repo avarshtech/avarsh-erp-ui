@@ -45,13 +45,13 @@ const AdvanceList = () => {
     try {
       const result = await getAllAdvances(statusFilter);
       setData(Array.isArray(result) ? result : result?.content || []);
-    } catch (err) {
+    } catch {
       setData([]);
-      message.error(err?.response?.data?.message || 'Failed to load advances');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, message]);
+  }, [statusFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -89,7 +89,7 @@ const AdvanceList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to record the advance');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSaving(false);
     }

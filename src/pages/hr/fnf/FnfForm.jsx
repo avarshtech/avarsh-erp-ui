@@ -46,13 +46,13 @@ const FnfForm = () => {
         size: 200,
       });
       setEmployees(Array.isArray(result) ? result : result?.content || []);
-    } catch (err) {
+    } catch {
       setEmployees([]);
-      message.error(err?.response?.data?.message || 'Could not load employees');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSearchLoading(false);
     }
-  }, [message]);
+  }, []);
 
   // onSearch fires on every keystroke, so hold off until typing pauses rather
   // than firing a request per character.
@@ -93,7 +93,7 @@ const FnfForm = () => {
       message.success('F&F calculated successfully');
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to calculate F&F');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -135,8 +135,8 @@ const FnfForm = () => {
       await approveFnf(fnfData.id);
       message.success('F&F settlement approved');
       navigate(`/hr/fnf/${fnfData.id}`);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve F&F');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

@@ -34,11 +34,11 @@ const PtReturnList = () => {
       const result = await getAllPtReturns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load PT returns');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -65,7 +65,7 @@ const PtReturnList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return; // form validation
-      message.error(err?.response?.data?.message || 'Failed to generate PT return');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setGenerating(false);
     }
@@ -81,8 +81,8 @@ const PtReturnList = () => {
             await filePtReturn(id);
             message.success('PT return marked as filed');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to file PT return');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });

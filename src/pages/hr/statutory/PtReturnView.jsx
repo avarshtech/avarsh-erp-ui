@@ -42,13 +42,13 @@ const PtReturnView = () => {
       ]);
       setPtReturn(returnResult);
       setRecords(Array.isArray(recordResult) ? recordResult : recordResult?.content || []);
-    } catch (err) {
+    } catch {
       setPtReturn(null);
-      message.error(err?.response?.data?.message || 'Failed to load the PT return');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -63,8 +63,8 @@ const PtReturnView = () => {
           await filePtReturn(id);
           message.success('PT return marked as filed');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Could not file the return');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         } finally {
           setFiling(false);
         }

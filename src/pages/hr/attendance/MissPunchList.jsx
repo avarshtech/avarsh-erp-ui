@@ -44,13 +44,13 @@ const MissPunchList = () => {
       const status = activeTab === 'ALL' ? undefined : activeTab;
       const result = await getMissPunchByStatus(status);
       setData(result || []);
-    } catch (err) {
+    } catch {
       setData([]); // don't leave the previous tab's rows looking like a success
-      message.error(err?.response?.data?.message || 'Failed to load miss punch requests');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [activeTab, message]);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -62,8 +62,8 @@ const MissPunchList = () => {
       message.success('Miss punch approved');
       setDetailOpen(false);
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [fetchData, message]);
 
@@ -98,8 +98,8 @@ const MissPunchList = () => {
           message.success('Miss punch rejected');
           setDetailOpen(false);
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to reject');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -125,7 +125,7 @@ const MissPunchList = () => {
       fetchData();
     } catch (err) {
       if (err.errorFields) return;
-      message.error('Failed to create miss punch request');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }

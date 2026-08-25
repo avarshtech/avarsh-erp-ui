@@ -57,8 +57,8 @@ const PayrollWizard = () => {
       } finally {
         setValidating(false);
       }
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to initiate payroll run');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -79,8 +79,8 @@ const PayrollWizard = () => {
       setRecords(Array.isArray(recs) ? recs : recs?.content || []);
       setCurrent(2);
       message.success('Salaries processed successfully');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to process payroll');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -94,8 +94,8 @@ const PayrollWizard = () => {
       await approvePayrollRun(runData.id);
       message.success('Payroll approved and finalized');
       navigate(`/hr/payroll/${runData.id}`);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve payroll');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

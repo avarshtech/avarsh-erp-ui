@@ -115,12 +115,12 @@ const AttendanceCalendar = () => {
         map[item.date] = item;
       });
       setCalendarData(map);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to load attendance calendar');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [employeeId, currentMonth, message]);
+  }, [employeeId, currentMonth]);
 
   useEffect(() => {
     fetchCalendar();

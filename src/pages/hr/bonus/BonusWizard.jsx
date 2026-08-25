@@ -53,8 +53,8 @@ const BonusWizard = () => {
       setRecords(Array.isArray(recs) ? recs : recs?.content || []);
       setCurrent(1);
       message.success('Bonus calculated successfully');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to calculate bonus');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -68,8 +68,8 @@ const BonusWizard = () => {
       await approveBonus(runData.id);
       message.success('Bonus run approved');
       setCurrent(2);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve bonus');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

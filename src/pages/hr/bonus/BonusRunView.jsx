@@ -41,12 +41,12 @@ const BonusRunView = () => {
       ]);
       setRun(runResult);
       setRecords(Array.isArray(recsResult) ? recsResult : recsResult?.content || []);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to load the bonus run');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -61,8 +61,8 @@ const BonusRunView = () => {
           await approveBonus(id);
           message.success('Bonus run approved');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to approve the bonus run');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         } finally {
           setAdvancing(false);
         }
@@ -81,8 +81,8 @@ const BonusRunView = () => {
           await markBonusPaid(id);
           message.success('Bonus run marked as paid');
           fetchData();
-        } catch (err) {
-          message.error(err?.response?.data?.message || 'Failed to mark the run as paid');
+        } catch {
+          // axiosInstance already toasts the server's message; adding another here showed two.
         } finally {
           setAdvancing(false);
         }
