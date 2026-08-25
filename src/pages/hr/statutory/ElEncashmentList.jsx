@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, InputNumber } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
 import { getActiveFactories } from '../../../services/master/factoryService';
@@ -15,6 +16,7 @@ const formatCurrency = (val) =>
 
 const ElEncashmentList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -143,7 +145,7 @@ const ElEncashmentList = () => {
         render: (_, r) => (
           <Space>
             {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(r.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(r.id); }}>
                 Approve
               </Button>
             )}
@@ -183,6 +185,7 @@ const ElEncashmentList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} runs` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/el/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -192,7 +195,7 @@ const ElEncashmentList = () => {
         onCancel={() => setProcessOpen(false)}
         confirmLoading={processing}
         afterClose={() => form.resetFields()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
