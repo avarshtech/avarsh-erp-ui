@@ -5,16 +5,9 @@ import { SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
-import axiosInstance from '../../../services/core/axiosInstance';
+import { getAllPtSlabs, createPtSlab, updatePtSlab, deletePtSlab } from '../../../services/hr/ptSlabService';
 
 const MODULE_ID = 'hr-masters';
-const PT_URL = '/hr/pt-slabs';
-
-// PT Slab API helpers (inline since small)
-const getAllPtSlabs = async () => (await axiosInstance.get(PT_URL)).data;
-const createPtSlab = async (data) => (await axiosInstance.post(PT_URL, data)).data;
-const updatePtSlab = async (id, data) => (await axiosInstance.put(`${PT_URL}/${id}`, { id, ...data })).data;
-const deletePtSlab = async (id) => (await axiosInstance.delete(`${PT_URL}/${id}`)).data;
 
 const PtSlabMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
@@ -32,6 +25,9 @@ const PtSlabMaster = ({ onDirtyChange }) => {
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
+  // Viewing an existing slab without update rights is read-only, rather than
+  // an editable form whose save button is hidden.
+  const isReadOnly = Boolean(selectedId) && !canUpdate;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -152,6 +148,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
       form={form}
       layout="vertical"
       onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
+      disabled={isReadOnly}
     >
       <Form.Item name="stateCode" label="State Code" rules={[{ required: true, message: 'Enter state code' }]}>
         <Input placeholder="e.g., TN" maxLength={2} style={{ textTransform: 'uppercase' }} />
@@ -177,7 +174,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
         {selectedId && canDelete && (
           <Button danger icon={<DeleteOutlined />} onClick={handleDelete}>Delete</Button>
         )}
-        <Button icon={<CloseOutlined />} onClick={handleClose}>Cancel</Button>
+        <Button icon={<CloseOutlined />} onClick={handleClose}>{isReadOnly ? 'Close' : 'Cancel'}</Button>
       </Space>
     </Form>
   );

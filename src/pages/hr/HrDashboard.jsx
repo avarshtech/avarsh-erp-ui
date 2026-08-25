@@ -3,7 +3,7 @@ import { Breadcrumb, Skeleton, Button, Tooltip, App } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   BankOutlined, ApartmentOutlined, IdcardOutlined,
-  ClockCircleOutlined, CalendarOutlined, FileProtectOutlined,
+  ClockCircleOutlined, CalendarOutlined, FileProtectOutlined, PercentageOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import FactoryMaster from './masters/FactoryMaster';
@@ -12,7 +12,7 @@ import DesignationMaster from './masters/DesignationMaster';
 import ShiftMaster from './masters/ShiftMaster';
 import HolidayMaster from './masters/HolidayMaster';
 import LeaveTypeMaster from './masters/LeaveTypeMaster';
-import { useTheme } from '../../context/ThemeContext';
+import PtSlabMaster from './masters/PtSlabMaster';
 import { hasModuleAccess } from '../../utils/permissions';
 
 // Group accent colors for left border on group headers
@@ -20,6 +20,7 @@ const GROUP_ACCENT = {
   organization: 'var(--info-color)',
   schedule: 'var(--warning-color)',
   leave: 'var(--success-color)',
+  statutory: 'var(--error-color)',
 };
 
 // Static navigation config
@@ -90,6 +91,22 @@ const NAV_GROUPS = [
       },
     ],
   },
+  {
+    groupKey: 'statutory',
+    label: 'Statutory',
+    items: [
+      {
+        // Built long ago but never registered here and never routed, so PT
+        // slabs could not be maintained through the application at all.
+        key: 'pt-slab',
+        label: 'PT Slabs',
+        icon: <PercentageOutlined />,
+        moduleId: 'hr-masters',
+        Component: PtSlabMaster,
+        description: 'Professional Tax slabs by state and half-yearly income',
+      },
+    ],
+  },
 ];
 
 // Permission-filtered nav groups
@@ -154,9 +171,7 @@ const collapsedItemSelected = {
 
 const HrDashboard = () => {
   const { modal } = App.useApp();
-  const { isDarkMode } = useTheme();
-
-  const accessibleGroups = useMemo(getAccessibleGroups, []);
+  const accessibleGroups = useMemo(() => getAccessibleGroups(), []);
   const accessibleItems = useMemo(
     () => accessibleGroups.flatMap(g => g.items.map(item => ({ ...item, groupLabel: g.label }))),
     [accessibleGroups],
