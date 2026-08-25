@@ -68,7 +68,7 @@ const SalarySlipView = () => {
       <Card style={{ maxWidth: 800, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <Title level={4} style={{ margin: 0 }}>{slip.companyName || 'Avarsh Apparels'}</Title>
+          <Title level={4} style={{ margin: 0 }}>{slip.factoryName || 'Avarsh Apparels'}</Title>
           <Text type="secondary">Salary Slip for {monthYear}</Text>
         </div>
 
@@ -90,16 +90,28 @@ const SalarySlipView = () => {
         <Row gutter={24}>
           <Col xs={24} sm={12}>
             <Title level={5}>Earnings</Title>
-            <EarningRow label="Basic" value={slip.basic} />
-            <EarningRow label="DA" value={slip.da} />
-            <EarningRow label="HRA" value={slip.hra} />
-            <EarningRow label="Conveyance" value={slip.conveyance} />
-            <EarningRow label="Washing Allowance" value={slip.washingAllowance} />
+            {/*
+              These read slip.basic, slip.da and so on, none of which exist on
+              SalarySlipDTO - the API returns the earned_ figures, pro-rated for
+              payable days. Every row in this column was therefore blank.
+            */}
+            <EarningRow label="Basic" value={slip.earnedBasic} />
+            <EarningRow label="DA" value={slip.earnedDa} />
+            <EarningRow label="HRA" value={slip.earnedHra} />
+            <EarningRow label="Conveyance" value={slip.earnedCa} />
+            <EarningRow label="Washing Allowance" value={slip.earnedWa} />
+            <EarningRow label="Other Allowance" value={slip.earnedOther} />
             <EarningRow label="OT" value={slip.otAmount} />
+            {Number(slip.incentive) > 0 && <EarningRow label="Incentive" value={slip.incentive} />}
+            {Number(slip.arrears) > 0 && <EarningRow label="Arrears" value={slip.arrears} />}
             <Divider dashed style={{ margin: '8px 0' }} />
             <Row justify="space-between" style={{ padding: '4px 0' }}>
               <Col><Text strong>Gross Salary</Text></Col>
-              <Col><Text strong>{formatCurrency(slip.grossSalary)}</Text></Col>
+              <Col><Text strong>{formatCurrency(slip.earnedGross)}</Text></Col>
+            </Row>
+            <Row justify="space-between" style={{ padding: '4px 0' }}>
+              <Col><Text strong>Total Earnings</Text></Col>
+              <Col><Text strong>{formatCurrency(slip.totalEarnings)}</Text></Col>
             </Row>
           </Col>
 
@@ -112,9 +124,41 @@ const SalarySlipView = () => {
             <DeductionRow label="Loan Recovery" value={slip.loanRecovery} />
             <DeductionRow label="Advance Recovery" value={slip.advanceRecovery} />
             <Divider dashed style={{ margin: '8px 0' }} />
+            <DeductionRow label="TDS" value={slip.tds} />
+            <DeductionRow label="Other Deductions" value={slip.otherDeductions} />
+            <Divider dashed style={{ margin: '8px 0' }} />
             <Row justify="space-between" style={{ padding: '4px 0' }}>
               <Col><Text strong>Total Deductions</Text></Col>
               <Col><Text strong type="danger">{formatCurrency(slip.totalDeductions)}</Text></Col>
+            </Row>
+          </Col>
+        </Row>
+
+        {/*
+          Employer contributions are computed and stored per record but have
+          never been shown, so the cost of employment was invisible to the
+          employee. They are not deducted from pay, which the heading says.
+        */}
+        <Divider style={{ margin: '16px 0' }} />
+        <Title level={5}>Employer Contributions (not deducted from your pay)</Title>
+        <Row gutter={24}>
+          <Col xs={24} sm={12}>
+            <EarningRow label="PF (Employer)" value={slip.pfEmployer} />
+            <EarningRow label="ESI (Employer)" value={slip.esiEmployer} />
+          </Col>
+          <Col xs={24} sm={12}>
+            <Divider dashed style={{ margin: '8px 0' }} />
+            <Row justify="space-between" style={{ padding: '4px 0' }}>
+              <Col><Text strong>Cost to Company</Text></Col>
+              <Col>
+                <Text strong>
+                  {formatCurrency(
+                    (Number(slip.totalEarnings) || 0)
+                    + (Number(slip.pfEmployer) || 0)
+                    + (Number(slip.esiEmployer) || 0),
+                  )}
+                </Text>
+              </Col>
             </Row>
           </Col>
         </Row>
