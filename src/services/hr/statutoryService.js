@@ -89,6 +89,18 @@ export const getAllPtReturns = async () => {
  * Get PT return records for a return.
  * GET /api/v1/hr/pt-returns/{id}/records
  */
+/**
+ * One PT return.
+ * GET /api/v1/hr/pt-returns/{id}
+ *
+ * The endpoint existed; nothing called it, so the return could be filed from
+ * the list without ever seeing the per-employee amounts behind it.
+ */
+export const getPtReturnById = async (id) => {
+  const response = await axiosInstance.get(`/hr/pt-returns/${id}`);
+  return response.data;
+};
+
 export const getPtReturnRecords = async (returnId) => {
   const response = await axiosInstance.get(`/hr/pt-returns/${returnId}/records`);
   return response.data;
