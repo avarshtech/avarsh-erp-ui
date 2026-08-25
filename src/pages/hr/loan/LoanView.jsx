@@ -29,8 +29,9 @@ const LoanView = () => {
     try {
       const result = await getLoanById(id);
       setLoan(result);
-    } catch {
-      message.error('Failed to load loan details');
+    } catch (err) {
+      setLoan(null);
+      message.error(err?.response?.data?.message || 'Failed to load loan details');
     } finally {
       setLoading(false);
     }
@@ -44,7 +45,7 @@ const LoanView = () => {
 
   const recoveryColumns = useMemo(
     () => [
-      { title: '#', dataIndex: 'installmentNo', key: 'installmentNo', width: 60, render: (_, __, idx) => idx + 1 },
+      { title: '#', dataIndex: 'installmentNo', key: 'installmentNo', width: 60, render: (v, __, idx) => v ?? idx + 1 },
       {
         title: 'Date',
         dataIndex: 'recoveryDate',
@@ -59,9 +60,6 @@ const LoanView = () => {
     [],
   );
 
-  if (loading) return <Spin style={{ display: 'block', margin: '100px auto' }} />;
-  if (!loan) return null;
-
   const handleRecordRepayment = useCallback(async () => {
     try {
       const values = await payForm.validateFields();
@@ -74,14 +72,31 @@ const LoanView = () => {
       message.success('Repayment recorded');
       setPayOpen(false);
       payForm.resetFields();
-      fetchData();
+      fetchLoan();
     } catch (err) {
       if (err?.errorFields) return;
       message.error(err?.response?.data?.message || 'Could not record the repayment');
     } finally {
       setSaving(false);
     }
-  }, [id, payForm, message, fetchData]);
+  }, [id, payForm, message, fetchLoan]);
+
+  if (loading) return <Spin style={{ display: 'block', margin: '100px auto' }} />;
+  // Returning null here used to be indistinguishable from the crash above it.
+  // Say why the page is empty instead.
+  if (!loan) {
+    return (
+      <>
+        <PageHeader title="Loan Details" onBack={() => navigate('/hr/loans')} />
+        <Alert
+          type="error"
+          showIcon
+          message="This loan could not be loaded"
+          description="It may have been deleted, or the server did not respond. Go back to the list and try again."
+        />
+      </>
+    );
+  }
 
   return (
     <>

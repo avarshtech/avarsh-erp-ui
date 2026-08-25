@@ -262,9 +262,9 @@ const PayrollWizard = () => {
     // Step 3 — Approve
     <Card key="approve" style={{ maxWidth: 600 }}>
       <Row gutter={[16, 16]}>
-        <Col span={8}><Statistic title="Total Gross" value={totals.gross} precision={2} prefix="\u20B9" /></Col>
-        <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix="\u20B9" /></Col>
-        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix="\u20B9" valueStyle={{ color: '#3f8600' }} /></Col>
+        <Col span={8}><Statistic title="Total Gross" value={totals.gross} precision={2} prefix={'\u20B9'} /></Col>
+        <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Col>
+        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Col>
       </Row>
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Button type="primary" size="large" loading={loading} icon={<CheckCircleOutlined />} onClick={handleApprove}>

@@ -162,7 +162,7 @@ const BonusWizard = () => {
                 <Statistic title="Bonus %" value={runData?.bonusPercentage || bonusPercentage} suffix="%" />
               </Col>
               <Col xs={12} sm={8}>
-                <Statistic title="Total Bonus" value={totalBonusAmount} prefix="\u20B9" precision={2} />
+                <Statistic title="Total Bonus" value={totalBonusAmount} prefix={'\u20B9'} precision={2} />
               </Col>
             </Row>
             <Table

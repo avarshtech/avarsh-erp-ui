@@ -205,19 +205,19 @@ const FnfForm = () => {
                 <Col xs={24} md={12}>
                   <Card title="Earnings" style={{ marginBottom: 16 }}>
                     <Form.Item name="pendingSalary" label="Pending Salary">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="elEncashmentAmount" label="EL Encashment">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="bonusProrata" label="Bonus Pro-rata">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="gratuity" label="Gratuity">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="otherEarnings" label="Other Earnings">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Divider />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
@@ -229,16 +229,16 @@ const FnfForm = () => {
                 <Col xs={24} md={12}>
                   <Card title="Deductions" style={{ marginBottom: 16 }}>
                     <Form.Item name="outstandingLoan" label="Outstanding Loan">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="outstandingAdvance" label="Outstanding Advance">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="noticePeriodRecovery" label="Notice Period Recovery">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Form.Item name="otherDeductions" label="Other Deductions">
-                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
+                      <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix={'\u20B9'} />
                     </Form.Item>
                     <Divider />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
