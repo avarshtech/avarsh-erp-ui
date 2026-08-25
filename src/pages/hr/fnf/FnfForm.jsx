@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { App, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Spin, Descriptions, Tag } from 'antd';
-import { CalculatorOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { App, Alert, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Space, Spin, Descriptions, Tag } from 'antd';
+import { CalculatorOutlined, CheckCircleOutlined, SaveOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { calculateFnf, approveFnf } from '../../../services/hr/fnfService';
+import { calculateFnf, updateFnf, approveFnf } from '../../../services/hr/fnfService';
+import { hasPermission } from '../../../utils/permissions';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { SEPARATION_REASONS, FNF_STATUS } from '../../../utils/hrConstants';
 import { employeeOptions } from '../../../utils/hrLabels';
@@ -19,6 +20,11 @@ const FnfForm = () => {
   const [employees, setEmployees] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [fnfData, setFnfData] = useState(null);
+  // The amount fields are overrides. Until they are saved they exist only in
+  // the form, so approving while dirty would silently approve the old figures.
+  const [dirty, setDirty] = useState(false);
+
+  const canApprove = hasPermission('hr-fnf', 'approve');
 
   /**
    * Loads employees for the picker.
@@ -74,8 +80,8 @@ const FnfForm = () => {
       // Populate override fields with calculated values
       form.setFieldsValue({
         pendingSalary: result.pendingSalary,
-        elEncashment: result.elEncashment,
-        bonusProRata: result.bonusProRata,
+        elEncashmentAmount: result.elEncashmentAmount,
+        bonusProrata: result.bonusProrata,
         gratuity: result.gratuity,
         otherEarnings: result.otherEarnings || 0,
         outstandingLoan: result.outstandingLoan,
@@ -83,6 +89,7 @@ const FnfForm = () => {
         noticePeriodRecovery: result.noticePeriodRecovery,
         otherDeductions: result.otherDeductions || 0,
       });
+      setDirty(false);
       message.success('F&F calculated successfully');
     } catch (err) {
       if (err?.errorFields) return;
@@ -91,6 +98,35 @@ const FnfForm = () => {
       setLoading(false);
     }
   }, [form, message]);
+
+  const handleSave = useCallback(async () => {
+    if (!fnfData?.id) return null;
+    const v = form.getFieldsValue();
+    setLoading(true);
+    try {
+      const saved = await updateFnf(fnfData.id, {
+        version: fnfData.version,
+        pendingSalary: v.pendingSalary,
+        elEncashmentAmount: v.elEncashmentAmount,
+        bonusProrata: v.bonusProrata,
+        gratuity: v.gratuity,
+        otherEarnings: v.otherEarnings,
+        outstandingLoan: v.outstandingLoan,
+        outstandingAdvance: v.outstandingAdvance,
+        noticePeriodRecovery: v.noticePeriodRecovery,
+        otherDeductions: v.otherDeductions,
+      });
+      setFnfData(saved);
+      setDirty(false);
+      message.success('Settlement saved');
+      return saved;
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to save the settlement');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }, [fnfData, form, message]);
 
   const handleApprove = useCallback(async () => {
     if (!fnfData?.id) return;
@@ -108,8 +144,8 @@ const FnfForm = () => {
 
   // Watch earnings/deductions for net calculation
   const pendingSalary = Form.useWatch('pendingSalary', form) || 0;
-  const elEncashment = Form.useWatch('elEncashment', form) || 0;
-  const bonusProRata = Form.useWatch('bonusProRata', form) || 0;
+  const elEncashmentAmount = Form.useWatch('elEncashmentAmount', form) || 0;
+  const bonusProrata = Form.useWatch('bonusProrata', form) || 0;
   const gratuity = Form.useWatch('gratuity', form) || 0;
   const otherEarnings = Form.useWatch('otherEarnings', form) || 0;
   const outstandingLoan = Form.useWatch('outstandingLoan', form) || 0;
@@ -117,7 +153,7 @@ const FnfForm = () => {
   const noticePeriodRecovery = Form.useWatch('noticePeriodRecovery', form) || 0;
   const otherDeductions = Form.useWatch('otherDeductions', form) || 0;
 
-  const totalEarnings = pendingSalary + elEncashment + bonusProRata + gratuity + otherEarnings;
+  const totalEarnings = pendingSalary + elEncashmentAmount + bonusProrata + gratuity + otherEarnings;
   const totalDeductions = outstandingLoan + outstandingAdvance + noticePeriodRecovery + otherDeductions;
   const netSettlement = totalEarnings - totalDeductions;
 
@@ -127,7 +163,7 @@ const FnfForm = () => {
     <>
       <PageHeader title="New F&F Settlement" onBack={() => navigate('/hr/fnf')} />
       <Spin spinning={loading}>
-        <Form form={form} layout="vertical">
+        <Form form={form} layout="vertical" onValuesChange={() => { if (fnfData) setDirty(true); }}>
           <Card title="Employee Details" style={{ marginBottom: 16 }}>
             <Row gutter={24}>
               <Col xs={24} sm={12} md={8}>
@@ -171,10 +207,10 @@ const FnfForm = () => {
                     <Form.Item name="pendingSalary" label="Pending Salary">
                       <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
                     </Form.Item>
-                    <Form.Item name="elEncashment" label="EL Encashment">
+                    <Form.Item name="elEncashmentAmount" label="EL Encashment">
                       <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
                     </Form.Item>
-                    <Form.Item name="bonusProRata" label="Bonus Pro-rata">
+                    <Form.Item name="bonusProrata" label="Bonus Pro-rata">
                       <InputNumber style={{ width: '100%' }} min={0} precision={2} prefix="\u20B9" />
                     </Form.Item>
                     <Form.Item name="gratuity" label="Gratuity">
@@ -221,11 +257,41 @@ const FnfForm = () => {
                 </div>
               </Card>
 
+              {dirty && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  style={{ marginBottom: 16 }}
+                  message="Unsaved changes"
+                  description="These amounts have not been saved yet. Save them before approving, or the settlement will be approved with the previously stored figures."
+                />
+              )}
+
               {isCalculated && (
                 <div style={{ textAlign: 'right' }}>
-                  <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove} loading={loading} size="large">
-                    Approve F&F Settlement
-                  </Button>
+                  <Space>
+                    <Button
+                      icon={<SaveOutlined />}
+                      onClick={handleSave}
+                      loading={loading}
+                      size="large"
+                      disabled={!dirty}
+                    >
+                      Save Changes
+                    </Button>
+                    {canApprove && (
+                      <Button
+                        type="primary"
+                        icon={<CheckCircleOutlined />}
+                        onClick={handleApprove}
+                        loading={loading}
+                        size="large"
+                        disabled={dirty}
+                      >
+                        Approve F&F Settlement
+                      </Button>
+                    )}
+                  </Space>
                 </div>
               )}
             </>

@@ -46,3 +46,16 @@ export const getFnfById = async (id) => {
   const response = await axiosInstance.get(`${BASE_URL}/${id}`);
   return response.data;
 };
+
+/**
+ * Save user overrides on a settlement.
+ * PUT /api/v1/hr/fnf/{id}
+ *
+ * The form's amount fields had no endpoint behind them until this existed, so
+ * edits were discarded on approve. Totals are recomputed server-side; whatever
+ * this sends for them is ignored.
+ */
+export const updateFnf = async (id, data) => {
+  const response = await axiosInstance.put(`${BASE_URL}/${id}`, data);
+  return response.data;
+};
