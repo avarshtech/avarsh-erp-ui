@@ -86,6 +86,7 @@ const PayrollWizard = lazy(() => import('./pages/hr/payroll/PayrollWizard'));
 const PayrollRunView = lazy(() => import('./pages/hr/payroll/PayrollRunView'));
 const SalarySlipView = lazy(() => import('./pages/hr/payroll/SalarySlipView'));
 const LoanList = lazy(() => import('./pages/hr/loan/LoanList'));
+const AdvanceList = lazy(() => import('./pages/hr/loan/AdvanceList'));
 const LoanView = lazy(() => import('./pages/hr/loan/LoanView'));
 // Bonus, Statutory, F&F (lazy-loaded)
 const BonusList = lazy(() => import('./pages/hr/bonus/BonusList'));
@@ -270,6 +271,7 @@ const ThemedApp = () => {
             {/* Loans */}
             <Route path="hr/loans" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanList /></Suspense></PermissionRoute>} />
             <Route path="hr/loans/:id" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanView /></Suspense></PermissionRoute>} />
+            <Route path="hr/advances" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><AdvanceList /></Suspense></PermissionRoute>} />
             {/* Bonus */}
             <Route path="hr/bonus" element={<PermissionRoute module="hr-bonus"><Suspense fallback={<PageSkeleton />}><BonusList /></Suspense></PermissionRoute>} />
             <Route path="hr/bonus/new" element={<PermissionRoute module="hr-bonus" operation="add"><Suspense fallback={<PageSkeleton />}><BonusWizard /></Suspense></PermissionRoute>} />

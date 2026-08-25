@@ -406,7 +406,8 @@ const MainLayoutInner = () => {
         { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
-        { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
+        { key: "/hr/loans", label: "Loans", moduleId: "hr-loans" },
+        { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
         { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
         { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
@@ -522,6 +523,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
+    if (path.startsWith('/hr/advances')) return ['/hr/advances'];
     if (path.startsWith('/hr/loans')) return ['/hr/loans'];
     if (path.startsWith('/hr/bonus')) return ['/hr/bonus'];
     if (path.startsWith('/hr/statutory/pf')) return ['/hr/statutory/pf'];
