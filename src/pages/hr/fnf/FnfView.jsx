@@ -4,6 +4,7 @@ import { PrinterOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-desig
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getFnfById, approveFnf, settleFnf } from '../../../services/hr/fnfService';
+import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 
@@ -84,8 +85,17 @@ const FnfView = () => {
   }
 
   const statusInfo = statusMap[data.status];
-  const totalEarnings = (data.pendingSalary || 0) + (data.elEncashment || 0) + (data.bonusProRata || 0) + (data.gratuity || 0) + (data.otherEarnings || 0);
-  const totalDeductions = (data.outstandingLoan || 0) + (data.outstandingAdvance || 0) + (data.noticePeriodRecovery || 0) + (data.otherDeductions || 0);
+  // The server stores all three totals; recomputing is only a fallback for
+  // older rows saved before they were persisted.
+  const totalEarnings = data.totalEarnings != null ? data.totalEarnings
+    : (data.pendingSalary || 0) + (data.elEncashmentAmount || 0) + (data.bonusProrata || 0) + (data.gratuity || 0) + (data.otherEarnings || 0);
+  const totalDeductions = data.totalDeductions != null ? data.totalDeductions
+    : (data.outstandingLoan || 0) + (data.outstandingAdvance || 0) + (data.noticePeriodRecovery || 0) + (data.otherDeductions || 0);
+  // Approve and Settle both authorise a payout, so both sit behind the same
+  // permission. Note this is a UI gate only - the API does not yet enforce
+  // per-operation permissions on any module.
+  const canApprove = hasPermission('hr-fnf', 'approve');
+
   const netSettlement = data.netSettlement != null ? data.netSettlement : totalEarnings - totalDeductions;
 
   return (
@@ -95,12 +105,12 @@ const FnfView = () => {
         onBack={() => navigate('/hr/fnf')}
         extra={
           <Space>
-            {data.status === 'CALCULATED' && (
+            {data.status === 'CALCULATED' && canApprove && (
               <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove} loading={actionLoading}>
                 Approve
               </Button>
             )}
-            {data.status === 'APPROVED' && (
+            {data.status === 'APPROVED' && canApprove && (
               <Button type="primary" icon={<DollarOutlined />} onClick={handleSettle} loading={actionLoading}>
                 Settle
               </Button>
@@ -135,8 +145,8 @@ const FnfView = () => {
         <Col xs={24} md={12}>
           <Card title="Earnings" styles={{ header: { background: '#f6ffed', borderBottom: '2px solid #b7eb8f' } }}>
             <AmountRow label="Pending Salary" value={data.pendingSalary} />
-            <AmountRow label="EL Encashment" value={data.elEncashment} />
-            <AmountRow label="Bonus Pro-rata" value={data.bonusProRata} />
+            <AmountRow label="EL Encashment" value={data.elEncashmentAmount} />
+            <AmountRow label="Bonus Pro-rata" value={data.bonusProrata} />
             <AmountRow label="Gratuity" value={data.gratuity} />
             <AmountRow label="Other Earnings" value={data.otherEarnings} />
             <Divider style={{ margin: '8px 0' }} />
