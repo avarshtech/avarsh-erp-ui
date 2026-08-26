@@ -37,6 +37,8 @@ import {
 } from '../../utils/orderConstants';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import OrderSrSummaryCard from '../sample-request/OrderSrSummaryCard';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';
@@ -529,7 +531,12 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
   const heroConfig = {
     title: orderNo,
-    status: <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />,
+    status: (
+      <>
+        <StatusTag status={status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} />
+        {orderData?.orderType === 'SAMPLE' && <SampleOrderTag />}
+      </>
+    ),
     subtitle: buyerName,
     subtitleIcon: <ShoppingOutlined />,
     image: styleImageElement,
@@ -810,6 +817,9 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             />
           </Card>
         )}
+
+        {/* ── Sample Requests raised against this order ── */}
+        <OrderSrSummaryCard orderNo={orderNo} />
 
         {/* ── Order Lines ── */}
         <Title level={5} style={{ marginBottom: 12 }}>

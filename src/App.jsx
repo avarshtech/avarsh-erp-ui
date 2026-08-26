@@ -112,6 +112,11 @@ const ElEncashmentList = lazy(() => import('./pages/hr/statutory/ElEncashmentLis
 const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
+// Sample Requests (lazy-loaded — UI mock phase)
+const SampleRequestList = lazy(() => import('./pages/sample-request/SampleRequestList'));
+const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
+const SampleInvoiceList = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceList'));
+const SampleInvoiceForm = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceForm'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -212,6 +217,13 @@ const ThemedApp = () => {
             <Route path="bom/list" element={<PermissionRoute module="bom"><BOMList /></PermissionRoute>} />
             <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
             <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
+            {/* Sample Requests (incl. commercial invoices for overseas dispatch) */}
+            <Route path="sample-requests/list" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleRequestList /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/edit/:id" element={<PermissionRoute module="sample-requests" operation="update"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/list" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleInvoiceList /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/edit/:id" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
             {/* Supplier PO */}
             <Route path="purchase-orders/supplier-po/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
             <Route path="purchase-orders/supplier-po/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />

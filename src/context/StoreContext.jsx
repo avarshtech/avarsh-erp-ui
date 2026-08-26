@@ -39,7 +39,10 @@ const initialState = {
   // Users & Roles
   users: [],
   roles: [],
-  
+
+  // Order numbers of SAMPLE-type orders (drives sample badges across lifecycle screens)
+  sampleOrderNos: [],
+
   // Loading states per data type
   loading: {
     categories: false,
@@ -56,6 +59,7 @@ const initialState = {
     sizePresets: false,
     users: false,
     roles: false,
+    sampleOrderNos: false,
   },
 
   // Error states per data type
@@ -74,6 +78,7 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -92,6 +97,7 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
   },
 };
 

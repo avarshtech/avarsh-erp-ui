@@ -20,6 +20,7 @@ import { PO_STATUS } from './poStatusConstants';
 import { BOM_STATUS } from './bomConstants';
 import { GRN_STATUS, QC_STATUS, STOCK_STATUS } from './inventoryConstants';
 import { PROD_PO_STATUS } from './productionConstants';
+import { SR_STATUS, SAMPLE_INVOICE_STATUS } from './sampleRequestConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -109,6 +110,26 @@ export const PRODUCTION_PO_STATUS_CONFIG = {
 };
 
 
+// ==================== SAMPLE REQUEST STATUS CONFIG ====================
+export const SR_STATUS_CONFIG = {
+  [SR_STATUS.DRAFT]:             { color: 'default',    icon: FileTextOutlined },
+  [SR_STATUS.SUBMITTED]:         { color: 'processing', icon: SendOutlined },
+  [SR_STATUS.IN_PRODUCTION]:     { color: 'blue',       icon: ClockCircleOutlined },
+  [SR_STATUS.DISPATCHED]:        { color: 'cyan',       icon: SendOutlined },
+  [SR_STATUS.FEEDBACK_RECEIVED]: { color: 'geekblue',   icon: AuditOutlined },
+  [SR_STATUS.APPROVED]:          { color: 'green',      icon: CheckCircleOutlined },
+  [SR_STATUS.REJECTED]:          { color: 'red',        icon: CloseCircleOutlined },
+  [SR_STATUS.REVISION_REQUIRED]: { color: 'orange',     icon: UndoOutlined },
+};
+
+// ==================== SAMPLE INVOICE STATUS CONFIG ====================
+export const SAMPLE_INVOICE_STATUS_CONFIG = {
+  [SAMPLE_INVOICE_STATUS.DRAFT]:      { color: 'default', icon: FileTextOutlined },
+  [SAMPLE_INVOICE_STATUS.ISSUED]:     { color: 'blue',    icon: SafetyCertificateOutlined },
+  [SAMPLE_INVOICE_STATUS.DISPATCHED]: { color: 'green',   icon: SendOutlined },
+  [SAMPLE_INVOICE_STATUS.CANCELLED]:  { color: 'volcano', icon: StopOutlined },
+};
+
 // ==================== STATUS FLOW (for StatusSteps) ====================
 export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLETED'];
 export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Sent_To_Supplier', 'Partially_Received', 'Completed'];
@@ -117,6 +138,9 @@ export const BOM_STATUS_FLOW = ['DRAFT', 'CREATED'];
 export const GRN_STATUS_FLOW = ['Draft', 'Submitted', 'QC_Pending', 'QC_Complete', 'Closed'];
 export const QC_STATUS_FLOW = ['Draft', 'Submitted', 'Pending_Approval', 'Approved', 'Conditional_Pass'];
 export const PRODUCTION_PO_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'];
+// SR flow base — the terminal step (APPROVED / REJECTED / REVISION_REQUIRED) is
+// appended dynamically in SampleRequestView based on the record's outcome.
+export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISPATCHED', 'FEEDBACK_RECEIVED'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

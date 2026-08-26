@@ -122,7 +122,7 @@
 ### Orders
 | Function | Method | Endpoint |
 |---|---|---|
-| searchOrders | GET | `/orders/search` |
+| searchOrders | GET | `/orders/search` (params incl. `orderType=BULK\|SAMPLE` since 2026-08-26; `ord_orders.order_type` NOT NULL default `BULK`, locked after Draft) |
 | getOrderById | GET | `/orders/{id}` |
 | getOrderByOrderNo | GET | `/orders/by-order-no` |
 | createOrder | POST | `/orders` |
@@ -244,6 +244,18 @@
 | createTermsConditions | POST | `/terms-conditions` |
 | updateTermsConditions | PUT | `/terms-conditions/{id}` |
 | deleteTermsConditions | DELETE | `/terms-conditions/{id}` |
+
+### Sample Requests (UI MOCK phase — no backend yet)
+`src/services/sr/srService.js` is the single import surface; data lives in localStorage
+(`avarsh.sr.mockStore.v1`, TNA-pattern, `USE_MOCK_SR_DATA` in `srEnv.js`). The mock mirrors the
+planned contract so the swap is mechanical:
+`GET/POST /sample-requests` · `GET/PUT/DELETE /sample-requests/{id}` · `POST /{id}/status` ·
+`POST /{id}/dispatch` · `POST /{id}/feedback` (returns `{sampleRequest, revisionSr?}`) ·
+`POST /{id}/comment-sheet:parse` · `GET /{id}/activity` · `GET /by-order/{orderNo}` ·
+`GET /sample-requests/dashboard` · masters under `/sample-requests/masters/*` ·
+`/sample-invoices` CRUD + `/{id}/issue|cancel|duplicate`. Sample POs become real PO-module
+records (`po_type='SAMPLE'` + sr link) at API phase. Invoice exporter/bank blocks reuse the REAL
+`/organisation-info`; consignee + overseas detection use buyer shipping-location country.
 
 ### Files
 | Function | Method | Endpoint |

@@ -60,6 +60,12 @@ export const MODULES = {
     path: '/bom',
     group: 'transactions',
   },
+  SAMPLE_REQUESTS: {
+    id: 'sample-requests',
+    name: 'Sample Requests',
+    path: '/sample-requests/list',
+    group: 'transactions',
+  },
   PURCHASE_ORDERS: {
     id: 'purchase-orders',
     name: 'Supplier PO',
@@ -410,6 +416,7 @@ export const PERMISSION_GROUPS = [
       { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
       { id: 'order-actions', name: 'Order Approval Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
+      { id: 'sample-requests', name: 'Sample Requests', operations: STANDARD_OPERATIONS, path: '/sample-requests/list' },
       { id: 'purchase-orders', name: 'Supplier PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/supplier-po/list' },
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within Supplier PO)' },
       { id: 'cutting-po', name: 'Cutting PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
@@ -708,6 +715,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/', moduleId: 'dashboard' },
     { route: '/orders/list', moduleId: 'orders' },
     { route: '/bom/list', moduleId: 'bom' },
+    { route: '/sample-requests/list', moduleId: 'sample-requests' },
     { route: '/purchase-orders/supplier-po/list', moduleId: 'purchase-orders' },
     { route: '/purchase-orders/cutting-po/list', moduleId: 'cutting-po' },
     { route: '/purchase-orders/work-order/list', moduleId: 'work-order' },

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Card, Space, Typography, Skeleton } from 'antd';
+import { Card, Space, Typography, Skeleton, Divider } from 'antd';
 import { CheckCircleOutlined, ClockCircleOutlined, InboxOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -16,7 +16,9 @@ const QuickStatItem = ({ icon, label, value, unit, background }) => (
   </Card>
 );
 
-const QuickStatsCard = memo(function QuickStatsCard({ quickStats, isDarkMode, loading = false }) {
+// extraItems: optional additional QuickStatItems appended after a divider
+// (used by the Sample Request module — default [] keeps this card unchanged).
+const QuickStatsCard = memo(function QuickStatsCard({ quickStats, isDarkMode, loading = false, extraItems = [] }) {
   return (
     <Card title="Quick Stats">
       {loading || !quickStats ? (
@@ -44,6 +46,10 @@ const QuickStatsCard = memo(function QuickStatsCard({ quickStats, isDarkMode, lo
             unit="POs"
             background={isDarkMode ? '#312e81' : '#e0e7ff'}
           />
+          {extraItems.length > 0 && <Divider style={{ margin: '4px 0' }} />}
+          {extraItems.map((item) => (
+            <QuickStatItem key={item.label} {...item} />
+          ))}
         </Space>
       )}
     </Card>

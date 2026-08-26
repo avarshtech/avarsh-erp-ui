@@ -24,6 +24,8 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { isPantoneCode } from '../../services/core/pantoneService';
 import { getRecentBoms } from '../../services/bom/bomService';
@@ -102,6 +104,7 @@ const BomLineSelectionDrawer = ({
   onConfirm,
 }) => {
   const { message } = App.useApp();
+  const { isSampleOrder } = useSampleOrderNos();
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [orderNoInput, setOrderNoInput] = useState('SG/');
   const [recentBoms, setRecentBoms] = useState([]);
@@ -460,7 +463,10 @@ const BomLineSelectionDrawer = ({
                     <Row gutter={[16, 4]}>
                       <Col>
                         <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Order No</Text>
-                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>
+                          {order.orderNo}
+                          {isSampleOrder(order.orderNo) && <SampleOrderTag />}
+                        </Text>
                       </Col>
                       <Col>
                         <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Style</Text>

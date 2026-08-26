@@ -23,6 +23,7 @@ import {
   Upload,
   Alert,
   Image,
+  Segmented,
 } from 'antd';
 import { numericInputProps, integerInputProps, getZeroClearHandlers, formattedIdKeyDown } from '../../utils/inputHelpers';
 import {
@@ -48,6 +49,7 @@ import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { hasPermission, canSubmitOrder } from '../../utils/permissions';
+import { useStore } from '../../context/StoreContext';
 import { createOrder, updateOrder, getOrderById, changeOrderStatus } from '../../services/orders/orderService';
 import { getBuyers, getBuyerById } from '../../services/master/buyerService';
 import { getAllPaymentTerms } from '../../services/master/paymentTermsService';
@@ -910,6 +912,11 @@ const OrderForm = () => {
   const formCurrency = Form.useWatch('currency', form);
   const watchedBuyerId = Form.useWatch('buyerId', form);
   const watchedStyleNo = Form.useWatch('styleNo', form);
+  const watchedOrderType = Form.useWatch('orderType', form);
+  // Sample orders skip costing (bulk costing is raised only after the buyer confirms
+  // the sample), so buyer/style/season fields become directly editable in sample mode.
+  const isSample = watchedOrderType === 'SAMPLE';
+  const { invalidateCache } = useStore();
 
   // Buyer destinations derived from selected buyer
   const buyerDestinations = useMemo(() => {
@@ -961,7 +968,8 @@ const OrderForm = () => {
     setResolvedGarmentName(order.garmentName || '');
     if (order.styleId) loadStyleImage(order.styleId);
     form.setFieldsValue({
-      costingId: order.costingId,
+      orderType: order.orderType || 'BULK',
+      costingId: order.costingId || 'CST/',
       buyerId: order.buyerId,
       styleNo: order.styleNo,
       garmentType: order.garmentType,
@@ -1457,13 +1465,18 @@ const OrderForm = () => {
     const values = form.getFieldsValue();
 
     // ── Order Details (in form layout order) ──
-    if (!values.costingId?.trim() || values.costingId.trim() === 'CST/') {
-      errors.push('Costing ID is required');
+    // Costing is optional for SAMPLE orders — bulk costing is raised only after
+    // the buyer confirms the sample.
+    const isSampleOrder = values.orderType === 'SAMPLE';
+    const costingBlank = !values.costingId?.trim() || values.costingId.trim() === 'CST/';
+    if (costingBlank) {
+      if (!isSampleOrder) errors.push('Costing ID is required');
     } else if (!COSTING_ID_PATTERN.test(values.costingId.trim())) {
       errors.push('Costing ID format is invalid (expected: CST/25-26/1001)');
     } else if (!values.buyerId) {
       errors.push('Costing ID has not been verified — click outside the field or press Enter to look it up');
     }
+    if (isSampleOrder && !values.buyerId) errors.push('Buyer is required for a sample order');
     if (!values.material) errors.push('Material is required');
     if (!values.component) errors.push('Component is required');
     if (values.component === 'Multiple' && formComponents.length < 2) {
@@ -1548,9 +1561,12 @@ const OrderForm = () => {
     const buyer = buyers.find((b) => b.id === values.buyerId);
     const orderDate = dayjs();
 
+    const costingBlank = !values.costingId?.trim() || values.costingId.trim() === 'CST/';
+
     return {
       version: entityVersion,
-      costingId: values.costingId,
+      orderType: values.orderType || 'BULK',
+      costingId: costingBlank ? null : values.costingId,
       buyerId: values.buyerId,
       buyerName: buyer?.name || '',
       orderDate: orderDate.format('YYYY-MM-DD'),
@@ -1615,6 +1631,7 @@ const OrderForm = () => {
         message.success('Order saved as draft');
       }
       if (saved?.version != null) setEntityVersion(saved.version);
+      invalidateCache('sampleOrderNos');
       setIsDirty(false);
       clearDirty();
       navigate('/orders/list');
@@ -1654,6 +1671,7 @@ const OrderForm = () => {
             savedOrder = await createOrder(data);
           }
           if (savedOrder?.version != null) setEntityVersion(savedOrder.version);
+          invalidateCache('sampleOrderNos');
           await changeOrderStatus(savedOrder.id, ORDER_STATUS.CONFIRMED, null, savedOrder.version);
           message.success(isReferredBack ? 'Order resubmitted and confirmed' : 'Order submitted and confirmed');
           setIsDirty(false);
@@ -1813,6 +1831,7 @@ const OrderForm = () => {
         initialValues={{
           orderDate: dayjs(),
           costingId: 'CST/',
+          orderType: 'BULK',
         }}
         onValuesChange={() => setIsDirty(true)}
       >
@@ -1822,13 +1841,28 @@ const OrderForm = () => {
           <div style={{ flex: 1, minWidth: 0 }}>
           <Title level={5} style={{ marginBottom: 16 }}>Order Details</Title>
 
-          {/* Row 1: Costing ID, Order No, Buyer, Style No, Garment Type, Season, Component */}
+          {/* Row 1: Order Type, Costing ID, Order No, Buyer, Style No, Garment Type, Season */}
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item
+                name="orderType"
+                label="Order Type"
+                tooltip="Sample orders (15–30 pcs for buyer approval) can skip costing; cutting is handled manually. Locked once the order leaves Draft."
+              >
+                <Segmented
+                  options={[
+                    { label: 'Bulk', value: 'BULK' },
+                    { label: 'Sample', value: 'SAMPLE' },
+                  ]}
+                  disabled={isEdit && existingOrder?.status !== ORDER_STATUS.DRAFT}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={4}>
+              <Form.Item
                 name="costingId"
-                label="Costing ID"
-                rules={[{ required: true, message: 'Enter costing ID' }]}
+                label={isSample ? 'Costing ID (optional)' : 'Costing ID'}
+                rules={[{ required: !isSample, message: 'Enter costing ID' }]}
                 normalize={(val, prevVal) => formatCostingId(val || '', prevVal || '')}
               >
                 <Input
@@ -1861,42 +1895,57 @@ const OrderForm = () => {
                 </Form.Item>
               </Col>
             )}
-            {/* buyerId hidden — used for destination lookup; value set from costing */}
-            <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>
+            {/* buyerId: hidden (set from costing lookup) for bulk; direct select for samples */}
+            {!isSample && <Form.Item name="buyerId" hidden noStyle><Input /></Form.Item>}
             <Col xs={24} sm={12} md={8} lg={4}>
-              <Form.Item label="Buyer">
-                <Input
-                  value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
-                />
-              </Form.Item>
+              {isSample ? (
+                <Form.Item
+                  name="buyerId"
+                  label="Buyer"
+                  rules={[{ required: true, message: 'Select buyer' }]}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Select buyer"
+                    options={buyers.map((b) => ({ value: b.id, label: b.name }))}
+                  />
+                </Form.Item>
+              ) : (
+                <Form.Item label="Buyer">
+                  <Input
+                    value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
+                    placeholder="Populated from costing"
+                    disabled
+                    style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  />
+                </Form.Item>
+              )}
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="styleNo" label="Style No">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'Enter style no' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="garmentType" label="Garment Type">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. Polo Shirt' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="season" label="Season">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. SS27' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>
@@ -1953,9 +2002,9 @@ const OrderForm = () => {
             <Col xs={24} sm={12} md={8} lg={4}>
               <Form.Item name="currency" label="Currency">
                 <Input
-                  placeholder="Populated from costing"
-                  disabled
-                  style={{ backgroundColor: 'var(--bg-tertiary)' }}
+                  placeholder={isSample ? 'e.g. USD' : 'Populated from costing'}
+                  disabled={!isSample}
+                  style={!isSample ? { backgroundColor: 'var(--bg-tertiary)' } : undefined}
                 />
               </Form.Item>
             </Col>

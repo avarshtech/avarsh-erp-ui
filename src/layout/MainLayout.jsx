@@ -36,6 +36,7 @@ import {
   TeamOutlined,
   AuditOutlined,
   ScissorOutlined,
+  ExperimentOutlined,
   FieldTimeOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
@@ -398,6 +399,19 @@ const MainLayoutInner = () => {
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
         { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
         // Packing arrives in the next design session.
+      ],
+    },
+    {
+      // Placed below Production by user preference (PRD suggested BOM→PO slot)
+      key: "/sample-requests",
+      icon: <ExperimentOutlined />,
+      label: "Sample Requests",
+      moduleId: "sample-requests",
+      children: [
+        { key: "/sample-requests/list", label: "SR List" },
+        { key: "/sample-requests/new", label: "New Sample Request" },
+        { key: "/sample-requests/invoices/list", label: "Sample Invoices" },
+        { key: "/sample-requests/invoices/new", label: "New Invoice" },
       ],
     },
     {

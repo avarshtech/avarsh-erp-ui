@@ -84,6 +84,8 @@ import { generatePOPdf } from '../../utils/poPdfGenerator';
 import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import POVersionHistory from './POVersionHistory';
 import FabricStagesDialog from './FabricStagesDialog';
@@ -192,6 +194,7 @@ const REJECTION_CATEGORIES = [
 
 const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefresh }) => {
   const { message, modal } = App.useApp();
+  const { isSampleOrder } = useSampleOrderNos();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [po, setPo] = useState(null);
@@ -1371,7 +1374,10 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                     {po.orderReferences.map((ref, idx) => (
                       <Col key={ref.orderNo || idx} xs={24} sm={12} md={8}>
                         <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--card-bg, #fafafa)', border: '1px solid var(--border-color, #f0f0f0)' }}>
-                          <Text strong style={{ color: 'var(--primary-color)', fontSize: 14, display: 'block' }}>{ref.orderNo}</Text>
+                          <Text strong style={{ color: 'var(--primary-color)', fontSize: 14, display: 'block' }}>
+                            {ref.orderNo}
+                            {isSampleOrder(ref.orderNo) && <SampleOrderTag />}
+                          </Text>
                           <Text type="secondary" style={{ fontSize: 12 }}>{ref.styleName || '-'} · {ref.season || '-'}</Text>
                         </div>
                       </Col>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   App, Tag, Typography, Button, Tooltip, Row, Col, Image, Skeleton,
 } from 'antd';
@@ -18,6 +19,9 @@ import DraftWatermark from '../../components/DraftWatermark';
 import { ActionButton } from '../../components/buttons';
 import { BOM_STATUS_CONFIG, BOM_STATUS_FLOW } from '../../utils/statusConfig';
 import { formatNumber } from '../../utils/formatters';
+import { hasPermission } from '../../utils/permissions';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 
 const { Text } = Typography;
 
@@ -38,6 +42,8 @@ const isFabricLine = (line) => (line?.categoryName || '').toLowerCase().includes
 
 const BOMView = ({ open, bomData, onClose }) => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
+  const { isSampleOrder } = useSampleOrderNos();
   const [fullBom, setFullBom] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cadFileNames, setCadFileNames] = useState({}); // { lineId: filename }
@@ -361,11 +367,14 @@ const BOMView = ({ open, bomData, onClose }) => {
       hero={{
         title: orderNo || 'BOM',
         status: (
-          <StatusTag
-            status={status}
-            config={BOM_STATUS_CONFIG}
-            getLabel={getStatusLabel}
-          />
+          <>
+            <StatusTag
+              status={status}
+              config={BOM_STATUS_CONFIG}
+              getLabel={getStatusLabel}
+            />
+            {isSampleOrder(orderNo) && <SampleOrderTag />}
+          </>
         ),
         subtitle: [styleName, buyerName].filter(Boolean).join(' \u2022 '),
         image: styleImageLoading ? (
@@ -396,7 +405,16 @@ const BOMView = ({ open, bomData, onClose }) => {
         highlight: orderQty ? { label: 'Order Qty', value: orderQty.toLocaleString() } : undefined,
       }}
       footer={
-        <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+          <div>
+            {status === 'CREATED' && isSampleOrder(orderNo) && hasPermission('sample-requests', 'add') && (
+              <ActionButton
+                action="create"
+                text="Raise Sample Request"
+                onClick={() => navigate(`/sample-requests/new?bomId=${fullBom?.id ?? bomData?.id ?? ''}&orderNo=${encodeURIComponent(orderNo || '')}`)}
+              />
+            )}
+          </div>
           <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
       }

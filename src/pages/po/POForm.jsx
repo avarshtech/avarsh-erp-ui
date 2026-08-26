@@ -34,6 +34,8 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import { ActionButton } from '../../components/buttons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -282,6 +284,7 @@ const TAX_OPTIONS = [
 ];
 
 const POForm = () => {
+  const { isSampleOrder } = useSampleOrderNos();
   const navigate = useNavigate();
   const { id } = useParams();
   const prevIdRef = useRef(id);
@@ -2181,7 +2184,10 @@ const POForm = () => {
                 <Row gutter={[24, 12]}>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
-                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>
+                      {order.orderNo}
+                      {isSampleOrder(order.orderNo) && <SampleOrderTag />}
+                    </Text>
                   </Col>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
