@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   App, Form, Input, Select, DatePicker, Switch, Button, Tabs, Card,
-  Row, Col, InputNumber, Table, Space, Spin,
+  Row, Col, InputNumber, Table, Space, Spin, Upload, Tooltip,
 } from 'antd';
-import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getEmployeeById, createEmployee, updateEmployee } from '../../../services/hr/employeeService';
@@ -17,6 +17,7 @@ import {
   BLOOD_GROUPS, PAYMENT_MODES, DOCUMENT_TYPES, RELATIONSHIP_TYPES,
   EMPLOYEE_CATEGORY, EMPLOYEE_GRADE,
 } from '../../../utils/hrConstants';
+import { uploadFile, downloadFileAsBlob } from '../../../services/core/fileService';
 import PageHeader from '../../../components/PageHeader';
 import { factoryOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -87,6 +88,92 @@ const bankFieldRule = (field, label) => ({ getFieldValue }) => ({
     return Promise.resolve();
   },
 });
+
+
+/** Identity scans and certificates; anything larger is not a document. */
+const MAX_DOCUMENT_MB = 10;
+
+/** A stored file is referenced by its UUID; anything else is a legacy typed-in value. */
+const FILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const saveBlob = (blob, filename) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'document';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * The File cell of the documents table.
+ *
+ * Three states, because rows created before uploads existed still hold whatever
+ * someone typed: an uploaded file shows its name and downloads; a legacy
+ * reference is shown as-is and can be cleared and replaced; an empty row offers
+ * the upload button.
+ */
+const DocumentCell = ({ row, uploading, onUpload, onClear }) => {
+  const { message } = App.useApp();
+  const [downloading, setDownloading] = useState(false);
+  const value = row.fileUrl;
+  const isStoredFile = Boolean(value) && FILE_ID_PATTERN.test(value);
+
+  const download = async () => {
+    setDownloading(true);
+    try {
+      saveBlob(await downloadFileAsBlob(value), row.fileName);
+    } catch {
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (isStoredFile) {
+    return (
+      <Space size={4} wrap>
+        <PaperClipOutlined />
+        <span style={{ maxWidth: 220, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+          {row.fileName || 'Attached file'}
+        </span>
+        <Button type="link" size="small" icon={<DownloadOutlined />} loading={downloading} onClick={download} />
+        <Button type="link" size="small" danger onClick={onClear}>Replace</Button>
+      </Space>
+    );
+  }
+
+  if (value) {
+    return (
+      <Space size={4} wrap>
+        <Tooltip title="Typed in before documents could be uploaded. Clear it and upload the file itself.">
+          <span style={{ color: 'var(--warning-color, #d46b08)' }}>{value}</span>
+        </Tooltip>
+        <Button type="link" size="small" danger onClick={onClear}>Clear</Button>
+      </Space>
+    );
+  }
+
+  return (
+    <Upload
+      showUploadList={false}
+      accept=".pdf,.png,.jpg,.jpeg"
+      beforeUpload={(file) => {
+        if (file.size > MAX_DOCUMENT_MB * 1024 * 1024) {
+          message.error(`${file.name} is larger than ${MAX_DOCUMENT_MB} MB`);
+          return Upload.LIST_IGNORE;
+        }
+        onUpload(file);
+        return false;
+      }}
+    >
+      <Button icon={<UploadOutlined />} size="small" loading={uploading}>Upload</Button>
+    </Upload>
+  );
+};
+
 
 const EmployeeForm = () => {
   const { message } = App.useApp();
@@ -272,7 +359,49 @@ const EmployeeForm = () => {
   const addNominee = () => setNominees((prev) => [...prev, { key: Date.now(), nomineeName: '', relationship: '', sharePercentage: 0, isMinor: false, guardianName: '' }]);
   const removeNominee = (key) => setNominees((prev) => prev.filter((n) => (n.key || n.id) !== key));
 
-  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', fileUrl: '', remarks: '' }]);
+  const [uploadingRow, setUploadingRow] = useState(null);
+
+  /**
+   * Uploads through the shared file service and keeps only the returned id.
+   *
+   * This cell used to be a free-text box holding whatever was typed - a Drive
+   * link, a folder path, a certificate number. None of it could be opened from
+   * here, none of it survived the link being moved, and anything readable by
+   * link put identity documents outside the application's access control.
+   */
+  const handleDocumentUpload = async (file, idx, row) => {
+    const rowKey = row.key || row.id;
+    setUploadingRow(rowKey);
+    try {
+      const stored = await uploadFile(file, {
+        module: 'HR',
+        entity: 'EMPLOYEE',
+        // Absent while the employee is still being created; the document row
+        // carries the file id, so the link survives either way.
+        entityId: isEdit ? Number(id) : undefined,
+        fileCategory: 'DOCUMENT',
+        description: row.documentType || undefined,
+      });
+      setDocuments((prev) => {
+        const arr = [...prev];
+        arr[idx] = {
+          ...arr[idx],
+          fileUrl: stored.fileId,
+          fileName: stored.originalFilename || file.name,
+          fileType: stored.fileType || file.type,
+        };
+        return arr;
+      });
+      setIsDirty(true);
+      message.success(`${file.name} uploaded`);
+    } catch {
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setUploadingRow(null);
+    }
+  };
+
+  const addDocument = () => setDocuments((prev) => [...prev, { key: Date.now(), documentType: '', fileUrl: '', fileName: '', fileType: '', remarks: '' }]);
   const removeDocument = (key) => setDocuments((prev) => prev.filter((d) => (d.key || d.id) !== key));
 
   const nomineeColumns = [
@@ -286,7 +415,24 @@ const EmployeeForm = () => {
 
   const documentColumns = [
     { title: 'Type', dataIndex: 'documentType', key: 'documentType', width: 200, render: (_, rec, idx) => <Select showSearch optionFilterProp="label" value={rec.documentType} onChange={(v) => { const arr = [...documents]; arr[idx] = { ...arr[idx], documentType: v }; setDocuments(arr); setIsDirty(true); }} options={DOCUMENT_TYPES} style={{ width: '100%' }} /> },
-    { title: 'File URL / Reference', dataIndex: 'fileUrl', key: 'fileUrl', render: (_, rec, idx) => <Input value={rec.fileUrl} onChange={(e) => { const arr = [...documents]; arr[idx] = { ...arr[idx], fileUrl: e.target.value }; setDocuments(arr); setIsDirty(true); }} /> },
+    {
+      title: 'File',
+      dataIndex: 'fileUrl',
+      key: 'fileUrl',
+      render: (_, rec, idx) => (
+        <DocumentCell
+          row={rec}
+          uploading={uploadingRow === (rec.key || rec.id)}
+          onUpload={(file) => handleDocumentUpload(file, idx, rec)}
+          onClear={() => {
+            const arr = [...documents];
+            arr[idx] = { ...arr[idx], fileUrl: '', fileName: '', fileType: '' };
+            setDocuments(arr);
+            setIsDirty(true);
+          }}
+        />
+      ),
+    },
     { title: 'Remarks', dataIndex: 'remarks', key: 'remarks', render: (_, rec, idx) => <Input value={rec.remarks} onChange={(e) => { const arr = [...documents]; arr[idx] = { ...arr[idx], remarks: e.target.value }; setDocuments(arr); setIsDirty(true); }} /> },
     { title: '', key: 'action', width: 50, render: (_, rec) => <Button type="text" danger icon={<DeleteOutlined />} onClick={() => removeDocument(rec.key || rec.id)} /> },
   ];
