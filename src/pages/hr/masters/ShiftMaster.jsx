@@ -272,7 +272,13 @@ const ShiftMaster = ({ onDirtyChange }) => {
               <Form.Item name="endTime" label="End Time" rules={[{ required: true, message: 'Please select an end time' }]}>
                 <TimePicker format={TIME_FORMAT} style={{ width: '100%' }} />
               </Form.Item>
-              <Form.Item name="breakMinutes" label="Break Duration (minutes)">
+              {/* NOT NULL in the schema, so an empty box has to mean zero rather
+                  than nothing. */}
+              <Form.Item
+                name="breakMinutes"
+                label="Break Duration (minutes)"
+                rules={[{ required: true, message: 'Enter the break duration, or 0 for none' }]}
+              >
                 <InputNumber min={0} max={120} placeholder="e.g. 30" style={{ width: '100%' }} />
               </Form.Item>
               <Form.Item name="isNightShift" label="Night Shift" valuePropName="checked">
