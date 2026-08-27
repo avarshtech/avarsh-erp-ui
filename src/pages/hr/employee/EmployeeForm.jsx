@@ -67,6 +67,27 @@ const IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 const MIN_WORKING_AGE = 14;
 
+/**
+ * Bank details are all-or-nothing: the three columns behind them are NOT NULL,
+ * so a half-filled set cannot be stored. Empty stays valid - that just means
+ * the employee has no bank details on file yet.
+ */
+const BANK_FIELDS = ['accountNumber', 'ifscCode', 'bankName'];
+
+const bankFieldRule = (field, label) => ({ getFieldValue }) => ({
+  validator: (_, value) => {
+    const anyFilled = BANK_FIELDS.some((f) => {
+      const v = f === field ? value : getFieldValue(f);
+      return v != null && String(v).trim() !== '';
+    });
+    const thisFilled = value != null && String(value).trim() !== '';
+    if (anyFilled && !thisFilled) {
+      return Promise.reject(new Error(`${label} is required once any bank detail is entered`));
+    }
+    return Promise.resolve();
+  },
+});
+
 const EmployeeForm = () => {
   const { message } = App.useApp();
   const { id } = useParams();
@@ -474,18 +495,47 @@ const EmployeeForm = () => {
         <>
           <Card title="Bank Details" size="small" style={{ marginBottom: 16 }}>
             <Row gutter={[16, 0]}>
-              <Col xs={24} sm={12} md={8}><Form.Item label="Account Number" name="accountNumber"><Input /></Form.Item></Col>
+              {/*
+                Account number, IFSC and bank name are all NOT NULL on
+                EmployeeBankDetails, and the server writes the record as soon as
+                the account number has content - so filling one and leaving
+                another blank failed on save with a raw constraint error.
+                Leaving all three empty is fine and means no bank details.
+              */}
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="Account Number"
+                  name="accountNumber"
+                  dependencies={['ifscCode', 'bankName']}
+                  rules={[bankFieldRule('accountNumber', 'Account number')]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
               <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   label="IFSC Code"
                   name="ifscCode"
+                  dependencies={['accountNumber', 'bankName']}
                   getValueFromEvent={(e) => e.target.value.toUpperCase()}
-                  rules={[{ pattern: IFSC_PATTERN, message: 'IFSC must look like HDFC0001234' }]}
+                  rules={[
+                    { pattern: IFSC_PATTERN, message: 'IFSC must look like HDFC0001234' },
+                    bankFieldRule('ifscCode', 'IFSC code'),
+                  ]}
                 >
                   <Input maxLength={11} />
                 </Form.Item>
               </Col>
-              <Col xs={24} sm={12} md={8}><Form.Item label="Bank Name" name="bankName"><Input /></Form.Item></Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  label="Bank Name"
+                  name="bankName"
+                  dependencies={['accountNumber', 'ifscCode']}
+                  rules={[bankFieldRule('bankName', 'Bank name')]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Branch Name" name="branchName"><Input /></Form.Item></Col>
               <Col xs={24} sm={12} md={8}><Form.Item label="Payment Mode" name="paymentMode"><Select showSearch optionFilterProp="label" options={PAYMENT_MODES} allowClear /></Form.Item></Col>
             </Row>
