@@ -67,7 +67,9 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
         toDate: isRangeMode ? values.toDate.format('YYYY-MM-DD') : single,
         isHalfDay: values.durationType === 'HALF',
         halfDayType: values.durationType === 'HALF' ? values.halfDayType : null,
-        days: calculateDays(),
+        // days is derived by the server from the dates and the half-day flag.
+        // It used to be sent from here and trusted, which put the number that
+        // gates the balance check in the browser's hands.
         reason: values.reason,
       };
       await applyLeave(payload);
@@ -81,7 +83,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
     } finally {
       setSubmitting(false);
     }
-  }, [form, message, onSuccess, onClose, calculateDays]);
+  }, [form, message, onSuccess, onClose]);
 
   const balance = getSelectedBalance();
   const days = calculateDays();
