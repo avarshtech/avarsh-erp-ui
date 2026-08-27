@@ -48,7 +48,9 @@ const PtSlabMaster = ({ onDirtyChange }) => {
   const columns = [
     { title: 'State', dataIndex: 'stateCode', width: 80, sorter: (a, b) => (a.stateCode || '').localeCompare(b.stateCode || '') },
     { title: 'From Amount', dataIndex: 'halfYearlyIncomeFrom', width: 120, align: 'right', render: (v) => v?.toLocaleString('en-IN') },
-    { title: 'To Amount', dataIndex: 'halfYearlyIncomeTo', width: 120, align: 'right', render: (v) => v?.toLocaleString('en-IN') },
+    // A blank cell made the open-ended top slab look like bad data.
+    { title: 'To Amount', dataIndex: 'halfYearlyIncomeTo', width: 120, align: 'right',
+      render: (v) => (v == null ? 'No limit' : v.toLocaleString('en-IN')) },
     { title: 'PT Amount', dataIndex: 'ptAmount', width: 110, align: 'right', render: (v) => v != null ? `\u20B9${v.toLocaleString('en-IN')}` : '-' },
     { title: 'Effective From', dataIndex: 'effectiveFrom', width: 120, render: (v) => v ? dayjs(v).format('DD-MMM-YYYY') : '-' },
   ];
@@ -156,8 +158,31 @@ const PtSlabMaster = ({ onDirtyChange }) => {
       <Form.Item name="halfYearlyIncomeFrom" label="From Amount (Half-Yearly)" rules={[{ required: true, message: 'Enter from amount' }]}>
         <InputNumber style={{ width: '100%' }} min={0} prefix={'\u20B9'} />
       </Form.Item>
-      <Form.Item name="halfYearlyIncomeTo" label="To Amount (Half-Yearly)" rules={[{ required: true, message: 'Enter to amount' }]}>
-        <InputNumber style={{ width: '100%' }} min={0} prefix={'\u20B9'} />
+      {/*
+        Optional on purpose. half_yearly_income_to is nullable, and the PT
+        calculation reads a null upper bound as "no ceiling" - which is what the
+        top slab needs. Requiring it here made the highest slab impossible to
+        enter, so every income above the last bounded slab matched no slab at
+        all and was charged nothing.
+      */}
+      <Form.Item
+        name="halfYearlyIncomeTo"
+        label="To Amount (Half-Yearly)"
+        extra="Leave empty for the highest slab, which has no upper limit."
+        rules={[
+          {
+            validator: (_, value) => {
+              if (value == null || value === '') return Promise.resolve();
+              const from = form.getFieldValue('halfYearlyIncomeFrom');
+              if (from != null && Number(value) <= Number(from)) {
+                return Promise.reject(new Error('To amount must be greater than the from amount'));
+              }
+              return Promise.resolve();
+            },
+          },
+        ]}
+      >
+        <InputNumber style={{ width: '100%' }} min={0} prefix={'\u20B9'} placeholder="Leave empty for no upper limit" />
       </Form.Item>
       <Form.Item name="ptAmount" label="PT Amount" rules={[{ required: true, message: 'Enter PT amount' }]}>
         <InputNumber style={{ width: '100%' }} min={0} prefix={'\u20B9'} />
