@@ -139,10 +139,18 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
 
     setSubmitting(true);
     try {
-      const payload = { ...values };
-      if (!payload.isCarryForward) {
-        payload.maxCarryForward = null;
-      }
+      // These columns are NOT NULL. Sending null for a switch that is off - or
+      // for a number the user cleared - failed the save with a raw constraint
+      // error naming a column the user was not even editing. Zero says the same
+      // thing: no carry forward is zero days carried forward.
+      const payload = {
+        ...values,
+        daysPerYear: values.daysPerYear ?? 0,
+        maxAccumulation: values.maxAccumulation ?? 0,
+        maxCarryForward: values.isCarryForward ? (values.maxCarryForward ?? 0) : 0,
+        isCarryForward: Boolean(values.isCarryForward),
+        isEncashable: Boolean(values.isEncashable),
+      };
       if (selectedId) {
         const selectedRecord = data.find(r => r.id === selectedId);
         await updateLeaveType(selectedId, { ...payload, version: selectedRecord?.version });
