@@ -20,6 +20,9 @@ const LeaveApplicationList = () => {
 
   const canAdd = hasPermission('hr-leave', 'add');
   const canApprove = hasPermission('hr-leave', 'approve');
+  // hr-leave declares reject as its own operation. Gating the Reject button on
+  // approve meant a role granted one but not the other got the wrong buttons.
+  const canReject = hasPermission('hr-leave', 'reject');
   const canUpdate = hasPermission('hr-leave', 'update');
 
   // Load leave types for the drawer
@@ -166,14 +169,14 @@ const LeaveApplicationList = () => {
         return (
           <Space size="small">
             {record.status === 'PENDING' && canApprove && (
-              <>
-                <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
-                  Approve
-                </Button>
-                <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
-                  Reject
-                </Button>
-              </>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
+                Approve
+              </Button>
+            )}
+            {record.status === 'PENDING' && canReject && (
+              <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
+                Reject
+              </Button>
             )}
             {cancellable && canUpdate && (
               <Button type="link" size="small" icon={<StopOutlined />} onClick={() => handleCancel(record)}>
@@ -184,7 +187,7 @@ const LeaveApplicationList = () => {
         );
       },
     },
-  ], [canApprove, canUpdate, handleApprove, handleReject, handleCancel]);
+  ], [canApprove, canReject, canUpdate, handleApprove, handleReject, handleCancel]);
 
   const tabItems = useMemo(() => [
     { key: 'ALL', label: 'All' },

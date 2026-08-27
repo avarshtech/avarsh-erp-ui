@@ -88,6 +88,19 @@ export const cancelLoan = async (id) => {
  * correction. Payroll creates its own recovery rows for the monthly EMI.
  * POST /api/v1/hr/loans/{id}/recoveries
  */
+/**
+ * Repayment schedule for a loan.
+ * GET /api/v1/hr/loans/{id}/recoveries
+ *
+ * Recoveries are a separate resource - LoanDTO does not carry them. The detail
+ * view read loan.recoveries, which is always undefined, so the schedule showed
+ * as empty no matter how many repayments had been taken.
+ */
+export const getLoanRecoveries = async (id) => {
+  const response = await axiosInstance.get(`${BASE_URL}/${id}/recoveries`);
+  return response.data;
+};
+
 export const recordLoanRecovery = async (loanId, { amount, recoveryDate, remarks }) => {
   const response = await axiosInstance.post(`${BASE_URL}/${loanId}/recoveries`, {
     amount, recoveryDate, remarks,
