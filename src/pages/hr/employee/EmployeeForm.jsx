@@ -17,7 +17,8 @@ import {
   BLOOD_GROUPS, PAYMENT_MODES, DOCUMENT_TYPES, RELATIONSHIP_TYPES,
   EMPLOYEE_CATEGORY, EMPLOYEE_GRADE,
 } from '../../../utils/hrConstants';
-import { uploadFile, downloadFileAsBlob } from '../../../services/core/fileService';
+import { uploadFile } from '../../../services/core/fileService';
+import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
 import { factoryOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -93,19 +94,6 @@ const bankFieldRule = (field, label) => ({ getFieldValue }) => ({
 /** Identity scans and certificates; anything larger is not a document. */
 const MAX_DOCUMENT_MB = 10;
 
-/** A stored file is referenced by its UUID; anything else is a legacy typed-in value. */
-const FILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const saveBlob = (blob, filename) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename || 'document';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-};
 
 /**
  * The File cell of the documents table.
@@ -119,12 +107,12 @@ const DocumentCell = ({ row, uploading, onUpload, onClear }) => {
   const { message } = App.useApp();
   const [downloading, setDownloading] = useState(false);
   const value = row.fileUrl;
-  const isStoredFile = Boolean(value) && FILE_ID_PATTERN.test(value);
+  const stored = isStoredFile(value);
 
   const download = async () => {
     setDownloading(true);
     try {
-      saveBlob(await downloadFileAsBlob(value), row.fileName);
+      await downloadStoredFile(value, row.fileName);
     } catch {
       // axiosInstance already toasts the server's message.
     } finally {
@@ -132,7 +120,7 @@ const DocumentCell = ({ row, uploading, onUpload, onClear }) => {
     }
   };
 
-  if (isStoredFile) {
+  if (stored) {
     return (
       <Space size={4} wrap>
         <PaperClipOutlined />
