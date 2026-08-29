@@ -12,11 +12,49 @@ import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
   PAYMENT_MODES, DOCUMENT_TYPES, EMPLOYEE_CATEGORY,
 } from '../../../utils/hrConstants';
+import { isStoredFile, isOpenableLink, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
 import SalaryStructureDrawer from './SalaryStructureDrawer';
 
 const getLabel = (list, value) => list.find((i) => i.value === value)?.label || value || '-';
 const getStatusColor = (status) => EMPLOYEE_STATUS.find((s) => s.value === status)?.color || 'default';
+
+
+/**
+ * Read-only view of one document row's file.
+ *
+ * Downloads an uploaded file through the API; a legacy value is opened as a
+ * link when it looks like one, and otherwise shown as the plain text it is.
+ */
+const DocumentFileLink = ({ value, fileName }) => {
+  const [busy, setBusy] = useState(false);
+
+  if (!value) return '-';
+
+  if (isStoredFile(value)) {
+    const download = async () => {
+      setBusy(true);
+      try {
+        await downloadStoredFile(value, fileName);
+      } catch {
+        // axiosInstance already toasts the server's message.
+      } finally {
+        setBusy(false);
+      }
+    };
+    return (
+      <Button type="link" size="small" loading={busy} onClick={download} style={{ padding: 0 }}>
+        {fileName || 'View'}
+      </Button>
+    );
+  }
+
+  if (isOpenableLink(value)) {
+    return <a href={value} target="_blank" rel="noopener noreferrer">View</a>;
+  }
+
+  return <span title="Recorded before documents could be uploaded">{value}</span>;
+};
 
 const EmployeeView = () => {
   const { message } = App.useApp();
@@ -159,7 +197,16 @@ const EmployeeView = () => {
           size="small"
           columns={[
             { title: 'Type', dataIndex: 'documentType', key: 'documentType', render: (v) => getLabel(DOCUMENT_TYPES, v) },
-            { title: 'File', dataIndex: 'fileUrl', key: 'fileUrl', render: (v) => v ? <a href={v} target="_blank" rel="noopener noreferrer">View</a> : '-' },
+            {
+              title: 'File',
+              dataIndex: 'fileUrl',
+              key: 'fileUrl',
+              // An uploaded file is a UUID, not a URL. Rendering it as an href
+              // made the browser resolve it against the current path, so View
+              // navigated to /hr/employees/<uuid> and the router read the uuid
+              // as an employee id.
+              render: (v, row) => <DocumentFileLink value={v} fileName={row.fileName} />,
+            },
             { title: 'Remarks', dataIndex: 'remarks', key: 'remarks', render: (v) => v || '-' },
           ]}
         />
