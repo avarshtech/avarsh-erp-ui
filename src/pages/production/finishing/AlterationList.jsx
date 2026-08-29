@@ -17,7 +17,7 @@ const AlterationList = () => {
   const [orders, setOrders] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drawer, setDrawer] = useState({ open: false, record: null });
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,7 +51,9 @@ const AlterationList = () => {
       title: 'Defect', dataIndex: 'defectCode', width: 220, ellipsis: true,
       render: (v) => { const d = DEFECT_LIBRARY.find((x) => x.code === v); return d ? `${d.code} — ${d.name}` : v; },
     },
+    { title: 'Qty Checked', dataIndex: 'qtyChecked', width: 100, align: 'right', render: (v) => v ?? '—' },
     { title: 'Source', dataIndex: 'source', width: 100, render: (v) => <Tag color={v === 'SEWING' ? 'orange' : v === 'FABRIC' ? 'purple' : v === 'TRIM' ? 'cyan' : 'blue'}>{v}</Tag> },
+    { title: 'Production Unit', dataIndex: 'productionUnit', width: 140, render: (v) => v || '—' },
     { title: 'Done By', dataIndex: 'doneById', width: 140, render: (v) => employees.find((e) => e.id === v)?.name || '—' },
     { title: 'Re-Check', dataIndex: 'recheckResult', width: 120, render: (v) => <FinishingStatusTag status={v === 'PENDING' ? 'PENDING_RECHECK' : v} /> },
     {
@@ -59,10 +61,6 @@ const AlterationList = () => {
       render: (v) => <strong style={{ color: v >= REALTER_CYCLE_ALERT ? 'var(--error-color)' : undefined }}>{v}</strong>,
     },
     { title: 'Status', dataIndex: 'status', width: 110, render: (v) => <FinishingStatusTag status={v} /> },
-    {
-      title: '', key: 'act', width: 70, align: 'center',
-      render: (_, r) => <ActionButton action="edit" size="small" onClick={() => setDrawer({ open: true, record: r })} />,
-    },
   ], [orders, employees]);
 
   return (
@@ -99,13 +97,13 @@ const AlterationList = () => {
           <span style={{ color: 'var(--text-secondary)' }}>
             Altered pieces must pass re-check before rejoining the flow. Checking sheets auto-create records here when Alter Qty &gt; 0.
           </span>
-          <ActionButton action="create" text="Log Alteration" onClick={() => setDrawer({ open: true, record: null })} />
+          <ActionButton action="create" text="Log Alterations (Issue to Production)" onClick={() => setDrawerOpen(true)} />
         </Space>
         <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}
           scroll={{ x: 1350 }} pagination={getTablePagination({ pageSize: 10 }, 'alterations')}
           locale={{ emptyText: <EmptyState title="No alterations" description="Defective garments route here from every checking stage" /> }} />
-        <AlterationDrawer open={drawer.open} record={drawer.record} orders={orders} employees={employees}
-          onClose={() => setDrawer({ open: false, record: null })} onSaved={() => { setDrawer({ open: false, record: null }); load(); }} />
+        <AlterationDrawer open={drawerOpen} orders={orders}
+          onClose={() => setDrawerOpen(false)} onSaved={() => { setDrawerOpen(false); load(); }} />
       </Card>
     </div>
   );

@@ -68,7 +68,7 @@ const BundlingDrawer = ({ open, cutPos, tmbChecks, onClose, onSaved }) => {
         </Space>
       )}
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <div>
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Cut PO</div>
           <FormSelect value={cutPoId} style={{ width: '100%' }} placeholder="Select Cut PO"

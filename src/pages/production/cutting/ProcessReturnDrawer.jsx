@@ -4,7 +4,7 @@ import { FormSelect } from '../../../components/form';
 import { RETURN_SHORTFALL_REASONS } from '../../../utils/cuttingConstants';
 import { saveProcessReturn } from '../../../services/production/cuttingService';
 
-/** FR-10 — Return DC: receive processed panels back; shortfalls need a reason. */
+/** FR-10 — Receive from Vendor: receive processed panels back; shortfalls need a reason. */
 const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [panelIssueId, setPanelIssueId] = useState(null);
@@ -83,7 +83,7 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
 
   return (
     <Drawer
-      title="Process Return to Cutting (Return DC)"
+      title="Receive from Vendor"
       size={720}
       open={open}
       onClose={onClose}
@@ -92,7 +92,7 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
         <Space style={{ float: 'right' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Returning: <strong>{totalReturn}</strong> pcs</span>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" loading={saving} onClick={handleSave}>Save &amp; Print Return DC</Button>
+          <Button type="primary" loading={saving} onClick={handleSave}>Save &amp; Print Receipt</Button>
         </Space>
       )}
     >
@@ -106,7 +106,7 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
           onChange={(id) => handleIssueSelect(id, issues)} />
       </div>
       <Table rowKey={(r) => lines.indexOf(r)} size="small" columns={columns} dataSource={lines} pagination={false} scroll={{ x: 800 }}
-        locale={{ emptyText: 'Partial returns allowed — multiple Return DCs can be raised against one issue' }} />
+        locale={{ emptyText: 'Partial receipts allowed — multiple vendor receipts can be raised against one issue' }} />
     </Drawer>
   );
 };

@@ -62,31 +62,52 @@ export const seedPlans = [
     id: 1, planNo: 'SPL-2026-0001', orderId: 1, line: 'Line-A', planDate: day(-6),
     startDate: day(-4), endDate: day(18), totalQty: 1800, sam: 12.4,
     operators: 6, helpers: 2, workingHours: 8, targetEfficiencyPct: 65, pricePerPiece: 38,
-    loadingDate: day(-4), settingHours: 4, status: 'IN_PROGRESS',
+    otherChargesPct: 8, loadingDate: day(-4), settingHours: 4, status: 'IN_PROGRESS',
     operations: [
-      { seq: 1, operation: 'Shoulder join', machine: 'Overlock', sam: 0.9, operatorId: 1 },
-      { seq: 2, operation: 'Neck rib attach', machine: 'Overlock', sam: 1.2, operatorId: 2 },
-      { seq: 3, operation: 'Collar attach', machine: 'SNLS', sam: 1.8, operatorId: 2 },
-      { seq: 4, operation: 'Sleeve attach', machine: 'Overlock', sam: 1.6, operatorId: 3 },
-      { seq: 5, operation: 'Side seam', machine: 'Overlock', sam: 2.0, operatorId: 3 },
-      { seq: 6, operation: 'Sleeve hem', machine: 'Flatlock', sam: 1.4, operatorId: 4 },
-      { seq: 7, operation: 'Bottom hem', machine: 'Flatlock', sam: 1.5, operatorId: 5 },
-      { seq: 8, operation: 'Label attach', machine: 'SNLS', sam: 1.0, operatorId: 6 },
-      { seq: 9, operation: 'Bartack', machine: 'Bartack', sam: 1.0, operatorId: 6 },
+      { seq: 1, operation: 'Shoulder join', machine: 'Overlock', sam: 0.9, operatorId: 1, rate: 2.5 },
+      { seq: 2, operation: 'Neck rib attach', machine: 'Overlock', sam: 1.2, operatorId: 2, rate: 3.4 },
+      { seq: 3, operation: 'Collar attach', machine: 'SNLS', sam: 1.8, operatorId: 2, rate: 5.1 },
+      { seq: 4, operation: 'Sleeve attach', machine: 'Overlock', sam: 1.6, operatorId: 3, rate: 4.5 },
+      { seq: 5, operation: 'Side seam', machine: 'Overlock', sam: 2.0, operatorId: 3, rate: 5.6 },
+      { seq: 6, operation: 'Sleeve hem', machine: 'Flatlock', sam: 1.4, operatorId: 4, rate: 3.9 },
+      { seq: 7, operation: 'Bottom hem', machine: 'Flatlock', sam: 1.5, operatorId: 5, rate: 4.2 },
+      { seq: 8, operation: 'Label attach', machine: 'SNLS', sam: 1.0, operatorId: 6, rate: 2.8 },
+      { seq: 9, operation: 'Bartack', machine: 'Bartack', sam: 1.0, operatorId: 6, rate: 2.8 },
     ],
   },
   {
     id: 2, planNo: 'SPL-2026-0002', orderId: 2, line: 'Line-B', planDate: day(-1),
     startDate: day(6), endDate: day(35), totalQty: 1500, sam: 6.9,
     operators: 8, helpers: 3, workingHours: 8, targetEfficiencyPct: 55, pricePerPiece: 62,
-    loadingDate: day(6), settingHours: 6, status: 'DRAFT',
+    otherChargesPct: 10, loadingDate: day(6), settingHours: 6, status: 'DRAFT',
     operations: [
-      { seq: 1, operation: 'Side seam', machine: 'DNLS', sam: 3.2, operatorId: 7 },
-      { seq: 2, operation: 'Bottom hem', machine: 'DNLS', sam: 2.1, operatorId: 8 },
-      { seq: 3, operation: 'Bartack', machine: 'Bartack', sam: 1.6, operatorId: 8 },
+      { seq: 1, operation: 'Side seam', machine: 'DNLS', sam: 3.2, operatorId: 7, rate: 9.0 },
+      { seq: 2, operation: 'Bottom hem', machine: 'DNLS', sam: 2.1, operatorId: 8, rate: 5.9 },
+      { seq: 3, operation: 'Bartack', machine: 'Bartack', sam: 1.6, operatorId: 8, rate: 4.5 },
     ],
   },
 ];
+
+/** CR-SEW-005 — BOM items per order (mirrors GET /api/v1/bom/{orderId}/items). */
+export const seedBomItems = {
+  1: [
+    { id: 101, category: 'Fabric & Materials', name: 'Single Jersey 180 GSM — Navy', spec: '100% cotton, Pantone 19-3933', qty: '576 kg', supplier: 'Sharadha Terry' },
+    { id: 102, category: 'Fabric & Materials', name: 'Neck rib 1x1 — Navy', spec: 'Self shade, 40 GSM allowance', qty: '38 kg', supplier: 'Sharadha Terry' },
+    { id: 103, category: 'Trims & Accessories', name: 'Main label — H&M woven', spec: 'Art HM-ML-104', qty: '1,850 pcs', supplier: 'Trimco India' },
+    { id: 104, category: 'Trims & Accessories', name: 'Size + care label set', spec: 'Printed satin, EN 14682', qty: '1,850 sets', supplier: 'Trimco India' },
+    { id: 105, category: 'Trims & Accessories', name: 'Sewing thread — Navy 402', spec: 'Coats Epic 120', qty: '96 cones', supplier: 'Coats India' },
+    { id: 106, category: 'Trims & Accessories', name: 'Chest print — logo', spec: 'Plastisol, 2-colour', qty: '1,820 pcs', supplier: 'PrintWorks' },
+    { id: 107, category: 'Approvals & Tests', name: 'PP sample approval', spec: 'Buyer comment sheet #PP-1104', qty: '1', supplier: '—' },
+    { id: 108, category: 'Approvals & Tests', name: 'GPT report', spec: 'SGS — pending upload', qty: '1', supplier: 'SGS' },
+    { id: 109, category: 'Approvals & Tests', name: 'Shade band approval', spec: 'Band A/B approved', qty: '1', supplier: '—' },
+  ],
+  2: [
+    { id: 201, category: 'Fabric & Materials', name: 'Denim 12 oz — Indigo', spec: '98/2 cotton-spandex', qty: '825 kg', supplier: 'Arvind Mills' },
+    { id: 202, category: 'Trims & Accessories', name: 'YKK zipper #4.5', spec: 'YG brass, 18 cm', qty: '1,520 pcs', supplier: 'YKK India' },
+    { id: 203, category: 'Trims & Accessories', name: 'Shank button 17 mm', spec: 'Antique brass', qty: '1,540 pcs', supplier: 'Trimco India' },
+    { id: 204, category: 'Approvals & Tests', name: 'Wash standard approval', spec: 'Mid-stone wash ref MSW-3', qty: '1', supplier: '—' },
+  ],
+};
 
 /** Cut parts receipts — from cutting Bundle Issue BIS-20260812-001 (B-1..B-3). */
 export const seedCutReceipts = [
@@ -127,22 +148,22 @@ export const seedHourly = [
   },
 ];
 
+/** CR-SEW-005 — items reference BOM (bomItemId), binary CORRECT/INCORRECT. */
 export const seedTrimCards = [
   {
     id: 1, cardNo: 'TVC-20260811-001', orderId: 1, date: day(-4), checkType: 'PILOT_RUN',
-    verifiedBy: 'QC - S. Devi', approvedBy: 'PM - N. Kumar', status: 'ISSUES_FOUND',
-    materials: {
-      Fabric: 'ACTUAL', 'Main Label': 'ACTUAL', 'Size Label': 'ACTUAL', 'C/C Label': 'ALTERNATE',
-      Thread: 'ACTUAL', Buttons: 'NOT_APPLICABLE', Zipper: 'NOT_APPLICABLE', Interlining: 'NOT_APPLICABLE',
-      Embroidery: 'NOT_APPLICABLE', Printing: 'ACTUAL', 'Bead Works': 'NOT_APPLICABLE', Pocketing: 'NOT_APPLICABLE',
-    },
-    approvals: {
-      Washing: 'ACTUAL', Sample: 'ACTUAL', 'PP Comment': 'ACTUAL', GPT: 'MISSING',
-      FPT: 'ACTUAL', Shrinkage: 'ACTUAL', 'Shade Band': 'ACTUAL',
-    },
-    issues: [
-      { description: 'Found flap, pcs center off', severity: 'MAJOR', rootCause: 'Pattern alignment', action: 'Re-set folder guide before bulk', status: 'RESOLVED', resolvedOn: day(-3) },
-      { description: 'Armhole joint up and down', severity: 'MAJOR', rootCause: 'Operator handling', action: 'Retrain OP-103; add notch check', status: 'OPEN', resolvedOn: null },
+    verifiedBy: 'QC - S. Devi', approvedBy: 'PM - N. Kumar', status: 'VERIFIED',
+    physicallyVerified: true, verifiedAt: `${day(-4)} 10:42`,
+    items: [
+      { bomItemId: 101, status: 'CORRECT', remarks: '' },
+      { bomItemId: 102, status: 'CORRECT', remarks: '' },
+      { bomItemId: 103, status: 'CORRECT', remarks: '' },
+      { bomItemId: 104, status: 'CORRECT', remarks: '' },
+      { bomItemId: 105, status: 'INCORRECT', remarks: 'Cone shade off vs approved — replaced by store before loading' },
+      { bomItemId: 106, status: 'CORRECT', remarks: '' },
+      { bomItemId: 107, status: 'CORRECT', remarks: '' },
+      { bomItemId: 108, status: 'INCORRECT', remarks: 'GPT report not yet uploaded — chase SGS' },
+      { bomItemId: 109, status: 'CORRECT', remarks: '' },
     ],
   },
 ];
@@ -161,16 +182,18 @@ export const seedMeasurements = [
   },
 ];
 
+/** CR-SEW-006 — hour-wise rows with per-row rework (capped at count). */
 export const seedTopse = [
   {
     id: 1, reportNo: 'TOPSE-20260814-001', orderId: 1, line: 'Line-A', date: day(-1),
-    totalInspected: 260, totalRework: 9,
+    totalInspected: 260,
     defects: [
-      { category: 'Stitching Defects', type: 'Skip stitch', count: 4 },
-      { category: 'Stitching Defects', type: 'Broken stitch', count: 2 },
-      { category: 'Construction Defects', type: 'Puckering', count: 2 },
-      { category: 'Appearance Defects', type: 'Oil stain', count: 2 },
-      { category: 'Trim/Accessory Defects', type: 'Label misplacement', count: 1 },
+      { hour: 'Hr 1', category: 'Stitching Defects', type: 'Skip stitch', count: 2, rework: 2 },
+      { hour: 'Hr 2', category: 'Stitching Defects', type: 'Broken stitch', count: 2, rework: 2 },
+      { hour: 'Hr 4', category: 'Construction Defects', type: 'Puckering', count: 2, rework: 1 },
+      { hour: 'Hr 5', category: 'Stitching Defects', type: 'Skip stitch', count: 2, rework: 2 },
+      { hour: 'Hr 5', category: 'Appearance Defects', type: 'Oil stain', count: 2, rework: 1 },
+      { hour: 'Hr 7', category: 'Trim/Accessory Defects', type: 'Label misplacement', count: 1, rework: 1 },
     ],
   },
 ];

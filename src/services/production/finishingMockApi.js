@@ -6,7 +6,7 @@
 import dayjs from 'dayjs';
 import {
   HOURS, AQL_25_TABLE, DHU_ALERT_PCT, ALTERATION_ALERT_PCT,
-  RECEIVING_SHORTAGE_PCT, WIP_AGING_DAYS, REALTER_CYCLE_ALERT,
+  WIP_AGING_DAYS, REALTER_CYCLE_ALERT,
 } from '../../utils/finishingConstants';
 import * as seed from './finishingMockData';
 import { seedOrders } from './sewingMockData';
@@ -50,16 +50,14 @@ export const getEmployees = async (station) => {
   return clone(station ? db.employees.filter((e) => e.station === station) : db.employees);
 };
 
-// ── Module 1: Receiving ─────────────────────────────────────────────────────
+// ── Module 1: Receiving (rev — against a sewing Garment Issue, size-wise) ──
 export const listReceivings = async () => { await delay(); return clone(db.receivings); };
 export const saveReceiving = async (payload) => {
   await delay();
-  const prev = db.receivings
-    .filter((r) => r.orderId === payload.orderId && r.size === payload.size && r.color === payload.color)
-    .reduce((s, r) => s + r.receivingQty, 0);
-  const cumulativeQty = prev + (payload.receivingQty || 0);
-  const status = (cumulativeQty / payload.orderQty) * 100 < RECEIVING_SHORTAGE_PCT ? 'SHORTAGE' : 'RECEIVED';
-  const row = { id: nextId(db.receivings), receivingNo: docNo('FRN', db.receivings), cumulativeQty, status, ...payload };
+  const short = (payload.lines || []).some((l) => (l.receivedQty || 0) < (l.issuedQty || 0));
+  const excess = (payload.lines || []).some((l) => (l.receivedQty || 0) > (l.issuedQty || 0));
+  const status = short ? 'SHORTAGE' : excess ? 'EXCESS' : 'RECEIVED';
+  const row = { id: nextId(db.receivings), receivingNo: docNo('FRN', db.receivings), status, ...payload };
   db.receivings.push(row);
   return clone(row);
 };
@@ -71,6 +69,7 @@ export const getHourlySheet = async ({ station, date }) => {
   if (found) return clone(found);
   return clone({
     id: null, station, orderId: db.orders[0]?.id, color: 'Navy Blue', date, target: 200,
+    ratePerPiece: 0.8,
     ...(station === 'IRONING' ? { ratePerPiece: 1.5, ironTemp: '150°C', ironMethod: 'Steam' } : {}),
     rows: db.employees.filter((e) => e.station === station).map((e) => ({
       employeeId: e.id, hr1: null, hr2: null, hr3: null, hr4: null, hr5: null, hr6: null, hr7: null, hr8: null, ot: null,
@@ -146,6 +145,21 @@ export const saveAlteration = async (payload) => {
   return clone(row);
 };
 
+/** Rev — order-scoped defect table saved in one shot, issued to a production unit. */
+export const saveAlterationBatch = async ({ orderId, color, rows }) => {
+  await delay();
+  const created = rows.map((r) => {
+    const row = {
+      id: nextId(db.alterations), alterNo: docNo('ALT', db.alterations),
+      orderId, color, date: dayjs().format('YYYY-MM-DD'), cycles: 1,
+      recheckResult: 'PENDING', status: 'IN_PROGRESS', ...r,
+    };
+    db.alterations.push(row);
+    return row;
+  });
+  return clone(created);
+};
+
 // ── Module 9: Metal detection + needle log ──────────────────────────────────
 export const listMetalDetection = async () => { await delay(); return clone(db.metalDetection); };
 export const saveMetalDetection = async (payload) => {
@@ -184,7 +198,7 @@ export const getFinishingDashboard = async () => {
   const rft = checked ? Math.round(((checked - altered) / checked) * 1000) / 10 : 0;
   const alterationRate = checked ? Math.round((altered / checked) * 1000) / 10 : 0;
 
-  const received = db.receivings.reduce((s, r) => s + r.receivingQty, 0);
+  const received = db.receivings.reduce((s, r) => s + (r.lines || []).reduce((x, l) => x + (l.receivedQty || 0), 0), 0);
   const trimmed = db.hourlySheets.filter((h) => h.station === 'THREAD_TRIM').reduce((s, h) => s + h.rows.reduce((x, r) => x + rowTotal(r), 0), 0);
   const kaja = db.hourlySheets.filter((h) => h.station === 'KAJA_BUTTON').reduce((s, h) => s + h.rows.reduce((x, r) => x + rowTotal(r), 0), 0);
   const checkedAll = checkedTotals(() => true).checked;
@@ -202,9 +216,10 @@ export const getFinishingDashboard = async () => {
   const wip = Math.max(0, received - segregated);
 
   const alerts = [];
-  db.receivings.filter((r) => r.status === 'SHORTAGE').forEach((r) => alerts.push({
-    type: 'warning', text: `${r.receivingNo}: cumulative received below ${RECEIVING_SHORTAGE_PCT}% of order qty (${r.size} · ${r.cumulativeQty}/${r.orderQty})`,
-  }));
+  db.receivings.filter((r) => r.status === 'SHORTAGE').forEach((r) => {
+    const short = (r.lines || []).reduce((s, l) => s + Math.max(0, (l.issuedQty || 0) - (l.receivedQty || 0)), 0);
+    alerts.push({ type: 'warning', text: `${r.receivingNo}: ${short} pcs short vs issue ${r.issueNo}` });
+  });
   if (dhu > DHU_ALERT_PCT) alerts.push({ type: 'error', text: `DHU ${dhu}% today exceeds ${DHU_ALERT_PCT}% threshold` });
   if (alterationRate > ALTERATION_ALERT_PCT) alerts.push({ type: 'error', text: `Alteration rate ${alterationRate}% exceeds ${ALTERATION_ALERT_PCT}% threshold` });
   db.measurements.filter((m) => m.lotStatus === 'HOLD').forEach((m) => alerts.push({

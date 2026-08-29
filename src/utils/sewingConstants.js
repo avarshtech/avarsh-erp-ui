@@ -73,10 +73,19 @@ export const DEFECT_CATEGORIES = {
 
 export const DHU_THRESHOLD_PCT = 5;
 
-/** Trim verification checklist per PRD 4.5.2. */
-export const CHECKLIST_MATERIALS = ['Fabric', 'Main Label', 'Size Label', 'C/C Label', 'Thread', 'Buttons', 'Zipper', 'Interlining', 'Embroidery', 'Printing', 'Bead Works', 'Pocketing'];
-export const CHECKLIST_APPROVALS = ['Washing', 'Sample', 'PP Comment', 'GPT', 'FPT', 'Shrinkage', 'Shade Band'];
-export const CHECKLIST_STATUSES = ['ACTUAL', 'ALTERNATE', 'MISSING', 'NOT_APPLICABLE'];
+/** CR-SEW-006 — TOPSE hour slots + traffic-light thresholds (configurable per buyer). */
+export const TOPSE_HOURS = ['Hr 1', 'Hr 2', 'Hr 3', 'Hr 4', 'Hr 5', 'Hr 6', 'Hr 7', 'Hr 8', 'OT'];
+export const TOPSE_TRAFFIC = { greenMax: 3, yellowMax: 5 }; // GREEN ≤3, YELLOW 3–5, RED >5
+export const topseTraffic = (dhu) => (dhu <= TOPSE_TRAFFIC.greenMax ? 'GREEN' : dhu <= TOPSE_TRAFFIC.yellowMax ? 'YELLOW' : 'RED');
+export const TOPSE_TRAFFIC_META = {
+  GREEN: { label: 'Pass', color: 'green' },
+  YELLOW: { label: 'Watch', color: 'orange' },
+  RED: { label: 'Fail', color: 'red' },
+};
+
+/** CR-SEW-005 — binary verification against BOM-driven items. */
+export const TRIM_ITEM_STATUSES = ['CORRECT', 'INCORRECT'];
+export const BOM_ITEM_CATEGORIES = ['Fabric & Materials', 'Trims & Accessories', 'Approvals & Tests'];
 export const CHECK_TYPES = ['SIZE_SET', 'IN_LINE', 'PILOT_RUN'];
 
 export const MEASUREMENT_STAGES = ['IN_LINE', 'PRE_FINAL', 'FINAL'];

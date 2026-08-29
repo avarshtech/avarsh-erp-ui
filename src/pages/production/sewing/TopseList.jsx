@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Table, Space } from 'antd';
+import { App, Card, Table, Space, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import RecordLink from '../../../components/RecordLink';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { DHU_THRESHOLD_PCT } from '../../../utils/sewingConstants';
+import { topseTraffic, TOPSE_TRAFFIC_META, TOPSE_TRAFFIC } from '../../../utils/sewingConstants';
 import { listTopse, getOrders } from '../../../services/production/sewingService';
 
 const dhuOf = (r) => {
@@ -39,17 +39,24 @@ const TopseList = () => {
     { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Inspected', dataIndex: 'totalInspected', width: 90, align: 'right' },
     { title: 'Defects', key: 'def', width: 80, align: 'right', render: (_, r) => r.defects.reduce((s, d) => s + d.count, 0) },
-    { title: 'Rework', dataIndex: 'totalRework', width: 80, align: 'right' },
+    { title: 'Rework', key: 'rework', width: 80, align: 'right', render: (_, r) => r.defects.reduce((s, d) => s + (d.rework || 0), 0) },
     {
       title: 'DHU %', key: 'dhu', width: 90, align: 'center',
+      render: (_, r) => <strong>{dhuOf(r)}%</strong>,
+    },
+    {
+      title: 'Traffic Light', key: 'light', width: 110, align: 'center',
       render: (_, r) => {
-        const dhu = dhuOf(r);
-        return <strong style={{ color: dhu > DHU_THRESHOLD_PCT ? 'var(--error-color)' : 'var(--success-color)' }}>{dhu}%</strong>;
+        const meta = TOPSE_TRAFFIC_META[topseTraffic(dhuOf(r))];
+        return <Tag color={meta.color} style={{ fontWeight: 700 }}>{meta.label}</Tag>;
       },
     },
     {
       title: 'Pass Rate', key: 'pass', width: 90, align: 'center',
-      render: (_, r) => `${r.totalInspected ? Math.round(((r.totalInspected - r.totalRework) / r.totalInspected) * 1000) / 10 : 0}%`,
+      render: (_, r) => {
+        const rework = r.defects.reduce((s, d) => s + (d.rework || 0), 0);
+        return `${r.totalInspected ? Math.round(((r.totalInspected - rework) / r.totalInspected) * 1000) / 10 : 0}%`;
+      },
     },
     {
       title: 'Actions', key: 'act', width: 90, fixed: 'right', align: 'center',
@@ -60,7 +67,7 @@ const TopseList = () => {
   return (
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
-        <span style={{ color: 'var(--text-secondary)' }}>DHU = defects ÷ inspected × 100. Above {DHU_THRESHOLD_PCT}% alerts the QA Manager automatically.</span>
+        <span style={{ color: 'var(--text-secondary)' }}>Hour-wise digital defect log. Traffic light: Pass ≤ {TOPSE_TRAFFIC.greenMax}% · Watch to {TOPSE_TRAFFIC.yellowMax}% · Fail above (configurable per buyer).</span>
         <ActionButton action="create" text="New End-Line Report" onClick={() => navigate('/production/sewing/topse/new')} />
       </Space>
       <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}

@@ -75,18 +75,16 @@ const FinishingHourlyTab = () => {
                 <InputNumber min={0} value={sheet.target} style={{ width: 110 }}
                   onChange={(v) => setSheet((prev) => ({ ...prev, target: v }))} />
               </div>
-              {stationCfg?.hasCost && (
-                <>
-                  <div>
-                    <FieldLabel>Rate ₹ / pc</FieldLabel>
-                    <InputNumber min={0} step={0.1} value={sheet.ratePerPiece} style={{ width: 90 }}
-                      onChange={(v) => setSheet((prev) => ({ ...prev, ratePerPiece: v }))} />
-                  </div>
-                  <div>
-                    <FieldLabel>Iron Setting (from fabric)</FieldLabel>
-                    <Tag color="blue">{sheet.ironTemp} · {sheet.ironMethod}</Tag>
-                  </div>
-                </>
+              <div>
+                <FieldLabel>Rate ₹ / pc (cost per operator)</FieldLabel>
+                <InputNumber min={0} step={0.1} value={sheet.ratePerPiece} style={{ width: 90 }}
+                  onChange={(v) => setSheet((prev) => ({ ...prev, ratePerPiece: v }))} />
+              </div>
+              {sheet.ironTemp && (
+                <div>
+                  <FieldLabel>Iron Setting (from fabric)</FieldLabel>
+                  <Tag color="blue">{sheet.ironTemp} · {sheet.ironMethod}</Tag>
+                </div>
               )}
               <ActionButton action="save" text="Save Sheet" loading={saving} onClick={handleSave} />
             </>

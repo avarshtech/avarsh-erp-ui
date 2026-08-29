@@ -88,7 +88,7 @@ const ReCutRegisterTab = () => {
         scroll={{ x: 1100 }} pagination={getTablePagination({ pageSize: 15 }, 'entries')}
         locale={{ emptyText: <EmptyState title="No re-cut entries" description="Log defective pieces reported from TMB, bundling or sewing lines" /> }} />
       <Modal title="Add Re-Cut Entry" open={modalOpen} onCancel={() => setModalOpen(false)} onOk={handleAdd} okText="Add Entry" destroyOnHidden>
-        <Space direction="vertical" size="middle" style={{ width: '100%', marginTop: 8 }}>
+        <Space orientation="vertical" size="middle" style={{ width: '100%', marginTop: 8 }}>
           <Space size="middle" wrap>
             <DatePicker size="small" format="DD-MMM-YYYY" value={draft.date} allowClear={false} onChange={(d) => setDraft((x) => ({ ...x, date: d }))} />
             <FormSelect size="small" value={draft.cutPoId} style={{ width: 210 }} placeholder="Cut PO"

@@ -33,8 +33,7 @@ const LayAuditList = () => {
   const poNo = useCallback((id) => cutPos.find((p) => p.id === id)?.cutPoNo || '—', [cutPos]);
 
   const columns = useMemo(() => [
-    { title: 'Lay #', dataIndex: 'layNo', width: 100, align: 'center', render: (v, r) => <RecordLink text={`LAY-${String(v).padStart(3, '0')}`} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} /> },
-    { title: 'Marker #', dataIndex: 'markerId', width: 100, align: 'center', render: (v) => (markerNames[v] ? <code>{markerNames[v]}</code> : '—') },
+    { title: 'Marker #', dataIndex: 'markerId', width: 110, align: 'center', render: (v, r) => <RecordLink text={markerNames[v] || `Lay ${r.layNo}`} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} /> },
     { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
     { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Length (m)', dataIndex: 'layLength', width: 100, align: 'right' },

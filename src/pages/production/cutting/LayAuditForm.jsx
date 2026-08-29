@@ -81,7 +81,7 @@ const LayAuditForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title={isEdit ? `Lay Audit — LAY-${String(lay.layNo).padStart(3, '0')}` : 'New Lay Audit'}
+        title={isEdit ? `Lay Audit — ${marker?.markerNo || ''} · Lay ${lay.layNo}` : 'New Lay Audit'}
         backPath="/production/cutting?tab=lay-audit"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >

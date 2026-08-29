@@ -31,8 +31,10 @@ export const rowTotal = mockApi.rowTotal;
 export const efficiencyPct = mockApi.efficiencyPct;
 export const targetPerHour = mockApi.targetPerHour;
 
+export const getBomItems = (...a) => mockApi.getBomItems(...a);
 export const listTrimCards = (...a) => mockApi.listTrimCards(...a);
 export const saveTrimCard = (...a) => mockApi.saveTrimCard(...a);
+export const fullMeasurementChart = mockApi.fullMeasurementChart;
 
 export const listMeasurements = (...a) => mockApi.listMeasurements(...a);
 export const getMeasurement = (...a) => mockApi.getMeasurement(...a);

@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Table, Space, Tag, Tooltip } from 'antd';
+import { App, Card, Table, Space, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { RECEIVING_SHORTAGE_PCT } from '../../../utils/finishingConstants';
 import { listReceivings, getOrders } from '../../../services/production/finishingService';
 import FinishingStatusTag from './FinishingStatusTag';
 import ReceivingDrawer from './ReceivingDrawer';
 
-/** PRD Module 1 — garments received from sewing with qty/size-color verification. */
+/** Module 1 (rev) — garments received against a sewing Garment Issue, size-wise. */
 const ReceivingList = () => {
   const { message } = App.useApp();
   const [rows, setRows] = useState([]);
@@ -29,45 +28,41 @@ const ReceivingList = () => {
 
   const columns = useMemo(() => [
     { title: 'Receiving #', dataIndex: 'receivingNo', width: 170, render: (v) => <code>{v}</code> },
+    { title: 'Issue # (Sewing)', dataIndex: 'issueNo', width: 160, render: (v) => <code>{v}</code> },
     { title: 'Order', dataIndex: 'orderId', width: 140, render: (v) => orders.find((o) => o.id === v)?.orderNo || '—' },
-    { title: 'Color', dataIndex: 'color', width: 110 },
-    { title: 'Size', dataIndex: 'size', width: 70, align: 'center' },
+    { title: 'Trimming PO', dataIndex: 'trimmingPoNo', width: 140, render: (v) => v || '—' },
+    { title: 'Checking PO', dataIndex: 'checkingPoNo', width: 140, render: (v) => v || '—' },
     { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
-    { title: 'From', dataIndex: 'sewingLine', width: 90, align: 'center' },
-    { title: 'Bundle', dataIndex: 'bundleNo', width: 80, align: 'center', render: (v) => v || '—' },
-    { title: 'Received', dataIndex: 'receivingQty', width: 90, align: 'right' },
     {
-      title: 'Cumulative / Order', key: 'cum', width: 150, align: 'right',
-      render: (_, r) => {
-        const pct = r.orderQty ? Math.round((r.cumulativeQty / r.orderQty) * 100) : 0;
+      title: 'Size-wise (Issued → Received)', key: 'lines', width: 260,
+      render: (_, r) => (r.lines || []).map((l) => {
+        const diff = (l.receivedQty || 0) - (l.issuedQty || 0);
         return (
-          <Tooltip title={`${pct}% of order qty received for this size`}>
-            <span style={{ color: pct < RECEIVING_SHORTAGE_PCT && r.status === 'SHORTAGE' ? 'var(--error-color)' : undefined }}>
-              {r.cumulativeQty} / {r.orderQty} ({pct}%)
-            </span>
-          </Tooltip>
+          <Tag key={l.size} color={diff < 0 ? 'red' : diff > 0 ? 'gold' : 'green'}>
+            {l.size}: {l.issuedQty}→{l.receivedQty}
+          </Tag>
         );
-      },
+      }),
     },
     {
-      title: 'Parts Repl.', key: 'parts', width: 100, align: 'center',
-      render: (_, r) => (r.partsReplacements?.length ? <Tag color="orange">{r.partsReplacements.length}</Tag> : '—'),
+      title: 'Received', key: 'total', width: 90, align: 'right',
+      render: (_, r) => <strong>{(r.lines || []).reduce((s, l) => s + (l.receivedQty || 0), 0)}</strong>,
     },
-    { title: 'Status', dataIndex: 'status', width: 120, render: (v) => <FinishingStatusTag status={v} /> },
+    { title: 'Status', dataIndex: 'status', width: 110, render: (v) => <FinishingStatusTag status={v} /> },
   ], [orders]);
 
   return (
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }} wrap>
         <span style={{ color: 'var(--text-secondary)' }}>
-          Entry point of finishing — every piece from sewing is verified here; below {RECEIVING_SHORTAGE_PCT}% cumulative receipt flags a shortage.
+          Receiving mirrors Sewing's Garment Issue to Finishing — pick the Issue #, receive size-wise; shortage red, excess yellow, exact green.
         </span>
         <ActionButton action="create" text="Receive from Sewing" onClick={() => setDrawerOpen(true)} />
       </Space>
       <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}
         rowClassName={(r) => (r.status === 'SHORTAGE' ? 'row-shortage' : '')}
-        scroll={{ x: 1200 }} pagination={getTablePagination({ pageSize: 10 }, 'receivings')}
-        locale={{ emptyText: <EmptyState title="No receivings yet" description="Record garments arriving from the sewing floor" /> }} />
+        scroll={{ x: 1300 }} pagination={getTablePagination({ pageSize: 10 }, 'receivings')}
+        locale={{ emptyText: <EmptyState title="No receivings yet" description="Receive garments against a sewing issue document" /> }} />
       <ReceivingDrawer open={drawerOpen} orders={orders}
         onClose={() => setDrawerOpen(false)} onSaved={() => { setDrawerOpen(false); load(); }} />
     </Card>

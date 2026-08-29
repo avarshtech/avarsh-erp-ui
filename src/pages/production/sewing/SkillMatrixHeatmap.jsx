@@ -13,7 +13,7 @@ const SkillMatrixHeatmap = ({ operators }) => {
     {
       title: 'Operator', key: 'op', width: 190, fixed: 'left',
       render: (_, o) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <strong>{o.name}</strong>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.code} · {o.line} · {o.machines.join(', ')}</span>
         </Space>

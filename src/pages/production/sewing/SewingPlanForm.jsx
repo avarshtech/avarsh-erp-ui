@@ -38,7 +38,8 @@ const SewingPlanForm = () => {
           orderId: ords[0]?.id, line: SEWING_LINES[0], planDate: dayjs().format('YYYY-MM-DD'),
           startDate: dayjs().add(3, 'day').format('YYYY-MM-DD'), endDate: dayjs().add(25, 'day').format('YYYY-MM-DD'),
           totalQty: ords[0]?.orderQty, sam: null, operators: 6, helpers: 2, workingHours: 8,
-          targetEfficiencyPct: 60, pricePerPiece: ords[0]?.cmRate, loadingDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
+          targetEfficiencyPct: 60, pricePerPiece: ords[0]?.cmRate, otherChargesPct: 8,
+          loadingDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
           settingHours: 4, status: 'DRAFT', operations: [],
         });
       } catch { message.error('Failed to load plan'); } finally { setLoading(false); }
@@ -49,6 +50,12 @@ const SewingPlanForm = () => {
   const patch = useCallback((p) => setPlan((prev) => ({ ...prev, ...p })), []);
   const totalSam = useMemo(() => (plan ? Math.round(plan.operations.reduce((s, o) => s + (o.sam || 0), 0) * 100) / 100 : 0), [plan]);
   const tph = plan ? targetPerHour(plan.operators, plan.sam || totalSam || 1, plan.targetEfficiencyPct) : 0;
+  /** CM Rate/Pc = Σ operation rates × (1 + other charges %). */
+  const cmRatePerPc = useMemo(() => {
+    if (!plan) return 0;
+    const rateSum = plan.operations.reduce((s, o) => s + (o.rate || 0), 0);
+    return Math.round(rateSum * (1 + (plan.otherChargesPct || 0) / 100) * 100) / 100;
+  }, [plan]);
 
   const handleSave = async () => {
     if (!plan.operations.length) return message.warning('Add the operation breakdown before saving');
@@ -122,8 +129,8 @@ const SewingPlanForm = () => {
             <InputNumber min={30} max={100} value={plan.targetEfficiencyPct} onChange={(v) => patch({ targetEfficiencyPct: v || 60 })} />
           </div>
           <div>
-            <FieldLabel>CM Rate ₹/pc</FieldLabel>
-            <InputNumber min={0} value={plan.pricePerPiece} onChange={(v) => patch({ pricePerPiece: v })} />
+            <FieldLabel>Other Charges %</FieldLabel>
+            <InputNumber min={0} max={50} value={plan.otherChargesPct} onChange={(v) => patch({ otherChargesPct: v || 0 })} />
           </div>
           <div>
             <FieldLabel>Line Loading Date</FieldLabel>
@@ -149,6 +156,11 @@ const SewingPlanForm = () => {
         <Col xs={8} md={4}><Card size="small"><Statistic title="Garment SAM (min)" value={plan.sam || totalSam} precision={1} /></Card></Col>
         <Col xs={8} md={4}><Card size="small"><Statistic title="Target / Hour" value={tph} /></Card></Col>
         <Col xs={8} md={4}><Card size="small"><Statistic title="Target / Day" value={tph * plan.workingHours} /></Card></Col>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic title={`CM Rate ₹/pc (Σ rates + ${plan.otherChargesPct || 0}% other charges)`} value={cmRatePerPc} precision={2} prefix="₹" />
+          </Card>
+        </Col>
       </Row>
 
       <OperationBreakdownGrid plan={plan} operators={operators} onChange={setPlan} />

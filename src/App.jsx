@@ -66,7 +66,6 @@ const MeasurementReportForm = lazy(() => import('./pages/production/sewing/Measu
 const TopseForm = lazy(() => import('./pages/production/sewing/TopseForm'));
 const FinishingWorkspace = lazy(() => import('./pages/production/finishing/FinishingWorkspace'));
 const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
-const FinishingMeasurementForm = lazy(() => import('./pages/production/finishing/FinishingMeasurementForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -274,8 +273,6 @@ const ThemedApp = () => {
             <Route path="production/finishing" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><FinishingWorkspace /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
-            <Route path="production/finishing/measurement/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingMeasurementForm /></Suspense></PermissionRoute>} />
-            <Route path="production/finishing/measurement/:id" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><FinishingMeasurementForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />

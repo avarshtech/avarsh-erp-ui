@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, Table, InputNumber, Input, Tag, DatePicker } from 'antd';
+import { App, Card, Space, Spin, Table, InputNumber, Input, Tag, DatePicker, Button } from 'antd';
+import { FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { MEASUREMENT_STAGES } from '../../../utils/sewingConstants';
-import { getMeasurement, saveMeasurement, getOrders, specPoints } from '../../../services/production/sewingService';
+import { getMeasurement, saveMeasurement, getOrders, specPoints, fullMeasurementChart } from '../../../services/production/sewingService';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
@@ -106,7 +107,16 @@ const MeasurementReportForm = () => {
         backPath="/production/sewing?tab=measurement"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
-        <ActionButton action="save" text="Save Report" loading={saving} onClick={handleSave} />
+        <Space>
+          <Button icon={<FileExcelOutlined />}
+            onClick={() => {
+              patch({ points: fullMeasurementChart(order?.styleNo, report.size) });
+              message.success('Measurement chart imported from Excel — all buyer spec points loaded');
+            }}>
+            Import Measurement Chart (Excel)
+          </Button>
+          <ActionButton action="save" text="Save Report" loading={saving} onClick={handleSave} />
+        </Space>
       </PageHeader>
 
       <Card style={{ marginBottom: 16 }}>

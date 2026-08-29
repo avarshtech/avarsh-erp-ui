@@ -31,6 +31,7 @@ export const getFinishingMeasurement = (...a) => mockApi.getFinishingMeasurement
 export const saveFinishingMeasurement = (...a) => mockApi.saveFinishingMeasurement(...a);
 
 export const listAlterations = (...a) => mockApi.listAlterations(...a);
+export const saveAlterationBatch = (...a) => mockApi.saveAlterationBatch(...a);
 export const saveAlteration = (...a) => mockApi.saveAlteration(...a);
 
 export const listMetalDetection = (...a) => mockApi.listMetalDetection(...a);
@@ -42,5 +43,5 @@ export const saveShadeGroup = (...a) => mockApi.saveShadeGroup(...a);
 
 export const getFinishingDashboard = (...a) => mockApi.getFinishingDashboard(...a);
 
-// Cross-module: sewing spec points reused for post-iron measurement auto-fill.
-export { specPoints } from './sewingMockApi';
+// Cross-module: sewing spec points + garment issues (receiving source).
+export { specPoints, fullMeasurementChart, listGarmentIssues } from './sewingMockApi';

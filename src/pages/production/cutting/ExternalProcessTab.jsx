@@ -15,7 +15,7 @@ import ProcessReturnDrawer from './ProcessReturnDrawer';
 const ExternalProcessTab = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const [view, setView] = useState('Panel Issues');
+  const [view, setView] = useState('Issue to Other Vendor');
   const [issues, setIssues] = useState([]);
   const [checks, setChecks] = useState([]);
   const [returns, setReturns] = useState([]);
@@ -85,9 +85,9 @@ const ExternalProcessTab = () => {
   ], [poNo]);
 
   const tables = {
-    'Panel Issues': { columns: issueColumns, data: issues, empty: 'No panels issued to external processes yet' },
+    'Issue to Other Vendor': { columns: issueColumns, data: issues, empty: 'No panels issued to other vendors yet' },
     'Panel Checks': { columns: checkColumns, data: checks, empty: 'No post-process panel checks yet' },
-    'Return DCs': { columns: returnColumns, data: returns, empty: 'No return delivery challans yet' },
+    'Receive from Vendor': { columns: returnColumns, data: returns, empty: 'No receipts back from vendors yet' },
   };
   const active = tables[view];
 
@@ -96,9 +96,9 @@ const ExternalProcessTab = () => {
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <Segmented options={Object.keys(tables)} value={view} onChange={setView} />
         <Space>
-          <ActionButton action="create" text="Issue Panels" onClick={() => setIssueOpen(true)} />
+          <ActionButton action="create" text="Issue to Other Vendor" onClick={() => setIssueOpen(true)} />
           <ActionButton action="create" text="Panel Check" onClick={() => navigate('/production/cutting/panel-check/new')} />
-          <ActionButton action="create" text="Return DC" onClick={() => setReturnOpen(true)} />
+          <ActionButton action="create" text="Receive from Vendor" onClick={() => setReturnOpen(true)} />
         </Space>
       </Space>
       <Table rowKey="id" size="small" columns={active.columns} dataSource={active.data} loading={loading}
