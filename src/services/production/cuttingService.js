@@ -55,17 +55,17 @@ export const generateBundles = (...a) => api.generateBundles(...a);
 export const listBundleIssues = (...a) => api.listBundleIssues(...a);
 export const issueBundles = (...a) => api.issueBundles(...a);
 
+export const listPanelIssues = (...a) => api.listPanelIssues(...a);
+export const savePanelIssue = (...a) => api.savePanelIssue(...a);
+export const listPanelChecks = (...a) => api.listPanelChecks(...a);
+export const savePanelCheck = (...a) => api.savePanelCheck(...a);
+export const listProcessReturns = (...a) => api.listProcessReturns(...a);
+export const saveProcessReturn = (...a) => api.saveProcessReturn(...a);
+
+export const listReCutEntries = (...a) => api.listReCutEntries(...a);
+export const addReCutEntry = (...a) => api.addReCutEntry(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const listPanelIssues = (...a) => impl.listPanelIssues(...a);
-export const savePanelIssue = (...a) => impl.savePanelIssue(...a);
-export const listPanelChecks = (...a) => impl.listPanelChecks(...a);
-export const savePanelCheck = (...a) => impl.savePanelCheck(...a);
-export const listProcessReturns = (...a) => impl.listProcessReturns(...a);
-export const saveProcessReturn = (...a) => impl.saveProcessReturn(...a);
-
-export const listReCutEntries = (...a) => impl.listReCutEntries(...a);
-export const addReCutEntry = (...a) => impl.addReCutEntry(...a);
 
 export const getReconciliation = (...a) => impl.getReconciliation(...a);
 export const saveEndBit = (...a) => impl.saveEndBit(...a);

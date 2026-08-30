@@ -34,26 +34,25 @@ const ExternalProcessTab = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const poNo = useCallback((id) => cutPos.find((p) => p.id === id)?.cutPoNo || '—', [cutPos]);
-
   const issueColumns = useMemo(() => [
     { title: 'Panel PO #', dataIndex: 'panelPoNo', width: 160, render: (v) => <code>{v}</code> },
-    { title: 'Process', dataIndex: 'process', width: 120, render: (v) => <Tag color="geekblue">{v}</Tag> },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Process', dataIndex: 'processName', width: 140, render: (v) => <Tag color="geekblue">{v}</Tag> },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Date', dataIndex: 'issueDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     {
       title: 'Panels', dataIndex: 'lines', width: 240,
       render: (lines) => lines.map((l, i) => <Tag key={i}>{l.panel} {l.size} × {l.issueQty}</Tag>),
     },
-    { title: 'Issued Qty', key: 'qty', width: 100, align: 'center', render: (_, r) => <strong>{r.lines.reduce((s, l) => s + l.issueQty, 0)}</strong> },
+    { title: 'Issued Qty', dataIndex: 'totalIssuedQty', width: 100, align: 'center', render: (v) => <strong>{v}</strong> },
+    { title: 'Pending', dataIndex: 'totalPendingQty', width: 100, align: 'center', render: (v) => (v > 0 ? <strong style={{ color: 'var(--warning-color)' }}>{v}</strong> : 0) },
     { title: 'Status', dataIndex: 'status', width: 160, render: (v) => <CuttingStatusTag status={v} /> },
-  ], [poNo]);
+  ], []);
 
   const checkColumns = useMemo(() => [
     { title: 'Check #', dataIndex: 'id', width: 90, align: 'center', render: (v) => <RecordLink text={`PC-${String(v).padStart(3, '0')}`} onClick={() => navigate(`/production/cutting/panel-check/${v}`)} /> },
-    { title: 'Process', dataIndex: 'process', width: 120, render: (v) => <Tag color="geekblue">{v}</Tag> },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Process', dataIndex: 'processName', width: 140, render: (v) => <Tag color="geekblue">{v}</Tag> },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Date', dataIndex: 'checkDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Ranges Checked', key: 'rows', width: 120, align: 'center', render: (_, r) => r.rows.length },
     {
       title: 'Verified', key: 'verified', width: 100, align: 'center',
@@ -64,25 +63,25 @@ const ExternalProcessTab = () => {
       title: 'Actions', key: 'act', width: 90, fixed: 'right', align: 'center',
       render: (_, r) => <ActionButton action="edit" size="small" onClick={() => navigate(`/production/cutting/panel-check/${r.id}`)} />,
     },
-  ], [poNo, navigate]);
+  ], [navigate]);
 
   const returnColumns = useMemo(() => [
     { title: 'Return DC #', dataIndex: 'returnDcNo', width: 170, render: (v) => <code>{v}</code> },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Date', dataIndex: 'returnDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     {
       title: 'Returned', key: 'ret', width: 100, align: 'center',
-      render: (_, r) => <strong>{r.lines.reduce((s, l) => s + l.returnQty, 0)}</strong>,
+      render: (_, r) => <strong>{r.totalReturnQty}</strong>,
     },
     {
       title: 'Outstanding', key: 'diff', width: 110, align: 'center',
       render: (_, r) => {
-        const diff = r.lines.reduce((s, l) => s + (l.issuedQty - l.returnQty), 0);
+        const diff = r.totalShortfallQty;
         return diff > 0 ? <span style={{ color: 'var(--error-color)', fontWeight: 600 }}>{diff}</span> : 0;
       },
     },
-    { title: 'Status', dataIndex: 'status', width: 110, render: (v) => <CuttingStatusTag status={v} /> },
-  ], [poNo]);
+    { title: 'Issue Status', dataIndex: 'issueStatus', width: 160, render: (v) => <CuttingStatusTag status={v} /> },
+  ], []);
 
   const tables = {
     'Issue to Other Vendor': { columns: issueColumns, data: issues, empty: 'No panels issued to other vendors yet' },

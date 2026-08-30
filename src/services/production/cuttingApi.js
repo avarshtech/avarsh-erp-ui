@@ -201,3 +201,51 @@ export const issueBundles = async (payload) => {
   const { data } = await axiosInstance.post(`${BASE}/bundle-issues`, payload);
   return data;
 };
+
+/* ── FR-08/09/10 External process ────────────────────────────────────────── */
+
+export const listPanelIssues = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/panel-issues`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const savePanelIssue = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/panel-issues/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/panel-issues`, payload);
+  return data;
+};
+
+export const listProcessReturns = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/process-returns`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const saveProcessReturn = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/process-returns`, payload);
+  return data;
+};
+
+export const listPanelChecks = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/panel-checks`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const savePanelCheck = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/panel-checks/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/panel-checks`, payload);
+  return data;
+};
+
+/* ── FR-11 Re-cut register ───────────────────────────────────────────────── */
+
+export const listReCutEntries = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/recut-entries`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const addReCutEntry = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/recut-entries`, payload);
+  return data;
+};

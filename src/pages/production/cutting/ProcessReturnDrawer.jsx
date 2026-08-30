@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber, Input } from 'antd';
 import { FormSelect } from '../../../components/form';
-import { RETURN_SHORTFALL_REASONS } from '../../../utils/cuttingConstants';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveProcessReturn } from '../../../services/production/cuttingService';
 
 /** FR-10 — Receive from Vendor: receive processed panels back; shortfalls need a reason. */
@@ -9,6 +9,8 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [panelIssueId, setPanelIssueId] = useState(null);
   const [lines, setLines] = useState([]);
+  const { options } = useCuttingMasters();
+  const shortfallReasons = options('RETURN_SHORTFALL_REASON');
   const [saving, setSaving] = useState(false);
 
   const openIssues = useMemo(() => issues.filter((i) => i.status !== 'FULLY_RETURNED'), [issues]);
@@ -18,7 +20,8 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
     setPanelIssueId(id);
     const src = list.find((i) => i.id === id);
     setLines((src?.lines || []).map((l) => ({
-      process: src.process, panel: l.panel, size: l.size, issuedQty: l.issueQty, returnQty: null, reason: null, remarks: '',
+      panelIssueLineId: l.id, process: src.processName, panel: l.panel, size: l.size,
+      issuedQty: l.pendingQty ?? l.issueQty, returnQty: null, shortfallReason: null, remarks: '',
     })));
   }, []);
 
@@ -45,13 +48,13 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
       },
     },
     {
-      title: 'Shortfall Reason', dataIndex: 'reason', width: 170,
+      title: 'Shortfall Reason', dataIndex: 'shortfallReason', width: 190,
       render: (v, r, idx) => {
         const diff = r.issuedQty - (r.returnQty || 0);
         if (diff <= 0 || r.returnQty == null) return null;
         return (
           <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Why short?"
-            options={RETURN_SHORTFALL_REASONS.map((x) => ({ value: x, label: x }))} onChange={(val) => setLine(idx, 'reason', val)} />
+            options={shortfallReasons} onChange={(val) => setLine(idx, 'shortfallReason', val)} />
         );
       },
     },
@@ -59,7 +62,7 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
       title: 'Remarks', dataIndex: 'remarks', width: 170,
       render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setLine(idx, 'remarks', e.target.value)} />,
     },
-  ], [setLine]);
+  ], [setLine, shortfallReasons]);
 
   const totalReturn = lines.reduce((s, l) => s + (l.returnQty || 0), 0);
 
@@ -67,18 +70,20 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
     if (!issue) return message.warning('Select the panel issue being returned');
     const entered = lines.filter((l) => l.returnQty != null);
     if (!entered.length) return message.warning('Enter the returned quantity for at least one panel');
-    const missingReason = entered.some((l) => l.issuedQty - l.returnQty > 0 && !l.reason);
+    const missingReason = entered.some((l) => l.issuedQty - l.returnQty > 0 && !l.shortfallReason);
     if (missingReason) return message.error('Every shortfall needs a reason (Lost / Damaged / Retained / Pending)');
     setSaving(true);
     try {
       const saved = await saveProcessReturn({
-        panelIssueId, cutPoId: issue.cutPoId, date: new Date().toISOString().slice(0, 10),
+        panelIssueId, returnDate: new Date().toISOString().slice(0, 10),
         lines: entered.map((l) => ({ ...l, returnQty: l.returnQty || 0 })),
       });
       message.success(`${saved.returnDcNo} saved — returned panels go to Panel Check before bundling`);
       setLines([]); setPanelIssueId(null);
       onSaved();
-    } catch { message.error('Failed to save return DC'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save return DC');
+    } finally { setSaving(false); }
   };
 
   return (
