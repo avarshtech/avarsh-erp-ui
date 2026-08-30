@@ -52,5 +52,6 @@ export const saveReplacement = (...a) => mockApi.saveReplacement(...a);
 export const getIncentives = (...a) => mockApi.getIncentives(...a);
 export const getFloorDashboard = (...a) => mockApi.getFloorDashboard(...a);
 
-// Cross-module: pending bundle issues from the Cutting mock (traceable receipt source).
-export { listBundleIssues as listCuttingBundleIssues, listBundles as listCuttingBundles } from './cuttingMockApi';
+// Cross-module: the cut-parts receipt traces back to a real bundle issue from
+// Cutting, which now runs on the backend even though Sewing itself does not.
+export { listBundleIssues as listCuttingBundleIssues, listBundles as listCuttingBundles } from './cuttingApi';

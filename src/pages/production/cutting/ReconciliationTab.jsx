@@ -4,7 +4,7 @@ import { InboxOutlined, ScissorOutlined, DeleteOutlined, RestOutlined, RollbackO
 import StatCard from '../../../components/StatCard';
 import { FormSelect } from '../../../components/form';
 import { formatNumber } from '../../../utils/formatters';
-import { THRESHOLDS } from '../../../utils/cuttingConstants';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getReconciliation, saveEndBit, returnToInventory, getCutPos } from '../../../services/production/cuttingService';
 
 /**
@@ -17,6 +17,8 @@ const ReconciliationTab = () => {
   const [cutPos, setCutPos] = useState([]);
   const [cutPoId, setCutPoId] = useState(null);
   const [recon, setRecon] = useState(null);
+  const { threshold } = useCuttingMasters();
+  const reconcileTolerancePct = threshold('RECONCILE_TOLERANCE_PCT', 0.5);
   const [selectedRolls, setSelectedRolls] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +85,7 @@ const ReconciliationTab = () => {
     {
       title: 'Variance (kg)', dataIndex: 'variance', width: 110, align: 'right',
       render: (v, r) => (r.status === 'USED'
-        ? <span style={{ color: Math.abs(v) > r.received * (THRESHOLDS.reconcileTolerancePct / 100) ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>{formatNumber(v, 3)}</span>
+        ? <span style={{ color: Math.abs(v) > r.received * (reconcileTolerancePct / 100) ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>{formatNumber(v, 3)}</span>
         : '—'),
     },
     {
@@ -119,7 +121,7 @@ const ReconciliationTab = () => {
         return <span style={{ color: 'var(--text-secondary)' }}>—</span>;
       },
     },
-  ], [handleEndBit, handleReturn]);
+  ], [handleEndBit, handleReturn, reconcileTolerancePct]);
 
   if (!recon || loading) {
     return (
@@ -141,16 +143,16 @@ const ReconciliationTab = () => {
             options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))} onChange={setCutPoId} />
           <div style={{ minWidth: 260 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
-              Utilization {recon.utilizationPct}% {recon.utilizationPct < THRESHOLDS.utilizationWarn && '— below target'}
+              Utilization {recon.utilizationPct}% {recon.utilizationPct < recon.utilizationWarnPct && '— below target'}
             </div>
-            <Progress percent={recon.utilizationPct} status={recon.utilizationPct < THRESHOLDS.utilizationWarn ? 'exception' : 'normal'} />
+            <Progress percent={Number(recon.utilizationPct)} status={recon.utilizationPct < recon.utilizationWarnPct ? 'exception' : 'normal'} />
           </div>
         </Space>
       </Card>
 
-      {recon.utilizationPct < THRESHOLDS.utilizationWarn && (
+      {recon.utilizationPct < recon.utilizationWarnPct && (
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          title={`Fabric utilization below ${THRESHOLDS.utilizationWarn}% — review end-bits and waste before closing this Cut PO`} />
+          title={`Fabric utilization below ${recon.utilizationWarnPct}% — review end-bits and waste before closing this Cut PO`} />
       )}
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
@@ -182,7 +184,7 @@ const ReconciliationTab = () => {
             <Space size="large" wrap>
               <span>Used + End-Bits + Re-Cut + Waste + In-Stock = <strong>{formatNumber(recon.used + recon.endBitTotal + recon.reCutKg + recon.waste + recon.inStock, 3)} kg</strong></span>
               <span>Received = <strong>{formatNumber(recon.received, 3)} kg</strong></span>
-              <span style={{ color: 'var(--text-secondary)' }}>(must match within ±{THRESHOLDS.reconcileTolerancePct}%)</span>
+              <span style={{ color: 'var(--text-secondary)' }}>(must match within ±{reconcileTolerancePct}%)</span>
             </Space>
           )} />
       </Card>

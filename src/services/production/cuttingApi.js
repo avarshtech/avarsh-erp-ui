@@ -249,3 +249,32 @@ export const addReCutEntry = async (payload) => {
   const { data } = await axiosInstance.post(`${BASE}/recut-entries`, payload);
   return data;
 };
+
+/* ── ENH-03 Reconciliation ───────────────────────────────────────────────── */
+
+export const getReconciliation = async (cutPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/reconciliation/${cutPoId}`);
+  return data;
+};
+
+export const saveEndBit = async (cutPoId, rollNo, patch) => {
+  const { data } = await axiosInstance.put(`${BASE}/reconciliation/${cutPoId}/end-bits`, { rollNo, ...patch });
+  return data;
+};
+
+/**
+ * Returns unused rolls and reusable end-bits to inventory under one note; the
+ * quantities are credited back to their fabric stock rows.
+ */
+export const returnToInventory = async (cutPoId, rollNos) => {
+  const list = Array.isArray(rollNos) ? rollNos : [rollNos];
+  await axiosInstance.post(`${BASE}/reconciliation/${cutPoId}/returns`, { rollNos: list });
+  return getReconciliation(cutPoId);
+};
+
+/* ── ENH-04 Dashboard ────────────────────────────────────────────────────── */
+
+export const getDashboard = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/dashboard`);
+  return data;
+};
