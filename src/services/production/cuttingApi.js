@@ -149,3 +149,55 @@ export const saveTmbCheck = async (payload) => {
     : await axiosInstance.post(`${BASE}/tmb-checks`, payload);
   return data;
 };
+
+/* ── FR-05 Cutting report ────────────────────────────────────────────────── */
+
+export const getCuttingReport = async (cutPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/report/${cutPoId}`);
+  return data;
+};
+
+/** Size quantities come from the marker's ratio — the client sends only plies. */
+export const addReportLay = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/report/lays`, payload);
+  return data;
+};
+
+export const deleteReportLay = async (id) => {
+  await axiosInstance.delete(`${BASE}/report/lays/${id}`);
+};
+
+/* ── FR-06/07 Bundling and issue to sewing ───────────────────────────────── */
+
+export const listBundlings = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/bundlings`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const listBundles = async (cutPoId, unissued = false) => {
+  const { data } = await axiosInstance.get(`${BASE}/bundles`, { params: { cuttingPoId: cutPoId, unissued } });
+  return data;
+};
+
+/** What a run would produce at this bundle size, before committing to it. */
+export const previewBundling = async (cutPoId, bundleSize) => {
+  const { data } = await axiosInstance.get(`${BASE}/bundlings/preview`, {
+    params: { cuttingPoId: cutPoId, bundleSize },
+  });
+  return data;
+};
+
+export const generateBundles = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/bundlings`, payload);
+  return data;
+};
+
+export const listBundleIssues = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/bundle-issues`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const issueBundles = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/bundle-issues`, payload);
+  return data;
+};

@@ -44,16 +44,18 @@ export const listTmbChecks = (...a) => api.listTmbChecks(...a);
 export const getTmbCheck = (...a) => api.getTmbCheck(...a);
 export const saveTmbCheck = (...a) => api.saveTmbCheck(...a);
 
+export const getCuttingReport = (...a) => api.getCuttingReport(...a);
+export const addReportLay = (...a) => api.addReportLay(...a);
+export const deleteReportLay = (...a) => api.deleteReportLay(...a);
+
+export const listBundlings = (...a) => api.listBundlings(...a);
+export const listBundles = (...a) => api.listBundles(...a);
+export const previewBundling = (...a) => api.previewBundling(...a);
+export const generateBundles = (...a) => api.generateBundles(...a);
+export const listBundleIssues = (...a) => api.listBundleIssues(...a);
+export const issueBundles = (...a) => api.issueBundles(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const getCuttingReport = (...a) => impl.getCuttingReport(...a);
-export const addReportLay = (...a) => impl.addReportLay(...a);
-
-export const listBundlings = (...a) => impl.listBundlings(...a);
-export const listBundles = (...a) => impl.listBundles(...a);
-export const generateBundles = (...a) => impl.generateBundles(...a);
-export const listBundleIssues = (...a) => impl.listBundleIssues(...a);
-export const issueBundles = (...a) => impl.issueBundles(...a);
 
 export const listPanelIssues = (...a) => impl.listPanelIssues(...a);
 export const savePanelIssue = (...a) => impl.savePanelIssue(...a);

@@ -21,18 +21,18 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
 
   useEffect(() => {
     listMarkersForPo(report.cutPo.id).then(setMarkers).catch(() => {});
-    listLayAudits().then((all) => setLays(all.filter((l) => l.cutPoId === report.cutPo.id))).catch(() => {});
+    listLayAudits({ cuttingPoId: report.cutPo.id }).then(setLays).catch(() => {});
   }, [report.cutPo.id]);
 
   const rows = useMemo(() => {
     const orderRow = { key: 'order', label: 'Order Qty', ...report.cutPo.sizeQty, total: report.cutPo.orderQty, frozen: true };
     const layRows = report.lays.map((l) => ({
-      key: `lay-${l.id}`, label: `Lay ${l.layNo} · ${dayjs(l.date).format('DD-MMM')}`,
+      key: `lay-${l.id}`, label: `${l.layRef} · ${dayjs(l.cutDate).format('DD-MMM')}`,
       cutBy: l.cutBy, pieceRate: l.pieceRate, plies: l.plies,
-      ...l.sizeQty, total: Object.values(l.sizeQty).reduce((s, v) => s + v, 0),
+      ...l.sizeQty, total: l.totalQty,
     }));
     const cutRow = { key: 'cut', label: 'Total Cut', ...report.cutBySize, total: report.totalCut, frozen: true };
-    const balRow = { key: 'balance', label: 'Balance', ...report.balance, total: report.cutPo.orderQty - report.totalCut, frozen: true };
+    const balRow = { key: 'balance', label: 'Balance', ...report.balanceBySize, total: report.totalBalance, frozen: true };
     return [orderRow, ...layRows, cutRow, balRow];
   }, [report]);
 
@@ -80,13 +80,25 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
   const handleAdd = async () => {
     if (!draft.markerId || !draft.layAuditId) return message.warning('Select the Marker # and Lay # this cut belongs to');
     if (!draft.plies) return message.warning('Enter the height (plies) cut');
-    const sizeQty = autoQty || {};
-    const total = Object.values(sizeQty).reduce((s, v) => s + (v || 0), 0);
+    const total = Object.values(autoQty || {}).reduce((s, v) => s + (v || 0), 0);
     if (!total) return message.warning('The selected marker has no size ratio — check the marker plan');
-    await addReportLay({ cutPoId: report.cutPo.id, date: draft.date, layNo: draft.layNo, plies: draft.plies, cutBy: draft.cutBy, pieceRate: draft.pieceRate, sizeQty });
-    message.success(`Lay ${draft.layNo} recorded — ${total} pcs (auto from ${marker.markerNo})`);
-    setModalOpen(false);
-    onLayAdded();
+    try {
+      // Size quantities are the marker's ratio times the plies; the server derives them.
+      const saved = await addReportLay({
+        cuttingPoId: report.cutPo.id,
+        markerId: draft.markerId,
+        layAuditId: draft.layAuditId,
+        cutDate: draft.date,
+        plies: draft.plies,
+        cutBy: draft.cutBy,
+        pieceRate: draft.pieceRate,
+      });
+      message.success(`${saved.layRef} recorded — ${saved.totalQty} pcs (auto from ${saved.markerNo})`);
+      setModalOpen(false);
+      onLayAdded();
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to record the cut lay');
+    }
   };
 
   return (
@@ -112,7 +124,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
                   setDraft((d) => ({ ...d, markerId: v, layAuditId: null, layNo: null, plies: m?.markerHeight ?? d.plies }));
                 }} />
               <FormSelect size="small" value={draft.layAuditId} style={{ width: 150 }} placeholder="Lay #" disabled={!draft.markerId}
-                options={markerLays.map((l) => ({ value: l.id, label: `Lay ${l.layNo} · ${dayjs(l.date).format('DD-MMM')}` }))}
+                options={markerLays.map((l) => ({ value: l.id, label: `${l.layRef} · ${dayjs(l.layDate).format('DD-MMM')}` }))}
                 onChange={(v) => {
                   const l = markerLays.find((x) => x.id === v);
                   setDraft((d) => ({ ...d, layAuditId: v, layNo: l?.layNo, date: l?.date ?? d.date, plies: l?.plies ?? d.plies }));

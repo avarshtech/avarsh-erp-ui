@@ -32,6 +32,14 @@ const useCuttingMasters = () => {
   const options = useCallback((lookupType) => (masters.lookups[lookupType] || [])
     .map((entry) => ({ value: entry.code, label: entry.name })), [masters.lookups]);
 
+  /**
+   * Options for a lookup whose meaning is its number, not its code — bundle
+   * sizes, for instance, are stored as the piece count itself.
+   */
+  const numericOptions = useCallback((lookupType) => (masters.lookups[lookupType] || [])
+    .filter((entry) => entry.numericValue != null)
+    .map((entry) => ({ value: Number(entry.numericValue), label: entry.name })), [masters.lookups]);
+
   /** Label for a stored code, falling back to the code when the entry is gone. */
   const labelOf = useCallback((lookupType, code) => (masters.lookups[lookupType] || [])
     .find((entry) => entry.code === code)?.name ?? code ?? '—', [masters.lookups]);
@@ -46,8 +54,9 @@ const useCuttingMasters = () => {
   const fabricTypeByName = useCallback((name) => masters.fabricTypes
     .find((f) => f.name?.toLowerCase() === String(name || '').toLowerCase()), [masters.fabricTypes]);
 
+  // Documents reference a cutting table by id, so that is what the option carries.
   const tableOptions = useMemo(
-    () => masters.cuttingTables.map((t) => ({ value: t.name, label: t.name })),
+    () => masters.cuttingTables.map((t) => ({ value: t.id, label: t.name })),
     [masters.cuttingTables],
   );
 
@@ -56,6 +65,7 @@ const useCuttingMasters = () => {
     cuttingTables: masters.cuttingTables,
     tableOptions,
     options,
+    numericOptions,
     labelOf,
     threshold,
     fabricTypeByName,

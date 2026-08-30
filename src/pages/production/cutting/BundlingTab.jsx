@@ -37,32 +37,29 @@ const BundlingTab = () => {
 
   const bundleColumns = useMemo(() => [
     { title: 'Bundle #', dataIndex: 'bundleNo', width: 90, align: 'center', render: (v) => <strong>B-{v}</strong> },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: (v) => poOf(v)?.cutPoNo || '—' },
+    { title: 'Cut PO', dataIndex: 'cuttingPoId', width: 150, render: (v) => poOf(v)?.cutPoNo || '—' },
     { title: 'Size', dataIndex: 'size', width: 70, align: 'center' },
     { title: 'Pieces', dataIndex: 'qty', width: 80, align: 'center' },
     { title: 'Serial Range', dataIndex: 'range', width: 110, align: 'center', render: (v) => <code>{v}</code> },
     { title: 'Status', dataIndex: 'status', width: 150, render: (v) => <CuttingStatusTag status={v} /> },
     {
       title: 'Ticket', key: 'ticket', width: 90, align: 'center', fixed: 'right',
-      render: (_, r) => <ActionButton action="print" size="small" onClick={() => setTicket({ bundle: r, po: poOf(r.cutPoId) })} />,
+      render: (_, r) => <ActionButton action="print" size="small" onClick={() => setTicket({ bundle: r, po: poOf(r.cuttingPoId) })} />,
     },
   ], [poOf]);
 
   const issueColumns = useMemo(() => [
     { title: 'Issue #', dataIndex: 'issueNo', width: 170, render: (v) => <code>{v}</code> },
     { title: 'Work Order', dataIndex: 'workOrderNo', width: 150 },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: (v) => poOf(v)?.cutPoNo || '—' },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Date', dataIndex: 'issueDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     {
-      title: 'Bundles', dataIndex: 'bundleIds', width: 200,
-      render: (ids) => ids.map((bid) => {
-        const b = bundles.find((x) => x.id === bid);
-        return b ? <Tag key={bid}>B-{b.bundleNo} ({b.size})</Tag> : null;
-      }),
+      title: 'Bundles', dataIndex: 'bundles', width: 220,
+      render: (rows) => (rows || []).map((b) => <Tag key={b.id}>B-{b.bundleNo} ({b.size})</Tag>),
     },
     { title: 'Total Pieces', dataIndex: 'totalPcs', width: 110, align: 'center', render: (v) => <strong>{v}</strong> },
     { title: 'Issued By', dataIndex: 'issuedBy', width: 130 },
-  ], [poOf, bundles]);
+  ], []);
 
   return (
     <Card>
