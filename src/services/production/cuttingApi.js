@@ -69,3 +69,39 @@ export const generateRelaxationReport = async (id) => {
   const { data } = await axiosInstance.post(`${BASE}/fabric-relaxations/${id}/report`);
   return data;
 };
+
+/* ── ENH-01 Marker plan ──────────────────────────────────────────────────── */
+
+export const listMarkerPlans = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/marker-plans`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const getMarkerPlan = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/marker-plans/${id}`);
+  return data;
+};
+
+/** Upsert — the planning screen saves the whole plan, markers and all. */
+export const saveMarkerPlan = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/marker-plans/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/marker-plans`, payload);
+  return data;
+};
+
+export const deleteMarkerPlan = async (id) => {
+  await axiosInstance.delete(`${BASE}/marker-plans/${id}`);
+};
+
+/** Markers planned for a Cut PO — the lay audit and cutting report dropdown. */
+export const listMarkersForPo = async (cutPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/cut-pos/${cutPoId}/markers`);
+  return data;
+};
+
+/** The size-set (pilot) cut gate that releases a Cut PO for bulk laying. */
+export const setSizeSetStatus = async (cutPoId, status, remarks) => {
+  const { data } = await axiosInstance.put(`${BASE}/cut-pos/${cutPoId}/size-set`, { status, remarks });
+  return data;
+};

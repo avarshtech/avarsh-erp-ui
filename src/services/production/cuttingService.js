@@ -2,9 +2,8 @@
  * Cutting module API surface. Screens import only from here, so a feature moves
  * off the mock by re-pointing its exports at cuttingApi — no screen changes.
  *
- * Migration state: Fabric In (receipts, relaxation, Cut PO / roll lookups) runs
- * on the real backend; everything below is still mock-backed until its stage
- * lands.
+ * Migration state: Fabric In and Marker Plan run on the real backend;
+ * everything below is still mock-backed until its stage lands.
  */
 import { USE_MOCK_CUTTING_DATA } from './cuttingEnv';
 import * as mockApi from './cuttingMockApi';
@@ -27,17 +26,17 @@ export const listRelaxations = (...a) => api.listRelaxations(...a);
 export const saveRelaxation = (...a) => api.saveRelaxation(...a);
 export const generateRelaxationReport = (...a) => api.generateRelaxationReport(...a);
 
+// CR-CUT-2026-001 — Marker Plan is the single planning screen (COP removed).
+export const listMarkerPlans = (...a) => api.listMarkerPlans(...a);
+export const getMarkerPlan = (...a) => api.getMarkerPlan(...a);
+export const saveMarkerPlan = (...a) => api.saveMarkerPlan(...a);
+export const deleteMarkerPlan = (...a) => api.deleteMarkerPlan(...a);
+export const listMarkersForPo = (...a) => api.listMarkersForPo(...a);
+export const setSizeSetStatus = (...a) => api.setSizeSetStatus(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
 
-// CR-CUT-2026-001 — Marker Plan is the single planning screen (COP removed).
-export const listMarkerPlans = (...a) => impl.listMarkerPlans(...a);
-export const getMarkerPlan = (...a) => impl.getMarkerPlan(...a);
-export const saveMarkerPlan = (...a) => impl.saveMarkerPlan(...a);
-export const listMarkersForPo = (...a) => impl.listMarkersForPo(...a);
 export const nextLayNo = (...a) => impl.nextLayNo(...a);
-export const setSizeSetStatus = (...a) => impl.setSizeSetStatus(...a);
-export const allowanceQty = mockApi.allowanceQty;
-export const sizeJumps = mockApi.sizeJumps;
 
 export const listLayAudits = (...a) => impl.listLayAudits(...a);
 export const getLayAudit = (...a) => impl.getLayAudit(...a);
