@@ -1,0 +1,1898 @@
+:root {
+  --primary-color: #6366f1;
+  --ant-modal-body-padding: 8px;
+}
+
+[data-theme="dark"] {
+  --primary-color: #818cf8;
+}
+
+/* ============================================================
+   DISABLED PRIMARY BUTTON — keep text visible
+   The gradient override in index.css applies to all .ant-btn-primary
+   including disabled, so we must explicitly reset the disabled state.
+   ============================================================ */
+.ant-btn-primary:disabled,
+.ant-btn-primary.ant-btn-disabled {
+  background: rgba(0, 0, 0, 0.04) !important;
+  border-color: var(--border-color, #d9d9d9) !important;
+  color: rgba(0, 0, 0, 0.25) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+}
+
+[data-theme="dark"] .ant-btn-primary:disabled,
+[data-theme="dark"] .ant-btn-primary.ant-btn-disabled {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: var(--border-color, #424242) !important;
+  color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* ============================================================
+   COMPREHENSIVE INPUT FOCUS OVERRIDES
+   Remove double outline/glow - single border color only
+   ============================================================ */
+
+/* Base: Remove browser outlines on mouse focus for ALL inputs.
+   :focus-visible (keyboard Tab) is preserved — index.css adds a visible ring.
+   Only suppress outline on mouse clicks (:focus without :focus-visible). */
+*:focus:not(:focus-visible) {
+  outline: none !important;
+}
+
+/* Input fields - all states */
+.ant-input,
+.ant-input:hover,
+.ant-input:focus:not(:focus-visible),
+.ant-input:focus-within,
+.ant-input:active,
+.ant-input-focused,
+.ant-input.ant-input-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input:focus,
+.ant-input:focus-within,
+.ant-input:active,
+.ant-input-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Input Number - all states */
+.ant-input-number,
+.ant-input-number:hover,
+.ant-input-number:focus:not(:focus-visible),
+.ant-input-number:focus-within,
+.ant-input-number:active,
+.ant-input-number-focused,
+.ant-input-number.ant-input-number-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input-number:focus,
+.ant-input-number:focus-within,
+.ant-input-number:active,
+.ant-input-number-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Input Affix Wrapper (search, password, etc.) - all states */
+.ant-input-affix-wrapper,
+.ant-input-affix-wrapper:hover,
+.ant-input-affix-wrapper:focus:not(:focus-visible),
+.ant-input-affix-wrapper:focus-within,
+.ant-input-affix-wrapper:active,
+.ant-input-affix-wrapper-focused,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper:focus-within,
+.ant-input-affix-wrapper:active,
+.ant-input-affix-wrapper-focused,
+.ant-input-affix-wrapper.ant-input-affix-wrapper-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* Also target the inner input inside affix wrapper */
+.ant-input-affix-wrapper .ant-input,
+.ant-input-affix-wrapper .ant-input:focus:not(:focus-visible),
+.ant-input-affix-wrapper .ant-input:active {
+  box-shadow: none !important;
+  outline: none !important;
+  border: none !important;
+}
+
+/* Select - all states */
+.ant-select-selector,
+.ant-select-selector:hover,
+.ant-select-selector:focus:not(:focus-visible),
+.ant-select-selector:focus-within,
+.ant-select-selector:active,
+.ant-select-focused .ant-select-selector,
+.ant-select.ant-select-focused .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-select-focused .ant-select-selector,
+.ant-select.ant-select-focused .ant-select-selector,
+.ant-select-open .ant-select-selector {
+  border-color: var(--primary-color) !important;
+}
+
+
+/* DatePicker / TimePicker - all states */
+.ant-picker,
+.ant-picker:hover,
+.ant-picker:focus:not(:focus-visible),
+.ant-picker:focus-within,
+.ant-picker:active,
+.ant-picker-focused,
+.ant-picker.ant-picker-focused {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.ant-picker:focus,
+.ant-picker:focus-within,
+.ant-picker:active,
+.ant-picker-focused,
+.ant-picker.ant-picker-focused {
+  border-color: var(--primary-color) !important;
+}
+
+/* TextArea - all states */
+.ant-input-textarea,
+.ant-input-textarea:hover,
+.ant-input-textarea:focus:not(:focus-visible),
+.ant-input-textarea:focus-within,
+.ant-input-textarea:active,
+textarea.ant-input,
+textarea.ant-input:hover,
+textarea.ant-input:focus:not(:focus-visible),
+textarea.ant-input:focus-within,
+textarea.ant-input:active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+textarea.ant-input:focus,
+textarea.ant-input:focus-within,
+textarea.ant-input:active {
+  border-color: var(--primary-color) !important;
+}
+
+/* Checkbox and Radio - no glow on mouse, keyboard ring preserved */
+.ant-checkbox-wrapper:focus:not(:focus-visible),
+.ant-checkbox-wrapper:focus-within,
+.ant-checkbox:focus:not(:focus-visible),
+.ant-checkbox-input:focus:not(:focus-visible),
+.ant-radio-wrapper:focus:not(:focus-visible),
+.ant-radio-wrapper:focus-within,
+.ant-radio:focus:not(:focus-visible),
+.ant-radio-input:focus:not(:focus-visible) {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Button focus - no glow on mouse, keyboard ring preserved */
+.ant-btn:focus:not(:focus-visible),
+.ant-btn:active {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Dark mode: remove box-shadow on default/danger buttons that shows as a white line at the bottom */
+[data-theme="dark"] .ant-btn-default,
+[data-theme="dark"] .ant-btn-dangerous {
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   FIX: Border lines at rounded corners
+   Ensure borders render cleanly at rounded corners globally
+   ============================================================ */
+
+/* Bordered descriptions - ensure border follows radius */
+.ant-descriptions-bordered .ant-descriptions-view {
+  border-radius: var(--radius-sm) !important;
+  overflow: hidden;
+  border: 1px solid var(--border-color) !important;
+}
+
+/* Remove cell-level border-radius so the parent overflow:hidden handles all rounding cleanly */
+.ant-descriptions-bordered .ant-descriptions-view table th,
+.ant-descriptions-bordered .ant-descriptions-view table td {
+  border-radius: 0 !important;
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-view {
+  border-color: var(--border-color) !important;
+}
+
+/* Page header and form container corners */
+.page-header,
+.form-container,
+.stat-card {
+  overflow: hidden;
+}
+
+/* Card body allows scrolling while card clips at rounded corners */
+.ant-card-body {
+  overflow: auto;
+}
+
+/* Nested tables inside cards should not add extra border/radius */
+.ant-card .ant-table {
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* ============================================================
+   PERMISSIONS MATRIX TABLE STYLES
+   ============================================================ */
+
+/* Compact spacing and visible overflow to avoid badge cutoff */
+.permissions-matrix-table .ant-table-cell {
+  padding: 6px 8px;
+  white-space: nowrap;
+  overflow: visible !important;
+}
+
+.permissions-matrix-table .ant-table-tbody > tr > td {
+  vertical-align: middle;
+}
+
+.permissions-matrix-table .ant-checkbox-wrapper {
+  margin: 0;
+}
+
+/* Slightly smaller checkboxes inside permission table */
+.permissions-matrix-table .ant-checkbox-inner {
+  width: 14px;
+  height: 14px;
+}
+
+/* Media tweak: allow tighter table on small screens */
+@media (max-width: 768px) {
+  .permissions-matrix-table .ant-table-cell {
+    padding: 4px 6px;
+  }
+}
+
+/* Ensure tags/badges inside permissions table are visible and not clipped */
+.permissions-matrix-table .ant-tag,
+.permissions-matrix-table .ant-badge {
+  z-index: 50;
+  position: relative;
+}
+
+/* If any inner wrapper hides overflow, make sure table row allows visible overflow */
+.permissions-matrix-table .ant-table-row,
+.permissions-matrix-table .ant-table-tbody > tr > td,
+.permissions-matrix-table .ant-table-thead > tr > th {
+  overflow: visible !important;
+}
+
+/* ============================================================
+   SIDEBAR / SIDER MENU OVERRIDES
+   ============================================================ */
+
+/* 1. Fix hover popup submenu background - solid dark background with proper styling */
+.ant-menu-submenu-popup {
+  padding: 0 !important;
+}
+
+/* Popup submenus (collapsed sidebar flyouts) — keep card styling */
+.ant-menu-submenu-popup > .ant-menu,
+.ant-menu-submenu-popup .ant-menu-sub {
+  background: #001529 !important;
+  border-radius: 8px !important;
+  padding: 8px 0 !important;
+  min-width: 200px !important;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.2),
+              0 3px 6px -4px rgba(0, 0, 0, 0.15),
+              0 9px 28px 8px rgba(0, 0, 0, 0.1) !important;
+  overflow: visible !important;
+}
+
+[data-theme="dark"] .ant-menu-submenu-popup > .ant-menu,
+[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-sub {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+}
+
+/* Inline submenus (expanded sidebar) — transparent, no card effect */
+.sidebar-menu .ant-menu-sub.ant-menu-inline,
+.ant-menu-submenu > .ant-menu.ant-menu-inline {
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  min-width: unset !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item {
+  margin: 4px 8px !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  height: auto !important;
+  line-height: 1.5 !important;
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.ant-menu-submenu-popup .ant-menu-item-selected,
+.ant-menu-submenu-popup .ant-menu-item-selected:hover {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+/* 2. Fix collapsed sidebar - center icons with even padding */
+.ant-layout-sider-collapsed .ant-menu-inline-collapsed {
+  width: 80px !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item,
+.ant-layout-sider-collapsed .ant-menu-submenu-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 80px !important;
+  height: 48px !important;
+  padding: 0 !important;
+  padding-inline: 0 !important;
+  margin: 4px 0 !important;
+  text-align: center !important;
+}
+
+/* Collapsed sidebar icons - always light for dark sidebar */
+.ant-layout-sider-collapsed .ant-menu-item .anticon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-item .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .ant-menu-item-icon,
+.ant-layout-sider-collapsed .ant-menu-item .anticon,
+.ant-layout-sider-collapsed .ant-menu-submenu-title .anticon {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-width: auto !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-title-content {
+  display: none !important;
+  width: 0 !important;
+  opacity: 0 !important;
+}
+
+.ant-layout-sider-collapsed .ant-menu-submenu-arrow {
+  display: none !important;
+}
+
+/* 3. Fix expanded sidebar - align icon and text with consistent spacing */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title {
+  display: flex !important;
+  align-items: center !important;
+  height: 40px !important;
+  margin: 4px 12px !important;
+  padding: 0 16px !important;
+  border-radius: 8px !important;
+}
+
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item .ant-menu-item-icon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title .ant-menu-item-icon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item .anticon,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title .anticon {
+  min-width: 20px !important;
+  width: 20px !important;
+  font-size: 18px !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-title-content {
+  flex: 1 !important;
+  margin-inline-start: 0 !important;
+}
+
+/* Submenu <ul> — indent the entire list, tight item spacing */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-sub.ant-menu-inline {
+  margin-left: 48px !important;
+}
+
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-sub .ant-menu-item {
+  margin: 1px 6px !important;
+  padding-left: 16px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-sub.ant-menu-inline {
+  margin-left: 48px !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-sub .ant-menu-item {
+  margin: 1px 6px !important;
+  padding-left: 16px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
+/* Expanded sidebar hover effect - always dark style */
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-item:hover,
+.ant-layout-sider:not(.ant-layout-sider-collapsed) .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Selected item styling - subtle tint, not solid fill */
+.sidebar-menu .ant-menu-item-selected {
+  background: var(--sidebar-item-selected) !important;
+  border-left: 3px solid var(--sidebar-item-accent) !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--sidebar-text-selected) !important;
+}
+
+/* ============================================================
+   DARK MODE SPECIFIC OVERRIDES
+   ============================================================ */
+
+/* Tags/Badges in dark mode - fix white background issue */
+[data-theme="dark"] .ant-tag {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .ant-tag-success,
+[data-theme="dark"] .ant-tag-green {
+  background-color: rgba(74, 222, 128, 0.15) !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
+  color: #4ade80 !important;
+}
+
+[data-theme="dark"] .ant-tag-processing,
+[data-theme="dark"] .ant-tag-blue {
+  background-color: rgba(96, 165, 250, 0.15) !important;
+  border-color: rgba(96, 165, 250, 0.3) !important;
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .ant-tag-warning,
+[data-theme="dark"] .ant-tag-gold,
+[data-theme="dark"] .ant-tag-orange {
+  background-color: rgba(251, 191, 36, 0.15) !important;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+  color: #fbbf24 !important;
+}
+
+[data-theme="dark"] .ant-tag-error,
+[data-theme="dark"] .ant-tag-red {
+  background-color: rgba(248, 113, 113, 0.15) !important;
+  border-color: rgba(248, 113, 113, 0.3) !important;
+  color: #f87171 !important;
+}
+
+[data-theme="dark"] .ant-tag-purple {
+  background-color: rgba(167, 139, 250, 0.15) !important;
+  border-color: rgba(167, 139, 250, 0.3) !important;
+  color: #a78bfa !important;
+}
+
+[data-theme="dark"] .ant-tag-cyan {
+  background-color: rgba(34, 211, 238, 0.15) !important;
+  border-color: rgba(34, 211, 238, 0.3) !important;
+  color: #22d3ee !important;
+}
+
+[data-theme="dark"] .ant-tag-magenta,
+[data-theme="dark"] .ant-tag-pink {
+  background-color: rgba(236, 72, 153, 0.15) !important;
+  border-color: rgba(236, 72, 153, 0.3) !important;
+  color: #ec4899 !important;
+}
+
+[data-theme="dark"] .ant-tag-default {
+  background-color: #475569 !important;
+  border-color: #64748b !important;
+  color: #cbd5e1 !important;
+}
+
+/* Make the required field asterisk consistently red (AntD v5/v6 uses ::before on the label) */
+.ant-form-item-label > label.ant-form-item-required::before {
+  color: var(--error-color) !important;
+}
+
+[data-theme="dark"] .ant-tag-geekblue {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}
+
+[data-theme="dark"] .ant-tag-volcano {
+  background-color: rgba(255, 122, 69, 0.15) !important;
+  border-color: rgba(255, 122, 69, 0.3) !important;
+  color: #ff7a45 !important;
+}
+
+[data-theme="dark"] .ant-tag-lime {
+  background-color: rgba(160, 217, 17, 0.15) !important;
+  border-color: rgba(160, 217, 17, 0.3) !important;
+  color: #a0d911 !important;
+}
+
+/* Tooltip styles handled via Ant Design ConfigProvider component tokens in ThemeContext.jsx */
+
+/* Modal fixes - dark mode borders and background */
+[data-theme="dark"] .ant-modal-content {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 
+              0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .ant-modal-header {
+  background-color: #1e293b !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .ant-modal-title {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .ant-modal-close {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .ant-modal-close:hover {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .ant-modal-body {
+  color: #e2e8f0 !important;
+}
+
+/* Ensure modal footer has comfortable spacing between divider and buttons */
+.ant-modal-footer {
+  padding: 12px 24px !important;
+}
+
+[data-theme="dark"] .ant-modal-footer {
+  border-top: 1px solid #334155 !important;
+  background-color: #1e293b !important;
+  padding: 12px 24px !important;
+}
+
+/* Modal confirm dialog */
+[data-theme="dark"] .ant-modal-confirm-body .ant-modal-confirm-title {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .ant-modal-confirm-body .ant-modal-confirm-content {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .ant-modal-confirm-confirm .ant-modal-container {
+  background-color: #1e293b !important;
+}
+
+/* Popconfirm dark mode */
+[data-theme="dark"] .ant-popconfirm .ant-popover-inner {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .ant-popconfirm .ant-popover-arrow::before {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .ant-popconfirm .ant-popconfirm-title {
+  color: #f1f5f9 !important;
+}
+
+[data-theme="dark"] .ant-popconfirm .ant-popconfirm-description {
+  color: #cbd5e1 !important;
+}
+
+/* Popover general dark mode */
+[data-theme="dark"] .ant-popover-inner {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .ant-popover-arrow::before {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .ant-popover-title {
+  color: #f1f5f9 !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .ant-popover-inner-content {
+  color: #e2e8f0 !important;
+}
+
+/* Badge dark mode fixes */
+[data-theme="dark"] .ant-badge-status-text {
+  color: #e2e8f0 !important;
+}
+
+/* Tabs */
+[data-theme="dark"] .ant-tabs-tab {
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-tabs-tab:hover {
+  color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-tabs-ink-bar {
+  background: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .ant-tabs-nav::before {
+  border-bottom-color: var(--border-color) !important;
+}
+
+/* Checkbox */
+[data-theme="dark"] .ant-checkbox-inner {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .ant-checkbox-checked .ant-checkbox-inner {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+/* Checkmark shape — force standard Ant Design geometry so the inner "L"
+   rotates cleanly into a tick instead of looking like a down-arrow.
+   Values mirror Ant Design 6.x defaults; kept explicit because the global
+   borderRadius token can otherwise skew the computed ::after geometry. */
+.ant-checkbox .ant-checkbox-inner::after {
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 25%;
+  width: 5.71428571px;
+  height: 9.14285714px;
+  border: 2px solid #fff;
+  border-top: 0;
+  border-inline-start: 0;
+  transform: rotate(45deg) scale(0) translate(-50%, -50%);
+  opacity: 0;
+  content: '';
+  transition: all 0.1s cubic-bezier(0.71, -0.46, 0.88, 0.6), opacity 0.1s;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1) translate(-50%, -50%);
+  transition: all 0.2s cubic-bezier(0.12, 0.4, 0.29, 1.46) 0.1s;
+}
+
+/* Radio */
+[data-theme="dark"] .ant-radio-inner {
+  background-color: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+[data-theme="dark"] .ant-radio-checked .ant-radio-inner {
+  border-color: var(--primary-color);
+}
+
+[data-theme="dark"] .ant-radio-checked .ant-radio-inner::after {
+  background-color: var(--primary-color);
+}
+
+/* Switch */
+[data-theme="dark"] .ant-switch {
+  background: var(--border-dark);
+}
+
+[data-theme="dark"] .ant-switch-checked {
+  background: var(--primary-color);
+}
+
+/* ============================================================
+   SIDEBAR SMOOTH TRANSITION OVERRIDES
+   Override AntD's default 0.2s sider transition with a slower,
+   GPU-accelerated ease for a fluid expand / collapse feel.
+   ============================================================ */
+
+.ant-layout-sider {
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  will-change: width;
+}
+
+/* Fade menu item labels in/out during collapse animation */
+.ant-menu-inline-collapsed .ant-menu-title-content {
+  opacity: 0;
+  transition: opacity 0.15s ease !important;
+}
+.ant-menu:not(.ant-menu-inline-collapsed) .ant-menu-title-content {
+  opacity: 1;
+  transition: opacity 0.25s ease 0.1s !important;
+}
+
+/* Smooth the sub-menu expand/collapse arrow + submenu open/close */
+.ant-menu-submenu-arrow {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-menu-inline .ant-menu-submenu-title,
+.ant-menu-inline .ant-menu-item {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Smooth submenu expand height animation */
+.ant-menu-sub.ant-menu-inline {
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease !important;
+}
+
+/* Sidebar: make ant-layout-sider-children a flex column so the menu area can scroll */
+.ant-layout-sider-children {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Sidebar scrollbar — same proportional style as page scrollbar but for dark bg */
+.ant-layout-sider::-webkit-scrollbar,
+.ant-layout-sider *::-webkit-scrollbar,
+.ant-drawer-body::-webkit-scrollbar,
+.ant-drawer-body *::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-track,
+.ant-layout-sider *::-webkit-scrollbar-track,
+.ant-drawer-body::-webkit-scrollbar-track,
+.ant-drawer-body *::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-radius: 9999px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-thumb,
+.ant-layout-sider *::-webkit-scrollbar-thumb,
+.ant-drawer-body::-webkit-scrollbar-thumb,
+.ant-drawer-body *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-radius: 9999px !important;
+}
+.ant-layout-sider::-webkit-scrollbar-thumb:hover,
+.ant-layout-sider *::-webkit-scrollbar-thumb:hover,
+.ant-drawer-body::-webkit-scrollbar-thumb:hover,
+.ant-drawer-body *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+}
+.ant-layout-sider,
+.ant-layout-sider *,
+.ant-drawer-body,
+.ant-drawer-body * {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.1) rgba(255, 255, 255, 0.04) !important;
+}
+
+/* Sidebar menu scroll area */
+.ant-layout-sider-children > div:last-child {
+  flex: 1;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.06) transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar {
+  width: 3px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-track {
+  background: transparent;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+}
+.ant-layout-sider-children > div:last-child::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Ant Design table scrollbar — dark mode fix
+   AntD Table renders a custom sticky scrollbar <div> (not a native scrollbar).
+   Its color is driven by --ant-table-sticky-scroll-bar-bg which defaults to
+   rgba(0,0,0,0.25) — nearly invisible on dark backgrounds.
+   Override to semi-transparent white for dark mode. */
+[data-theme='dark'] .ant-table-sticky-scroll-bar {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-sticky-scroll-bar:hover,
+[data-theme='dark'] .ant-table-sticky-scroll-bar:active {
+  background: #7d95b7 !important;
+}
+
+/* Native scrollbar (table body overflow) — dark mode fix */
+[data-theme='dark'] .ant-table-body,
+[data-theme='dark'] .ant-table-content {
+  scrollbar-color: rgba(255, 255, 255, 0.25) rgba(255, 255, 255, 0.05);
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25) !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-thumb:hover,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-thumb:hover {
+  background: #7d95b7 !important;
+}
+[data-theme='dark'] .ant-table-body::-webkit-scrollbar-track,
+[data-theme='dark'] .ant-table-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Collapse section tables — stretch to fill the card width (no right-side gap) */
+.ant-collapse .ant-table-body > table,
+.ant-collapse .ant-table-content > table {
+  min-width: 100% !important;
+}
+
+/* ============================================================
+   COLLAPSE / ACCORDION
+   ============================================================ */
+
+/* Collapse / Accordion */
+[data-theme="dark"] .ant-collapse {
+  background-color: var(--card-bg);
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-collapse-header {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-collapse-content {
+  background-color: var(--bg-secondary);
+  border-top-color: var(--border-color);
+}
+
+/* Remove bottom border-radius from header when panel is expanded — prevents triangle gap */
+.ant-collapse-item-active > .ant-collapse-header {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+}
+
+/* Fix top border-radius gap on the first accordion panel header */
+.ant-collapse > .ant-collapse-item:first-child > .ant-collapse-header {
+  border-top-left-radius: 8px !important;
+  border-top-right-radius: 8px !important;
+}
+
+/* Divider */
+[data-theme="dark"] .ant-divider {
+  border-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-divider-with-text::before,
+[data-theme="dark"] .ant-divider-with-text::after {
+  border-color: var(--border-color);
+}
+
+/* Alert */
+[data-theme="dark"] .ant-alert {
+  border: 1px solid var(--border-color);
+}
+
+[data-theme="dark"] .ant-alert-info {
+  background-color: rgba(96, 165, 250, 0.1);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+[data-theme="dark"] .ant-alert-success {
+  background-color: rgba(74, 222, 128, 0.1);
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+[data-theme="dark"] .ant-alert-warning {
+  background-color: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+[data-theme="dark"] .ant-alert-error {
+  background-color: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+/* Steps */
+[data-theme="dark"] .ant-steps-item-title {
+  color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ant-steps-item-description {
+  color: var(--text-secondary) !important;
+}
+
+/* Timeline */
+[data-theme="dark"] .ant-timeline-item-content {
+  color: var(--text-primary);
+}
+
+/* Tooltip - duplicate removed, handled above */
+
+/* Spin */
+[data-theme="dark"] .ant-spin-dot-item {
+  background-color: var(--primary-color);
+}
+
+/* Progress */
+[data-theme="dark"] .ant-progress-text {
+  color: var(--text-primary);
+}
+
+/* Avatar */
+[data-theme="dark"] .ant-avatar {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Badge */
+[data-theme="dark"] .ant-badge-count {
+  box-shadow: 0 0 0 2px var(--bg-secondary);
+}
+
+/* List */
+[data-theme="dark"] .ant-list-item {
+  border-bottom-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-list-item-meta-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-list-item-meta-description {
+  color: var(--text-secondary);
+}
+
+/* Descriptions */
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-label {
+  background-color: var(--table-header-bg);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-descriptions-bordered .ant-descriptions-item-content {
+  background-color: var(--card-bg);
+  color: var(--text-primary);
+}
+
+/* Drawer */
+[data-theme="dark"] .ant-drawer-content {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .ant-drawer-header {
+  background-color: var(--card-bg);
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .ant-drawer-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-drawer-body {
+  color: var(--text-primary);
+}
+
+/* Segmented Control */
+[data-theme="dark"] .ant-segmented {
+  background-color: var(--bg-tertiary);
+}
+
+[data-theme="dark"] .ant-segmented-item-selected {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .ant-segmented-item-label {
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   DRAWER DARK MODE OVERRIDES
+   ============================================================ */
+
+[data-theme="dark"] .ant-drawer-content {
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .ant-drawer-header {
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ant-drawer-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .ant-drawer-close {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .ant-drawer-body {
+  color: var(--text-primary);
+  background-color: var(--card-bg);
+}
+
+[data-theme="dark"] .ant-drawer-footer {
+  border-top: 1px solid var(--border-color) !important;
+  background-color: var(--card-bg);
+}
+
+/* Divider in dark mode */
+[data-theme="dark"] .ant-divider {
+  border-color: #475569 !important;
+  color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .ant-divider-with-text::before,
+[data-theme="dark"] .ant-divider-with-text::after {
+  border-block-start-color: #475569 !important;
+}
+
+[data-theme="dark"] .ant-divider-inner-text {
+  color: var(--text-secondary) !important;
+}
+
+/* Descriptions in dark mode drawer */
+[data-theme="dark"] .ant-descriptions-item-label {
+  color: var(--text-muted) !important;
+}
+
+[data-theme="dark"] .ant-descriptions-item-content {
+  color: var(--primary-color) !important;
+}
+
+/* Ensure Ant Design message/notification text and icons are white in dark mode */
+[data-theme="dark"] .ant-message-notice .ant-message-custom-content {
+  color: #f1f5f9 !important;
+}
+
+.ant-descriptions-item-container {
+  align-items: center;
+}
+
+/* Center all table headers for view/preview tables */
+.centered-header-table .ant-table-thead > tr > th {
+  text-align: center !important;
+}
+
+/* Form item additional / extra text — visible below editor with padding */
+.ant-form-item-extra,
+.ant-form-item .ant-form-item-extra {
+  padding: 8px 4px 4px 4px;
+  font-size: 13px;
+}
+
+/* ============================================================
+   USER DROPDOWN MENU STYLES
+   Enhanced dropdown for profile/logout menu
+   ============================================================ */
+.ant-dropdown .ant-dropdown-menu {
+  border-radius: 12px !important;
+  padding: 8px !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item {
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item:hover {
+  background: var(--bg-secondary) !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item-group-title {
+  padding: 0 !important;
+}
+
+.ant-dropdown .ant-dropdown-menu-item-divider {
+  margin: 8px 0 !important;
+}
+
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+[data-theme="dark"] .ant-dropdown .ant-dropdown-menu-item:hover {
+  background: #334155 !important;
+}
+
+/* ============================================================
+   BOM CONSUMPTION MODE TOGGLE
+   Segmented control in BOM variant column for trims
+   ============================================================ */
+.bom-consumption-mode-toggle {
+  font-size: 11px !important;
+  padding: 2px !important;
+  width: auto !important;
+  display: inline-flex !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item {
+  padding: 0 6px !important;
+  min-height: 24px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-label {
+  font-size: 11px !important;
+  line-height: 22px !important;
+  min-height: 22px !important;
+  padding: 0 2px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.bom-consumption-mode-toggle .ant-segmented-thumb {
+  background: var(--primary-color) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-disabled,
+[data-theme="dark"] .bom-consumption-mode-toggle .ant-segmented-item-disabled .ant-segmented-item-label {
+  color: #4a5568 !important;
+}
+
+/* ============================================================
+   PO TYPE TOGGLE
+   Segmented control in PO supplier card for PO type selection
+   ============================================================ */
+.po-type-toggle {
+  font-size: 12px !important;
+  padding: 2px !important;
+}
+
+.po-type-toggle .ant-segmented-item {
+  padding: 0 10px !important;
+  min-height: 28px !important;
+}
+
+.po-type-toggle .ant-segmented-item-label {
+  font-size: 12px !important;
+  line-height: 26px !important;
+  min-height: 26px !important;
+  padding: 0 4px !important;
+}
+
+.po-type-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border-radius: 4px !important;
+}
+
+.po-type-toggle .ant-segmented-item-selected .ant-segmented-item-label {
+  color: #fff !important;
+}
+
+.po-type-toggle .ant-segmented-thumb {
+  background: var(--primary-color) !important;
+  border-radius: 4px !important;
+}
+
+[data-theme="dark"] .po-type-toggle .ant-segmented-item-selected {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+}
+
+/* BOM variant attribute tags — purple in light, geekblue in dark */
+.bom-variant-tag {
+  background-color: rgba(114, 46, 209, 0.08) !important;
+  border-color: rgba(114, 46, 209, 0.25) !important;
+  color: #722ed1 !important;
+}
+
+[data-theme="dark"] .bom-variant-tag {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border-color: rgba(99, 102, 241, 0.3) !important;
+  color: #818cf8 !important;
+}
+
+/* ============================================================
+   VIEW DIALOG — Line Item Cards & Close Button
+   ============================================================ */
+
+/* Line item card hover effect — shared across PO, BOM, Orders */
+.view-line-item-card,
+.po-line-item-card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.view-line-item-card:hover,
+.po-line-item-card:hover {
+  border-color: var(--primary-color) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.10);
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .view-line-item-card:hover,
+[data-theme="dark"] .po-line-item-card:hover {
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.18);
+}
+
+/* PO View modal — close button always visible above scroll */
+.po-view-modal .ant-modal-content {
+  position: relative;
+  overflow: hidden;
+}
+
+.po-view-modal .ant-modal-close {
+  position: absolute !important;
+  top: 12px !important;
+  right: 16px !important;
+  z-index: 20 !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 8px !important;
+  background: var(--card-bg, #fff) !important;
+  border: 1px solid var(--border-color, #e8e8e8) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  color: var(--text-color, #333) !important;
+  transition: all 0.2s ease !important;
+}
+
+.po-view-modal .ant-modal-close:hover {
+  background: var(--bg-secondary, #f5f5f5) !important;
+  border-color: var(--primary-color) !important;
+  color: var(--primary-color) !important;
+}
+
+[data-theme="dark"] .po-view-modal .ant-modal-close {
+  background: var(--card-bg, #1e293b) !important;
+  border-color: var(--border-color, #334155) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .po-view-modal .ant-modal-close:hover {
+  color: var(--primary-color) !important;
+  background: #334155 !important;
+}
+
+/* PO View modal body — scroll without overlapping close */
+.po-view-modal .ant-modal-body {
+  padding-top: 0 !important;
+}
+
+/* Stage action buttons — hover effects for light & dark mode */
+.stage-btn-complete {
+  color: var(--primary-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent) !important;
+  color: var(--primary-color) !important;
+}
+
+.stage-btn-revert {
+  color: var(--text-secondary) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 10%, transparent) !important;
+  color: var(--error-color) !important;
+}
+
+.stage-btn-add {
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+  border-radius: 6px !important;
+  transition: all 0.2s ease !important;
+}
+.stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 12%, transparent) !important;
+  color: var(--btn-duplicate-color) !important;
+  border-color: var(--btn-duplicate-color) !important;
+}
+
+[data-theme="dark"] .stage-btn-complete:hover {
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-revert:hover {
+  background: color-mix(in srgb, var(--error-color) 18%, transparent) !important;
+}
+[data-theme="dark"] .stage-btn-add:hover {
+  background: color-mix(in srgb, var(--btn-duplicate-color) 20%, transparent) !important;
+}
+
+/* ============================================================
+   RESPONSIVE OVERRIDES
+   ============================================================ */
+
+/* Mobile drawer sidebar — match desktop sidebar styling */
+.ant-drawer .ant-menu-dark .ant-menu-item {
+  border-radius: var(--radius-md);
+  margin: 4px 8px !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-item:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-item-selected {
+  background: var(--sidebar-item-selected) !important;
+  border-left: 3px solid var(--sidebar-item-accent) !important;
+  color: var(--sidebar-text-selected) !important;
+}
+
+.ant-drawer .sidebar-menu .ant-menu-sub {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-submenu-title {
+  border-radius: var(--radius-md);
+  margin: 4px 8px !important;
+}
+
+.ant-drawer .ant-menu-dark .ant-menu-submenu-title:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ---- Master form header — responsive layout ---- */
+@media (max-width: 992px) {
+  /* Tablet: keep row layout, allow wrapping when tight */
+  .master-form-header {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    padding: 12px 16px !important;
+  }
+
+  .master-form-header h2 {
+    font-size: 16px !important;
+    margin: 0 !important;
+  }
+}
+
+@media (max-width: 576px) {
+  /* Mobile: stack title above buttons */
+  .master-form-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .master-form-header > .ant-space,
+  .master-form-header > div > .ant-space {
+    width: 100%;
+    flex-wrap: wrap !important;
+  }
+
+  .master-form-header .ant-space .ant-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* Tablet — slightly tighter form spacing */
+@media (max-width: 992px) {
+  .ant-form-item-label > label {
+    font-size: 13px !important;
+  }
+
+  /* Tighter dropdown menus */
+  .ant-dropdown .ant-dropdown-menu {
+    min-width: 180px !important;
+  }
+}
+
+/* Mobile — form and table layout */
+@media (max-width: 576px) {
+  /* Ant Design Form: vertical layout on mobile */
+  .ant-form-item .ant-form-item-label {
+    padding-bottom: 4px !important;
+  }
+
+  /* Descriptions — force vertical layout */
+  .ant-descriptions-row {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .ant-descriptions-item {
+    padding-bottom: 8px !important;
+  }
+
+  /* Popconfirm — wider on mobile */
+  .ant-popover {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Steps — vertical on mobile */
+  .ant-steps-horizontal:not(.ant-steps-label-vertical) {
+    flex-direction: column !important;
+  }
+
+  .ant-steps-horizontal:not(.ant-steps-label-vertical) .ant-steps-item {
+    padding-left: 0 !important;
+  }
+
+  /* User dropdown menu */
+  .ant-dropdown .ant-dropdown-menu {
+    min-width: 200px !important;
+  }
+}
+
+/* ============================================================
+ * Live Activity Feed
+ * ============================================================ */
+
+.live-feed-window {
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: width 180ms ease, height 180ms ease;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.live-feed-window .ant-card-head {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 1) 0%, rgba(241, 245, 249, 1) 100%);
+  border-bottom: 1px solid #e2e8f0;
+  touch-action: none;
+}
+
+.live-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: grab;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.live-feed-header:active { cursor: grabbing; }
+
+.live-feed-header--mobile { cursor: default; padding: 12px 16px; }
+
+.live-feed-header__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-feed-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #fff;
+  min-height: 36px;
+  flex-shrink: 0;
+}
+
+.live-feed-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.live-feed-toolbar__status-label {
+  color: #475569;
+  font-weight: 500;
+}
+
+.live-feed-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #cbd5e1;
+}
+
+.live-feed-status-dot--live {
+  background-color: #16a34a;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55);
+  animation: live-feed-pulse 1.6s ease-out infinite;
+}
+
+@keyframes live-feed-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.55); }
+  70%  { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0); }
+}
+
+.live-feed-status-dot--warn { background-color: #d97706; }
+.live-feed-status-dot--off  { background-color: #94a3b8; }
+
+.live-feed-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 8px;
+  scroll-behavior: smooth;
+  touch-action: pan-y;
+  background-color: #f8fafc;
+}
+
+.live-feed-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 180px;
+}
+
+.live-feed-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  background-color: #fff;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  animation: live-feed-item-enter 240ms ease both;
+}
+
+@keyframes live-feed-item-enter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.live-feed-item:hover {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.live-feed-item--expanded {
+  padding: 12px 14px;
+}
+
+.live-feed-item__accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 4px;
+  height: 100%;
+  border-radius: 0 8px 8px 0;
+}
+
+.live-feed-item__icon {
+  font-size: 18px;
+  padding-top: 2px;
+}
+
+.live-feed-item__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.live-feed-item__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.live-feed-item__actor { font-size: 13px; }
+.live-feed-item__action { color: #475569; font-size: 13px; }
+
+.live-feed-item__summary {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.live-feed-item__time {
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  padding-top: 2px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  align-self: start;
+  justify-self: end;
+}
+
+.live-feed-paused-banner {
+  padding: 6px 12px;
+  background-color: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #fde68a;
+}
+
+.live-feed-disabled-banner {
+  padding: 8px 12px;
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  text-align: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.live-feed-filter-popover-wrap {
+  min-width: 260px;
+  max-width: 300px;
+}
+
+.live-feed-filter-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.live-feed-filter-popover {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+}
+
+.live-feed-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background-color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 120ms ease;
+  color: #475569;
+}
+
+.live-feed-filter-chip:hover { border-color: #94a3b8; }
+
+.live-feed-filter-chip.is-active {
+  font-weight: 600;
+}
+
+.live-feed-minimized-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background-color: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+  font-size: 13px;
+  color: #0f172a;
+  z-index: 1050;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
+}
+
+.live-feed-minimized-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.16);
+}
+
+.live-feed-expand-corner {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+}
+
+/* Enable-card on Admin Dashboard */
+.live-feed-enable-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.04) 0%, rgba(99, 102, 241, 0) 40%);
+}
+
+.live-feed-enable-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.live-feed-enable-card__left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.live-feed-enable-card__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-feed-item { animation: none; }
+  .live-feed-status-dot--live { animation: none; }
+  .live-feed-window { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .live-feed-minimized-pill {
+    right: 16px !important;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0)) !important;
+  }
+  .live-feed-drawer .ant-drawer-body { padding: 0 !important; }
+}
+
+/* ============================================================
+ * Live Activity Feed — dark mode
+ * ============================================================ */
+
+[data-theme="dark"] .live-feed-window {
+  background-color: #0f172a;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .live-feed-window .ant-card-head {
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  border-bottom: 1px solid #334155;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .live-feed-header {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .live-feed-toolbar {
+  background-color: #0f172a;
+  border-bottom: 1px solid #334155;
+}
+
+[data-theme="dark"] .live-feed-toolbar__status-label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .live-feed-list {
+  background-color: #0b1220;
+}
+
+[data-theme="dark"] .live-feed-item {
+  background-color: #1e293b !important;
+  color: #e2e8f0;
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+}
+
+[data-theme="dark"] .live-feed-item:hover {
+  background-color: #263446 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .live-feed-item__actor {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .live-feed-item__action {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .live-feed-item__summary {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .live-feed-item__time {
+  color: #64748b;
+}
+
+[data-theme="dark"] .live-feed-paused-banner {
+  background-color: #422006;
+  color: #fde68a;
+  border-bottom: 1px solid #78350f;
+}
+
+[data-theme="dark"] .live-feed-disabled-banner {
+  background-color: #1e293b;
+  color: #cbd5e1;
+  border-bottom: 1px solid #334155;
+}
+
+[data-theme="dark"] .live-feed-filter-popover-header {
+  border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .live-feed-filter-popover .live-feed-filter-chip {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .live-feed-filter-chip:hover {
+  border-color: #64748b;
+}
+
+[data-theme="dark"] .live-feed-minimized-pill {
+  background-color: #1e293b;
+  border-color: #334155;
+  color: #f1f5f9;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .live-feed-minimized-pill:hover {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .live-feed-empty .ant-empty-description {
+  color: #64748b;
+}
+
+/* Enable-card on Admin Dashboard — dark */
+[data-theme="dark"] .live-feed-enable-card {
+  background: linear-gradient(90deg, rgba(129, 140, 248, 0.08) 0%, rgba(129, 140, 248, 0) 40%) #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .live-feed-enable-card__icon {
+  background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+}
+
