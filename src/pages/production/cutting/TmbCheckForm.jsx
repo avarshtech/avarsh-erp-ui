@@ -128,7 +128,7 @@ const TmbCheckForm = () => {
         title="Part & Size Measurements (cm)"
         extra={(
           <Button icon={<PlusOutlined />} size="small"
-            onClick={() => patch({ rows: [...check.rows, { part: null, size: null, top: [null, null, null], middle: [null, null, null], bottom: [null, null, null], pcs: null, comment: 'OK', action: 'Accept' }] })}>
+            onClick={() => patch({ rows: [...check.rows, { part: null, size: null, top: [null], middle: [null], bottom: [null], pcs: null, comment: 'OK', action: 'Accept' }] })}>
             Add Row
           </Button>
         )}

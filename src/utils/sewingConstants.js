@@ -38,6 +38,13 @@ export const sewingStatusLabel = (s) => String(s || '').replaceAll('_', ' ')
 
 export const SEWING_LINES = ['Line-A', 'Line-B', 'B-1', 'B-2'];
 
+/** Lines belong to a production unit — Line selects filter by Unit. */
+export const UNITS = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
+export const LINES_BY_UNIT = {
+  'Unit-1 Tirupur': ['Line-A', 'Line-B'],
+  'Unit-2 Avinashi': ['B-1', 'B-2'],
+};
+
 export const MACHINE_TYPES = ['SNLS', 'DNLS', 'Overlock', 'Flatlock', 'Bartack', 'Kansai', 'Iron'];
 
 export const SHIFTS = ['DAY', 'NIGHT', 'OVERTIME'];
@@ -88,7 +95,7 @@ export const TRIM_ITEM_STATUSES = ['CORRECT', 'INCORRECT'];
 export const BOM_ITEM_CATEGORIES = ['Fabric & Materials', 'Trims & Accessories', 'Approvals & Tests'];
 export const CHECK_TYPES = ['SIZE_SET', 'IN_LINE', 'PILOT_RUN'];
 
-export const MEASUREMENT_STAGES = ['IN_LINE', 'PRE_FINAL', 'FINAL'];
+export const MEASUREMENT_STAGES = ['PILOT_RUN_SAMPLE', 'IN_LINE', 'END_LINE', 'FIRST_GARMENT', 'SIZE_SET'];
 
 export const DAMAGE_REASONS = ['FABRIC_DEFECT', 'CUTTING_ERROR', 'SHADE_VARIATION', 'CONTAMINATION', 'OTHER'];
 

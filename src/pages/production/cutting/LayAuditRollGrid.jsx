@@ -5,10 +5,11 @@ import { FormSelect } from '../../../components/form';
 import { formatNumber } from '../../../utils/formatters';
 
 /**
- * FR-03 roll grid — Total = #Lays × Weight/Lay; Variance = Total − Roll Weight
+ * FR-03 roll grid — Total = #Lays × Weight/Lay; Variance = Total − Roll Weight.
+ * UOM follows the fabric category: kg for knits, metres for woven/denim.
  * (positive ⇒ shortage in red, negative ⇒ excess left on roll in green).
  */
-const LayAuditRollGrid = ({ lay, availableRolls, onChange }) => {
+const LayAuditRollGrid = ({ lay, availableRolls, uom = 'kg', onChange }) => {
   const setRoll = useCallback((idx, field, val) => {
     onChange((prev) => ({
       ...prev,
@@ -43,16 +44,16 @@ const LayAuditRollGrid = ({ lay, availableRolls, onChange }) => {
           onChange={(val) => pickRoll(idx, val, availableRolls)} />
       ),
     },
-    { title: 'Roll Weight (kg)', dataIndex: 'weight', width: 120, align: 'right', render: (v) => (v != null ? formatNumber(v, 3) : '—') },
+    { title: 'Roll Weight', dataIndex: 'weight', width: 120, align: 'right', render: (v) => (v != null ? `${formatNumber(v, 3)} ${uom}` : '—') },
     {
-      title: 'Weight / Lay (kg)', dataIndex: 'weightPerLay', width: 130, align: 'center',
+      title: `Weight / Lay (${uom})`, dataIndex: 'weightPerLay', width: 130, align: 'center',
       render: (v, _, idx) => <InputNumber size="small" min={0} step={0.01} value={v} style={{ width: 100 }} onChange={(val) => setRoll(idx, 'weightPerLay', val)} />,
     },
     {
       title: '# of Lays', dataIndex: 'numLays', width: 100, align: 'center',
       render: (v, _, idx) => <InputNumber size="small" min={0} value={v} style={{ width: 80 }} onChange={(val) => setRoll(idx, 'numLays', val)} />,
     },
-    { title: 'Total Lay Weight', dataIndex: 'total', width: 130, align: 'right', render: (v) => <strong>{formatNumber(v, 3)}</strong> },
+    { title: 'Total Lay Weight', dataIndex: 'total', width: 130, align: 'right', render: (v) => <strong>{formatNumber(v, 3)} {uom}</strong> },
     {
       title: 'Short / Excess', dataIndex: 'variance', width: 120, align: 'right',
       render: (v) => (
@@ -72,7 +73,7 @@ const LayAuditRollGrid = ({ lay, availableRolls, onChange }) => {
           onClick={() => onChange((prev) => ({ ...prev, rolls: prev.rolls.filter((_, i) => i !== idx) }))} />
       ),
     },
-  ], [availableRolls, usedRollNos, pickRoll, setRoll, onChange]);
+  ], [availableRolls, usedRollNos, uom, pickRoll, setRoll, onChange]);
 
   const totals = useMemo(() => ({
     used: rows.reduce((s, r) => s + r.total, 0),
@@ -94,9 +95,9 @@ const LayAuditRollGrid = ({ lay, availableRolls, onChange }) => {
         locale={{ emptyText: 'Only rolls with completed relaxation can be added' }}
         footer={() => (
           <Space size="large">
-            <span>Total plies: <strong>{totals.lays}</strong></span>
-            <span>Total weight used: <strong>{formatNumber(totals.used, 3)} kg</strong></span>
-            <span>Net variance: <strong style={{ color: totals.variance > 0 ? 'var(--error-color)' : 'var(--success-color)' }}>{formatNumber(totals.variance, 3)} kg</strong></span>
+            <span>Total height: <strong>{totals.lays}</strong></span>
+            <span>Total weight used: <strong>{formatNumber(totals.used, 3)} {uom}</strong></span>
+            <span>Net variance: <strong style={{ color: totals.variance > 0 ? 'var(--error-color)' : 'var(--success-color)' }}>{formatNumber(totals.variance, 3)} {uom}</strong></span>
           </Space>
         )} />
     </Card>

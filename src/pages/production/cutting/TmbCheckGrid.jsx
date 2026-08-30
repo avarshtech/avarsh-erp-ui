@@ -7,7 +7,7 @@ import { tmbRowInTolerance } from './tmbUtils';
 
 const POSITIONS = ['top', 'middle', 'bottom'];
 
-/** FR-04 grid — grouped TOP | MIDDLE | BOTTOM columns, 3 measurement points each. */
+/** FR-04 grid — one measurement per position: TOP | MIDDLE | BOTTOM. */
 const TmbCheckGrid = ({ check, sizes, onChange }) => {
   const setRow = useCallback((idx, field, val) => {
     onChange((prev) => ({ ...prev, rows: prev.rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)) }));
@@ -36,14 +36,11 @@ const TmbCheckGrid = ({ check, sizes, onChange }) => {
       ),
     },
     ...POSITIONS.map((pos) => ({
-      title: pos.toUpperCase(),
-      children: [0, 1, 2].map((pointIdx) => ({
-        title: `P${pointIdx + 1}`, key: `${pos}${pointIdx}`, width: 78, align: 'center',
-        render: (_, row, idx) => (
-          <InputNumber size="small" step={0.1} controls={false} value={row[pos][pointIdx]} style={{ width: 64 }}
-            onChange={(val) => setPoint(idx, pos, pointIdx, val)} />
-        ),
-      })),
+      title: pos.toUpperCase(), key: pos, width: 100, align: 'center',
+      render: (_, row, idx) => (
+        <InputNumber size="small" step={0.1} controls={false} value={row[pos][0]} style={{ width: 80 }}
+          onChange={(val) => setPoint(idx, pos, 0, val)} />
+      ),
     })),
     {
       title: '# Pcs', dataIndex: 'pcs', width: 85, align: 'center',
@@ -79,7 +76,7 @@ const TmbCheckGrid = ({ check, sizes, onChange }) => {
       columns={columns}
       dataSource={check.rows}
       pagination={false}
-      scroll={{ x: 1250 }}
+      scroll={{ x: 1000 }}
       rowClassName={(row) => (tmbRowInTolerance(row) ? '' : 'row-shortage')}
       locale={{ emptyText: 'Add a row per part + size combination measured at Top, Middle and Bottom plies' }}
     />

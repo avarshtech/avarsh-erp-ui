@@ -16,7 +16,7 @@ const HourlyGrid = ({ sheet, operators, targetPerDay = 0, onChange }) => {
 
   const columns = useMemo(() => [
     {
-      title: 'Tailor Name', dataIndex: 'operatorId', width: 170, fixed: 'left',
+      title: 'Tailor Name (employee master)', dataIndex: 'operatorId', width: 180, fixed: 'left',
       render: (v, _, idx) => (
         <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Operator"
           options={operators.map((o) => ({ value: o.id, label: `${o.name} (${o.code})` }))}
@@ -81,8 +81,13 @@ const HourlyGrid = ({ sheet, operators, targetPerDay = 0, onChange }) => {
         locale={{ emptyText: 'Add operator rows and enter output per hour' }}
       />
       <Space style={{ marginTop: 8, color: 'var(--text-secondary)' }} wrap>
-        <span>Balance = day target ({targetPerDay}) − operation total. Total Garment Output = the last operation's total.</span>
-        <strong>Total Garment Output: {sheet.rows.length ? rowTotal(sheet.rows[sheet.rows.length - 1]) : 0} pcs</strong>
+        <span>Balance = day target ({targetPerDay}) − operation total. Total Garment Output sums every operator on the last operation.</span>
+        <strong>
+          Total Garment Output: {(() => {
+            const lastPart = sheet.rows[sheet.rows.length - 1]?.part;
+            return lastPart ? sheet.rows.filter((r) => r.part === lastPart).reduce((s, r) => s + rowTotal(r), 0) : 0;
+          })()} pcs
+        </strong>
       </Space>
     </Card>
   );

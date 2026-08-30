@@ -5,7 +5,7 @@ import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { SHIFTS, EFFICIENCY_BANDS, trafficLight, TRAFFIC_COLORS } from '../../../utils/sewingConstants';
 import {
-  listPlans, getOrders, getOperators, getHourlySheet, saveHourlySheet, rowTotal, efficiencyPct, targetPerHour, listCutReceipts,
+  listPlans, getOrders, getOperators, getHourlySheet, saveHourlySheet, findHourConflicts, rowTotal, efficiencyPct, targetPerHour, listCutReceipts,
 } from '../../../services/production/sewingService';
 import HourlyGrid from './HourlyGrid';
 
@@ -50,8 +50,12 @@ const HourlyProductionTab = () => {
 
   const kpis = useMemo(() => {
     if (!sheet || !plan) return null;
-    const lastRow = sheet.rows[sheet.rows.length - 1];
-    const completed = lastRow ? rowTotal(lastRow) : 0;
+    // Final output = last OPERATION's output — summed across parallel operators
+    // doing that same operation, not just the last row.
+    const lastPart = sheet.rows[sheet.rows.length - 1]?.part;
+    const completed = lastPart
+      ? sheet.rows.filter((r) => r.part === lastPart).reduce((s, r) => s + rowTotal(r), 0)
+      : 0;
     const workedHours = ['hr1', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'hr7', 'hr8'].filter((h) => sheet.rows.some((r) => r[h] != null)).length || 1;
     const eff = efficiencyPct(completed, plan.sam, sheet.presentOperators || plan.operators, workedHours);
     const tph = targetPerHour(plan.operators, plan.sam, plan.targetEfficiencyPct);
@@ -66,6 +70,12 @@ const HourlyProductionTab = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Duplicate guard: one operation per tailor per hour across styles/lines.
+      const conflicts = await findHourConflicts(sheet);
+      if (conflicts.length) {
+        conflicts.forEach((c) => message.error(c));
+        return;
+      }
       const saved = await saveHourlySheet(sheet);
       setSheet(saved);
       message.success('Hourly production saved');
@@ -123,6 +133,11 @@ const HourlyProductionTab = () => {
             <span>Performance vs target ({kpis.workedHours}h): <strong>{kpis.performance}%</strong></span>
           </Space>
         </Card>
+      )}
+
+      {sheet?.carriedFrom && !sheet.id && (
+        <Alert type="info" showIcon style={{ marginBottom: 16 }}
+          title={`Line continuity — operators copied from ${dayjs(sheet.carriedFrom).format('DD-MMM')}'s sheet (editable); hours start blank.`} />
       )}
 
       {sheet && kpis?.light === 'red' && (

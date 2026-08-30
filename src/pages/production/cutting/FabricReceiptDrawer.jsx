@@ -27,7 +27,7 @@ const FabricReceiptDrawer = ({ open, cutPos, onClose, onSaved }) => {
   const columns = useMemo(() => [
     { title: 'Roll #', dataIndex: 'rollNo', width: 100, render: (v) => <code>{v}</code> },
     { title: 'Fabric Type', dataIndex: 'fabricType', width: 140 },
-    { title: 'Weight (kg)', dataIndex: 'weight', width: 110, align: 'right', render: (v) => v.toFixed(3) },
+    { title: 'Weight', dataIndex: 'weight', width: 110, align: 'right', render: (v) => `${v.toFixed(3)} kg` },
     { title: 'Color', dataIndex: 'color', width: 120 },
     { title: 'Shade Lot', dataIndex: 'shadeLot', width: 100, align: 'center' },
   ], []);

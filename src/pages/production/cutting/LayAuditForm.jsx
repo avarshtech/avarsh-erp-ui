@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import { FABRIC_TYPES } from '../../../utils/cuttingConstants';
 import { getLayAudit, saveLayAudit, getCutPos, getRolls, listMarkersForPo, nextLayNo } from '../../../services/production/cuttingService';
 import LayAuditRollGrid from './LayAuditRollGrid';
 
@@ -116,12 +117,8 @@ const LayAuditForm = () => {
             <InputNumber min={0} step={0.1} value={lay.layLength} onChange={(v) => patch({ layLength: v })} />
           </div>
           <div>
-            <FieldLabel>Plies — from marker height</FieldLabel>
+            <FieldLabel>Height — from marker</FieldLabel>
             <InputNumber min={0} value={lay.plies} onChange={(v) => patch({ plies: v })} />
-          </div>
-          <div>
-            <FieldLabel>Lay Height (m)</FieldLabel>
-            <InputNumber min={0} step={0.01} value={lay.layHeight} onChange={(v) => patch({ layHeight: v })} />
           </div>
           <div>
             <FieldLabel>Lay Width (in) — marker tab width</FieldLabel>
@@ -152,7 +149,7 @@ const LayAuditForm = () => {
       <Alert type="info" showIcon style={{ marginBottom: 16 }}
         title="Lays are planned based on the selected Marker #"
         description={marker
-          ? `${marker.markerNo} (${marker.planNo}): length ${marker.markerLength} m · height ${marker.markerHeight} plies · cuttable width ${marker.cuttableWidth}" — lay fields pre-fill from the marker and stay editable except width.`
+          ? `${marker.markerNo} (${marker.planNo}): length ${marker.markerLength} m · height ${marker.markerHeight} · cuttable width ${marker.cuttableWidth}" — lay fields pre-fill from the marker and stay editable except width.`
           : 'Select the marker this lay executes; Lay #, length, plies and width auto-populate from it.'} />
 
       {po?.sizeSetStatus !== 'APPROVED' && (
@@ -165,7 +162,8 @@ const LayAuditForm = () => {
           description="Rolls from different shade lots in the same lay can cause part-to-part shade variation in a garment. Split into separate lays unless shades are band-matched." />
       )}
 
-      <LayAuditRollGrid lay={lay} availableRolls={availableRolls} onChange={setLay} />
+      <LayAuditRollGrid lay={lay} availableRolls={availableRolls} onChange={setLay}
+        uom={FABRIC_TYPES.find((f) => f.value === po?.fabricType)?.category === 'Knit' ? 'kg' : 'm'} />
     </div>
   );
 };

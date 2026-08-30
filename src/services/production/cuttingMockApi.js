@@ -31,6 +31,7 @@ const db = {
   reCutEntries: clone(seed.seedReCutEntries),
   endBits: clone(seed.seedEndBits),
   reCutFabricKg: clone(seed.seedReCutFabricKg),
+  inventoryReturns: {}, // { [cutPoId]: { [rollNo]: { type, qty, returnNo, date } } }
 };
 
 const cutPo = (id) => db.cutPos.find((p) => p.id === Number(id));
@@ -292,6 +293,7 @@ export const getReconciliation = async (cutPoId) => {
     usedByRoll[r.rollNo] = round3((usedByRoll[r.rollNo] || 0) + (r.numLays || 0) * (r.weightPerLay || 0));
   }));
   const endBits = db.endBits[po.id] || {};
+  const returns = db.inventoryReturns[po.id] || {};
   const rows = receivedRolls.map((r) => {
     const used = usedByRoll[r.rollNo] || 0;
     const endBit = endBits[r.rollNo]?.weight || 0;
@@ -300,8 +302,10 @@ export const getReconciliation = async (cutPoId) => {
       reusable: Boolean(endBits[r.rollNo]?.reusable),
       variance: round3(r.weight - used - endBit),
       status: used > 0 ? 'USED' : 'IN_STOCK',
+      returned: returns[r.rollNo] || null,
     };
   });
+  const returnedTotal = round3(rows.reduce((s, r) => s + (r.returned?.qty || 0), 0));
   const received = round3(receivedRolls.reduce((s, r) => s + r.weight, 0));
   const used = round3(Object.values(usedByRoll).reduce((s, v) => s + v, 0));
   const endBitTotal = round3(rows.reduce((s, r) => s + r.endBit, 0));
@@ -309,12 +313,37 @@ export const getReconciliation = async (cutPoId) => {
   const inStock = round3(rows.filter((r) => r.status === 'IN_STOCK').reduce((s, r) => s + r.received, 0));
   const waste = round3(received - used - endBitTotal - reCutKg - inStock);
   const utilizationPct = received - inStock > 0 ? Math.round(((used + reCutKg) / (received - inStock)) * 1000) / 10 : 0;
-  return clone({ cutPo: po, rows, received, used, endBitTotal, reCutKg, inStock, waste, utilizationPct });
+  return clone({ cutPo: po, rows, received, used, endBitTotal, reCutKg, inStock, waste, utilizationPct, returnedTotal });
 };
 export const saveEndBit = async (cutPoId, rollNo, patch) => {
   await delay(60);
   db.endBits[cutPoId] = db.endBits[cutPoId] || {};
   db.endBits[cutPoId][rollNo] = { ...db.endBits[cutPoId][rollNo], ...patch };
+  return getReconciliation(cutPoId);
+};
+
+/**
+ * Return unused rolls (full weight) and/or used rolls' end-bits back to fabric
+ * inventory. One call raises ONE Fabric Return Note covering all selected
+ * lines (mirrors the future POST /api/v1/cutting/reconciliation/{cutPoId}/returns
+ * → inventory stock-in). Accepts a single rollNo or an array.
+ */
+let frtSeq = 0;
+export const returnToInventory = async (cutPoId, rollNos) => {
+  await delay();
+  const list = Array.isArray(rollNos) ? rollNos : [rollNos];
+  const recon = await getReconciliation(cutPoId);
+  db.inventoryReturns[cutPoId] = db.inventoryReturns[cutPoId] || {};
+  const returnNo = `FRT-${dayjs().format('YYYYMMDD')}-${String(++frtSeq).padStart(3, '0')}`;
+  const date = dayjs().format('YYYY-MM-DD');
+  list.forEach((rollNo) => {
+    const row = recon.rows.find((r) => r.rollNo === rollNo);
+    if (!row || row.returned) return;
+    const type = row.status === 'IN_STOCK' ? 'ROLL' : 'END_BIT';
+    const qty = type === 'ROLL' ? row.received : row.endBit;
+    if (!qty) return;
+    db.inventoryReturns[cutPoId][rollNo] = { type, qty: round3(qty), date, returnNo };
+  });
   return getReconciliation(cutPoId);
 };
 

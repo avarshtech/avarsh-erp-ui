@@ -104,15 +104,43 @@ export const getHourlySheet = async ({ planId, date, shift }) => {
   const found = db.hourly.find((h) => h.planId === Number(planId) && h.date === date && h.shift === shift);
   if (found) return clone(found);
   const plan = db.plans.find((p) => p.id === Number(planId));
+  // Line continuity: copy the previous day's operator rows (editable), hours blank.
+  const prior = db.hourly
+    .filter((h) => h.planId === Number(planId) && h.date < date)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  const blankHours = { hr1: null, hr2: null, hr3: null, hr4: null, hr5: null, hr6: null, hr7: null, hr8: null, ot: null };
+  const rows = prior
+    ? prior.rows.map((r) => ({ operatorId: r.operatorId, part: r.part, ...blankHours }))
+    : (plan?.operations || []).slice(0, 6).map((op) => ({ operatorId: null, part: op.operation, ...blankHours }));
   return clone({
     id: null, planId: Number(planId), orderId: plan?.orderId, line: plan?.line, date, shift,
     plannedOperators: plan?.operators ?? 0, presentOperators: plan?.operators ?? 0, status: 'IN_PROGRESS',
-    rows: (plan?.operations || []).slice(0, 6).map((op) => ({
-      operatorId: op.operatorId, part: op.operation,
-      hr1: null, hr2: null, hr3: null, hr4: null, hr5: null, hr6: null, hr7: null, hr8: null, ot: null,
-    })),
+    carriedFrom: prior?.date || null, rows,
   });
 };
+/**
+ * Duplicate guard — a tailor cannot log output in the same hour on another
+ * style/plan for the same date. Returns conflict descriptions (empty = clean).
+ */
+export const findHourConflicts = async (sheet) => {
+  await delay(40);
+  const conflicts = [];
+  db.hourly
+    .filter((h) => h.date === sheet.date && h.planId !== Number(sheet.planId) && h.id !== sheet.id)
+    .forEach((other) => {
+      other.rows.forEach((oRow) => {
+        const mine = (sheet.rows || []).filter((r) => r.operatorId && r.operatorId === oRow.operatorId);
+        mine.forEach((r) => {
+          HOURS.filter((h) => r[h] != null && oRow[h] != null).forEach((h) => {
+            const op = db.operators.find((o) => o.id === r.operatorId);
+            conflicts.push(`${op?.name || 'Operator'} already has ${h.replace('hr', 'Hr ')} output on ${other.line} — one operation per hour`);
+          });
+        });
+      });
+    });
+  return [...new Set(conflicts)];
+};
+
 export const saveHourlySheet = async (payload) => {
   await delay();
   const existing = payload.id && db.hourly.find((h) => h.id === payload.id);

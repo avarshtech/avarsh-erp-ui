@@ -113,17 +113,17 @@ export const seedTmbChecks = [
     id: 1, layAuditId: 1, cutPoId: 1, layNo: 1, date: day(-4), qcSign: 'K. Raman',
     cuttingMc: 'Eastman EC-3', grain: 'Straight', approvedPattern: 'HM-TS-2601-Rev2', status: 'PASSED',
     rows: [
-      { part: 'Front', size: 'M', top: [52.1, 52.0, 52.2], middle: [52.0, 52.1, 52.0], bottom: [52.2, 52.3, 52.1], pcs: 54, comment: 'OK', action: 'Accept' },
-      { part: 'Back', size: 'L', top: [54.0, 54.1, 54.0], middle: [54.1, 54.0, 54.2], bottom: [54.0, 54.2, 54.1], pcs: 54, comment: 'OK', action: 'Accept' },
-      { part: 'Sleeve', size: 'M', top: [23.5, 23.4, 23.5], middle: [23.5, 23.5, 23.6], bottom: [23.6, 23.5, 23.5], pcs: 108, comment: 'OK', action: 'Accept' },
+      { part: 'Front', size: 'M', top: [52.1], middle: [52.0], bottom: [52.2], pcs: 54, comment: 'OK', action: 'Accept' },
+      { part: 'Back', size: 'L', top: [54.0], middle: [54.1], bottom: [54.0], pcs: 54, comment: 'OK', action: 'Accept' },
+      { part: 'Sleeve', size: 'M', top: [23.5], middle: [23.5], bottom: [23.6], pcs: 108, comment: 'OK', action: 'Accept' },
     ],
   },
   {
     id: 2, layAuditId: 2, cutPoId: 1, layNo: 2, date: day(0), qcSign: '',
     cuttingMc: 'Eastman EC-3', grain: 'Straight', approvedPattern: 'HM-TS-2601-Rev2', status: 'PENDING',
     rows: [
-      { part: 'Front', size: 'M', top: [52.1, 52.2, 52.0], middle: [52.4, 52.5, 52.4], bottom: [52.8, 52.9, 52.8], pcs: 30, comment: 'Pattern Drift', action: 'Re-spread' },
-      { part: 'Back', size: 'L', top: [54.0, 54.0, 54.1], middle: [54.1, 54.0, 54.0], bottom: [54.2, 54.1, 54.2], pcs: 30, comment: 'OK', action: 'Accept' },
+      { part: 'Front', size: 'M', top: [52.1], middle: [52.4], bottom: [52.8], pcs: 30, comment: 'Pattern Drift', action: 'Re-spread' },
+      { part: 'Back', size: 'L', top: [54.0], middle: [54.1], bottom: [54.2], pcs: 30, comment: 'OK', action: 'Accept' },
     ],
   },
 ];

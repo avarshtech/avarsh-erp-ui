@@ -27,6 +27,7 @@ export const saveGarmentIssue = (...a) => mockApi.saveGarmentIssue(...a);
 export const listHourly = (...a) => mockApi.listHourly(...a);
 export const getHourlySheet = (...a) => mockApi.getHourlySheet(...a);
 export const saveHourlySheet = (...a) => mockApi.saveHourlySheet(...a);
+export const findHourConflicts = (...a) => mockApi.findHourConflicts(...a);
 export const rowTotal = mockApi.rowTotal;
 export const efficiencyPct = mockApi.efficiencyPct;
 export const targetPerHour = mockApi.targetPerHour;

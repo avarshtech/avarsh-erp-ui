@@ -60,5 +60,6 @@ export const addReCutEntry = (...a) => impl.addReCutEntry(...a);
 
 export const getReconciliation = (...a) => impl.getReconciliation(...a);
 export const saveEndBit = (...a) => impl.saveEndBit(...a);
+export const returnToInventory = (...a) => impl.returnToInventory(...a);
 
 export const getDashboard = (...a) => impl.getDashboard(...a);

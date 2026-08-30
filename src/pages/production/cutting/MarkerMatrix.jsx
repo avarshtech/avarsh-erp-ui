@@ -160,7 +160,7 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
         )}
       />
       <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-        One row per marker, exactly like the CAD marker sheet — H = plies; Pcs/Mkr = garments per marker (e.g. 100=10).
+        One row per marker, exactly like the CAD marker sheet — H = height; Pcs/Mkr = garments per marker (e.g. 100=10).
         Expand a row for length, efficiency, lay/cut dates and table. Totals turn red where cutting exceeds the +{plan.allowancePct || 0}% allowance.
       </div>
     </Card>

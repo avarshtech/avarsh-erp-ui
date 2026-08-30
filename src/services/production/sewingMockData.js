@@ -59,7 +59,7 @@ export const seedSamValues = [
 
 export const seedPlans = [
   {
-    id: 1, planNo: 'SPL-2026-0001', orderId: 1, line: 'Line-A', planDate: day(-6),
+    id: 1, planNo: 'SPL-2026-0001', orderId: 1, unit: 'Unit-1 Tirupur', line: 'Line-A', planDate: day(-6),
     startDate: day(-4), endDate: day(18), totalQty: 1800, sam: 12.4,
     operators: 6, helpers: 2, workingHours: 8, targetEfficiencyPct: 65, pricePerPiece: 38,
     otherChargesPct: 8, loadingDate: day(-4), settingHours: 4, status: 'IN_PROGRESS',
@@ -76,7 +76,7 @@ export const seedPlans = [
     ],
   },
   {
-    id: 2, planNo: 'SPL-2026-0002', orderId: 2, line: 'Line-B', planDate: day(-1),
+    id: 2, planNo: 'SPL-2026-0002', orderId: 2, unit: 'Unit-1 Tirupur', line: 'Line-B', planDate: day(-1),
     startDate: day(6), endDate: day(35), totalQty: 1500, sam: 6.9,
     operators: 8, helpers: 3, workingHours: 8, targetEfficiencyPct: 55, pricePerPiece: 62,
     otherChargesPct: 10, loadingDate: day(6), settingHours: 6, status: 'DRAFT',
@@ -112,7 +112,7 @@ export const seedBomItems = {
 /** Cut parts receipts — from cutting Bundle Issue BIS-20260812-001 (B-1..B-3). */
 export const seedCutReceipts = [
   {
-    id: 1, receiptNo: 'SCR-20260812-001', orderId: 1, line: 'Line-A', bundleIssueNo: 'BIS-20260812-001',
+    id: 1, receiptNo: 'SCR-20260812-001', orderId: 1, unit: 'Unit-1 Tirupur', line: 'Line-A', bundleIssueNo: 'BIS-20260812-001',
     date: day(-3), receivedBy: 'Line Supervisor - G. Ravi', status: 'DISCREPANCY',
     bundles: [
       { size: 'S', bundleNo: 'B-1', serialRange: '1-50', qty: 50, quality: 'OK', remarks: '' },

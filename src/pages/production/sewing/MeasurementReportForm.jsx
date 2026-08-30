@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, Table, InputNumber, Input, Tag, DatePicker, Button } from 'antd';
-import { FileExcelOutlined } from '@ant-design/icons';
+import { App, Card, Space, Spin, Table, InputNumber, Input, Tag, DatePicker, Button, Upload } from 'antd';
+import { FileExcelOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import { MEASUREMENT_STAGES } from '../../../utils/sewingConstants';
-import { getMeasurement, saveMeasurement, getOrders, specPoints, fullMeasurementChart } from '../../../services/production/sewingService';
+import { MEASUREMENT_STAGES, sewingStatusLabel } from '../../../utils/sewingConstants';
+import { getMeasurement, saveMeasurement, getOrders, getOperators, specPoints, fullMeasurementChart } from '../../../services/production/sewingService';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
@@ -29,6 +29,8 @@ const MeasurementReportForm = () => {
   const isEdit = Boolean(id);
   const [report, setReport] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -36,12 +38,12 @@ const MeasurementReportForm = () => {
     (async () => {
       setLoading(true);
       try {
-        const [record, ords] = await Promise.all([isEdit ? getMeasurement(id) : Promise.resolve(null), getOrders()]);
-        setOrders(ords);
+        const [record, ords, emps] = await Promise.all([isEdit ? getMeasurement(id) : Promise.resolve(null), getOrders(), getOperators()]);
+        setOrders(ords); setEmployees(emps);
         const first = ords[0];
         setReport(record || {
           orderId: first?.id, stage: 'IN_LINE', size: first?.sizes[1] || first?.sizes[0],
-          date: dayjs().format('YYYY-MM-DD'), inspector: '', result: 'CONDITIONAL',
+          date: dayjs().format('YYYY-MM-DD'), inspector: null, result: 'CONDITIONAL',
           points: specPoints(first?.styleNo, first?.sizes[1] || first?.sizes[0]),
         });
       } catch { message.error('Failed to load report'); } finally { setLoading(false); }
@@ -57,9 +59,24 @@ const MeasurementReportForm = () => {
   const fails = useMemo(() => (report ? report.points.filter((p) => pointStatus(p).label === 'FAIL').length : 0), [report]);
 
   const columns = useMemo(() => [
-    { title: 'Measurement Point', dataIndex: 'point', width: 190 },
-    { title: 'Spec (cm)', dataIndex: 'spec', width: 90, align: 'right' },
-    { title: 'Tol ±', dataIndex: 'tol', width: 70, align: 'center' },
+    {
+      title: 'Measurement Point', dataIndex: 'point', width: 190,
+      render: (v, p, idx) => (p.manual
+        ? <Input size="small" value={v} placeholder="Point name" onChange={(e) => setPoint(idx, 'point', e.target.value)} />
+        : v),
+    },
+    {
+      title: 'Spec (cm)', dataIndex: 'spec', width: 100, align: 'right',
+      render: (v, p, idx) => (p.manual
+        ? <InputNumber size="small" step={0.1} controls={false} value={v} style={{ width: 80 }} onChange={(val) => setPoint(idx, 'spec', val)} />
+        : v),
+    },
+    {
+      title: 'Tol ±', dataIndex: 'tol', width: 90, align: 'center',
+      render: (v, p, idx) => (p.manual
+        ? <InputNumber size="small" step={0.1} controls={false} value={v} style={{ width: 70 }} onChange={(val) => setPoint(idx, 'tol', val)} />
+        : v),
+    },
     {
       title: 'Actual (cm)', dataIndex: 'actual', width: 110, align: 'center',
       render: (v, _, idx) => (
@@ -88,7 +105,7 @@ const MeasurementReportForm = () => {
   ], [setPoint]);
 
   const handleSave = async () => {
-    if (!report.inspector.trim()) return message.warning('Enter the inspector name');
+    if (!report.inspector) return message.warning('Select the inspector');
     const result = fails > 0 ? 'NOT_APPROVED' : report.points.some((p) => pointStatus(p).label === 'At limit') ? 'CONDITIONAL' : 'APPROVED';
     setSaving(true);
     try {
@@ -132,12 +149,12 @@ const MeasurementReportForm = () => {
           </div>
           <div>
             <FieldLabel>Stage</FieldLabel>
-            <FormSelect value={report.stage} style={{ width: 130 }}
-              options={MEASUREMENT_STAGES.map((s) => ({ value: s, label: s.replace('_', ' ') }))}
+            <FormSelect value={report.stage} style={{ width: 170 }}
+              options={MEASUREMENT_STAGES.map((s) => ({ value: s, label: sewingStatusLabel(s) }))}
               onChange={(v) => patch({ stage: v })} />
           </div>
           <div>
-            <FieldLabel>Size</FieldLabel>
+            <FieldLabel>Size (from style size preset)</FieldLabel>
             <FormSelect value={report.size} style={{ width: 90 }}
               options={(order?.sizes || []).map((s) => ({ value: s, label: s }))}
               onChange={(v) => patch({ size: v, points: specPoints(order?.styleNo, v) })} />
@@ -147,15 +164,39 @@ const MeasurementReportForm = () => {
             <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(report.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
           </div>
           <div>
-            <FieldLabel>Inspector</FieldLabel>
-            <Input value={report.inspector} style={{ width: 170 }} placeholder="QC name" onChange={(e) => patch({ inspector: e.target.value })} />
+            <FieldLabel>Inspector (employee master)</FieldLabel>
+            <FormSelect value={report.inspector} style={{ width: 190 }} placeholder="Select inspector" showSearch
+              options={employees.map((e) => ({ value: `${e.name} (${e.code})`, label: `${e.name} (${e.code})` }))}
+              onChange={(v) => patch({ inspector: v })} />
           </div>
           {fails > 0 && <Tag color="red" style={{ fontSize: 13 }}>{fails} point(s) out of tolerance — QA review</Tag>}
         </Space>
       </Card>
 
       <Card title={`Measurement Points — ${order?.styleNo || ''} · Size ${report.size}`}>
-        <Table rowKey="point" size="small" columns={columns} dataSource={report.points} pagination={false} scroll={{ x: 880 }} />
+        <Table rowKey={(r) => report.points.indexOf(r)} size="small" columns={columns} dataSource={report.points} pagination={false} scroll={{ x: 880 }} />
+        <Button icon={<PlusOutlined />} size="small" style={{ marginTop: 12 }}
+          onClick={() => patch({ points: [...report.points, { point: '', spec: null, tol: 0.5, actual: null, remarks: '', manual: true }] })}>
+          Add Measurement Point
+        </Button>
+      </Card>
+
+      <Card title="Reference Images (measurement photos / defects)" size="small" style={{ marginTop: 16 }}>
+        <Upload
+          listType="picture-card"
+          fileList={images}
+          accept="image/*"
+          beforeUpload={(file) => {
+            setImages((prev) => [...prev, {
+              uid: `${Date.now()}-${file.name}`, name: file.name, status: 'done',
+              url: URL.createObjectURL(file),
+            }]);
+            return false; // mock phase — kept locally, uploads at backend integration
+          }}
+          onRemove={(file) => setImages((prev) => prev.filter((f) => f.uid !== file.uid))}
+        >
+          <div><PlusOutlined /><div style={{ marginTop: 6 }}>Add Image</div></div>
+        </Upload>
       </Card>
     </div>
   );

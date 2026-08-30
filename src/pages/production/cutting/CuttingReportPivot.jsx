@@ -9,7 +9,7 @@ import { addReportLay, listMarkersForPo, listLayAudits } from '../../../services
 /**
  * FR-05 pivot — rows are lays, columns are sizes. Recording a lay now starts
  * from Marker # + Lay # (from lay audits) and cut qty auto-computes as
- * plies × marker ratio per size.
+ * height × marker ratio per size.
  */
 const CuttingReportPivot = ({ report, onLayAdded }) => {
   const { message } = App.useApp();
@@ -47,7 +47,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
           : <Tag>In-house</Tag>;
       },
     },
-    { title: 'Plies', dataIndex: 'plies', width: 70, align: 'center' },
+    { title: 'Height', dataIndex: 'plies', width: 70, align: 'center' },
     ...sizes.map((size) => ({
       title: size, dataIndex: size, width: 90, align: 'center',
       render: (v, r) => {
@@ -66,7 +66,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
   const marker = useMemo(() => markers.find((m) => m.id === draftMarkerId), [markers, draftMarkerId]);
   const markerLays = useMemo(() => lays.filter((l) => l.markerId === draftMarkerId), [lays, draftMarkerId]);
 
-  /** Cut qty per size = plies × marker ratio (auto, per CR note). */
+  /** Cut qty per size = height × marker ratio (auto, per CR note). */
   const autoQty = useMemo(() => {
     if (!marker || !draftPlies) return null;
     return Object.fromEntries(sizes.map((s) => [s, draftPlies * (marker.ratio?.[s] || 0)]));
@@ -79,7 +79,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
 
   const handleAdd = async () => {
     if (!draft.markerId || !draft.layAuditId) return message.warning('Select the Marker # and Lay # this cut belongs to');
-    if (!draft.plies) return message.warning('Enter the plies cut');
+    if (!draft.plies) return message.warning('Enter the height (plies) cut');
     const sizeQty = autoQty || {};
     const total = Object.values(sizeQty).reduce((s, v) => s + (v || 0), 0);
     if (!total) return message.warning('The selected marker has no size ratio — check the marker plan');
@@ -117,7 +117,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
                   const l = markerLays.find((x) => x.id === v);
                   setDraft((d) => ({ ...d, layAuditId: v, layNo: l?.layNo, date: l?.date ?? d.date, plies: l?.plies ?? d.plies }));
                 }} />
-              <span>Plies<InputNumber size="small" min={1} value={draft.plies} style={{ width: 80, marginLeft: 6 }} onChange={(v) => setDraft((d) => ({ ...d, plies: v }))} /></span>
+              <span>Height<InputNumber size="small" min={1} value={draft.plies} style={{ width: 80, marginLeft: 6 }} onChange={(v) => setDraft((d) => ({ ...d, plies: v }))} /></span>
               <DatePicker size="small" format="DD-MMM-YYYY" allowClear={false} value={dayjs(draft.date)} onChange={(d) => setDraft((x) => ({ ...x, date: d.format('YYYY-MM-DD') }))} />
               <FormSelect size="small" value={draft.cutBy} style={{ width: 120 }}
                 options={CUTTING_BY_OPTIONS.map((o) => ({ value: o, label: o }))} onChange={(v) => setDraft((d) => ({ ...d, cutBy: v }))} />
@@ -132,7 +132,7 @@ const CuttingReportPivot = ({ report, onLayAdded }) => {
               <Tag color="blue">Total {autoQty ? Object.values(autoQty).reduce((s, v) => s + v, 0) : 0} pcs</Tag>
             </Space>
             <span style={{ color: 'var(--text-secondary)' }}>
-              Cut qty auto-calculates: plies × marker ratio {marker ? `(${sizes.map((s) => marker.ratio?.[s] || 0).join(':')})` : ''} — no manual size entry.
+              Cut qty auto-calculates: height × marker ratio {marker ? `(${sizes.map((s) => marker.ratio?.[s] || 0).join(':')})` : ''} — no manual size entry.
             </span>
           </Space>
         )}
