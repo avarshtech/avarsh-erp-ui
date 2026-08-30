@@ -105,3 +105,47 @@ export const setSizeSetStatus = async (cutPoId, status, remarks) => {
   const { data } = await axiosInstance.put(`${BASE}/cut-pos/${cutPoId}/size-set`, { status, remarks });
   return data;
 };
+
+/* ── FR-03 Lay audit ─────────────────────────────────────────────────────── */
+
+export const listLayAudits = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/lay-audits`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const getLayAudit = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/lay-audits/${id}`);
+  return data;
+};
+
+export const saveLayAudit = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/lay-audits/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/lay-audits`, payload);
+  return data;
+};
+
+/** Lay numbers run per marker, so the next one is asked for per marker. */
+export const nextLayNo = async (markerId) => {
+  const { data } = await axiosInstance.get(`${BASE}/lay-audits/next-lay-no`, { params: { markerId } });
+  return data.layNo;
+};
+
+/* ── FR-04 TMB check ─────────────────────────────────────────────────────── */
+
+export const listTmbChecks = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/tmb-checks`, { params: { size: 200, ...params } });
+  return data.content;
+};
+
+export const getTmbCheck = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/tmb-checks/${id}`);
+  return data;
+};
+
+export const saveTmbCheck = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/tmb-checks/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/tmb-checks`, payload);
+  return data;
+};

@@ -34,17 +34,17 @@ export const deleteMarkerPlan = (...a) => api.deleteMarkerPlan(...a);
 export const listMarkersForPo = (...a) => api.listMarkersForPo(...a);
 export const setSizeSetStatus = (...a) => api.setSizeSetStatus(...a);
 
+export const nextLayNo = (...a) => api.nextLayNo(...a);
+
+export const listLayAudits = (...a) => api.listLayAudits(...a);
+export const getLayAudit = (...a) => api.getLayAudit(...a);
+export const saveLayAudit = (...a) => api.saveLayAudit(...a);
+
+export const listTmbChecks = (...a) => api.listTmbChecks(...a);
+export const getTmbCheck = (...a) => api.getTmbCheck(...a);
+export const saveTmbCheck = (...a) => api.saveTmbCheck(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const nextLayNo = (...a) => impl.nextLayNo(...a);
-
-export const listLayAudits = (...a) => impl.listLayAudits(...a);
-export const getLayAudit = (...a) => impl.getLayAudit(...a);
-export const saveLayAudit = (...a) => impl.saveLayAudit(...a);
-
-export const listTmbChecks = (...a) => impl.listTmbChecks(...a);
-export const getTmbCheck = (...a) => impl.getTmbCheck(...a);
-export const saveTmbCheck = (...a) => impl.saveTmbCheck(...a);
 
 export const getCuttingReport = (...a) => impl.getCuttingReport(...a);
 export const addReportLay = (...a) => impl.addReportLay(...a);
