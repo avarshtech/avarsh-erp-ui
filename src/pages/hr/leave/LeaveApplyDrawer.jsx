@@ -21,6 +21,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
   const fromDate = Form.useWatch('fromDate', form);
   const toDate = Form.useWatch('toDate', form);
   const leaveDate = Form.useWatch('leaveDate', form);
+  const selectedEmployeeCategory = employees.find((e) => e.id === selectedEmployeeId)?.category;
 
   useEffect(() => {
     searchEmployees({ status: 'ACTIVE', size: 500 })
@@ -37,6 +38,16 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
       setBalances([]);
     }
   }, [selectedEmployeeId]);
+
+  // Changing the employee can make an already-picked type inapplicable. Leaving
+  // it selected would submit a type this employee cannot take.
+  useEffect(() => {
+    if (!selectedLeaveTypeId || !selectedEmployeeCategory) return;
+    const picked = leaveTypes.find((lt) => lt.id === selectedLeaveTypeId);
+    if (picked?.applicableCategory && picked.applicableCategory !== selectedEmployeeCategory) {
+      form.setFieldValue('leaveTypeId', undefined);
+    }
+  }, [selectedEmployeeCategory, selectedLeaveTypeId, leaveTypes, form]);
 
   const getSelectedBalance = useCallback(() => {
     if (!selectedLeaveTypeId || !balances.length) return null;
@@ -88,9 +99,21 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
   const balance = getSelectedBalance();
   const days = calculateDays();
 
-  const leaveTypeOptions = leaveTypes.map((lt) => {
+  // A leave type can be limited to one employee category. Every active type was
+  // being offered regardless, so a STAFF employee could pick a WORKER-only type;
+  // the server then refused to provision a balance for it and the application
+  // failed on submit with no hint that the type was never available to them.
+  const applicableLeaveTypes = leaveTypes.filter((lt) => {
+    if (!lt.applicableCategory) return true;
+    if (!selectedEmployeeCategory) return true;
+    return lt.applicableCategory === selectedEmployeeCategory;
+  });
+
+  const leaveTypeOptions = applicableLeaveTypes.map((lt) => {
     const bal = balances.find((b) => b.leaveTypeId === lt.id);
-    const suffix = bal ? ` (Bal: ${bal.balance})` : '';
+    // closingBalance is what LeaveBalanceDTO carries; there is no `balance`,
+    // so this read "(Bal: undefined)" on every option.
+    const suffix = bal?.closingBalance != null ? ` (Bal: ${bal.closingBalance})` : '';
     return { value: lt.id, label: `${lt.name}${suffix}` };
   });
 
@@ -123,7 +146,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
         {balance && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">Available Balance: </Text>
-            <Text strong>{balance.balance}</Text>
+            <Text strong>{balance.closingBalance}</Text>
           </div>
         )}
         {/* A half day or single day needs one date, not a range. Asking for
