@@ -133,7 +133,21 @@ const LoanList = () => {
 
   return (
     <>
-      <PageHeader title="Loans & Advances" />
+      {/*
+        This said "Loans & Advances" while the screen only ever listed loans,
+        so the obvious conclusion was that advances belonged here and the button
+        for them was missing. They are separate records with separate recovery
+        rules and live on their own screen; the header now says what this one is
+        and points at the other.
+      */}
+      <PageHeader
+        title="Loans"
+        extra={
+          <Button type="link" onClick={() => navigate('/hr/advances')}>
+            Salary Advances
+          </Button>
+        }
+      />
       <Row gutter={16} style={{ marginBottom: 16 }} align="middle">
         <Col>
           <Select

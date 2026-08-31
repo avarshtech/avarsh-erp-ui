@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm, Alert, Drawer, Form, InputNumber, DatePicker } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -29,6 +30,7 @@ const monthName = (m) => (m >= 1 && m <= 12 ? dayjs().month(m - 1).format('MMM')
  */
 const AdvanceList = () => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -159,10 +161,15 @@ const AdvanceList = () => {
     <>
       <PageHeader
         title="Salary Advances"
-        extra={canAdd && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
-            New Advance
-          </Button>
+        extra={(
+          <Space>
+            <Button type="link" onClick={() => navigate('/hr/loans')}>Loans</Button>
+            {canAdd && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
+                New Advance
+              </Button>
+            )}
+          </Space>
         )}
       />
 
