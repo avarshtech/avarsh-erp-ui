@@ -2,6 +2,7 @@ import axios from 'axios';
 import axiosInstance from '../core/axiosInstance';
 import { getEmptyPermissions } from '../../utils/permissions';
 import { fetchAndCacheOrganisation } from '../admin/organisationService';
+import { getMyPermissions } from './permissionsService';
 import {
   setAccessToken,
   getAccessToken,
@@ -62,13 +63,19 @@ const normalizeTokenPermissions = (raw) => {
 
 /**
  * Build a user session object from a JWT and optional fallback user data.
+ *
+ * Permissions no longer travel in the JWT (they pushed the Authorization header past
+ * Tomcat's 8 KB limit); they are fetched from GET /me/permissions and passed in here.
+ *
  * @param {string} token - JWT access token
  * @param {object|null} fallbackUser - Existing user data to merge with
+ * @param {object|null} permissions - Permissions map from /me/permissions.
+ *   Falls back to the cached user's permissions when omitted.
  * @returns {object} User session object
  */
-const buildUserSession = (token, fallbackUser = null) => {
+const buildUserSession = (token, fallbackUser = null, permissions = null) => {
   const payload = decodeToken(token);
-  const rawPermissions = payload.permissions || {};
+  const rawPermissions = permissions ?? fallbackUser?.permissions ?? {};
   const normalizedPermissions = normalizeTokenPermissions(rawPermissions);
 
   return {
@@ -108,11 +115,32 @@ export const authenticateUser = async (username, password) => {
       return { success: false, message: 'Invalid response from server (missing token)' };
     }
 
-    const userSession = buildUserSession(token, { username, email: `${username}@avarsh.com` });
-
-    // Store token in memory (NOT in sessionStorage)
+    // Store token in memory (NOT in sessionStorage) BEFORE any authenticated call —
+    // the axios request interceptor reads it to attach the Authorization header.
     setAccessToken(token);
-    // Cache user display info in sessionStorage (token field is stripped automatically)
+
+    // Permissions are no longer a JWT claim; the session is not usable without them.
+    let permissions;
+    try {
+      ({ permissions } = await getMyPermissions());
+    } catch {
+      // Fail the login rather than proceed with an empty permission set — that would
+      // render an app with no menu and no reachable routes, which reads as a broken
+      // app rather than a failed sign-in.
+      clearAll();
+      return {
+        success: false,
+        message: "Signed in, but couldn't load your permissions. Please try again.",
+      };
+    }
+
+    const userSession = buildUserSession(
+      token,
+      { username, email: `${username}@avarsh.com` },
+      permissions
+    );
+
+    // Cache user display info in localStorage (token field is stripped automatically)
     cacheUserDisplay(userSession);
     // Mark that this tab has an active session (for page-refresh bootstrap)
     setSessionActiveFlag();
@@ -250,11 +278,23 @@ export const refreshSession = async () => {
 
     if (!newToken) return false;
 
-    const currentUser = getCurrentUser();
-    const updatedUser = buildUserSession(newToken, currentUser);
-
-    // Store new token in memory
+    // Store new token in memory BEFORE any authenticated call — the axios request
+    // interceptor reads it to attach the Authorization header.
     setAccessToken(newToken);
+
+    const currentUser = getCurrentUser();
+
+    // Permissions are cached from login and only change on re-login, so reuse them
+    // rather than paying a request on every refresh cycle. Fetch only when the cache
+    // is missing (e.g. bootstrap after storage was cleared). A failure here throws to
+    // the outer catch, which returns false — initializeSession then clears the session.
+    let permissions = currentUser?.permissions;
+    if (!permissions || Object.keys(permissions).length === 0) {
+      ({ permissions } = await getMyPermissions());
+    }
+
+    const updatedUser = buildUserSession(newToken, currentUser, permissions);
+
     // Update cached user display info
     cacheUserDisplay(updatedUser);
     // Ensure the session active flag is set
