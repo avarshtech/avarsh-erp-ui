@@ -1,5 +1,20 @@
-// Sample Request (SR) module constants — PRD v3.0.
-// Sample TYPES are user-defined master data (see srService.listSampleTypes), not an enum.
+// Sample Request (SR) module constants — PRD v3.0 + process-flow revision R2.
+
+/**
+ * FIXED sample-type list (R2): exactly these eight, fixed ids — no user-created
+ * types ("Others" covers ad-hoc cases). The mock master seeds verbatim from
+ * this constant; substitution default: Proto/Fit allowed, everything else not.
+ */
+export const SAMPLE_TYPE_LIST = [
+  { id: 1, name: 'Proto', colourSubstitutionDefault: true },
+  { id: 2, name: 'Fit', colourSubstitutionDefault: true },
+  { id: 3, name: 'Size Set', colourSubstitutionDefault: false },
+  { id: 4, name: 'Photoshoot Sample', colourSubstitutionDefault: false },
+  { id: 5, name: 'PP Sample', colourSubstitutionDefault: false },
+  { id: 6, name: 'Shipment Sample', colourSubstitutionDefault: false },
+  { id: 7, name: 'SMS', colourSubstitutionDefault: false },
+  { id: 8, name: 'Others', colourSubstitutionDefault: false },
+];
 
 export const SR_STATUS = {
   DRAFT: 'DRAFT',
@@ -90,6 +105,27 @@ export const SR_PRIORITY_OPTIONS = [
   { value: 'NORMAL', label: 'Normal' },
   { value: 'URGENT', label: 'Urgent' },
 ];
+
+// ── Dispatch entity (R2: one dispatch groups many SRs to one customer) ──
+export const DISPATCH_STATUS = { DRAFT: 'DRAFT', DISPATCHED: 'DISPATCHED' };
+
+export const DISPATCH_STATUS_LABELS = {
+  [DISPATCH_STATUS.DRAFT]: 'Draft',
+  [DISPATCH_STATUS.DISPATCHED]: 'Dispatched',
+};
+
+export const getDispatchStatusLabel = (s) => DISPATCH_STATUS_LABELS[s] || (s || '').replace(/_/g, ' ');
+
+// ── Invoice types (R2): COMMERCIAL = customs doc BEFORE dispatch;
+// SAMPLE = chargeable recovery invoice AFTER dispatch (non-converted samples) ──
+export const INVOICE_TYPES = { COMMERCIAL: 'COMMERCIAL', SAMPLE: 'SAMPLE' };
+
+export const INVOICE_TYPE_LABELS = {
+  [INVOICE_TYPES.COMMERCIAL]: 'Commercial Invoice',
+  [INVOICE_TYPES.SAMPLE]: 'Sample Invoice',
+};
+
+export const INVOICE_TYPE_SERIES = { [INVOICE_TYPES.COMMERCIAL]: 'EXSG', [INVOICE_TYPES.SAMPLE]: 'SA' };
 
 // ── Commercial invoice (PRD §10) ──
 export const SAMPLE_INVOICE_STATUS = {

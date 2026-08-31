@@ -75,4 +75,20 @@ export const nextSamplePoNo = (db) => {
   return `SPO/${fiscalYearLabel()}/${db.poSeq}`;
 };
 
+// Dispatch numbers — one dispatch groups many SRs to one customer (R2)
+export const nextDispatchNo = (db) => {
+  const year = new Date().getFullYear();
+  db.dspSeq = db.dspSeq || {};
+  db.dspSeq[year] = (db.dspSeq[year] || 0) + 1;
+  return `DSP-${year}-${String(db.dspSeq[year]).padStart(4, '0')}`;
+};
+
+// Sample-issue numbers — material issued against an SR (Submitted → In Production)
+export const nextSampleIssueNo = (db) => {
+  const year = new Date().getFullYear();
+  db.sriSeq = db.sriSeq || {};
+  db.sriSeq[year] = (db.sriSeq[year] || 0) + 1;
+  return `SRI-${year}-${String(db.sriSeq[year]).padStart(4, '0')}`;
+};
+
 export const isMemoryOnly = () => memoryDb != null;

@@ -1,6 +1,6 @@
 import { Row, Col, Input, Select, Alert, Typography, Statistic } from 'antd';
 import { amountInWords } from '../../../utils/amountInWords';
-import { SAMPLE_DECLARATION_BAND } from '../../../utils/sampleRequestConstants';
+import { SAMPLE_DECLARATION_BAND, INVOICE_TYPES } from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -8,19 +8,41 @@ const { TextArea } = Input;
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'INR'].map((c) => ({ value: c, label: c }));
 
 /**
- * Step 4 — declaration, totals and bank (PRD §10.6). The NOT-FOR-SALE band is
- * fixed; the declaration paragraph lives in the Company Profile so the CHA
- * can revert the wording without a code change (OQ3). Amount in words is
- * auto-generated — never typed.
+ * Step 4 — declaration, totals and bank, type-aware (R2). COMMERCIAL prints
+ * the fixed NOT-FOR-SALE band + customs declaration; SAMPLE (chargeable) has
+ * NO band and uses the actual-price declaration (ref SA011). Both paragraphs
+ * live in the Company Profile so the CHA can revert wording without a code
+ * change (OQ3). Amount in words is auto-generated — never typed.
  */
-const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => (
+const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => {
+  const isSample = inv.invoiceType === INVOICE_TYPES.SAMPLE;
+  return (
   <Row gutter={24}>
     <Col xs={24} md={12}>
-      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Sample Declaration (fixed — prints in bold above the totals)</Text>
-      <Input value={SAMPLE_DECLARATION_BAND} disabled style={{ backgroundColor: 'var(--bg-tertiary)', fontWeight: 600, marginBottom: 12 }} />
-      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Declaration Text (Company Master — confirm wording with your clearing agent)</Text>
-      <TextArea value={profile.extra?.declarationText || ''} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)', marginBottom: 12 }} />
-      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Bank Details (Company Master)</Text>
+      {isSample ? (
+        <Alert
+          type="info" showIcon style={{ marginBottom: 12 }}
+          message="Chargeable invoice — no NOT-FOR-SALE band"
+          description="The printed invoice shows the entered rates as the actual price with the declaration below. Recovery pricing guidance never prints."
+        />
+      ) : (
+        <>
+          <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Sample Declaration (fixed — prints in bold above the totals)</Text>
+          <Input value={SAMPLE_DECLARATION_BAND} disabled style={{ backgroundColor: 'var(--bg-tertiary)', fontWeight: 600, marginBottom: 12 }} />
+        </>
+      )}
+      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>
+        {isSample
+          ? 'Declaration Text (Company Master — actual-price wording)'
+          : 'Declaration Text (Company Master — confirm wording with your clearing agent)'}
+      </Text>
+      <TextArea
+        value={(isSample ? profile.extra?.declarationTextSample : profile.extra?.declarationText) || ''}
+        disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)', marginBottom: 12 }}
+      />
+      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>
+        Bank Details (Company Master{isSample ? ' — payment is expected against this invoice' : ''})
+      </Text>
       <TextArea value={profile.bankBlock} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)' }} />
     </Col>
     <Col xs={24} md={12}>
@@ -68,6 +90,7 @@ const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => (
       </Row>
     </Col>
   </Row>
-);
+  );
+};
 
 export default InvoiceStepDeclaration;

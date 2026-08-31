@@ -1,53 +1,37 @@
-import { Card, Typography, Tag, Button, Space } from 'antd';
-import { FileProtectOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Card, Typography, Tag } from 'antd';
+import { INVOICE_TYPES } from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 
 /**
- * Commercial Invoice panel (PRD §8.3/§8.4) — overseas consignees only.
- * Shows the linked invoice once raised, or the Generate Invoice route; the
- * overseas gate blocks Mark-as-Dispatched until one is issued.
+ * Read-only invoice panel (R2): invoices are raised from Dispatches → Invoices,
+ * never from the SR. Shows the linked invoice when one exists; overseas SRs
+ * without one get the explanatory hint (the dispatch gate enforces it).
  */
 const InvoicePanel = ({ sr, overseas }) => {
-  const navigate = useNavigate();
-  if (!overseas) return null;
-  const has = Boolean(sr.invoiceRef?.invoiceNo);
+  const ref = sr.invoiceRef;
+  if (!ref && !overseas) return null;
   return (
     <Card
       size="small"
-      title="Commercial Invoice"
-      extra={!has && <Tag color="red">Required — overseas</Tag>}
+      title="Invoice"
+      extra={!ref && overseas && <Tag color="red">Required before dispatch</Tag>}
     >
-      <Space direction="vertical" style={{ width: '100%' }}>
-        <div>
-          <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Consignee</Text>
-          <Text strong>{sr.buyerName} · {sr.buyerCountry}</Text> <Tag color="purple">overseas</Tag>
-        </div>
-        {has ? (
-          <div>
-            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Invoice No · Declared Value</Text>
-            <Text strong>{sr.invoiceRef.invoiceNo}</Text>
-            {sr.invoiceRef.declaredValue != null && (
-              <Text style={{ marginInlineStart: 8 }}>{sr.invoiceRef.declaredValue.toFixed(2)}</Text>
-            )}
-          </div>
-        ) : (
-          <>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              This package cannot be marked dispatched without an issued invoice. One invoice can cover several styles to the same consignee.
-            </Text>
-            <Button
-              type="primary"
-              block
-              icon={<FileProtectOutlined />}
-              onClick={() => navigate(`/sample-requests/invoices/new?srId=${sr.id}`)}
-            >
-              Generate Commercial Invoice
-            </Button>
-          </>
-        )}
-      </Space>
+      {ref ? (
+        <>
+          <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block' }}>
+            {ref.invoiceType === INVOICE_TYPES.SAMPLE ? 'Sample Invoice (chargeable)' : 'Commercial Invoice'}
+          </Text>
+          <Text strong>{ref.invoiceNo || 'DRAFT'}</Text>
+          {ref.declaredValue != null && <Text style={{ marginInlineStart: 8 }}>{ref.declaredValue.toFixed(2)}</Text>}
+        </>
+      ) : (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          Overseas consignee ({sr.buyerCountry}) — a commercial invoice must be issued before this
+          sample can ship. Raise it from <Text strong>Dispatches → Invoices</Text>; the dispatch
+          cannot be marked dispatched without it.
+        </Text>
+      )}
     </Card>
   );
 };

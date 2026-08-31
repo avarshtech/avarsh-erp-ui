@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useImperativeHandle } from 'react';
 import {
   App, Card, Form, DatePicker, Input, Select, Upload, Button, Table, Checkbox,
   Tag, Alert, Space, Typography, Steps, Row, Col, Spin,
@@ -9,7 +9,10 @@ import {
   recordFeedback, saveFeedbackDraft, listRejectionReasons,
   getFeedbackCategoryLabels, parseCommentSheet,
 } from '../../../services/sr/srService';
-import { FEEDBACK_DECISIONS, FEEDBACK_DECISION_OPTIONS, SR_STATUS } from '../../../utils/sampleRequestConstants';
+import {
+  FEEDBACK_DECISIONS, FEEDBACK_DECISION_OPTIONS, FEEDBACK_DECISION_LABELS,
+  SR_STATUS, getSrStatusLabel,
+} from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -21,15 +24,30 @@ const CONFIDENCE_TAG = {
   UNMAPPED: { color: 'red', label: 'Unmapped' },
 };
 
+const DECISION_TAG_COLOR = {
+  [FEEDBACK_DECISIONS.APPROVED]: 'green',
+  [FEEDBACK_DECISIONS.APPROVED_WITH_COMMENTS]: 'green',
+  [FEEDBACK_DECISIONS.REJECTED]: 'red',
+  [FEEDBACK_DECISIONS.REVISION_REQUIRED]: 'orange',
+};
+
+const IMPORT_EXTENSIONS = ['xlsx', 'xls', 'pdf'];
+const ATTACHMENT_EXTENSIONS = ['xlsx', 'xls', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp'];
+const extOf = (name) => String(name || '').split('.').pop().toLowerCase();
+
 /**
- * Buyer Comments panel (PRD v3 §8.5 — renamed from "Client Feedback").
- * Two routes into the same fields: the manual form, or importing the buyer's
- * own Excel/PDF comment sheet with a review-before-apply step. Apply only
- * fills the form — nothing commits until Save, so a bad parse can never
- * commit itself. Applied values are marked import-sourced in the activity log.
+ * Customer Comments capture (R2) — rendered inside the Customer Comments page
+ * dialog. Two routes into the same fields: the manual form, or importing the
+ * buyer's Excel/PDF comment sheet with a review-before-apply step. Decisions
+ * are TERMINAL — no next round is ever created (the buyer's spec sheet means
+ * ~95% of samples are never redone).
+ *
+ * Saving is driven from the dialog footer, so the two actions are exposed on a
+ * ref instead of being rendered here; the caller awaits them for its own
+ * button loading state.
  */
-const BuyerCommentsPanel = ({ sr, onChanged }) => {
-  const { message, modal } = App.useApp();
+const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
+  const { message } = App.useApp();
   const [form] = Form.useForm();
   const [reasons, setReasons] = useState([]);
   const [labels, setLabels] = useState({ fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' });
@@ -40,13 +58,13 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
   const [ticked, setTicked] = useState({});
   const [importSource, setImportSource] = useState(sr.feedback?.importSource || null);
   const [unmappedValues, setUnmappedValues] = useState(sr.feedback?.unmappedValues || []);
-  const [saving, setSaving] = useState(false);
-  const [savingDraft, setSavingDraft] = useState(false);
 
   const decision = Form.useWatch('decision', form);
   // Comments can be logged from Dispatched, or completed (decision recorded)
-  // while the SR rests at Feedback Received (PRD §14)
-  const editable = [SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(sr.status);
+  // while the SR rests at Feedback Received — terminal statuses are read-only,
+  // as is the whole form for a reader without sample-comments update rights
+  // (the dialog footer hides its save actions on the same condition).
+  const editable = canUpdate && [SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(sr.status);
 
   useEffect(() => {
     listRejectionReasons().then(setReasons).catch(() => {});
@@ -67,17 +85,20 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
       workmanship: f.comments?.workmanship,
       additional: f.comments?.additional,
     });
-    setAttachments(f.attachments || []);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sr.id]);
 
   const handleParse = async (file) => {
+    if (!IMPORT_EXTENSIONS.includes(extOf(file.name))) {
+      message.error(`${file.name}: only Excel (.xlsx / .xls) or PDF comment sheets can be imported`);
+      return Upload.LIST_IGNORE;
+    }
     if (file.size > 5 * 1024 * 1024) { message.error(`${file.name} exceeds 5 MB`); return Upload.LIST_IGNORE; }
     setParsing(true);
     try {
       const result = await parseCommentSheet(file);
       setParsed(result);
-      // High + Medium pre-ticked; Low + Unmapped confirmed deliberately (PRD §8.5)
+      // High + Medium pre-ticked; Low + Unmapped confirmed deliberately
       const init = {};
       result.rows.forEach((r) => { init[r.key] = r.confidence === 'HIGH' || r.confidence === 'MEDIUM'; });
       setTicked(init);
@@ -100,7 +121,7 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
     form.setFieldsValue(patch);
     setImportSource(parsed.fileName);
     // Unmapped values are never silently dropped — retained on the record and
-    // written to the Activity Log at save (PRD §8.5)
+    // written to the Activity Log at save
     setUnmappedValues(parsed.rows
       .filter((r) => r.confidence === 'UNMAPPED')
       .map((r) => ({ label: r.label, value: Array.isArray(r.value) ? r.value.join(', ') : String(r.value), sourceRef: r.sourceRef })));
@@ -123,48 +144,42 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
   });
 
   const handleSaveDraft = async () => {
-    setSavingDraft(true);
     try {
       await saveFeedbackDraft(sr.id, buildDto(form.getFieldsValue()));
       message.success('Comment record saved — status unchanged');
       onChanged?.();
     } catch (e) {
       message.error(e.message || 'Failed to save');
-    } finally { setSavingDraft(false); }
+    }
   };
 
+  // Decisions are terminal (R2) — no round creation, so no special confirm
   const handleSave = async () => {
     let values;
     try { values = await form.validateFields(); } catch { return; }
-    const isRevision = values.decision === FEEDBACK_DECISIONS.REVISION_REQUIRED;
-    const run = async () => {
-      setSaving(true);
-      try {
-        const { sampleRequest, revisionSr } = await recordFeedback(sr.id, buildDto(values));
-        if (revisionSr) {
-          message.success(`${sampleRequest.srNo} set to Revision Required — Round ${revisionSr.round} draft ${revisionSr.srNo} created`);
-        } else {
-          message.success(`Buyer comments saved — ${sampleRequest.srNo} is now ${sampleRequest.status.replace(/_/g, ' ')}`);
-        }
-        onChanged?.();
-      } catch (e) { message.error(e.message || 'Failed to save comments'); } finally { setSaving(false); }
-    };
-    if (isRevision) {
-      modal.confirm({
-        title: `Create Round ${(sr.round || 1) + 1}?`,
-        content: 'On save the system sets this SR to Revision Required and auto-creates the next round against the same BOM & Order — header and materials copied, this round\'s comments carried forward read-only, new deadline dates required.',
-        okText: `Save & Create Round ${(sr.round || 1) + 1}`,
-        onOk: run,
-      });
-    } else run();
+    try {
+      const { sampleRequest } = await recordFeedback(sr.id, buildDto(values));
+      message.success(`Comments saved — ${sampleRequest.srNo} is now ${getSrStatusLabel(sampleRequest.status)}`);
+      onChanged?.();
+      onClose?.();
+    } catch (e) { message.error(e.message || 'Failed to save comments'); }
   };
 
-  // Read-only rendering once feedback is committed
+  // The dialog footer owns the buttons and awaits these for its loading state
+  useImperativeHandle(ref, () => ({ saveDraft: handleSaveDraft, save: handleSave }));
+
+  // Read-only rendering once a terminal decision is committed
   if (!editable) {
     const f = sr.feedback;
-    if (!f) return null;
+    if (!f) return <Text type="secondary">No customer comments were recorded for this sample request.</Text>;
     return (
-      <Card size="small" style={{ marginTop: 16 }} title="Buyer Comments" extra={<Tag>{(f.decision || '').replace(/_/g, ' ')}</Tag>}>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text strong>Recorded Feedback</Text>
+          <Tag color={DECISION_TAG_COLOR[f.decision] || 'default'} style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>
+            {FEEDBACK_DECISION_LABELS[f.decision] || 'Draft — decision pending'}
+          </Tag>
+        </div>
         <Row gutter={[16, 8]}>
           <Col xs={12} sm={6}><Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Received</Text><Text strong>{f.date}</Text></Col>
           <Col xs={12} sm={6}><Text type="secondary" style={{ fontSize: 11, display: 'block' }}>From</Text><Text strong>{f.from}</Text></Col>
@@ -187,7 +202,7 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
             ))}
           </div>
         )}
-      </Card>
+      </div>
     );
   }
 
@@ -218,19 +233,21 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
   ];
 
   return (
-    <Card
-      size="small"
-      style={{ marginTop: 16 }}
-      title={sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'Buyer Comments — decision pending' : 'Log Buyer Comments'}
-      extra={<Tag color={sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'geekblue' : 'cyan'}>{sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'Feedback Received · Merchandiser' : 'Dispatched · Merchandiser'}</Tag>}
-    >
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Text strong>{sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'Customer comments — decision pending' : 'Log customer comments'}</Text>
+        <Tag color={sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'geekblue' : 'cyan'} style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>
+          {sr.status === SR_STATUS.FEEDBACK_RECEIVED ? 'Feedback Received · Merchandiser' : 'Dispatched · Merchandiser'}
+        </Tag>
+      </div>
+
       {/* ── Importer ── */}
-      <Card size="small" type="inner" style={{ marginBottom: 16 }} title="Import from buyer comment sheet">
+      <Card size="small" style={{ marginBottom: 16 }} title="Import from buyer comment sheet">
         <Steps
           size="small"
           current={importStep}
           items={[{ title: 'Upload' }, { title: 'Review & apply' }]}
-          style={{ maxWidth: 420, marginBottom: 12 }}
+          style={{ marginBottom: 12 }}
         />
         {importStep === 0 && (
           <Spin spinning={parsing} tip="Parsing comment sheet…">
@@ -304,10 +321,15 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
           <Col xs={24} sm={12}><Form.Item name="workmanship" label={`${labels.workmanship} Comments`}><TextArea rows={2} /></Form.Item></Col>
         </Row>
         <Form.Item name="additional" label="Additional Comments"><TextArea rows={1} placeholder="Anything not covered above…" /></Form.Item>
-        <Form.Item label="Attachments" extra="Buyer comment sheets or annotated photos · PDF or images · max 5 MB per file">
+        <Form.Item label="Attachments" extra="Buyer comment sheets or annotated photos · Excel, PDF or images · max 5 MB per file">
           <Upload
             multiple
+            accept=".xlsx,.xls,.pdf,image/*"
             beforeUpload={(file) => {
+              if (!ATTACHMENT_EXTENSIONS.includes(extOf(file.name))) {
+                message.error('Only Excel, PDF or image files are allowed');
+                return Upload.LIST_IGNORE;
+              }
               if (file.size > 5 * 1024 * 1024) { message.error(`${file.name} exceeds 5 MB`); return Upload.LIST_IGNORE; }
               setAttachments((prev) => [...prev, { name: file.name, size: file.size, type: file.type }]);
               return false;
@@ -318,17 +340,9 @@ const BuyerCommentsPanel = ({ sr, onChanged }) => {
             <Button icon={<UploadOutlined />}>Add attachment</Button>
           </Upload>
         </Form.Item>
-        <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button loading={savingDraft} onClick={handleSaveDraft}>Save as Draft</Button>
-          <Button type="primary" danger={decision === FEEDBACK_DECISIONS.REVISION_REQUIRED} loading={saving} onClick={handleSave}>
-            {decision === FEEDBACK_DECISIONS.REVISION_REQUIRED
-              ? `Save Comments & Create Round ${(sr.round || 1) + 1}`
-              : 'Save Comments'}
-          </Button>
-        </Space>
       </Form>
-    </Card>
+    </div>
   );
 };
 
-export default BuyerCommentsPanel;
+export default FeedbackCapture;

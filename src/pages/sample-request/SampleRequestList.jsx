@@ -3,7 +3,7 @@ import { App, Table, Card } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchSampleRequests, deleteSampleRequest,
-  listSampleTypes, listSrBuyers, getSampleDashboard, isOverseas,
+  listSampleTypes, listSrBuyers, getSampleDashboard,
 } from '../../services/sr/srService';
 import { hasPermission } from '../../utils/permissions';
 import { SR_STATUS_LABELS } from '../../utils/sampleRequestConstants';
@@ -135,8 +135,6 @@ const SampleRequestList = () => {
     onView: (record) => setViewId(record.id),
     onEdit: (record) => navigate(`/sample-requests/edit/${record.id}`),
     onDelete: handleDelete,
-    onGenerateInvoice: (record) => navigate(`/sample-requests/invoices/new?srId=${record.id}`),
-    isOverseasRow: (record) => isOverseas(record),
     canUpdate,
     canDelete,
   }), [navigate, handleDelete, canUpdate, canDelete]);
@@ -148,7 +146,7 @@ const SampleRequestList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Sample Requests">
+      <PageHeader title="Sample Requests" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         {canAdd && (
           <ActionButton action="create" text="New Sample Request" onClick={() => navigate('/sample-requests/new')} />
         )}
@@ -177,7 +175,7 @@ const SampleRequestList = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1530 }}
+          scroll={{ x: 1420 }}
           onRow={(record) => ({
             // PRD §8.1 — row click opens SR Detail (actions column stops propagation)
             onClick: () => setViewId(record.id),

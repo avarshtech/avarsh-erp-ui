@@ -406,12 +406,14 @@ const MainLayoutInner = () => {
       key: "/sample-requests",
       icon: <ExperimentOutlined />,
       label: "Sample Requests",
-      moduleId: "sample-requests",
+      // Each child is its own RBAC module (R2); the group shows if ANY is accessible.
+      // Creation happens via the list-page buttons — no "New …" menu items.
+      moduleId: ["sample-requests", "sample-dispatches", "sample-comments", "sample-invoices"],
       children: [
-        { key: "/sample-requests/list", label: "SR List" },
-        { key: "/sample-requests/new", label: "New Sample Request" },
-        { key: "/sample-requests/invoices/list", label: "Sample Invoices" },
-        { key: "/sample-requests/invoices/new", label: "New Invoice" },
+        { key: "/sample-requests/list", label: "SR List", moduleId: "sample-requests" },
+        { key: "/sample-requests/dispatches/list", label: "Dispatches", moduleId: "sample-dispatches" },
+        { key: "/sample-requests/comments", label: "Customer Comments", moduleId: "sample-comments" },
+        { key: "/sample-requests/invoices/list", label: "Invoices", moduleId: "sample-invoices" },
       ],
     },
     {

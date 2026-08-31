@@ -44,11 +44,15 @@ export const todayStr = () => {
 };
 
 // Derived, read-only decoration (never persisted)
-export const decorate = (sr) => {
+export const decorate = (sr, db = null) => {
   const out = clone(sr);
   out.daysToDispatch = daysRemaining(sr.dispatchDeadline);
   out.deadlineRag = deadlineRag(out.daysToDispatch);
   out.daysToApproval = daysRemaining(sr.buyerApprovalDeadline);
+  // Dispatch details live on the dispatch entity (R2) — resolve for the view
+  const store = db || loadDb();
+  const dispatch = (store.dispatches || []).find((d) => (d.srIds || []).includes(sr.id));
+  out.dispatchInfo = dispatch ? clone(dispatch) : null;
   out.materials = (out.materials || []).map((line) => {
     const stock = getStockStatus(line, line.sampleQtyRequired || 0);
     return { ...line, stockStatus: stock.status, stockAvailable: stock.available };
@@ -88,7 +92,7 @@ const matches = (sr, params) => {
 export const searchSampleRequests = async (params = {}) => {
   await delay();
   const db = loadDb();
-  const filtered = db.requests.filter((sr) => matches(sr, params)).map(decorate);
+  const filtered = db.requests.filter((sr) => matches(sr, params)).map((sr) => decorate(sr, db));
   filtered.sort((a, b) => (b.id - a.id));
   const size = Number(params.size ?? 10);
   const page = Number(params.page ?? 0);
@@ -107,15 +111,6 @@ export const getSampleRequest = async (id) => {
   const sr = loadDb().requests.find((r) => r.id === Number(id));
   if (!sr) fail('NOT_FOUND', `Sample request ${id} not found`);
   return decorate(sr);
-};
-
-export const getNextRound = async (orderNo, sampleTypeName) => {
-  const db = loadDb();
-  const rounds = db.requests
-    .filter((r) => r.orderNo === orderNo
-      && r.sampleTypeName?.toLowerCase() === String(sampleTypeName || '').toLowerCase())
-    .map((r) => r.round || 1);
-  return rounds.length ? Math.max(...rounds) + 1 : 1;
 };
 
 export const createSampleRequest = async (payload) => {
@@ -217,9 +212,18 @@ export const deleteSampleRequest = async (id) => {
 export const listByOrderNo = async (orderNo) => {
   await delay();
   const db = loadDb();
-  const rows = db.requests.filter((r) => r.orderNo === orderNo).map(decorate);
+  const rows = db.requests.filter((r) => r.orderNo === orderNo).map((sr) => decorate(sr, db));
   rows.sort((a, b) => a.id - b.id);
-  const totalCourierCost = rows.reduce((sum, r) => sum + (r.dispatch?.courierCost || 0), 0);
+  // Courier cost lives on the dispatch entity — count each dispatch ONCE
+  const seen = new Set();
+  let totalCourierCost = 0;
+  rows.forEach((r) => {
+    const d = r.dispatchInfo;
+    if (d && d.status === 'DISPATCHED' && !seen.has(d.id)) {
+      seen.add(d.id);
+      totalCourierCost += d.courierCost || 0;
+    }
+  });
   return { content: rows, totalCourierCost };
 };
 

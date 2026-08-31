@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Row, Col, Tag, Button, Space, Typography, Alert } from 'antd';
+import { App, Table, Card, Row, Col, Tag, Button, Space, Typography, Alert, Modal, Input } from 'antd';
 import {
   FileProtectOutlined, FileTextOutlined, SendOutlined, WarningOutlined,
 } from '@ant-design/icons';
@@ -8,6 +8,7 @@ import { listInvoices, cancelInvoice, duplicateInvoice, getInvoice } from '../..
 import { hasPermission } from '../../../utils/permissions';
 import {
   SAMPLE_INVOICE_STATUS, SAMPLE_INVOICE_STATUS_LABELS, getInvoiceStatusLabel,
+  INVOICE_TYPES, INVOICE_TYPE_LABELS,
 } from '../../../utils/sampleRequestConstants';
 import { SAMPLE_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { printSampleInvoice } from '../../../utils/sampleInvoicePdfGenerator';
@@ -26,12 +27,14 @@ import SampleInvoiceView from './SampleInvoiceView';
 const { Text } = Typography;
 
 /**
- * Sample Invoices list (PRD v3 §10.2) — landing page of the invoice area.
- * Invoice Qty is the whole invoice (incl. manual swatch lines); drafts show
- * no number so the series never gains gaps.
+ * Invoices list (R2) — landing page of the invoice area, both types under one
+ * menu: COMMERCIAL (customs doc before dispatch) and SAMPLE (chargeable, after
+ * dispatch). Invoice Qty is the whole invoice (incl. manual swatch lines);
+ * drafts show no number so the series never gains gaps. Cancel requires a
+ * reason — shown on the view and logged to the activity trail.
  */
 const SampleInvoiceList = () => {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const profile = useCompanyProfile();
   const [loading, setLoading] = useState(false);
@@ -39,11 +42,13 @@ const SampleInvoiceList = () => {
   const [stats, setStats] = useState(null);
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
+  const [typeFilter, setTypeFilter] = useState(undefined);
   const [dateRange, setDateRange] = useState(null);
   const [viewId, setViewId] = useState(null);
+  const [cancelState, setCancelState] = useState({ target: null, reason: '', saving: false });
 
-  const canAdd = hasPermission('sample-requests', 'add');
-  const canUpdate = hasPermission('sample-requests', 'update');
+  const canAdd = hasPermission('sample-invoices', 'add');
+  const canUpdate = hasPermission('sample-invoices', 'update');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -51,6 +56,7 @@ const SampleInvoiceList = () => {
       const params = {};
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
+      if (typeFilter) params.invoiceType = typeFilter;
       if (dateRange?.length === 2) {
         params.dateFrom = dateRange[0].format('YYYY-MM-DD');
         params.dateTo = dateRange[1].format('YYYY-MM-DD');
@@ -59,7 +65,7 @@ const SampleInvoiceList = () => {
       setRows(res.content);
       setStats(res.stats);
     } catch { message.error('Failed to load invoices'); } finally { setLoading(false); }
-  }, [debouncedSearch, statusFilter, dateRange, message]);
+  }, [debouncedSearch, statusFilter, typeFilter, dateRange, message]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -73,21 +79,24 @@ const SampleInvoiceList = () => {
     } finally { hide(); }
   }, [profile, message]);
 
+  // Cancel needs a MANDATORY reason (R2) — modal with required TextArea
   const handleCancel = useCallback((record) => {
-    modal.confirm({
-      title: `Cancel invoice ${record.invoiceNo}?`,
-      content: 'Issued invoices are immutable — cancelling releases its SRs for re-invoicing. Correct by cancelling and duplicating; the issued number is never altered.',
-      okText: 'Cancel Invoice',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          await cancelInvoice(record.id);
-          message.success(`${record.invoiceNo} cancelled — linked SRs released`);
-          fetchData();
-        } catch (e) { message.error(e.message || 'Failed to cancel'); }
-      },
-    });
-  }, [modal, message, fetchData]);
+    setCancelState({ target: record, reason: '', saving: false });
+  }, []);
+
+  const submitCancel = useCallback(async () => {
+    const { target, reason } = cancelState;
+    setCancelState((s) => ({ ...s, saving: true }));
+    try {
+      await cancelInvoice(target.id, reason.trim());
+      message.success(`${target.invoiceNo} cancelled — linked SRs released`);
+      setCancelState({ target: null, reason: '', saving: false });
+      fetchData();
+    } catch (e) {
+      message.error(e.message || 'Failed to cancel');
+      setCancelState((s) => ({ ...s, saving: false }));
+    }
+  }, [cancelState, message, fetchData]);
 
   const handleDuplicate = useCallback(async (record) => {
     try {
@@ -108,6 +117,14 @@ const SampleInvoiceList = () => {
           </span>
         )
         : <Tag onClick={() => navigate(`/sample-requests/invoices/edit/${r.id}`)} style={{ cursor: 'pointer' }}>DRAFT</Tag>),
+    },
+    {
+      title: 'Type', dataIndex: 'invoiceType', key: 'invoiceType', width: 150,
+      render: (t) => (
+        <Tag color={t === INVOICE_TYPES.SAMPLE ? 'gold' : 'geekblue'} style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>
+          {INVOICE_TYPE_LABELS[t] || t}
+        </Tag>
+      ),
     },
     { title: 'Date', dataIndex: 'invoiceDate', key: 'invoiceDate', width: 110, render: (d) => formatDate(d) },
     { title: 'Consignee', dataIndex: 'consigneeName', key: 'consigneeName', width: 180, ellipsis: true, render: (v) => <Text strong>{v}</Text> },
@@ -154,9 +171,9 @@ const SampleInvoiceList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Sample Invoices">
+      <PageHeader title="Invoices" style={{ position: 'sticky', top: 64, zIndex: 10 }}>
         {canAdd && (
-          <ActionButton action="create" text="New Commercial Invoice" onClick={() => navigate('/sample-requests/invoices/new')} />
+          <ActionButton action="create" text="New Invoice" onClick={() => navigate('/sample-requests/invoices/new')} />
         )}
       </PageHeader>
 
@@ -191,6 +208,14 @@ const SampleInvoiceList = () => {
               type: 'select',
               span: { xs: 12, sm: 8, md: 4, lg: 3 },
               props: {
+                placeholder: 'Type', value: typeFilter, onChange: setTypeFilter,
+                options: Object.entries(INVOICE_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+              },
+            },
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
                 placeholder: 'Status', value: statusFilter, onChange: setStatusFilter,
                 options: Object.entries(SAMPLE_INVOICE_STATUS_LABELS).map(([value, label]) => ({ value, label })),
               },
@@ -209,13 +234,13 @@ const SampleInvoiceList = () => {
           dataSource={rows}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1260 }}
+          scroll={{ x: 1410 }}
           pagination={false}
           locale={{
             emptyText: (
               <EmptyState
-                title="No sample invoices"
-                description="Overseas sample dispatch needs a commercial invoice — create one covering one or more styles."
+                title="No invoices"
+                description="Overseas dispatch needs a commercial invoice before it ships; a chargeable sample invoice recovers cost when a sample does not convert to a bulk order."
               />
             ),
           }}
@@ -231,6 +256,33 @@ const SampleInvoiceList = () => {
         onCancelInvoice={handleCancel}
         canUpdate={canUpdate}
       />
+
+      {/* Cancel with MANDATORY reason — stored on the invoice + activity trail */}
+      <Modal
+        title={`Cancel invoice ${cancelState.target?.invoiceNo || ''}?`}
+        open={cancelState.target != null}
+        okText="Cancel Invoice"
+        okButtonProps={{ danger: true, disabled: !cancelState.reason.trim() }}
+        cancelText="Keep Invoice"
+        confirmLoading={cancelState.saving}
+        onCancel={() => setCancelState({ target: null, reason: '', saving: false })}
+        onOk={submitCancel}
+        destroyOnHidden
+      >
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+          Issued invoices are immutable — cancelling releases its SRs for re-invoicing. Correct by
+          cancelling and duplicating; the issued number is never altered.
+        </Text>
+        <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          Cancellation Reason <Text type="danger">*</Text>
+        </Text>
+        <Input.TextArea
+          rows={3}
+          value={cancelState.reason}
+          placeholder="Mandatory — shown on the invoice view and logged in the activity trail"
+          onChange={(e) => setCancelState((s) => ({ ...s, reason: e.target.value }))}
+        />
+      </Modal>
     </div>
   );
 };

@@ -1,34 +1,32 @@
-import { useState } from 'react';
 import {
-  Card, Row, Col, Form, Select, InputNumber, Input, Segmented, Typography, Tag, Divider,
+  Card, Row, Col, Form, Select, InputNumber, Input, Segmented, Typography, Tag,
 } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
 import { SR_PRIORITY_OPTIONS } from '../../../utils/sampleRequestConstants';
 
-const { Text, Title } = Typography;
+const { Title } = Typography;
 const { TextArea } = Input;
 
 /**
- * Section B — Sample Details (PRD v3 §8.2 B).
- * Sample Type is a CREATABLE combobox over the user-defined master: typing an
- * unknown name offers "Create new type" (written to Master Data, substitution
- * defaults to Not allowed). The Colour/Design Substitution toggle pre-fills
- * from the selected type's default and is overridable per SR — it drives the
- * Section D lock state.
+ * Section B — Sample Details (R2).
+ * Sample Type is a FIXED list of eight (Proto, Fit, Size Set, Photoshoot
+ * Sample, PP Sample, Shipment Sample, SMS, Others) — no user-created types.
+ * The Colour/Design Substitution toggle pre-fills from the selected type's
+ * default and is overridable per SR — it drives the Section D lock state.
  */
-const SectionDetails = ({ form, sampleTypes, typesLoading = false, onCreateType, orderSizes, round }) => {
-  const [typeSearch, setTypeSearch] = useState('');
+const SectionDetails = ({ form, sampleTypes, typesLoading = false, orderSizes }) => {
   const substitution = Form.useWatch('colourSubstitutionAllowed', form);
-
-  const exactMatch = sampleTypes.some((t) => t.name.toLowerCase() === typeSearch.trim().toLowerCase());
-  const showCreate = typeSearch.trim() && !exactMatch;
 
   const options = sampleTypes.map((t) => ({
     value: t.id,
+    // alignItems centres the tag against the text — without it the tag
+    // stretches to the control height and its label rides high
     label: (
-      <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-        <span>{t.name}</span>
-        <Tag color={t.colourSubstitutionDefault ? 'green' : 'default'} style={{ marginInlineEnd: 0 }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+        <Tag
+          color={t.colourSubstitutionDefault ? 'green' : 'default'}
+          style={{ marginInlineEnd: 0, flexShrink: 0 }}
+        >
           {t.colourSubstitutionDefault ? 'Substitution: Allowed' : 'Substitution: Not allowed'}
         </Tag>
       </span>
@@ -43,43 +41,22 @@ const SectionDetails = ({ form, sampleTypes, typesLoading = false, onCreateType,
           <Form.Item
             name="sampleTypeId"
             label="Sample Type"
-            rules={[{ required: true, message: 'Select or create a sample type' }]}
-            tooltip="User-defined list — type a new name to create it (new types default to substitution Not allowed)"
+            rules={[{ required: true, message: 'Select a sample type' }]}
+            tooltip="Fixed list — Proto, Fit, Size Set, Photoshoot Sample, PP Sample, Shipment Sample, SMS, Others"
           >
             <Select
               showSearch
               loading={typesLoading}
-              placeholder="e.g. Fit — Revised"
+              placeholder="Select sample type"
               optionFilterProp="name"
-              onSearch={setTypeSearch}
               options={options}
               onChange={(id) => {
                 const type = sampleTypes.find((t) => t.id === id);
                 if (type) {
-                  // Pre-fill the per-SR override from the type default (PRD §9)
+                  // Pre-fill the per-SR override from the type default
                   form.setFieldValue('colourSubstitutionAllowed', Boolean(type.colourSubstitutionDefault));
                 }
               }}
-              popupRender={(menu) => (
-                <>
-                  {menu}
-                  {showCreate && (
-                    <>
-                      <Divider style={{ margin: '4px 0' }} />
-                      <div
-                        style={{ padding: '6px 12px', cursor: 'pointer', color: 'var(--primary-color)' }}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { onCreateType(typeSearch.trim()); setTypeSearch(''); }}
-                      >
-                        <PlusOutlined /> Create new type &quot;{typeSearch.trim()}&quot;
-                        <Text type="secondary" style={{ marginInlineStart: 8, fontSize: 11 }}>
-                          saves to Master Data · defaults to Not allowed
-                        </Text>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
             />
           </Form.Item>
         </Col>
@@ -142,7 +119,7 @@ const SectionDetails = ({ form, sampleTypes, typesLoading = false, onCreateType,
           </Form.Item>
         </Col>
         <Col xs={24} md={8} lg={12}>
-          <Form.Item name="specialInstructions" label={`Special Instructions${round > 1 ? ` (Round ${round})` : ''}`}>
+          <Form.Item name="specialInstructions" label="Special Instructions">
             <TextArea rows={1} placeholder="Buyer-specific requirements" />
           </Form.Item>
         </Col>

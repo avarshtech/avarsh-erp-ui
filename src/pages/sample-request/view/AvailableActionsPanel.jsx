@@ -1,15 +1,17 @@
 import { Card, Button, Space, Typography } from 'antd';
 import {
-  EditOutlined, SendOutlined, ToolOutlined, RollbackOutlined, CommentOutlined, DeleteOutlined,
+  EditOutlined, SendOutlined, ToolOutlined, RollbackOutlined, CommentOutlined,
+  DeleteOutlined, CarOutlined,
 } from '@ant-design/icons';
 import { SR_STATUS } from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 
 /**
- * Available Actions (PRD §8.3): status- and role-gated. Unavailable actions
- * stay visible but DISABLED, with the reason on its own line beneath the
- * label — full-width and wrap-safe, so long reasons never get cut off.
+ * Available Actions (R2). Status- and role-gated; unavailable actions stay
+ * visible but DISABLED with the reason beneath the label. Production starts
+ * via material issue (inventory), dispatching via the Dispatches screen, and
+ * feedback on the Customer Comments page — those rows NAVIGATE there.
  */
 const ActionRow = ({ enabled, reason, icon, label, onClick, danger, primary }) => (
   <Button
@@ -34,7 +36,7 @@ const ActionRow = ({ enabled, reason, icon, label, onClick, danger, primary }) =
   </Button>
 );
 
-const AvailableActionsPanel = ({ sr, canUpdate, canDelete, handlers }) => {
+const AvailableActionsPanel = ({ sr, canUpdate, canDelete, canIssue, handlers }) => {
   const s = sr.status;
   const terminal = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED].includes(s);
   return (
@@ -52,25 +54,33 @@ const AvailableActionsPanel = ({ sr, canUpdate, canDelete, handlers }) => {
         />
         <ActionRow
           enabled={s === SR_STATUS.SUBMITTED && canUpdate}
-          reason={!canUpdate ? 'Needs update permission' : 'Available once Submitted — Production team accepts the SR'}
-          icon={<ToolOutlined />} label="Start Production" primary onClick={handlers.onStartProduction}
-        />
-        <ActionRow
-          enabled={s === SR_STATUS.SUBMITTED && canUpdate}
           reason="Available only while Submitted — returned for edits"
           icon={<RollbackOutlined />} label="Return to Draft" onClick={handlers.onReturnToDraft}
         />
         <ActionRow
-          enabled={s === SR_STATUS.IN_PRODUCTION && canUpdate}
-          reason={!canUpdate ? 'Needs update permission' : 'Available while In Production — Dispatch / QC role'}
-          icon={<SendOutlined />} label="Update Dispatch Details" primary onClick={handlers.onGoDispatch}
+          // Gated on the issue screen's own permission — the route it opens is
+          // wrapped in PermissionRoute, so an ungated button dead-ends on a 403
+          enabled={s === SR_STATUS.SUBMITTED && canIssue}
+          reason={!canIssue
+            ? 'Needs Material Issue (add) permission'
+            : 'Production starts when material is issued — available once Submitted'}
+          icon={<ToolOutlined />} primary
+          label="Issue Materials & Start Production"
+          onClick={handlers.onGoMaterialIssue}
         />
         <ActionRow
-          enabled={[SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(s) && canUpdate}
-          reason={!canUpdate ? 'Needs update permission' : 'Available once the sample is Dispatched'}
-          icon={<CommentOutlined />}
-          label={s === SR_STATUS.FEEDBACK_RECEIVED ? 'Record Buyer Decision' : 'Log Buyer Comments'}
-          primary onClick={handlers.onGoComments}
+          enabled={s === SR_STATUS.IN_PRODUCTION}
+          reason="Available while In Production — several SRs of one customer ship together"
+          icon={<CarOutlined />} primary
+          label="Add to a Dispatch"
+          onClick={handlers.onGoDispatches}
+        />
+        <ActionRow
+          enabled={[SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(s)}
+          reason={terminal ? 'Feedback recorded — SR is closed' : 'Available once the sample is Dispatched'}
+          icon={<CommentOutlined />} primary
+          label={s === SR_STATUS.FEEDBACK_RECEIVED ? 'Record Customer Decision' : 'Record Customer Feedback'}
+          onClick={handlers.onGoComments}
         />
         <ActionRow
           enabled={s === SR_STATUS.DRAFT && canDelete}

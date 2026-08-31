@@ -8,10 +8,11 @@ import { formatDate } from '../../../utils/formatters';
 const { Text } = Typography;
 
 /**
- * Step 1 — style selection (PRD §10.3). Eligible = In Production or later,
- * not covered by an issued invoice, not already dispatched. Ineligible rows
- * are greyed with the reason shown; consignee + destination must match across
- * every line of one invoice.
+ * Step 1 — style selection, type-aware (R2). COMMERCIAL: overseas SRs at
+ * In Production not yet covered (raised BEFORE dispatch — feeds the dispatch
+ * gate). SAMPLE: any dispatched-or-closed SR of one customer not on an issued
+ * sample invoice. Ineligible rows are greyed with the reason shown; consignee
+ * + destination must match across every line of one invoice.
  */
 const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
   const resolved = useMemo(() => {
@@ -42,7 +43,6 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
       title: 'Sample Type', dataIndex: 'sampleTypeName', key: 'sampleTypeName', width: 170,
       render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>,
     },
-    { title: 'Round', dataIndex: 'round', key: 'round', width: 70, align: 'center', render: (v) => `R${v}` },
     { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70, align: 'right' },
     {
       title: 'Status', key: 'status', width: 235,
@@ -67,7 +67,7 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
         dataSource={eligible}
         pagination={false}
         rowClassName={(r) => (!r.eligible && !selectedIds.includes(r.id) ? 'ant-table-row-disabled' : '')}
-        scroll={{ x: 1180 }}
+        scroll={{ x: 1110 }}
         footer={() => (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Text>

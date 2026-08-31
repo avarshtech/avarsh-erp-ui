@@ -3,7 +3,7 @@
  * Sample types are user-maintainable through the creatable combobox (PRD §8.2 B);
  * the rest are read-only lists in this phase.
  */
-import { loadDb, saveDb } from './srMockStore';
+import { loadDb } from './srMockStore';
 
 const delay = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -11,30 +11,6 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 export const listSampleTypes = async () => {
   await delay();
   return clone(loadDb().masters.sampleTypes.filter((t) => t.active !== false));
-};
-
-/**
- * Creatable combobox path — writes the new type to Master Data.
- * New types default to substitution NOT allowed (PRD §9: the safe direction —
- * an un-reviewed type must not silently unlock buyer-approved colours).
- */
-export const createSampleType = async (name) => {
-  await delay();
-  const db = loadDb();
-  const trimmed = String(name || '').trim();
-  if (!trimmed) { const e = new Error('Type name is required'); e.code = 'VALIDATION'; throw e; }
-  const existing = db.masters.sampleTypes.find((t) => t.name.toLowerCase() === trimmed.toLowerCase());
-  if (existing) return clone(existing);
-  const created = {
-    id: Math.max(0, ...db.masters.sampleTypes.map((t) => t.id)) + 1,
-    name: trimmed,
-    colourSubstitutionDefault: false,
-    active: true,
-    custom: true,
-  };
-  db.masters.sampleTypes.push(created);
-  saveDb(db);
-  return clone(created);
 };
 
 export const listCouriers = async () => {

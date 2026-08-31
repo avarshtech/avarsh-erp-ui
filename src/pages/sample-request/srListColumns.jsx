@@ -1,5 +1,4 @@
 import { Tag, Typography, Space } from 'antd';
-import { FileProtectOutlined } from '@ant-design/icons';
 import StatusTag from '../../components/StatusTag';
 import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
@@ -11,12 +10,12 @@ import DaysRemainingTag from './DaysRemainingTag';
 const { Text } = Typography;
 
 /**
- * SR List columns (PRD v3 §8.1). Draft rows lead with Edit, everything else
- * with View; the ⋮ menu holds the role/status-gated secondary actions —
- * including Generate Invoice for overseas SRs.
+ * SR List columns (R2). Direct role/status-gated action buttons — invoices are
+ * generated after DISPATCH creation (Dispatches → Invoices), never from here;
+ * rounds are not used, so there is no Round column.
  */
 export const buildSrColumns = ({
-  onView, onEdit, onDelete, onGenerateInvoice, isOverseasRow, canUpdate, canDelete,
+  onView, onEdit, onDelete, canUpdate, canDelete,
 }) => [
   {
     title: 'SR Number',
@@ -53,14 +52,6 @@ export const buildSrColumns = ({
     ),
   },
   {
-    title: 'Round',
-    dataIndex: 'round',
-    key: 'round',
-    width: 70,
-    align: 'center',
-    render: (r) => <Tag>{`R${r || 1}`}</Tag>,
-  },
-  {
     title: 'Status',
     dataIndex: 'status',
     key: 'status',
@@ -90,11 +81,10 @@ export const buildSrColumns = ({
     title: 'Days Remaining',
     key: 'daysRemaining',
     width: 150,
-    // Terminal rows show a short outcome chip (PRD Figure 1: "→ Round 2 created")
-    // instead of repeating the long Status badge and clipping it.
+    // Terminal rows show a short outcome chip instead of repeating the Status badge
     render: (_, record) => {
       if (record.status === SR_STATUS.REVISION_REQUIRED) {
-        return <Tag color="orange" style={{ whiteSpace: 'nowrap' }}>{`→ Round ${(record.round || 1) + 1} created`}</Tag>;
+        return <Tag color="orange" style={{ whiteSpace: 'nowrap' }}>Closed — revision noted</Tag>;
       }
       if (record.status === SR_STATUS.APPROVED) return <Tag color="green">Closed</Tag>;
       if (record.status === SR_STATUS.REJECTED) return <Tag>Closed</Tag>;
@@ -109,7 +99,7 @@ export const buildSrColumns = ({
     title: 'Actions',
     key: 'actions',
     fixed: 'right',
-    width: 145,
+    width: 120,
     // Row click opens the detail — keep action clicks from bubbling into it
     onCell: () => ({ onClick: (e) => e.stopPropagation() }),
     // All actions are direct icon buttons (no grouped ⋮ menu), role/status gated
@@ -120,15 +110,6 @@ export const buildSrColumns = ({
           <ActionButton action="view" size="small" onClick={() => onView(record)} />
           {draft && canUpdate && (
             <ActionButton action="edit" size="small" onClick={() => onEdit(record)} />
-          )}
-          {isOverseasRow(record) && canUpdate && (
-            <ActionButton
-              action="custom"
-              size="small"
-              icon={<FileProtectOutlined />}
-              tooltip="Generate Invoice"
-              onClick={() => onGenerateInvoice(record)}
-            />
           )}
           {isSrDeletable(record.status) && canDelete && (
             <ActionButton action="delete" size="small" onClick={() => onDelete(record)} />

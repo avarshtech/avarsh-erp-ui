@@ -1,21 +1,36 @@
 import { useState, useCallback } from 'react';
 import { Segmented } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import FabricIssueList from './FabricIssueList';
 import AccessoriesIssueList from './AccessoriesIssueList';
+import SampleRequestIssuePane from './SampleRequestIssuePane';
+
+const NEW_ISSUE_PATH = {
+  Fabric: '/inventory/issue/fabric/new',
+  Accessories: '/inventory/issue/accessories/new',
+  SampleRequest: '/inventory/issue/sample/new',
+};
+const NEW_ISSUE_TEXT = {
+  Fabric: 'New Fabric Issue',
+  Accessories: 'New Accessories Issue',
+  SampleRequest: 'New Sample Issue',
+};
 
 const MaterialIssuePage = () => {
   const navigate = useNavigate();
-  const [activeSegment, setActiveSegment] = useState('Fabric');
+  const [searchParams] = useSearchParams();
+  // ?segment= lets a form return the user to the segment they came from
+  const [activeSegment, setActiveSegment] = useState(() => {
+    const requested = searchParams.get('segment');
+    // hasOwn, not a bare lookup — 'constructor'/'toString' would pass truthiness
+    return Object.prototype.hasOwnProperty.call(NEW_ISSUE_PATH, requested) ? requested : 'Fabric';
+  });
 
   const handleNewIssue = useCallback(() => {
-    const path = activeSegment === 'Fabric'
-      ? '/inventory/issue/fabric/new'
-      : '/inventory/issue/accessories/new';
-    navigate(path);
+    navigate(NEW_ISSUE_PATH[activeSegment]);
   }, [activeSegment, navigate]);
 
   return (
@@ -28,7 +43,7 @@ const MaterialIssuePage = () => {
         {hasPermission('inventory-issue', 'add') && (
           <ActionButton
             action="create"
-            text={activeSegment === 'Fabric' ? 'New Fabric Issue' : 'New Accessories Issue'}
+            text={NEW_ISSUE_TEXT[activeSegment]}
             onClick={handleNewIssue}
           />
         )}
@@ -38,6 +53,7 @@ const MaterialIssuePage = () => {
         options={[
           { label: 'Fabric Material Issue', value: 'Fabric' },
           { label: 'Accessories Material Issue', value: 'Accessories' },
+          { label: 'Sample Request Issue', value: 'SampleRequest' },
         ]}
         value={activeSegment}
         onChange={setActiveSegment}
@@ -51,11 +67,9 @@ const MaterialIssuePage = () => {
         }}
       />
 
-      {activeSegment === 'Fabric' ? (
-        <FabricIssueList embedded />
-      ) : (
-        <AccessoriesIssueList embedded />
-      )}
+      {activeSegment === 'Fabric' && <FabricIssueList embedded />}
+      {activeSegment === 'Accessories' && <AccessoriesIssueList embedded />}
+      {activeSegment === 'SampleRequest' && <SampleRequestIssuePane />}
     </div>
   );
 };

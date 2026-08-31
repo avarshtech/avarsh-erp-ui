@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Form, Card, Space, Skeleton, Alert, Result, Spin } from 'antd';
+import { App, Form, Card, Row, Col, Space, Skeleton, Alert, Result, Spin } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
   createSampleRequest, updateSampleRequest, changeStatus, getSampleRequest,
-  listSampleTypes, createSampleType, getNextRound,
+  listSampleTypes,
 } from '../../services/sr/srService';
 import { SR_STATUS } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
@@ -21,6 +21,10 @@ import RaisePoDrawer from './form/RaisePoDrawer';
 import { getStockStatus } from '../../services/sr/srService';
 
 const toDate = (v) => (v ? dayjs(v) : null);
+
+// Same sticky header card as the Supplier PO form — actions stay reachable
+// however far down the materials table the user has scrolled.
+const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 
 const SampleRequestForm = () => {
   const { message, modal } = App.useApp();
@@ -37,7 +41,6 @@ const SampleRequestForm = () => {
   const [sampleTypes, setSampleTypes] = useState([]);
   const [typesLoading, setTypesLoading] = useState(true);
   const [poPreparing, setPoPreparing] = useState(false);
-  const [round, setRound] = useState(1);
   const [savedId, setSavedId] = useState(id ? Number(id) : null);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -60,7 +63,6 @@ const SampleRequestForm = () => {
     setMaterials(draft.materials);
     if (draft.mode === 'edit' && draft.record) {
       const r = draft.record;
-      setRound(r.round || 1);
       form.setFieldsValue({
         sampleTypeId: r.sampleTypeId,
         colourSubstitutionAllowed: Boolean(r.colourSubstitutionAllowed),
@@ -80,12 +82,6 @@ const SampleRequestForm = () => {
     setIsDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.loading, draft.mode]);
-
-  // Round auto-increments per order + sample-type chain
-  useEffect(() => {
-    if (draft.mode !== 'create' || !typeName || !draft.header?.orderNo) return;
-    getNextRound(draft.header.orderNo, typeName).then(setRound).catch(() => {});
-  }, [typeName, draft.header?.orderNo, draft.mode]);
 
   // Toggling substitution OFF resets any edited colours back to BOM values
   useEffect(() => {
@@ -136,7 +132,7 @@ const SampleRequestForm = () => {
       sampleTypeId: v.sampleTypeId ?? null,
       sampleTypeName: typeName,
       colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
-      round,
+      round: 1, // rounds unused in R2 — dormant internal field
       sampleQty: v.sampleQty ?? null,
       sizes: v.sizes || [],
       colourReference: v.colourReference || '',
@@ -217,20 +213,10 @@ const SampleRequestForm = () => {
     });
   };
 
-  const handleCreateType = async (name) => {
-    try {
-      const created = await createSampleType(name);
-      const types = await listSampleTypes();
-      setSampleTypes(types);
-      form.setFieldsValue({ sampleTypeId: created.id, colourSubstitutionAllowed: Boolean(created.colourSubstitutionDefault) });
-      message.success(`Sample type "${created.name}" saved to Master Data (substitution: Not allowed)`);
-    } catch (e) { message.error(e.message || 'Failed to create type'); }
-  };
-
   if (draft.needsPicker) {
     return (
       <div className="animate-fade-in-up">
-        <PageHeader title="New Sample Request" />
+        <PageHeader title="New Sample Request" style={STICKY_HEADER} />
         <SampleOrderPicker
           onPick={setPickedOrderNo}
           resolving={draft.loading && Boolean(pickedOrderNo)}
@@ -239,7 +225,74 @@ const SampleRequestForm = () => {
       </div>
     );
   }
-  if (draft.loading) return <Card><Skeleton active paragraph={{ rows: 8 }} /></Card>;
+  if (draft.loading) {
+    return (
+      <div className="animate-fade-in-up">
+        <div className="page-header" style={STICKY_HEADER}>
+          <Space>
+            <Skeleton.Button active size="small" style={{ width: 32, height: 32 }} />
+            <Skeleton.Input active style={{ width: 200 }} />
+          </Space>
+          <Space>
+            <Skeleton.Button active style={{ width: 90 }} />
+            <Skeleton.Button active style={{ width: 130 }} />
+            <Skeleton.Button active style={{ width: 180 }} />
+          </Space>
+        </div>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 16 }} />
+          <Row gutter={[24, 16]}>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+              <Col xs={12} sm={8} md={6} key={i}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 4 }} block={false} />
+                <Skeleton.Input active size="small" block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Row gutter={16}>
+            {[[1, 6], [2, 6], [3, 4], [4, 8]].map(([k, lg]) => (
+              <Col xs={24} sm={12} md={8} lg={lg} key={k} style={{ marginBottom: 16 }}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={10} lg={8} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+            <Col xs={24} md={8} lg={12} style={{ marginBottom: 16 }}>
+              <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+              <Skeleton.Input active block />
+            </Col>
+          </Row>
+        </Card>
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Row gutter={16}>
+            {[1, 2, 3].map((i) => (
+              <Col xs={24} sm={8} key={i} style={{ marginBottom: 16 }}>
+                <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                <Skeleton.Input active block />
+              </Col>
+            ))}
+          </Row>
+        </Card>
+        <Card size="small">
+          <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+          <Skeleton active paragraph={{ rows: 5 }} />
+        </Card>
+      </div>
+    );
+  }
   if (draft.error === 'NOT_EDITABLE') {
     return (
       <Result
@@ -256,22 +309,26 @@ const SampleRequestForm = () => {
 
   return (
     <div className="animate-fade-in-up">
+      <PageHeader
+        title={savedId ? 'Edit Sample Request' : 'New Sample Request'}
+        onBack={handleCancel}
+        style={STICKY_HEADER}
+      >
+        <ActionButton action="close" text="Cancel" onClick={handleCancel} />
+        <ActionButton action="save" variant="draft" text="Save as Draft" loading={saving} onClick={handleSaveDraft} />
+        <ActionButton action="send" text="Submit Sample Request" loading={saving} onClick={handleSubmit} />
+      </PageHeader>
       <Spin spinning={poPreparing} tip="Preparing sample PO…">
-      <PageHeader title={savedId ? `Edit Sample Request — Round ${round}` : `New Sample Request — Round ${round}`} />
       <SectionHeader
         srNo={draft.record?.srNo}
         header={draft.header}
-        round={round}
-        priorFeedbackRef={draft.record?.priorFeedbackRef}
       />
       <Form form={form} layout="vertical" onValuesChange={() => setIsDirty(true)}>
         <SectionDetails
           form={form}
           sampleTypes={sampleTypes}
           typesLoading={typesLoading}
-          onCreateType={handleCreateType}
           orderSizes={draft.orderSizes}
-          round={round}
         />
         <SectionDeadlines form={form} />
         <MaterialsTable
@@ -286,13 +343,6 @@ const SampleRequestForm = () => {
         />
         <SummaryBar totals={totals} onRaisePoFromShortfall={() => handleRaisePo(null)} />
       </Form>
-      <Card size="small">
-        <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <ActionButton action="close" text="Cancel" onClick={handleCancel} />
-          <ActionButton action="save" variant="draft" text="Save as Draft" loading={saving} onClick={handleSaveDraft} />
-          <ActionButton action="send" text="Submit Sample Request" loading={saving} onClick={handleSubmit} />
-        </Space>
-      </Card>
       </Spin>
       <RaisePoDrawer
         open={poDrawer.open}

@@ -122,6 +122,12 @@ export const SR_STATUS_CONFIG = {
   [SR_STATUS.REVISION_REQUIRED]: { color: 'orange',     icon: UndoOutlined },
 };
 
+// ==================== SAMPLE DISPATCH STATUS CONFIG ====================
+export const SR_DISPATCH_STATUS_CONFIG = {
+  DRAFT:      { color: 'default', icon: FileTextOutlined },
+  DISPATCHED: { color: 'cyan',    icon: SendOutlined },
+};
+
 // ==================== SAMPLE INVOICE STATUS CONFIG ====================
 export const SAMPLE_INVOICE_STATUS_CONFIG = {
   [SAMPLE_INVOICE_STATUS.DRAFT]:      { color: 'default', icon: FileTextOutlined },

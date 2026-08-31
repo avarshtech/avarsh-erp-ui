@@ -47,7 +47,13 @@ const ViewDialog = memo(({
             <Title level={3} style={{ margin: 0, lineHeight: 1.3 }}>
               {hero.title}
             </Title>
-            {hero.status && <span>{hero.status}</span>}
+            {/* Own gap: `status` is usually several badges, and relying on each
+                tag's trailing margin leaves them touching */}
+            {hero.status && (
+              <span className="status-badge-group" style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                {hero.status}
+              </span>
+            )}
             {hero.tags?.length > 0 && (
               <Space size={4} wrap>
                 {hero.tags.map((tag, i) => (

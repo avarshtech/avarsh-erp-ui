@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { App, Row, Col, Card, Table, Typography, Tag, Collapse, Skeleton } from 'antd';
+import { App, Row, Col, Card, Table, Typography, Tag, Collapse, Skeleton, Alert } from 'antd';
 import ViewDialog from '../../../components/ViewDialog';
 import StatusTag from '../../../components/StatusTag';
 import ActivityTimeline from '../../../components/ActivityTimeline';
@@ -7,6 +7,7 @@ import { ActionButton } from '../../../components/buttons';
 import { SAMPLE_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   SAMPLE_INVOICE_STATUS, getInvoiceStatusLabel, SAMPLE_DECLARATION_BAND,
+  INVOICE_TYPES, INVOICE_TYPE_LABELS,
 } from '../../../utils/sampleRequestConstants';
 import { amountInWords } from '../../../utils/amountInWords';
 import { formatDate } from '../../../utils/formatters';
@@ -24,9 +25,11 @@ const Field = ({ label, children, span = { xs: 12, sm: 8, md: 6 } }) => (
 );
 
 /**
- * Read-only Commercial Invoice view (opened from the Sample Invoices list).
+ * Read-only invoice view (opened from the Invoices list) — type-aware (R2):
+ * commercial shows the NOT-FOR-SALE band, chargeable sample invoices don't.
  * Issued invoices are immutable — this is a VIEW, not the edit wizard;
- * corrections go through Cancel + Duplicate (PRD §10.8).
+ * corrections go through Cancel + Duplicate. Cancelled invoices surface
+ * their mandatory cancellation reason.
  */
 const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onCancelInvoice, canUpdate }) => {
   const { message } = App.useApp();
@@ -70,23 +73,28 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
   // Never show a stale record while a different invoice loads
   const current = !loading && inv ? inv : null;
   const issued = current?.status === SAMPLE_INVOICE_STATUS.ISSUED;
+  const isSample = current?.invoiceType === INVOICE_TYPES.SAMPLE;
 
   return (
     <ViewDialog
       open={open}
       onClose={onClose}
       width={1080}
-      loading={loading}
+      // No `loading` — ViewDialog would swap children for a generic blob and
+      // the structured skeleton below (which mirrors this layout) would never paint
       hero={current ? {
         title: inv.invoiceNo || 'DRAFT',
         status: (
-          <StatusTag status={inv.status} config={SAMPLE_INVOICE_STATUS_CONFIG} getLabel={getInvoiceStatusLabel} />
+          <>
+            <Tag color={isSample ? 'gold' : 'geekblue'}>{INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType}</Tag>
+            <StatusTag status={inv.status} config={SAMPLE_INVOICE_STATUS_CONFIG} getLabel={getInvoiceStatusLabel} />
+          </>
         ),
         subtitle: [inv.consigneeName, inv.destinationCountry].filter(Boolean).join(' • '),
         highlight: inv.declaredValue != null
           ? { label: 'Declared Value', value: `${inv.currency} ${inv.declaredValue.toFixed(2)}` }
           : { label: 'Declared Value', value: 'not entered' },
-      } : { title: 'Commercial Invoice' }}
+      } : { title: 'Invoice' }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -100,8 +108,34 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
         </div>
       }
     >
-      {!current ? <Skeleton active paragraph={{ rows: 8 }} /> : (
+      {!current ? (
         <>
+          <Card size="small" title={<Skeleton.Input active size="small" style={{ width: 140 }} />} style={{ marginBottom: 16 }}>
+            <Row gutter={[24, 16]}>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <Col xs={12} sm={8} md={6} key={i}>
+                  <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                  <Skeleton.Input active size="small" block />
+                </Col>
+              ))}
+            </Row>
+          </Card>
+          <Card size="small" title={<Skeleton.Input active size="small" style={{ width: 160 }} />} style={{ marginBottom: 16 }}>
+            <Skeleton active title={false} paragraph={{ rows: 4 }} />
+          </Card>
+          <Skeleton.Input active block />
+        </>
+      ) : (
+        <>
+          {current.status === SAMPLE_INVOICE_STATUS.CANCELLED && (
+            <Alert
+              type="error" showIcon style={{ marginBottom: 16 }}
+              message="Invoice cancelled"
+              description={current.cancelReason
+                ? `Reason: ${current.cancelReason}`
+                : 'No reason recorded (cancelled before reasons became mandatory).'}
+            />
+          )}
           <Card size="small" title={<Title level={5} style={{ margin: 0 }}>Invoice Header</Title>} style={{ marginBottom: 16 }}>
             <Row gutter={[24, 16]}>
               <Field label="Invoice Date">{formatDate(inv.invoiceDate)}</Field>
@@ -111,12 +145,14 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
               <Field label="Country of Origin">{inv.countryOfOrigin}</Field>
               <Field label="Final Destination">{inv.finalDestination || inv.destinationCountry}</Field>
               <Field label="Terms of Delivery & Payment" span={{ xs: 24, sm: 16, md: 12 }}>{inv.termsOfDelivery}</Field>
+              <Field label="Payment Terms">{inv.paymentTerms}</Field>
+              {inv.containerNo && <Field label="Container No.">{inv.containerNo}</Field>}
               <Field label="Port of Loading">{inv.portOfLoading}</Field>
               <Field label="Port of Discharge">{inv.portOfDischarge}</Field>
               <Field label="Marks & Nos.">{inv.marksAndNos}</Field>
               <Field label="No. & Kind of Packages">{inv.packages}</Field>
               <Field label="Consignee" span={{ xs: 24, sm: 24, md: 12 }}>
-                {[inv.consigneeName, inv.consigneeAddress].filter(Boolean).join('\n')}
+                {[inv.consigneeName, inv.consigneeAddress, inv.consigneeContact].filter(Boolean).join('\n')}
               </Field>
               {inv.notifyParty && <Field label="Notify Party">{inv.notifyParty}</Field>}
             </Row>
@@ -143,9 +179,11 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
                 </Table.Summary.Row>
               )}
             />
-            <div style={{ marginTop: 12, textAlign: 'center' }}>
-              <Text strong style={{ letterSpacing: 1 }}>{SAMPLE_DECLARATION_BAND}</Text>
-            </div>
+            {!isSample && (
+              <div style={{ marginTop: 12, textAlign: 'center' }}>
+                <Text strong style={{ letterSpacing: 1 }}>{SAMPLE_DECLARATION_BAND}</Text>
+              </div>
+            )}
             {inv.declaredValue != null && (
               <div style={{ marginTop: 8 }}>
                 <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, display: 'block' }}>Amount in Words</Text>

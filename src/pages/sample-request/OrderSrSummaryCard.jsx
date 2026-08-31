@@ -11,9 +11,9 @@ import DaysRemainingTag from './DaysRemainingTag';
 const { Text } = Typography;
 
 /**
- * Sample Requests summary on the Order detail (PRD v3 §13 Orders integration):
- * round, type, status and latest deadline per SR, plus the total courier cost
- * tracked against the order. Renders nothing when the module is inaccessible
+ * Sample Requests summary on the Order detail: type, status and latest
+ * deadline per SR, plus the total courier cost tracked against the order
+ * (summed once per dispatch). Renders nothing when the module is inaccessible
  * or the order has no SRs — OrderView is unchanged for everyone else.
  */
 const OrderSrSummaryCard = ({ orderNo }) => {
@@ -42,7 +42,6 @@ const OrderSrSummaryCard = ({ orderNo }) => {
         </Text>
       ),
     },
-    { title: 'Round', dataIndex: 'round', key: 'round', width: 70, align: 'center', render: (v) => <Tag>{`R${v || 1}`}</Tag> },
     {
       title: 'Sample Type', dataIndex: 'sampleTypeName', key: 'sampleTypeName', width: 170,
       render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>,
@@ -82,7 +81,7 @@ const OrderSrSummaryCard = ({ orderNo }) => {
         columns={columns}
         dataSource={state.rows}
         pagination={false}
-        scroll={{ x: 820 }}
+        scroll={{ x: 750 }}
       />
     </Card>
   );

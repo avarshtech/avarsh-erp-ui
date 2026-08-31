@@ -126,6 +126,29 @@
   border-color: var(--primary-color) !important;
 }
 
+/* Badge group beside a page/dialog title: the container owns the spacing via
+   `gap`, so individual tag margins must not add an uneven second gap. */
+.status-badge-group > .ant-tag,
+.status-badge-group > span > .ant-tag {
+  margin-inline-end: 0;
+}
+
+/* Rich option labels (text + a Tag/Badge): the selected value and the dropdown
+   row are line-height boxes, so a flex label stretches its tag to the full
+   control height and the tag's text rides high. Centre them everywhere. */
+.ant-select-selection-item > span,
+.ant-select-item-option-content > span {
+  align-items: center;
+}
+
+.ant-select-selection-item .ant-tag,
+.ant-select-item-option-content .ant-tag,
+.ant-select-selection-item .ant-badge,
+.ant-select-item-option-content .ant-badge {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 
 /* DatePicker / TimePicker - all states */
 .ant-picker,

@@ -1,12 +1,15 @@
 /**
- * Seed data for the Sample Request mock layer. All dates are computed relative
- * to "today" (TNA convention — never hand-dated) so the demo always shows a
- * live spread: overdue, due-today, amber, green, a Round-1→2 chain, an
- * overseas pair for the invoice gate, and one approval inside this week.
+ * Seed data for the Sample Request mock layer (R2 flow). All dates are
+ * computed relative to "today" so the demo always shows a live spread:
+ * submitted SRs across the type tabs (material-issue demo), a combined draft
+ * dispatch (gate demo), dispatched/closed SRs with dispatch records, and
+ * invoices in every status across both types.
  */
 import dayjs from 'dayjs';
+import { SAMPLE_TYPE_LIST } from '../../utils/sampleRequestConstants';
+import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
 
-export const SEED_VERSION = 5;
+export const SEED_VERSION = 8;
 
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
 const ts = (offsetDays, time = '10:00') =>
@@ -14,16 +17,8 @@ const ts = (offsetDays, time = '10:00') =>
 
 // ── Master seeds ───────────────────────────────────────────────────────────
 
-// The five original types ship as master rows (PRD §9 seeded values); new
-// user-created types default to substitution NOT allowed.
-export const SEED_SAMPLE_TYPES = [
-  { id: 1, name: 'Proto', colourSubstitutionDefault: true,  active: true, custom: false },
-  { id: 2, name: 'Fit', colourSubstitutionDefault: true,  active: true, custom: false },
-  { id: 3, name: 'SMS', colourSubstitutionDefault: false, active: true, custom: false },
-  { id: 4, name: 'Pre-Production', colourSubstitutionDefault: false, active: true, custom: false },
-  { id: 5, name: 'TOP', colourSubstitutionDefault: false, active: true, custom: false },
-  { id: 6, name: 'Wash Test Sample', colourSubstitutionDefault: false, active: true, custom: true },
-];
+// FIXED list of eight (R2) — seeded verbatim from the constant, no user-created types
+export const SEED_SAMPLE_TYPES = SAMPLE_TYPE_LIST.map((t) => ({ ...t, active: true, custom: false }));
 
 export const SEED_COURIERS = [
   { id: 1, name: 'DHL Express', isLocal: false },
@@ -51,8 +46,6 @@ export const SEED_REJECTION_REASONS = [
   { code: 'OTHER', label: 'Other' },
 ];
 
-// Default global label set; per-buyer sets are supported (PRD §8.5 —
-// "configurable per buyer without a code change").
 export const SEED_FEEDBACK_CATEGORIES = [
   {
     buyerName: null,
@@ -60,7 +53,6 @@ export const SEED_FEEDBACK_CATEGORIES = [
   },
 ];
 
-// HSN default per garment/product category (PRD §10.5 — editable per line)
 export const SEED_HSN_CODES = [
   { category: 'Woven', code: '6206' },
   { category: 'Knit', code: '6109' },
@@ -69,20 +61,20 @@ export const SEED_HSN_CODES = [
   { category: 'Default', code: '6217' },
 ];
 
-// Fields the REAL organisation-info master does NOT hold — everything else
-// (exporter block, GSTIN, address, country, bank) is read live from
-// GET /organisation-info (see plan: Company Profile reuse).
 export const SEED_COMPANY_PROFILE_EXTRA = {
   iecNumber: '0405008481',
   swiftCode: 'UCBAINBB302',
   declarationText:
     'We declare that the goods described are samples supplied free of charge and are not for sale. '
     + 'The value shown is declared for customs purposes only and all particulars are true and correct.',
+  // Chargeable SAMPLE invoice uses the actual-price wording (ref SA011)
+  declarationTextSample:
+    'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
   signatory: 'Authorised Signatory',
   exporterCountryFallback: 'India',
   invoiceSeries: [
-    { code: 'EXSG', label: 'Full export format' },
-    { code: 'SA', label: 'Simple courier format' },
+    { code: 'EXSG', label: 'Commercial (export/customs)' },
+    { code: 'SA', label: 'Sample (chargeable)' },
   ],
   defaultSeries: 'EXSG',
 };
@@ -145,12 +137,10 @@ const mkSr = (over = {}) => {
     buyerName: 'Vingino',
     buyerCountry: 'India',
     season: 'Spring/Summer 2027',
-    sampleTypeId: 3,
+    sampleTypeId: 7,
     sampleTypeName: 'SMS',
     colourSubstitutionAllowed: false,
     round: 1,
-    parentSrId: null,
-    childSrId: null,
     status: 'DRAFT',
     priority: 'NORMAL',
     sampleQty: 2,
@@ -162,9 +152,8 @@ const mkSr = (over = {}) => {
     buyerApprovalDeadline: d(16),
     remarks: '',
     materials: baseMaterials(),
-    dispatch: null,
+    dispatchRef: null,
     feedback: null,
-    priorFeedbackRef: null,
     invoiceRef: null,
     statusHistory: [{ status: 'DRAFT', date: d(-2), user: 'Priya S.' }],
     activity: [
@@ -178,10 +167,10 @@ const mkSr = (over = {}) => {
 export const buildSeedDb = () => {
   seq = 0;
   const requests = [
-    // 1 — overseas SMS, In Production, 2 days to dispatch (red) → demo invoice gate
+    // 1 — overseas SMS, In Production, on the DRAFT dispatch (gate demo)
     mkSr({
       orderNo: 'ORD/25-26/1051', buyerName: 'Vingino', buyerCountry: 'Netherlands',
-      sampleTypeId: 3, sampleTypeName: 'SMS', priority: 'URGENT',
+      sampleTypeId: 7, sampleTypeName: 'SMS', priority: 'URGENT',
       status: 'IN_PRODUCTION', inHandDate: d(-1), dispatchDeadline: d(2), buyerApprovalDeadline: d(10),
       specialInstructions: 'Self-fabric loop on left sleeve placket. Send with hangtag mock-up.',
       statusHistory: [
@@ -190,18 +179,13 @@ export const buildSeedDb = () => {
         { status: 'IN_PRODUCTION', date: d(-6), user: 'Ravi Kumar' },
       ],
     }),
-    // 2 — Fit chain Round 1: revision required (closed) …
+    // 2 — Fit, dispatched + revision-required feedback (closed; no auto-round in R2)
     mkSr({
       orderNo: 'ORD/25-26/1042', styleNo: 'KG-6202', garmentName: 'Girls Woven Blouse', buyerName: 'Koalabay',
       sampleTypeId: 2, sampleTypeName: 'Fit', colourSubstitutionAllowed: true,
       status: 'REVISION_REQUIRED',
       inHandDate: d(-16), dispatchDeadline: d(-13), buyerApprovalDeadline: d(-5),
-      dispatch: {
-        deliveryMethod: 'COURIER', dispatchedDate: d(-13), courierId: 1, courierName: 'DHL Express',
-        trackingNo: '7712 4498 0031', dispatchMode: 'AIR', packages: 1, courierCost: 1850,
-        buyingOffice: null, handedOverTo: null, acknowledgement: null,
-        dispatchedBy: 'Suresh V.', remarks: '2 pcs each in 104/116/128.', documents: [],
-      },
+      dispatchRef: { dispatchId: 1, dispatchNo: `DSP-${new Date().getFullYear()}-0001` },
       feedback: {
         date: d(-4), from: 'Marieke de Vries', decision: 'REVISION_REQUIRED',
         rejectionReasonCodes: ['FIT_ISSUE', 'MEASUREMENT_VARIATION'],
@@ -210,10 +194,10 @@ export const buildSeedDb = () => {
           fabricShade: 'Shade acceptable against approved lab dip.',
           measurement: 'Sleeve length +1.5 cm vs spec on 128.',
           workmanship: 'Placket topstitch uneven on one piece.',
-          additional: '',
+          additional: 'Corrections noted for bulk — no re-sample required.',
         },
-        attachments: [{ name: 'Koalabay_CommentSheet_R1.xlsx', size: 91500, type: 'xlsx' }],
-        importSource: 'Koalabay_CommentSheet_R1.xlsx',
+        attachments: [{ name: 'Koalabay_CommentSheet.xlsx', size: 91500, type: 'xlsx' }],
+        importSource: 'Koalabay_CommentSheet.xlsx',
       },
       statusHistory: [
         { status: 'DRAFT', date: d(-20), user: 'Priya S.' },
@@ -224,36 +208,21 @@ export const buildSeedDb = () => {
         { status: 'REVISION_REQUIRED', date: d(-4), user: 'Priya S.' },
       ],
     }),
-    // 3 — … Fit chain Round 2 draft carrying Round-1 comments
+    // 3 — plain Fit DRAFT (R2: no rounds, no revised-type chain)
     mkSr({
       orderNo: 'ORD/25-26/1042', styleNo: 'KG-6202', garmentName: 'Girls Woven Blouse', buyerName: 'Koalabay',
-      sampleTypeId: 2, sampleTypeName: 'Fit — Revised', colourSubstitutionAllowed: true,
-      round: 2, parentSrId: 2, status: 'DRAFT',
+      sampleTypeId: 2, sampleTypeName: 'Fit', colourSubstitutionAllowed: true,
+      status: 'DRAFT',
       inHandDate: null, dispatchDeadline: null, buyerApprovalDeadline: null,
-      priorFeedbackRef: {
-        srNo: `SRQ-${new Date().getFullYear()}-0002`, round: 1, decision: 'REVISION_REQUIRED',
-        date: d(-4), from: 'Marieke de Vries',
-        comments: {
-          fit: 'Shoulder slope too square on 116. Armhole 1 cm tight across all sizes.',
-          measurement: 'Sleeve length +1.5 cm vs spec on 128.',
-        },
-      },
     }),
-    // 4 — dispatched (courier), awaiting buyer feedback, overseas + issued invoice
+    // 4 — Proto, dispatched overseas w/ issued commercial invoice, awaiting feedback (has comment draft → Pending Approval)
     mkSr({
       orderNo: 'ORD/25-26/1055', styleNo: 'O56054-1', garmentName: 'Boys Denim Jacket', buyerName: 'Raizzed',
       buyerCountry: 'Netherlands', sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
       status: 'DISPATCHED',
       inHandDate: d(-6), dispatchDeadline: d(-3), buyerApprovalDeadline: d(6),
-      dispatch: {
-        deliveryMethod: 'COURIER', dispatchedDate: d(-3), courierId: 2, courierName: 'FedEx',
-        trackingNo: '8890 1123 7745', dispatchMode: 'AIR', packages: 1, courierCost: 2400,
-        buyingOffice: null, handedOverTo: null, acknowledgement: null,
-        dispatchedBy: 'Suresh V.', remarks: '', documents: [{ name: 'AWB_8890_1123_7745.pdf', size: 312000, type: 'pdf' }],
-      },
-      invoiceRef: { invoiceId: 1, invoiceNo: null, declaredValue: 13.8 }, // invoiceNo filled from seed invoice below
-      // Comment DRAFT saved but no decision yet → counts as "Pending Approval"
-      // (comments logged, action pending) while still Dispatched.
+      dispatchRef: { dispatchId: 2, dispatchNo: `DSP-${new Date().getFullYear()}-0002` },
+      invoiceRef: { invoiceId: 1, invoiceNo: null, invoiceType: 'COMMERCIAL', declaredValue: 13.8 }, // invoiceNo filled below
       feedback: {
         date: d(-1), from: 'Anita George', decision: null,
         rejectionReasonCodes: [],
@@ -267,18 +236,13 @@ export const buildSeedDb = () => {
         { status: 'DISPATCHED', date: d(-3), user: 'Suresh V.' },
       ],
     }),
-    // 5 — local hand delivery, approved this week (quick-stat)
+    // 5 — PP Sample, local hand delivery, approved this week
     mkSr({
       orderNo: 'ORD/25-26/1060', styleNo: 'K64942-37', garmentName: 'Boys Cargo Short', buyerName: 'Koalabay',
-      sampleTypeId: 4, sampleTypeName: 'Pre-Production',
+      sampleTypeId: 5, sampleTypeName: 'PP Sample',
       status: 'APPROVED',
       inHandDate: d(-10), dispatchDeadline: d(-8), buyerApprovalDeadline: d(-1),
-      dispatch: {
-        deliveryMethod: 'LOCAL_HAND', dispatchedDate: d(-8), courierId: 6, courierName: 'Hand Delivered — Buying Office',
-        trackingNo: null, dispatchMode: 'HAND_CARRY', packages: 1, courierCost: 0,
-        buyingOffice: 'Koalabay Buying House — Chennai', handedOverTo: 'S. Ramesh',
-        acknowledgement: 'Signed DC', dispatchedBy: 'Suresh V.', remarks: '', documents: [{ name: 'Signed_DC_1060.pdf', size: 180000, type: 'pdf' }],
-      },
+      dispatchRef: { dispatchId: 3, dispatchNo: `DSP-${new Date().getFullYear()}-0003` },
       feedback: {
         date: d(-1), from: 'Anita George', decision: 'APPROVED',
         rejectionReasonCodes: [],
@@ -294,10 +258,11 @@ export const buildSeedDb = () => {
         { status: 'APPROVED', date: d(-1), user: 'Priya S.' },
       ],
     }),
-    // 6 — overdue: dispatch deadline passed, still In Production (alert strip)
+    // 6 — Photoshoot Sample, overdue In Production (alert strip)
     mkSr({
       orderNo: 'ORD/25-26/1058', styleNo: 'L62003-1', garmentName: 'Girls Denim Jacket', buyerName: 'Vingino',
-      sampleTypeId: 6, sampleTypeName: 'Wash Test Sample',
+      buyerCountry: 'Netherlands',
+      sampleTypeId: 4, sampleTypeName: 'Photoshoot Sample',
       status: 'IN_PRODUCTION', priority: 'URGENT',
       inHandDate: d(-4), dispatchDeadline: d(-2), buyerApprovalDeadline: d(8),
       statusHistory: [
@@ -306,9 +271,10 @@ export const buildSeedDb = () => {
         { status: 'IN_PRODUCTION', date: d(-8), user: 'Ravi Kumar' },
       ],
     }),
-    // 7 — submitted, due tomorrow (amber→red edge)
+    // 7 — Fit SUBMITTED, due tomorrow (material-issue tab: Fit)
     mkSr({
       orderNo: 'ORD/25-26/1061', styleNo: 'Q500017', garmentName: 'Girls Jersey Dress', buyerName: 'Raizzed',
+      buyerCountry: 'Netherlands',
       sampleTypeId: 2, sampleTypeName: 'Fit', colourSubstitutionAllowed: true,
       status: 'SUBMITTED',
       inHandDate: d(0), dispatchDeadline: d(1), buyerApprovalDeadline: d(9),
@@ -317,10 +283,10 @@ export const buildSeedDb = () => {
         { status: 'SUBMITTED', date: d(-3), user: 'Priya S.' },
       ],
     }),
-    // 8 — comfortable green, In Production
+    // 8 — SMS, In Production, on the DRAFT dispatch with #1
     mkSr({
       orderNo: 'ORD/25-26/1062', styleNo: 'N58924SR-37', garmentName: 'Girls Woven Blouse', buyerName: 'Vingino',
-      buyerCountry: 'Netherlands', sampleTypeId: 3, sampleTypeName: 'SMS',
+      buyerCountry: 'Netherlands', sampleTypeId: 7, sampleTypeName: 'SMS',
       status: 'IN_PRODUCTION',
       inHandDate: d(9), dispatchDeadline: d(12), buyerApprovalDeadline: d(21),
       statusHistory: [
@@ -329,25 +295,21 @@ export const buildSeedDb = () => {
         { status: 'IN_PRODUCTION', date: d(-1), user: 'Ravi Kumar' },
       ],
     }),
-    // 9 — draft due today (quick-stat "Due Today")
+    // 9 — Proto draft due today
     mkSr({
       orderNo: 'ORD/25-26/1063', styleNo: 'T77210', garmentName: 'Boys Polo — Pique', buyerName: 'Koalabay',
       sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
       status: 'DRAFT',
       inHandDate: d(-1), dispatchDeadline: d(0), buyerApprovalDeadline: d(7),
     }),
-    // 10 — rejected chain end (no auto-round; PRD §14)
+    // 10 — Shipment Sample, dispatched + rejected (SAMPLE-invoice demo: didn't convert)
     mkSr({
       orderNo: 'ORD/25-26/1044', styleNo: 'M11402', garmentName: 'Girls Skort', buyerName: 'Raizzed',
-      sampleTypeId: 5, sampleTypeName: 'TOP',
+      buyerCountry: 'Netherlands', sampleTypeId: 6, sampleTypeName: 'Shipment Sample',
       status: 'REJECTED',
       inHandDate: d(-25), dispatchDeadline: d(-22), buyerApprovalDeadline: d(-12),
-      dispatch: {
-        deliveryMethod: 'COURIER', dispatchedDate: d(-22), courierId: 5, courierName: 'DTDC',
-        trackingNo: 'D22019945IN', dispatchMode: 'ROAD', packages: 1, courierCost: 420,
-        buyingOffice: null, handedOverTo: null, acknowledgement: null,
-        dispatchedBy: 'Suresh V.', remarks: '', documents: [],
-      },
+      dispatchRef: { dispatchId: 4, dispatchNo: `DSP-${new Date().getFullYear()}-0004` },
+      invoiceRef: { invoiceId: 3, invoiceNo: 'SA0011/26-27', invoiceType: 'SAMPLE', declaredValue: 592.2 },
       feedback: {
         date: d(-11), from: 'Anita George', decision: 'REJECTED',
         rejectionReasonCodes: ['BUYER_CHANGE'],
@@ -363,18 +325,13 @@ export const buildSeedDb = () => {
         { status: 'REJECTED', date: d(-11), user: 'Priya S.' },
       ],
     }),
-    // 11 — comments received, DECISION PENDING → rests at Feedback Received
+    // 11 — Proto, comments received, DECISION PENDING (rests at Feedback Received)
     mkSr({
       orderNo: 'ORD/25-26/1046', styleNo: 'P30988-2', garmentName: 'Girls Twill Pinafore', buyerName: 'Koalabay',
       sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
       status: 'FEEDBACK_RECEIVED',
       inHandDate: d(-9), dispatchDeadline: d(-7), buyerApprovalDeadline: d(2),
-      dispatch: {
-        deliveryMethod: 'COURIER', dispatchedDate: d(-7), courierId: 3, courierName: 'UPS',
-        trackingNo: '1Z 999 AA1 01 2345 6784', dispatchMode: 'AIR', packages: 1, courierCost: 1650,
-        buyingOffice: null, handedOverTo: null, acknowledgement: null,
-        dispatchedBy: 'Suresh V.', remarks: '', documents: [],
-      },
+      dispatchRef: { dispatchId: 5, dispatchNo: `DSP-${new Date().getFullYear()}-0005` },
       feedback: {
         date: d(-1), from: 'S. Ramesh', decision: null,
         rejectionReasonCodes: [],
@@ -393,20 +350,99 @@ export const buildSeedDb = () => {
         { status: 'FEEDBACK_RECEIVED', date: d(-1), user: 'Priya S.' },
       ],
     }),
+    // 12 — Proto SUBMITTED (material-issue tab: Proto)
+    mkSr({
+      orderNo: 'ORD/25-26/1064', styleNo: 'T77219', garmentName: 'Boys Henley Tee', buyerName: 'Koalabay',
+      sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
+      status: 'SUBMITTED',
+      inHandDate: d(3), dispatchDeadline: d(6), buyerApprovalDeadline: d(14),
+      statusHistory: [
+        { status: 'DRAFT', date: d(-2), user: 'Priya S.' },
+        { status: 'SUBMITTED', date: d(-1), user: 'Priya S.' },
+      ],
+    }),
+    // 13 — SMS SUBMITTED (material-issue tab: SMS)
+    mkSr({
+      orderNo: 'ORD/25-26/1065', styleNo: 'R20441', garmentName: 'Girls Chambray Skirt', buyerName: 'Raizzed',
+      buyerCountry: 'Netherlands', sampleTypeId: 7, sampleTypeName: 'SMS',
+      status: 'SUBMITTED',
+      inHandDate: d(6), dispatchDeadline: d(9), buyerApprovalDeadline: d(18),
+      statusHistory: [
+        { status: 'DRAFT', date: d(-2), user: 'Priya S.' },
+        { status: 'SUBMITTED', date: d(0), user: 'Priya S.' },
+      ],
+    }),
   ];
 
-  // Cross-link the Fit chain
-  requests[1].childSrId = requests[2].id;
+  const year = new Date().getFullYear();
 
-  const invoices = [
+  // ── Dispatch entity seeds (R2): one per already-shipped SR + one combined DRAFT ──
+  const dispatches = [
     {
-      id: 1,
-      invoiceNo: `EXSG0031/${'26-27'}`,
-      series: 'EXSG',
-      status: 'DISPATCHED',
+      id: 1, dispatchNo: `DSP-${year}-0001`, status: 'DISPATCHED',
+      buyerName: 'Koalabay', buyerCountry: 'India', srIds: [2],
+      deliveryMethod: 'COURIER', dispatchedDate: d(-13), courierId: 1, courierName: 'DHL Express',
+      trackingNo: '7712 4498 0031', dispatchMode: 'AIR', packages: 1, courierCost: 1850,
+      buyingOffice: null, handedOverTo: null, acknowledgement: null,
+      remarks: '2 pcs each in 104/116/128.', documents: [], dispatchedBy: 'Suresh V.',
+      activity: [{ id: 1, timestamp: ts(-13, '16:02'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
+    },
+    {
+      id: 2, dispatchNo: `DSP-${year}-0002`, status: 'DISPATCHED',
+      buyerName: 'Raizzed', buyerCountry: 'Netherlands', srIds: [4],
+      deliveryMethod: 'COURIER', dispatchedDate: d(-3), courierId: 2, courierName: 'FedEx',
+      trackingNo: '8890 1123 7745', dispatchMode: 'AIR', packages: 1, courierCost: 2400,
+      buyingOffice: null, handedOverTo: null, acknowledgement: null,
+      remarks: '', documents: [{ name: 'AWB_8890_1123_7745.pdf', size: 312000, type: 'pdf' }], dispatchedBy: 'Suresh V.',
+      activity: [{ id: 1, timestamp: ts(-3, '15:10'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
+    },
+    {
+      id: 3, dispatchNo: `DSP-${year}-0003`, status: 'DISPATCHED',
+      buyerName: 'Koalabay', buyerCountry: 'India', srIds: [5],
+      deliveryMethod: 'LOCAL_HAND', dispatchedDate: d(-8), courierId: 6, courierName: 'Hand Delivered — Buying Office',
+      trackingNo: null, dispatchMode: 'HAND_CARRY', packages: 1, courierCost: 0,
+      buyingOffice: 'Koalabay Buying House — Chennai', handedOverTo: 'S. Ramesh', acknowledgement: 'Signed DC',
+      remarks: '', documents: [{ name: 'Signed_DC_1060.pdf', size: 180000, type: 'pdf' }], dispatchedBy: 'Suresh V.',
+      activity: [{ id: 1, timestamp: ts(-8, '12:30'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
+    },
+    {
+      id: 4, dispatchNo: `DSP-${year}-0004`, status: 'DISPATCHED',
+      buyerName: 'Raizzed', buyerCountry: 'Netherlands', srIds: [10],
+      deliveryMethod: 'COURIER', dispatchedDate: d(-22), courierId: 5, courierName: 'DTDC',
+      trackingNo: 'D22019945IN', dispatchMode: 'ROAD', packages: 1, courierCost: 420,
+      buyingOffice: null, handedOverTo: null, acknowledgement: null,
+      remarks: '', documents: [], dispatchedBy: 'Suresh V.',
+      activity: [{ id: 1, timestamp: ts(-22, '11:15'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
+    },
+    {
+      id: 5, dispatchNo: `DSP-${year}-0005`, status: 'DISPATCHED',
+      buyerName: 'Koalabay', buyerCountry: 'India', srIds: [11],
+      deliveryMethod: 'COURIER', dispatchedDate: d(-7), courierId: 3, courierName: 'UPS',
+      trackingNo: '1Z 999 AA1 01 2345 6784', dispatchMode: 'AIR', packages: 1, courierCost: 1650,
+      buyingOffice: null, handedOverTo: null, acknowledgement: null,
+      remarks: '', documents: [], dispatchedBy: 'Suresh V.',
+      activity: [{ id: 1, timestamp: ts(-7, '14:45'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
+    },
+    // DRAFT dispatch combining the two Vingino/Netherlands IN_PRODUCTION SRs (gate demo)
+    {
+      id: 6, dispatchNo: `DSP-${year}-0006`, status: 'DRAFT',
+      buyerName: 'Vingino', buyerCountry: 'Netherlands', srIds: [1, 8],
+      deliveryMethod: 'COURIER', dispatchedDate: d(0), courierId: 1, courierName: 'DHL Express',
+      trackingNo: null, dispatchMode: 'AIR', packages: 1, courierCost: null,
+      buyingOffice: null, handedOverTo: null, acknowledgement: null,
+      remarks: 'Combine both SS27 development styles in one carton.', documents: [], dispatchedBy: null,
+      activity: [{ id: 1, timestamp: ts(-1, '09:20'), user: 'Priya S.', action: 'Dispatch draft created — 2 SR(s) for Vingino' }],
+    },
+  ];
+
+  // ── Invoice seeds — every status across both types ─────────────────────────
+  const invoices = [
+    // 1 — COMMERCIAL, DISPATCHED (covers SR #4)
+    {
+      id: 1, invoiceType: 'COMMERCIAL', invoiceNo: 'EXSG0031/26-27', series: 'EXSG', status: 'DISPATCHED',
       invoiceDate: d(-4),
-      consigneeName: 'Raizzed B.V.',
-      consigneeAddress: 'Keizersgracht 12, 1015 CW Amsterdam, Netherlands\nATTN: ANITA GEORGE',
+      consigneeName: 'Raizzed B.V.', consigneeContact: 'Attn: Anita George · +31 (0)20 555 0182',
+      consigneeAddress: 'Keizersgracht 12, 1015 CW Amsterdam, Netherlands',
       destinationCountry: 'Netherlands',
       buyerOrderNoDate: 'ORD/25-26/1055 · 02 Jun 2026',
       otherReferences: 'Sample submission — SS27 development',
@@ -414,59 +450,146 @@ export const buildSeedDb = () => {
       countryOfOrigin: 'India',
       preCarriage: 'N.A.', placeOfReceipt: 'N.A.', vesselFlightNo: '',
       portOfLoading: 'CHENNAI / INDIA', portOfDischarge: '', finalDestination: 'Netherlands',
-      termsOfDelivery: 'DELIVERY AT PLACE — BY COURIER',
+      termsOfDelivery: 'DELIVERY AT PLACE — BY COURIER', paymentTerms: 'SAMPLES ONLY', containerNo: '',
       marksAndNos: 'SG/RZ 1-1', packages: '1 CARTON',
       currency: 'EUR',
       lines: [
-        { key: 'l1', srId: 4, srNo: `SRQ-${new Date().getFullYear()}-0004`, styleNo: 'O56054-1', hsnCode: '6203', description: 'BOYS DENIM JACKET', quantity: 6, uom: 'PCS', rate: 2.1, manual: false },
+        { key: 'l1', srId: 4, srNo: `SRQ-${year}-0004`, styleNo: 'O56054-1', hsnCode: '6203', description: 'BOYS DENIM JACKET', quantity: 6, uom: 'PCS', rate: 2.1, manual: false },
         { key: 'l2', srId: null, srNo: null, styleNo: null, hsnCode: '48211010', description: 'FABRIC SWATCHES', quantity: 24, uom: 'PCS', rate: 0.05, manual: true },
       ],
-      srIds: [4],
+      srIds: [4], cancelReason: null,
       activity: [
         { id: 1, timestamp: ts(-4, '15:20'), user: 'Priya S.', action: 'Invoice issued', details: 'EXSG0031 · EUR 13.80' },
-        { id: 2, timestamp: ts(-3, '09:41'), user: 'Suresh V.', action: 'Linked SR dispatched — invoice marked Dispatched' },
+        { id: 2, timestamp: ts(-3, '09:41'), user: 'Suresh V.', action: 'All covered SRs dispatched via DSP — invoice marked Dispatched' },
       ],
       version: 0,
     },
+    // 2 — COMMERCIAL, DRAFT (covers SR #1 only — partial-coverage gate demo vs draft dispatch #6)
     {
-      id: 2,
-      invoiceNo: null, // DRAFT — number assigned on issue (PRD §10.8)
-      series: 'EXSG',
-      status: 'DRAFT',
+      id: 2, invoiceType: 'COMMERCIAL', invoiceNo: null, series: 'EXSG', status: 'DRAFT',
       invoiceDate: d(0),
-      consigneeName: 'Vingino B.V.',
-      consigneeAddress: 'Koningin Wilhelminaplein 13, 1062 HH Amsterdam, Netherlands\nATTN: MARIEKE DE VRIES',
+      consigneeName: 'Vingino B.V.', consigneeContact: 'Attn: Marieke de Vries · +31 (0)20 850 1200',
+      consigneeAddress: 'Koningin Wilhelminaplein 13, 1062 HH Amsterdam, Netherlands',
       destinationCountry: 'Netherlands',
       buyerOrderNoDate: 'ORD/25-26/1051 · 12 Jun 2026',
       otherReferences: '', buyerOtherThanConsignee: '', notifyParty: '',
       countryOfOrigin: 'India',
       preCarriage: 'N.A.', placeOfReceipt: 'N.A.', vesselFlightNo: '',
       portOfLoading: 'CHENNAI / INDIA', portOfDischarge: '', finalDestination: 'Netherlands',
-      termsOfDelivery: 'DELIVERY AT PLACE — BY COURIER',
+      termsOfDelivery: 'DELIVERY AT PLACE — BY COURIER', paymentTerms: 'SAMPLES ONLY', containerNo: '',
       marksAndNos: '', packages: '',
       currency: 'EUR',
       lines: [
-        { key: 'l1', srId: 1, srNo: `SRQ-${new Date().getFullYear()}-0001`, styleNo: 'N58921SR-37', hsnCode: '6206', description: 'GIRLS WOVEN SHIRT — LONG SLEEVE', quantity: 6, uom: 'PCS', rate: null, manual: false },
+        { key: 'l1', srId: 1, srNo: `SRQ-${year}-0001`, styleNo: 'N58921SR-37', hsnCode: '6206', description: 'GIRLS WOVEN SHIRT — LONG SLEEVE', quantity: 6, uom: 'PCS', rate: null, manual: false },
       ],
-      srIds: [1],
-      activity: [{ id: 1, timestamp: ts(0, '09:05'), user: 'Priya S.', action: 'Invoice draft created' }],
+      srIds: [1], cancelReason: null,
+      activity: [{ id: 1, timestamp: ts(0, '09:05'), user: 'Priya S.', action: 'Commercial invoice draft created' }],
+      version: 0,
+    },
+    // 3 — SAMPLE, ISSUED (2× recovery charge for the rejected/non-converted SR #10, ref SA011)
+    {
+      id: 3, invoiceType: 'SAMPLE', invoiceNo: 'SA0011/26-27', series: 'SA', status: 'ISSUED',
+      invoiceDate: d(-2),
+      consigneeName: 'Raizzed B.V.', consigneeContact: 'Attn: Anita George',
+      consigneeAddress: 'Keizersgracht 12, 1015 CW Amsterdam, Netherlands',
+      destinationCountry: 'Netherlands',
+      buyerOrderNoDate: 'ORD/25-26/1044 · 08 May 2026',
+      otherReferences: 'Cancel sampling charges — style dropped from range',
+      buyerOtherThanConsignee: '', notifyParty: '',
+      countryOfOrigin: 'India',
+      preCarriage: 'N.A.', placeOfReceipt: 'N.A.', vesselFlightNo: '',
+      portOfLoading: 'CHENNAI / INDIA', portOfDischarge: '', finalDestination: 'Netherlands',
+      termsOfDelivery: 'AS AGREED', paymentTerms: 'TT 30 DAYS', containerNo: '',
+      marksAndNos: '', packages: '',
+      currency: 'USD',
+      lines: [
+        { key: 'l1', srId: 10, srNo: `SRQ-${year}-0010`, styleNo: 'M11402', hsnCode: '6203', description: 'GIRLS SKORT — CANCELLED SAMPLE CHARGES', quantity: 6, uom: 'PCS', rate: 41.2, manual: false },
+        { key: 'l2', srId: null, srNo: null, styleNo: null, hsnCode: '6217', description: 'FABRIC COSTING FOR CANCELLED STYLES', quantity: 1, uom: 'LOT', rate: 345, manual: true },
+      ],
+      srIds: [10], cancelReason: null,
+      activity: [{ id: 1, timestamp: ts(-2, '11:30'), user: 'Priya S.', action: 'Invoice issued', details: 'SA0011 · USD 592.20' }],
+      version: 0,
+    },
+    // 4 — COMMERCIAL, CANCELLED (with mandatory reason, shown in view + activity)
+    {
+      id: 4, invoiceType: 'COMMERCIAL', invoiceNo: 'EXSG0030/26-27', series: 'EXSG', status: 'CANCELLED',
+      invoiceDate: d(-15),
+      consigneeName: 'Vingino B.V.', consigneeContact: 'Attn: Marieke de Vries',
+      consigneeAddress: 'Marienhoef 6, 3851 ST Ermelo, Netherlands',
+      destinationCountry: 'Netherlands',
+      buyerOrderNoDate: 'ORD/25-26/1038 · 22 Apr 2026',
+      otherReferences: '', buyerOtherThanConsignee: '', notifyParty: '',
+      countryOfOrigin: 'India',
+      preCarriage: 'N.A.', placeOfReceipt: 'N.A.', vesselFlightNo: '',
+      portOfLoading: 'CHENNAI / INDIA', portOfDischarge: '', finalDestination: 'Netherlands',
+      termsOfDelivery: 'DELIVERY AT PLACE — BY COURIER', paymentTerms: 'SAMPLES ONLY', containerNo: '',
+      marksAndNos: 'SG/VNG 1-1', packages: '1 CARTON',
+      currency: 'EUR',
+      lines: [
+        { key: 'l1', srId: null, srNo: null, styleNo: 'N58880SR-11', hsnCode: '6206', description: 'GIRLS WOVEN SHIRT — SS27 PROTO', quantity: 4, uom: 'PCS', rate: 0.85, manual: true },
+      ],
+      srIds: [], cancelReason: 'Consignee address changed after issue — cancelled and re-raised with the corrected Amsterdam address.',
+      activity: [
+        { id: 1, timestamp: ts(-15, '10:12'), user: 'Priya S.', action: 'Invoice issued', details: 'EXSG0030 · EUR 3.40' },
+        { id: 2, timestamp: ts(-14, '17:55'), user: 'Priya S.', action: 'Invoice cancelled — linked SRs released for re-invoicing', details: 'Reason: Consignee address changed after issue — cancelled and re-raised with the corrected Amsterdam address.' },
+      ],
       version: 0,
     },
   ];
 
-  // Point the dispatched SR's invoiceRef at the issued invoice number
-  requests[3].invoiceRef = { invoiceId: 1, invoiceNo: invoices[0].invoiceNo, declaredValue: 13.8 };
+  // Fill the dispatched SR's commercial invoiceRef number
+  requests[3].invoiceRef = { invoiceId: 1, invoiceNo: invoices[0].invoiceNo, invoiceType: 'COMMERCIAL', declaredValue: 13.8 };
 
-  const samplePos = [];
+  // ── Sample issues ────────────────────────────────────────────────────────
+  // Every SR at In Production or beyond got there through a material issue —
+  // so each one carries an SRI record, dated from its IN_PRODUCTION history
+  // stamp. One issue holds BOTH the fabric and the trim lines.
+  const ISSUED_STATUSES = ['IN_PRODUCTION', 'DISPATCHED', 'FEEDBACK_RECEIVED', 'APPROVED', 'REJECTED', 'REVISION_REQUIRED'];
+  let sriSeq = 0;
+  const sampleIssues = requests
+    .filter((sr) => ISSUED_STATUSES.includes(sr.status))
+    .map((sr) => {
+      sriSeq += 1;
+      const issuedOn = sr.statusHistory.find((h) => h.status === 'IN_PRODUCTION')?.date || d(-1);
+      return {
+        id: sriSeq,
+        issueNo: `SRI-${year}-${String(sriSeq).padStart(4, '0')}`,
+        srId: sr.id,
+        srNo: sr.srNo,
+        issuedDate: issuedOn,
+        issuedBy: 'Ravi Kumar',
+        receivedBy: 'Suresh V. (Sampling Room)',
+        remarks: sr.priority === 'URGENT' ? 'Urgent sample — issued ahead of the bulk pick list.' : '',
+        lines: sr.materials.map((m) => {
+          const requiredQty = computeSampleQtyRequired(m, sr.sampleQty, sr.sizes || []);
+          return {
+            lineNo: m.lineNo,
+            section: m.section,
+            fabricType: m.fabricType,
+            classification: m.classification,
+            description: m.description,
+            colourDesign: m.colourDesign,
+            width: m.width,
+            uom: m.uom,
+            requiredQty,
+            issueQty: requiredQty,
+          };
+        }),
+      };
+    });
 
   return {
     seedVersion: SEED_VERSION,
-    srSeq: { [new Date().getFullYear()]: 100 + requests.length },
-    invSeq: { 'EXSG/26-27': 31 },
+    srSeq: { [year]: 100 + requests.length },
+    invSeq: { 'EXSG/26-27': 31, 'SA/26-27': 11 },
     poSeq: 1000,
+    dspSeq: { [year]: dispatches.length },
+    sriSeq: { [year]: sampleIssues.length },
     requests,
+    dispatches,
     invoices,
-    samplePos,
+    samplePos: [],
+    sampleIssues,
     masters: {
       sampleTypes: SEED_SAMPLE_TYPES,
       couriers: SEED_COURIERS,

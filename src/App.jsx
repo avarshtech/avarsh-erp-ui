@@ -37,6 +37,7 @@ const OpeningStockBatchForm = lazy(() => import('./pages/inventory/opening-stock
 const MaterialIssuePage = lazy(() => import('./pages/inventory/issue/MaterialIssuePage'));
 const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueForm'));
 const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
+const SampleIssueForm = lazy(() => import('./pages/inventory/issue/SampleIssueForm'));
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
@@ -117,6 +118,9 @@ const SampleRequestList = lazy(() => import('./pages/sample-request/SampleReques
 const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
 const SampleInvoiceList = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceList'));
 const SampleInvoiceForm = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceForm'));
+const DispatchList = lazy(() => import('./pages/sample-request/dispatch/DispatchList'));
+const DispatchForm = lazy(() => import('./pages/sample-request/dispatch/DispatchForm'));
+const CustomerCommentsPage = lazy(() => import('./pages/sample-request/comments/CustomerCommentsPage'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -217,13 +221,17 @@ const ThemedApp = () => {
             <Route path="bom/list" element={<PermissionRoute module="bom"><BOMList /></PermissionRoute>} />
             <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
             <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
-            {/* Sample Requests (incl. commercial invoices for overseas dispatch) */}
+            {/* Sample Requests (R2) — SR / Dispatches / Customer Comments / Invoices, one RBAC module per screen */}
             <Route path="sample-requests/list" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleRequestList /></Suspense></PermissionRoute>} />
             <Route path="sample-requests/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />
             <Route path="sample-requests/edit/:id" element={<PermissionRoute module="sample-requests" operation="update"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />
-            <Route path="sample-requests/invoices/list" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleInvoiceList /></Suspense></PermissionRoute>} />
-            <Route path="sample-requests/invoices/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
-            <Route path="sample-requests/invoices/edit/:id" element={<PermissionRoute module="sample-requests"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/dispatches/list" element={<PermissionRoute module="sample-dispatches"><Suspense fallback={<PageSkeleton />}><DispatchList /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/dispatches/new" element={<PermissionRoute module="sample-dispatches" operation="add"><Suspense fallback={<PageSkeleton />}><DispatchForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/dispatches/edit/:id" element={<PermissionRoute module="sample-dispatches"><Suspense fallback={<PageSkeleton />}><DispatchForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/comments" element={<PermissionRoute module="sample-comments"><Suspense fallback={<PageSkeleton />}><CustomerCommentsPage /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/list" element={<PermissionRoute module="sample-invoices"><Suspense fallback={<PageSkeleton />}><SampleInvoiceList /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/new" element={<PermissionRoute module="sample-invoices" operation="add"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
+            <Route path="sample-requests/invoices/edit/:id" element={<PermissionRoute module="sample-invoices"><Suspense fallback={<PageSkeleton />}><SampleInvoiceForm /></Suspense></PermissionRoute>} />
             {/* Supplier PO */}
             <Route path="purchase-orders/supplier-po/list" element={<PermissionRoute module="purchase-orders"><POList /></PermissionRoute>} />
             <Route path="purchase-orders/supplier-po/new" element={<PermissionRoute module="purchase-orders" operation="add"><POForm /></PermissionRoute>} />
@@ -300,6 +308,8 @@ const ThemedApp = () => {
             <Route path="inventory/issue/fabric/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
+            {/* Sample issue: one document covering a whole SR (fabric + trims); the only Submitted → In Production trigger */}
+            <Route path="inventory/issue/sample/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><SampleIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentList /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />

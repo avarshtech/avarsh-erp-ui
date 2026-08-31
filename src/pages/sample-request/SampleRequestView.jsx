@@ -14,77 +14,56 @@ import {
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
 import {
-  getSampleRequest, changeStatus, deleteSampleRequest, listByOrderNo, isOverseas,
-  updateInstructions,
+  getSampleRequest, changeStatus, deleteSampleRequest, isOverseas, updateInstructions,
 } from '../../services/sr/srService';
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
 import DeadlinesPanel from './view/DeadlinesPanel';
 import AvailableActionsPanel from './view/AvailableActionsPanel';
 import InvoicePanel from './view/InvoicePanel';
-import RevisionHistoryPanel from './view/RevisionHistoryPanel';
 import ActivityLogPanel from './view/ActivityLogPanel';
-import DispatchPanel from './view/DispatchPanel';
-import BuyerCommentsPanel from './view/BuyerCommentsPanel';
+import DispatchInfoCard from './view/DispatchInfoCard';
+import FeedbackSummaryCard from './view/FeedbackSummaryCard';
 import RaisePoDrawer from './form/RaisePoDrawer';
 
 const { Text, Title } = Typography;
 
 const TERMINALS = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED];
 
-const scrollToPanel = (domId) => {
-  document.getElementById(domId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
-
-/** Walk parent/child links to collect this SR's sample-type chain, oldest first. */
-const buildChain = (all, sr) => {
-  const byId = new Map(all.map((r) => [r.id, r]));
-  let head = sr;
-  while (head.parentSrId && byId.has(head.parentSrId)) head = byId.get(head.parentSrId);
-  const chain = [];
-  let cur = head;
-  while (cur) {
-    chain.push(cur);
-    cur = cur.childSrId ? byId.get(cur.childSrId) : null;
-  }
-  return chain.length ? chain : [sr];
-};
-
 const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [sr, setSr] = useState(null);
-  const [chain, setChain] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [currentId, setCurrentId] = useState(srId);
   const [poDrawer, setPoDrawer] = useState({ open: false, focusLine: null });
   const [instrModal, setInstrModal] = useState({ open: false, specialInstructions: '', remarks: '', saving: false });
 
   const canUpdate = hasPermission('sample-requests', 'update');
   const canDelete = hasPermission('sample-requests', 'delete');
-
-  useEffect(() => { setCurrentId(srId); }, [srId]);
+  // The issue screen lives in Inventory and carries its own permission
+  const canIssue = hasPermission('inventory-issue', 'add');
 
   const load = useCallback(async (id) => {
     if (id == null) return;
     setLoading(true);
     try {
-      const record = await getSampleRequest(id);
-      setSr(record);
-      const { content } = await listByOrderNo(record.orderNo);
-      setChain(buildChain(content, record));
+      setSr(await getSampleRequest(id));
     } catch (e) {
       message.error(e.message || 'Failed to load sample request');
       onClose?.();
     } finally { setLoading(false); }
   }, [message, onClose]);
 
-  useEffect(() => { if (open && currentId != null) load(currentId); }, [open, currentId, load]);
+  useEffect(() => { if (open && srId != null) load(srId); }, [open, srId, load]);
 
   const refresh = useCallback(async () => {
-    await load(currentId);
+    await load(srId);
     onChanged?.();
-  }, [load, currentId, onChanged]);
+  }, [load, srId, onChanged]);
+
+  // Never render a stale record: reopening on a different SR keeps the old one
+  // in state until its fetch resolves, so gate every read on the id matching.
+  const fresh = sr && sr.id === Number(srId) ? sr : null;
 
   const overseas = useMemo(() => (sr ? isOverseas(sr) : false), [sr]);
 
@@ -118,10 +97,10 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const handlers = useMemo(() => ({
     onEdit: () => { onClose?.(); navigate(`/sample-requests/edit/${sr?.id}`); },
     onSubmit: () => doTransition(SR_STATUS.SUBMITTED, 'Submit sample request'),
-    onStartProduction: () => doTransition(SR_STATUS.IN_PRODUCTION, 'Start production'),
     onReturnToDraft: () => doTransition(SR_STATUS.DRAFT, 'Return to Draft for edits'),
-    onGoDispatch: () => scrollToPanel('sr-dispatch-panel'),
-    onGoComments: () => scrollToPanel('sr-comments-panel'),
+    onGoMaterialIssue: () => { onClose?.(); navigate(`/inventory/issue/sample/new?srId=${sr?.id}`); },
+    onGoDispatches: () => { onClose?.(); navigate('/sample-requests/dispatches/list'); },
+    onGoComments: () => { onClose?.(); navigate(`/sample-requests/comments?srId=${sr?.id}`); },
     onDelete: () => modal.confirm({
       title: 'Delete Sample Request',
       content: `Delete ${sr?.srNo}? Only Draft SRs can be deleted.`,
@@ -138,7 +117,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   }), [sr, doTransition, modal, message, navigate, onChanged, onClose]);
 
   const detailsRows = sr ? [
-    ['Sample Type', <Tag color="purple" key="t">{sr.sampleTypeName}</Tag>],
+    ['Sample Type', <Tag color="purple" key="t" style={{ whiteSpace: 'nowrap' }}>{sr.sampleTypeName}</Tag>],
     ['Substitution', sr.colourSubstitutionAllowed ? <Tag color="green" key="s">Allowed</Tag> : <Tag key="s">Not allowed</Tag>],
     ['Quantity', `${sr.sampleQty ?? '—'} pcs per size`],
     ['Sizes', (sr.sizes || []).join(' · ') || '—'],
@@ -152,8 +131,9 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
         open={open}
         onClose={onClose}
         width={1240}
-        loading={loading && !sr}
-        hero={sr ? {
+        // No `loading` — ViewDialog would swap children for a generic blob and
+        // the structured skeleton below (which mirrors this layout) would never paint
+        hero={fresh ? {
           title: sr.srNo,
           status: (
             <>
@@ -163,7 +143,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
             </>
           ),
           subtitle: [sr.styleNo, sr.garmentName, sr.buyerName, sr.season].filter(Boolean).join(' • '),
-          highlight: { label: 'Round', value: `R${sr.round || 1} · ${sr.sampleTypeName}` },
+          highlight: { label: 'Sample Type', value: sr.sampleTypeName },
         } : { title: 'Sample Request' }}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%' }}>
@@ -171,13 +151,49 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           </div>
         }
       >
-        {!sr ? <Skeleton active paragraph={{ rows: 8 }} /> : (
-          <Spin spinning={loading} tip="Refreshing…">
+        {!fresh ? (
+          <>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Skeleton.Input key={i} active size="small" style={{ width: 96 }} block={false} />
+              ))}
+            </div>
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={16}>
+                <Card size="small" style={{ marginBottom: 16 }}>
+                  <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+                  <Row gutter={[24, 16]}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <Col xs={12} sm={8} key={i}>
+                        <Skeleton.Input active size="small" style={{ width: 80, marginBottom: 8 }} block={false} />
+                        <Skeleton.Input active block />
+                      </Col>
+                    ))}
+                  </Row>
+                </Card>
+                <Card size="small">
+                  <Skeleton.Input active style={{ width: 180, marginBottom: 24 }} />
+                  <Skeleton active title={false} paragraph={{ rows: 4 }} />
+                </Card>
+              </Col>
+              <Col xs={24} lg={8}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {[1, 2, 3].map((i) => (
+                    <Card size="small" key={i}>
+                      <Skeleton active title={{ width: '40%' }} paragraph={{ rows: 2 }} />
+                    </Card>
+                  ))}
+                </div>
+              </Col>
+            </Row>
+          </>
+        ) : (
+          <Spin spinning={loading && Boolean(sr)} tip="Refreshing…">
           <DraftWatermark status={sr.status}>
             <div style={{ marginBottom: 20 }}>
               <StatusSteps
                 statusFlow={statusFlow}
-                currentStatus={TERMINALS.includes(sr.status) ? sr.status : sr.status}
+                currentStatus={sr.status}
                 statusConfig={{ ...SR_STATUS_CONFIG, OUTCOME: {} }}
                 getLabel={(s) => (s === 'OUTCOME' ? 'Outcome' : getSrStatusLabel(s))}
                 getDescription={getStepDescription}
@@ -186,7 +202,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
             </div>
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={16}>
-                <SectionHeader srNo={sr.srNo} header={sr} round={sr.round} priorFeedbackRef={sr.priorFeedbackRef} />
+                <SectionHeader srNo={sr.srNo} header={sr} />
                 <Card
                   size="small"
                   title={<Title level={5} style={{ margin: 0 }}>Sample Details</Title>}
@@ -227,21 +243,21 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                   )}
                 </Card>
                 <ViewMaterials sr={sr} onRaisePo={(line) => setPoDrawer({ open: true, focusLine: line })} />
-                <div id="sr-dispatch-panel">
-                  <DispatchPanel sr={sr} overseas={overseas} onChanged={refresh} />
-                </div>
-                <div id="sr-comments-panel">
-                  <BuyerCommentsPanel sr={sr} onChanged={refresh} />
-                </div>
-                <ActivityLogPanel activity={sr.activity} />
               </Col>
               <Col xs={24} lg={8}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <DeadlinesPanel sr={sr} />
-                  <AvailableActionsPanel sr={sr} canUpdate={canUpdate} canDelete={canDelete} handlers={handlers} />
+                  <AvailableActionsPanel sr={sr} canUpdate={canUpdate} canDelete={canDelete} canIssue={canIssue} handlers={handlers} />
                   <InvoicePanel sr={sr} overseas={overseas} />
-                  <RevisionHistoryPanel sr={sr} chain={chain} onOpen={(id) => setCurrentId(id)} />
                 </div>
+              </Col>
+              {/* Full width below the materials table — the dispatch grid and the
+                  feedback prose are unreadable squeezed into the side column.
+                  Both are READ-ONLY here; they are captured on their own screens (R2). */}
+              <Col span={24}>
+                <DispatchInfoCard sr={sr} />
+                <FeedbackSummaryCard sr={sr} />
+                <ActivityLogPanel activity={sr.activity} />
               </Col>
             </Row>
           </DraftWatermark>

@@ -1,16 +1,20 @@
 import { Table, Input, InputNumber, Button, Alert, Typography, Space, Tag } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import { INVOICE_TYPES } from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 
 /**
- * Step 3 — line items and valuation (PRD §10.5). Quantity is DERIVED from the
- * SR (a fact the system holds); Rate is MANUAL-ONLY and blank by default — a
+ * Step 3 — line items and valuation. Quantity is DERIVED from the SR (a fact
+ * the system holds); Rate is MANUAL-ONLY and blank by default. COMMERCIAL: a
  * sample's declared value is a customs judgement with no correct system
- * source. A blank rate blocks Issue. Manual lines (swatches, hangers, trim
- * cards) are fully editable.
+ * source. SAMPLE (chargeable): recovery pricing — typically 2× the sample
+ * cost — is a WIZARD-ONLY hint; the print shows only the entered rates. A
+ * blank rate blocks Issue. Manual lines (swatches, fabric costing for
+ * cancelled styles) are fully editable.
  */
 const InvoiceStepLines = ({ inv, patch, locked, onAddFromSr }) => {
+  const isSample = inv.invoiceType === INVOICE_TYPES.SAMPLE;
   const setLine = (key, field, value) => {
     patch({ lines: inv.lines.map((l) => (l.key === key ? { ...l, [field]: value } : l)) });
   };
@@ -83,7 +87,9 @@ const InvoiceStepLines = ({ inv, patch, locked, onAddFromSr }) => {
     <>
       <Alert
         type={missingRates ? 'warning' : 'info'} showIcon style={{ marginBottom: 12 }}
-        message="Values are entered by hand. Nothing is pulled from costing or the order — a sample's declared value is a customs judgement, not the commercial price. The invoice cannot be issued until every line carries a rate."
+        message={isSample
+          ? 'Chargeable sample invoice — rates are entered by hand, typically 2× the sample cost for non-converted samples. This guidance never prints: the invoice shows only the rates you enter. Issue is blocked until every line carries a rate.'
+          : "Values are entered by hand. Nothing is pulled from costing or the order — a sample's declared value is a customs judgement, not the commercial price. The invoice cannot be issued until every line carries a rate."}
       />
       <Table rowKey="key" size="small" columns={columns} dataSource={inv.lines} pagination={false} scroll={{ x: 900 }} />
       {!locked && (

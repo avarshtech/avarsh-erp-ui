@@ -35,7 +35,13 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
         <TextArea
           value={inv.consigneeAddress} disabled={locked} rows={3}
           placeholder="Delivery address — prefilled from the buyer's shipping address, editable per shipment"
+          style={{ marginBottom: 4 }}
           onChange={(e) => patch({ consigneeAddress: e.target.value })}
+        />
+        <Input
+          value={inv.consigneeContact} disabled={locked}
+          placeholder="Attn: contact person · phone (prints under the consignee address)"
+          onChange={(e) => patch({ consigneeContact: e.target.value })}
         />
       </Field>
       <Row gutter={12}>
@@ -134,6 +140,16 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
         <Col span={24}>
           <Field label="Terms of Delivery & Payment" required hint="Pre-filled from the SR's dispatch mode where one is recorded">
             <Input value={inv.termsOfDelivery} disabled={locked} onChange={(e) => patch({ termsOfDelivery: e.target.value })} />
+          </Field>
+        </Col>
+        <Col span={12}>
+          <Field label="Payment Terms" hint="e.g. SAMPLES ONLY (commercial) · TT 30 DAYS (chargeable)">
+            <Input value={inv.paymentTerms} disabled={locked} onChange={(e) => patch({ paymentTerms: e.target.value })} />
+          </Field>
+        </Col>
+        <Col span={12}>
+          <Field label="Container No.">
+            <Input value={inv.containerNo} disabled={locked} placeholder="Blank for courier parcels" onChange={(e) => patch({ containerNo: e.target.value })} />
           </Field>
         </Col>
         <Col span={12}>
