@@ -11,7 +11,7 @@ import {
 import { SR_STATUS } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
 import useSampleRequestDraft from './useSampleRequestDraft';
-import SampleOrderPicker from './form/SampleOrderPicker';
+import SampleBomPicker from './form/SampleBomPicker';
 import SectionHeader from './form/SectionHeader';
 import SectionDetails from './form/SectionDetails';
 import SectionDeadlines from './form/SectionDeadlines';
@@ -31,9 +31,11 @@ const SampleRequestForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const [pickedOrderNo, setPickedOrderNo] = useState(null);
-  const bomId = searchParams.get('bomId') || undefined;
-  const orderNo = pickedOrderNo || searchParams.get('orderNo') || undefined;
+  // Set by the bare-entry BOM picker; the ?bomId/?orderNo query params carry
+  // the same pair when the SR is raised from the BOM screen.
+  const [picked, setPicked] = useState(null);
+  const bomId = picked?.bomId || searchParams.get('bomId') || undefined;
+  const orderNo = picked?.orderNo || searchParams.get('orderNo') || undefined;
 
   const draft = useSampleRequestDraft({ id, bomId, orderNo });
   const [form] = Form.useForm();
@@ -217,10 +219,10 @@ const SampleRequestForm = () => {
     return (
       <div className="animate-fade-in-up">
         <PageHeader title="New Sample Request" style={STICKY_HEADER} />
-        <SampleOrderPicker
-          onPick={setPickedOrderNo}
-          resolving={draft.loading && Boolean(pickedOrderNo)}
-          pickedOrderNo={pickedOrderNo}
+        <SampleBomPicker
+          onPick={setPicked}
+          resolving={draft.loading && Boolean(picked)}
+          pickedBomId={picked?.bomId}
         />
       </div>
     );

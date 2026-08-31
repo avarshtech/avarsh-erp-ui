@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { Card, Table, Typography } from 'antd';
-import { buildMaterialsColumns } from '../form/materialsColumns';
+import { buildMaterialsColumns } from '../form/MaterialsColumns';
 import { canRaisePo } from '../../../services/sr/srService';
 
 const { Text, Title } = Typography;

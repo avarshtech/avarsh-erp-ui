@@ -15,7 +15,7 @@ import SampleKpiRow from '../../components/sample/SampleKpiRow';
 import SampleDeadlineAlert from '../../components/sample/SampleDeadlineAlert';
 import { getTablePagination } from '../../utils/paginationConfig';
 import useDebouncedSearch from '../../hooks/useDebouncedSearch';
-import { buildSrColumns } from './srListColumns';
+import { buildSrColumns } from './SrListColumns';
 import SampleRequestView from './SampleRequestView';
 
 const SampleRequestList = () => {

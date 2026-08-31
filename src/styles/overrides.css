@@ -1111,6 +1111,15 @@ textarea.ant-input:active {
   text-align: center !important;
 }
 
+/* Roomier document tables (invoice/dispatch registers) — document numbers,
+   dates and status tags need breathing room so nothing clips or wraps.
+   The zero-height measure row rc-table injects for column sizing must keep its
+   inline padding:0 — padding it out leaves a phantom gap under the header. */
+.roomy-table .ant-table-thead > tr > th,
+.roomy-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  padding: 14px 16px !important;
+}
+
 /* Form item additional / extra text — visible below editor with padding */
 .ant-form-item-extra,
 .ant-form-item .ant-form-item-extra {

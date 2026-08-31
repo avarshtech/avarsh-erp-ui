@@ -38,7 +38,7 @@ import {
 import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import SampleOrderTag from '../../components/SampleOrderTag';
-import OrderSrSummaryCard from '../sample-request/OrderSrSummaryCard';
+import OrderSrSummaryCard from '../sr/OrderSrSummaryCard';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';

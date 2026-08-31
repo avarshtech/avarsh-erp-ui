@@ -108,7 +108,7 @@ const SampleInvoiceList = () => {
 
   const columns = useMemo(() => [
     {
-      title: 'Invoice No', dataIndex: 'invoiceNo', key: 'invoiceNo', fixed: 'left', width: 150,
+      title: 'Invoice No', dataIndex: 'invoiceNo', key: 'invoiceNo', fixed: 'left', width: 175,
       // Issued/cancelled invoices open the read-only VIEW; only drafts go to the wizard
       render: (v, r) => (v
         ? (
@@ -119,28 +119,31 @@ const SampleInvoiceList = () => {
         : <Tag onClick={() => navigate(`/sample-requests/invoices/edit/${r.id}`)} style={{ cursor: 'pointer' }}>DRAFT</Tag>),
     },
     {
-      title: 'Type', dataIndex: 'invoiceType', key: 'invoiceType', width: 150,
+      title: 'Type', dataIndex: 'invoiceType', key: 'invoiceType', width: 170,
       render: (t) => (
         <Tag color={t === INVOICE_TYPES.SAMPLE ? 'gold' : 'geekblue'} style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>
           {INVOICE_TYPE_LABELS[t] || t}
         </Tag>
       ),
     },
-    { title: 'Date', dataIndex: 'invoiceDate', key: 'invoiceDate', width: 110, render: (d) => formatDate(d) },
-    { title: 'Consignee', dataIndex: 'consigneeName', key: 'consigneeName', width: 180, ellipsis: true, render: (v) => <Text strong>{v}</Text> },
-    { title: 'Destination', dataIndex: 'destinationCountry', key: 'destinationCountry', width: 120 },
-    { title: 'SRs / Styles', dataIndex: 'srCount', key: 'srCount', width: 90, align: 'center' },
     {
-      title: 'Invoice Qty', dataIndex: 'totalQty', key: 'totalQty', width: 100, align: 'right',
+      title: 'Date', dataIndex: 'invoiceDate', key: 'invoiceDate', width: 130,
+      render: (d) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span>,
+    },
+    { title: 'Consignee', dataIndex: 'consigneeName', key: 'consigneeName', width: 200, ellipsis: true, render: (v) => <Text strong>{v}</Text> },
+    { title: 'Destination', dataIndex: 'destinationCountry', key: 'destinationCountry', width: 130 },
+    { title: 'SRs / Styles', dataIndex: 'srCount', key: 'srCount', width: 110, align: 'center' },
+    {
+      title: 'Invoice Qty', dataIndex: 'totalQty', key: 'totalQty', width: 115, align: 'right',
       render: (v) => <Text strong>{v}</Text>,
     },
-    { title: 'Curr.', dataIndex: 'currency', key: 'currency', width: 70, align: 'center' },
+    { title: 'Curr.', dataIndex: 'currency', key: 'currency', width: 80, align: 'center' },
     {
-      title: 'Declared Value', dataIndex: 'declaredValue', key: 'declaredValue', width: 120, align: 'right',
+      title: 'Declared Value', dataIndex: 'declaredValue', key: 'declaredValue', width: 135, align: 'right',
       render: (v) => (v == null ? <Text type="secondary">not entered</Text> : <Text strong>{v.toFixed(2)}</Text>),
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 135,
+      title: 'Status', dataIndex: 'status', key: 'status', width: 140,
       render: (s) => (
         <span style={{ whiteSpace: 'nowrap' }}>
           <StatusTag status={s} config={SAMPLE_INVOICE_STATUS_CONFIG} getLabel={getInvoiceStatusLabel} />
@@ -148,7 +151,7 @@ const SampleInvoiceList = () => {
       ),
     },
     {
-      title: 'Actions', key: 'actions', fixed: 'right', width: 170,
+      title: 'Actions', key: 'actions', fixed: 'right', width: 200,
       // All actions are direct icon buttons (no grouped ⋮ menu)
       render: (_, record) => {
         const draft = record.status === SAMPLE_INVOICE_STATUS.DRAFT;
@@ -234,7 +237,8 @@ const SampleInvoiceList = () => {
           dataSource={rows}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1410 }}
+          className="roomy-table"
+          scroll={{ x: 1585 }}
           pagination={false}
           locale={{
             emptyText: (

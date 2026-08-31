@@ -113,13 +113,13 @@ const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
 // Sample Requests (lazy-loaded — UI mock phase)
-const SampleRequestList = lazy(() => import('./pages/sample-request/SampleRequestList'));
-const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
-const SampleInvoiceList = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceList'));
-const SampleInvoiceForm = lazy(() => import('./pages/sample-request/invoice/SampleInvoiceForm'));
-const DispatchList = lazy(() => import('./pages/sample-request/dispatch/DispatchList'));
-const DispatchForm = lazy(() => import('./pages/sample-request/dispatch/DispatchForm'));
-const CustomerCommentsPage = lazy(() => import('./pages/sample-request/comments/CustomerCommentsPage'));
+const SampleRequestList = lazy(() => import('./pages/sr/SampleRequestList'));
+const SampleRequestForm = lazy(() => import('./pages/sr/SampleRequestForm'));
+const SampleInvoiceList = lazy(() => import('./pages/sr/invoice/SampleInvoiceList'));
+const SampleInvoiceForm = lazy(() => import('./pages/sr/invoice/SampleInvoiceForm'));
+const DispatchList = lazy(() => import('./pages/sr/dispatch/DispatchList'));
+const DispatchForm = lazy(() => import('./pages/sr/dispatch/DispatchForm'));
+const CustomerCommentsPage = lazy(() => import('./pages/sr/comments/CustomerCommentsPage'));
 import './index.css';
 import './styles/overrides.css';
 

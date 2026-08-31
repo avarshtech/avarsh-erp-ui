@@ -46,7 +46,7 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
     { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70, align: 'right' },
     {
       title: 'Status', key: 'status', width: 235,
-      // Ineligibility reasons ("Covered by EXSG0034/26-27") stay on ONE line —
+      // Ineligibility reasons ("Covered by EXSG/26-27/1001") stay on ONE line —
       // the column is wide enough and the table scrolls if space runs out.
       render: (_, r) => (r.eligible
         ? <StatusTag status={r.status} config={SR_STATUS_CONFIG} getLabel={getSrStatusLabel} />

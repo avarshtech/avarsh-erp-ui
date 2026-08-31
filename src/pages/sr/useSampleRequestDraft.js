@@ -10,7 +10,7 @@ import { isSrEditable } from '../../utils/sampleRequestConstants';
  * Resolves the initial draft for the SR form's three entry modes:
  *  - new from BOM  (?bomId=&orderNo= — the BOMView "Raise Sample Request" path):
  *    loads the REAL BOM + Order so auto-population uses live data
- *  - new bare      → needsPicker (sample-order picker)
+ *  - new bare      → needsPicker (BOM picker — any BOM, sample or bulk)
  *  - edit /:id     → mock record; only Draft SRs are editable
  * Buyer country (overseas invoice gate) comes from the buyer's shipping
  * locations — the Buyer entity itself has no country field.

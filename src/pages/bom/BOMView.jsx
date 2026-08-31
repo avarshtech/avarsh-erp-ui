@@ -407,7 +407,8 @@ const BOMView = ({ open, bomData, onClose }) => {
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
           <div>
-            {status === 'CREATED' && isSampleOrder(orderNo) && hasPermission('sample-requests', 'add') && (
+            {/* Any BOM can raise an SR — PP/fit samples run against the bulk order's BOM */}
+            {status === 'CREATED' && hasPermission('sample-requests', 'add') && (
               <ActionButton
                 action="create"
                 text="Raise Sample Request"

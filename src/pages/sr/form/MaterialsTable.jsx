@@ -3,7 +3,7 @@ import { Card, Table, Alert, Typography } from 'antd';
 import { substitutionBanner } from '../../../utils/sampleFabricRules';
 import { computeSampleQtyRequired } from '../../../utils/sampleBomMapper';
 import { getStockStatus } from '../../../services/sr/srService';
-import { buildMaterialsColumns } from './materialsColumns';
+import { buildMaterialsColumns } from './MaterialsColumns';
 
 const { Title, Text } = Typography;
 

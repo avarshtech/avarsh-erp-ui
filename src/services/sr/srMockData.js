@@ -8,8 +8,9 @@
 import dayjs from 'dayjs';
 import { SAMPLE_TYPE_LIST } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
+import { docNo, fiscalYearLabel, SR_DOC_PREFIX } from './srDocNumbers';
 
-export const SEED_VERSION = 8;
+export const SEED_VERSION = 9;
 
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
 const ts = (offsetDays, time = '10:00') =>
@@ -67,7 +68,7 @@ export const SEED_COMPANY_PROFILE_EXTRA = {
   declarationText:
     'We declare that the goods described are samples supplied free of charge and are not for sale. '
     + 'The value shown is declared for customs purposes only and all particulars are true and correct.',
-  // Chargeable SAMPLE invoice uses the actual-price wording (ref SA011)
+  // Chargeable SAMPLE invoice uses the actual-price wording (ref SA/FY/1001)
   declarationTextSample:
     'We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.',
   signatory: 'Authorised Signatory',
@@ -129,7 +130,7 @@ const mkSr = (over = {}) => {
   seq += 1;
   return {
     id: seq,
-    srNo: `SRQ-${new Date().getFullYear()}-${String(seq).padStart(4, '0')}`,
+    srNo: docNo(SR_DOC_PREFIX.REQUEST, 1000 + seq),
     orderNo: 'ORD/25-26/1042',
     bomId: null,
     styleNo: 'N58921SR-37',
@@ -185,7 +186,7 @@ export const buildSeedDb = () => {
       sampleTypeId: 2, sampleTypeName: 'Fit', colourSubstitutionAllowed: true,
       status: 'REVISION_REQUIRED',
       inHandDate: d(-16), dispatchDeadline: d(-13), buyerApprovalDeadline: d(-5),
-      dispatchRef: { dispatchId: 1, dispatchNo: `DSP-${new Date().getFullYear()}-0001` },
+      dispatchRef: { dispatchId: 1, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1001) },
       feedback: {
         date: d(-4), from: 'Marieke de Vries', decision: 'REVISION_REQUIRED',
         rejectionReasonCodes: ['FIT_ISSUE', 'MEASUREMENT_VARIATION'],
@@ -221,7 +222,7 @@ export const buildSeedDb = () => {
       buyerCountry: 'Netherlands', sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
       status: 'DISPATCHED',
       inHandDate: d(-6), dispatchDeadline: d(-3), buyerApprovalDeadline: d(6),
-      dispatchRef: { dispatchId: 2, dispatchNo: `DSP-${new Date().getFullYear()}-0002` },
+      dispatchRef: { dispatchId: 2, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1002) },
       invoiceRef: { invoiceId: 1, invoiceNo: null, invoiceType: 'COMMERCIAL', declaredValue: 13.8 }, // invoiceNo filled below
       feedback: {
         date: d(-1), from: 'Anita George', decision: null,
@@ -242,7 +243,7 @@ export const buildSeedDb = () => {
       sampleTypeId: 5, sampleTypeName: 'PP Sample',
       status: 'APPROVED',
       inHandDate: d(-10), dispatchDeadline: d(-8), buyerApprovalDeadline: d(-1),
-      dispatchRef: { dispatchId: 3, dispatchNo: `DSP-${new Date().getFullYear()}-0003` },
+      dispatchRef: { dispatchId: 3, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1003) },
       feedback: {
         date: d(-1), from: 'Anita George', decision: 'APPROVED',
         rejectionReasonCodes: [],
@@ -308,8 +309,8 @@ export const buildSeedDb = () => {
       buyerCountry: 'Netherlands', sampleTypeId: 6, sampleTypeName: 'Shipment Sample',
       status: 'REJECTED',
       inHandDate: d(-25), dispatchDeadline: d(-22), buyerApprovalDeadline: d(-12),
-      dispatchRef: { dispatchId: 4, dispatchNo: `DSP-${new Date().getFullYear()}-0004` },
-      invoiceRef: { invoiceId: 3, invoiceNo: 'SA0011/26-27', invoiceType: 'SAMPLE', declaredValue: 592.2 },
+      dispatchRef: { dispatchId: 4, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1004) },
+      invoiceRef: { invoiceId: 3, invoiceNo: docNo('SA', 1001), invoiceType: 'SAMPLE', declaredValue: 592.2 },
       feedback: {
         date: d(-11), from: 'Anita George', decision: 'REJECTED',
         rejectionReasonCodes: ['BUYER_CHANGE'],
@@ -331,7 +332,7 @@ export const buildSeedDb = () => {
       sampleTypeId: 1, sampleTypeName: 'Proto', colourSubstitutionAllowed: true,
       status: 'FEEDBACK_RECEIVED',
       inHandDate: d(-9), dispatchDeadline: d(-7), buyerApprovalDeadline: d(2),
-      dispatchRef: { dispatchId: 5, dispatchNo: `DSP-${new Date().getFullYear()}-0005` },
+      dispatchRef: { dispatchId: 5, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1005) },
       feedback: {
         date: d(-1), from: 'S. Ramesh', decision: null,
         rejectionReasonCodes: [],
@@ -374,12 +375,12 @@ export const buildSeedDb = () => {
     }),
   ];
 
-  const year = new Date().getFullYear();
+  const fy = fiscalYearLabel();
 
   // ── Dispatch entity seeds (R2): one per already-shipped SR + one combined DRAFT ──
   const dispatches = [
     {
-      id: 1, dispatchNo: `DSP-${year}-0001`, status: 'DISPATCHED',
+      id: 1, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1001), status: 'DISPATCHED',
       buyerName: 'Koalabay', buyerCountry: 'India', srIds: [2],
       deliveryMethod: 'COURIER', dispatchedDate: d(-13), courierId: 1, courierName: 'DHL Express',
       trackingNo: '7712 4498 0031', dispatchMode: 'AIR', packages: 1, courierCost: 1850,
@@ -388,7 +389,7 @@ export const buildSeedDb = () => {
       activity: [{ id: 1, timestamp: ts(-13, '16:02'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
     },
     {
-      id: 2, dispatchNo: `DSP-${year}-0002`, status: 'DISPATCHED',
+      id: 2, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1002), status: 'DISPATCHED',
       buyerName: 'Raizzed', buyerCountry: 'Netherlands', srIds: [4],
       deliveryMethod: 'COURIER', dispatchedDate: d(-3), courierId: 2, courierName: 'FedEx',
       trackingNo: '8890 1123 7745', dispatchMode: 'AIR', packages: 1, courierCost: 2400,
@@ -397,7 +398,7 @@ export const buildSeedDb = () => {
       activity: [{ id: 1, timestamp: ts(-3, '15:10'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
     },
     {
-      id: 3, dispatchNo: `DSP-${year}-0003`, status: 'DISPATCHED',
+      id: 3, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1003), status: 'DISPATCHED',
       buyerName: 'Koalabay', buyerCountry: 'India', srIds: [5],
       deliveryMethod: 'LOCAL_HAND', dispatchedDate: d(-8), courierId: 6, courierName: 'Hand Delivered — Buying Office',
       trackingNo: null, dispatchMode: 'HAND_CARRY', packages: 1, courierCost: 0,
@@ -406,7 +407,7 @@ export const buildSeedDb = () => {
       activity: [{ id: 1, timestamp: ts(-8, '12:30'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
     },
     {
-      id: 4, dispatchNo: `DSP-${year}-0004`, status: 'DISPATCHED',
+      id: 4, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1004), status: 'DISPATCHED',
       buyerName: 'Raizzed', buyerCountry: 'Netherlands', srIds: [10],
       deliveryMethod: 'COURIER', dispatchedDate: d(-22), courierId: 5, courierName: 'DTDC',
       trackingNo: 'D22019945IN', dispatchMode: 'ROAD', packages: 1, courierCost: 420,
@@ -415,7 +416,7 @@ export const buildSeedDb = () => {
       activity: [{ id: 1, timestamp: ts(-22, '11:15'), user: 'Suresh V.', action: 'Marked as Dispatched' }],
     },
     {
-      id: 5, dispatchNo: `DSP-${year}-0005`, status: 'DISPATCHED',
+      id: 5, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1005), status: 'DISPATCHED',
       buyerName: 'Koalabay', buyerCountry: 'India', srIds: [11],
       deliveryMethod: 'COURIER', dispatchedDate: d(-7), courierId: 3, courierName: 'UPS',
       trackingNo: '1Z 999 AA1 01 2345 6784', dispatchMode: 'AIR', packages: 1, courierCost: 1650,
@@ -425,7 +426,7 @@ export const buildSeedDb = () => {
     },
     // DRAFT dispatch combining the two Vingino/Netherlands IN_PRODUCTION SRs (gate demo)
     {
-      id: 6, dispatchNo: `DSP-${year}-0006`, status: 'DRAFT',
+      id: 6, dispatchNo: docNo(SR_DOC_PREFIX.DISPATCH, 1006), status: 'DRAFT',
       buyerName: 'Vingino', buyerCountry: 'Netherlands', srIds: [1, 8],
       deliveryMethod: 'COURIER', dispatchedDate: d(0), courierId: 1, courierName: 'DHL Express',
       trackingNo: null, dispatchMode: 'AIR', packages: 1, courierCost: null,
@@ -439,7 +440,7 @@ export const buildSeedDb = () => {
   const invoices = [
     // 1 — COMMERCIAL, DISPATCHED (covers SR #4)
     {
-      id: 1, invoiceType: 'COMMERCIAL', invoiceNo: 'EXSG0031/26-27', series: 'EXSG', status: 'DISPATCHED',
+      id: 1, invoiceType: 'COMMERCIAL', invoiceNo: docNo('EXSG', 1002), series: 'EXSG', status: 'DISPATCHED',
       invoiceDate: d(-4),
       consigneeName: 'Raizzed B.V.', consigneeContact: 'Attn: Anita George · +31 (0)20 555 0182',
       consigneeAddress: 'Keizersgracht 12, 1015 CW Amsterdam, Netherlands',
@@ -454,12 +455,12 @@ export const buildSeedDb = () => {
       marksAndNos: 'SG/RZ 1-1', packages: '1 CARTON',
       currency: 'EUR',
       lines: [
-        { key: 'l1', srId: 4, srNo: `SRQ-${year}-0004`, styleNo: 'O56054-1', hsnCode: '6203', description: 'BOYS DENIM JACKET', quantity: 6, uom: 'PCS', rate: 2.1, manual: false },
+        { key: 'l1', srId: 4, srNo: docNo(SR_DOC_PREFIX.REQUEST, 1004), styleNo: 'O56054-1', hsnCode: '6203', description: 'BOYS DENIM JACKET', quantity: 6, uom: 'PCS', rate: 2.1, manual: false },
         { key: 'l2', srId: null, srNo: null, styleNo: null, hsnCode: '48211010', description: 'FABRIC SWATCHES', quantity: 24, uom: 'PCS', rate: 0.05, manual: true },
       ],
       srIds: [4], cancelReason: null,
       activity: [
-        { id: 1, timestamp: ts(-4, '15:20'), user: 'Priya S.', action: 'Invoice issued', details: 'EXSG0031 · EUR 13.80' },
+        { id: 1, timestamp: ts(-4, '15:20'), user: 'Priya S.', action: 'Invoice issued', details: `${docNo('EXSG', 1002)} · EUR 13.80` },
         { id: 2, timestamp: ts(-3, '09:41'), user: 'Suresh V.', action: 'All covered SRs dispatched via DSP — invoice marked Dispatched' },
       ],
       version: 0,
@@ -480,15 +481,15 @@ export const buildSeedDb = () => {
       marksAndNos: '', packages: '',
       currency: 'EUR',
       lines: [
-        { key: 'l1', srId: 1, srNo: `SRQ-${year}-0001`, styleNo: 'N58921SR-37', hsnCode: '6206', description: 'GIRLS WOVEN SHIRT — LONG SLEEVE', quantity: 6, uom: 'PCS', rate: null, manual: false },
+        { key: 'l1', srId: 1, srNo: docNo(SR_DOC_PREFIX.REQUEST, 1001), styleNo: 'N58921SR-37', hsnCode: '6206', description: 'GIRLS WOVEN SHIRT — LONG SLEEVE', quantity: 6, uom: 'PCS', rate: null, manual: false },
       ],
       srIds: [1], cancelReason: null,
       activity: [{ id: 1, timestamp: ts(0, '09:05'), user: 'Priya S.', action: 'Commercial invoice draft created' }],
       version: 0,
     },
-    // 3 — SAMPLE, ISSUED (2× recovery charge for the rejected/non-converted SR #10, ref SA011)
+    // 3 — SAMPLE, ISSUED (2× recovery charge for the rejected/non-converted SR #10)
     {
-      id: 3, invoiceType: 'SAMPLE', invoiceNo: 'SA0011/26-27', series: 'SA', status: 'ISSUED',
+      id: 3, invoiceType: 'SAMPLE', invoiceNo: docNo('SA', 1001), series: 'SA', status: 'ISSUED',
       invoiceDate: d(-2),
       consigneeName: 'Raizzed B.V.', consigneeContact: 'Attn: Anita George',
       consigneeAddress: 'Keizersgracht 12, 1015 CW Amsterdam, Netherlands',
@@ -503,16 +504,16 @@ export const buildSeedDb = () => {
       marksAndNos: '', packages: '',
       currency: 'USD',
       lines: [
-        { key: 'l1', srId: 10, srNo: `SRQ-${year}-0010`, styleNo: 'M11402', hsnCode: '6203', description: 'GIRLS SKORT — CANCELLED SAMPLE CHARGES', quantity: 6, uom: 'PCS', rate: 41.2, manual: false },
+        { key: 'l1', srId: 10, srNo: docNo(SR_DOC_PREFIX.REQUEST, 1010), styleNo: 'M11402', hsnCode: '6203', description: 'GIRLS SKORT — CANCELLED SAMPLE CHARGES', quantity: 6, uom: 'PCS', rate: 41.2, manual: false },
         { key: 'l2', srId: null, srNo: null, styleNo: null, hsnCode: '6217', description: 'FABRIC COSTING FOR CANCELLED STYLES', quantity: 1, uom: 'LOT', rate: 345, manual: true },
       ],
       srIds: [10], cancelReason: null,
-      activity: [{ id: 1, timestamp: ts(-2, '11:30'), user: 'Priya S.', action: 'Invoice issued', details: 'SA0011 · USD 592.20' }],
+      activity: [{ id: 1, timestamp: ts(-2, '11:30'), user: 'Priya S.', action: 'Invoice issued', details: `${docNo('SA', 1001)} · USD 592.20` }],
       version: 0,
     },
     // 4 — COMMERCIAL, CANCELLED (with mandatory reason, shown in view + activity)
     {
-      id: 4, invoiceType: 'COMMERCIAL', invoiceNo: 'EXSG0030/26-27', series: 'EXSG', status: 'CANCELLED',
+      id: 4, invoiceType: 'COMMERCIAL', invoiceNo: docNo('EXSG', 1001), series: 'EXSG', status: 'CANCELLED',
       invoiceDate: d(-15),
       consigneeName: 'Vingino B.V.', consigneeContact: 'Attn: Marieke de Vries',
       consigneeAddress: 'Marienhoef 6, 3851 ST Ermelo, Netherlands',
@@ -530,7 +531,7 @@ export const buildSeedDb = () => {
       ],
       srIds: [], cancelReason: 'Consignee address changed after issue — cancelled and re-raised with the corrected Amsterdam address.',
       activity: [
-        { id: 1, timestamp: ts(-15, '10:12'), user: 'Priya S.', action: 'Invoice issued', details: 'EXSG0030 · EUR 3.40' },
+        { id: 1, timestamp: ts(-15, '10:12'), user: 'Priya S.', action: 'Invoice issued', details: `${docNo('EXSG', 1001)} · EUR 3.40` },
         { id: 2, timestamp: ts(-14, '17:55'), user: 'Priya S.', action: 'Invoice cancelled — linked SRs released for re-invoicing', details: 'Reason: Consignee address changed after issue — cancelled and re-raised with the corrected Amsterdam address.' },
       ],
       version: 0,
@@ -553,7 +554,7 @@ export const buildSeedDb = () => {
       const issuedOn = sr.statusHistory.find((h) => h.status === 'IN_PRODUCTION')?.date || d(-1);
       return {
         id: sriSeq,
-        issueNo: `SRI-${year}-${String(sriSeq).padStart(4, '0')}`,
+        issueNo: docNo(SR_DOC_PREFIX.ISSUE, 1000 + sriSeq),
         srId: sr.id,
         srNo: sr.srNo,
         issuedDate: issuedOn,
@@ -580,11 +581,14 @@ export const buildSeedDb = () => {
 
   return {
     seedVersion: SEED_VERSION,
-    srSeq: { [year]: 100 + requests.length },
-    invSeq: { 'EXSG/26-27': 31, 'SA/26-27': 11 },
-    poSeq: 1000,
-    dspSeq: { [year]: dispatches.length },
-    sriSeq: { [year]: sampleIssues.length },
+    // sys_doc_counters equivalent: one counter per <PREFIX>/<FY>, last number used
+    docSeq: {
+      [`${SR_DOC_PREFIX.REQUEST}/${fy}`]: 1000 + requests.length,
+      [`${SR_DOC_PREFIX.DISPATCH}/${fy}`]: 1000 + dispatches.length,
+      [`${SR_DOC_PREFIX.ISSUE}/${fy}`]: 1000 + sampleIssues.length,
+      [`EXSG/${fy}`]: 1002,
+      [`SA/${fy}`]: 1001,
+    },
     requests,
     dispatches,
     invoices,

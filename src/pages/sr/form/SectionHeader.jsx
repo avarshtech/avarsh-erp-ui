@@ -19,7 +19,7 @@ const Field = ({ label, children }) => (
 const SectionHeader = ({ srNo, header }) => (
   <Card size="small" style={{ marginBottom: 16 }} title={<Title level={5} style={{ margin: 0 }}>A · Header — auto-populated from BOM &amp; Order</Title>}>
     <Row gutter={[24, 16]}>
-      <Field label="SR Number">{srNo || 'Auto on save (SRQ-YYYY-NNNN)'}</Field>
+      <Field label="SR Number">{srNo || 'Auto on save (SRQ/FY/NNNN)'}</Field>
       <Field label="Order Number">{header?.orderNo}</Field>
       <Field label="BOM Reference">{header?.bomId ? `BOM #${header.bomId}` : '—'}</Field>
       <Field label="Style Number">{header?.styleNo}</Field>

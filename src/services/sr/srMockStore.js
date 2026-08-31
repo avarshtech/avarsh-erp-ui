@@ -8,6 +8,7 @@
  * Multi-tab is last-write-wins; acceptable for a mock phase.
  */
 import { buildSeedDb, SEED_VERSION } from './srMockData';
+import { nextDocNo, SR_DOC_PREFIX } from './srDocNumbers';
 
 const STORAGE_KEY = 'avarsh.sr.mockStore.v1';
 
@@ -40,55 +41,27 @@ export const resetSrMockStore = () => {
 };
 
 // ── Numbering ──────────────────────────────────────────────────────────────
-// SR numbers follow the PRD format SRQ-YYYY-NNNN (per calendar year).
-// NOTE: deviates from the backend DocumentNumberService convention
-// (<PFX>/<FY>/<NNNN>) — reconcile at API phase.
-export const nextSrNo = (db) => {
-  const year = new Date().getFullYear();
-  db.srSeq = db.srSeq || {};
-  db.srSeq[year] = (db.srSeq[year] || 100) + 1;
-  return `SRQ-${year}-${String(db.srSeq[year]).padStart(4, '0')}`;
-};
+// Every sampling document follows the ERP standard <PREFIX>/<FY>/<NNNN> handed
+// out by the backend DocumentNumberService — see srDocNumbers.js.
 
-// Indian fiscal year label, e.g. 2026-08 → "26-27"
-export const fiscalYearLabel = (d = new Date()) => {
-  const y = d.getFullYear() % 100;
-  const startsThisYear = d.getMonth() + 1 >= 4; // Apr–Mar
-  const from = startsThisYear ? y : y - 1;
-  return `${String(from).padStart(2, '0')}-${String(from + 1).padStart(2, '0')}`;
-};
+/** Sample Request, e.g. SRQ/26-27/1001 */
+export const nextSrNo = (db) => nextDocNo(db, SR_DOC_PREFIX.REQUEST);
 
-// Invoice numbers are assigned ON ISSUE ONLY (PRD §10.8) so the series never
-// gains gaps from abandoned drafts. e.g. EXSG0034/26-27
-export const nextInvoiceNo = (db, series = 'EXSG') => {
-  const fy = fiscalYearLabel();
-  const key = `${series}/${fy}`;
-  db.invSeq = db.invSeq || {};
-  db.invSeq[key] = (db.invSeq[key] || 30) + 1;
-  return `${series}${String(db.invSeq[key]).padStart(4, '0')}/${fy}`;
-};
+/**
+ * Invoice numbers are assigned ON ISSUE ONLY (PRD §10.8) so the series never
+ * gains gaps from abandoned drafts. The prefix is the buyer-facing invoice
+ * series, e.g. EXSG/26-27/1001 (commercial) or SA/26-27/1001 (sample charge).
+ */
+export const nextInvoiceNo = (db, series = 'EXSG') => nextDocNo(db, series);
 
 // Mock sample-PO numbers — clearly distinct from real supplier POs (PO/FY/NNNN);
 // the real integration creates actual PO-module records flagged po_type=SAMPLE.
-export const nextSamplePoNo = (db) => {
-  db.poSeq = (db.poSeq || 1000) + 1;
-  return `SPO/${fiscalYearLabel()}/${db.poSeq}`;
-};
+export const nextSamplePoNo = (db) => nextDocNo(db, SR_DOC_PREFIX.SAMPLE_PO);
 
-// Dispatch numbers — one dispatch groups many SRs to one customer (R2)
-export const nextDispatchNo = (db) => {
-  const year = new Date().getFullYear();
-  db.dspSeq = db.dspSeq || {};
-  db.dspSeq[year] = (db.dspSeq[year] || 0) + 1;
-  return `DSP-${year}-${String(db.dspSeq[year]).padStart(4, '0')}`;
-};
+/** Dispatch — one dispatch groups many SRs to one customer (R2) */
+export const nextDispatchNo = (db) => nextDocNo(db, SR_DOC_PREFIX.DISPATCH);
 
-// Sample-issue numbers — material issued against an SR (Submitted → In Production)
-export const nextSampleIssueNo = (db) => {
-  const year = new Date().getFullYear();
-  db.sriSeq = db.sriSeq || {};
-  db.sriSeq[year] = (db.sriSeq[year] || 0) + 1;
-  return `SRI-${year}-${String(db.sriSeq[year]).padStart(4, '0')}`;
-};
+/** Sample issue — material issued against an SR (Submitted → In Production) */
+export const nextSampleIssueNo = (db) => nextDocNo(db, SR_DOC_PREFIX.ISSUE);
 
 export const isMemoryOnly = () => memoryDb != null;
