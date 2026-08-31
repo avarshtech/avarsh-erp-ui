@@ -1,127 +1,173 @@
-import { useCallback, useEffect, useState } from 'react';
-import { App, Drawer, Button, Space, Segmented, Table, Input, Divider } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { App, Drawer, Space, Table, Radio, Input, Button, Alert, DatePicker, Tag } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import {
-  CHECKLIST_MATERIALS, CHECKLIST_APPROVALS, CHECKLIST_STATUSES, CHECK_TYPES, ISSUE_SEVERITIES,
-} from '../../../utils/sewingConstants';
-import { saveTrimCard } from '../../../services/production/sewingService';
+import { CHECK_TYPES, BOM_ITEM_CATEGORIES } from '../../../utils/sewingConstants';
+import { getBomItems, saveTrimCard } from '../../../services/production/sewingService';
 
-const STATUS_COLORS = { ACTUAL: 'var(--success-color)', ALTERNATE: 'var(--warning-color)', MISSING: 'var(--error-color)', NOT_APPLICABLE: 'var(--text-secondary)' };
+const FieldLabel = ({ children }) => (
+  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
+);
 
-const emptyCard = (orderId) => ({
-  orderId, date: dayjs().format('YYYY-MM-DD'), checkType: 'IN_LINE', verifiedBy: '', approvedBy: '',
-  materials: Object.fromEntries(CHECKLIST_MATERIALS.map((m) => [m, 'ACTUAL'])),
-  approvals: Object.fromEntries(CHECKLIST_APPROVALS.map((a) => [a, 'ACTUAL'])),
-  issues: [],
-});
-
-/** PRD 4.5 drawer — checklist statuses per item + structured issue entries. */
+/**
+ * CR-SEW-005 — items auto-populate from the work order's BOM; binary
+ * Correct/Incorrect per item; save requires explicit physical confirmation.
+ */
 const TrimVerificationDrawer = ({ open, record, orders, onClose, onSaved }) => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [card, setCard] = useState(null);
+  const [bomItems, setBomItems] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setCard(record ? JSON.parse(JSON.stringify(record)) : emptyCard(orders[0]?.id));
+    setCard(record ? { ...record } : {
+      orderId: orders[0]?.id, checkType: 'PILOT_RUN', date: dayjs().format('YYYY-MM-DD'),
+      verifiedBy: '', items: null,
+    });
   }, [open, record, orders]);
 
-  const setItem = useCallback((group, item, status) => {
-    setCard((prev) => ({ ...prev, [group]: { ...prev[group], [item]: status } }));
+  useEffect(() => {
+    if (!open || !card?.orderId) return;
+    getBomItems(card.orderId).then((items) => {
+      setBomItems(items);
+      setCard((prev) => (prev.items ? prev : {
+        ...prev, items: items.map((b) => ({ bomItemId: b.id, status: null, remarks: '' })),
+      }));
+    }).catch(() => message.error('Failed to load BOM items'));
+  }, [open, card?.orderId, message]);
+
+  const setItem = useCallback((idx, patch) => {
+    setCard((prev) => ({ ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
   }, []);
 
-  const setIssue = useCallback((idx, field, val) => {
-    setCard((prev) => ({ ...prev, issues: prev.issues.map((x, i) => (i === idx ? { ...x, [field]: val } : x)) }));
-  }, []);
+  const summary = useMemo(() => {
+    const items = card?.items || [];
+    const correct = items.filter((i) => i.status === 'CORRECT').length;
+    const incorrect = items.filter((i) => i.status === 'INCORRECT').length;
+    return { total: items.length, correct, incorrect, pending: items.length - correct - incorrect };
+  }, [card?.items]);
 
-  const handleSave = async () => {
-    if (!card.verifiedBy.trim()) return message.warning('Enter who verified this card');
-    setSaving(true);
-    try {
-      const saved = await saveTrimCard({ ...card, id: record?.id });
-      message.success(`${saved.cardNo} saved — gate is ${saved.status === 'ALL_CLEAR' ? 'ALL CLEAR' : 'blocked (issues found)'}`);
-      onSaved();
-    } catch { message.error('Failed to save card'); } finally { setSaving(false); }
+  const rows = useMemo(() => (card?.items || []).map((it, idx) => ({
+    ...it, idx, bom: bomItems.find((b) => b.id === it.bomItemId) || it.manual || {},
+  })), [card?.items, bomItems]);
+
+  const columns = useMemo(() => [
+    { title: 'Category', key: 'cat', width: 140, render: (_, r) => <Tag>{r.bom.category || '—'}</Tag> },
+    {
+      title: 'Item (from BOM)', key: 'name', width: 220,
+      render: (_, r) => (r.bom.id ? <strong>{r.bom.name}</strong> : (
+        <Input size="small" placeholder="Manual item name" value={r.manual?.name}
+          onChange={(e) => setItem(r.idx, { manual: { ...r.manual, name: e.target.value, category: r.manual?.category || 'Trims & Accessories' } })} />
+      )),
+    },
+    { title: 'Specification', key: 'spec', width: 200, ellipsis: true, render: (_, r) => r.bom.spec || '—' },
+    { title: 'Qty', key: 'qty', width: 90, render: (_, r) => r.bom.qty || '—' },
+    { title: 'Supplier', key: 'sup', width: 120, ellipsis: true, render: (_, r) => r.bom.supplier || '—' },
+    {
+      title: 'Verification', key: 'status', width: 190, align: 'center',
+      render: (_, r) => (
+        <Radio.Group size="small" value={r.status} buttonStyle="solid"
+          onChange={(e) => setItem(r.idx, { status: e.target.value })}>
+          <Radio.Button value="CORRECT">Correct</Radio.Button>
+          <Radio.Button value="INCORRECT">Incorrect</Radio.Button>
+        </Radio.Group>
+      ),
+    },
+    {
+      title: 'Remarks', key: 'remarks', width: 220,
+      render: (_, r) => (
+        <Input size="small" value={r.remarks} disabled={r.status !== 'INCORRECT'}
+          placeholder={r.status === 'INCORRECT' ? 'What is wrong?' : '—'}
+          onChange={(e) => setItem(r.idx, { remarks: e.target.value })} />
+      ),
+    },
+  ], [setItem]);
+
+  const handleSave = () => {
+    if (summary.pending > 0) return message.warning(`${summary.pending} item(s) still unverified — mark each Correct or Incorrect`);
+    if ((card.items || []).some((it) => it.status === 'INCORRECT' && !it.remarks)) return message.warning('Add remarks for every Incorrect item');
+    modal.confirm({
+      title: 'Physically verified against trim card?',
+      content: 'Confirm only after physically checking every trim on the floor. "No" returns to the form without saving.',
+      okText: 'Yes', cancelText: 'No',
+      onOk: async () => {
+        setSaving(true);
+        try {
+          await saveTrimCard({ ...card, physicallyVerified: true });
+          message.success('Verification card saved — VERIFIED');
+          onSaved();
+        } catch { message.error('Failed to save verification card'); } finally { setSaving(false); }
+      },
+    });
   };
 
   if (!card) return null;
 
-  const ChecklistGroup = ({ title, group, items }) => (
-    <div style={{ marginBottom: 12 }}>
-      <Divider orientation="left" style={{ margin: '8px 0' }}>{title}</Divider>
-      <Space wrap size={[16, 10]}>
-        {items.map((item) => (
-          <div key={item} style={{ minWidth: 150 }}>
-            <div style={{ fontSize: 12, color: STATUS_COLORS[card[group][item]], marginBottom: 2 }}>{item}</div>
-            <Segmented
-              size="small"
-              value={card[group][item]}
-              options={CHECKLIST_STATUSES.map((s) => ({ value: s, label: s === 'NOT_APPLICABLE' ? 'N/A' : s.slice(0, 3) }))}
-              onChange={(v) => setItem(group, item, v)}
-            />
-          </div>
-        ))}
-      </Space>
-    </div>
-  );
-
   return (
-    <Drawer
-      title={record ? `Verification Card — ${record.cardNo}` : 'New Material & Trim Verification Card'}
-      size={760}
-      open={open}
-      onClose={onClose}
-      destroyOnHidden
+    <Drawer title={record ? `Trim Verification — ${record.cardNo}` : 'New Trim Verification Card'} open={open}
+      onClose={onClose} size={1100} destroyOnHidden
       footer={(
-        <Space style={{ float: 'right' }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" loading={saving} onClick={handleSave}>Save Card</Button>
+        <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+          <Space size={6}>
+            <Tag>Total {summary.total}</Tag>
+            <Tag color="green">Correct {summary.correct}</Tag>
+            <Tag color="red">Incorrect {summary.incorrect}</Tag>
+            <Tag color="orange">Pending {summary.pending}</Tag>
+          </Space>
+          <Space>
+            <Button onClick={onClose}>Cancel</Button>
+            <ActionButton action="save" text="Save Card" loading={saving} onClick={handleSave} />
+          </Space>
         </Space>
-      )}
-    >
-      <Space size="middle" wrap style={{ marginBottom: 8 }}>
-        <FormSelect value={card.orderId} style={{ width: 250 }} disabled={Boolean(record)}
-          options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-          onChange={(v) => setCard((prev) => ({ ...prev, orderId: v }))} />
-        <FormSelect value={card.checkType} style={{ width: 130 }}
-          options={CHECK_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
-          onChange={(v) => setCard((prev) => ({ ...prev, checkType: v }))} />
-        <Input value={card.verifiedBy} style={{ width: 170 }} placeholder="Verified by (QC)"
-          onChange={(e) => setCard((prev) => ({ ...prev, verifiedBy: e.target.value }))} />
-        <Input value={card.approvedBy} style={{ width: 170 }} placeholder="Approved by (PM/QA)"
-          onChange={(e) => setCard((prev) => ({ ...prev, approvedBy: e.target.value }))} />
+      )}>
+      <Space size="middle" wrap style={{ marginBottom: 12 }}>
+        <div>
+          <FieldLabel>Work Order</FieldLabel>
+          <FormSelect value={card.orderId} style={{ width: 230 }} disabled={Boolean(record)}
+            options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
+            onChange={(v) => setCard((prev) => ({ ...prev, orderId: v, items: null }))} />
+        </div>
+        <div>
+          <FieldLabel>Check Type</FieldLabel>
+          <FormSelect value={card.checkType} style={{ width: 130 }}
+            options={CHECK_TYPES.map((t) => ({ value: t, label: t.replace('_', ' ') }))}
+            onChange={(v) => setCard((prev) => ({ ...prev, checkType: v }))} />
+        </div>
+        <div>
+          <FieldLabel>Date</FieldLabel>
+          <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(card.date)}
+            onChange={(d) => setCard((prev) => ({ ...prev, date: d.format('YYYY-MM-DD') }))} />
+        </div>
+        <div>
+          <FieldLabel>Verified By</FieldLabel>
+          <Input value={card.verifiedBy} style={{ width: 180 }} placeholder="QC name"
+            onChange={(e) => setCard((prev) => ({ ...prev, verifiedBy: e.target.value }))} />
+        </div>
       </Space>
 
-      <ChecklistGroup title="Materials" group="materials" items={CHECKLIST_MATERIALS} />
-      <ChecklistGroup title="Approvals & Tests" group="approvals" items={CHECKLIST_APPROVALS} />
+      {bomItems.length > 0 && bomItems.length < 3 && (
+        <Alert type="warning" showIcon style={{ marginBottom: 12 }}
+          title={`Only ${bomItems.length} BOM item(s) found for this order — the BOM may be incomplete. Add missing items manually below.`} />
+      )}
 
-      <Divider orientation="left" style={{ margin: '8px 0' }}>
-        Issues Found
-        <Button icon={<PlusOutlined />} size="small" style={{ marginLeft: 12 }}
-          onClick={() => setCard((prev) => ({ ...prev, issues: [...prev.issues, { description: '', severity: 'MAJOR', rootCause: '', action: '', status: 'OPEN', resolvedOn: null }] }))}>
-          Add Issue
-        </Button>
-      </Divider>
-      <Table
-        rowKey={(r) => card.issues.indexOf(r)} size="small" pagination={false} dataSource={card.issues}
-        columns={[
-          { title: 'Issue', dataIndex: 'description', width: 200, render: (v, _, idx) => <Input size="small" value={v} placeholder="e.g. Found flap, pcs center off" onChange={(e) => setIssue(idx, 'description', e.target.value)} /> },
-          { title: 'Severity', dataIndex: 'severity', width: 110, render: (v, _, idx) => <FormSelect size="small" value={v} style={{ width: 95 }} options={ISSUE_SEVERITIES.map((s) => ({ value: s, label: s }))} onChange={(val) => setIssue(idx, 'severity', val)} /> },
-          { title: 'Root Cause', dataIndex: 'rootCause', width: 150, render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setIssue(idx, 'rootCause', e.target.value)} /> },
-          { title: 'Corrective Action', dataIndex: 'action', width: 180, render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setIssue(idx, 'action', e.target.value)} /> },
-          { title: 'Status', dataIndex: 'status', width: 120, render: (v, _, idx) => <FormSelect size="small" value={v} style={{ width: 105 }} options={['OPEN', 'RESOLVED'].map((s) => ({ value: s, label: s }))} onChange={(val) => setIssue(idx, 'status', val)} /> },
-          {
-            title: '', key: 'del', width: 46, align: 'center',
-            render: (_, __, idx) => (
-              <Button size="small" type="text" danger icon={<DeleteOutlined />}
-                onClick={() => setCard((prev) => ({ ...prev, issues: prev.issues.filter((_, i) => i !== idx) }))} />
-            ),
-          },
-        ]}
-        locale={{ emptyText: 'No issues logged — card can go ALL CLEAR' }}
-      />
+      {BOM_ITEM_CATEGORIES.map((cat) => {
+        const catRows = rows.filter((r) => (r.bom.category || 'Trims & Accessories') === cat);
+        if (!catRows.length) return null;
+        return (
+          <div key={cat} style={{ marginBottom: 14 }}>
+            <strong style={{ display: 'block', marginBottom: 6 }}>{cat}</strong>
+            <Table rowKey={(r) => r.idx} size="small" columns={columns} dataSource={catRows}
+              pagination={false} scroll={{ x: 1050 }} showHeader={cat === BOM_ITEM_CATEGORIES.find((c) => rows.some((r) => (r.bom.category || 'Trims & Accessories') === c))} />
+          </div>
+        );
+      })}
+      <Button icon={<PlusOutlined />} size="small"
+        onClick={() => setCard((prev) => ({ ...prev, items: [...(prev.items || []), { bomItemId: null, status: null, remarks: '', manual: { name: '', category: 'Trims & Accessories' } }] }))}>
+        Add Item Manually (BOM fallback)
+      </Button>
     </Drawer>
   );
 };

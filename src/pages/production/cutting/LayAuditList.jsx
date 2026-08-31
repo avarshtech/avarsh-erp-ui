@@ -7,7 +7,7 @@ import EmptyState from '../../../components/EmptyState';
 import RecordLink from '../../../components/RecordLink';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { formatNumber } from '../../../utils/formatters';
-import { listLayAudits, getCutPos, listMarkerPlans } from '../../../services/production/cuttingService';
+import { listLayAudits } from '../../../services/production/cuttingService';
 import CuttingStatusTag from './CuttingStatusTag';
 
 /** FR-03 — spreading records: rolls used, plies, weight per lay and variance. */
@@ -15,28 +15,25 @@ const LayAuditList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
-  const [cutPos, setCutPos] = useState([]);
-  const [markerNames, setMarkerNames] = useState({});
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [lays, pos, plans] = await Promise.all([listLayAudits(), getCutPos(), listMarkerPlans()]);
-      setRows(lays); setCutPos(pos);
-      setMarkerNames(Object.fromEntries(plans.flatMap((p) => p.markers.map((m) => [m.id, m.markerNo]))));
+      setRows(await listLayAudits());
     } catch { message.error('Failed to load lay audits'); } finally { setLoading(false); }
   }, [message]);
 
   useEffect(() => { load(); }, [load]);
 
-  const poNo = useCallback((id) => cutPos.find((p) => p.id === id)?.cutPoNo || '—', [cutPos]);
-
   const columns = useMemo(() => [
-    { title: 'Lay #', dataIndex: 'layNo', width: 100, align: 'center', render: (v, r) => <RecordLink text={`LAY-${String(v).padStart(3, '0')}`} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} /> },
-    { title: 'Marker #', dataIndex: 'markerId', width: 100, align: 'center', render: (v) => (markerNames[v] ? <code>{markerNames[v]}</code> : '—') },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    {
+      title: 'Marker #', dataIndex: 'markerNo', width: 120, align: 'center',
+      render: (v, r) => <RecordLink text={v || r.layRef} onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} />,
+    },
+    { title: 'Lay #', dataIndex: 'layRef', width: 90, align: 'center' },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Date', dataIndex: 'layDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Length (m)', dataIndex: 'layLength', width: 100, align: 'right' },
     { title: 'Rolls', key: 'rolls', width: 70, align: 'center', render: (_, r) => r.rolls.length },
     {
@@ -44,22 +41,23 @@ const LayAuditList = () => {
       render: (_, r) => r.rolls.reduce((s, x) => s + (x.numLays || 0), 0),
     },
     {
-      title: 'Weight Used (kg)', key: 'used', width: 130, align: 'right',
-      render: (_, r) => formatNumber(r.rolls.reduce((s, x) => s + (x.total || 0), 0), 3),
+      title: 'Weight Used', key: 'used', width: 130, align: 'right',
+      render: (_, r) => `${formatNumber(r.totalLayWeight, 3)} ${r.uom || ''}`,
     },
     {
-      title: 'Short / Excess (kg)', key: 'var', width: 140, align: 'right',
-      render: (_, r) => {
-        const v = r.rolls.reduce((s, x) => s + (x.variance || 0), 0);
-        return <span style={{ color: v > 0 ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>{formatNumber(v, 3)}</span>;
-      },
+      title: 'Short / Excess', key: 'var', width: 140, align: 'right',
+      render: (_, r) => (
+        <span style={{ color: r.totalVariance > 0 ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>
+          {formatNumber(r.totalVariance, 3)}
+        </span>
+      ),
     },
     { title: 'Status', dataIndex: 'status', width: 110, render: (v) => <CuttingStatusTag status={v} /> },
     {
       title: 'Actions', key: 'act', width: 90, fixed: 'right', align: 'center',
       render: (_, r) => <ActionButton action="edit" size="small" onClick={() => navigate(`/production/cutting/lay-audit/${r.id}`)} />,
     },
-  ], [poNo, markerNames, navigate]);
+  ], [navigate]);
 
   return (
     <Card>

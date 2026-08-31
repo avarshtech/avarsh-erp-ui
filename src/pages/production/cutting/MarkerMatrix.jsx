@@ -3,8 +3,8 @@ import { Card, Table, InputNumber, Button, Space, Tag, DatePicker, Input } from 
 import { PlusOutlined, DeleteOutlined, FileExcelOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
-import { LAY_TABLES, MARKER_EFFICIENCY_TARGET } from '../../../utils/cuttingConstants';
-import { allowanceQty } from '../../../services/production/cuttingService';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
+import { allowanceQty, totalAllowanceQty } from '../../../utils/cuttingCalc';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
@@ -16,6 +16,8 @@ const FieldLabel = ({ children }) => (
  * TOTAL row at the bottom. Marker details sit in the row expansion.
  */
 const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, onImportExcel }) => {
+  const { tableOptions, threshold } = useCuttingMasters();
+  const efficiencyTarget = threshold('MARKER_EFFICIENCY_TARGET', 85);
   const pcsOf = useCallback((m) => (po?.sizes || []).reduce((s, sz) => s + (m.ratio?.[sz] || 0), 0), [po]);
 
   const rows = useMemo(() => [
@@ -39,7 +41,9 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
         if (r.type === 'allow') return <strong style={{ color: 'var(--primary-color)' }}>+{plan.allowancePct || 0}% (cut qty)</strong>;
         return (
           <Space size={6}>
-            <Tag color="blue" style={{ marginInline: 0 }}><code>{r.markerNo}</code></Tag>
+            <Tag color="blue" style={{ marginInline: 0 }}>
+              <code>{r.markerNo || `MK-${String(r.idx + 1).padStart(3, '0')}`}</code>
+            </Tag>
             <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>H:</span>
             <InputNumber size="small" min={1} value={r.markerHeight} style={{ width: 70 }}
               onChange={(v) => onPatchMarker(r.idx, { markerHeight: v })} />
@@ -66,7 +70,7 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
       title: 'Qty', key: 'qty', width: 90, align: 'right',
       render: (_, r) => {
         if (r.type === 'qty') return <strong>{po?.orderQty ?? 0}</strong>;
-        if (r.type === 'allow') return <strong style={{ color: 'var(--primary-color)' }}>{allowanceQty(po?.orderQty, plan.allowancePct)}</strong>;
+        if (r.type === 'allow') return <strong style={{ color: 'var(--primary-color)' }}>{totalAllowanceQty(po?.sizes, po?.sizeQty, plan.allowancePct)}</strong>;
         return <strong>{(r.markerHeight || 0) * pcsOf(r)}</strong>;
       },
     },
@@ -85,12 +89,12 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
           onChange={(v) => onPatchMarker(r.idx, { markerLength: v })} />
       </div>
       <div>
-        <FieldLabel>Efficiency % (target ≥ {MARKER_EFFICIENCY_TARGET})</FieldLabel>
+        <FieldLabel>Efficiency % (target ≥ {efficiencyTarget})</FieldLabel>
         <Space size={6}>
           <InputNumber size="small" min={40} max={99} value={r.efficiencyPct} style={{ width: 70 }}
             onChange={(v) => onPatchMarker(r.idx, { efficiencyPct: v })} />
-          {r.efficiencyPct != null && (r.efficiencyPct >= MARKER_EFFICIENCY_TARGET
-            ? <Tag color="green">On target</Tag> : <Tag color="orange">Below {MARKER_EFFICIENCY_TARGET}%</Tag>)}
+          {r.efficiencyPct != null && (r.efficiencyPct >= efficiencyTarget
+            ? <Tag color="green">On target</Tag> : <Tag color="orange">Below {efficiencyTarget}%</Tag>)}
         </Space>
       </div>
       <div>
@@ -104,9 +108,9 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
           onChange={(d) => onPatchMarker(r.idx, { cutPlanDate: d ? d.format('YYYY-MM-DD') : null })} style={{ width: 100 }} />
       </div>
       <div>
-        <FieldLabel>Lay Table #</FieldLabel>
-        <FormSelect size="small" value={r.layTableNo} style={{ width: 70 }} placeholder="#"
-          options={LAY_TABLES.map((t) => ({ value: t, label: t }))} onChange={(v) => onPatchMarker(r.idx, { layTableNo: v })} />
+        <FieldLabel>Lay Table</FieldLabel>
+        <FormSelect size="small" value={r.cuttingTableId} style={{ width: 120 }} placeholder="Table"
+          options={tableOptions} onChange={(v) => onPatchMarker(r.idx, { cuttingTableId: v })} />
       </div>
       <div>
         <FieldLabel>CAD File</FieldLabel>
@@ -114,7 +118,7 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
           onChange={(e) => onPatchMarker(r.idx, { cadFile: e.target.value })} />
       </div>
     </Space>
-  ), [onPatchMarker]);
+  ), [onPatchMarker, tableOptions, efficiencyTarget]);
 
   return (
     <Card
@@ -160,7 +164,7 @@ const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, on
         )}
       />
       <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
-        One row per marker, exactly like the CAD marker sheet — H = plies; Pcs/Mkr = garments per marker (e.g. 100=10).
+        One row per marker, exactly like the CAD marker sheet — H = height; Pcs/Mkr = garments per marker (e.g. 100=10).
         Expand a row for length, efficiency, lay/cut dates and table. Totals turn red where cutting exceeds the +{plan.allowancePct || 0}% allowance.
       </div>
     </Card>

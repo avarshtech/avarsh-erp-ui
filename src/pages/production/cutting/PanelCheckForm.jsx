@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import { PANEL_QUALITY_OPTIONS, PANEL_CHECK_ACTIONS, THRESHOLDS } from '../../../utils/cuttingConstants';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { listPanelChecks, listPanelIssues, savePanelCheck, getCutPos } from '../../../services/production/cuttingService';
 
 /** FR-09 — QC on panels returning from an external process, per bundle range. */
@@ -20,6 +20,10 @@ const PanelCheckForm = () => {
   const [cutPos, setCutPos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { options, threshold } = useCuttingMasters();
+  const qualityOptions = options('PANEL_QUALITY');
+  const actionOptions = options('PANEL_CHECK_ACTION');
+  const defectLotPct = threshold('PANEL_DEFECT_LOT_PCT', 5);
 
   useEffect(() => {
     setLoading(true);
@@ -78,7 +82,7 @@ const PanelCheckForm = () => {
       title: 'Print / Process Quality', dataIndex: 'quality', width: 170,
       render: (v, _, idx) => (
         <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Quality"
-          options={PANEL_QUALITY_OPTIONS.map((q) => ({ value: q, label: q }))} onChange={(val) => setRow(idx, 'quality', val)} />
+          options={qualityOptions} onChange={(val) => setRow(idx, 'quality', val)} />
       ),
     },
     {
@@ -89,7 +93,7 @@ const PanelCheckForm = () => {
       title: 'Corrective Action', dataIndex: 'action', width: 200,
       render: (v, _, idx) => (
         <FormSelect size="small" value={v} style={{ width: 185 }} placeholder="Action"
-          options={PANEL_CHECK_ACTIONS.map((a) => ({ value: a, label: a }))} onChange={(val) => setRow(idx, 'action', val)} />
+          options={actionOptions} onChange={(val) => setRow(idx, 'action', val)} />
       ),
     },
     {
@@ -103,18 +107,20 @@ const PanelCheckForm = () => {
           onClick={() => setCheck((prev) => ({ ...prev, rows: prev.rows.filter((_, i) => i !== idx) }))} />
       ),
     },
-  ], [setRow]);
+  ], [setRow, qualityOptions, actionOptions]);
 
   const handleSave = async () => {
     if (!check.panelIssueId) return message.warning('Select the panel issue being checked');
     if (!check.rows.length) return message.warning('Add at least one bundle-range row');
-    const status = stats.pending > 0 ? 'PARTIAL' : stats.failed > 0 ? 'FAILED' : 'PASSED';
     setSaving(true);
     try {
-      await savePanelCheck({ ...check, status });
-      message.success('Panel check saved — passed panels are released to bundling');
+      // The verdict is the server's: any verified row that was not accepted fails the lot.
+      const saved = await savePanelCheck({ ...check, id: check.id });
+      message.success(`Panel check saved as ${saved.status.toLowerCase()}`);
       navigate('/production/cutting?tab=external');
-    } catch { message.error('Failed to save panel check'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save panel check');
+    } finally { setSaving(false); }
   };
 
   if (loading || !check) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -134,7 +140,7 @@ const PanelCheckForm = () => {
           <div style={{ minWidth: 280 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Panel Issue (external process PO)</div>
             <FormSelect value={check.panelIssueId} style={{ width: 270 }} placeholder="Select panel issue" disabled={isEdit}
-              options={issues.map((i) => ({ value: i.id, label: `${i.panelPoNo} · ${i.process}` }))}
+              options={issues.map((i) => ({ value: i.id, label: `${i.panelPoNo} · ${i.processName}` }))}
               onChange={handleIssueSelect} />
           </div>
           <div style={{ minWidth: 280 }}>
@@ -149,14 +155,14 @@ const PanelCheckForm = () => {
               { key: 's', label: 'Style', children: po.styleNo },
               { key: 'c', label: 'Color', children: po.color },
               { key: 'o', label: 'Order #', children: po.orderNo },
-              { key: 'p', label: 'Process', children: check.process },
+              { key: 'p', label: 'Process', children: check.processName },
             ]} />
         )}
       </Card>
 
-      {stats.defectPct > THRESHOLDS.panelDefectLotPct && (
+      {stats.defectPct > defectLotPct && (
         <Alert type="error" showIcon style={{ marginBottom: 16 }}
-          title={`Defect rate ${stats.defectPct}% exceeds ${THRESHOLDS.panelDefectLotPct}% — entire lot flagged for review (BR-FR-09-04)`} />
+          title={`Defect rate ${stats.defectPct}% exceeds ${defectLotPct}% — entire lot flagged for review (BR-FR-09-04)`} />
       )}
 
       <Card

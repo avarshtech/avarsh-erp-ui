@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getLayAudit, saveLayAudit, getCutPos, getRolls, listMarkersForPo, nextLayNo } from '../../../services/production/cuttingService';
 import LayAuditRollGrid from './LayAuditRollGrid';
 
@@ -24,6 +25,7 @@ const LayAuditForm = () => {
   const [markers, setMarkers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { fabricTypeByName } = useCuttingMasters();
 
   useEffect(() => {
     setLoading(true);
@@ -31,8 +33,8 @@ const LayAuditForm = () => {
       .then(([record, pos]) => {
         setCutPos(pos);
         setLay(record || {
-          cutPoId: pos[0]?.id, markerId: null, layNo: null, date: dayjs().format('YYYY-MM-DD'),
-          layLength: null, layHeight: null, width: null, startTime: null, endTime: null, rolls: [],
+          cuttingPoId: pos[0]?.id, markerId: null, layNo: null, layDate: dayjs().format('YYYY-MM-DD'),
+          layLength: null, plies: null, width: null, startTime: null, endTime: null, rolls: [],
         });
       })
       .catch(() => message.error('Failed to load lay audit'))
@@ -40,12 +42,12 @@ const LayAuditForm = () => {
   }, [id, isEdit, message]);
 
   useEffect(() => {
-    if (!lay?.cutPoId) return;
-    getRolls(lay.cutPoId).then(setAvailableRolls).catch(() => {});
-    listMarkersForPo(lay.cutPoId).then(setMarkers).catch(() => {});
-  }, [lay?.cutPoId]);
+    if (!lay?.cuttingPoId) return;
+    getRolls(lay.cuttingPoId).then(setAvailableRolls).catch(() => {});
+    listMarkersForPo(lay.cuttingPoId).then(setMarkers).catch(() => {});
+  }, [lay?.cuttingPoId]);
 
-  const po = useMemo(() => cutPos.find((p) => p.id === lay?.cutPoId), [cutPos, lay]);
+  const po = useMemo(() => cutPos.find((p) => p.id === lay?.cuttingPoId), [cutPos, lay]);
   const marker = useMemo(() => markers.find((m) => m.id === lay?.markerId), [markers, lay?.markerId]);
 
   /** CR Change 3 — marker selected: Lay # auto per marker; length/plies/width pre-fill. */
@@ -70,10 +72,12 @@ const LayAuditForm = () => {
     if (!lay.rolls.length) return message.warning('Add at least one roll to the lay');
     setSaving(true);
     try {
-      await saveLayAudit({ ...lay, id: lay.id });
-      message.success(`LAY-${String(lay.layNo).padStart(3, '0')} saved`);
+      const saved = await saveLayAudit({ ...lay, id: lay.id });
+      message.success(`${saved.layRef} saved`);
       navigate('/production/cutting?tab=lay-audit');
-    } catch { message.error('Failed to save lay audit'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save lay audit');
+    } finally { setSaving(false); }
   };
 
   if (loading || !lay) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -81,7 +85,7 @@ const LayAuditForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title={isEdit ? `Lay Audit — LAY-${String(lay.layNo).padStart(3, '0')}` : 'New Lay Audit'}
+        title={isEdit ? `Lay Audit — ${marker?.markerNo || ''} · Lay ${lay.layNo}` : 'New Lay Audit'}
         backPath="/production/cutting?tab=lay-audit"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
@@ -92,9 +96,9 @@ const LayAuditForm = () => {
         <Space size="large" wrap align="end">
           <div>
             <FieldLabel>Cut PO #</FieldLabel>
-            <FormSelect value={lay.cutPoId} style={{ width: 240 }} disabled={isEdit}
+            <FormSelect value={lay.cuttingPoId} style={{ width: 240 }} disabled={isEdit}
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-              onChange={(v) => patch({ cutPoId: v, markerId: null, layNo: null, rolls: [] })} />
+              onChange={(v) => patch({ cuttingPoId: v, markerId: null, layNo: null, rolls: [] })} />
           </div>
           <div>
             <FieldLabel>Marker # (mandatory)</FieldLabel>
@@ -105,7 +109,7 @@ const LayAuditForm = () => {
           </div>
           <div>
             <FieldLabel>Date</FieldLabel>
-            <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(lay.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
+            <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(lay.layDate)} onChange={(d) => patch({ layDate: d.format('YYYY-MM-DD') })} />
           </div>
           <div>
             <FieldLabel>Lay # (auto per marker)</FieldLabel>
@@ -116,12 +120,8 @@ const LayAuditForm = () => {
             <InputNumber min={0} step={0.1} value={lay.layLength} onChange={(v) => patch({ layLength: v })} />
           </div>
           <div>
-            <FieldLabel>Plies — from marker height</FieldLabel>
+            <FieldLabel>Height — from marker</FieldLabel>
             <InputNumber min={0} value={lay.plies} onChange={(v) => patch({ plies: v })} />
-          </div>
-          <div>
-            <FieldLabel>Lay Height (m)</FieldLabel>
-            <InputNumber min={0} step={0.01} value={lay.layHeight} onChange={(v) => patch({ layHeight: v })} />
           </div>
           <div>
             <FieldLabel>Lay Width (in) — marker tab width</FieldLabel>
@@ -152,7 +152,7 @@ const LayAuditForm = () => {
       <Alert type="info" showIcon style={{ marginBottom: 16 }}
         title="Lays are planned based on the selected Marker #"
         description={marker
-          ? `${marker.markerNo} (${marker.planNo}): length ${marker.markerLength} m · height ${marker.markerHeight} plies · cuttable width ${marker.cuttableWidth}" — lay fields pre-fill from the marker and stay editable except width.`
+          ? `${marker.markerNo} (${marker.planNo}): length ${marker.markerLength} m · height ${marker.markerHeight} · cuttable width ${marker.cuttableWidth}" — lay fields pre-fill from the marker and stay editable except width.`
           : 'Select the marker this lay executes; Lay #, length, plies and width auto-populate from it.'} />
 
       {po?.sizeSetStatus !== 'APPROVED' && (
@@ -165,7 +165,8 @@ const LayAuditForm = () => {
           description="Rolls from different shade lots in the same lay can cause part-to-part shade variation in a garment. Split into separate lays unless shades are band-matched." />
       )}
 
-      <LayAuditRollGrid lay={lay} availableRolls={availableRolls} onChange={setLay} />
+      <LayAuditRollGrid lay={lay} availableRolls={availableRolls} onChange={setLay}
+        uom={fabricTypeByName(po?.fabricType)?.stockUom || 'kg'} />
     </div>
   );
 };

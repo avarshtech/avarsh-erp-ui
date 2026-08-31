@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber, Input, Alert } from 'antd';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
-import { SEWING_LINES, RECEIPT_DISCREPANCY_PCT } from '../../../utils/sewingConstants';
+import { UNITS, LINES_BY_UNIT, RECEIPT_DISCREPANCY_PCT } from '../../../utils/sewingConstants';
 import { saveCutReceipt, listCuttingBundleIssues, listCuttingBundles } from '../../../services/production/sewingService';
 
 /** PRD 4.2 — receive a Cutting Bundle Issue onto a sewing line; verify per-bundle qty. */
@@ -11,7 +11,8 @@ const CutPartsReceiptDrawer = ({ open, orders, onClose, onSaved }) => {
   const [issues, setIssues] = useState([]);
   const [allBundles, setAllBundles] = useState([]);
   const [issueId, setIssueId] = useState(null);
-  const [line, setLine] = useState(SEWING_LINES[0]);
+  const [unit, setUnit] = useState(UNITS[0]);
+  const [line, setLine] = useState(LINES_BY_UNIT[UNITS[0]][0]);
   const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
 
@@ -77,7 +78,7 @@ const CutPartsReceiptDrawer = ({ open, orders, onClose, onSaved }) => {
     try {
       const orderId = orders.find((o) => o.orderNo === 'SG/26-27/1001')?.id ?? orders[0]?.id;
       await saveCutReceipt({
-        orderId, line, bundleIssueNo: issue.issueNo, date: dayjs().format('YYYY-MM-DD'),
+        orderId, unit, line, bundleIssueNo: issue.issueNo, date: dayjs().format('YYYY-MM-DD'),
         receivedBy: 'Line Supervisor', status: flagged ? 'DISCREPANCY' : 'VERIFIED',
         bundles: rows.map(({ expectedQty, ...r }) => ({ ...r, qty: r.qty || 0, expectedQty })),
       });
@@ -106,8 +107,11 @@ const CutPartsReceiptDrawer = ({ open, orders, onClose, onSaved }) => {
         <FormSelect value={issueId} style={{ width: 300 }} placeholder="Bundle Issue note from Cutting"
           options={issues.map((i) => ({ value: i.id, label: `${i.issueNo} · ${i.workOrderNo} · ${i.totalPcs} pcs` }))}
           onChange={(id) => handleIssueSelect(id, issues, allBundles)} />
+        <FormSelect value={unit} style={{ width: 160 }}
+          options={UNITS.map((u) => ({ value: u, label: u }))}
+          onChange={(v) => { setUnit(v); setLine(LINES_BY_UNIT[v][0]); }} />
         <FormSelect value={line} style={{ width: 120 }}
-          options={SEWING_LINES.map((l) => ({ value: l, label: l }))} onChange={setLine} />
+          options={(LINES_BY_UNIT[unit] || []).map((l) => ({ value: l, label: l }))} onChange={setLine} />
       </Space>
       {flagged && (
         <Alert type="error" showIcon style={{ marginBottom: 12 }}

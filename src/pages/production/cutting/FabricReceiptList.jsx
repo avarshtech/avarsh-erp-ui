@@ -27,23 +27,21 @@ const FabricReceiptList = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const poNo = useCallback((id) => cutPos.find((p) => p.id === id)?.cutPoNo || '—', [cutPos]);
-
   const columns = useMemo(() => [
     { title: 'Receipt #', dataIndex: 'receiptNo', width: 170, render: (v) => <code>{v}</code> },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
-    { title: 'Cut PO', dataIndex: 'cutPoId', width: 150, render: poNo },
-    { title: 'Fabric Issue #', dataIndex: 'fabricIssueNo', width: 150, render: (v) => <code>{v}</code> },
+    { title: 'Date', dataIndex: 'receiptDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150, render: (v) => <code>{v}</code> },
+    { title: 'Fabric Issue #', dataIndex: 'materialIssueNo', width: 150, render: (v) => (v ? <code>{v}</code> : '—') },
     {
       title: 'Rolls (received / issued)', key: 'rolls', width: 170, align: 'center',
-      render: (_, r) => `${r.rolls.filter((x) => x.received).length} / ${r.rolls.length}`,
+      render: (_, r) => `${r.receivedRollCount} / ${r.rolls.length}`,
     },
     {
       title: 'Received Weight', key: 'wt', width: 140, align: 'right',
-      render: (_, r) => `${formatNumber(r.rolls.filter((x) => x.received).reduce((s, x) => s + x.weight, 0), 3)} kg`,
+      render: (_, r) => `${formatNumber(r.receivedQty, 3)} ${r.rolls[0]?.uom || ''}`,
     },
     { title: 'Status', dataIndex: 'status', width: 160, render: (v) => <CuttingStatusTag status={v} /> },
-  ], [poNo]);
+  ], []);
 
   return (
     <Card>

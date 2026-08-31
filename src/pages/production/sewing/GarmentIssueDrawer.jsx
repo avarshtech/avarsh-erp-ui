@@ -65,7 +65,7 @@ const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
 
   return (
     <Drawer
-      title="Garment Issue to Production"
+      title="Garment Issue to Finishing"
       size={640}
       open={open}
       onClose={onClose}

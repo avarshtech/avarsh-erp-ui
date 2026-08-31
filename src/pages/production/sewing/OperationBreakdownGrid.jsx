@@ -9,7 +9,7 @@ import { MACHINE_TYPES } from '../../../utils/sewingConstants';
  * line-balancing view: bar per operation vs pitch time (bottleneck SAM);
  * operations at the pitch are the constraint (red).
  */
-const OperationBreakdownGrid = ({ plan, operators, onChange }) => {
+const OperationBreakdownGrid = ({ plan, onChange }) => {
   const setOp = useCallback((idx, field, val) => {
     onChange((prev) => ({ ...prev, operations: prev.operations.map((o, i) => (i === idx ? { ...o, [field]: val } : o)) }));
   }, [onChange]);
@@ -37,12 +37,12 @@ const OperationBreakdownGrid = ({ plan, operators, onChange }) => {
       render: (v, _, idx) => <InputNumber size="small" min={0} step={0.1} value={v} style={{ width: 80 }} onChange={(val) => setOp(idx, 'sam', val)} />,
     },
     {
-      title: 'Assigned Operator', dataIndex: 'operatorId', width: 170,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Operator"
-          options={operators.map((o) => ({ value: o.id, label: `${o.name} (${o.code})` }))}
-          onChange={(val) => setOp(idx, 'operatorId', val)} />
-      ),
+      title: 'Rate ₹/Op', dataIndex: 'rate', width: 95, align: 'center',
+      render: (v, _, idx) => <InputNumber size="small" min={0} step={0.1} value={v} style={{ width: 75 }} onChange={(val) => setOp(idx, 'rate', val)} />,
+    },
+    {
+      title: 'Target/Hr', key: 'tph', width: 85, align: 'center',
+      render: (_, r) => (r.sam ? <strong>{Math.round((60 / r.sam) * ((plan.targetEfficiencyPct || 100) / 100))}</strong> : '—'),
     },
     {
       title: `Line Balance (pitch ${pitch.toFixed(1)} min)`, key: 'bar', width: 260,
@@ -69,14 +69,14 @@ const OperationBreakdownGrid = ({ plan, operators, onChange }) => {
           onClick={() => onChange((prev) => ({ ...prev, operations: prev.operations.filter((_, i) => i !== idx) }))} />
       ),
     },
-  ], [operators, pitch, setOp, onChange]);
+  ], [pitch, plan.targetEfficiencyPct, setOp, onChange]);
 
   return (
     <Card
       title="Operation Breakdown & Line Balancing"
       extra={(
         <Button icon={<PlusOutlined />} size="small"
-          onClick={() => onChange((prev) => ({ ...prev, operations: [...prev.operations, { seq: prev.operations.length + 1, operation: '', machine: null, sam: null, operatorId: null }] }))}>
+          onClick={() => onChange((prev) => ({ ...prev, operations: [...prev.operations, { seq: prev.operations.length + 1, operation: '', machine: null, sam: null, rate: null }] }))}>
           Add Operation
         </Button>
       )}
@@ -86,6 +86,7 @@ const OperationBreakdownGrid = ({ plan, operators, onChange }) => {
         footer={() => (
           <Space size="large">
             <span>Total garment SAM: <strong>{plan.operations.reduce((s, o) => s + (o.sam || 0), 0).toFixed(1)} min</strong></span>
+            <span>Σ Operation rates: <strong>₹{plan.operations.reduce((s, o) => s + (o.rate || 0), 0).toFixed(2)}</strong></span>
             <span>Pitch (bottleneck): <strong>{pitch.toFixed(1)} min</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Red bars exceed no other operation — rebalance by splitting work or adding an operator there.</span>
           </Space>

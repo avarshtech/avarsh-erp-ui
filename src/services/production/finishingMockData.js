@@ -16,43 +16,29 @@ export const seedEmployees = [
   { id: 5, code: 'FN-205', name: 'B. Vasanthi', station: 'KAJA_BUTTON', status: 'ACTIVE' },
   { id: 6, code: 'FN-206', name: 'N. Pechiamma', station: 'IRONING', status: 'ACTIVE' },
   { id: 7, code: 'FN-207', name: 'R. Chitra', station: 'IRONING', status: 'ACTIVE' },
-  { id: 8, code: 'FN-208', name: 'K. Uma', station: 'CHECKING', status: 'ACTIVE' },
-  { id: 9, code: 'FN-209', name: 'L. Jaya', station: 'CHECKING', status: 'ACTIVE' },
+  { id: 8, code: 'FN-208', name: 'K. Uma', station: 'FIRST_CHECK', status: 'ACTIVE' },
+  { id: 9, code: 'FN-209', name: 'L. Jaya', station: 'FINAL_CHECK', status: 'ACTIVE' },
   { id: 10, code: 'FN-210', name: 'P. Eswari', station: 'SPOT_WASH', status: 'ACTIVE' },
   { id: 11, code: 'FN-211', name: 'M. Rani', station: 'SHADE', status: 'ACTIVE' },
 ];
 
-/** Module 1 — receiving entries grouped by style-color-size (BR 4.3). */
+/** Module 1 (rev) — receiving against a sewing Garment Issue (size-wise). */
 export const seedReceivings = [
   {
-    id: 1, receivingNo: 'FRN-20260813-001', orderId: 1, color: 'Navy Blue', size: 'M',
-    date: day(-2), orderQty: 600, receivingQty: 180, cumulativeQty: 180, bundleNo: 'B-1',
-    sewingLine: 'Line-A', partsReplacements: [], status: 'RECEIVED',
-  },
-  {
-    id: 2, receivingNo: 'FRN-20260814-001', orderId: 1, color: 'Navy Blue', size: 'M',
-    date: day(-1), orderQty: 600, receivingQty: 176, cumulativeQty: 356, bundleNo: 'B-2',
-    sewingLine: 'Line-A', status: 'RECEIVED',
-    partsReplacements: [
-      { partName: 'Left sleeve', defectReason: 'M-09', source: 'SEWING' },
+    id: 1, receivingNo: 'FRN-20260813-001', orderId: 1, color: 'Navy Blue', date: day(-2),
+    issueNo: 'GIS-20260813-001', trimmingPoNo: 'TPO/26-27/0041', checkingPoNo: 'KPO/26-27/0018',
+    lines: [
+      { size: 'S', issuedQty: 82, receivedQty: 78 },
+      { size: 'M', issuedQty: 50, receivedQty: 52 },
     ],
-  },
-  {
-    id: 3, receivingNo: 'FRN-20260814-002', orderId: 1, color: 'Navy Blue', size: 'L',
-    date: day(-1), orderQty: 600, receivingQty: 168, cumulativeQty: 168, bundleNo: 'B-3',
-    sewingLine: 'Line-A', partsReplacements: [], status: 'RECEIVED',
-  },
-  {
-    id: 4, receivingNo: 'FRN-20260815-001', orderId: 1, color: 'Navy Blue', size: 'XL',
-    date: today, orderQty: 300, receivingQty: 96, cumulativeQty: 96, bundleNo: 'B-4',
-    sewingLine: 'Line-A', partsReplacements: [], status: 'SHORTAGE',
+    status: 'SHORTAGE',
   },
 ];
 
 /** Modules 2/3/6 — hourly sheets keyed by station (PRD §19 pattern). */
 export const seedHourlySheets = [
   {
-    id: 1, station: 'THREAD_TRIM', orderId: 1, color: 'Navy Blue', date: today, target: 220,
+    id: 1, station: 'THREAD_TRIM', orderId: 1, color: 'Navy Blue', date: today, target: 220, ratePerPiece: 0.6,
     rows: [
       { employeeId: 1, hr1: 30, hr2: 32, hr3: 31, hr4: 30, hr5: 33, hr6: 31, hr7: 32, hr8: null, ot: null },
       { employeeId: 2, hr1: 27, hr2: 28, hr3: 30, hr4: 29, hr5: 28, hr6: 30, hr7: 29, hr8: null, ot: null },
@@ -60,7 +46,7 @@ export const seedHourlySheets = [
     ],
   },
   {
-    id: 2, station: 'KAJA_BUTTON', orderId: 1, color: 'Navy Blue', date: today, target: 200,
+    id: 2, station: 'KAJA_BUTTON', orderId: 1, color: 'Navy Blue', date: today, target: 200, ratePerPiece: 0.9,
     rows: [
       { employeeId: 4, hr1: 26, hr2: 27, hr3: 28, hr4: 27, hr5: 26, hr6: 28, hr7: 27, hr8: null, ot: null },
       { employeeId: 5, hr1: 24, hr2: 24, hr3: 25, hr4: 23, hr5: 24, hr6: 25, hr7: 24, hr8: null, ot: null },
@@ -72,6 +58,18 @@ export const seedHourlySheets = [
     rows: [
       { employeeId: 6, hr1: 25, hr2: 26, hr3: 27, hr4: 26, hr5: 27, hr6: 26, hr7: 27, hr8: null, ot: null },
       { employeeId: 7, hr1: 22, hr2: 23, hr3: 22, hr4: 24, hr5: 23, hr6: 22, hr7: 23, hr8: null, ot: null },
+    ],
+  },
+  {
+    id: 4, station: 'FIRST_CHECK', orderId: 1, color: 'Navy Blue', date: today, target: 200, ratePerPiece: 0.7,
+    rows: [
+      { employeeId: 8, hr1: 24, hr2: 25, hr3: 26, hr4: 25, hr5: 24, hr6: 26, hr7: 25, hr8: null, ot: null },
+    ],
+  },
+  {
+    id: 5, station: 'FINAL_CHECK', orderId: 1, color: 'Navy Blue', date: today, target: 190, ratePerPiece: 0.8,
+    rows: [
+      { employeeId: 9, hr1: 22, hr2: 23, hr3: 22, hr4: 23, hr5: 24, hr6: 23, hr7: 22, hr8: null, ot: null },
     ],
   },
 ];
@@ -137,10 +135,10 @@ export const seedMeasurements = [
 
 /** Module 8 — alteration register (defect code + source + re-check loop). */
 export const seedAlterations = [
-  { id: 1, alterNo: 'ALT-20260815-001', orderId: 1, color: 'Navy Blue', size: 'M', date: today, alterPcs: 6, defectCode: 'M-03', source: 'FINISHING', doneById: 10, recheckResult: 'PASS', cycles: 1, remarks: 'Oil spots removed at spot wash', status: 'CLOSED' },
-  { id: 2, alterNo: 'ALT-20260815-002', orderId: 1, color: 'Navy Blue', size: 'M', date: today, alterPcs: 4, defectCode: 'M-01', source: 'SEWING', doneById: 9, recheckResult: 'PENDING', cycles: 1, remarks: 'Sent back for re-stitch at Line-A', status: 'IN_PROGRESS' },
-  { id: 3, alterNo: 'ALT-20260815-003', orderId: 1, color: 'Navy Blue', size: 'L', date: today, alterPcs: 2, defectCode: 'M-07', source: 'SEWING', doneById: 9, recheckResult: 'RE_ALTER', cycles: 3, remarks: 'Armhole puckering persists after two repairs', status: 'IN_PROGRESS' },
-  { id: 4, alterNo: 'ALT-20260814-001', orderId: 1, color: 'Navy Blue', size: 'M', date: day(-1), alterPcs: 3, defectCode: 'M-08', source: 'TRIM', doneById: 4, recheckResult: 'PASS', cycles: 1, remarks: 'Buttons re-attached', status: 'CLOSED' },
+  { id: 1, alterNo: 'ALT-20260815-001', orderId: 1, color: 'Navy Blue', size: 'M', date: today, qtyChecked: 160, alterPcs: 6, defectCode: 'M-03', source: 'FINISHING', productionUnit: 'Unit-1 Tirupur', doneById: 10, recheckResult: 'PASS', cycles: 1, remarks: 'Oil spots removed at spot wash', status: 'CLOSED' },
+  { id: 2, alterNo: 'ALT-20260815-002', orderId: 1, color: 'Navy Blue', size: 'M', date: today, qtyChecked: 174, alterPcs: 4, defectCode: 'M-01', source: 'SEWING', productionUnit: 'Unit-1 Tirupur', doneById: 9, recheckResult: 'PENDING', cycles: 1, remarks: 'Sent back for re-stitch at Line-A', status: 'IN_PROGRESS' },
+  { id: 3, alterNo: 'ALT-20260815-003', orderId: 1, color: 'Navy Blue', size: 'L', date: today, qtyChecked: 168, alterPcs: 2, defectCode: 'M-07', source: 'SEWING', productionUnit: 'Unit-2 Avinashi', doneById: 9, recheckResult: 'RE_ALTER', cycles: 3, remarks: 'Armhole puckering persists after two repairs', status: 'IN_PROGRESS' },
+  { id: 4, alterNo: 'ALT-20260814-001', orderId: 1, color: 'Navy Blue', size: 'M', date: day(-1), qtyChecked: 150, alterPcs: 3, defectCode: 'M-08', source: 'TRIM', productionUnit: 'Unit-1 Tirupur', doneById: 4, recheckResult: 'PASS', cycles: 1, remarks: 'Buttons re-attached', status: 'CLOSED' },
 ];
 
 /** Module 9 — metal detection day logs + needle log (buyer compliance). */

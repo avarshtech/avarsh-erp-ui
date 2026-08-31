@@ -27,12 +27,15 @@ export const saveGarmentIssue = (...a) => mockApi.saveGarmentIssue(...a);
 export const listHourly = (...a) => mockApi.listHourly(...a);
 export const getHourlySheet = (...a) => mockApi.getHourlySheet(...a);
 export const saveHourlySheet = (...a) => mockApi.saveHourlySheet(...a);
+export const findHourConflicts = (...a) => mockApi.findHourConflicts(...a);
 export const rowTotal = mockApi.rowTotal;
 export const efficiencyPct = mockApi.efficiencyPct;
 export const targetPerHour = mockApi.targetPerHour;
 
+export const getBomItems = (...a) => mockApi.getBomItems(...a);
 export const listTrimCards = (...a) => mockApi.listTrimCards(...a);
 export const saveTrimCard = (...a) => mockApi.saveTrimCard(...a);
+export const fullMeasurementChart = mockApi.fullMeasurementChart;
 
 export const listMeasurements = (...a) => mockApi.listMeasurements(...a);
 export const getMeasurement = (...a) => mockApi.getMeasurement(...a);
@@ -49,5 +52,6 @@ export const saveReplacement = (...a) => mockApi.saveReplacement(...a);
 export const getIncentives = (...a) => mockApi.getIncentives(...a);
 export const getFloorDashboard = (...a) => mockApi.getFloorDashboard(...a);
 
-// Cross-module: pending bundle issues from the Cutting mock (traceable receipt source).
-export { listBundleIssues as listCuttingBundleIssues, listBundles as listCuttingBundles } from './cuttingMockApi';
+// Cross-module: the cut-parts receipt traces back to a real bundle issue from
+// Cutting, which now runs on the backend even though Sewing itself does not.
+export { listBundleIssues as listCuttingBundleIssues, listBundles as listCuttingBundles } from './cuttingApi';

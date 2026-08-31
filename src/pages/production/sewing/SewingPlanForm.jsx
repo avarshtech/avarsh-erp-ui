@@ -5,8 +5,8 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import { SEWING_LINES } from '../../../utils/sewingConstants';
-import { getPlan, savePlan, setPlanStatus, getOrders, getOperators, targetPerHour } from '../../../services/production/sewingService';
+import { UNITS, LINES_BY_UNIT } from '../../../utils/sewingConstants';
+import { getPlan, savePlan, setPlanStatus, getOrders, targetPerHour } from '../../../services/production/sewingService';
 import SewingStatusTag from './SewingStatusTag';
 import OperationBreakdownGrid from './OperationBreakdownGrid';
 
@@ -22,7 +22,6 @@ const SewingPlanForm = () => {
   const isEdit = Boolean(id);
   const [plan, setPlan] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [operators, setOperators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -30,15 +29,16 @@ const SewingPlanForm = () => {
     (async () => {
       setLoading(true);
       try {
-        const [record, ords, ops] = await Promise.all([
-          isEdit ? getPlan(id) : Promise.resolve(null), getOrders(), getOperators(),
+        const [record, ords] = await Promise.all([
+          isEdit ? getPlan(id) : Promise.resolve(null), getOrders(),
         ]);
-        setOrders(ords); setOperators(ops);
+        setOrders(ords);
         setPlan(record || {
-          orderId: ords[0]?.id, line: SEWING_LINES[0], planDate: dayjs().format('YYYY-MM-DD'),
+          orderId: ords[0]?.id, unit: UNITS[0], line: LINES_BY_UNIT[UNITS[0]][0], planDate: dayjs().format('YYYY-MM-DD'),
           startDate: dayjs().add(3, 'day').format('YYYY-MM-DD'), endDate: dayjs().add(25, 'day').format('YYYY-MM-DD'),
           totalQty: ords[0]?.orderQty, sam: null, operators: 6, helpers: 2, workingHours: 8,
-          targetEfficiencyPct: 60, pricePerPiece: ords[0]?.cmRate, loadingDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
+          targetEfficiencyPct: 60, pricePerPiece: ords[0]?.cmRate, otherChargesPct: 8,
+          loadingDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
           settingHours: 4, status: 'DRAFT', operations: [],
         });
       } catch { message.error('Failed to load plan'); } finally { setLoading(false); }
@@ -49,6 +49,12 @@ const SewingPlanForm = () => {
   const patch = useCallback((p) => setPlan((prev) => ({ ...prev, ...p })), []);
   const totalSam = useMemo(() => (plan ? Math.round(plan.operations.reduce((s, o) => s + (o.sam || 0), 0) * 100) / 100 : 0), [plan]);
   const tph = plan ? targetPerHour(plan.operators, plan.sam || totalSam || 1, plan.targetEfficiencyPct) : 0;
+  /** CM Rate/Pc = Σ operation rates × (1 + other charges %). */
+  const cmRatePerPc = useMemo(() => {
+    if (!plan) return 0;
+    const rateSum = plan.operations.reduce((s, o) => s + (o.rate || 0), 0);
+    return Math.round(rateSum * (1 + (plan.otherChargesPct || 0) / 100) * 100) / 100;
+  }, [plan]);
 
   const handleSave = async () => {
     if (!plan.operations.length) return message.warning('Add the operation breakdown before saving');
@@ -93,9 +99,15 @@ const SewingPlanForm = () => {
               }} />
           </div>
           <div>
-            <FieldLabel>Sewing Line</FieldLabel>
+            <FieldLabel>Unit</FieldLabel>
+            <FormSelect value={plan.unit} style={{ width: 160 }}
+              options={UNITS.map((u) => ({ value: u, label: u }))}
+              onChange={(v) => patch({ unit: v, line: LINES_BY_UNIT[v][0] })} />
+          </div>
+          <div>
+            <FieldLabel>Sewing Line (of unit)</FieldLabel>
             <FormSelect value={plan.line} style={{ width: 120 }}
-              options={SEWING_LINES.map((l) => ({ value: l, label: l }))} onChange={(v) => patch({ line: v })} />
+              options={(LINES_BY_UNIT[plan.unit] || []).map((l) => ({ value: l, label: l }))} onChange={(v) => patch({ line: v })} />
           </div>
           <div>
             <FieldLabel>Production Start</FieldLabel>
@@ -122,12 +134,8 @@ const SewingPlanForm = () => {
             <InputNumber min={30} max={100} value={plan.targetEfficiencyPct} onChange={(v) => patch({ targetEfficiencyPct: v || 60 })} />
           </div>
           <div>
-            <FieldLabel>CM Rate ₹/pc</FieldLabel>
-            <InputNumber min={0} value={plan.pricePerPiece} onChange={(v) => patch({ pricePerPiece: v })} />
-          </div>
-          <div>
-            <FieldLabel>Line Loading Date</FieldLabel>
-            <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(plan.loadingDate)} onChange={(d) => patch({ loadingDate: d.format('YYYY-MM-DD') })} />
+            <FieldLabel>Other Charges %</FieldLabel>
+            <InputNumber min={0} max={50} value={plan.otherChargesPct} onChange={(v) => patch({ otherChargesPct: v || 0 })} />
           </div>
           <div>
             <FieldLabel>Setting Time (hrs)</FieldLabel>
@@ -149,9 +157,14 @@ const SewingPlanForm = () => {
         <Col xs={8} md={4}><Card size="small"><Statistic title="Garment SAM (min)" value={plan.sam || totalSam} precision={1} /></Card></Col>
         <Col xs={8} md={4}><Card size="small"><Statistic title="Target / Hour" value={tph} /></Card></Col>
         <Col xs={8} md={4}><Card size="small"><Statistic title="Target / Day" value={tph * plan.workingHours} /></Card></Col>
+        <Col xs={12} md={6}>
+          <Card size="small">
+            <Statistic title={`CM Rate ₹/pc (Σ rates + ${plan.otherChargesPct || 0}% other charges)`} value={cmRatePerPc} precision={2} prefix="₹" />
+          </Card>
+        </Col>
       </Row>
 
-      <OperationBreakdownGrid plan={plan} operators={operators} onChange={setPlan} />
+      <OperationBreakdownGrid plan={plan} onChange={setPlan} />
     </div>
   );
 };

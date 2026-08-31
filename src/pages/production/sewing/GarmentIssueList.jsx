@@ -48,7 +48,7 @@ const GarmentIssueList = () => {
       </Space>
       <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}
         scroll={{ x: 1150 }} pagination={getTablePagination({ pageSize: 10 }, 'issues')}
-        locale={{ emptyText: <EmptyState title="No garment issues" description="Issue pieces size-wise to the production floor" /> }} />
+        locale={{ emptyText: <EmptyState title="No garment issues" description="Issue finished garments size-wise to the finishing floor" /> }} />
       <GarmentIssueDrawer open={drawerOpen} orders={orders}
         onClose={() => setDrawerOpen(false)} onSaved={() => { setDrawerOpen(false); load(); }} />
     </Card>

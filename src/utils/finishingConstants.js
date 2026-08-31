@@ -9,6 +9,7 @@ export const FINISHING_STATUS_COLORS = {
   RECEIVED: 'success',
   VERIFIED: 'success',
   SHORTAGE: 'error',
+  EXCESS: 'warning',
   IN_PROGRESS: 'processing',
   COMPLETED: 'success',
   PASS: 'success',
@@ -31,11 +32,15 @@ export const finishingStatusLabel = (s) => String(s || '').replaceAll('_', ' ')
 
 export const HOURS = ['hr1', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'hr7', 'hr8'];
 
-/** Hourly stations combined in one tab (PRD §19 common UI pattern). */
+/** Hourly stations combined in one tab (PRD §19 pattern; rev: checking stations
+ * added after trimming and after ironing; every station carries a piece rate
+ * so cost per operator is always visible). */
 export const HOURLY_STATIONS = [
-  { key: 'THREAD_TRIM', label: 'Thread Trimming', prdRef: 'Module 2' },
-  { key: 'KAJA_BUTTON', label: 'Kaja / Button', prdRef: 'Module 3' },
+  { key: 'THREAD_TRIM', label: 'Thread Trimming', prdRef: 'Module 2', hasCost: true },
+  { key: 'FIRST_CHECK', label: 'First Checking', prdRef: 'after Trimming', hasCost: true },
+  { key: 'KAJA_BUTTON', label: 'Kaja / Button', prdRef: 'Module 3', hasCost: true },
   { key: 'IRONING', label: 'Ironing / Pressing', prdRef: 'Module 6', hasCost: true },
+  { key: 'FINAL_CHECK', label: 'Final Checking', prdRef: 'after Ironing', hasCost: true },
 ];
 
 export const STAIN_TYPES = ['Oil', 'Dirt', 'Pen', 'Grease', 'Rust', 'Other'];

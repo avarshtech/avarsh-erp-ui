@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
+import dayjs from 'dayjs';
 import { App, Card, Row, Col, Table, Progress, Alert, Space, Tag, Spin } from 'antd';
 import { ScissorOutlined, PercentageOutlined, RedoOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
 import { statusLabel, CUTTING_STATUS_COLORS } from '../../../utils/cuttingConstants';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getDashboard, getReconciliation, getCutPos } from '../../../services/production/cuttingService';
 
 /** ENH-04 — cutting room overview: KPIs, order progress, relaxation queue, alerts. */
 const CuttingDashboard = ({ onNavigateTab }) => {
   const { message } = App.useApp();
   const [data, setData] = useState(null);
+  const { threshold } = useCuttingMasters();
+  const reCutAlertPct = threshold('RECUT_ALERT_PCT', 2);
   const [utilizationPct, setUtilizationPct] = useState(null);
 
   useEffect(() => {
@@ -29,7 +33,7 @@ const CuttingDashboard = ({ onNavigateTab }) => {
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><StatCard title="Today's Output (pcs)" value={data.todayOutput} color="var(--primary-color)" icon={<ScissorOutlined />} /></Col>
         <Col xs={12} md={6}><StatCard title="Fabric Utilization" value={utilizationPct != null ? `${utilizationPct}%` : '—'} color="var(--success-color)" icon={<PercentageOutlined />} /></Col>
-        <Col xs={12} md={6}><StatCard title="Re-Cut Rate" value={`${data.reCutPct}%`} color={data.reCutPct > 2 ? 'var(--error-color)' : 'var(--warning-color)'} icon={<RedoOutlined />} /></Col>
+        <Col xs={12} md={6}><StatCard title="Re-Cut Rate" value={`${data.reCutPct}%`} color={data.reCutPct > reCutAlertPct ? 'var(--error-color)' : 'var(--warning-color)'} icon={<RedoOutlined />} /></Col>
         <Col xs={12} md={6}><StatCard title="TMB First-Pass Rate" value={`${data.tmbPassPct}%`} color="var(--success-color)" icon={<SafetyCertificateOutlined />} /></Col>
       </Row>
 
@@ -79,12 +83,13 @@ const CuttingDashboard = ({ onNavigateTab }) => {
               rowKey="id" size="small" pagination={false}
               dataSource={data.pendingRelaxations}
               columns={[
-                { title: 'Relaxation #', dataIndex: 'relaxNo', width: 160, render: (v) => <code>{v}</code> },
+                { title: 'Relaxation #', dataIndex: 'relaxationNo', width: 160, render: (v) => <code>{v}</code> },
+                { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
                 { title: 'Fabric', dataIndex: 'fabricType', width: 130 },
-                { title: 'Min Hours', dataIndex: 'minHrs', width: 90, align: 'center' },
-                { title: 'Ready At', dataIndex: 'readyAt', width: 130 },
+                { title: 'Min Hours', dataIndex: 'minRelaxHours', width: 90, align: 'center' },
+                { title: 'Ready At', dataIndex: 'readyAt', width: 140, render: (v) => (v ? dayjs(v).format('DD-MMM HH:mm') : '—') },
                 {
-                  title: 'Remaining', dataIndex: 'remainingHrs', width: 110, align: 'center',
+                  title: 'Remaining', dataIndex: 'remainingHours', width: 110, align: 'center',
                   render: (v) => (v <= 0 ? <Tag color="green">Ready</Tag> : <Tag color="blue">{v} h</Tag>),
                 },
               ]}

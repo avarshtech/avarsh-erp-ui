@@ -1,17 +1,31 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
-import { EXTERNAL_PROCESSES, PANEL_NAMES } from '../../../utils/cuttingConstants';
+import { getActiveParts } from '../../../services/master/partsService';
+import { getActiveProcesses } from '../../../services/master/processService';
 import { savePanelIssue } from '../../../services/production/cuttingService';
 
 /** FR-08 — send cut panels out for printing / embroidery / washing with a DC. */
 const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [cutPoId, setCutPoId] = useState(null);
-  const [process, setProcess] = useState(null);
+  const [processId, setProcessId] = useState(null);
   const [lines, setLines] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  // Panels are the shared parts master; processes are the shared process master.
+  const [parts, setParts] = useState([]);
+  const [processes, setProcesses] = useState([]);
+  useEffect(() => {
+    if (!open) return;
+    getActiveParts().then(setParts).catch(() => setParts([]));
+    getActiveProcesses().then(setProcesses).catch(() => setProcesses([]));
+  }, [open]);
+  const partOptions = useMemo(() => parts.map((p) => ({ value: p.name, label: p.name })), [parts]);
+  const processOptions = useMemo(
+    () => processes.map((p) => ({ value: p.id, label: p.processName })), [processes],
+  );
 
   const po = useMemo(() => cutPos.find((p) => p.id === cutPoId), [cutPos, cutPoId]);
 
@@ -19,7 +33,7 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
     setLines((prev) => prev.map((l, i) => {
       if (i !== idx) return l;
       const next = { ...l, [field]: val };
-      if (field === 'size' && po) next.ordQty = po.sizeQty[val] || 0;
+      if (field === 'size' && po) next.orderQty = po.sizeQty[val] || 0;
       return next;
     }));
   }, [po]);
@@ -29,7 +43,7 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
       title: 'Panel', dataIndex: 'panel', width: 130,
       render: (v, _, idx) => (
         <FormSelect size="small" value={v} style={{ width: 115 }} placeholder="Panel"
-          options={PANEL_NAMES.map((p) => ({ value: p, label: p }))} onChange={(val) => setLine(idx, 'panel', val)} />
+          options={partOptions} onChange={(val) => setLine(idx, 'panel', val)} />
       ),
     },
     {
@@ -39,12 +53,12 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
           options={(po?.sizes || []).map((s) => ({ value: s, label: s }))} onChange={(val) => setLine(idx, 'size', val)} />
       ),
     },
-    { title: 'Ord Qty', dataIndex: 'ordQty', width: 90, align: 'right', render: (v) => v ?? '—' },
+    { title: 'Ord Qty', dataIndex: 'orderQty', width: 90, align: 'right', render: (v) => v ?? '—' },
     {
       title: 'Issue Qty', dataIndex: 'issueQty', width: 110, align: 'center',
       render: (v, r, idx) => (
-        <InputNumber size="small" min={0} max={r.ordQty || undefined} value={v} style={{ width: 90 }}
-          status={v > (r.ordQty || Infinity) ? 'error' : undefined} onChange={(val) => setLine(idx, 'issueQty', val)} />
+        <InputNumber size="small" min={0} max={r.orderQty || undefined} value={v} style={{ width: 90 }}
+          status={v > (r.orderQty || Infinity) ? 'error' : undefined} onChange={(val) => setLine(idx, 'issueQty', val)} />
       ),
     },
     {
@@ -54,21 +68,28 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
           onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))} />
       ),
     },
-  ], [po, setLine]);
+  ], [po, setLine, partOptions]);
 
   const total = lines.reduce((s, l) => s + (l.issueQty || 0), 0);
 
   const handleSave = async () => {
-    if (!cutPoId || !process) return message.warning('Select the Cut PO and the external process');
+    if (!cutPoId || !processId) return message.warning('Select the Cut PO and the external process');
     const valid = lines.filter((l) => l.panel && l.size && l.issueQty > 0);
     if (!valid.length) return message.warning('Add at least one panel line with quantity');
     setSaving(true);
     try {
-      const saved = await savePanelIssue({ cutPoId, process, date: new Date().toISOString().slice(0, 10), lines: valid });
-      message.success(`${saved.panelPoNo} issued to ${process} — DC ready to print`);
-      setLines([]); setProcess(null);
+      const saved = await savePanelIssue({
+        cuttingPoId: cutPoId,
+        processId,
+        issueDate: new Date().toISOString().slice(0, 10),
+        lines: valid,
+      });
+      message.success(`${saved.panelPoNo} issued to ${saved.processName} — DC ready to print`);
+      setLines([]); setProcessId(null);
       onSaved();
-    } catch { message.error('Failed to issue panels'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to issue panels');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -90,10 +111,10 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
         <FormSelect value={cutPoId} style={{ width: 230 }} placeholder="Cut PO"
           options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
           onChange={(v) => { setCutPoId(v); setLines([]); }} />
-        <FormSelect value={process} style={{ width: 160 }} placeholder="Process"
-          options={EXTERNAL_PROCESSES.map((p) => ({ value: p, label: p }))} onChange={setProcess} />
+        <FormSelect value={processId} style={{ width: 190 }} placeholder="Process"
+          options={processOptions} onChange={setProcessId} />
         <Button icon={<PlusOutlined />} size="small" disabled={!cutPoId}
-          onClick={() => setLines((prev) => [...prev, { panel: null, size: null, ordQty: null, issueQty: null }])}>
+          onClick={() => setLines((prev) => [...prev, { panel: null, size: null, orderQty: null, issueQty: null }])}>
           Add Panel
         </Button>
       </Space>

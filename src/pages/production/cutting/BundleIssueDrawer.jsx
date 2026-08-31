@@ -13,10 +13,10 @@ const BundleIssueDrawer = ({ open, cutPos, bundles, onClose, onSaved }) => {
   const [saving, setSaving] = useState(false);
 
   const available = useMemo(() => bundles.filter((b) => b.status === 'BUNDLED'
-    && (!cutPoId || b.cutPoId === Number(cutPoId))
+    && (!cutPoId || b.cuttingPoId === Number(cutPoId))
     && (!sizeFilter || b.size === sizeFilter)), [bundles, cutPoId, sizeFilter]);
 
-  const sizes = useMemo(() => [...new Set(bundles.filter((b) => !cutPoId || b.cutPoId === Number(cutPoId)).map((b) => b.size))], [bundles, cutPoId]);
+  const sizes = useMemo(() => [...new Set(bundles.filter((b) => !cutPoId || b.cuttingPoId === Number(cutPoId)).map((b) => b.size))], [bundles, cutPoId]);
   const selected = useMemo(() => bundles.filter((b) => selectedIds.includes(b.id)), [bundles, selectedIds]);
 
   const handleIssue = async () => {
@@ -25,11 +25,13 @@ const BundleIssueDrawer = ({ open, cutPos, bundles, onClose, onSaved }) => {
     if (!selectedIds.length) return message.warning('Select at least one bundle');
     setSaving(true);
     try {
-      const issue = await issueBundles({ cutPoId, workOrderNo, bundleIds: selectedIds });
+      const issue = await issueBundles({ cuttingPoId: cutPoId, workOrderNo, bundleIds: selectedIds });
       message.success(`${issue.issueNo}: ${issue.totalPcs} pcs issued to ${workOrderNo}`);
       setSelectedIds([]);
       onSaved();
-    } catch { message.error('Failed to issue bundles'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to issue bundles');
+    } finally { setSaving(false); }
   };
 
   return (

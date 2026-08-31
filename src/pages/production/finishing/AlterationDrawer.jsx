@@ -1,100 +1,125 @@
-import { useEffect, useMemo, useState } from 'react';
-import { App, Drawer, Space, InputNumber, Input, DatePicker, Button, Alert, Tag } from 'antd';
-import dayjs from 'dayjs';
-import { ActionButton } from '../../../components/buttons';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { App, Drawer, Space, InputNumber, Table, Button, Tag } from 'antd';
+import { PlusOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
-import { DEFECT_LIBRARY, DEFECT_SOURCES, DEFECT_SEVERITIES, RECHECK_RESULTS, REALTER_CYCLE_ALERT } from '../../../utils/finishingConstants';
-import { saveAlteration } from '../../../services/production/finishingService';
+import { FACTORIES } from '../../../utils/cuttingConstants';
+import { DEFECT_LIBRARY, DEFECT_SOURCES, DEFECT_SEVERITIES } from '../../../utils/finishingConstants';
+import { saveAlterationBatch } from '../../../services/production/finishingService';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
 );
 
-const emptyForm = { orderId: null, color: null, size: null, date: dayjs().format('YYYY-MM-DD'), alterPcs: null, defectCode: null, source: null, doneById: null, recheckResult: 'PENDING', remarks: '' };
+const blankRow = () => ({ size: null, qtyChecked: null, alterPcs: null, defectCode: null, source: null, productionUnit: FACTORIES[0] });
 
-/** PRD Module 8 — alteration entry: defect code + source mandatory, re-check loop. */
-const AlterationDrawer = ({ open, record, orders, employees, onClose, onSaved }) => {
+/**
+ * Rev — select the Order #, log the defect table (Size / Qty Checked / No. of
+ * Alter Pcs / Defect Code / Source / Production Unit) and issue to production.
+ */
+const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
-  const [form, setForm] = useState(emptyForm);
+  const [orderId, setOrderId] = useState(null);
+  const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (open) setForm(record ? { ...record } : emptyForm); }, [open, record]);
+  useEffect(() => {
+    if (!open) return;
+    setOrderId(orders[0]?.id);
+    setRows([blankRow()]);
+  }, [open, orders]);
 
-  const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
-  const order = useMemo(() => orders.find((o) => o.id === form.orderId), [orders, form.orderId]);
-  const severity = DEFECT_LIBRARY.find((d) => d.code === form.defectCode)?.severity;
+  const order = useMemo(() => orders.find((o) => o.id === orderId), [orders, orderId]);
+  const setRow = useCallback((idx, patch) => {
+    setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  }, []);
 
-  const handleSave = async () => {
-    if (!form.orderId || !form.alterPcs || !form.defectCode || !form.source) return message.warning('Order, pieces, defect code and source are mandatory');
+  const columns = useMemo(() => [
+    {
+      title: 'Size', dataIndex: 'size', width: 90,
+      render: (v, _, idx) => (
+        <FormSelect size="small" value={v} style={{ width: 75 }} placeholder="Size"
+          options={(order?.sizes || []).map((s) => ({ value: s, label: s }))} onChange={(val) => setRow(idx, { size: val })} />
+      ),
+    },
+    {
+      title: 'Qty Checked', dataIndex: 'qtyChecked', width: 105, align: 'center',
+      render: (v, _, idx) => <InputNumber size="small" min={0} value={v} style={{ width: 85 }} onChange={(val) => setRow(idx, { qtyChecked: val })} />,
+    },
+    {
+      title: 'No. of Alter Pcs', dataIndex: 'alterPcs', width: 115, align: 'center',
+      render: (v, r, idx) => <InputNumber size="small" min={0} max={r.qtyChecked || undefined} value={v} style={{ width: 90 }} onChange={(val) => setRow(idx, { alterPcs: val })} />,
+    },
+    {
+      title: 'Defect Type Code', dataIndex: 'defectCode', width: 250,
+      render: (v, _, idx) => (
+        <Space size={4}>
+          <FormSelect size="small" value={v} style={{ width: 200 }} placeholder="From library" showSearch
+            options={DEFECT_LIBRARY.map((d) => ({ value: d.code, label: `${d.code} — ${d.name}` }))} onChange={(val) => setRow(idx, { defectCode: val })} />
+          {v && <Tag color={DEFECT_SEVERITIES[DEFECT_LIBRARY.find((d) => d.code === v)?.severity]?.color} style={{ marginInline: 0 }}>{DEFECT_LIBRARY.find((d) => d.code === v)?.severity?.[0]}</Tag>}
+        </Space>
+      ),
+    },
+    {
+      title: 'Defect Source', dataIndex: 'source', width: 120,
+      render: (v, _, idx) => (
+        <FormSelect size="small" value={v} style={{ width: 105 }} placeholder="Source"
+          options={DEFECT_SOURCES.map((s) => ({ value: s, label: s }))} onChange={(val) => setRow(idx, { source: val })} />
+      ),
+    },
+    {
+      title: 'Production Unit', dataIndex: 'productionUnit', width: 160,
+      render: (v, _, idx) => (
+        <FormSelect size="small" value={v} style={{ width: 145 }}
+          options={FACTORIES.map((f) => ({ value: f, label: f }))} onChange={(val) => setRow(idx, { productionUnit: val })} />
+      ),
+    },
+    {
+      title: '', key: 'del', width: 46, align: 'center',
+      render: (_, __, idx) => (
+        <Button size="small" type="text" danger icon={<DeleteOutlined />}
+          onClick={() => setRows((prev) => prev.filter((_, i) => i !== idx))} />
+      ),
+    },
+  ], [order, setRow]);
+
+  const handleIssue = async () => {
+    const valid = rows.filter((r) => r.size && r.alterPcs && r.defectCode && r.source);
+    if (!valid.length) return message.warning('Each row needs size, alter pcs, defect code and source');
+    if (valid.length < rows.length) return message.warning('Complete or remove the incomplete rows');
     setSaving(true);
     try {
-      await saveAlteration(form);
-      message.success(record ? 'Alteration updated' : 'Alteration logged');
+      await saveAlterationBatch({ orderId, color: order?.color, rows: valid });
+      message.success(`${valid.reduce((s, r) => s + r.alterPcs, 0)} pcs issued to production for alteration`);
       onSaved();
-    } catch { message.error('Failed to save alteration'); } finally { setSaving(false); }
+    } catch { message.error('Failed to issue alterations'); } finally { setSaving(false); }
   };
 
   return (
-    <Drawer title={record ? `Alteration — ${record.alterNo}` : 'Log Alteration'} open={open} onClose={onClose} size={620} destroyOnHidden
+    <Drawer title="Log Alterations — Issue to Production" open={open} onClose={onClose} size={980} destroyOnHidden
       footer={(
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onClose}>Cancel</Button>
-          <ActionButton action="save" text="Save" loading={saving} onClick={handleSave} />
+          <Button type="primary" icon={<SendOutlined />} loading={saving} onClick={handleIssue}>Issue to Production</Button>
         </Space>
       )}>
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
         <div>
-          <FieldLabel>Order</FieldLabel>
-          <FormSelect value={form.orderId} style={{ width: 220 }} placeholder="Order" disabled={Boolean(record)}
+          <FieldLabel>Order #</FieldLabel>
+          <FormSelect value={orderId} style={{ width: 240 }}
             options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-            onChange={(v) => patch({ orderId: v, color: orders.find((o) => o.id === v)?.color, size: null })} />
+            onChange={(v) => { setOrderId(v); setRows([blankRow()]); }} />
         </div>
-        <div>
-          <FieldLabel>Size</FieldLabel>
-          <FormSelect value={form.size} style={{ width: 90 }} placeholder="Size"
-            options={(order?.sizes || []).map((s) => ({ value: s, label: s }))} onChange={(v) => patch({ size: v })} />
-        </div>
-        <div>
-          <FieldLabel>Date</FieldLabel>
-          <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(form.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
-        </div>
-        <div>
-          <FieldLabel>Alter Pcs</FieldLabel>
-          <InputNumber min={1} value={form.alterPcs} style={{ width: 90 }} onChange={(v) => patch({ alterPcs: v })} />
-        </div>
+        {order && <Tag style={{ alignSelf: 'end' }}>{order.buyer} · {order.color}</Tag>}
       </Space>
-      <Space size="middle" wrap style={{ marginBottom: 16 }}>
-        <div>
-          <FieldLabel>Defect Type Code {severity && <Tag color={DEFECT_SEVERITIES[severity].color}>{DEFECT_SEVERITIES[severity].label}</Tag>}</FieldLabel>
-          <FormSelect value={form.defectCode} style={{ width: 320 }} placeholder="From defect library" showSearch
-            options={DEFECT_LIBRARY.map((d) => ({ value: d.code, label: `${d.code} — ${d.name}` }))} onChange={(v) => patch({ defectCode: v })} />
-        </div>
-        <div>
-          <FieldLabel>Defect Source</FieldLabel>
-          <FormSelect value={form.source} style={{ width: 140 }} placeholder="Source"
-            options={DEFECT_SOURCES.map((s) => ({ value: s, label: s }))} onChange={(v) => patch({ source: v })} />
-        </div>
-      </Space>
-      <Space size="middle" wrap style={{ marginBottom: 16 }}>
-        <div>
-          <FieldLabel>Alteration Done By</FieldLabel>
-          <FormSelect value={form.doneById} style={{ width: 200 }} placeholder="Employee"
-            options={employees.map((e) => ({ value: e.id, label: `${e.name} (${e.code})` }))} onChange={(v) => patch({ doneById: v })} />
-        </div>
-        <div>
-          <FieldLabel>Re-Check Result</FieldLabel>
-          <FormSelect value={form.recheckResult} style={{ width: 150 }}
-            options={[{ value: 'PENDING', label: 'Pending' }, ...RECHECK_RESULTS.map((r) => ({ value: r, label: r.replace('_', '-') }))]}
-            onChange={(v) => patch({ recheckResult: v })} />
-        </div>
-      </Space>
-      {form.recheckResult === 'RE_ALTER' && (form.cycles || 1) + 1 >= REALTER_CYCLE_ALERT && (
-        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          title={`This piece will reach ${(form.cycles || 1) + 1} alteration cycles — supervisor alert triggers at ${REALTER_CYCLE_ALERT}`} />
-      )}
-      <FieldLabel>Reason / Remarks</FieldLabel>
-      <Input.TextArea rows={2} value={form.remarks} onChange={(e) => patch({ remarks: e.target.value })}
-        placeholder="Additional notes (defect code is still mandatory)" />
+      <Table
+        title={() => (
+          <Space style={{ justifyContent: 'space-between', width: '100%' }}>
+            <strong>Defect Log</strong>
+            <Button icon={<PlusOutlined />} size="small" onClick={() => setRows((prev) => [...prev, blankRow()])}>Add Row</Button>
+          </Space>
+        )}
+        rowKey={(r) => rows.indexOf(r)} size="small" columns={columns} dataSource={rows} pagination={false} scroll={{ x: 900 }}
+        locale={{ emptyText: 'Add defect rows for this order' }} />
     </Drawer>
   );
 };

@@ -43,7 +43,7 @@ const FabricRelaxationList = () => {
   }, [message, load]);
 
   const columns = useMemo(() => [
-    { title: 'Relaxation #', dataIndex: 'relaxNo', width: 170, render: (v) => <code>{v}</code> },
+    { title: 'Relaxation #', dataIndex: 'relaxationNo', width: 170, render: (v) => <code>{v}</code> },
     { title: 'Fabric Receipt', dataIndex: 'receiptId', width: 170, render: receiptNo },
     { title: 'Fabric Type', dataIndex: 'fabricType', width: 130 },
     { title: 'Start', dataIndex: 'startTime', width: 140, render: (v) => (v ? dayjs(v).format('DD-MMM HH:mm') : '—') },

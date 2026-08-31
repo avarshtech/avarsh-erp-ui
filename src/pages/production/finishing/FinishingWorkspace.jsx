@@ -7,7 +7,6 @@ import ReceivingList from './ReceivingList';
 import FinishingHourlyTab from './FinishingHourlyTab';
 import SpotWashTab from './SpotWashTab';
 import CheckingList from './CheckingList';
-import FinishingMeasurementList from './FinishingMeasurementList';
 import AlterationList from './AlterationList';
 import MetalDetectionTab from './MetalDetectionTab';
 import ShadeSegregationTab from './ShadeSegregationTab';
@@ -32,7 +31,6 @@ const FinishingWorkspace = () => {
     { key: 'hourly', label: 'Hourly Stations', children: <FinishingHourlyTab /> },
     { key: 'spot-wash', label: 'Spot Wash', children: <SpotWashTab /> },
     { key: 'checking', label: 'Checking', children: <CheckingList /> },
-    { key: 'measurement', label: 'Measurement', children: <FinishingMeasurementList /> },
     { key: 'alterations', label: 'Alterations', children: <AlterationList /> },
     { key: 'metal-detection', label: 'Metal Detection', children: <MetalDetectionTab /> },
     { key: 'shade', label: 'Shade Segregation', children: <ShadeSegregationTab /> },

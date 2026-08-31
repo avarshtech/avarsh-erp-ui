@@ -104,15 +104,43 @@ export const getHourlySheet = async ({ planId, date, shift }) => {
   const found = db.hourly.find((h) => h.planId === Number(planId) && h.date === date && h.shift === shift);
   if (found) return clone(found);
   const plan = db.plans.find((p) => p.id === Number(planId));
+  // Line continuity: copy the previous day's operator rows (editable), hours blank.
+  const prior = db.hourly
+    .filter((h) => h.planId === Number(planId) && h.date < date)
+    .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  const blankHours = { hr1: null, hr2: null, hr3: null, hr4: null, hr5: null, hr6: null, hr7: null, hr8: null, ot: null };
+  const rows = prior
+    ? prior.rows.map((r) => ({ operatorId: r.operatorId, part: r.part, ...blankHours }))
+    : (plan?.operations || []).slice(0, 6).map((op) => ({ operatorId: null, part: op.operation, ...blankHours }));
   return clone({
     id: null, planId: Number(planId), orderId: plan?.orderId, line: plan?.line, date, shift,
     plannedOperators: plan?.operators ?? 0, presentOperators: plan?.operators ?? 0, status: 'IN_PROGRESS',
-    rows: (plan?.operations || []).slice(0, 6).map((op) => ({
-      operatorId: op.operatorId, part: op.operation,
-      hr1: null, hr2: null, hr3: null, hr4: null, hr5: null, hr6: null, hr7: null, hr8: null, ot: null,
-    })),
+    carriedFrom: prior?.date || null, rows,
   });
 };
+/**
+ * Duplicate guard — a tailor cannot log output in the same hour on another
+ * style/plan for the same date. Returns conflict descriptions (empty = clean).
+ */
+export const findHourConflicts = async (sheet) => {
+  await delay(40);
+  const conflicts = [];
+  db.hourly
+    .filter((h) => h.date === sheet.date && h.planId !== Number(sheet.planId) && h.id !== sheet.id)
+    .forEach((other) => {
+      other.rows.forEach((oRow) => {
+        const mine = (sheet.rows || []).filter((r) => r.operatorId && r.operatorId === oRow.operatorId);
+        mine.forEach((r) => {
+          HOURS.filter((h) => r[h] != null && oRow[h] != null).forEach((h) => {
+            const op = db.operators.find((o) => o.id === r.operatorId);
+            conflicts.push(`${op?.name || 'Operator'} already has ${h.replace('hr', 'Hr ')} output on ${other.line} — one operation per hour`);
+          });
+        });
+      });
+    });
+  return [...new Set(conflicts)];
+};
+
 export const saveHourlySheet = async (payload) => {
   await delay();
   const existing = payload.id && db.hourly.find((h) => h.id === payload.id);
@@ -122,16 +150,17 @@ export const saveHourlySheet = async (payload) => {
   return clone(row);
 };
 
-// ── 4.5 Trim Verification ───────────────────────────────────────────────────
+// ── 4.5 Trim Verification (CR-SEW-005: BOM-driven, binary, physical confirm) ─
+/** Mirrors GET /api/v1/bom/{orderId}/items. */
+export const getBomItems = async (orderId) => { await delay(80); return clone(seed.seedBomItems[orderId] || []); };
 export const listTrimCards = async () => { await delay(); return clone(db.trimCards); };
 export const saveTrimCard = async (payload) => {
   await delay();
+  if (!payload.physicallyVerified) throw new Error('physically_verified must be true to save');
+  const stamped = { ...payload, status: 'VERIFIED', verifiedAt: dayjs().format('YYYY-MM-DD HH:mm') };
   const existing = payload.id && db.trimCards.find((c) => c.id === payload.id);
-  const hasMissing = Object.values({ ...payload.materials, ...payload.approvals }).includes('MISSING');
-  const openIssues = (payload.issues || []).some((i) => i.status === 'OPEN');
-  const status = hasMissing || openIssues ? 'ISSUES_FOUND' : 'ALL_CLEAR';
-  if (existing) { Object.assign(existing, payload, { status }); return clone(existing); }
-  const row = { id: nextId(db.trimCards), cardNo: docNo('TVC', db.trimCards), status, ...payload };
+  if (existing) { Object.assign(existing, stamped); return clone(existing); }
+  const row = { id: nextId(db.trimCards), cardNo: docNo('TVC', db.trimCards), ...stamped };
   db.trimCards.push(row);
   return clone(row);
 };
@@ -154,6 +183,18 @@ export const specPoints = (styleNo, size) => {
     : [['Waist', 82, 1], ['Inseam', 78, 1], ['Front rise', 26, 0.5], ['Thigh round', 58, 1]];
   const sizeShift = { S: -4, M: 0, L: 4, XL: 8, 30: -4, 32: 0, 34: 4, 36: 8 }[size] ?? 0;
   return base.map(([point, spec, tol]) => ({ point, spec: spec + (point.includes('length') || point.includes('rise') ? sizeShift / 2 : sizeShift), tol, actual: null, remarks: '' }));
+};
+
+/** Full measurement chart (mock Excel import) — every point on the buyer sheet. */
+export const fullMeasurementChart = (styleNo, size) => {
+  const extra = styleNo === 'HM-TS-2601'
+    ? [['Shoulder width', 44, 0.5], ['Armhole straight', 24, 0.5], ['Sleeve opening', 17, 0.5], ['Neck drop front', 9.5, 0.3], ['Neck drop back', 2.5, 0.3]]
+    : [['Back rise', 36, 0.5], ['Knee round', 44, 1], ['Leg opening', 36, 1], ['Belt loop length', 5.5, 0.3]];
+  const sizeShift = { S: -2, M: 0, L: 2, XL: 4, 30: -2, 32: 0, 34: 2, 36: 4 }[size] ?? 0;
+  return [
+    ...specPoints(styleNo, size),
+    ...extra.map(([point, spec, tol]) => ({ point, spec: spec + sizeShift / 2, tol, actual: null, remarks: '' })),
+  ];
 };
 
 // ── 4.7 TOPSE ───────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getTmbCheck, saveTmbCheck, listLayAudits, getCutPos } from '../../../services/production/cuttingService';
 import { tmbRowInTolerance } from './tmbUtils';
 import TmbCheckGrid from './TmbCheckGrid';
@@ -21,6 +22,8 @@ const TmbCheckForm = () => {
   const [cutPos, setCutPos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { threshold } = useCuttingMasters();
+  const tolerance = threshold('TMB_TOLERANCE_CM', 0.5);
 
   useEffect(() => {
     setLoading(true);
@@ -28,7 +31,7 @@ const TmbCheckForm = () => {
       .then(([record, layRows, pos]) => {
         setLays(layRows); setCutPos(pos);
         setCheck(record || {
-          layAuditId: null, cutPoId: null, layNo: null, date: dayjs().format('YYYY-MM-DD'),
+          layAuditId: null, cuttingPoId: null, layNo: null, checkDate: dayjs().format('YYYY-MM-DD'),
           grain: '', approvedPattern: '', cuttingMc: '', qcSign: '', status: 'PENDING', rows: [],
         });
       })
@@ -36,29 +39,35 @@ const TmbCheckForm = () => {
       .finally(() => setLoading(false));
   }, [id, isEdit, message]);
 
-  const po = useMemo(() => cutPos.find((p) => p.id === check?.cutPoId), [cutPos, check]);
-  const failedRows = useMemo(() => (check ? check.rows.filter((r) => !tmbRowInTolerance(r)) : []), [check]);
+  const po = useMemo(() => cutPos.find((p) => p.id === check?.cuttingPoId), [cutPos, check]);
+  const failedRows = useMemo(() => (check ? check.rows.filter((r) => !tmbRowInTolerance(r, tolerance)) : []), [check, tolerance]);
   const patch = useCallback((p) => setCheck((prev) => ({ ...prev, ...p })), []);
 
   const handleLaySelect = useCallback((layAuditId) => {
     const layRow = lays.find((l) => l.id === layAuditId);
-    patch({ layAuditId, cutPoId: layRow?.cutPoId, layNo: layRow?.layNo });
+    patch({ layAuditId, cuttingPoId: layRow?.cuttingPoId, layNo: layRow?.layNo });
   }, [lays, patch]);
 
-  const handleSave = async (finalStatus) => {
+  /**
+   * The pass/fail verdict is the server's — it compares each row against the
+   * tolerance. What is enforced here is the floor rule that a failing row must
+   * carry a corrective action before anyone records the check.
+   */
+  const handleSave = async () => {
     if (!check.layAuditId) return message.warning('Select the lay being checked');
     if (!check.rows.length) return message.warning('Add at least one part/size row');
-    const missingAction = failedRows.some((r) => !r.action || r.action === 'Accept');
-    if (finalStatus && failedRows.length && missingAction) {
-      return message.error('Out-of-tolerance rows need a corrective action before sign-off');
+    if (failedRows.some((r) => !r.action || r.action === 'Accept')) {
+      return message.error('Out-of-tolerance rows need a corrective action before the check can be recorded');
     }
-    if (finalStatus === 'PASSED' && !check.qcSign) return message.warning('QC sign is required to close the check');
+    if (failedRows.length === 0 && !check.qcSign) return message.warning('QC sign is required to close the check');
     setSaving(true);
     try {
-      await saveTmbCheck({ ...check, status: finalStatus || check.status });
-      message.success(`TMB check for Lay ${check.layNo} saved`);
+      const saved = await saveTmbCheck({ ...check, id: check.id });
+      message.success(`TMB check for ${saved.layRef} saved as ${saved.status.toLowerCase()}`);
       navigate('/production/cutting?tab=tmb');
-    } catch { message.error('Failed to save TMB check'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save TMB check');
+    } finally { setSaving(false); }
   };
 
   if (loading || !check) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -70,12 +79,7 @@ const TmbCheckForm = () => {
         backPath="/production/cutting?tab=tmb"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
-        <Space>
-          <Button onClick={() => handleSave(failedRows.length ? 'FAILED' : 'PASSED')}>
-            {failedRows.length ? 'Sign-off as Failed' : 'Sign-off as Passed'}
-          </Button>
-          <ActionButton action="save" text="Save Draft" loading={saving} onClick={() => handleSave(null)} />
-        </Space>
+        <ActionButton action="save" text="Save Check" loading={saving} onClick={handleSave} />
       </PageHeader>
 
       <Card style={{ marginBottom: 16 }}>
@@ -83,12 +87,12 @@ const TmbCheckForm = () => {
           <div style={{ minWidth: 260 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Lay (from Lay Audit)</div>
             <FormSelect value={check.layAuditId} style={{ width: 250 }} placeholder="Select audited lay" disabled={isEdit}
-              options={lays.map((l) => ({ value: l.id, label: `Lay ${l.layNo} · ${cutPos.find((p) => p.id === l.cutPoId)?.cutPoNo || ''}` }))}
+              options={lays.map((l) => ({ value: l.id, label: `${l.layRef} · ${l.markerNo || ''} · ${l.cuttingPoNo}` }))}
               onChange={handleLaySelect} />
           </div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Date</div>
-            <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(check.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
+            <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(check.checkDate)} onChange={(d) => patch({ checkDate: d.format('YYYY-MM-DD') })} />
           </div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Direction / Grain</div>
@@ -120,7 +124,7 @@ const TmbCheckForm = () => {
 
       {failedRows.length > 0 && (
         <Alert type="error" showIcon style={{ marginBottom: 16 }}
-          title={`${failedRows.length} row(s) out of tolerance (±0.5 cm across Top/Middle/Bottom)`}
+          title={`${failedRows.length} row(s) out of tolerance (±${tolerance} cm across Top/Middle/Bottom)`}
           description="Each failing row must carry a corrective action (Re-spread / Re-cut / Return to Cutting) before the check can be signed off." />
       )}
 
@@ -128,7 +132,7 @@ const TmbCheckForm = () => {
         title="Part & Size Measurements (cm)"
         extra={(
           <Button icon={<PlusOutlined />} size="small"
-            onClick={() => patch({ rows: [...check.rows, { part: null, size: null, top: [null, null, null], middle: [null, null, null], bottom: [null, null, null], pcs: null, comment: 'OK', action: 'Accept' }] })}>
+            onClick={() => patch({ rows: [...check.rows, { part: null, size: null, top: null, middle: null, bottom: null, pcs: null, comment: 'OK', action: 'Accept' }] })}>
             Add Row
           </Button>
         )}

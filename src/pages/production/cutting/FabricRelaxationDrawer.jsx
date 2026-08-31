@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Form, Button, Space, DatePicker, InputNumber, Alert, Tag } from 'antd';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
-import { FABRIC_TYPES } from '../../../utils/cuttingConstants';
-import { saveRelaxation, minRelaxHours } from '../../../services/production/cuttingService';
+import useCuttingMasters from '../../../hooks/useCuttingMasters';
+import { saveRelaxation } from '../../../services/production/cuttingService';
 
 /** FR-02 drawer — start or complete a relaxation; warns when ended before the fabric-type minimum. */
 const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { fabricTypes, fabricTypeByName } = useCuttingMasters();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
   const fabricType = Form.useWatch('fabricType', form);
@@ -29,7 +30,7 @@ const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) =>
     }
   }, [open, record, form]);
 
-  const minHrs = fabricType ? minRelaxHours(fabricType) : null;
+  const minHrs = fabricType ? fabricTypeByName(fabricType)?.minRelaxHours ?? null : null;
   const durationMins = startTime && endTime ? endTime.diff(startTime, 'minute') : null;
   const endedEarly = durationMins != null && minHrs != null && durationMins < minHrs * 60;
 
@@ -48,12 +49,11 @@ const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) =>
       setSaving(true);
       await saveRelaxation({
         id: record?.id,
+        version: record?.version,
         receiptId: values.receiptId,
-        cutPoId: receipts.find((r) => r.id === values.receiptId)?.cutPoId,
-        date: dayjs().format('YYYY-MM-DD'),
-        fabricType: values.fabricType,
-        startTime: values.startTime.format('YYYY-MM-DD HH:mm'),
-        endTime: values.endTime ? values.endTime.format('YYYY-MM-DD HH:mm') : null,
+        relaxationDate: dayjs().format('YYYY-MM-DD'),
+        startTime: values.startTime.format('YYYY-MM-DDTHH:mm:ss'),
+        endTime: values.endTime ? values.endTime.format('YYYY-MM-DDTHH:mm:ss') : null,
         shrinkagePrePct: values.shrinkagePrePct ?? null,
         shrinkagePostPct: values.shrinkagePostPct ?? null,
       });
@@ -67,7 +67,7 @@ const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) =>
 
   return (
     <Drawer
-      title={record ? `Complete Relaxation — ${record.relaxNo}` : 'Start Fabric Relaxation'}
+      title={record ? `Complete Relaxation — ${record.relaxationNo}` : 'Start Fabric Relaxation'}
       size={560}
       open={open}
       onClose={onClose}
@@ -82,12 +82,13 @@ const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) =>
       <Form form={form} layout="vertical">
         <Form.Item name="receiptId" label="Fabric Receipt #" rules={[{ required: true, message: 'Select receipt' }]}>
           <FormSelect placeholder="Select confirmed receipt" disabled={Boolean(record)}
-            options={receipts.map((r) => ({ value: r.id, label: `${r.receiptNo} (${r.rolls.filter((x) => x.received).length} rolls)` }))} />
+            options={receipts.map((r) => ({ value: r.id, label: `${r.receiptNo} (${r.receivedRollCount} rolls)` }))}
+            onChange={(v) => form.setFieldValue('fabricType', receipts.find((r) => r.id === v)?.fabricType)} />
         </Form.Item>
         <Form.Item name="fabricType" label="Fabric Type" rules={[{ required: true, message: 'Select fabric type' }]}
           extra={minHrs ? `Minimum relaxation for this fabric: ${minHrs} hours` : undefined}>
           <FormSelect placeholder="Select fabric type"
-            options={FABRIC_TYPES.map((f) => ({ value: f.value, label: `${f.value} (${f.category})` }))} />
+            options={fabricTypes.map((f) => ({ value: f.name, label: `${f.name} (${f.category})` }))} />
         </Form.Item>
         <Space size="large" align="center" wrap>
           <Form.Item name="startTime" label="Start Date & Time" rules={[{ required: true, message: 'Start time required' }]}>

@@ -1,26 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, InputNumber, Alert, DatePicker, Row, Col, Statistic, Segmented, Checkbox, Tag } from 'antd';
+import { App, Card, Space, Spin, InputNumber, Alert, DatePicker, Row, Col, Statistic, Segmented, Checkbox, Tag, Table, Button } from 'antd';
+import { FileExcelOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { CHECK_STAGES, LABEL_CHECKS, DHU_ALERT_PCT } from '../../../utils/finishingConstants';
-import { getChecking, saveChecking, getOrders, getEmployees, aqlSample, dhuPct, rowTotal } from '../../../services/production/finishingService';
-import FinishingHourlyGrid from './FinishingHourlyGrid';
+import { getChecking, saveChecking, getOrders, aqlSample, dhuPct, specPoints, fullMeasurementChart } from '../../../services/production/finishingService';
 import CheckingDefectsCard from './CheckingDefectsCard';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
 );
 
+const pointStatus = (p) => {
+  if (p.actual == null) return null;
+  const dev = Math.round((p.actual - p.spec) * 10) / 10;
+  if (Math.abs(dev) > p.tol) return { label: 'FAIL', color: 'red', dev };
+  return { label: 'PASS', color: 'green', dev };
+};
+
 const newSheet = (orders) => ({
   stage: 'PRE_FINAL', orderId: orders[0]?.id, color: orders[0]?.color, date: dayjs().format('YYYY-MM-DD'),
-  target: 190, lotSize: null, rows: [], passQty: null, alterQty: null, rejectQty: null, defects: [],
+  target: 190, lotSize: null, passQty: null, alterQty: null, rejectQty: null, defects: [],
   labelChecks: Object.fromEntries(LABEL_CHECKS.map((l) => [l, false])),
+  chartSize: orders[0]?.sizes[0], points: specPoints(orders[0]?.styleNo, orders[0]?.sizes[0]),
 });
 
-/** PRD Module 5 — checking sheet: 100% pre-final or AQL 2.5 final inspection. */
+/** Module 5 (rev) — checking sheet: Pass/Alter/Reject + defect log + measurement chart. */
 const CheckingForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -28,36 +36,57 @@ const CheckingForm = () => {
   const isEdit = Boolean(id);
   const [sheet, setSheet] = useState(null);
   const [orders, setOrders] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const [record, ords, emps] = await Promise.all([isEdit ? getChecking(id) : Promise.resolve(null), getOrders(), getEmployees('CHECKING')]);
-        setOrders(ords); setEmployees(emps);
-        setSheet(record || newSheet(ords));
+        const [record, ords] = await Promise.all([isEdit ? getChecking(id) : Promise.resolve(null), getOrders()]);
+        setOrders(ords);
+        if (record) {
+          const o = ords.find((x) => x.id === record.orderId);
+          setSheet({ chartSize: o?.sizes[0], points: record.points || specPoints(o?.styleNo, o?.sizes[0]), ...record });
+        } else setSheet(newSheet(ords));
       } catch { message.error('Failed to load checking sheet'); }
     })();
   }, [id, isEdit, message]);
 
   const patch = useCallback((p) => setSheet((prev) => ({ ...prev, ...p })), []);
+  const order = useMemo(() => orders.find((o) => o.id === sheet?.orderId), [orders, sheet?.orderId]);
 
   const totals = useMemo(() => {
     if (!sheet) return null;
     const checked = (sheet.passQty || 0) + (sheet.alterQty || 0) + (sheet.rejectQty || 0);
-    const gridTotal = sheet.rows.reduce((s, r) => s + rowTotal(r), 0);
     const defects = sheet.defects.reduce((s, d) => s + (d.count || 0), 0);
     const dhu = dhuPct(defects, checked);
     const aql = sheet.stage === 'FINAL' && sheet.lotSize ? aqlSample(sheet.lotSize) : null;
-    const majorPlus = defects; // mock: all logged defects count toward the AQL decision
-    const verdict = aql ? (majorPlus <= aql.accept ? 'ACCEPTED' : 'REJECTED') : null;
-    return { checked, gridTotal, defects, dhu, aql, verdict, reconciled: checked === gridTotal };
+    const verdict = aql ? (defects <= aql.accept ? 'ACCEPTED' : 'REJECTED') : null;
+    return { checked, defects, dhu, aql, verdict };
   }, [sheet]);
+
+  const chartColumns = useMemo(() => [
+    { title: 'Measurement Point', dataIndex: 'point', width: 190 },
+    { title: 'Spec (cm)', dataIndex: 'spec', width: 90, align: 'right' },
+    { title: 'Tol ±', dataIndex: 'tol', width: 70, align: 'center' },
+    {
+      title: 'Actual', dataIndex: 'actual', width: 110, align: 'center',
+      render: (v, _, idx) => (
+        <InputNumber size="small" step={0.1} value={v} style={{ width: 85 }}
+          onChange={(val) => setSheet((prev) => ({ ...prev, points: prev.points.map((p, i) => (i === idx ? { ...p, actual: val } : p)) }))} />
+      ),
+    },
+    {
+      title: 'Deviation', key: 'dev', width: 90, align: 'center',
+      render: (_, r) => { const s = pointStatus(r); return s ? <span style={{ color: s.color === 'red' ? 'var(--error-color)' : undefined }}>{s.dev > 0 ? '+' : ''}{s.dev}</span> : '—'; },
+    },
+    {
+      title: 'Result', key: 'res', width: 90, align: 'center',
+      render: (_, r) => { const s = pointStatus(r); return s ? <Tag color={s.color}>{s.label}</Tag> : '—'; },
+    },
+  ], []);
 
   const handleSave = async () => {
     if (!totals.checked) return message.warning('Enter Pass / Alter / Reject quantities');
-    if (!totals.reconciled) return message.warning(`Pass + Alter + Reject (${totals.checked}) must equal the grid total checked (${totals.gridTotal})`);
     setSaving(true);
     try {
       const saved = await saveChecking({ ...sheet, verdict: totals.verdict, sampleSize: totals.aql?.sample, acceptNo: totals.aql?.accept, rejectNo: totals.aql?.reject });
@@ -89,15 +118,14 @@ const CheckingForm = () => {
             <FieldLabel>Order</FieldLabel>
             <FormSelect value={sheet.orderId} style={{ width: 230 }} disabled={isEdit}
               options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-              onChange={(v) => patch({ orderId: v, color: orders.find((o) => o.id === v)?.color })} />
+              onChange={(v) => {
+                const o = orders.find((x) => x.id === v);
+                patch({ orderId: v, color: o?.color, chartSize: o?.sizes[0], points: specPoints(o?.styleNo, o?.sizes[0]) });
+              }} />
           </div>
           <div>
             <FieldLabel>Date</FieldLabel>
             <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(sheet.date)} onChange={(d) => patch({ date: d.format('YYYY-MM-DD') })} />
-          </div>
-          <div>
-            <FieldLabel>Target / checker</FieldLabel>
-            <InputNumber min={0} value={sheet.target} style={{ width: 100 }} onChange={(v) => patch({ target: v })} />
           </div>
           {sheet.stage === 'FINAL' && (
             <>
@@ -117,7 +145,6 @@ const CheckingForm = () => {
       </Card>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col xs={8} md={3}><Card size="small"><Statistic title="Checked (grid)" value={totals.gridTotal} /></Card></Col>
         <Col xs={8} md={3}>
           <Card size="small">
             <FieldLabel>Pass Qty</FieldLabel>
@@ -136,6 +163,7 @@ const CheckingForm = () => {
             <InputNumber min={0} value={sheet.rejectQty} style={{ width: '100%' }} onChange={(v) => patch({ rejectQty: v })} />
           </Card>
         </Col>
+        <Col xs={8} md={3}><Card size="small"><Statistic title="Total Checked" value={totals.checked} /></Card></Col>
         <Col xs={8} md={3}>
           <Card size="small">
             <Statistic title="DHU %" value={totals.dhu} suffix="%"
@@ -152,10 +180,6 @@ const CheckingForm = () => {
         )}
       </Row>
 
-      {!totals.reconciled && totals.checked > 0 && (
-        <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          title={`Pass + Alter + Reject = ${totals.checked} but the checker grid totals ${totals.gridTotal} — they must match (PRD 8.3)`} />
-      )}
       {totals.dhu > DHU_ALERT_PCT && (
         <Alert type="error" showIcon style={{ marginBottom: 16 }}
           title={`DHU ${totals.dhu}% exceeds the ${DHU_ALERT_PCT}% threshold — QA alert`} />
@@ -175,9 +199,28 @@ const CheckingForm = () => {
       )}
 
       <div style={{ marginBottom: 16 }}>
-        <FinishingHourlyGrid sheet={sheet} employees={employees} onChange={setSheet} />
+        <CheckingDefectsCard defects={sheet.defects} onChange={setSheet} />
       </div>
-      <CheckingDefectsCard defects={sheet.defects} onChange={setSheet} />
+
+      <Card
+        title={`Measurement Chart — ${order?.styleNo || ''} (buyer spec)`}
+        extra={(
+          <Space>
+            <FormSelect size="small" value={sheet.chartSize} style={{ width: 80 }}
+              options={(order?.sizes || []).map((s) => ({ value: s, label: s }))}
+              onChange={(v) => patch({ chartSize: v, points: specPoints(order?.styleNo, v) })} />
+            <Button size="small" icon={<FileExcelOutlined />}
+              onClick={() => {
+                patch({ points: fullMeasurementChart(order?.styleNo, sheet.chartSize) });
+                message.success('Measurement chart imported — all buyer spec points loaded');
+              }}>
+              Import Measurement Chart (Excel)
+            </Button>
+          </Space>
+        )}
+      >
+        <Table rowKey="point" size="small" columns={chartColumns} dataSource={sheet.points} pagination={false} scroll={{ x: 650 }} />
+      </Card>
     </div>
   );
 };
