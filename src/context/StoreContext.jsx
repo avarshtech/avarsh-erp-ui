@@ -46,6 +46,7 @@ const initialState = {
   // Cutting-room masters: fabric types (relaxation hours + stock UOM), cut/lay
   // tables, and the code lists + thresholds the cutting screens read from
   cuttingMasters: null,
+  sewingMasters: null,
 
   // Loading states per data type
   loading: {
@@ -65,6 +66,7 @@ const initialState = {
     roles: false,
     sampleOrderNos: false,
     cuttingMasters: false,
+    sewingMasters: false,
   },
 
   // Error states per data type
@@ -85,6 +87,7 @@ const initialState = {
     roles: null,
     sampleOrderNos: null,
     cuttingMasters: null,
+    sewingMasters: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -105,6 +108,7 @@ const initialState = {
     roles: null,
     sampleOrderNos: null,
     cuttingMasters: null,
+    sewingMasters: null,
   },
 };
 
