@@ -420,7 +420,7 @@ const MainLayoutInner = () => {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier"],
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier", "inventory-bill-passing"],
       children: [
         { key: "/inventory/dashboard", label: "Dashboard" },
         { key: "/inventory/grn/list", label: "GRN List" },
@@ -431,6 +431,7 @@ const MainLayoutInner = () => {
         { key: "/inventory/issue", label: "Material Issue" },
         { key: "/inventory/adjustment", label: "Stock Adjustment" },
         { key: "/inventory/return-to-supplier", label: "Return to Supplier" },
+        { key: "/inventory/bill-passing", label: "Bill Passing" },
       ],
     },
     {
@@ -561,6 +562,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
     if (path.startsWith('/inventory/return-to-supplier')) return ['/inventory/return-to-supplier'];
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
+    if (path.startsWith('/inventory/bill-passing')) return ['/inventory/bill-passing'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];

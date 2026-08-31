@@ -206,6 +206,13 @@ export const MODULES = {
     group: 'transactions',
     linkedTo: 'inventory',
   },
+  INVENTORY_BILL_PASSING: {
+    id: 'inventory-bill-passing',
+    name: 'Bill Passing',
+    path: '/inventory/bill-passing',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
   OPENING_STOCK: {
     id: 'opening-stock',
     name: 'Opening Stock Balance',
@@ -404,6 +411,10 @@ export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reje
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
+// Bill Passing splits the clerk (add/update), the verifier (verify) and the
+// approver (approve) across one module, the way inventory-qc already does.
+export const BILL_PASSING_OPERATIONS = ['view', 'add', 'update', 'delete', 'verify', 'approve'];
+
 // GRN approval-action operations — mirror exactly what the GRN helpers check:
 // canApproveGRNReferBack → grn-approval.refer_back, canApproveGRNReversal → grn-reversal.approve
 export const GRN_APPROVAL_OPERATIONS = ['refer_back'];
@@ -456,6 +467,8 @@ export const PERMISSION_GROUPS = [
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
       { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
       { id: 'inventory-return-supplier', name: 'Return to Supplier', operations: ['view', 'add'], linkedTo: 'inventory', path: '/inventory/return-to-supplier' },
+      // verify = the Accounts Executive check; approve = the value-band approver.
+      { id: 'inventory-bill-passing', name: 'Bill Passing', operations: BILL_PASSING_OPERATIONS, linkedTo: 'inventory', path: '/inventory/bill-passing' },
       { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
@@ -537,6 +550,7 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
   if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
+  if (moduleId === 'inventory-bill-passing') return BILL_PASSING_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;

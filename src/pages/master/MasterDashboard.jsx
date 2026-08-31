@@ -9,6 +9,10 @@ import {
   ToolOutlined,
   ScissorOutlined,
   DollarOutlined,
+  MinusCircleOutlined,
+  PlusCircleOutlined,
+  IssuesCloseOutlined,
+  SlidersOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -27,6 +31,10 @@ import PartsMaster from './PartsMaster';
 import OverheadMaster from './OverheadMaster';
 import DefectTypeMaster from './DefectTypeMaster';
 import TrimsQCCriteriaMaster from './TrimsQCCriteriaMaster';
+import BpDebitTypeMaster from './BpDebitTypeMaster';
+import BpChargeTypeMaster from './BpChargeTypeMaster';
+import BpIssueTypeMaster from './BpIssueTypeMaster';
+import BpToleranceSettings from './BpToleranceSettings';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
@@ -49,6 +57,7 @@ const GROUP_ACCENT = {
   commercial: 'var(--warning-color)',
   manufacturing: 'var(--error-color)',
   quality: 'var(--primary-color)',
+  billPassing: 'var(--btn-print-color)',
 };
 
 // Static navigation config — add new master data entries here
@@ -239,6 +248,48 @@ const NAV_GROUPS = [
         Component: TrimsQCCriteriaMaster,
         loadingKey: null,
         description: 'Criteria checking master for trims QC inspection',
+      },
+    ],
+  },
+  {
+    groupKey: 'billPassing',
+    label: 'Bill Passing',
+    items: [
+      {
+        key: 'bp-debit-type',
+        label: 'Debit Types',
+        icon: <MinusCircleOutlined />,
+        moduleId: 'inventory-bill-passing',
+        Component: BpDebitTypeMaster,
+        loadingKey: null,
+        description: 'Reasons a supplier invoice can be debited, and whether each needs a QC reference',
+      },
+      {
+        key: 'bp-charge-type',
+        label: 'Charge Types',
+        icon: <PlusCircleOutlined />,
+        moduleId: 'inventory-bill-passing',
+        Component: BpChargeTypeMaster,
+        loadingKey: null,
+        description: 'Freight, insurance and other charges addable to a bill, with their default GST treatment',
+      },
+      {
+        key: 'bp-issue-type',
+        label: 'Issue Types',
+        icon: <IssuesCloseOutlined />,
+        moduleId: 'inventory-bill-passing',
+        Component: BpIssueTypeMaster,
+        loadingKey: null,
+        description: 'Query and hold reasons, and which of them block a bill from reaching approval',
+      },
+      {
+        key: 'bp-tolerance',
+        label: 'Tolerance Settings',
+        icon: <SlidersOutlined />,
+        moduleId: 'inventory-bill-passing',
+        Component: BpToleranceSettings,
+        loadingKey: null,
+        description: 'Quantity, rate and value variance limits used by the four-way match',
       },
     ],
   },
