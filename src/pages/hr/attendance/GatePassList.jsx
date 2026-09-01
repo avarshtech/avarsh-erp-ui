@@ -73,14 +73,26 @@ const GatePassList = () => {
   }, []);
 
   const handleReject = useCallback(async (id) => {
+    // Miss punch has always asked for a reason here. Gate pass rejected without
+    // one, so the requester was told no and never told why.
+    let reason = '';
     modal.confirm({
       title: 'Reject Gate Pass?',
-      content: 'Are you sure you want to reject this gate pass?',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>The requester will see this reason.</p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Why is this being rejected?"
+            onChange={(e) => { reason = e.target.value; }}
+          />
+        </div>
+      ),
       okText: 'Reject',
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
-          await rejectGatePass(id);
+          await rejectGatePass(id, reason.trim() || null);
           message.success('Gate pass rejected');
           setDetailOpen(false);
           fetchData();
@@ -252,6 +264,13 @@ const GatePassList = () => {
               <Descriptions.Item label="To">{selected.toTime || '-'}</Descriptions.Item>
               <Descriptions.Item label="Destination">{selected.destination || '-'}</Descriptions.Item>
               <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              {selected.status === 'REJECTED' && (
+                <Descriptions.Item label="Rejection Reason">
+                  <span style={{ color: 'var(--error-color, #ff4d4f)', whiteSpace: 'pre-wrap' }}>
+                    {selected.rejectionReason || 'No reason was recorded.'}
+                  </span>
+                </Descriptions.Item>
+              )}
               <Descriptions.Item label="Raised On">
                 {selected.createdAt ? dayjs(selected.createdAt).format('DD MMM YYYY HH:mm') : '-'}
               </Descriptions.Item>

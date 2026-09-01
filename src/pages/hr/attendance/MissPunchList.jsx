@@ -278,6 +278,13 @@ const MissPunchList = () => {
               </Descriptions.Item>
               <Descriptions.Item label="Corrected Time">{selected.correctedTime || '-'}</Descriptions.Item>
               <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              {selected.status === 'REJECTED' && (
+                <Descriptions.Item label="Rejection Reason">
+                  <span style={{ color: 'var(--error-color, #ff4d4f)', whiteSpace: 'pre-wrap' }}>
+                    {selected.rejectionReason || 'No reason was recorded.'}
+                  </span>
+                </Descriptions.Item>
+              )}
               <Descriptions.Item label="Raised On">
                 {selected.createdAt ? dayjs(selected.createdAt).format('DD MMM YYYY HH:mm') : '-'}
               </Descriptions.Item>
