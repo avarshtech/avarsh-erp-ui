@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Space, Tabs, Input, Drawer, Descriptions, Typography } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -12,6 +13,7 @@ const statusMap = Object.fromEntries(LEAVE_STATUS.map((s) => [s.value, s]));
 
 const LeaveApplicationList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState('ALL');
@@ -207,13 +209,21 @@ const LeaveApplicationList = () => {
     <>
       <PageHeader
         title="Leave Applications"
-        extra={
-          canAdd && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
-              Apply Leave
+        extra={(
+          <Space>
+            {/* Balances was routed but nothing linked to it, so the only way in
+                was to type the URL. Deciding on an application without seeing
+                the balance behind it is the wrong way round. */}
+            <Button type="link" onClick={() => navigate('/hr/leaves/balances')}>
+              Leave Balances
             </Button>
-          )
-        }
+            {canAdd && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setDrawerOpen(true)}>
+                Apply Leave
+              </Button>
+            )}
+          </Space>
+        )}
       />
       <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} style={{ marginBottom: 16 }} />
       <Table

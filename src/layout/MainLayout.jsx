@@ -405,6 +405,7 @@ const MainLayoutInner = () => {
         { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
         { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
+        { key: "/hr/leaves/balances", label: "Leave Balances", moduleId: "hr-leave" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
         { key: "/hr/loans", label: "Loans", moduleId: "hr-loans" },
         { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
@@ -521,6 +522,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
     if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
+    if (path.startsWith('/hr/leaves/balances')) return ['/hr/leaves/balances'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
     if (path.startsWith('/hr/advances')) return ['/hr/advances'];

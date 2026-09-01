@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Select, Row, Col, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Table, Select, Row, Col, Spin, Button } from 'antd';
 import dayjs from 'dayjs';
 import { getLeaveBalancesBulk } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
@@ -9,6 +10,7 @@ import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [year, setYear] = useState(dayjs().year());
   const [factories, setFactories] = useState([]);
@@ -120,7 +122,14 @@ const LeaveBalanceView = () => {
 
   return (
     <>
-      <PageHeader title="Leave Balances" />
+      <PageHeader
+        title="Leave Balances"
+        extra={
+          <Button type="link" onClick={() => navigate('/hr/leaves')}>
+            Leave Applications
+          </Button>
+        }
+      />
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={6} md={4}>
           <Select
