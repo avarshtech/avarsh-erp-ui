@@ -131,6 +131,11 @@ const EmployeeView = () => {
           <Descriptions.Item label="Employee Type">{getLabel(EMPLOYEE_TYPE, employee.employeeType)}</Descriptions.Item>
           <Descriptions.Item label="Grade">{employee.grade ? employee.grade.replace('_', '+') : '-'}</Descriptions.Item>
           <Descriptions.Item label="Date of Joining">{employee.dateOfJoining ? dayjs(employee.dateOfJoining).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
+          {employee.dateOfLeaving && (
+            <Descriptions.Item label="Date of Leaving">
+              {dayjs(employee.dateOfLeaving).format('DD-MMM-YYYY')}
+            </Descriptions.Item>
+          )}
           <Descriptions.Item label="Reporting Manager">{employee.reportingManagerName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Migrant Worker">{employee.isMigrantWorker ? 'Yes' : 'No'}</Descriptions.Item>
           <Descriptions.Item label="Present Address" span={3}>{employee.presentAddress || '-'}</Descriptions.Item>

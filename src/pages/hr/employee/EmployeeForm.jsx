@@ -50,6 +50,7 @@ const FIELD_TAB = {
   category: 'employment',
   employeeType: 'employment',
   dateOfJoining: 'employment',
+  dateOfLeaving: 'employment',
   ifscCode: 'bank',
 };
 
@@ -222,6 +223,7 @@ const EmployeeForm = () => {
           ...emp,
           dateOfBirth: emp.dateOfBirth ? dayjs(emp.dateOfBirth) : null,
           dateOfJoining: emp.dateOfJoining ? dayjs(emp.dateOfJoining) : null,
+          dateOfLeaving: emp.dateOfLeaving ? dayjs(emp.dateOfLeaving) : null,
           ...(emp.statutory || {}),
           ...(emp.bankDetails || {}),
         });
@@ -289,6 +291,7 @@ const EmployeeForm = () => {
         ...values,
         dateOfBirth: values.dateOfBirth?.format('YYYY-MM-DD'),
         dateOfJoining: values.dateOfJoining?.format('YYYY-MM-DD'),
+        dateOfLeaving: values.dateOfLeaving ? values.dateOfLeaving.format('YYYY-MM-DD') : null,
         statutory: {
           pfApplicable: values.pfApplicable || false,
           pfNumber: values.pfNumber,
@@ -600,6 +603,37 @@ const EmployeeForm = () => {
               <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
             </Form.Item>
           </Col>
+          {/*
+            dateOfLeaving is on the DTO and persisted by update(), and only F&F
+            settlement ever set it - which happens after the leaver's final
+            payroll. So payroll could not know someone had left, LEFT_MID_MONTH
+            never fired, and their unmarked days were reported as loss of pay
+            rather than days they were not employed.
+          */}
+          {isEdit && (
+            <Col xs={24} sm={12} md={8}>
+              <Form.Item
+                label="Date of Leaving"
+                name="dateOfLeaving"
+                dependencies={['dateOfJoining']}
+                extra="Set this when the last working day is known, before the final payroll."
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator: (_, value) => {
+                      if (!value) return Promise.resolve();
+                      const joining = getFieldValue('dateOfJoining');
+                      if (joining && value.isBefore(joining, 'day')) {
+                        return Promise.reject(new Error('Date of leaving cannot precede date of joining'));
+                      }
+                      return Promise.resolve();
+                    },
+                  }),
+                ]}
+              >
+                <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" allowClear />
+              </Form.Item>
+            </Col>
+          )}
           {isEdit && (
             <Col xs={24} sm={12} md={8}><Form.Item label="Status" name="status"><Select showSearch optionFilterProp="label" options={EMPLOYEE_STATUS} /></Form.Item></Col>
           )}
