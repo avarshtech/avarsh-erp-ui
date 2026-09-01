@@ -68,6 +68,7 @@ const SewingPlanForm = lazy(() => import('./pages/production/sewing/SewingPlanFo
 const MeasurementReportForm = lazy(() => import('./pages/production/sewing/MeasurementReportForm'));
 const TopseForm = lazy(() => import('./pages/production/sewing/TopseForm'));
 const FinishingWorkspace = lazy(() => import('./pages/production/finishing/FinishingWorkspace'));
+const ProductionMastersPage = lazy(() => import('./pages/production/masters/ProductionMastersPage'));
 const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
@@ -281,6 +282,7 @@ const ThemedApp = () => {
 
             {/* Production — Finishing (UI mock phase) */}
             <Route path="production/finishing" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><FinishingWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="production/masters" element={<PermissionRoute module="production-masters"><Suspense fallback={<PageSkeleton />}><ProductionMastersPage /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             {/* Inventory */}

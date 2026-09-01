@@ -16,6 +16,7 @@
  *   "production-cutting":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "production-sewing":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "production-finishing": { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "production-masters":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "inventory":        { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "inventory-qc":     { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
  *   "inventory-issue":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
@@ -171,6 +172,12 @@ export const MODULES = {
     name: 'Production — Finishing',
     path: '/production/finishing',
     group: 'transactions',
+  },
+  PRODUCTION_MASTERS: {
+    id: 'production-masters',
+    name: 'Production Masters',
+    path: '/production/masters',
+    group: 'masters',
   },
   INVENTORY: {
     id: 'inventory',
@@ -460,6 +467,7 @@ export const PERMISSION_GROUPS = [
       { id: 'production-cutting', name: 'Production — Cutting', operations: STANDARD_OPERATIONS, path: '/production/cutting' },
       { id: 'production-sewing', name: 'Production — Sewing', operations: STANDARD_OPERATIONS, path: '/production/sewing' },
       { id: 'production-finishing', name: 'Production — Finishing', operations: STANDARD_OPERATIONS, path: '/production/finishing' },
+      { id: 'production-masters', name: 'Production Masters', operations: STANDARD_OPERATIONS, path: '/production/masters' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'grn-approval', name: 'GRN Refer-Back Approval', operations: GRN_APPROVAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
       { id: 'grn-reversal', name: 'GRN Reversal Approval', operations: GRN_REVERSAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
