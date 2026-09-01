@@ -94,11 +94,6 @@ export const TOPSE_TRAFFIC_META = {
 
 /** CR-SEW-005 — binary verification against BOM-driven items. */
 export const TRIM_ITEM_STATUSES = ['CORRECT', 'INCORRECT'];
-export const BOM_ITEM_CATEGORIES = ['Fabric & Materials', 'Trims & Accessories', 'Approvals & Tests'];
-export const CHECK_TYPES = ['SIZE_SET', 'IN_LINE', 'PILOT_RUN'];
-
-export const MEASUREMENT_STAGES = ['PILOT_RUN_SAMPLE', 'IN_LINE', 'END_LINE', 'FIRST_GARMENT', 'SIZE_SET'];
-
 export const DAMAGE_REASONS = ['FABRIC_DEFECT', 'CUTTING_ERROR', 'SHADE_VARIATION', 'CONTAMINATION', 'OTHER'];
 
 export const ISSUE_SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR'];

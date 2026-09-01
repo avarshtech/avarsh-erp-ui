@@ -2,9 +2,8 @@
  * Sewing module API surface. Screens import only from here, so a feature moves
  * off the mock by re-pointing its exports at sewingApi — no screen changes.
  *
- * Migration state: operators, the SAM library, plans, cut parts receipts,
- * garment issues and hourly production run on the real backend; everything
- * below the divider is still mock-backed until its stage lands.
+ * Migration state: everything above the divider runs on the real backend;
+ * what remains below is still mock-backed until its stage lands.
  */
 import * as mockApi from './sewingMockApi';
 import * as api from './sewingApi';
@@ -39,17 +38,19 @@ export const saveHourlySheet = (...a) => api.saveHourlySheet(...a);
 export const findHourConflicts = (...a) => api.findHourConflicts(...a);
 export const setHourlyStatus = (...a) => api.setHourlyStatus(...a);
 
+export const getBomItems = (...a) => api.getBomItems(...a);
+export const listTrimCards = (...a) => api.listTrimCards(...a);
+export const saveTrimCard = (...a) => api.saveTrimCard(...a);
+
+export const listMeasurements = (...a) => api.listMeasurements(...a);
+export const getMeasurement = (...a) => api.getMeasurement(...a);
+export const saveMeasurement = (...a) => api.saveMeasurement(...a);
+export const getMeasurementOpeningPoints = (...a) => api.getMeasurementOpeningPoints(...a);
+export const getMeasurementChart = (...a) => api.getMeasurementChart(...a);
+export const parseMeasurementChart = (...a) => api.parseMeasurementChart(...a);
+export const saveMeasurementChart = (...a) => api.saveMeasurementChart(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const getBomItems = (...a) => mockApi.getBomItems(...a);
-export const listTrimCards = (...a) => mockApi.listTrimCards(...a);
-export const saveTrimCard = (...a) => mockApi.saveTrimCard(...a);
-export const fullMeasurementChart = mockApi.fullMeasurementChart;
-
-export const listMeasurements = (...a) => mockApi.listMeasurements(...a);
-export const getMeasurement = (...a) => mockApi.getMeasurement(...a);
-export const saveMeasurement = (...a) => mockApi.saveMeasurement(...a);
-export const specPoints = mockApi.specPoints;
 
 export const listTopse = (...a) => mockApi.listTopse(...a);
 export const getTopse = (...a) => mockApi.getTopse(...a);

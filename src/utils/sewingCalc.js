@@ -52,6 +52,32 @@ export const workedHoursOf = (rows) => HOURS.filter(
   (h) => (rows || []).some((r) => r[h] != null),
 ).length;
 
+/**
+ * Whether one measurement point is inside its tolerance. A point exactly on the
+ * limit is neither a pass nor a failure — it is the one the QA lead looks at.
+ */
+export const pointStatus = (p) => {
+  if (p.actual == null || p.spec == null) return { status: 'PENDING', deviation: null };
+  const deviation = Math.round((p.actual - p.spec) * 1000) / 1000;
+  const tolerance = Number(p.tolerance) || 0;
+  const gap = Math.round((Math.abs(deviation) - tolerance) * 1000) / 1000;
+  return { status: gap > 0 ? 'FAIL' : gap === 0 ? 'AT_LIMIT' : 'PASS', deviation };
+};
+
+/** The report's verdict, mirroring SewMeasurementCalculator on the server. */
+export const measurementResult = (points) => {
+  const counts = { PASS: 0, AT_LIMIT: 0, FAIL: 0, PENDING: 0 };
+  points.forEach((p) => { counts[pointStatus(p).status] += 1; });
+  const measured = counts.PASS + counts.AT_LIMIT + counts.FAIL;
+  return {
+    ...counts,
+    failCount: counts.FAIL,
+    measured,
+    result: counts.FAIL > 0 ? 'NOT_APPROVED'
+      : measured === 0 || counts.AT_LIMIT > 0 ? 'CONDITIONAL' : 'APPROVED',
+  };
+};
+
 /** Line efficiency: standard minutes produced against minutes actually paid for. */
 export const efficiencyPct = (completed, sam, presentOperators, workedHours) => (
   sam > 0 && presentOperators > 0 && workedHours > 0

@@ -3,7 +3,7 @@
  * sewingService surface the screens already call, so moving a feature off the
  * mock is a one-line change in sewingService.js.
  */
-import axiosInstance from '../core/axiosInstance';
+import axiosInstance, { upload } from '../core/axiosInstance';
 
 const BASE = '/sewing';
 
@@ -126,6 +126,73 @@ export const findHourConflicts = async (payload) => {
 
 export const setHourlyStatus = async (id, status) => {
   const { data } = await axiosInstance.put(`${BASE}/hourly/${id}/status`, null, { params: { status } });
+  return data;
+};
+
+/* ── 4.5 Trim verification ───────────────────────────────────────────────── */
+
+export const listTrimCards = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/trim-cards`);
+  return data;
+};
+
+/** The order's BOM, which is what a new verification card starts from. */
+export const getBomItems = async (orderId) => {
+  const { data } = await axiosInstance.get(`${BASE}/trim-cards/bom-items`, { params: { orderId } });
+  return data;
+};
+
+export const saveTrimCard = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/trim-cards`, payload);
+  return data;
+};
+
+/* ── 4.6 Measurement reports ─────────────────────────────────────────────── */
+
+export const listMeasurements = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/measurements`);
+  return data;
+};
+
+export const getMeasurement = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/measurements/${id}`);
+  return data;
+};
+
+/** The style's chart for a size, actuals blank — what a new report starts from. */
+export const getMeasurementOpeningPoints = async (orderId, size) => {
+  const { data } = await axiosInstance.get(`${BASE}/measurements/opening-points`, { params: { orderId, size } });
+  return data;
+};
+
+export const saveMeasurement = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/measurements`, payload);
+  return data;
+};
+
+/* ── Measurement chart master ────────────────────────────────────────────── */
+
+const SPECS = '/measurement-specs';
+
+export const getMeasurementChart = async (styleNo) => {
+  const { data } = await axiosInstance.get(SPECS, { params: { styleNo } });
+  return data;
+};
+
+/**
+ * Reads an uploaded chart and returns what it says, writing nothing. Posted
+ * through the shared upload helper so the multipart boundary is set rather than
+ * the instance's JSON content type.
+ */
+export const parseMeasurementChart = async (file, styleNo) => {
+  const form = new FormData();
+  form.append('file', file);
+  return upload(`${SPECS}/parse?styleNo=${encodeURIComponent(styleNo)}`, form);
+};
+
+/** Commits a parsed chart, replacing the style's existing one. */
+export const saveMeasurementChart = async (payload) => {
+  const { data } = await axiosInstance.post(SPECS, payload);
   return data;
 };
 
