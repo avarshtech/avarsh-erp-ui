@@ -269,13 +269,13 @@ const LeaveApplicationList = () => {
                 ? <Tag color={statusMap[selected.status].color}>{statusMap[selected.status].label}</Tag>
                 : selected.status}
             </Descriptions.Item>
-            <Descriptions.Item label="Reason">
+            <Descriptions.Item label="Reason for Request">
               <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>
                 {selected.reason || '-'}
               </Typography.Text>
             </Descriptions.Item>
             {selected.status === 'REJECTED' && (
-              <Descriptions.Item label="Rejection Reason">
+              <Descriptions.Item label="Reason for Rejection">
                 <Typography.Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
                   {selected.rejectionReason || 'No reason was recorded.'}
                 </Typography.Text>

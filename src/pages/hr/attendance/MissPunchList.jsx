@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createMissPunch, getMissPunchByStatus, approveMissPunch, rejectMissPunch } from '../../../services/hr/missPunchService';
@@ -149,15 +149,25 @@ const MissPunchList = () => {
       render: (val) => PUNCH_TYPE.find((p) => p.value === val)?.label || val,
     },
     { title: 'Corrected Time', dataIndex: 'correctedTime', key: 'correctedTime', width: 120 },
-    { title: 'Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
+    // Two different reasons exist on this record. Naming the column after the
+    // one it shows keeps it from reading as the rejection reason.
+    { title: 'Request Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       width: 110,
-      render: (val) => {
+      // A rejected row said only "Rejected" and gave no way to see why without
+      // opening it. The reason hangs off the tag rather than taking a column.
+      render: (val, record) => {
         const s = statusMap[val];
-        return s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        const tag = s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        if (val !== 'REJECTED') return tag;
+        return (
+          <Tooltip title={record.rejectionReason || 'No reason was recorded.'}>
+            <span style={{ cursor: 'help' }}>{tag}</span>
+          </Tooltip>
+        );
       },
     },
     {
@@ -277,9 +287,9 @@ const MissPunchList = () => {
                 {PUNCH_TYPE.find((p) => p.value === selected.punchType)?.label || selected.punchType || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Corrected Time">{selected.correctedTime || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Reason for Request">{selected.reason || '-'}</Descriptions.Item>
               {selected.status === 'REJECTED' && (
-                <Descriptions.Item label="Rejection Reason">
+                <Descriptions.Item label="Reason for Rejection">
                   <span style={{ color: 'var(--error-color, #ff4d4f)', whiteSpace: 'pre-wrap' }}>
                     {selected.rejectionReason || 'No reason was recorded.'}
                   </span>
@@ -338,7 +348,7 @@ const MissPunchList = () => {
           <Form.Item name="correctedTime" label="Corrected Time" rules={[{ required: true, message: 'Please enter corrected time' }]}>
             <TimePicker format="HH:mm" style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please enter a reason' }]}>
+          <Form.Item name="reason" label="Reason for Request" rules={[{ required: true, message: 'Please enter a reason' }]}>
             <Input.TextArea rows={3} placeholder="Reason for miss punch" />
           </Form.Item>
         </Form>
