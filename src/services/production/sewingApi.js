@@ -40,3 +40,40 @@ export const saveStyleSam = async (payload) => {
     : await axiosInstance.post(`${BASE}/style-sam`, payload);
   return data;
 };
+
+/* ── Order lookup ────────────────────────────────────────────────────────── */
+
+export const getOrders = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/orders`);
+  return data;
+};
+
+/* ── 4.1 Production plan ─────────────────────────────────────────────────── */
+
+export const listPlans = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/plans`);
+  return data;
+};
+
+export const getPlan = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/plans/${id}`);
+  return data;
+};
+
+export const savePlan = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/plans/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/plans`, payload);
+  return data;
+};
+
+export const setPlanStatus = async (id, status) => {
+  const { data } = await axiosInstance.put(`${BASE}/plans/${id}/status`, null, { params: { status } });
+  return data;
+};
+
+/** The style's SAM sheet as plan operations, so a studied style is not re-timed. */
+export const getSuggestedOperations = async (orderId) => {
+  const { data } = await axiosInstance.get(`${BASE}/plans/suggested-operations`, { params: { orderId } });
+  return data;
+};

@@ -15,13 +15,15 @@ export const getSamValues = (...a) => api.getSamValues(...a);
 export const getStyleSam = (...a) => api.getStyleSam(...a);
 export const saveStyleSam = (...a) => api.saveStyleSam(...a);
 
-/* ── Still mock-backed ───────────────────────────────────────────────────── */
-export const getOrders = (...a) => mockApi.getOrders(...a);
+export const getOrders = (...a) => api.getOrders(...a);
 
-export const listPlans = (...a) => mockApi.listPlans(...a);
-export const getPlan = (...a) => mockApi.getPlan(...a);
-export const savePlan = (...a) => mockApi.savePlan(...a);
-export const setPlanStatus = (...a) => mockApi.setPlanStatus(...a);
+export const listPlans = (...a) => api.listPlans(...a);
+export const getPlan = (...a) => api.getPlan(...a);
+export const savePlan = (...a) => api.savePlan(...a);
+export const setPlanStatus = (...a) => api.setPlanStatus(...a);
+export const getSuggestedOperations = (...a) => api.getSuggestedOperations(...a);
+
+/* ── Still mock-backed ───────────────────────────────────────────────────── */
 
 export const listCutReceipts = (...a) => mockApi.listCutReceipts(...a);
 export const saveCutReceipt = (...a) => mockApi.saveCutReceipt(...a);
