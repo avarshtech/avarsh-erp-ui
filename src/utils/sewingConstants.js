@@ -1,6 +1,10 @@
 /**
- * Sewing module (production execution) constants — Sewing PRD v1.0 +
- * Indian SME garment practice. Mirrors cuttingConstants.js conventions.
+ * Sewing module presentation constants.
+ *
+ * Everything the floor can configure — lines, machine types, operations, defect
+ * types, check types, damage reasons, efficiency and DHU bands, incentive slabs
+ * — is master data and comes from the API. What is left here is presentation:
+ * colours, labels and the hour numbering the screens share.
  */
 
 export const SEWING_STATUS_COLORS = {
@@ -36,22 +40,10 @@ export const SEWING_STATUS_COLORS = {
 export const sewingStatusLabel = (s) => String(s || '').replaceAll('_', ' ')
   .toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 
-/** Lines belong to a production unit — Line selects filter by Unit. */
-export const UNITS = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
-export const LINES_BY_UNIT = {
-  'Unit-1 Tirupur': ['Line-A', 'Line-B'],
-  'Unit-2 Avinashi': ['B-1', 'B-2'],
-};
-
-export const MACHINE_TYPES = ['SNLS', 'DNLS', 'Overlock', 'Flatlock', 'Bartack', 'Kansai', 'Iron'];
-
+/** Hourly sheet columns — the eight worked hours as they are stored. */
 export const HOURS = ['hr1', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'hr7', 'hr8'];
 
-/** Traffic light bands per PRD 4.3.4 (line efficiency %). */
-export const EFFICIENCY_BANDS = { green: 70, yellow: 50 }; // >=70 green, >=50 yellow, else red
-
-export const trafficLight = (eff) => (eff >= EFFICIENCY_BANDS.green ? 'green' : eff >= EFFICIENCY_BANDS.yellow ? 'yellow' : 'red');
-
+/** Line-efficiency traffic light colours; the bands themselves are master data. */
 export const TRAFFIC_COLORS = { green: 'var(--success-color)', yellow: 'var(--warning-color)', red: 'var(--error-color)' };
 
 /**
@@ -65,11 +57,6 @@ export const SKILL_GRADE_COLORS = {
   C: '#faad14',
   D: '#ff4d4f',
 };
-
-export const OPERATIONS = ['Shoulder join', 'Neck rib attach', 'Collar attach', 'Sleeve attach', 'Side seam', 'Sleeve hem', 'Bottom hem', 'Label attach', 'Bartack'];
-
-
-export const DHU_THRESHOLD_PCT = 5;
 
 /**
  * CR-SEW-006 — TOPSE hour slots. Numbered 1-8 for the shift and 9 for overtime,
@@ -100,23 +87,3 @@ export const CATEGORY_COLORS = {
   'Appearance Defects': '#faad14',
   'Measurement Defects': '#eb2f96',
 };
-
-/** CR-SEW-005 — binary verification against BOM-driven items. */
-export const TRIM_ITEM_STATUSES = ['CORRECT', 'INCORRECT'];
-export const ISSUE_SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR'];
-
-/** Incentive slabs per PRD 5.3 (configurable; defaults shown in mock). */
-export const INCENTIVE_CONFIG = {
-  baseEfficiency: 70,
-  slabs: [
-    { from: 70, to: 80, amount: 50 },
-    { from: 80, to: 90, amount: 100 },
-    { from: 90, to: 999, amount: 150 },
-  ],
-  dhuDeductionPct: 20, // if line DHU > threshold
-  attendanceBonusWeekly: 200,
-  lineBonusPerDay: 50,
-};
-
-/** Receipt discrepancy auto-flag threshold per BR 4.2.3. */
-export const RECEIPT_DISCREPANCY_PCT = 2;

@@ -207,6 +207,19 @@ export const setReplacementPartStatus = async (id, partId, status) => {
   return data;
 };
 
+/* ── 5.3 Incentives · 6.1 Floor dashboard ────────────────────────────────── */
+
+/** Read-only: computed from the hourly sheets every call, never posted anywhere. */
+export const getIncentives = async (date) => {
+  const { data } = await axiosInstance.get(`${BASE}/incentives`, { params: { date } });
+  return data;
+};
+
+export const getFloorDashboard = async (date) => {
+  const { data } = await axiosInstance.get(`${BASE}/dashboard`, { params: { date } });
+  return data;
+};
+
 /* ── Measurement chart master ────────────────────────────────────────────── */
 
 const SPECS = '/measurement-specs';

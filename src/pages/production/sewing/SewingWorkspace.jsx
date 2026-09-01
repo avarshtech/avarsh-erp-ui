@@ -42,7 +42,7 @@ const SewingWorkspace = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Sewing"
-        subtitle="Sewing floor — cut parts in, hourly line tracking, quality gates (design preview on sample data)"
+        subtitle="Sewing floor — cut parts in, hourly line tracking, quality gates"
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       />
       <Tabs
