@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createGatePass, getGatePassByStatus, approveGatePass, rejectGatePass } from '../../../services/hr/gatePassService';
@@ -91,8 +91,14 @@ const GatePassList = () => {
       okText: 'Reject',
       okButtonProps: { danger: true },
       onOk: async () => {
+        // Miss punch refuses to reject without a reason; there is no argument for
+        // gate pass being laxer about it.
+        if (!reason.trim()) {
+          message.error('A reason is required to reject');
+          return Promise.reject(new Error('reason required'));
+        }
         try {
-          await rejectGatePass(id, reason.trim() || null);
+          await rejectGatePass(id, reason.trim());
           message.success('Gate pass rejected');
           setDetailOpen(false);
           fetchData();
@@ -150,16 +156,26 @@ const GatePassList = () => {
     },
     { title: 'From', dataIndex: 'fromTime', key: 'fromTime', width: 90 },
     { title: 'To', dataIndex: 'toTime', key: 'toTime', width: 90 },
-    { title: 'Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
+    // Two different reasons exist on this record. Naming the column after the
+    // one it shows keeps it from reading as the rejection reason.
+    { title: 'Request Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
     { title: 'Destination', dataIndex: 'destination', key: 'destination', width: 150, ellipsis: true },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       width: 110,
-      render: (val) => {
+      // A rejected row said only "Rejected" and gave no way to see why without
+      // opening it. The reason hangs off the tag rather than taking a column.
+      render: (val, record) => {
         const s = statusMap[val];
-        return s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        const tag = s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        if (val !== 'REJECTED') return tag;
+        return (
+          <Tooltip title={record.rejectionReason || 'No reason was recorded.'}>
+            <span style={{ cursor: 'help' }}>{tag}</span>
+          </Tooltip>
+        );
       },
     },
     {
@@ -263,9 +279,9 @@ const GatePassList = () => {
               <Descriptions.Item label="From">{selected.fromTime || '-'}</Descriptions.Item>
               <Descriptions.Item label="To">{selected.toTime || '-'}</Descriptions.Item>
               <Descriptions.Item label="Destination">{selected.destination || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Reason">{selected.reason || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Reason for Request">{selected.reason || '-'}</Descriptions.Item>
               {selected.status === 'REJECTED' && (
-                <Descriptions.Item label="Rejection Reason">
+                <Descriptions.Item label="Reason for Rejection">
                   <span style={{ color: 'var(--error-color, #ff4d4f)', whiteSpace: 'pre-wrap' }}>
                     {selected.rejectionReason || 'No reason was recorded.'}
                   </span>
@@ -330,7 +346,7 @@ const GatePassList = () => {
           <Form.Item name="destination" label="Destination">
             <Input placeholder="Destination (optional)" />
           </Form.Item>
-          <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please enter a reason' }]}>
+          <Form.Item name="reason" label="Reason for Request" rules={[{ required: true, message: 'Please enter a reason' }]}>
             <Input.TextArea rows={3} placeholder="Reason for gate pass" />
           </Form.Item>
         </Form>
