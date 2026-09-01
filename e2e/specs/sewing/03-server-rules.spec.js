@@ -27,8 +27,13 @@ test.describe('Sewing — server-derived rules reach the screen', () => {
       test.info().annotations.push({ type: 'note', description: 'Selected order has no BOM lines — physical-check guard not exercised.' });
       return;
     }
+    // Mark every item Correct by clicking the visible button, not the radio
+    // input behind it: AntD renders that input at opacity 0 and off-viewport,
+    // so Playwright will never click it.
     for (let i = 0; i < count; i++) {
-      await groups.nth(i).locator('input').first().click();
+      const correct = groups.nth(i).locator('.ant-radio-button-wrapper', { hasText: /^Correct$/ }).first();
+      await correct.scrollIntoViewIfNeeded();
+      await correct.click();
     }
 
     await page.locator('.ant-drawer-footer button.ant-btn-primary').click();
