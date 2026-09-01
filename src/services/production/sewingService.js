@@ -23,14 +23,16 @@ export const savePlan = (...a) => api.savePlan(...a);
 export const setPlanStatus = (...a) => api.setPlanStatus(...a);
 export const getSuggestedOperations = (...a) => api.getSuggestedOperations(...a);
 
+export const listCutReceipts = (...a) => api.listCutReceipts(...a);
+export const listPendingBundleIssues = (...a) => api.listPendingBundleIssues(...a);
+export const saveCutReceipt = (...a) => api.saveCutReceipt(...a);
+
+export const listGarmentIssues = (...a) => api.listGarmentIssues(...a);
+export const issuedBySize = (...a) => api.issuedBySize(...a);
+export const getIssueOpeningLines = (...a) => api.getIssueOpeningLines(...a);
+export const saveGarmentIssue = (...a) => api.saveGarmentIssue(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const listCutReceipts = (...a) => mockApi.listCutReceipts(...a);
-export const saveCutReceipt = (...a) => mockApi.saveCutReceipt(...a);
-
-export const listGarmentIssues = (...a) => mockApi.listGarmentIssues(...a);
-export const issuedBySize = (...a) => mockApi.issuedBySize(...a);
-export const saveGarmentIssue = (...a) => mockApi.saveGarmentIssue(...a);
 
 export const listHourly = (...a) => mockApi.listHourly(...a);
 export const getHourlySheet = (...a) => mockApi.getHourlySheet(...a);
@@ -59,7 +61,3 @@ export const saveReplacement = (...a) => mockApi.saveReplacement(...a);
 
 export const getIncentives = (...a) => mockApi.getIncentives(...a);
 export const getFloorDashboard = (...a) => mockApi.getFloorDashboard(...a);
-
-// Cross-module: the cut-parts receipt traces back to a real bundle issue from
-// Cutting, which now runs on the backend even though Sewing itself does not.
-export { listBundleIssues as listCuttingBundleIssues, listBundles as listCuttingBundles } from './cuttingApi';
