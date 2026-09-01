@@ -106,7 +106,11 @@ const PayrollWizard = () => {
       { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100 },
       { title: 'Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
       { title: 'Payable Days', dataIndex: 'payableDays', key: 'payableDays', width: 110, align: 'right' },
-      { title: 'Gross', dataIndex: 'grossSalary', key: 'grossSalary', width: 120, align: 'right', render: formatCurrency },
+      // There is no grossSalary on SalaryRecordDTO, so this column was empty on
+      // every row. totalEarnings is the figure that belongs beside Deductions
+      // and Net, because those three are what reconcile: earnings less
+      // deductions is net. earnedGross excludes overtime and would not.
+      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatCurrency },
       { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatCurrency },
       { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatCurrency },
       { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatCurrency },
@@ -118,7 +122,7 @@ const PayrollWizard = () => {
 
   const totals = useMemo(() => {
     const sum = (key) => records.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
-    return { gross: sum('grossSalary'), deductions: sum('totalDeductions'), net: sum('netSalary') };
+    return { earnings: sum('totalEarnings'), deductions: sum('totalDeductions'), net: sum('netSalary') };
   }, [records]);
 
   const steps = [
@@ -249,7 +253,7 @@ const PayrollWizard = () => {
           <Table.Summary fixed>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={3}><strong>Totals</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.gross)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.earnings)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={4} colSpan={3} />
               <Table.Summary.Cell index={7} align="right"><strong>{formatCurrency(totals.deductions)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={8} align="right"><strong>{formatCurrency(totals.net)}</strong></Table.Summary.Cell>
@@ -262,7 +266,7 @@ const PayrollWizard = () => {
     // Step 3 — Approve
     <Card key="approve" style={{ maxWidth: 600 }}>
       <Row gutter={[16, 16]}>
-        <Col span={8}><Statistic title="Total Gross" value={totals.gross} precision={2} prefix={'\u20B9'} /></Col>
+        <Col span={8}><Statistic title="Total Earnings" value={totals.earnings} precision={2} prefix={'\u20B9'} /></Col>
         <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Col>
         <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Col>
       </Row>
