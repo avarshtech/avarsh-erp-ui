@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Input } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Input, Drawer, Descriptions, Typography } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getLeavesByStatus, approveLeave, rejectLeave, cancelLeave } from '../../../services/hr/leaveService';
@@ -16,6 +16,10 @@ const LeaveApplicationList = () => {
   const [data, setData] = useState([]);
   const [activeTab, setActiveTab] = useState('ALL');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Reason is mandatory to apply and was shown nowhere afterwards, so an
+  // approver decided without it. rejectionReason was stored and never read
+  // back either, leaving a rejected application with no visible explanation.
+  const [selected, setSelected] = useState(null);
   const [leaveTypes, setLeaveTypes] = useState([]);
 
   const canAdd = hasPermission('hr-leave', 'add');
@@ -158,9 +162,11 @@ const LeaveApplicationList = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 140,
+      width: 240,
       fixed: 'right',
       render: (_, record) => {
+        // Rows open the detail drawer, so each action stops propagation -
+        // otherwise confirming one would leave the drawer open behind it.
         // Cancel stays available on an approved leave that has not started yet,
         // which is the usual reason someone withdraws one.
         const cancellable = record.status === 'PENDING'
@@ -169,17 +175,17 @@ const LeaveApplicationList = () => {
         return (
           <Space size="small">
             {record.status === 'PENDING' && canApprove && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}>
                 Approve
               </Button>
             )}
             {record.status === 'PENDING' && canReject && (
-              <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
+              <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}>
                 Reject
               </Button>
             )}
             {cancellable && canUpdate && (
-              <Button type="link" size="small" icon={<StopOutlined />} onClick={() => handleCancel(record)}>
+              <Button type="link" size="small" icon={<StopOutlined />} onClick={(e) => { e.stopPropagation(); handleCancel(record); }}>
                 Cancel
               </Button>
             )}
@@ -215,10 +221,67 @@ const LeaveApplicationList = () => {
         dataSource={data}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1200 }}
         size="small"
         pagination={{ pageSize: 25, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => setSelected(record),
+          style: { cursor: 'pointer' },
+        })}
       />
+
+      <Drawer
+        title="Leave Application"
+        open={Boolean(selected)}
+        onClose={() => setSelected(null)}
+        width={480}
+      >
+        {selected && (
+          <Descriptions column={1} bordered size="small">
+            <Descriptions.Item label="Employee">
+              {[selected.employeeNo, selected.employeeName].filter(Boolean).join(' - ') || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Leave Type">{selected.leaveTypeName || '-'}</Descriptions.Item>
+            <Descriptions.Item label="From">
+              {selected.fromDate ? dayjs(selected.fromDate).format('DD-MMM-YYYY') : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="To">
+              {selected.toDate ? dayjs(selected.toDate).format('DD-MMM-YYYY') : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Days">
+              {selected.days ?? '-'}
+              {selected.isHalfDay && selected.halfDayType
+                ? ` (${selected.halfDayType.replace('_', ' ').toLowerCase()})`
+                : ''}
+            </Descriptions.Item>
+            <Descriptions.Item label="Status">
+              {statusMap[selected.status]
+                ? <Tag color={statusMap[selected.status].color}>{statusMap[selected.status].label}</Tag>
+                : selected.status}
+            </Descriptions.Item>
+            <Descriptions.Item label="Reason">
+              <Typography.Text style={{ whiteSpace: 'pre-wrap' }}>
+                {selected.reason || '-'}
+              </Typography.Text>
+            </Descriptions.Item>
+            {selected.status === 'REJECTED' && (
+              <Descriptions.Item label="Rejection Reason">
+                <Typography.Text type="danger" style={{ whiteSpace: 'pre-wrap' }}>
+                  {selected.rejectionReason || 'No reason was recorded.'}
+                </Typography.Text>
+              </Descriptions.Item>
+            )}
+            {selected.approvedAt && (
+              <Descriptions.Item label="Decided On">
+                {dayjs(selected.approvedAt).format('DD-MMM-YYYY HH:mm')}
+              </Descriptions.Item>
+            )}
+            <Descriptions.Item label="Applied On">
+              {selected.createdAt ? dayjs(selected.createdAt).format('DD-MMM-YYYY HH:mm') : '-'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Drawer>
 
       <LeaveApplyDrawer
         open={drawerOpen}

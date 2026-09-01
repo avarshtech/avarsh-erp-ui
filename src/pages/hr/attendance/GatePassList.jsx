@@ -153,7 +153,7 @@ const GatePassList = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 140,
+      width: 180,
       fixed: 'right',
       render: (_, record) => {
         if (record.status !== 'PENDING' || !canDecide) return null;
@@ -200,7 +200,7 @@ const GatePassList = () => {
         dataSource={data}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1240 }}
         size="small"
         pagination={{ pageSize: 25, showSizeChanger: true }}
         onRow={(record) => ({
