@@ -36,8 +36,6 @@ export const SEWING_STATUS_COLORS = {
 export const sewingStatusLabel = (s) => String(s || '').replaceAll('_', ' ')
   .toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 
-export const SEWING_LINES = ['Line-A', 'Line-B', 'B-1', 'B-2'];
-
 /** Lines belong to a production unit — Line selects filter by Unit. */
 export const UNITS = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
 export const LINES_BY_UNIT = {
@@ -70,32 +68,41 @@ export const SKILL_GRADE_COLORS = {
 
 export const OPERATIONS = ['Shoulder join', 'Neck rib attach', 'Collar attach', 'Sleeve attach', 'Side seam', 'Sleeve hem', 'Bottom hem', 'Label attach', 'Bartack'];
 
-/** TOPSE defect categories per PRD 4.7.2. */
-export const DEFECT_CATEGORIES = {
-  'Fabric Defects': ['Fabric hole', 'Stain', 'Shade variation', 'Slub'],
-  'Stitching Defects': ['Broken stitch', 'Skip stitch', 'Uneven SPI', 'Loose tension', 'Open seam', 'Raw edge'],
-  'Construction Defects': ['Puckering', 'High-low', 'Uneven seam', 'Pleat', 'Needle hole'],
-  'Trim/Accessory Defects': ['Insecure button/snap', 'Missing operation', 'Label misplacement'],
-  'Appearance Defects': ['Dirt mark', 'Oil stain', 'Sticker', 'Uncut thread'],
-  'Measurement Defects': ['Out of tolerance'],
-};
 
 export const DHU_THRESHOLD_PCT = 5;
 
-/** CR-SEW-006 — TOPSE hour slots + traffic-light thresholds (configurable per buyer). */
-export const TOPSE_HOURS = ['Hr 1', 'Hr 2', 'Hr 3', 'Hr 4', 'Hr 5', 'Hr 6', 'Hr 7', 'Hr 8', 'OT'];
-export const TOPSE_TRAFFIC = { greenMax: 3, yellowMax: 5 }; // GREEN ≤3, YELLOW 3–5, RED >5
-export const topseTraffic = (dhu) => (dhu <= TOPSE_TRAFFIC.greenMax ? 'GREEN' : dhu <= TOPSE_TRAFFIC.yellowMax ? 'YELLOW' : 'RED');
+/**
+ * CR-SEW-006 — TOPSE hour slots. Numbered 1-8 for the shift and 9 for overtime,
+ * the same numbering the hourly production sheet uses, so a defect hour and an
+ * output hour mean the same thing. The DHU bands live in the threshold master.
+ */
+export const TOPSE_HOUR_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export const topseHourLabel = (hour) => (hour > 8 ? 'OT' : `Hr ${hour}`);
+export const topseHourOptions = () => TOPSE_HOUR_NUMBERS.map(
+  (hour) => ({ value: hour, label: topseHourLabel(hour) }),
+);
+
 export const TOPSE_TRAFFIC_META = {
   GREEN: { label: 'Pass', color: 'green' },
   YELLOW: { label: 'Watch', color: 'orange' },
   RED: { label: 'Fail', color: 'red' },
 };
 
+/**
+ * Pareto bar colour per defect category. The categories themselves are master
+ * data (mst_sewing_defect_types); only the colour is presentation.
+ */
+export const CATEGORY_COLORS = {
+  'Fabric Defects': '#722ed1',
+  'Stitching Defects': '#fa541c',
+  'Construction Defects': '#1677ff',
+  'Trim/Accessory Defects': '#13c2c2',
+  'Appearance Defects': '#faad14',
+  'Measurement Defects': '#eb2f96',
+};
+
 /** CR-SEW-005 — binary verification against BOM-driven items. */
 export const TRIM_ITEM_STATUSES = ['CORRECT', 'INCORRECT'];
-export const DAMAGE_REASONS = ['FABRIC_DEFECT', 'CUTTING_ERROR', 'SHADE_VARIATION', 'CONTAMINATION', 'OTHER'];
-
 export const ISSUE_SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR'];
 
 /** Incentive slabs per PRD 5.3 (configurable; defaults shown in mock). */

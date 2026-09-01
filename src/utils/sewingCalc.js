@@ -4,7 +4,7 @@
  * only so the grid updates as the planner types, before anything is posted.
  * Keep the two in step.
  */
-import { HOURS } from './sewingConstants';
+import { HOURS, TOPSE_HOUR_NUMBERS, topseHourLabel } from './sewingConstants';
 
 /** Garment SAM: the sum of the operations, never a figure typed beside them. */
 export const totalSamOf = (operations) => Math.round(
@@ -51,6 +51,51 @@ export const completedOf = (rows, lastOperationId) => (lastOperationId == null ?
 export const workedHoursOf = (rows) => HOURS.filter(
   (h) => (rows || []).some((r) => r[h] != null),
 ).length;
+
+/**
+ * End-line figures, mirroring SewTopseCalculator on the server: DHU counts
+ * faults against pieces inspected, pass rate counts pieces that did not go
+ * back, and the same fault logged in three hours is one Pareto bar, not three.
+ */
+export const topseTotals = (defects, totalInspected, greenMax, yellowMax) => {
+  const inspected = Number(totalInspected) || 0;
+  const totalDefects = defects.reduce((s, d) => s + (d.count || 0), 0);
+  const totalRework = defects.reduce((s, d) => s + (d.rework || 0), 0);
+  const rate = (part) => (inspected > 0 ? Math.round((part / inspected) * 10000) / 100 : 0);
+  const dhuPct = rate(totalDefects);
+
+  const byType = new Map();
+  defects.forEach((d) => {
+    if (!d.defectTypeId || !d.count) return;
+    const row = byType.get(d.defectTypeId)
+      || { defectTypeId: d.defectTypeId, category: d.category, defectType: d.defectType, count: 0 };
+    row.count += d.count;
+    byType.set(d.defectTypeId, row);
+  });
+  const pareto = [...byType.values()]
+    .sort((a, b) => b.count - a.count || String(a.defectType).localeCompare(String(b.defectType)))
+    .slice(0, 5)
+    .map((row) => ({ ...row, sharePct: totalDefects ? Math.round((row.count / totalDefects) * 100) : 0 }));
+
+  const counts = TOPSE_HOUR_NUMBERS.map(
+    (hour) => defects.filter((d) => d.hour === hour).reduce((s, d) => s + (d.count || 0), 0),
+  );
+  const peak = Math.max(0, ...counts);
+  const byHour = TOPSE_HOUR_NUMBERS.map((hour, i) => ({
+    hour, label: topseHourLabel(hour), count: counts[i], peak: peak > 0 && counts[i] === peak,
+  }));
+
+  return {
+    totalDefects,
+    totalRework,
+    dhuPct,
+    passRatePct: rate(Math.max(0, inspected - totalRework)),
+    trafficLight: dhuPct <= greenMax ? 'GREEN' : dhuPct <= yellowMax ? 'YELLOW' : 'RED',
+    pareto,
+    paretoMax: pareto[0]?.count || 1,
+    byHour,
+  };
+};
 
 /**
  * Whether one measurement point is inside its tolerance. A point exactly on the

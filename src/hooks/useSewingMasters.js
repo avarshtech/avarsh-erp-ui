@@ -74,10 +74,15 @@ const useSewingMasters = () => {
     [masters.operations],
   );
 
-  /** Defect categories, and the types under one — the two end-line dropdowns. */
+  /**
+   * Defect categories, and the types under one — the two end-line dropdowns.
+   * The rows come back whole: an end-line defect is stored by id, so the caller
+   * needs more than a label.
+   */
   const defectCategories = useMemo(() => Object.keys(masters.defectTypes), [masters.defectTypes]);
-  const defectTypesOf = useCallback((category) => (masters.defectTypes[category] || [])
-    .map((d) => ({ value: d.name, label: d.name })), [masters.defectTypes]);
+  const defectTypesOf = useCallback(
+    (category) => masters.defectTypes[category] || [], [masters.defectTypes],
+  );
 
   return {
     lines: masters.lines,

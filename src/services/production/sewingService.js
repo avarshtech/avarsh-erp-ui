@@ -50,14 +50,15 @@ export const getMeasurementChart = (...a) => api.getMeasurementChart(...a);
 export const parseMeasurementChart = (...a) => api.parseMeasurementChart(...a);
 export const saveMeasurementChart = (...a) => api.saveMeasurementChart(...a);
 
+export const listTopse = (...a) => api.listTopse(...a);
+export const getTopse = (...a) => api.getTopse(...a);
+export const saveTopse = (...a) => api.saveTopse(...a);
+
+export const listReplacements = (...a) => api.listReplacements(...a);
+export const saveReplacement = (...a) => api.saveReplacement(...a);
+export const setReplacementPartStatus = (...a) => api.setReplacementPartStatus(...a);
+
 /* ── Still mock-backed ───────────────────────────────────────────────────── */
-
-export const listTopse = (...a) => mockApi.listTopse(...a);
-export const getTopse = (...a) => mockApi.getTopse(...a);
-export const saveTopse = (...a) => mockApi.saveTopse(...a);
-
-export const listReplacements = (...a) => mockApi.listReplacements(...a);
-export const saveReplacement = (...a) => mockApi.saveReplacement(...a);
 
 export const getIncentives = (...a) => mockApi.getIncentives(...a);
 export const getFloorDashboard = (...a) => mockApi.getFloorDashboard(...a);

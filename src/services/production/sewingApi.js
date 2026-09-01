@@ -170,6 +170,43 @@ export const saveMeasurement = async (payload) => {
   return data;
 };
 
+/* ── 4.7 End-line check (TOPSE) ──────────────────────────────────────────── */
+
+export const listTopse = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/topse`);
+  return data;
+};
+
+export const getTopse = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/topse/${id}`);
+  return data;
+};
+
+export const saveTopse = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/topse`, payload);
+  return data;
+};
+
+/* ── 4.8 Parts replacement ───────────────────────────────────────────────── */
+
+export const listReplacements = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/replacements`);
+  return data;
+};
+
+export const saveReplacement = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/replacements`, payload);
+  return data;
+};
+
+/** Cutting marking one rejected part cut, or delivered back to the line. */
+export const setReplacementPartStatus = async (id, partId, status) => {
+  const { data } = await axiosInstance.put(
+    `${BASE}/replacements/${id}/parts/${partId}/status`, null, { params: { status } },
+  );
+  return data;
+};
+
 /* ── Measurement chart master ────────────────────────────────────────────── */
 
 const SPECS = '/measurement-specs';
