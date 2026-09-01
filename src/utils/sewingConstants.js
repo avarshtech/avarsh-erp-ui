@@ -47,8 +47,6 @@ export const LINES_BY_UNIT = {
 
 export const MACHINE_TYPES = ['SNLS', 'DNLS', 'Overlock', 'Flatlock', 'Bartack', 'Kansai', 'Iron'];
 
-export const SHIFTS = ['DAY', 'NIGHT', 'OVERTIME'];
-
 export const HOURS = ['hr1', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'hr7', 'hr8'];
 
 /** Traffic light bands per PRD 4.3.4 (line efficiency %). */

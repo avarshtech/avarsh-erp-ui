@@ -96,6 +96,39 @@ export const saveCutReceipt = async (payload) => {
   return data;
 };
 
+/* ── 4.3 Hourly production ───────────────────────────────────────────────── */
+
+export const listHourly = async () => {
+  const { data } = await axiosInstance.get(`${BASE}/hourly`);
+  return data;
+};
+
+/**
+ * The sheet for a plan on a day and shift. When none is saved yet the server
+ * returns a blank one carrying the previous day's operators forward, so the
+ * response has no id until it is saved.
+ */
+export const getHourlySheet = async ({ planId, date, shiftId }) => {
+  const { data } = await axiosInstance.get(`${BASE}/hourly/sheet`, { params: { planId, date, shiftId } });
+  return data;
+};
+
+export const saveHourlySheet = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/hourly`, payload);
+  return data;
+};
+
+/** Tailors already counted for the same hour elsewhere, without saving. */
+export const findHourConflicts = async (payload) => {
+  const { data } = await axiosInstance.post(`${BASE}/hourly/conflicts`, payload);
+  return data;
+};
+
+export const setHourlyStatus = async (id, status) => {
+  const { data } = await axiosInstance.put(`${BASE}/hourly/${id}/status`, null, { params: { status } });
+  return data;
+};
+
 /* ── 4.4 Garment issue to finishing ──────────────────────────────────────── */
 
 export const listGarmentIssues = async () => {

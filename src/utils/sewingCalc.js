@@ -4,6 +4,7 @@
  * only so the grid updates as the planner types, before anything is posted.
  * Keep the two in step.
  */
+import { HOURS } from './sewingConstants';
 
 /** Garment SAM: the sum of the operations, never a figure typed beside them. */
 export const totalSamOf = (operations) => Math.round(
@@ -32,3 +33,27 @@ export const operationRateTotal = (operations) => Math.round(
 export const cmRatePerPc = (operations, otherChargesPct) => Math.round(
   operationRateTotal(operations) * (1 + (Number(otherChargesPct) || 0) / 100) * 100,
 ) / 100;
+
+/** Hourly sheet: what one tailor made across the eight hours plus overtime. */
+export const rowTotal = (row) => HOURS.reduce((sum, h) => sum + (row[h] || 0), 0) + (row.ot || 0);
+
+/**
+ * Finished garments on a sheet: the output of the plan's last operation, summed
+ * over every operator working it. Adding up all the operations would count the
+ * same garment once per station it passed through.
+ */
+export const completedOf = (rows, lastOperationId) => (lastOperationId == null ? 0
+  : (rows || [])
+    .filter((r) => r.operationId === lastOperationId)
+    .reduce((sum, r) => sum + rowTotal(r), 0));
+
+/** Hours where somebody counted something — a blank hour is not a worked hour. */
+export const workedHoursOf = (rows) => HOURS.filter(
+  (h) => (rows || []).some((r) => r[h] != null),
+).length;
+
+/** Line efficiency: standard minutes produced against minutes actually paid for. */
+export const efficiencyPct = (completed, sam, presentOperators, workedHours) => (
+  sam > 0 && presentOperators > 0 && workedHours > 0
+    ? Math.round(((completed * sam) / (presentOperators * workedHours * 60)) * 10000) / 100
+    : 0);
