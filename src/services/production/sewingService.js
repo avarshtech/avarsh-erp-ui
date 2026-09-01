@@ -1,16 +1,22 @@
 /**
- * Sewing module API surface. Mock-only during the design phase; signatures
- * mirror the future real endpoints (/api/v1/sewing/… per PRD 8.2) so
- * integration swaps the delegate without touching screens.
+ * Sewing module API surface. Screens import only from here, so a feature moves
+ * off the mock by re-pointing its exports at sewingApi — no screen changes.
+ *
+ * Migration state: operators and the SAM library run on the real backend;
+ * everything below is still mock-backed until its stage lands.
  */
 import * as mockApi from './sewingMockApi';
+import * as api from './sewingApi';
 
-export const USE_MOCK_SEWING_DATA = true;
+/* ── Live on the backend ─────────────────────────────────────────────────── */
+export const getOperators = (...a) => api.getOperators(...a);
+export const saveOperator = (...a) => api.saveOperator(...a);
+export const getSamValues = (...a) => api.getSamValues(...a);
+export const getStyleSam = (...a) => api.getStyleSam(...a);
+export const saveStyleSam = (...a) => api.saveStyleSam(...a);
 
+/* ── Still mock-backed ───────────────────────────────────────────────────── */
 export const getOrders = (...a) => mockApi.getOrders(...a);
-export const getOperators = (...a) => mockApi.getOperators(...a);
-export const saveOperator = (...a) => mockApi.saveOperator(...a);
-export const getSamValues = (...a) => mockApi.getSamValues(...a);
 
 export const listPlans = (...a) => mockApi.listPlans(...a);
 export const getPlan = (...a) => mockApi.getPlan(...a);

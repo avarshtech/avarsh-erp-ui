@@ -58,13 +58,17 @@ export const trafficLight = (eff) => (eff >= EFFICIENCY_BANDS.green ? 'green' : 
 
 export const TRAFFIC_COLORS = { green: 'var(--success-color)', yellow: 'var(--warning-color)', red: 'var(--error-color)' };
 
-/** Skill grades per PRD 5.1 with heat-map colors. */
-export const SKILL_GRADES = [
-  { grade: 'A', label: 'Expert (>100%)', color: '#237804' },
-  { grade: 'B', label: 'Proficient (80-100%)', color: '#73d13d' },
-  { grade: 'C', label: 'Learning (60-80%)', color: '#faad14' },
-  { grade: 'D', label: 'Trainee (<60%)', color: '#ff4d4f' },
-];
+/**
+ * Heat-map colour per skill grade. The grades themselves and what they mean are
+ * master data (mst_sewing_lookups, SKILL_GRADE); only the colour is presentation
+ * and so stays here.
+ */
+export const SKILL_GRADE_COLORS = {
+  A: '#237804',
+  B: '#73d13d',
+  C: '#faad14',
+  D: '#ff4d4f',
+};
 
 export const OPERATIONS = ['Shoulder join', 'Neck rib attach', 'Collar attach', 'Sleeve attach', 'Side seam', 'Sleeve hem', 'Bottom hem', 'Label attach', 'Bartack'];
 

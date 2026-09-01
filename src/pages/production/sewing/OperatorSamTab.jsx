@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { App, Card, Segmented, Table, Space, Tag } from 'antd';
 import EmptyState from '../../../components/EmptyState';
-import { INCENTIVE_CONFIG } from '../../../utils/sewingConstants';
+import useSewingMasters from '../../../hooks/useSewingMasters';
 import { getOperators, getSamValues, getIncentives } from '../../../services/production/sewingService';
 import SkillMatrixHeatmap from './SkillMatrixHeatmap';
 import SewingStatusTag from './SewingStatusTag';
@@ -14,6 +14,7 @@ const OperatorSamTab = () => {
   const [samValues, setSamValues] = useState([]);
   const [incentives, setIncentives] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { incentiveSlabs, threshold, labelOf } = useSewingMasters();
 
   useEffect(() => {
     (async () => {
@@ -27,8 +28,7 @@ const OperatorSamTab = () => {
 
   const samRows = useMemo(() => samValues.flatMap((s) => s.operations.map((o, i) => ({
     key: `${s.styleNo}-${i}`, styleNo: s.styleNo, source: s.source, approvedBy: s.approvedBy, ...o,
-    totalSam: Math.round(s.operations.reduce((sum, x) => sum + x.sam, 0) * 10) / 10,
-    isFirst: i === 0, span: s.operations.length,
+    totalSam: s.totalSam, isFirst: i === 0, span: s.operations.length,
   }))), [samValues]);
 
   const samColumns = useMemo(() => [
@@ -37,9 +37,9 @@ const OperatorSamTab = () => {
     { title: 'Machine', dataIndex: 'machine', width: 100, align: 'center', render: (v) => <Tag>{v}</Tag> },
     { title: 'SAM (min)', dataIndex: 'sam', width: 90, align: 'right' },
     { title: 'Garment SAM', dataIndex: 'totalSam', width: 110, align: 'right', onCell: (r) => ({ rowSpan: r.isFirst ? r.span : 0 }), render: (v) => <strong>{v}</strong> },
-    { title: 'Source', dataIndex: 'source', width: 130, onCell: (r) => ({ rowSpan: r.isFirst ? r.span : 0 }), render: (v) => <Tag color="blue">{v.replace('_', ' ')}</Tag> },
+    { title: 'Source', dataIndex: 'source', width: 140, onCell: (r) => ({ rowSpan: r.isFirst ? r.span : 0 }), render: (v) => (v ? <Tag color="blue">{labelOf('SAM_SOURCE', v)}</Tag> : '—') },
     { title: 'Approved By', dataIndex: 'approvedBy', width: 150, onCell: (r) => ({ rowSpan: r.isFirst ? r.span : 0 }) },
-  ], []);
+  ], [labelOf]);
 
   const incentiveColumns = useMemo(() => [
     { title: 'Date', dataIndex: 'date', width: 110 },
@@ -62,8 +62,8 @@ const OperatorSamTab = () => {
         <Segmented options={['Skill Matrix', 'SAM Values', 'Incentives']} value={view} onChange={setView} />
         {view === 'Incentives' && (
           <span style={{ color: 'var(--text-secondary)' }}>
-            Slabs: {INCENTIVE_CONFIG.slabs.map((s) => `${s.from}-${s.to === 999 ? '+' : s.to}% → ₹${s.amount}`).join('  ·  ')}
-            &nbsp;| DHU &gt; 5% deducts {INCENTIVE_CONFIG.dhuDeductionPct}%
+            Slabs: {incentiveSlabs.map((s) => `${s.name} → ₹${s.amount}`).join('  ·  ')}
+            &nbsp;| DHU &gt; {threshold('DHU_THRESHOLD_PCT', 5)}% deducts {threshold('INCENTIVE_DHU_DEDUCT_PCT', 20)}%
           </span>
         )}
       </Space>
