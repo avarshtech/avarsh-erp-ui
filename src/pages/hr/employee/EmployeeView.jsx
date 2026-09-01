@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  App, Descriptions, Tag, Table, Tabs, Button, Space, Dropdown, Spin, Card,
+  App, Descriptions, Tag, Table, Tabs, Button, Space, Dropdown, Spin, Card, DatePicker,
 } from 'antd';
 import { EditOutlined, DownOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -57,7 +57,7 @@ const DocumentFileLink = ({ value, fileName }) => {
 };
 
 const EmployeeView = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -89,14 +89,60 @@ const EmployeeView = () => {
 
   useEffect(() => { loadEmployee(); loadSalaryHistory(); }, [loadEmployee, loadSalaryHistory]);
 
-  const handleStatusChange = async (status) => {
+  const applyStatusChange = async (status, dateOfLeaving) => {
     try {
-      await changeEmployeeStatus(id, status);
+      await changeEmployeeStatus(id, status, dateOfLeaving);
       message.success(`Status changed to ${getLabel(EMPLOYEE_STATUS, status)}`);
       loadEmployee();
     } catch {
       // axiosInstance already toasts the server's message; adding another here showed two.
     }
+  };
+
+  /**
+   * Moving off ACTIVE is the moment the last working day is known, and it used
+   * to be recorded nowhere - so the leaver's final payroll could not tell they
+   * had gone, and their unworked days were reported as loss of pay. Asking here
+   * beats expecting someone to remember a field on the edit form.
+   */
+  const handleStatusChange = (status) => {
+    if (status === 'ACTIVE') {
+      modal.confirm({
+        title: 'Set this employee back to Active?',
+        content: 'Any recorded last working day will be cleared.',
+        okText: 'Set Active',
+        onOk: () => applyStatusChange(status),
+      });
+      return;
+    }
+
+    let leaving = dayjs();
+    modal.confirm({
+      title: `Change status to ${getLabel(EMPLOYEE_STATUS, status)}`,
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>
+            Last working day. Payroll uses this to pro-rate the final month and to
+            flag that the employee left partway through it.
+          </p>
+          <DatePicker
+            style={{ width: '100%' }}
+            format="DD-MMM-YYYY"
+            defaultValue={leaving}
+            onChange={(d) => { leaving = d; }}
+          />
+        </div>
+      ),
+      okText: 'Change Status',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        if (!leaving) {
+          message.error('A last working day is required');
+          return Promise.reject(new Error('date required'));
+        }
+        return applyStatusChange(status, leaving.format('YYYY-MM-DD'));
+      },
+    });
   };
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', marginTop: 100 }} />;
