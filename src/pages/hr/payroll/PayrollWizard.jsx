@@ -6,6 +6,7 @@ import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRec
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import SalaryRecordDrawer from './SalaryRecordDrawer';
 
 const MONTH_OPTIONS = [
   { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -22,6 +23,8 @@ const PayrollWizard = () => {
   const navigate = useNavigate();
 
   const [current, setCurrent] = useState(0);
+  // Clicking a row opens the derivation behind its figures.
+  const [selectedRecord, setSelectedRecord] = useState(null);
   const [validation, setValidation] = useState(null);
   const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -249,6 +252,10 @@ const PayrollWizard = () => {
         scroll={{ x: 1000 }}
         pagination={false}
         size="small"
+        onRow={(r) => ({
+          onClick: () => setSelectedRecord(r),
+          style: { cursor: 'pointer' },
+        })}
         summary={() => (
           <Table.Summary fixed>
             <Table.Summary.Row>
@@ -285,6 +292,13 @@ const PayrollWizard = () => {
       <Spin spinning={loading && current > 0}>
         {stepContent[current]}
       </Spin>
+
+      <SalaryRecordDrawer
+        record={selectedRecord}
+        open={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+      />
+
       {current > 0 && current < 3 && (
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between' }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => setCurrent((c) => c - 1)}>

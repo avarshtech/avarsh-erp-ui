@@ -11,6 +11,7 @@ import { hasPermission } from '../../../utils/permissions';
 import dayjs from 'dayjs';
 import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
+import SalaryRecordDrawer from './SalaryRecordDrawer';
 
 const statusMap = Object.fromEntries(PAYROLL_STATUS.map((s) => [s.value, s]));
 
@@ -27,6 +28,8 @@ const PayrollRunView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  // Clicking a row opens the derivation behind its figures.
+  const [selectedRecord, setSelectedRecord] = useState(null);
   const [run, setRun] = useState(null);
   const [records, setRecords] = useState([]);
   const [payOpen, setPayOpen] = useState(false);
@@ -85,7 +88,8 @@ const PayrollRunView = () => {
             type="link"
             size="small"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/hr/payroll/slip/${r.id}`)}
+            // Rows open the breakdown drawer, so the payslip link must not do both.
+            onClick={(e) => { e.stopPropagation(); navigate(`/hr/payroll/slip/${r.id}`); }}
           />
         ),
       },
@@ -289,6 +293,10 @@ const PayrollRunView = () => {
         scroll={{ x: 1100 }}
         pagination={false}
         size="small"
+        onRow={(r) => ({
+          onClick: () => setSelectedRecord(r),
+          style: { cursor: 'pointer' },
+        })}
         summary={() => (
           <Table.Summary fixed>
             <Table.Summary.Row>
@@ -327,6 +335,12 @@ const PayrollRunView = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <SalaryRecordDrawer
+        record={selectedRecord}
+        open={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+      />
     </>
   );
 };
