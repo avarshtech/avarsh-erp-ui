@@ -59,3 +59,15 @@ export const updateFnf = async (id, data) => {
   const response = await axiosInstance.put(`${BASE_URL}/${id}`, data);
   return response.data;
 };
+
+/**
+ * Abandon a settlement calculated in error.
+ * POST /api/v1/hr/fnf/{id}/cancel
+ *
+ * Only before approval. Settling marks the employee inactive and records their
+ * leaving date, so undoing that is a reversal, not a cancellation.
+ */
+export const cancelFnf = async (id, reason) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${id}/cancel`, { reason });
+  return response.data;
+};
