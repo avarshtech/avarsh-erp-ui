@@ -172,6 +172,44 @@ export const MODULES = {
     path: '/production/finishing',
     group: 'transactions',
   },
+  EXPORT_PACKING: {
+    id: 'export-packing',
+    name: 'Carton Packing Entry',
+    path: '/export-docs/packing/list',
+    group: 'transactions',
+  },
+  EXPORT_SHIPMENTS: {
+    id: 'export-shipments',
+    name: 'Shipments',
+    path: '/export-docs/shipments/list',
+    group: 'transactions',
+  },
+  EXPORT_PACKING_LIST: {
+    id: 'export-packing-list',
+    name: 'Packing List',
+    path: '/export-docs/packing-lists/list',
+    group: 'transactions',
+  },
+  EXPORT_INVOICE: {
+    id: 'export-invoice',
+    name: 'Export Invoice',
+    path: '/export-docs/invoices/list',
+    group: 'transactions',
+  },
+  EXPORT_STICKERS: {
+    id: 'export-stickers',
+    name: 'Carton Stickers',
+    path: '/export-docs/stickers',
+    group: 'transactions',
+    // Stickers render an existing packing list — without PL access there is nothing to draw.
+    linkedTo: 'export-packing-list',
+  },
+  EXPORT_TEMPLATES: {
+    id: 'export-templates',
+    name: 'Buyer Document Templates',
+    path: '/export-docs/templates/list',
+    group: 'transactions',
+  },
   INVENTORY: {
     id: 'inventory',
     name: 'Inventory Management',
@@ -423,6 +461,28 @@ export const GRN_REVERSAL_OPERATIONS = ['approve'];
 // Costing Approval operations
 export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 
+// Export documents (Packing List / Export Invoice) carry an approval lifecycle:
+// maker (add/update), approver (approve), and the two post-approval powers the
+// PRD separates — `revise` opens a new draft version of an approved document,
+// `override` forces a non-default template version onto one document. Both are
+// logged; neither is ordinary editing. Acknowledging a validation WARNing maps to
+// `update`, not `override`: every role that may acknowledge already holds an edit
+// right, whereas template override is approver-only.
+// No `submit` op — repo-wide, Draft→Submitted is gated on `update`
+// (see canSubmitOrder below, and Bill Passing).
+export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'approve', 'revise', 'override'];
+
+// Stickers have no approval of their own — they inherit the packing list's state,
+// so there is nothing to add/update/delete. What varies is who may put ink on
+// paper: `print` from an approved PL, `reprint` a carton/range (an audited
+// exception), `override` to print from a still-Draft PL.
+export const EXPORT_STICKER_OPERATIONS = ['view', 'print', 'reprint', 'override'];
+
+// `publish` moves a Draft template to Active and retires the previous Active — the
+// only act that can break the "exactly one Active per buyer/sub-client/doc-type"
+// invariant, so it is separated from ordinary draft editing.
+export const EXPORT_TEMPLATE_OPERATIONS = ['view', 'add', 'update', 'delete', 'publish'];
+
 // Dashboard only has view
 export const DASHBOARD_OPERATIONS = ['view'];
 
@@ -460,6 +520,12 @@ export const PERMISSION_GROUPS = [
       { id: 'production-cutting', name: 'Production — Cutting', operations: STANDARD_OPERATIONS, path: '/production/cutting' },
       { id: 'production-sewing', name: 'Production — Sewing', operations: STANDARD_OPERATIONS, path: '/production/sewing' },
       { id: 'production-finishing', name: 'Production — Finishing', operations: STANDARD_OPERATIONS, path: '/production/finishing' },
+      { id: 'export-packing', name: 'Carton Packing Entry', operations: STANDARD_OPERATIONS, path: '/export-docs/packing/list' },
+      { id: 'export-shipments', name: 'Shipments', operations: STANDARD_OPERATIONS, path: '/export-docs/shipments/list' },
+      { id: 'export-packing-list', name: 'Packing List', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/packing-lists/list' },
+      { id: 'export-invoice', name: 'Export Invoice', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/invoices/list' },
+      { id: 'export-stickers', name: 'Carton Stickers', operations: EXPORT_STICKER_OPERATIONS, linkedTo: 'export-packing-list', path: '/export-docs/stickers' },
+      { id: 'export-templates', name: 'Buyer Document Templates', operations: EXPORT_TEMPLATE_OPERATIONS, path: '/export-docs/templates/list' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
       { id: 'grn-approval', name: 'GRN Refer-Back Approval', operations: GRN_APPROVAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
       { id: 'grn-reversal', name: 'GRN Reversal Approval', operations: GRN_REVERSAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
@@ -551,6 +617,12 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
   if (moduleId === 'inventory-bill-passing') return BILL_PASSING_OPERATIONS;
+  if (moduleId === 'export-packing')      return STANDARD_OPERATIONS;
+  if (moduleId === 'export-shipments')    return STANDARD_OPERATIONS;
+  if (moduleId === 'export-packing-list') return EXPORT_DOC_OPERATIONS;
+  if (moduleId === 'export-invoice')      return EXPORT_DOC_OPERATIONS;
+  if (moduleId === 'export-stickers')     return EXPORT_STICKER_OPERATIONS;
+  if (moduleId === 'export-templates')    return EXPORT_TEMPLATE_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
@@ -761,6 +833,12 @@ export const getFirstAccessibleRoute = () => {
     { route: '/production/cutting', moduleId: 'production-cutting' },
     { route: '/production/sewing', moduleId: 'production-sewing' },
     { route: '/production/finishing', moduleId: 'production-finishing' },
+    { route: '/export-docs/packing/list', moduleId: 'export-packing' },
+    { route: '/export-docs/shipments/list', moduleId: 'export-shipments' },
+    { route: '/export-docs/packing-lists/list', moduleId: 'export-packing-list' },
+    { route: '/export-docs/invoices/list', moduleId: 'export-invoice' },
+    { route: '/export-docs/stickers', moduleId: 'export-stickers' },
+    { route: '/export-docs/templates/list', moduleId: 'export-templates' },
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
     { route: '/reports/list', moduleId: 'reports' },
@@ -855,6 +933,15 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized['ai-assistant'] = {
       access: false,
       operations: { view: false },
+    };
+  }
+
+  // Enforce export-stickers → export-packing-list link. Stickers are a projection
+  // of an approved packing list; without PL access there is nothing to render.
+  if (!normalized['export-packing-list']?.access) {
+    normalized['export-stickers'] = {
+      access: false,
+      operations: EXPORT_STICKER_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
     };
   }
 

@@ -1,4 +1,5 @@
 import { amountInWords } from './amountInWords';
+import { esc, cell, openPrintWindow } from './printDoc';
 import { SAMPLE_DECLARATION_BAND, INVOICE_TYPES } from './sampleRequestConstants';
 
 /**
@@ -13,16 +14,6 @@ import { SAMPLE_DECLARATION_BAND, INVOICE_TYPES } from './sampleRequestConstants
  * Same print mechanism as the other document generators in this folder
  * (new window + window.print()).
  */
-const esc = (v) => String(v ?? '')
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  .replace(/\n/g, '<br/>');
-
-const cell = (label, value, opts = {}) => `
-  <td colspan="${opts.colspan || 1}" style="border:1px solid #333;padding:4px 6px;vertical-align:top;${opts.style || ''}">
-    <div style="font-size:8px;color:#555;font-style:italic;">${esc(label)}</div>
-    <div style="font-size:10px;font-weight:${opts.bold ? 700 : 400};white-space:pre-wrap;">${esc(value) || '&mdash;'}</div>
-  </td>`;
-
 export const buildSampleInvoiceHtml = (inv, profile) => {
   const isSample = inv.invoiceType === INVOICE_TYPES.SAMPLE;
   const printTitle = isSample ? 'INVOICE' : 'COMMERCIAL INVOICE — NOT FOR SALE';
@@ -140,14 +131,7 @@ export const buildSampleInvoiceHtml = (inv, profile) => {
 };
 
 export const printSampleInvoice = (inv, profile) => {
-  // Same print mechanism as trimsQCPdfGenerator/returnToSupplierPdfGenerator:
-  // a fresh same-origin window; every interpolated value is HTML-escaped via
-  // esc() above, so no user-controlled markup can execute.
-  const html = buildSampleInvoiceHtml(inv, profile);
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return false;
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.onload = () => setTimeout(() => printWindow.print(), 400);
-  return true;
+  // esc()/cell()/openPrintWindow() now come from printDoc.js, shared with the
+  // export documents. Same escaping, same same-origin print window as before.
+  return openPrintWindow(buildSampleInvoiceHtml(inv, profile));
 };

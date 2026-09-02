@@ -21,6 +21,12 @@ import { BOM_STATUS } from './bomConstants';
 import { GRN_STATUS, QC_STATUS, STOCK_STATUS } from './inventoryConstants';
 import { PROD_PO_STATUS } from './productionConstants';
 import { SR_STATUS, SAMPLE_INVOICE_STATUS } from './sampleRequestConstants';
+import {
+  PACKING_ENTRY_STATUS,
+  PL_STATUS,
+  INVOICE_STATUS,
+  TEMPLATE_STATUS,
+} from './expDocConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -136,6 +142,36 @@ export const SAMPLE_INVOICE_STATUS_CONFIG = {
   [SAMPLE_INVOICE_STATUS.CANCELLED]:  { color: 'volcano', icon: StopOutlined },
 };
 
+// ==================== EXPORT DOCUMENTATION STATUS CONFIG ====================
+export const PACKING_ENTRY_STATUS_CONFIG = {
+  [PACKING_ENTRY_STATUS.OPEN]:      { color: 'processing', icon: InboxOutlined },
+  [PACKING_ENTRY_STATUS.COMPLETED]: { color: 'green',      icon: CheckCircleOutlined },
+};
+
+export const PL_STATUS_CONFIG = {
+  [PL_STATUS.DRAFT]:      { color: 'default',    icon: FileTextOutlined },
+  [PL_STATUS.SUBMITTED]:  { color: 'processing', icon: SendOutlined },
+  [PL_STATUS.APPROVED]:   { color: 'green',      icon: CheckCircleOutlined },
+  [PL_STATUS.EXPORTED]:   { color: 'cyan',       icon: SafetyCertificateOutlined },
+  [PL_STATUS.CANCELLED]:  { color: 'volcano',    icon: StopOutlined },
+  [PL_STATUS.SUPERSEDED]: { color: 'default',    icon: SwapOutlined },
+};
+
+export const EXPORT_INVOICE_STATUS_CONFIG = {
+  [INVOICE_STATUS.DRAFT]:      { color: 'default',    icon: FileTextOutlined },
+  [INVOICE_STATUS.SUBMITTED]:  { color: 'processing', icon: SendOutlined },
+  [INVOICE_STATUS.APPROVED]:   { color: 'green',      icon: CheckCircleOutlined },
+  [INVOICE_STATUS.EXPORTED]:   { color: 'cyan',       icon: SafetyCertificateOutlined },
+  [INVOICE_STATUS.CANCELLED]:  { color: 'volcano',    icon: StopOutlined },
+  [INVOICE_STATUS.SUPERSEDED]: { color: 'default',    icon: SwapOutlined },
+};
+
+export const TEMPLATE_STATUS_CONFIG = {
+  [TEMPLATE_STATUS.DRAFT]:   { color: 'default', icon: FileTextOutlined },
+  [TEMPLATE_STATUS.ACTIVE]:  { color: 'green',   icon: CheckCircleOutlined },
+  [TEMPLATE_STATUS.RETIRED]: { color: 'default', icon: StopOutlined },
+};
+
 // ==================== STATUS FLOW (for StatusSteps) ====================
 export const ORDER_STATUS_FLOW = ['DRAFT', 'CONFIRMED', 'IN_PRODUCTION', 'COMPLETED'];
 export const PO_STATUS_FLOW = ['Draft', 'Pending_Approval', 'Sent_To_Supplier', 'Partially_Received', 'Completed'];
@@ -147,6 +183,10 @@ export const PRODUCTION_PO_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED
 // SR flow base — the terminal step (APPROVED / REJECTED / REVISION_REQUIRED) is
 // appended dynamically in SampleRequestView based on the record's outcome.
 export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISPATCHED', 'FEEDBACK_RECEIVED'];
+// Export documents share one happy path. CANCELLED and SUPERSEDED are outcomes, not
+// steps, so they stay off the flow and show as a status tag instead.
+export const PL_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'APPROVED', 'EXPORTED'];
+export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'APPROVED', 'EXPORTED'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

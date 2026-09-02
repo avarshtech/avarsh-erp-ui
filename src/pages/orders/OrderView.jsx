@@ -39,6 +39,7 @@ import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import SampleOrderTag from '../../components/SampleOrderTag';
 import OrderSrSummaryCard from '../sr/OrderSrSummaryCard';
+import OrderPackingSummaryCard from '../expdoc/OrderPackingSummaryCard';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';
@@ -820,6 +821,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
         {/* ── Sample Requests raised against this order ── */}
         <OrderSrSummaryCard orderNo={orderNo} />
+        <OrderPackingSummaryCard orderNo={orderNo} />
 
         {/* ── Order Lines ── */}
         <Title level={5} style={{ marginBottom: 12 }}>

@@ -38,6 +38,7 @@ import {
   ScissorOutlined,
   ExperimentOutlined,
   FieldTimeOutlined,
+  ContainerOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -398,7 +399,32 @@ const MainLayoutInner = () => {
         { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
         { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
-        // Packing arrives in the next design session.
+        // Carton packing lives under Export Documentation for now — see the note there.
+      ],
+    },
+    {
+      key: "/export-docs",
+      icon: <ContainerOutlined />,
+      label: "Export Documentation",
+      // Each child is its own RBAC module; the group shows if ANY is accessible.
+      // Carton Packing sits here rather than under Production because it is the only
+      // producer of the PRD §7.3 dataset these documents consume; the Finishing
+      // workspace reserves the eventual home for it.
+      moduleId: [
+        "export-packing", "export-shipments", "export-packing-list",
+        "export-stickers", "export-invoice", "export-templates",
+      ],
+      children: [
+        { key: "/export-docs/packing/list", label: "Carton Packing", moduleId: "export-packing" },
+        { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
+        { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
+        { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
+        { key: "/export-docs/invoices/list", label: "Export Invoices", moduleId: "export-invoice" },
+        { key: "/export-docs/templates/list", label: "Buyer Templates", moduleId: "export-templates" },
+        // Reports and the audit trail read packing lists, so they ride that key —
+        // a viewer of the documents may read what was done to them.
+        { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
+        { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
       ],
     },
     {
@@ -566,6 +592,16 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];
+    // Order matters: '/export-docs/packing-lists/...' also startsWith
+    // '/export-docs/packing', so the longer prefix must be tested first.
+    if (path.startsWith('/export-docs/packing-lists')) return ['/export-docs/packing-lists/list'];
+    if (path.startsWith('/export-docs/packing')) return ['/export-docs/packing/list'];
+    if (path.startsWith('/export-docs/shipments')) return ['/export-docs/shipments/list'];
+    if (path.startsWith('/export-docs/stickers')) return ['/export-docs/stickers'];
+    if (path.startsWith('/export-docs/invoices')) return ['/export-docs/invoices/list'];
+    if (path.startsWith('/export-docs/templates')) return ['/export-docs/templates/list'];
+    if (path.startsWith('/export-docs/reports')) return ['/export-docs/reports'];
+    if (path.startsWith('/export-docs/audit')) return ['/export-docs/audit'];
     if (path.startsWith('/production/cutting')) return ['/production/cutting'];
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
@@ -590,6 +626,7 @@ const MainLayoutInner = () => {
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
     if (path.startsWith("/tna")) return ["/tna"];
     if (path.startsWith("/production")) return ["/production"];
+    if (path.startsWith("/export-docs")) return ["/export-docs"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];

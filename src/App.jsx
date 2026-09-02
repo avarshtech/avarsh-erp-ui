@@ -122,6 +122,21 @@ const SampleInvoiceForm = lazy(() => import('./pages/sr/invoice/SampleInvoiceFor
 const DispatchList = lazy(() => import('./pages/sr/dispatch/DispatchList'));
 const DispatchForm = lazy(() => import('./pages/sr/dispatch/DispatchForm'));
 const CustomerCommentsPage = lazy(() => import('./pages/sr/comments/CustomerCommentsPage'));
+// Export Documentation (lazy-loaded — UI mock phase)
+const ShipmentList = lazy(() => import('./pages/expdoc/shipments/ShipmentList'));
+const ShipmentForm = lazy(() => import('./pages/expdoc/shipments/ShipmentForm'));
+const CartonPackingList = lazy(() => import('./pages/expdoc/packing/CartonPackingList'));
+const CartonPackingForm = lazy(() => import('./pages/expdoc/packing/CartonPackingForm'));
+const PackingListList = lazy(() => import('./pages/expdoc/packing-list/PackingListList'));
+const PackingListWorkspace = lazy(() => import('./pages/expdoc/packing-list/PackingListWorkspace'));
+const StickerConsole = lazy(() => import('./pages/expdoc/sticker/StickerConsole'));
+const StickerWorkspace = lazy(() => import('./pages/expdoc/sticker/StickerWorkspace'));
+const ExportInvoiceList = lazy(() => import('./pages/expdoc/invoice/ExportInvoiceList'));
+const ExportInvoiceForm = lazy(() => import('./pages/expdoc/invoice/ExportInvoiceForm'));
+const BuyerTemplateList = lazy(() => import('./pages/expdoc/template/BuyerTemplateList'));
+const BuyerTemplateBuilder = lazy(() => import('./pages/expdoc/template/BuyerTemplateBuilder'));
+const ExportDocReports = lazy(() => import('./pages/expdoc/reports/ExportDocReports'));
+const ExportDocAudit = lazy(() => import('./pages/expdoc/reports/AuditTrailViewer'));
 import './index.css';
 import './styles/overrides.css';
 
@@ -283,6 +298,27 @@ const ThemedApp = () => {
             <Route path="production/finishing" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><FinishingWorkspace /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production-finishing"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
+
+            {/* Export Documentation (UI mock phase) — packing entry -> packing list -> stickers / invoice.
+                One RBAC module per screen. Following the sample-requests precedent, edit/:id routes carry
+                no `operation`: a viewer must be able to open them, and write actions are gated per button. */}
+            <Route path="export-docs/shipments/list" element={<PermissionRoute module="export-shipments"><Suspense fallback={<PageSkeleton />}><ShipmentList /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/shipments/new" element={<PermissionRoute module="export-shipments" operation="add"><Suspense fallback={<PageSkeleton />}><ShipmentForm /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/shipments/edit/:id" element={<PermissionRoute module="export-shipments"><Suspense fallback={<PageSkeleton />}><ShipmentForm /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/packing/list" element={<PermissionRoute module="export-packing"><Suspense fallback={<PageSkeleton />}><CartonPackingList /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/packing/new" element={<PermissionRoute module="export-packing" operation="add"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/packing/edit/:id" element={<PermissionRoute module="export-packing"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/packing-lists/list" element={<PermissionRoute module="export-packing-list"><Suspense fallback={<PageSkeleton />}><PackingListList /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/packing-lists/edit/:id" element={<PermissionRoute module="export-packing-list"><Suspense fallback={<PageSkeleton />}><PackingListWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/stickers" element={<PermissionRoute module="export-stickers"><Suspense fallback={<PageSkeleton />}><StickerConsole /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/stickers/:plId" element={<PermissionRoute module="export-stickers"><Suspense fallback={<PageSkeleton />}><StickerWorkspace /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/invoices/list" element={<PermissionRoute module="export-invoice"><Suspense fallback={<PageSkeleton />}><ExportInvoiceList /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/invoices/edit/:id" element={<PermissionRoute module="export-invoice"><Suspense fallback={<PageSkeleton />}><ExportInvoiceForm /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/templates/list" element={<PermissionRoute module="export-templates"><Suspense fallback={<PageSkeleton />}><BuyerTemplateList /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/templates/edit/:id" element={<PermissionRoute module="export-templates"><Suspense fallback={<PageSkeleton />}><BuyerTemplateBuilder /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/reports" element={<PermissionRoute module="export-packing-list"><Suspense fallback={<PageSkeleton />}><ExportDocReports /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/audit" element={<PermissionRoute module="export-packing-list"><Suspense fallback={<PageSkeleton />}><ExportDocAudit /></Suspense></PermissionRoute>} />
+
             {/* Inventory */}
             <Route path="inventory/dashboard" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />

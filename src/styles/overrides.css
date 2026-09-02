@@ -1928,3 +1928,34 @@ textarea.ant-input:active {
   background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
 }
 
+
+/* ============================================================
+   EXPORT DOCUMENTATION
+   ============================================================ */
+
+/* Carton rows carrying a structural error (V-02 / V-06). Tinted rather than
+   outlined so the row still reads as editable, and built from the error token
+   via color-mix so it tracks the theme instead of hard-coding a pink. */
+.expdoc-row-error > td {
+  background: color-mix(in srgb, var(--error-color) 8%, transparent) !important;
+}
+.expdoc-row-error:hover > td {
+  background: color-mix(in srgb, var(--error-color) 14%, transparent) !important;
+}
+
+/* Order-vs-packed rows outside the buyer tolerance. Same construction as the
+   carton error row: a token tint, so it tracks the theme. */
+.expdoc-row-warn > td {
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent) !important;
+}
+.expdoc-row-warn:hover > td {
+  background: color-mix(in srgb, var(--warning-color) 14%, transparent) !important;
+}
+
+/* A row offered for context but not for selection — an ineligible packing list in
+   the invoice picker. Muted rather than hidden, because the reason it cannot be
+   picked is more useful than its absence. Opacity only, so the text keeps its own
+   contrast in both themes. */
+.expdoc-row-muted > td {
+  opacity: 0.55;
+}

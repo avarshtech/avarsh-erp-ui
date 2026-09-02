@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Row, Col, Alert, Button, Tabs } from 'antd';
+import { Row, Col, Alert, Button, Card, Tabs } from 'antd';
 import {
   ShoppingCartOutlined,
   FileTextOutlined,
@@ -7,6 +7,7 @@ import {
   InboxOutlined,
   ExperimentOutlined,
   WarningOutlined,
+  ContainerOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Navigate } from 'react-router-dom';
@@ -20,6 +21,9 @@ import QuickStatsCard from '../components/dashboard/QuickStatsCard';
 import SampleDeadlinesCard from '../components/dashboard/SampleDeadlinesCard';
 import SampleStatusBreakdownCard from '../components/dashboard/SampleStatusBreakdownCard';
 import useSampleDashboard from '../components/dashboard/useSampleDashboard';
+import useExpDocDashboard from '../components/dashboard/useExpDocDashboard';
+import ShipmentReadinessCard from '../components/dashboard/ShipmentReadinessCard';
+import ExportDocsPendingCard from '../components/dashboard/ExportDocsPendingCard';
 import SampleKpiRow from '../components/sample/SampleKpiRow';
 import SampleDeadlineAlert from '../components/sample/SampleDeadlineAlert';
 import { getDashboardSummary } from '../services/dashboard/dashboardService';
@@ -38,6 +42,8 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   // Sample Request widgets — render nothing for users without the module
   const sample = useSampleDashboard();
+  // Export Documentation widgets — same contract: nothing renders without the module.
+  const expdoc = useExpDocDashboard();
 
   const sampleQuickStats = useMemo(() => (sample.enabled && sample.data ? [
     {
@@ -56,6 +62,20 @@ const Dashboard = () => {
       background: isDarkMode ? '#14532d' : '#f0fdf4',
     },
   ] : []), [sample.enabled, sample.data, isDarkMode]);
+
+  const expDocQuickStats = useMemo(() => (expdoc.enabled && expdoc.data ? [
+    {
+      icon: <ContainerOutlined style={{ fontSize: 24, color: '#0369a1' }} />,
+      label: 'Export Docs Awaiting Approval', value: expdoc.data.quickStats.awaitingApproval, unit: 'docs',
+      background: isDarkMode ? '#082f49' : '#f0f9ff',
+    },
+    {
+      icon: <WarningOutlined style={{ fontSize: 24, color: 'var(--warning-color)' }} />,
+      label: 'Shipments At Risk', value: expdoc.data.quickStats.shipmentsAtRisk, unit: 'shipments',
+      background: isDarkMode ? '#78350f' : '#fffbeb',
+    },
+  ] : []), [expdoc.enabled, expdoc.data, isDarkMode]);
+
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -149,10 +169,36 @@ const Dashboard = () => {
             quickStats={data?.quickStats}
             isDarkMode={isDarkMode}
             loading={loading}
-            extraItems={sampleQuickStats}
+            extraItems={[...sampleQuickStats, ...expDocQuickStats]}
           />
         </Col>
       </Row>
+
+      {/* Export Documentation (PRD §11.1 "Receives back") — shipment readiness and
+          what is waiting on whom. Absent entirely for users without the module. */}
+      {expdoc.enabled && (
+        <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+          <Col xs={24} lg={14}>
+            <Card title="Shipment Readiness" size="small">
+              <ShipmentReadinessCard
+                rows={expdoc.data?.readiness}
+                total={expdoc.data?.readinessTotal || 0}
+                loading={expdoc.loading}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} lg={10}>
+            <Card title="Export Documents Pending" size="small">
+              <ExportDocsPendingCard
+                rows={expdoc.data?.pending}
+                total={expdoc.data?.pendingTotal || 0}
+                loading={expdoc.loading}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
+
 
       {/* Pending Purchase Orders + Sample Status Breakdown */}
       <Row gutter={[24, 24]}>
