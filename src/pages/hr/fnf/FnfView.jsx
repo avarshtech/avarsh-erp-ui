@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space } from 'antd';
+import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space, Alert } from 'antd';
 import { PrinterOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getFnfById, approveFnf, settleFnf } from '../../../services/hr/fnfService';
+import { getFnfById, approveFnf, settleFnf, cancelFnf } from '../../../services/hr/fnfService';
 import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -22,7 +22,7 @@ const AmountRow = ({ label, value, bold }) => (
 );
 
 const FnfView = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -44,6 +44,29 @@ const FnfView = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleCancel = useCallback(() => {
+    modal.confirm({
+      title: 'Cancel this settlement?',
+      content: 'The settlement is abandoned. Nothing has been approved or paid, and the employee '
+        + 'stays active, so nothing needs reversing.',
+      okText: 'Cancel Settlement',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      onOk: async () => {
+        setActionLoading(true);
+        try {
+          await cancelFnf(id);
+          message.success('Settlement cancelled');
+          fetchData();
+        } catch {
+          // axiosInstance already toasts the server's message.
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
 
   const handleApprove = useCallback(async () => {
     setActionLoading(true);
@@ -110,6 +133,13 @@ const FnfView = () => {
                 Approve
               </Button>
             )}
+            {/* Calculated for the wrong person or on the wrong date is a real
+                case, and there was no way back short of leaving it in the list. */}
+            {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
+              <Button danger onClick={handleCancel} loading={actionLoading}>
+                Cancel
+              </Button>
+            )}
             {data.status === 'APPROVED' && canApprove && (
               <Button type="primary" icon={<DollarOutlined />} onClick={handleSettle} loading={actionLoading}>
                 Settle
@@ -166,7 +196,17 @@ const FnfView = () => {
       </Row>
 
       <Card>
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  {netSettlement < 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <Alert
+                type="warning"
+                showIcon
+                message="This settlement is negative"
+                description="Deductions exceed earnings, so the employee owes the company this amount rather than being paid it. Settling records the figure; recovering it is a separate matter."
+              />
+            </div>
+          )}
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <span style={{ fontSize: 24, fontWeight: 700 }}>
             Net Settlement:{' '}
             <span style={{ color: netSettlement >= 0 ? '#52c41a' : '#ff4d4f' }}>
