@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Card, Row, Col, Statistic, Button, Space, Spin, Alert } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getBonusRunById, getBonusRecords, approveBonus, markBonusPaid } from '../../../services/hr/bonusService';
+import { getBonusRunById, getBonusRecords, approveBonus, markBonusPaid, cancelBonus } from '../../../services/hr/bonusService';
 import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
@@ -31,6 +31,9 @@ const BonusRunView = () => {
 
   const canUpdate = hasPermission('hr-bonus', 'update');
   const canApprove = hasPermission('hr-bonus', 'approve') || canUpdate;
+  // hr-bonus declares cancel and nothing checked it, because there was
+  // nothing to cancel until now.
+  const canCancel = hasPermission('hr-bonus', 'cancel') || canUpdate;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -49,6 +52,29 @@ const BonusRunView = () => {
   }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleCancel = useCallback(() => {
+    modal.confirm({
+      title: 'Cancel this bonus run?',
+      content: 'The run and its records are abandoned, and the factory and year become free to '
+        + 'calculate again. Nothing has been paid, so nothing needs reversing.',
+      okText: 'Cancel Run',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      onOk: async () => {
+        setAdvancing(true);
+        try {
+          await cancelBonus(id);
+          message.success('Bonus run cancelled');
+          fetchData();
+        } catch {
+          // axiosInstance already toasts the server's message.
+        } finally {
+          setAdvancing(false);
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
 
   const handleApprove = useCallback(() => {
     modal.confirm({
@@ -123,6 +149,11 @@ const BonusRunView = () => {
             {statusInfo && <Tag color={statusInfo.color}>{statusInfo.label}</Tag>}
             {run?.status === 'CALCULATED' && canApprove && (
               <Button type="primary" loading={advancing} onClick={handleApprove}>Approve</Button>
+            )}
+            {/* A run at the wrong rate or for the wrong year used to be permanent,
+                and it blocked every retry for that factory and year. */}
+            {run?.status === 'CALCULATED' && canCancel && (
+              <Button danger loading={advancing} onClick={handleCancel}>Cancel Run</Button>
             )}
             {run?.status === 'APPROVED' && canUpdate && (
               <Button type="primary" loading={advancing} onClick={handleMarkPaid}>Mark as Paid</Button>

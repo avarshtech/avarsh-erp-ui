@@ -105,3 +105,15 @@ export const getPtReturnRecords = async (returnId) => {
   const response = await axiosInstance.get(`/hr/pt-returns/${returnId}/records`);
   return response.data;
 };
+
+/**
+ * Abandon an EL encashment run calculated in error.
+ * PUT /api/v1/hr/el-encashment/{id}/cancel
+ *
+ * Only while it is CALCULATED. Approving takes the days off leave balances, so
+ * undoing that is a reversal rather than a cancellation.
+ */
+export const cancelElEncashment = async (id, reason) => {
+  const response = await axiosInstance.put(`/hr/el-encashment/${id}/cancel`, { reason });
+  return response.data;
+};

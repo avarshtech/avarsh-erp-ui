@@ -55,3 +55,15 @@ export const markBonusPaid = async (runId) => {
   const response = await axiosInstance.post(`${BASE_URL}/${runId}/mark-paid`);
   return response.data;
 };
+
+/**
+ * Abandon a bonus run calculated in error.
+ * PUT /api/v1/hr/bonus/{id}/cancel
+ *
+ * Only while it is CALCULATED. There was no way back at all before, so a run at
+ * the wrong rate blocked that factory and year permanently.
+ */
+export const cancelBonus = async (id, reason) => {
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/cancel`, { reason });
+  return response.data;
+};

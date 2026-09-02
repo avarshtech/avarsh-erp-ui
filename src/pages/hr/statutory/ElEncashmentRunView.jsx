@@ -3,7 +3,7 @@ import { App, Table, Tag, Card, Row, Col, Statistic, Button, Space, Spin, Alert 
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   getElEncashmentRunById, getElEncashmentRecords,
-  approveElEncashment, markElEncashmentPaid,
+  approveElEncashment, markElEncashmentPaid, cancelElEncashment,
 } from '../../../services/hr/statutoryService';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
@@ -114,11 +114,27 @@ const ElEncashmentRunView = () => {
                 loading={advancing}
                 onClick={() => act(
                   'Approve this encashment run?',
-                  'Approving finalises the amounts below.',
+                  'Approving finalises the amounts below and takes the encashed days off each '
+                    + "employee's leave balance. It cannot be undone.",
                   approveElEncashment, 'Approve',
                 )}
               >
                 Approve
+              </Button>
+            )}
+            {/* Calculated in error is a real case, and there was no way back. */}
+            {run?.status === 'CALCULATED' && canUpdate && (
+              <Button
+                danger
+                loading={advancing}
+                onClick={() => act(
+                  'Cancel this encashment run?',
+                  'The run and its records are abandoned. Nothing has been taken off any leave '
+                    + 'balance yet, so nothing needs putting back.',
+                  cancelElEncashment, 'Cancel Run',
+                )}
+              >
+                Cancel Run
               </Button>
             )}
             {run?.status === 'APPROVED' && canUpdate && (
