@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm } from 'antd';
+import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm, Tooltip } from 'antd';
 import { PlusOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -109,23 +109,50 @@ const LoanList = () => {
       {
         title: 'Actions',
         key: 'actions',
-        width: 140,
+        width: 240,
         fixed: 'right',
-        render: (_, r) => (
-          <Space size="small">
-            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/hr/loans/${r.id}`)} />
-            {r.status === 'ACTIVE' && canUpdate && (
-              <>
-                <Popconfirm title="Close this loan?" onConfirm={() => handleClose(r.id)}>
-                  <Button type="link" size="small" icon={<CheckCircleOutlined />} />
-                </Popconfirm>
-                <Popconfirm title="Cancel this loan?" onConfirm={() => handleCancel(r.id)}>
-                  <Button type="link" size="small" danger icon={<StopOutlined />} />
-                </Popconfirm>
-              </>
-            )}
-          </Space>
-        ),
+        // Three unlabelled icons read as approve and reject, which is not what
+        // any of them do. They are view, stop recovering, and undo - and the
+        // last two are not interchangeable, so each says what it will do.
+        render: (_, r) => {
+          const outstanding = Number(r.balance) || 0;
+          return (
+            <Space size="small">
+              <Tooltip title="View the loan and its repayment schedule">
+                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/hr/loans/${r.id}`)} />
+              </Tooltip>
+              {r.status === 'ACTIVE' && canUpdate && (
+                <>
+                  <Popconfirm
+                    title="Stop recovering this loan?"
+                    description={outstanding > 0
+                      ? `${formatCurrency(outstanding)} is still outstanding and will be written off. Payroll will stop deducting the EMI.`
+                      : 'Nothing is outstanding. The loan will be marked fully recovered.'}
+                    okText={outstanding > 0 ? 'Write off and close' : 'Close'}
+                    okButtonProps={outstanding > 0 ? { danger: true } : undefined}
+                    onConfirm={() => handleClose(r.id)}
+                  >
+                    <Tooltip title="Close: stop recovery and write off anything still owed">
+                      <Button type="link" size="small" icon={<CheckCircleOutlined />}>Close</Button>
+                    </Tooltip>
+                  </Popconfirm>
+                  <Popconfirm
+                    title="Cancel this loan?"
+                    description="For a loan raised in error. Only possible while nothing has been recovered; once an instalment has been taken, close it instead."
+                    okText="Cancel Loan"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Keep"
+                    onConfirm={() => handleCancel(r.id)}
+                  >
+                    <Tooltip title="Cancel: undo a loan raised in error">
+                      <Button type="link" size="small" danger icon={<StopOutlined />}>Cancel</Button>
+                    </Tooltip>
+                  </Popconfirm>
+                </>
+              )}
+            </Space>
+          );
+        },
       },
     ],
     [navigate, canUpdate, handleClose, handleCancel],
@@ -173,7 +200,7 @@ const LoanList = () => {
         loading={loading}
         dataSource={data}
         columns={columns}
-        scroll={{ x: 1100 }}
+        scroll={{ x: 1300 }}
         pagination={getTablePagination(pagination, 'loans')}
         onChange={handleTableChange}
       />
