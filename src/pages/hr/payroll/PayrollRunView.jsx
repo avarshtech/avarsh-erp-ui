@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space, Alert } from 'antd';
+import { App, Table, Tag, Card, Row, Col, Statistic, Button, Modal, Form, DatePicker, Input, Select, Space, Alert, Collapse } from 'antd';
 import { EyeOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -224,6 +224,9 @@ const PayrollRunView = () => {
                 loading={advancing}
                 onClick={handleProcess}
                 disabled={validation ? validation.blockingCount > 0 : false}
+                title={validation && validation.blockingCount > 0
+                  ? 'Resolve the blocking issues listed below before processing'
+                  : undefined}
               >
                 Process Salaries
               </Button>
@@ -260,6 +263,38 @@ const PayrollRunView = () => {
                 ? `${validation.payableEmployees} of ${validation.totalEmployees} employees are ready. Process when you are.`
                 : 'No salaries have been calculated. Process the run to continue.'
           }
+        />
+      )}
+      {/*
+        The wizard lists who each problem belongs to; opening the same draft
+        from the payroll list gave only a count. So a draft that could not be
+        processed said two employees were a problem and left you to work out
+        which two, on the screen you land on when resuming.
+      */}
+      {run?.status === 'DRAFT' && validation?.issues?.length > 0 && (
+        <Collapse
+          style={{ marginBottom: 16 }}
+          items={[{
+            key: 'issues',
+            label: `Details (${validation.issues.length})`,
+            children: (
+              <Table
+                rowKey={(r, i) => `${r.employeeId ?? 'run'}-${r.code}-${i}`}
+                dataSource={validation.issues}
+                size="small"
+                pagination={{ pageSize: 8, showSizeChanger: false }}
+                columns={[
+                  {
+                    title: '', dataIndex: 'severity', key: 'severity', width: 96,
+                    render: (v) => <Tag color={v === 'BLOCKING' ? 'error' : 'warning'}>{v}</Tag>,
+                  },
+                  { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100, render: (v) => v || '—' },
+                  { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 160, ellipsis: true, render: (v) => v || '—' },
+                  { title: 'Problem', dataIndex: 'message', key: 'message' },
+                ]}
+              />
+            ),
+          }]}
         />
       )}
       {run?.status === 'PROCESSED' && (
