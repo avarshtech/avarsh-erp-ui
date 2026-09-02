@@ -25,6 +25,9 @@ const BonusWizard = () => {
     ? new Date().getFullYear()
     : new Date().getFullYear() - 1);
   const [bonusPercentage, setBonusPercentage] = useState(8.33);
+  // The statutory band. A rate outside it cannot be paid, so the wizard
+  // will not carry it forward to a calculation the server would refuse.
+  const outOfBand = bonusPercentage == null || bonusPercentage < 8.33 || bonusPercentage > 20;
   const [runData, setRunData] = useState(null);
   const [records, setRecords] = useState([]);
 
@@ -132,19 +135,36 @@ const BonusWizard = () => {
               </Col>
               <Col xs={24} sm={12} md={8}>
                 <div style={{ marginBottom: 8, fontWeight: 500 }}>Bonus %</div>
+                {/*
+                  0 to 100 let anything through - 55% was accepted, and so was 2%.
+                  The Payment of Bonus Act sets the rate between 8.33% and 20%,
+                  and the server refuses outside it, so the input should not
+                  invite a number that cannot be paid.
+                */}
                 <InputNumber
                   value={bonusPercentage}
                   onChange={setBonusPercentage}
-                  min={0}
-                  max={100}
+                  min={8.33}
+                  max={20}
+                  step={0.01}
                   precision={2}
                   addonAfter="%"
+                  status={outOfBand ? 'error' : undefined}
                   style={{ width: '100%' }}
                 />
+                <div style={{ marginTop: 4, fontSize: 12 }}>
+                  {outOfBand
+                    ? <span style={{ color: 'var(--error-color, #ff4d4f)' }}>
+                        Must be between 8.33% and 20%
+                      </span>
+                    : <span style={{ color: 'rgba(0,0,0,0.45)' }}>
+                        8.33% is the statutory minimum, 20% the maximum
+                      </span>}
+                </div>
               </Col>
             </Row>
             <div style={{ marginTop: 24, textAlign: 'right' }}>
-              <Button type="primary" icon={<ArrowRightOutlined />} onClick={handleCalculate} loading={loading}>
+              <Button type="primary" icon={<ArrowRightOutlined />} onClick={handleCalculate} loading={loading} disabled={outOfBand}>
                 Calculate Bonus
               </Button>
             </div>
