@@ -287,6 +287,7 @@ const ThemedApp = () => {
             {/* F&F Settlement */}
             <Route path="hr/fnf" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfList /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/new" element={<PermissionRoute module="hr-fnf" operation="add"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
+            <Route path="hr/fnf/edit/:id" element={<PermissionRoute module="hr-fnf" operation="update"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/:id" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfView /></Suspense></PermissionRoute>} />
             {/* Reports (lazy-loaded) */}
             <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
