@@ -43,5 +43,10 @@ export const saveShadeGroup = (...a) => mockApi.saveShadeGroup(...a);
 
 export const getFinishingDashboard = (...a) => mockApi.getFinishingDashboard(...a);
 
-// Cross-module: sewing spec points + garment issues (receiving source).
-export { specPoints, fullMeasurementChart, listGarmentIssues } from './sewingMockApi';
+// Finishing carries its own measurement chart while it is still mock-backed;
+// the real chart lives in mst_measurement_specs and lands here when Finishing
+// is cut over to the backend.
+export { specPoints, fullMeasurementChart } from './finishingMockData';
+
+// Cross-module and real: the sewing garment issues finishing receives against.
+export { listGarmentIssues } from './sewingApi';

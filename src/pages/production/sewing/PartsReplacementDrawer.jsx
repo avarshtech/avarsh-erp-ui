@@ -1,31 +1,49 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber, Input } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
-import { DAMAGE_REASONS } from '../../../utils/sewingConstants';
-import { PANEL_NAMES } from '../../../utils/cuttingConstants';
+import useSewingMasters from '../../../hooks/useSewingMasters';
+import { getActiveParts } from '../../../services/master/partsService';
 import { saveReplacement } from '../../../services/production/sewingService';
+
+const blankPart = () => ({ size: null, serialNo: '', partId: null, reason: null, pieces: null });
 
 /** PRD 4.8 — raise a parts replacement request to cutting for rejected pieces. */
 const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { options, lineOptions } = useSewingMasters();
+  const [partOptions, setPartOptions] = useState([]);
   const [orderId, setOrderId] = useState(null);
+  const [lineId, setLineId] = useState(null);
+  const [requestedBy, setRequestedBy] = useState('');
   const [parts, setParts] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  const reasonOptions = options('DAMAGE_REASON');
+
+  // Panel names come from the shared parts master rather than a cutting-module
+  // constant, so both floors name the same panel the same way.
+  useEffect(() => {
+    if (!open || partOptions.length) return;
+    getActiveParts()
+      .then((parts) => setPartOptions(parts.map((p) => ({ value: p.id, label: p.partName }))))
+      .catch(() => message.error('Failed to load the parts master'));
+  }, [open, partOptions.length, message]);
 
   const setPart = useCallback((idx, field, val) => {
     setParts((prev) => prev.map((p, i) => (i === idx ? { ...p, [field]: val } : p)));
   }, []);
 
-  const order = orders.find((o) => o.id === orderId);
+  const order = useMemo(() => orders.find((o) => o.id === orderId), [orders, orderId]);
 
-  const columns = [
+  const columns = useMemo(() => [
     {
-      title: 'Size', dataIndex: 'size', width: 90,
+      title: 'Size', dataIndex: 'size', width: 100,
       render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 74 }} placeholder="Size"
-          options={(order?.sizes || []).map((s) => ({ value: s, label: s }))} onChange={(val) => setPart(idx, 'size', val)} />
+        <FormSelect size="small" value={v} style={{ width: 84 }} placeholder="Size"
+          options={(order?.sizes || []).map((s) => ({ value: s, label: s }))}
+          onChange={(val) => setPart(idx, 'size', val)} />
       ),
     },
     {
@@ -33,17 +51,17 @@ const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
       render: (v, _, idx) => <Input size="small" value={v} placeholder="B-3/S-21" onChange={(e) => setPart(idx, 'serialNo', e.target.value)} />,
     },
     {
-      title: 'Part', dataIndex: 'part', width: 130,
+      title: 'Part', dataIndex: 'partId', width: 150,
       render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 115 }} placeholder="Part"
-          options={PANEL_NAMES.map((p) => ({ value: p, label: p }))} onChange={(val) => setPart(idx, 'part', val)} />
+        <FormSelect size="small" value={v} style={{ width: 135 }} placeholder="Part" showSearch optionFilterProp="label"
+          options={partOptions} onChange={(val) => setPart(idx, 'partId', val)} />
       ),
     },
     {
-      title: 'Damage Reason', dataIndex: 'reason', width: 170,
+      title: 'Damage Reason', dataIndex: 'reason', width: 180,
       render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Reason"
-          options={DAMAGE_REASONS.map((r) => ({ value: r, label: r.replace('_', ' ') }))} onChange={(val) => setPart(idx, 'reason', val)} />
+        <FormSelect size="small" value={v} style={{ width: 165 }} placeholder="Reason"
+          options={reasonOptions} onChange={(val) => setPart(idx, 'reason', val)} />
       ),
     },
     {
@@ -57,28 +75,33 @@ const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
           onClick={() => setParts((prev) => prev.filter((_, i) => i !== idx))} />
       ),
     },
-  ];
+  ], [order, partOptions, reasonOptions, setPart]);
 
   const handleSave = async () => {
     if (!orderId) return message.warning('Select the order');
-    const valid = parts.filter((p) => p.size && p.part && p.reason && p.pieces > 0);
+    const valid = parts.filter((p) => p.size && p.partId && p.reason && p.pieces > 0);
     if (!valid.length) return message.warning('Add at least one rejected part');
     setSaving(true);
     try {
       const saved = await saveReplacement({
-        orderId, date: dayjs().format('YYYY-MM-DD'), requestedBy: 'Line Supervisor',
-        parts: valid.map((p) => ({ ...p, replStatus: 'PENDING', replDate: null })),
+        orderId,
+        lineId,
+        requestDate: dayjs().format('YYYY-MM-DD'),
+        requestedBy: requestedBy || null,
+        parts: valid,
       });
-      message.success(`${saved.requestNo} sent to cutting for replacement`);
-      setParts([]); setOrderId(null);
+      message.success(`${saved.requestNo} sent to cutting — ${saved.totalPieces} pcs`);
+      setParts([]); setOrderId(null); setLineId(null); setRequestedBy('');
       onSaved();
-    } catch { message.error('Failed to save request'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save the request');
+    } finally { setSaving(false); }
   };
 
   return (
     <Drawer
       title="Cutting Rejection — Parts Replacement Request"
-      size={720}
+      size={800}
       open={open}
       onClose={onClose}
       destroyOnHidden
@@ -90,10 +113,15 @@ const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
       )}
     >
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
-        <FormSelect value={orderId} style={{ width: 280 }} placeholder="Order"
-          options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))} onChange={setOrderId} />
+        <FormSelect value={orderId} style={{ width: 260 }} placeholder="Order"
+          options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
+          onChange={(v) => { setOrderId(v); setParts([]); }} />
+        <FormSelect value={lineId} style={{ width: 140 }} placeholder="Line" allowClear
+          options={lineOptions} onChange={(v) => setLineId(v ?? null)} />
+        <Input style={{ width: 180 }} placeholder="Requested by" value={requestedBy}
+          onChange={(e) => setRequestedBy(e.target.value)} />
         <Button icon={<PlusOutlined />} size="small" disabled={!orderId}
-          onClick={() => setParts((prev) => [...prev, { size: null, serialNo: '', part: null, reason: null, pieces: null }])}>
+          onClick={() => setParts((prev) => [...prev, blankPart()])}>
           Add Rejected Part
         </Button>
       </Space>

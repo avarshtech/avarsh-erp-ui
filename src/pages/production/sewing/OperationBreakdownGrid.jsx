@@ -1,20 +1,35 @@
 import { useCallback, useMemo } from 'react';
 import { Card, Table, InputNumber, Input, Button, Space, Tooltip } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, ImportOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
-import { MACHINE_TYPES } from '../../../utils/sewingConstants';
+import useSewingMasters from '../../../hooks/useSewingMasters';
+import { operationTargetPerHour, pitchOf, totalSamOf, operationRateTotal } from '../../../utils/sewingCalc';
 
 /**
  * PRD 4.1.2 + 4.1.3 — operation breakdown with SAM per operation and a
  * line-balancing view: bar per operation vs pitch time (bottleneck SAM);
  * operations at the pitch are the constraint (red).
  */
-const OperationBreakdownGrid = ({ plan, onChange }) => {
+const OperationBreakdownGrid = ({ plan, onChange, onLoadSamSheet }) => {
+  const { operationOptions, machineOptions, operations: opMaster } = useSewingMasters();
+
   const setOp = useCallback((idx, field, val) => {
     onChange((prev) => ({ ...prev, operations: prev.operations.map((o, i) => (i === idx ? { ...o, [field]: val } : o)) }));
   }, [onChange]);
 
-  const pitch = useMemo(() => Math.max(0, ...plan.operations.map((o) => o.sam || 0)), [plan.operations]);
+  /** Picking an operation pulls its default machine, as the server would. */
+  const pickOperation = useCallback((idx, operationId) => {
+    const master = opMaster.find((o) => o.id === operationId);
+    onChange((prev) => ({
+      ...prev,
+      operations: prev.operations.map((o, i) => (i === idx
+        ? { ...o, operationId, operation: master?.name, machineTypeId: o.machineTypeId ?? master?.machineTypeId }
+        : o)),
+    }));
+  }, [onChange, opMaster]);
+
+  const pitch = useMemo(() => pitchOf(plan.operations), [plan.operations]);
+  const usedIds = useMemo(() => new Set(plan.operations.map((o) => o.operationId)), [plan.operations]);
 
   const columns = useMemo(() => [
     {
@@ -22,14 +37,18 @@ const OperationBreakdownGrid = ({ plan, onChange }) => {
       render: (v, _, idx) => <InputNumber size="small" min={1} value={v} style={{ width: 56 }} onChange={(val) => setOp(idx, 'seq', val)} />,
     },
     {
-      title: 'Operation', dataIndex: 'operation', width: 180,
-      render: (v, _, idx) => <Input size="small" value={v} placeholder="e.g. Shoulder join" onChange={(e) => setOp(idx, 'operation', e.target.value)} />,
+      title: 'Operation', dataIndex: 'operationId', width: 190,
+      render: (v, _, idx) => (
+        <FormSelect size="small" value={v} style={{ width: 175 }} placeholder="Operation" showSearch optionFilterProp="label"
+          options={operationOptions.map((o) => ({ ...o, disabled: usedIds.has(o.value) && o.value !== v }))}
+          onChange={(val) => pickOperation(idx, val)} />
+      ),
     },
     {
-      title: 'Machine', dataIndex: 'machine', width: 120,
+      title: 'Machine', dataIndex: 'machineTypeId', width: 130,
       render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 105 }} placeholder="M/C"
-          options={MACHINE_TYPES.map((m) => ({ value: m, label: m }))} onChange={(val) => setOp(idx, 'machine', val)} />
+        <FormSelect size="small" value={v} style={{ width: 115 }} placeholder="M/C"
+          options={machineOptions} onChange={(val) => setOp(idx, 'machineTypeId', val)} />
       ),
     },
     {
@@ -42,12 +61,12 @@ const OperationBreakdownGrid = ({ plan, onChange }) => {
     },
     {
       title: 'Target/Hr', key: 'tph', width: 85, align: 'center',
-      render: (_, r) => (r.sam ? <strong>{Math.round((60 / r.sam) * ((plan.targetEfficiencyPct || 100) / 100))}</strong> : '—'),
+      render: (_, r) => (r.sam ? <strong>{operationTargetPerHour(r.sam, plan.targetEfficiencyPct)}</strong> : '—'),
     },
     {
       title: `Line Balance (pitch ${pitch.toFixed(1)} min)`, key: 'bar', width: 260,
       render: (_, r) => {
-        const sam = r.sam || 0;
+        const sam = Number(r.sam) || 0;
         const pct = pitch ? Math.round((sam / pitch) * 100) : 0;
         const isBottleneck = pitch > 0 && sam >= pitch;
         return (
@@ -69,24 +88,30 @@ const OperationBreakdownGrid = ({ plan, onChange }) => {
           onClick={() => onChange((prev) => ({ ...prev, operations: prev.operations.filter((_, i) => i !== idx) }))} />
       ),
     },
-  ], [pitch, plan.targetEfficiencyPct, setOp, onChange]);
+  ], [pitch, plan.targetEfficiencyPct, setOp, onChange, operationOptions, machineOptions, usedIds, pickOperation]);
 
   return (
     <Card
       title="Operation Breakdown & Line Balancing"
       extra={(
-        <Button icon={<PlusOutlined />} size="small"
-          onClick={() => onChange((prev) => ({ ...prev, operations: [...prev.operations, { seq: prev.operations.length + 1, operation: '', machine: null, sam: null, rate: null }] }))}>
-          Add Operation
-        </Button>
+        <Space>
+          <Button icon={<ImportOutlined />} size="small" onClick={onLoadSamSheet}>Load from SAM Sheet</Button>
+          <Button icon={<PlusOutlined />} size="small"
+            onClick={() => onChange((prev) => ({
+              ...prev,
+              operations: [...prev.operations, { seq: prev.operations.length + 1, operationId: null, machineTypeId: null, sam: null, rate: null }],
+            }))}>
+            Add Operation
+          </Button>
+        </Space>
       )}
     >
-      <Table rowKey={(r) => plan.operations.indexOf(r)} size="small" columns={columns} dataSource={plan.operations} pagination={false} scroll={{ x: 950 }}
-        locale={{ emptyText: 'Add operations with SAM values — the balancing bars reveal the bottleneck' }}
+      <Table rowKey={(r) => plan.operations.indexOf(r)} size="small" columns={columns} dataSource={plan.operations} pagination={false} scroll={{ x: 1000 }}
+        locale={{ emptyText: 'Load the style’s SAM sheet, or add operations with SAM values — the balancing bars reveal the bottleneck' }}
         footer={() => (
-          <Space size="large">
-            <span>Total garment SAM: <strong>{plan.operations.reduce((s, o) => s + (o.sam || 0), 0).toFixed(1)} min</strong></span>
-            <span>Σ Operation rates: <strong>₹{plan.operations.reduce((s, o) => s + (o.rate || 0), 0).toFixed(2)}</strong></span>
+          <Space size="large" wrap>
+            <span>Total garment SAM: <strong>{totalSamOf(plan.operations).toFixed(2)} min</strong></span>
+            <span>Σ Operation rates: <strong>₹{operationRateTotal(plan.operations).toFixed(2)}</strong></span>
             <span>Pitch (bottleneck): <strong>{pitch.toFixed(1)} min</strong></span>
             <span style={{ color: 'var(--text-secondary)' }}>Red bars exceed no other operation — rebalance by splitting work or adding an operator there.</span>
           </Space>

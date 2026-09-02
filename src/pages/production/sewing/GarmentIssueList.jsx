@@ -28,17 +28,23 @@ const GarmentIssueList = () => {
 
   const columns = useMemo(() => [
     { title: 'Issue #', dataIndex: 'issueNo', width: 170, render: (v) => <code>{v}</code> },
-    { title: 'Order', dataIndex: 'orderId', width: 140, render: (v) => orders.find((o) => o.id === v)?.orderNo || '—' },
-    { title: 'Date', dataIndex: 'date', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    { title: 'Order', dataIndex: 'orderNo', width: 140, render: (v) => v || '—' },
+    { title: 'Date', dataIndex: 'issueDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     {
-      title: 'Sizes Issued', dataIndex: 'lines', width: 260,
-      render: (lines) => lines.map((l) => <Tag key={l.size}>{l.size} × {l.currentQty}</Tag>),
+      // The server reports which sizes went past the order quantity; those are the
+      // ones a Production Manager has to answer for, so they read red here.
+      title: 'Sizes Issued', key: 'lines', width: 260,
+      render: (_, r) => (r.lines || []).map((l) => (
+        <Tag key={l.size} color={r.overIssuedSizes?.includes(l.size) ? 'red' : undefined}>
+          {l.size} × {l.currentQty}
+        </Tag>
+      )),
     },
-    { title: 'Total Pcs', key: 'total', width: 90, align: 'center', render: (_, r) => <strong>{r.lines.reduce((s, l) => s + l.currentQty, 0)}</strong> },
+    { title: 'Total Pcs', dataIndex: 'totalQty', width: 90, align: 'center', render: (v) => <strong>{v}</strong> },
     { title: 'Issued By', dataIndex: 'issuedBy', width: 170, ellipsis: true },
     { title: 'Received By', dataIndex: 'receivedBy', width: 130 },
     { title: 'Status', dataIndex: 'status', width: 140, render: (v) => <SewingStatusTag status={v} /> },
-  ], [orders]);
+  ], []);
 
   return (
     <Card>

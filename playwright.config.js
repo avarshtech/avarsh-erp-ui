@@ -102,6 +102,31 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Cutting room — same shape as the sewing suite: the screens must load
+      // from the API and stay clean.
+      name: 'cutting',
+      testDir: './e2e/specs/cutting',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
+      // Sewing floor — the module runs entirely on the API, so these specs
+      // assert the screens load from it, records survive a reload and the
+      // server-derived rules reach the screen.
+      name: 'sewing',
+      testDir: './e2e/specs/sewing',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'hr',
       testDir: './e2e/specs/hr',
       use: {

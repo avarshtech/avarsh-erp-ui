@@ -394,7 +394,7 @@ const MainLayoutInner = () => {
       key: "/production",
       icon: <ScissorOutlined />,
       label: "Production",
-      moduleId: ["production-cutting", "production-sewing", "production-finishing"],
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-masters"],
       children: [
         { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
@@ -425,6 +425,8 @@ const MainLayoutInner = () => {
         // a viewer of the documents may read what was done to them.
         { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
         { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
+        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
+        // Packing arrives in the next design session.
       ],
     },
     {
@@ -605,6 +607,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/cutting')) return ['/production/cutting'];
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
+    if (path.startsWith('/production/masters')) return ['/production/masters'];
     if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];

@@ -1,25 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Drawer, Button, Space, Table, InputNumber, Alert } from 'antd';
+import { App, Drawer, Button, Space, Table, InputNumber, Alert, Input } from 'antd';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
-import { saveGarmentIssue, issuedBySize } from '../../../services/production/sewingService';
+import { saveGarmentIssue, getIssueOpeningLines } from '../../../services/production/sewingService';
 
 /** PRD 4.4 — size-wise issue with Order / Prev Issued / Current / Total / Balance columns. */
 const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [orderId, setOrderId] = useState(null);
   const [lines, setLines] = useState([]);
+  const [issuedBy, setIssuedBy] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open || !orderId) { setLines([]); return; }
-    const order = orders.find((o) => o.id === orderId);
-    issuedBySize(orderId).then((prev) => {
-      setLines((order?.sizes || []).map((size) => ({
-        size, orderQty: order.sizeQty[size], prevIssued: prev[size] || 0, currentQty: null,
-      })));
-    }).catch(() => {});
-  }, [open, orderId, orders]);
+    getIssueOpeningLines(orderId)
+      .then(setLines)
+      .catch(() => message.error('Failed to load the size-wise balances'));
+  }, [open, orderId, message]);
 
   const setQty = useCallback((idx, val) => {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, currentQty: val } : l)));
@@ -54,13 +53,19 @@ const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
     setSaving(true);
     try {
       const saved = await saveGarmentIssue({
-        orderId, date: dayjs().format('YYYY-MM-DD'), issuedBy: 'Store Keeper', receivedBy: 'Line Supervisor',
-        lines: entered.map((l) => ({ size: l.size, orderQty: l.orderQty, prevIssued: l.prevIssued, currentQty: l.currentQty })),
+        orderId,
+        issueDate: dayjs().format('YYYY-MM-DD'),
+        issuedBy: issuedBy || null,
+        receivedBy: receivedBy || null,
+        lines: entered.map((l) => ({ size: l.size, currentQty: l.currentQty })),
       });
-      message.success(`${saved.issueNo}: ${total} pcs issued${overIssued.length ? ' (over-issue — PM approval required)' : ''}`);
+      message.success(`${saved.issueNo}: ${saved.totalQty} pcs issued${
+        saved.overIssuedSizes?.length ? ' (over-issue — PM approval required)' : ''}`);
       setLines([]); setOrderId(null);
       onSaved();
-    } catch { message.error('Failed to save issue'); } finally { setSaving(false); }
+    } catch (e) {
+      message.error(e?.response?.data?.message || 'Failed to save issue');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -80,9 +85,15 @@ const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
     >
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Order</div>
-        <FormSelect value={orderId} style={{ width: 320 }} placeholder="Select order"
-          options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo} · ${o.color}` }))}
-          onChange={setOrderId} />
+        <Space size="middle" wrap>
+          <FormSelect value={orderId} style={{ width: 320 }} placeholder="Select order"
+            options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo} · ${o.color || ''}` }))}
+            onChange={setOrderId} />
+          <Input style={{ width: 170 }} placeholder="Issued by" value={issuedBy}
+            onChange={(e) => setIssuedBy(e.target.value)} />
+          <Input style={{ width: 170 }} placeholder="Received by" value={receivedBy}
+            onChange={(e) => setReceivedBy(e.target.value)} />
+        </Space>
       </div>
       {overIssued.length > 0 && (
         <Alert type="warning" showIcon style={{ marginBottom: 12 }}

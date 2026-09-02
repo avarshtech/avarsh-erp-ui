@@ -46,12 +46,13 @@ const OperatorSamTab = () => {
     { title: 'Line', dataIndex: 'line', width: 90, align: 'center' },
     { title: 'Operator', dataIndex: 'operator', width: 150 },
     { title: 'Output (pcs)', dataIndex: 'output', width: 100, align: 'right' },
-    { title: 'Efficiency', dataIndex: 'effPct', width: 100, align: 'center', render: (v) => `${v}%` },
-    { title: 'Slab', dataIndex: 'slab', width: 110, align: 'center' },
+    { title: 'Operation', dataIndex: 'operation', width: 150, ellipsis: true, render: (v) => v || '—' },
+    { title: 'Efficiency', dataIndex: 'efficiencyPct', width: 100, align: 'center', render: (v) => `${v}%` },
+    { title: 'Slab', dataIndex: 'slab', width: 130, align: 'center', render: (v) => v || <span style={{ color: 'var(--text-secondary)' }}>Below base</span> },
     { title: 'Gross ₹', dataIndex: 'gross', width: 90, align: 'right' },
     {
       title: 'DHU Deduction ₹', dataIndex: 'dhuDeduction', width: 130, align: 'right',
-      render: (v) => (v ? <span style={{ color: 'var(--error-color)' }}>−{v}</span> : 0),
+      render: (v, r) => (Number(v) ? <span style={{ color: 'var(--error-color)' }}>−{v} <span style={{ color: 'var(--text-secondary)' }}>(DHU {r.lineDhuPct}%)</span></span> : 0),
     },
     { title: 'Net ₹ / day', dataIndex: 'net', width: 100, align: 'right', render: (v) => <strong>{v}</strong> },
   ], []);
@@ -73,7 +74,7 @@ const OperatorSamTab = () => {
           locale={{ emptyText: <EmptyState title="No SAM values" description="Maintain SAM per style and operation" /> }} />
       )}
       {view === 'Incentives' && (
-        <Table rowKey={(r) => `${r.date}-${r.operatorId}`} size="small" columns={incentiveColumns} dataSource={incentives}
+        <Table rowKey={(r) => `${r.date}-${r.lineId}-${r.operatorId}-${r.operation}`} size="small" columns={incentiveColumns} dataSource={incentives}
           pagination={false} scroll={{ x: 950 }}
           locale={{ emptyText: <EmptyState title="No incentive data" description="Incentives compute from hourly production" /> }} />
       )}

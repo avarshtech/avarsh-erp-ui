@@ -9,7 +9,6 @@ import {
   WIP_AGING_DAYS, REALTER_CYCLE_ALERT,
 } from '../../utils/finishingConstants';
 import * as seed from './finishingMockData';
-import { seedOrders } from './sewingMockData';
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
 const clone = (v) => JSON.parse(JSON.stringify(v));
@@ -17,7 +16,7 @@ const nextId = (rows) => rows.reduce((m, r) => Math.max(m, r.id), 0) + 1;
 const docNo = (prefix, rows) => `${prefix}-${dayjs().format('YYYYMMDD')}-${String(rows.length + 1).padStart(3, '0')}`;
 
 const db = {
-  orders: clone(seedOrders),
+  orders: clone(seed.seedOrders),
   employees: clone(seed.seedEmployees),
   receivings: clone(seed.seedReceivings),
   hourlySheets: clone(seed.seedHourlySheets),
