@@ -114,7 +114,7 @@ const ElEncashmentList = () => {
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',

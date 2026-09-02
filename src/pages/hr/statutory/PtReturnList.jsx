@@ -112,14 +112,14 @@ const PtReturnList = () => {
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',
       },
       {
         title: 'Total PT Amount',
-        dataIndex: 'totalAmount',
+        dataIndex: 'totalPtAmount',
         key: 'totalAmount',
         width: 150,
         align: 'right',
