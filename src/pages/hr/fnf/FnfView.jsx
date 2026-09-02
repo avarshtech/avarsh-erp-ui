@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space, Alert } from 'antd';
-import { PrinterOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons';
+import { PrinterOutlined, CheckCircleOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getFnfById, approveFnf, settleFnf, cancelFnf } from '../../../services/hr/fnfService';
+import { getFnfById, approveFnf, settleFnf, cancelFnf, recalculateFnf } from '../../../services/hr/fnfService';
 import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -44,6 +44,27 @@ const FnfView = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleRecalculate = useCallback(() => {
+    modal.confirm({
+      title: 'Recalculate this settlement?',
+      content: 'Every amount is re-derived from the employee’s current loans, advances, leave '
+        + 'balance and salary structure. Any figures edited by hand are replaced.',
+      okText: 'Recalculate',
+      onOk: async () => {
+        setActionLoading(true);
+        try {
+          await recalculateFnf(id);
+          message.success('Settlement recalculated');
+          fetchData();
+        } catch {
+          // axiosInstance already toasts the server's message.
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
 
   const handleCancel = useCallback(() => {
     modal.confirm({
@@ -135,6 +156,14 @@ const FnfView = () => {
             )}
             {/* Calculated for the wrong person or on the wrong date is a real
                 case, and there was no way back short of leaving it in the list. */}
+            {/* Every figure here is derived from data that keeps moving - loan
+                balances, leave, advances, the salary structure. Without this the
+                only way to pick up a change was to cancel and start again. */}
+            {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
+              <Button icon={<ReloadOutlined />} onClick={handleRecalculate} loading={actionLoading}>
+                Recalculate
+              </Button>
+            )}
             {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
               <Button danger onClick={handleCancel} loading={actionLoading}>
                 Cancel
