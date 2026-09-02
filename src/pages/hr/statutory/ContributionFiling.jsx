@@ -3,11 +3,12 @@ import {
   App, Card, Row, Col, Select, InputNumber, Button, Table, Statistic,
   Space, Alert, Tag, Spin, Empty, Typography,
 } from 'antd';
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, ReloadOutlined, FileExcelOutlined } from '@ant-design/icons';
 import {
   getPfSummary, getEsiSummary, downloadEcrFile, downloadEsiFile,
 } from '../../../services/hr/statutoryFilingService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { downloadContributionStatement } from '../../../services/hr/statutoryFilingService';
 import { triggerBrowserDownload } from '../../../services/hr/attendanceService';
 import { factoryOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
@@ -45,6 +46,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
 
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [statementLoading, setStatementLoading] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
 
@@ -68,6 +70,24 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
       setLoading(false);
     }
   }, [factoryId, month, year, isPf, scheme, message]);
+
+  const handleStatement = useCallback(async () => {
+    setStatementLoading(true);
+    try {
+      const blob = await downloadContributionStatement(
+        isPf ? 'pf' : 'esi', factoryId, month, year,
+      );
+      triggerBrowserDownload(
+        blob,
+        `${isPf ? 'PF' : 'ESI'}_statement_${factoryId}_${String(month).padStart(2, '0')}_${year}.xlsx`,
+      );
+      message.success('Statement downloaded');
+    } catch {
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setStatementLoading(false);
+    }
+  }, [factoryId, month, year, isPf, message]);
 
   const handleDownload = useCallback(async () => {
     setDownloading(true);
@@ -160,12 +180,26 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
               <Button icon={<ReloadOutlined />} onClick={load} loading={loading} disabled={!factoryId || !canView}>
                 Load Summary
               </Button>
+              {/*
+                Available whether or not the return can be filed. A blocked
+                return is exactly when someone needs to read what is in it, and
+                the statement names whoever is blocking it.
+              */}
+              <Button
+                icon={<FileExcelOutlined />}
+                onClick={handleStatement}
+                loading={statementLoading}
+                disabled={!summary}
+              >
+                Download Statement
+              </Button>
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={handleDownload}
                 loading={downloading}
                 disabled={!summary || blocked}
+                title={blocked ? 'Resolve the issues above before filing' : undefined}
               >
                 {isPf ? 'Download ECR' : 'Download Contribution File'}
               </Button>
