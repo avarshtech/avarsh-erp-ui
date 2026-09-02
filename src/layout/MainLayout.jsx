@@ -41,6 +41,7 @@ import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
