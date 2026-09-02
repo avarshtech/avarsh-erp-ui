@@ -207,7 +207,14 @@ const POList = () => {
       key: 'deliveryDate',
       width: 120,
       sorter: true,
-      render: (date) => formatDate(date),
+      // Shows the date the PO is actually tracking to; the original stays visible,
+      // struck through, so a revision is never mistaken for a data-entry change.
+      render: (date, record) => (record.revisedDeliveryDate ? (
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+          <span>{formatDate(record.revisedDeliveryDate)}<Tag color="warning" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>Revised</Tag></span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(date)}</span>
+        </div>
+      ) : formatDate(date)),
     },
     {
       title: 'Items',

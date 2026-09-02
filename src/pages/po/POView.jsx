@@ -65,6 +65,7 @@ import {
   referBackPurchaseOrder,
   cancelPurchaseOrder,
 } from '../../services/po/purchaseOrderService';
+import ReviseDeliveryDateDialog from './ReviseDeliveryDateDialog';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
 import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import { updateBomLinePoStatus } from '../../services/bom/bomService';
@@ -79,7 +80,7 @@ import {
   hasPermission,
   getCurrentUser,
 } from '../../utils/permissions';
-import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_CANCEL_REASONS } from '../../utils/poStatusConstants';
+import { PO_STATUS, LINE_ITEM_STATUS, getStatusLabel, getLineItemStatusLabel, BOM_UNLOCK_STATUSES, EWAY_BILL_CANCEL_REASONS, getEffectiveDeliveryDate } from '../../utils/poStatusConstants';
 import { generatePOPdf } from '../../utils/poPdfGenerator';
 import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
 import { ActionButton } from '../../components/buttons';
@@ -192,6 +193,18 @@ const REJECTION_CATEGORIES = [
   { value: 'other', label: 'Other' },
 ];
 
+/** Map a PO payload's activity rows into the shape the timeline renders. */
+const mapActivities = (data) =>
+  (data?.activities || data?.notes || []).map((activity) => ({
+    id: activity.id,
+    text: activity.comment || activity.text || '',
+    isSystemGenerated: activity.isSystemGenerated || false,
+    status: activity.status ?? null,
+    timestamp: activity.createdAt || activity.timestamp || '',
+    user: activity.userName || activity.name || (activity.isSystemGenerated ? 'System' : 'User'),
+    edited: activity.edited || false,
+  }));
+
 const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefresh }) => {
   const { message, modal } = App.useApp();
   const { isSampleOrder } = useSampleOrderNos();
@@ -217,6 +230,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   const [stageUpdating, setStageUpdating] = useState(null); // 'lineItemId-stageIndex'
   const [addStagesDialog, setAddStagesDialog] = useState({ open: false, lineItem: null });
   const [completeStageModal, setCompleteStageModal] = useState({ open: false, lineItemId: null, stageIndex: null });
+  const [reviseDeliveryOpen, setReviseDeliveryOpen] = useState(false);
 
   useEffect(() => {
     if (open && poData?.id) {
@@ -263,16 +277,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
       const data = await getPurchaseOrderById(poId);
       setPo(data);
       loadLineItemImages(data.lineItems || []);
-      const activities = data.activities || data.notes || [];
-      setNotes(activities.map((activity) => ({
-        id: activity.id,
-        text: activity.comment || activity.text || '',
-        isSystemGenerated: activity.isSystemGenerated || false,
-        status: activity.status ?? null,
-        timestamp: activity.createdAt || activity.timestamp || '',
-        user: activity.userName || activity.name || (activity.isSystemGenerated ? 'System' : 'User'),
-        edited: activity.edited || false,
-      })));
+      setNotes(mapActivities(data));
       try {
         const files = await getFilesByEntity('PO', poId);
         setPoFiles(files || []);
@@ -506,6 +511,17 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   // ========================
   const canUpdateStages = po?.status === PO_STATUS.SENT_TO_SUPPLIER ||
     po?.status === PO_STATUS.PARTIALLY_RECEIVED;
+
+  // The date the PO is actually tracking to. Every stage date bound and overdue
+  // calculation below reads this, so a revision extends them all at once.
+  const effectiveDeliveryDate = getEffectiveDeliveryDate(po);
+
+  const handleDeliveryDateRevised = useCallback((updatedPo) => {
+    setPo(updatedPo);
+    setNotes(mapActivities(updatedPo));
+    setReviseDeliveryOpen(false);
+    onRefresh?.();
+  }, [onRefresh]);
 
   const handleStageCompletion = useCallback(async (lineItemId, stageIndex, completed, actualDate, notes) => {
     const key = `${lineItemId}-${stageIndex}`;
@@ -772,6 +788,60 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
           <UndoOutlined style={{ color: 'var(--warning-color)' }} />
           <Text>Stage <Text strong>"{data.stageName}"</Text> completion reverted for <Text strong>{data.itemLabel}</Text></Text>
           <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+        </div>);
+      }
+      if (data?.type === 'stages_added') {
+        return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <PlusOutlined style={{ color: 'var(--primary-color)' }} />
+          <Text><Text strong>{data.count}</Text> {data.count === 1 ? 'stage' : 'stages'} added to <Text strong>{data.itemLabel}</Text>{data.stageNames ? <>: <Text strong>{data.stageNames}</Text></> : null}</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+        </div>);
+      }
+      if (data?.type === 'delivery_date_revised') {
+        const stages = Array.isArray(data.stages) ? data.stages : [];
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <CalendarOutlined style={{ color: 'var(--warning-color)' }} />
+              <Text>Delivery date revised</Text>
+              <Tag style={{ margin: 0, textDecoration: 'line-through', opacity: 0.75 }}>{dayjs(data.from).format('DD MMM YYYY')}</Tag>
+              <span style={{ fontSize: 18, color: 'var(--text-secondary, #888)', lineHeight: 1 }}>→</span>
+              <Tag color="warning" style={{ margin: 0 }}>{dayjs(data.to).format('DD MMM YYYY')}</Tag>
+              {data.shiftDays != null && data.shiftDays !== 0 && (
+                <Tag color={data.shiftDays > 0 ? 'error' : 'success'} style={{ margin: 0, fontSize: 10 }}>
+                  {data.shiftDays > 0 ? `+${data.shiftDays}` : data.shiftDays} day{Math.abs(data.shiftDays) === 1 ? '' : 's'}
+                </Tag>
+              )}
+              <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>
+            </div>
+            {data.reason && (
+              <div style={{ paddingLeft: 4, fontSize: 12 }}>
+                <Text type="secondary">Reason: </Text><Text style={{ fontSize: 12 }}>{data.reason}</Text>
+              </div>
+            )}
+            {stages.length > 0 && (
+              <div style={{ paddingLeft: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Text type="secondary" style={{ fontSize: 11 }}>
+                  {stages.length} stage target{stages.length === 1 ? '' : 's'} moved:
+                </Text>
+                {stages.map((s, i) => (
+                  <Text key={i} type="secondary" style={{ fontSize: 11, paddingLeft: 8 }}>
+                    {s.item} · <Text style={{ fontSize: 11 }}>{s.stage}</Text>
+                    {' '}{s.from ? dayjs(s.from).format('DD MMM') : '—'} → {dayjs(s.to).format('DD MMM YYYY')}
+                  </Text>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+      // Unknown structured event — render a readable line instead of leaking raw JSON
+      if (data && typeof data === 'object' && data.type) {
+        const label = String(data.type).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+        return (<div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <SettingOutlined style={{ color: 'var(--text-secondary, #888)' }} />
+          <Text>{label}</Text>
+          {data.by && <Text type="secondary" style={{ fontSize: 12 }}>by {data.by}</Text>}
         </div>);
       }
     } catch { /* not JSON */ }
@@ -1246,10 +1316,16 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                       <CalendarOutlined style={{ color: 'var(--text-secondary)', fontSize: 13 }} />
                       <Text type="secondary">{formatDate(po.poDate)}</Text>
                     </div>
-                    {po.deliveryDate && (
+                    {effectiveDeliveryDate && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <TagOutlined style={{ color: 'var(--text-secondary)', fontSize: 13 }} />
-                        <Text type="secondary">Due: {formatDate(po.deliveryDate)}</Text>
+                        <Text type="secondary">Due: {formatDate(effectiveDeliveryDate)}</Text>
+                        {po.revisedDeliveryDate && (
+                          <>
+                            <Text type="secondary" style={{ textDecoration: 'line-through', opacity: 0.6 }}>{formatDate(po.deliveryDate)}</Text>
+                            <Tag color="warning" style={{ margin: 0, fontSize: 10 }}>Revised</Tag>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1286,8 +1362,31 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                       </Col>
                       <Col xs={12} sm={8}>
                         <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Delivery Date</Text>
-                        <Text strong style={{ fontSize: 14 }}>{formatDate(po.deliveryDate)}</Text>
+                        <Text strong style={{ fontSize: 14, textDecoration: po.revisedDeliveryDate ? 'line-through' : 'none', opacity: po.revisedDeliveryDate ? 0.6 : 1 }}>
+                          {formatDate(po.deliveryDate)}
+                        </Text>
                       </Col>
+                      {canUpdateStages && (
+                        <Col xs={12} sm={8}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Revised Delivery Date</Text>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <Text strong style={{ fontSize: 14, color: po.revisedDeliveryDate ? 'var(--warning-color)' : undefined }}>
+                              {po.revisedDeliveryDate ? formatDate(po.revisedDeliveryDate) : '—'}
+                            </Text>
+                            {hasPermission('purchase-orders', 'update') && (
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<CalendarOutlined style={{ fontSize: 12 }} />}
+                                style={{ padding: 0, height: 'auto', fontSize: 11 }}
+                                onClick={() => setReviseDeliveryOpen(true)}
+                              >
+                                {po.revisedDeliveryDate ? 'Revise again' : 'Revise'}
+                              </Button>
+                            )}
+                          </div>
+                        </Col>
+                      )}
                       <Col xs={12} sm={8}>
                         <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 2 }}>Terms & Conditions</Text>
                         <Text style={{ fontSize: 13 }}>{po.termsConditionsTitle || '-'}</Text>
@@ -1734,7 +1833,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         existingStages={addStagesDialog.lineItem?.processingStages || []}
         appendOnly
         poDate={po?.poDate}
-        deliveryDate={po?.deliveryDate}
+        deliveryDate={effectiveDeliveryDate}
         itemName={addStagesDialog.lineItem?.itemName || ''}
         itemCode={addStagesDialog.lineItem?.itemCode || ''}
         variantAttributes={addStagesDialog.lineItem?.variantAttributes}
@@ -1745,13 +1844,21 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
         open={completeStageModal.open}
         onCancel={() => setCompleteStageModal({ open: false, lineItemId: null, stageIndex: null })}
         poDate={po?.poDate}
-        deliveryDate={po?.deliveryDate}
+        deliveryDate={effectiveDeliveryDate}
         isUpdating={!!stageUpdating}
         message={message}
         onComplete={(dateVal, notesVal) => {
           handleStageCompletion(completeStageModal.lineItemId, completeStageModal.stageIndex, true, dateVal, notesVal);
           setCompleteStageModal({ open: false, lineItemId: null, stageIndex: null });
         }}
+      />
+
+      {/* Revise Delivery Date */}
+      <ReviseDeliveryDateDialog
+        open={reviseDeliveryOpen}
+        po={po}
+        onClose={() => setReviseDeliveryOpen(false)}
+        onSaved={handleDeliveryDateRevised}
       />
     </>
   );

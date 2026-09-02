@@ -690,6 +690,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="label">Delivery Date</div>
         <div class="value">${formatDate(po.deliveryDate || po.expectedDeliveryDate)}</div>
       </div>
+      ${po.revisedDeliveryDate ? `
+      <div class="po-detail-item">
+        <div class="label">Revised Delivery Date</div>
+        <div class="value">${formatDate(po.revisedDeliveryDate)}</div>
+      </div>` : ''}
       <div class="po-detail-item">
         <div class="label">Tax Type</div>
         <div class="value">${gst.isIgst ? 'IGST' : 'CGST + SGST'}</div>
