@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space, Alert, Modal, Form, DatePicker, Select } from 'antd';
-import { PrinterOutlined, CheckCircleOutlined, DollarOutlined, ReloadOutlined } from '@ant-design/icons';
+import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space, Alert } from 'antd';
+import { PrinterOutlined, CheckCircleOutlined, DollarOutlined, EditOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getFnfById, approveFnf, settleFnf, cancelFnf, recalculateFnf } from '../../../services/hr/fnfService';
+import { getFnfById, approveFnf, settleFnf, cancelFnf } from '../../../services/hr/fnfService';
 import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -28,8 +28,6 @@ const FnfView = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [recalcOpen, setRecalcOpen] = useState(false);
-  const [recalcForm] = Form.useForm();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -47,38 +45,6 @@ const FnfView = () => {
     fetchData();
   }, [fetchData]);
 
-  /**
-   * Recalculating can correct the two inputs the whole settlement is derived
-   * from, so it asks for them rather than silently re-deriving against the
-   * dates already stored - which is all it did, and gave no way to fix a wrong
-   * last working day short of cancelling.
-   */
-  const openRecalculate = useCallback(() => {
-    recalcForm.setFieldsValue({
-      lastWorkingDate: data?.lastWorkingDate ? dayjs(data.lastWorkingDate) : null,
-      separationReason: data?.separationReason,
-    });
-    setRecalcOpen(true);
-  }, [data, recalcForm]);
-
-  const handleRecalculate = useCallback(async () => {
-    try {
-      const values = await recalcForm.validateFields();
-      setActionLoading(true);
-      await recalculateFnf(id, {
-        lastWorkingDate: values.lastWorkingDate.format('YYYY-MM-DD'),
-        separationReason: values.separationReason,
-      });
-      message.success('Settlement recalculated');
-      setRecalcOpen(false);
-      fetchData();
-    } catch (err) {
-      if (err?.errorFields) return;
-      // axiosInstance already toasts the server's message.
-    } finally {
-      setActionLoading(false);
-    }
-  }, [id, recalcForm, message, fetchData]);
 
   const handleCancel = useCallback(() => {
     modal.confirm({
@@ -168,16 +134,17 @@ const FnfView = () => {
                 Approve
               </Button>
             )}
-            {/* Calculated for the wrong person or on the wrong date is a real
-                case, and there was no way back short of leaving it in the list. */}
-            {/* Every figure here is derived from data that keeps moving - loan
-                balances, leave, advances, the salary structure. Without this the
-                only way to pick up a change was to cancel and start again. */}
+            {/* The editable form is where anything gets changed - amounts, the
+                last working day, the separation reason - and it was reachable
+                only while creating a settlement, so coming back through the
+                list left no way to alter one. */}
             {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
-              <Button icon={<ReloadOutlined />} onClick={openRecalculate} loading={actionLoading}>
-                Recalculate
+              <Button icon={<EditOutlined />} onClick={() => navigate(`/hr/fnf/edit/${id}`)}>
+                Edit / Recalculate
               </Button>
             )}
+            {/* Calculated for the wrong person is a real case, and there was no
+                way back short of leaving it in the list. */}
             {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
               <Button danger onClick={handleCancel} loading={actionLoading}>
                 Cancel
@@ -259,42 +226,6 @@ const FnfView = () => {
         </div>
       </Card>
 
-      <Modal
-        title="Recalculate settlement"
-        open={recalcOpen}
-        onOk={handleRecalculate}
-        onCancel={() => setRecalcOpen(false)}
-        confirmLoading={actionLoading}
-        okText="Recalculate"
-        destroyOnHidden
-      >
-        <Alert
-          type="warning"
-          showIcon
-          style={{ marginBottom: 16 }}
-          message="Every amount is re-derived"
-          description="Pending salary, EL encashment, bonus pro-rata, gratuity, and the outstanding loan
-            and advance are recomputed from this employee's data as it stands now. Any figures edited by
-            hand are replaced."
-        />
-        <Form form={recalcForm} layout="vertical">
-          <Form.Item
-            name="lastWorkingDate"
-            label="Last Working Date"
-            extra="Drives pending salary, gratuity service and the bonus period."
-            rules={[{ required: true, message: 'A last working date is required' }]}
-          >
-            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
-          </Form.Item>
-          <Form.Item
-            name="separationReason"
-            label="Separation Reason"
-            rules={[{ required: true, message: 'A separation reason is required' }]}
-          >
-            <Select options={SEPARATION_REASONS} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </>
   );
 };

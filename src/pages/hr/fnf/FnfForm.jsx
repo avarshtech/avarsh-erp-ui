@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { App, Alert, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Space, Spin, Descriptions, Tag } from 'antd';
 import { CalculatorOutlined, CheckCircleOutlined, SaveOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
-import { calculateFnf, updateFnf, approveFnf } from '../../../services/hr/fnfService';
+import { useNavigate, useParams } from 'react-router-dom';
+import dayjs from 'dayjs';
+import { calculateFnf, updateFnf, approveFnf, getFnfById, recalculateFnf } from '../../../services/hr/fnfService';
 import { hasPermission } from '../../../utils/permissions';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { SEPARATION_REASONS, FNF_STATUS } from '../../../utils/hrConstants';
@@ -15,6 +16,11 @@ const formatCurrency = (val) =>
 const FnfForm = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // This screen was reachable only while creating a settlement, so the
+  // editable amounts existed for one visit and never again - coming back
+  // through the list landed on the read-only statement.
+  const { id } = useParams();
+  const isEdit = Boolean(id);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
@@ -66,6 +72,53 @@ const FnfForm = () => {
     loadEmployees();
     return () => clearTimeout(searchTimer.current);
   }, [loadEmployees]);
+
+  const applyToForm = useCallback((result) => {
+    setFnfData(result);
+    form.setFieldsValue({
+      employeeId: result.employeeId,
+      lastWorkingDate: result.lastWorkingDate ? dayjs(result.lastWorkingDate) : null,
+      separationReason: result.separationReason,
+      pendingSalary: result.pendingSalary,
+      elEncashmentAmount: result.elEncashmentAmount,
+      bonusProrata: result.bonusProrata,
+      gratuity: result.gratuity,
+      otherEarnings: result.otherEarnings || 0,
+      outstandingLoan: result.outstandingLoan,
+      outstandingAdvance: result.outstandingAdvance,
+      noticePeriodRecovery: result.noticePeriodRecovery,
+      otherDeductions: result.otherDeductions || 0,
+    });
+    setDirty(false);
+  }, [form]);
+
+  useEffect(() => {
+    if (!isEdit) return;
+    setLoading(true);
+    getFnfById(id)
+      .then(applyToForm)
+      .catch(() => { /* axiosInstance already toasts the server's message. */ })
+      .finally(() => setLoading(false));
+  }, [id, isEdit, applyToForm]);
+
+  /** Re-derives every amount from the employee's data as it stands now. */
+  const handleRecalculate = useCallback(async () => {
+    try {
+      const values = await form.validateFields(['lastWorkingDate', 'separationReason']);
+      setLoading(true);
+      const result = await recalculateFnf(fnfData.id, {
+        lastWorkingDate: values.lastWorkingDate.format('YYYY-MM-DD'),
+        separationReason: values.separationReason,
+      });
+      applyToForm(result);
+      message.success('Recalculated from current data');
+    } catch (err) {
+      if (err?.errorFields) return;
+      // axiosInstance already toasts the server's message.
+    } finally {
+      setLoading(false);
+    }
+  }, [form, fnfData, applyToForm, message]);
 
   const handleCalculate = useCallback(async () => {
     try {
@@ -161,7 +214,7 @@ const FnfForm = () => {
 
   return (
     <>
-      <PageHeader title="New F&F Settlement" onBack={() => navigate('/hr/fnf')} />
+      <PageHeader title={isEdit ? 'Edit F&F Settlement' : 'New F&F Settlement'} onBack={() => navigate('/hr/fnf')} />
       <Spin spinning={loading}>
         <Form form={form} layout="vertical" onValuesChange={() => { if (fnfData) setDirty(true); }}>
           <Card title="Employee Details" style={{ marginBottom: 16 }}>
@@ -174,6 +227,7 @@ const FnfForm = () => {
                     filterOption={false}
                     onSearch={handleEmployeeSearch}
                     loading={searchLoading}
+                    disabled={isEdit}
                     options={employeeOptions(employees)}
                     notFoundContent={searchLoading ? 'Searching…' : 'No matching employee'}
                   />
@@ -270,6 +324,16 @@ const FnfForm = () => {
               {isCalculated && (
                 <div style={{ textAlign: 'right' }}>
                   <Space>
+                    {/* Re-derives from current loans, leave and advances, using
+                        the dates in the panel above. */}
+                    <Button
+                      icon={<CalculatorOutlined />}
+                      onClick={handleRecalculate}
+                      loading={loading}
+                      size="large"
+                    >
+                      Recalculate
+                    </Button>
                     <Button
                       icon={<SaveOutlined />}
                       onClick={handleSave}
