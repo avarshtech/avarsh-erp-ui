@@ -71,3 +71,17 @@ export const cancelFnf = async (id, reason) => {
   const response = await axiosInstance.post(`${BASE_URL}/${id}/cancel`, { reason });
   return response.data;
 };
+
+/**
+ * Recompute a settlement from the source data as it stands now.
+ * POST /api/v1/hr/fnf/{id}/recalculate
+ *
+ * Loans, leave balances, advances and the salary structure all keep moving
+ * after a settlement is first calculated. Pass a last working date or
+ * separation reason to correct those at the same time. Manual overrides are
+ * replaced - they adjusted a calculation that no longer stands.
+ */
+export const recalculateFnf = async (id, changes) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${id}/recalculate`, changes || {});
+  return response.data;
+};
