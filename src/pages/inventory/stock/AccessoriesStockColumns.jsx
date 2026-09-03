@@ -22,7 +22,7 @@ const getAccessoriesStockColumns = () => [
     fixed: 'left',
     width: 200,
     align: 'center',
-    render: (code) => code,
+    render: (code, r) => r.variantCode || '—',
   },
   {
     title: 'Category',

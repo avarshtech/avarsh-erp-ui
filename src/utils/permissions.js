@@ -10,6 +10,13 @@
  *   "bom":              { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "purchase-orders":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "po-approval":      { "access": true, "operations": { "approve": true, "reject": true, "cancel": true, "refer_back": true } },
+ *   "cutting-po":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "work-order":       { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "finishing-po":     { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "production-cutting":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "production-sewing":    { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "production-finishing": { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "production-masters":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "inventory":        { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "inventory-qc":     { "access": true, "operations": { "view": true, "add": true, "update": true, "approve": true } },
  *   "inventory-issue":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
@@ -54,10 +61,34 @@ export const MODULES = {
     path: '/bom',
     group: 'transactions',
   },
+  SAMPLE_REQUESTS: {
+    id: 'sample-requests',
+    name: 'Sample Requests',
+    path: '/sample-requests/list',
+    group: 'transactions',
+  },
+  SAMPLE_DISPATCHES: {
+    id: 'sample-dispatches',
+    name: 'Sample Dispatches',
+    path: '/sample-requests/dispatches/list',
+    group: 'transactions',
+  },
+  SAMPLE_COMMENTS: {
+    id: 'sample-comments',
+    name: 'Customer Comments',
+    path: '/sample-requests/comments',
+    group: 'transactions',
+  },
+  SAMPLE_INVOICES: {
+    id: 'sample-invoices',
+    name: 'Invoices (Samples)',
+    path: '/sample-requests/invoices/list',
+    group: 'transactions',
+  },
   PURCHASE_ORDERS: {
     id: 'purchase-orders',
-    name: 'Purchase Orders',
-    path: '/purchase-orders',
+    name: 'Supplier PO',
+    path: '/purchase-orders/supplier-po/list',
     group: 'transactions',
   },
   ORDER_ACTIONS: {
@@ -70,15 +101,121 @@ export const MODULES = {
   PO_APPROVAL: {
     id: 'po-approval',
     name: 'PO Approval',
-    path: '/purchase-orders', // Integrated within PO module
+    path: '/purchase-orders/supplier-po', // Integrated within Supplier PO module
     group: 'transactions',
     linkedTo: 'purchase-orders',
   },
-  PRODUCTION: {
-    id: 'production',
-    name: 'Production POs (Cutting / Work Order / Finishing)',
+  GRN_APPROVAL: {
+    id: 'grn-approval',
+    name: 'GRN Refer-Back Approval',
+    path: '/inventory/grn', // Integrated within GRN module
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  GRN_REVERSAL: {
+    id: 'grn-reversal',
+    name: 'GRN Reversal Approval',
+    path: '/inventory/grn', // Integrated within GRN module
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  CUTTING_PO: {
+    id: 'cutting-po',
+    name: 'Cutting PO',
     path: '/purchase-orders/cutting-po/list',
     group: 'transactions',
+  },
+  WORK_ORDER: {
+    id: 'work-order',
+    name: 'Work Orders',
+    path: '/purchase-orders/work-order/list',
+    group: 'transactions',
+  },
+  FINISHING_PO: {
+    id: 'finishing-po',
+    name: 'Finishing PO',
+    path: '/purchase-orders/finishing-po/list',
+    group: 'transactions',
+  },
+  TNA: {
+    id: 'tna',
+    name: 'Time & Action',
+    path: '/tna/control-tower',
+    group: 'transactions',
+  },
+  TNA_MASTERS: {
+    id: 'tna-masters',
+    name: 'TNA Masters',
+    path: '/tna/masters',
+    group: 'transactions',
+  },
+  TNA_REPLAN_APPROVAL: {
+    id: 'tna-replan-approval',
+    name: 'TNA Re-plan Approvals',
+    path: '/tna/replans',
+    group: 'transactions',
+  },
+  PRODUCTION_CUTTING: {
+    id: 'production-cutting',
+    name: 'Production — Cutting',
+    path: '/production/cutting',
+    group: 'transactions',
+  },
+  PRODUCTION_SEWING: {
+    id: 'production-sewing',
+    name: 'Production — Sewing',
+    path: '/production/sewing',
+    group: 'transactions',
+  },
+  PRODUCTION_FINISHING: {
+    id: 'production-finishing',
+    name: 'Production — Finishing',
+    path: '/production/finishing',
+    group: 'transactions',
+  },
+  EXPORT_PACKING: {
+    id: 'export-packing',
+    name: 'Carton Packing Entry',
+    path: '/export-docs/packing/list',
+    group: 'transactions',
+  },
+  EXPORT_SHIPMENTS: {
+    id: 'export-shipments',
+    name: 'Shipments',
+    path: '/export-docs/shipments/list',
+    group: 'transactions',
+  },
+  EXPORT_PACKING_LIST: {
+    id: 'export-packing-list',
+    name: 'Packing List',
+    path: '/export-docs/packing-lists/list',
+    group: 'transactions',
+  },
+  EXPORT_INVOICE: {
+    id: 'export-invoice',
+    name: 'Export Invoice',
+    path: '/export-docs/invoices/list',
+    group: 'transactions',
+  },
+  EXPORT_STICKERS: {
+    id: 'export-stickers',
+    name: 'Carton Stickers',
+    path: '/export-docs/stickers',
+    group: 'transactions',
+    // Stickers render an existing packing list — without PL access there is nothing to draw.
+    linkedTo: 'export-packing-list',
+  },
+  EXPORT_TEMPLATES: {
+    id: 'export-templates',
+    name: 'Buyer Document Templates',
+    path: '/export-docs/templates/list',
+    group: 'transactions',
+  },
+  PRODUCTION_MASTERS: {
+    id: 'production-masters',
+    name: 'Production Masters',
+    path: '/production/masters',
+    group: 'masters',
   },
   INVENTORY: {
     id: 'inventory',
@@ -111,6 +248,13 @@ export const MODULES = {
     id: 'inventory-return-supplier',
     name: 'Return to Supplier',
     path: '/inventory/return-to-supplier',
+    group: 'transactions',
+    linkedTo: 'inventory',
+  },
+  INVENTORY_BILL_PASSING: {
+    id: 'inventory-bill-passing',
+    name: 'Bill Passing',
+    path: '/inventory/bill-passing',
     group: 'transactions',
     linkedTo: 'inventory',
   },
@@ -312,8 +456,39 @@ export const ORDER_ACTION_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reje
 // PO Approval operations
 export const PO_APPROVAL_OPERATIONS = ['refer_back', 'cancel', 'approve', 'reject'];
 
+// Bill Passing splits the clerk (add/update), the verifier (verify) and the
+// approver (approve) across one module, the way inventory-qc already does.
+export const BILL_PASSING_OPERATIONS = ['view', 'add', 'update', 'delete', 'verify', 'approve'];
+
+// GRN approval-action operations — mirror exactly what the GRN helpers check:
+// canApproveGRNReferBack → grn-approval.refer_back, canApproveGRNReversal → grn-reversal.approve
+export const GRN_APPROVAL_OPERATIONS = ['refer_back'];
+export const GRN_REVERSAL_OPERATIONS = ['approve'];
+
 // Costing Approval operations
 export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
+
+// Export documents (Packing List / Export Invoice) carry an approval lifecycle:
+// maker (add/update), approver (approve), and the two post-approval powers the
+// PRD separates — `revise` opens a new draft version of an approved document,
+// `override` forces a non-default template version onto one document. Both are
+// logged; neither is ordinary editing. Acknowledging a validation WARNing maps to
+// `update`, not `override`: every role that may acknowledge already holds an edit
+// right, whereas template override is approver-only.
+// No `submit` op — repo-wide, Draft→Submitted is gated on `update`
+// (see canSubmitOrder below, and Bill Passing).
+export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'approve', 'revise', 'override'];
+
+// Stickers have no approval of their own — they inherit the packing list's state,
+// so there is nothing to add/update/delete. What varies is who may put ink on
+// paper: `print` from an approved PL, `reprint` a carton/range (an audited
+// exception), `override` to print from a still-Draft PL.
+export const EXPORT_STICKER_OPERATIONS = ['view', 'print', 'reprint', 'override'];
+
+// `publish` moves a Draft template to Active and retires the previous Active — the
+// only act that can break the "exactly one Active per buyer/sub-client/doc-type"
+// invariant, so it is separated from ordinary draft editing.
+export const EXPORT_TEMPLATE_OPERATIONS = ['view', 'add', 'update', 'delete', 'publish'];
 
 // Dashboard only has view
 export const DASHBOARD_OPERATIONS = ['view'];
@@ -337,18 +512,41 @@ export const PERMISSION_GROUPS = [
       { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
       { id: 'order-actions', name: 'Order Approval Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
       { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
-      { id: 'purchase-orders', name: 'Purchase Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/list' },
-      { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within PO)' },
-      { id: 'production', name: 'Production POs (Cutting / Sewing / Finishing)', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
+      { id: 'sample-requests', name: 'Sample Requests', operations: STANDARD_OPERATIONS, path: '/sample-requests/list' },
+      { id: 'sample-dispatches', name: 'Sample Dispatches', operations: STANDARD_OPERATIONS, path: '/sample-requests/dispatches/list' },
+      { id: 'sample-comments', name: 'Customer Comments', operations: STANDARD_OPERATIONS, path: '/sample-requests/comments' },
+      { id: 'sample-invoices', name: 'Invoices (Samples)', operations: STANDARD_OPERATIONS, path: '/sample-requests/invoices/list' },
+      { id: 'purchase-orders', name: 'Supplier PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/supplier-po/list' },
+      { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within Supplier PO)' },
+      { id: 'cutting-po', name: 'Cutting PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
+      { id: 'work-order', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/work-order/list' },
+      { id: 'finishing-po', name: 'Finishing PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/finishing-po/list' },
+      { id: 'tna', name: 'Time & Action (TNA)', operations: STANDARD_OPERATIONS, path: '/tna/control-tower' },
+      { id: 'tna-masters', name: 'TNA Masters', operations: STANDARD_OPERATIONS, path: '/tna/masters' },
+      { id: 'tna-replan-approval', name: 'TNA Re-plan Approvals', operations: ['view', 'approve'], path: '/tna/replans' },
+      { id: 'production-cutting', name: 'Production — Cutting', operations: STANDARD_OPERATIONS, path: '/production/cutting' },
+      { id: 'production-sewing', name: 'Production — Sewing', operations: STANDARD_OPERATIONS, path: '/production/sewing' },
+      { id: 'production-finishing', name: 'Production — Finishing', operations: STANDARD_OPERATIONS, path: '/production/finishing' },
+      { id: 'export-packing', name: 'Carton Packing Entry', operations: STANDARD_OPERATIONS, path: '/export-docs/packing/list' },
+      { id: 'export-shipments', name: 'Shipments', operations: STANDARD_OPERATIONS, path: '/export-docs/shipments/list' },
+      { id: 'export-packing-list', name: 'Packing List', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/packing-lists/list' },
+      { id: 'export-invoice', name: 'Export Invoice', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/invoices/list' },
+      { id: 'export-stickers', name: 'Carton Stickers', operations: EXPORT_STICKER_OPERATIONS, linkedTo: 'export-packing-list', path: '/export-docs/stickers' },
+      { id: 'export-templates', name: 'Buyer Document Templates', operations: EXPORT_TEMPLATE_OPERATIONS, path: '/export-docs/templates/list' },
+      { id: 'production-masters', name: 'Production Masters', operations: STANDARD_OPERATIONS, path: '/production/masters' },
       { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
+      { id: 'grn-approval', name: 'GRN Refer-Back Approval', operations: GRN_APPROVAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
+      { id: 'grn-reversal', name: 'GRN Reversal Approval', operations: GRN_REVERSAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
       { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
       { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
       { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
       { id: 'inventory-return-supplier', name: 'Return to Supplier', operations: ['view', 'add'], linkedTo: 'inventory', path: '/inventory/return-to-supplier' },
+      // verify = the Accounts Executive check; approve = the value-band approver.
+      { id: 'inventory-bill-passing', name: 'Bill Passing', operations: BILL_PASSING_OPERATIONS, linkedTo: 'inventory', path: '/inventory/bill-passing' },
       { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
       { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
       { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
-      { id: 'reports', name: 'Reports & Analytics', operations: ['view'], path: '/reports/list' },
+      { id: 'reports', name: 'Reports & Analytics', operations: STANDARD_OPERATIONS, path: '/reports/list' },
       { id: 'ai-assistant', name: 'AI Assistant', operations: ['view'], linkedTo: 'reports', path: '/reports/ai-chat' },
     ],
   },
@@ -415,9 +613,12 @@ export const getSidebarModules = () =>
 export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
   if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
+  if (moduleId === 'grn-approval')    return GRN_APPROVAL_OPERATIONS;
+  if (moduleId === 'grn-reversal')    return GRN_REVERSAL_OPERATIONS;
   if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
   if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
-  if (moduleId === 'reports')              return ['view'];
+  // Admins design reports in-app (create/edit/delete definitions); everyone else runs them
+  if (moduleId === 'reports')              return STANDARD_OPERATIONS;
   if (moduleId === 'ai-assistant')        return ['view'];
   if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
@@ -435,6 +636,13 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'hr-payroll')      return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
   if (moduleId === 'hr-bonus')        return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
   if (moduleId === 'hr-fnf')          return [...STANDARD_OPERATIONS, 'approve'];
+  if (moduleId === 'inventory-bill-passing') return BILL_PASSING_OPERATIONS;
+  if (moduleId === 'export-packing')      return STANDARD_OPERATIONS;
+  if (moduleId === 'export-shipments')    return STANDARD_OPERATIONS;
+  if (moduleId === 'export-packing-list') return EXPORT_DOC_OPERATIONS;
+  if (moduleId === 'export-invoice')      return EXPORT_DOC_OPERATIONS;
+  if (moduleId === 'export-stickers')     return EXPORT_STICKER_OPERATIONS;
+  if (moduleId === 'export-templates')    return EXPORT_TEMPLATE_OPERATIONS;
   // Items do not support delete via UI — remove 'delete' from operations
   if (moduleId === 'items')           return ['view', 'add', 'update'];
   return STANDARD_OPERATIONS;
@@ -634,7 +842,23 @@ export const getFirstAccessibleRoute = () => {
     { route: '/', moduleId: 'dashboard' },
     { route: '/orders/list', moduleId: 'orders' },
     { route: '/bom/list', moduleId: 'bom' },
-    { route: '/purchase-orders/list', moduleId: 'purchase-orders' },
+    { route: '/sample-requests/list', moduleId: 'sample-requests' },
+    { route: '/sample-requests/dispatches/list', moduleId: 'sample-dispatches' },
+    { route: '/sample-requests/comments', moduleId: 'sample-comments' },
+    { route: '/sample-requests/invoices/list', moduleId: 'sample-invoices' },
+    { route: '/purchase-orders/supplier-po/list', moduleId: 'purchase-orders' },
+    { route: '/purchase-orders/cutting-po/list', moduleId: 'cutting-po' },
+    { route: '/purchase-orders/work-order/list', moduleId: 'work-order' },
+    { route: '/purchase-orders/finishing-po/list', moduleId: 'finishing-po' },
+    { route: '/production/cutting', moduleId: 'production-cutting' },
+    { route: '/production/sewing', moduleId: 'production-sewing' },
+    { route: '/production/finishing', moduleId: 'production-finishing' },
+    { route: '/export-docs/packing/list', moduleId: 'export-packing' },
+    { route: '/export-docs/shipments/list', moduleId: 'export-shipments' },
+    { route: '/export-docs/packing-lists/list', moduleId: 'export-packing-list' },
+    { route: '/export-docs/invoices/list', moduleId: 'export-invoice' },
+    { route: '/export-docs/stickers', moduleId: 'export-stickers' },
+    { route: '/export-docs/templates/list', moduleId: 'export-templates' },
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
     { route: '/reports/list', moduleId: 'reports' },
@@ -729,6 +953,15 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized['ai-assistant'] = {
       access: false,
       operations: { view: false },
+    };
+  }
+
+  // Enforce export-stickers → export-packing-list link. Stickers are a projection
+  // of an approved packing list; without PL access there is nothing to render.
+  if (!normalized['export-packing-list']?.access) {
+    normalized['export-stickers'] = {
+      access: false,
+      operations: EXPORT_STICKER_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
     };
   }
 

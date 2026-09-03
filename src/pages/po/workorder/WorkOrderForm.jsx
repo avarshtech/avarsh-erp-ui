@@ -14,9 +14,13 @@ import PpSampleGate from '../components/PpSampleGate';
 import OrderCoveragePanel from '../components/OrderCoveragePanel';
 import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, VARIANCE_THRESHOLD, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getOrderForPo, getApprovedCuttingPos, getConsumptionComparison, getStockByBom,
-  getPpApprovalStatus, getSewingLines, getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getOrderCoverage,
-} from '../../../services/po/productionService';
+  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom,
+  getPpApprovalStatus, setPpApprovalStatus, getSewingLines,
+} from '../../../services/po/production/productionLookupService';
+import { getApprovedCuttingPos } from '../../../services/po/production/cuttingPoService';
+import {
+  getWorkOrder, createWorkOrder, updateWorkOrder, changeWorkOrderStatus, getWorkOrderCoverage,
+} from '../../../services/po/production/workOrderService';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
@@ -56,13 +60,13 @@ const WorkOrderForm = () => {
   const hydrateOrder = useCallback(async (orderId) => {
     const [o, pp, cps] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId), getApprovedCuttingPos(orderId)]);
     setOrder(o); setPpStatus(pp); setCuttingPos(cps);
-    setStock(normTrimStock(await getStockByBom(orderId, 'trim')));
+    setStock(normTrimStock(await getStockByBom(o, 'trim')));
     return o;
   }, []);
 
   const applyCuttingPo = useCallback(async (cp, o) => {
     setCuttingPo(cp);
-    setConsumption(await getConsumptionComparison(o.id, cp.cadConsumptionPerPc));
+    setConsumption(await getConsumptionComparison(o, cp.cadConsumptionPerPc, cp.totalPlannedQty));
     setItems((cp.items || o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
   }, []);
 
@@ -71,13 +75,13 @@ const WorkOrderForm = () => {
     getWorkOrder(id).then(async (wo) => {
       if (!wo) { message.error('Work Order not found'); return navigate('/purchase-orders/work-order/list'); }
       const o = await hydrateOrder(wo.orderId);
-      getOrderCoverage(PO_TYPE.WORK_ORDER, wo.orderId, id).then(setCoverage);
+      getWorkOrderCoverage(wo.orderId, id).then(setCoverage);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
         setAllowanceWarn({ stored: wo.allowancePercent, live: o.allowancePercent });
       }
       const cp = (await getApprovedCuttingPos(wo.orderId)).find((c) => c.id === wo.cuttingPoId) || { id: wo.cuttingPoId, cuttingPoNo: wo.cuttingPoNo, cadConsumptionPerPc: wo.cadConsumptionPerPc, items: wo.items };
       setCuttingPo(cp);
-      setConsumption(await getConsumptionComparison(wo.orderId, wo.cadConsumptionPerPc));
+      setConsumption(await getConsumptionComparison(o, wo.cadConsumptionPerPc, wo.totalPlannedQty));
       setItems(wo.items || []);
       form.setFieldsValue({
         orderId: wo.orderId, cuttingPoId: wo.cuttingPoId,
@@ -94,7 +98,7 @@ const WorkOrderForm = () => {
     form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]); setConsumption([]);
     setAllowanceWarn(null);
     await hydrateOrder(orderId);
-    getOrderCoverage(PO_TYPE.WORK_ORDER, orderId).then(setCoverage);
+    getWorkOrderCoverage(orderId).then(setCoverage);
   };
 
   const handleCuttingPoSelect = async (cpId) => {
@@ -113,7 +117,7 @@ const WorkOrderForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order.id, 'trim', { plannedQty: total }).then((s) => setStock(normTrimStock(s)));
+    if (order) getStockByBom(order, 'trim', { plannedQty: total }).then((s) => setStock(normTrimStock(s)));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
@@ -177,7 +181,16 @@ const WorkOrderForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
-        {ppStatus && <PpSampleGate status={ppStatus} />}
+        {ppStatus && (
+          <PpSampleGate
+            status={ppStatus}
+            onMarkApproved={order ? async () => {
+              const next = await setPpApprovalStatus(order.id, 'COMPLETED');
+              setPpStatus(next);
+              message.success('PP Sample marked approved for this order');
+            } : undefined}
+          />
+        )}
         <FormSection title="Order & Cutting PO" columns={2}>
           <Form.Item name="orderId" label="Confirmed Order" rules={[{ required: true, message: 'Select an order' }]}>
             <FormSelect placeholder="Select order" disabled={isEdit} onChange={handleOrderSelect}

@@ -18,7 +18,8 @@ import {
 import { getFilesByEntity } from '../../../services/core/fileService';
 import { processGrnAttachments } from './grnAttachments';
 import { validateFabricGRN } from '../../../utils/grnValidation';
-import { GRN_STATUS, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
+import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { GRN_STATUS, GRN_CATEGORY, matchesGrnCategory, getInventoryStatusLabel } from '../../../utils/inventoryConstants';
 import { GRN_STATUS_CONFIG } from '../../../utils/statusConfig';
 import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -31,8 +32,10 @@ const { TextArea } = Input;
 
 const CHALLAN_REGEX = /^[A-Za-z0-9\-/]+$/;
 
-// Exact mst_categories.name denormalized onto each PO line item as categoryName.
-const PO_CATEGORY = 'Fabric';
+// Fabric lines are received as rolls. Matched by classification rather than an exact
+// category name, so "Fabric", "Knitted Fabric" etc. all qualify — see
+// matchesGrnCategory in utils/inventoryConstants.
+const PO_CATEGORY = GRN_CATEGORY.FABRIC;
 
 const FabricGRNForm = () => {
   const { message } = App.useApp();
@@ -70,7 +73,7 @@ const FabricGRNForm = () => {
   // here if at least one of its line items belongs to the Fabric category.
   useEffect(() => {
     getPurchaseOrdersForGRN()
-      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => li.categoryName === PO_CATEGORY))))
+      .then((pos) => setPurchaseOrders(pos.filter((p) => (p.items || []).some((li) => matchesGrnCategory(li.categoryName, PO_CATEGORY)))))
       .catch(() => message.error('Failed to load purchase orders'));
   }, [message]);
 
@@ -154,7 +157,15 @@ const FabricGRNForm = () => {
   // - maintain selection order; group rolls per line item
   useEffect(() => {
     if (!selectedPO) return;
-    setRolls((prevRolls) => {
+    let cancelled = false;
+    // Resolve variant identity up front (async API), then reconcile rolls.
+    const variantIds = selectedLineItemIds.map(
+      (id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId,
+    );
+    getItemVariantsBulk(variantIds).then((variants) => {
+      if (cancelled) return;
+      const variantByLineId = new Map(selectedLineItemIds.map((id, i) => [id, variants[i]]));
+      setRolls((prevRolls) => {
       const kept = prevRolls.filter((r) => selectedLineItemIds.includes(r.poLineItemId));
       const existingLineItemIds = new Set(prevRolls.map((r) => r.poLineItemId));
       const newLineIds = selectedLineItemIds.filter((id) => !existingLineItemIds.has(id));
@@ -162,14 +173,14 @@ const FabricGRNForm = () => {
         // No structural change — bail out to avoid unnecessary re-renders
         return prevRolls;
       }
-      const newVariantIds = newLineIds.map((id) => (selectedPO.items || []).find((i) => i.id === id)?.variantId);
-      const newVariants = getItemVariantsBulk(newVariantIds);
-      const freshRows = newLineIds.map((id, idx) => {
+      const freshRows = newLineIds.map((id) => {
         const li = (selectedPO.items || []).find((i) => i.id === id);
-        const v = newVariants[idx];
+        const v = variantByLineId.get(id);
         return {
           poLineItemId: id,
           variantId: li?.variantId,
+          variantName: li?.variantName,
+          variantCode: li?.variantCode,
           itemCode: li?.itemCode,
           description: li?.description,
           width: v?.attributes?.width ?? '—',
@@ -198,11 +209,39 @@ const FabricGRNForm = () => {
         }
       });
       return result;
+      });
     });
+    return () => { cancelled = true; };
   }, [selectedPO, selectedLineItemIds]);
 
   const handleRollChange = useCallback((idx, field, value) => {
     setRolls((prev) => prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r)));
+    setIsDirty(true);
+  }, []);
+
+  // Add another physical roll for a PO line — clones the line's static fields,
+  // blanks the roll-specific entries. `id` must NOT carry over: edit-mode rolls
+  // hold server row ids and a duplicated id would collide on save.
+  const handleAddRoll = useCallback((poLineItemId) => {
+    setRolls((prev) => {
+      const lastIdx = prev.map((r) => r.poLineItemId).lastIndexOf(poLineItemId);
+      if (lastIdx < 0) return prev;
+      const fresh = { ...prev[lastIdx], id: undefined, rollNumber: '', receivingQty: null, shadeLot: '' };
+      const next = [...prev];
+      next.splice(lastIdx + 1, 0, fresh);
+      return next;
+    });
+    setIsDirty(true);
+  }, []);
+
+  // Removing the line's last roll is not allowed — deselect the line item instead.
+  const handleRemoveRoll = useCallback((idx) => {
+    setRolls((prev) => {
+      const row = prev[idx];
+      if (!row) return prev;
+      if (prev.filter((r) => r.poLineItemId === row.poLineItemId).length <= 1) return prev;
+      return prev.filter((_, i) => i !== idx);
+    });
     setIsDirty(true);
   }, []);
 
@@ -366,6 +405,7 @@ const FabricGRNForm = () => {
                   <Col xs={24} md={12}>
                     <Form.Item label="GRN Date">
                       <DatePicker
+                        format={DATE_FORMAT}
                         style={{ width: '100%' }}
                         value={grnRecord?.grnDate ? dayjs(grnRecord.grnDate) : null}
                         disabled
@@ -403,6 +443,7 @@ const FabricGRNForm = () => {
                     rules={[{ required: true, message: 'Invoice Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {
@@ -423,6 +464,7 @@ const FabricGRNForm = () => {
                     rules={[{ required: true, message: 'Delivery Challan Date is required' }]}
                   >
                     <DatePicker
+                      format={DATE_FORMAT}
                       style={{ width: '100%' }}
                       disabled={readOnly || !selectedPO}
                       disabledDate={(d) => {
@@ -470,6 +512,7 @@ const FabricGRNForm = () => {
                       compact
                       placeholder="Upload DC image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (dcImage.previewUrl) URL.revokeObjectURL(dcImage.previewUrl);
                         setDcImage((prev) => ({
@@ -508,6 +551,7 @@ const FabricGRNForm = () => {
                       compact
                       placeholder="Upload invoice image or PDF"
                       disabled={readOnly}
+                      infoMessage="This file is saved together with the GRN when you submit — it is not uploaded on its own."
                       onSelect={(file) => {
                         if (supplierInvoice.previewUrl) URL.revokeObjectURL(supplierInvoice.previewUrl);
                         setSupplierInvoice((prev) => ({
@@ -550,7 +594,13 @@ const FabricGRNForm = () => {
         )}
 
         <Card title={<Space><BranchesOutlined /><span>Roll Details</span></Space>} size="small" style={{ marginBottom: 24 }}>
-          <FabricGRNRollTable rolls={rolls} onRollChange={handleRollChange} readOnly={readOnly} />
+          <FabricGRNRollTable
+            rolls={rolls}
+            onRollChange={handleRollChange}
+            onAddRoll={handleAddRoll}
+            onRemoveRoll={handleRemoveRoll}
+            readOnly={readOnly}
+          />
         </Card>
 
         <Card size="small">

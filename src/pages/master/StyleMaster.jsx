@@ -140,7 +140,9 @@ const StyleMaster = ({ onDirtyChange }) => {
         const uploaded = result?.data || result;
         setExistingImage(uploaded);
         setImageUploading(false);
-        markDirty(true);
+        // Image is already persisted server-side and is independent of the
+        // style's other fields — do NOT mark the form dirty (that would wrongly
+        // enable "Save changes" for a change that is already saved).
         message.success('Style image uploaded');
       } catch {
         message.error('Image upload failed. Please try again.');
@@ -171,7 +173,8 @@ const StyleMaster = ({ onDirtyChange }) => {
       try {
         await deleteFile(prevImage.fileId);
         setImageUploading(false);
-        markDirty(true);
+        // Removal is already persisted server-side and independent of the
+        // style's other fields — do NOT mark the form dirty.
         message.success('Image removed');
       } catch {
         message.error('Failed to remove image. Please try again.');
@@ -489,12 +492,12 @@ const StyleMaster = ({ onDirtyChange }) => {
                   compact
                   placeholder="Click or drag to upload style image"
                   hint="PNG, JPG up to 10 MB"
+                  infoMessage={
+                    selectedId
+                      ? 'Image changes are saved immediately and independently of the other style fields.'
+                      : 'The image will be uploaded automatically when you save the style.'
+                  }
                 />
-                {!selectedId && imageFile && (
-                  <Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
-                    Will upload on save
-                  </Text>
-                )}
               </div>
 
               <Form.Item name="isActive" label="Active" valuePropName="checked">

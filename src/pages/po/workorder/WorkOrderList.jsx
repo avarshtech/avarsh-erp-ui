@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Table, Card, Space } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -14,7 +14,7 @@ import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   PROD_PO_STATUS, getStatusLabel, EDITABLE_STATUSES, PROCESSING_UNIT_OPTIONS, PO_TYPE,
 } from '../../../utils/productionConstants';
-import { listWorkOrders } from '../../../services/po/productionService';
+import { listWorkOrders, getWorkOrder } from '../../../services/po/production/workOrderService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
@@ -50,6 +50,18 @@ const WorkOrderList = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deep link from My Approvals (?viewId=X) — GRNList pattern.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getWorkOrder(viewId)
+      .then((wo) => wo && setView({ open: true, record: wo }))
+      .catch(() => message.error('Work Order not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
 
   const columns = useMemo(() => [
@@ -71,7 +83,7 @@ const WorkOrderList = () => {
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.WORK_ORDER)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="work-order" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/work-order/edit/${r.id}`)} />
             </PermissionGuard>
           )}
@@ -82,7 +94,7 @@ const WorkOrderList = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Work Orders (Sewing)">
-        <PermissionGuard module="production" operation="add">
+        <PermissionGuard module="work-order" operation="add">
           <ActionButton action="create" text="New Work Order" onClick={() => navigate('/purchase-orders/work-order/new')} />
         </PermissionGuard>
       </PageHeader>

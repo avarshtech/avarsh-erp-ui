@@ -27,8 +27,11 @@ import {
   updateCostSheet,
   approveCostSheet,
   rejectCostSheet,
+  revertCostSheetApproval,
 } from '../../services/costing/costingService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
+import ApprovalReasonDialog from '../../components/ApprovalReasonDialog';
+import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import {
   COSTING_STATUS,
   EDITABLE_STATUSES,
@@ -49,6 +52,22 @@ import { COSTING_STATUS_CONFIG, COSTING_STATUS_FLOW } from '../../utils/statusCo
 
 const { Text, Title } = Typography;
 
+// Post-approval reversal: sends an Approved sheet back to Draft so it can be edited.
+// Only offered while no order has been raised against the costing id.
+const REVERT_ACTION = {
+  key: 'revert-approval',
+  label: 'Revert Approval',
+  title: 'Revert Cost Sheet Approval',
+  subtitle: 'Reopen this approved cost sheet for editing. It moves back to Draft and must be re-submitted for approval after the changes.',
+  flowLabel: 'Approved → Draft',
+  btnText: 'Revert Approval',
+  icon: <RollbackOutlined />,
+  color: 'var(--warning-color, #faad14)',
+  requiresReason: true,
+  minChars: 50,
+  placeholder: 'Explain what needs to change on this approved costing — pricing, consumption, trims, or other corrections that justify reopening it...',
+};
+
 const CostingView = () => {
   const { message } = App.useApp();
   const { id } = useParams();
@@ -66,19 +85,27 @@ const CostingView = () => {
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertReason, setRevertReason] = useState('');
+  const [reverting, setReverting] = useState(false);
 
   const canAdd    = hasPermission('costing', 'add');
   const canUpdate = hasPermission('costing', 'update');
   const canApprove = hasPermission('costing-approval', 'approve');
   const canRevise = canReviseCostSheet();
 
-  // Handle deep link from push notification (?action=approve)
+  // Handle deep link from push notification (?action=approve).
+  // Never auto-approve: highlight the approval bar so the decision stays with
+  // the user and goes through the approval engine's level checks.
   const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightApproval, setHighlightApproval] = useState(false);
   useEffect(() => {
     const action = searchParams.get('action');
     if (action && data && !loading) {
-      if (action === 'approve' && data.status === COSTING_STATUS.FINAL && canApprove) {
-        handleApprove();
+      if (action === 'approve' && data.status === COSTING_STATUS.FINAL) {
+        setHighlightApproval(true);
+        message.info('Review this cost sheet and use the Approve action above.');
+        setTimeout(() => setHighlightApproval(false), 4000);
       }
       searchParams.delete('action');
       setSearchParams(searchParams, { replace: true });
@@ -144,6 +171,20 @@ const CostingView = () => {
       message.error('Failed to revise cost sheet');
     } finally {
       setRevising(false);
+    }
+  };
+
+  const handleRevertApproval = async (reason) => {
+    setReverting(true);
+    try {
+      await revertCostSheetApproval(id, reason);
+      message.success('Approval reverted — cost sheet is back in Draft for editing');
+      setRevertOpen(false);
+      loadData();
+    } catch (err) {
+      message.error(err?.response?.data?.message || 'Failed to revert approval');
+    } finally {
+      setReverting(false);
     }
   };
 
@@ -259,14 +300,29 @@ const CostingView = () => {
     return <span>{arr[0]} <Tag style={{ marginLeft: 2 }}>+{arr.length - 1}</Tag></span>;
   };
 
+  // Unit `consumption` is expressed in — the item's secondary UOM. Prefer the symbol
+  // ("GMS") over uomName, which renders as the full word ("KILOGRAMS") and previously made
+  // the view disagree with the form.
+  const consumptionUomOf = (record) =>
+    String(record.uomSymbol || record.uom || record.uomName || '').toUpperCase();
+
+  /** Rate plus the purchase unit it is quoted per: "₹ 600.00 / kg". */
+  const rateWithUom = (value, record, currency) => {
+    const rateUom = record.primaryUomSymbol || record.primaryUom || '';
+    const amount = formatCurrency(value, currency);
+    return rateUom ? `${amount} / ${rateUom}` : amount;
+  };
+
   const fabricColumns = [
     { title: 'S.No', width: 50, align: 'center', render: (_, __, i) => i + 1 },
     { title: 'Sizes', dataIndex: 'sizes', width: 160, align: 'center', render: renderSizes },
     { title: 'Fabric Name', dataIndex: 'fabricType', width: 240, align: 'center' },
     { title: 'Classification', dataIndex: 'classification', width: 120, align: 'center' },
     { title: 'Description', dataIndex: 'description', align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${(record.uomSymbol || record.uom || record.uomName || '').toUpperCase()}`.trim() : '-' },
-    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v.toFixed(4)} ${consumptionUomOf(record)}`.trim() : '-' },
+    // The rate is quoted per PURCHASE unit while consumption is in the secondary unit, so
+    // spell the unit out — an unlabelled ₹600 beside 59.33 GMS reads as an error otherwise.
+    { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, data.currency) },
     { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 100, align: 'center' },
     { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 110, align: 'center' },
     { title: 'Vendor', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
@@ -281,8 +337,8 @@ const CostingView = () => {
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
-    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 120, align: 'center', render: (v) => formatCurrency(v, data.currency) },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${consumptionUomOf(record)}`.trim() : '-' },
+    { title: `Cost (${getCurrencySymbol(data.currency)})`, dataIndex: 'cost', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, data.currency) },
     { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'price', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, data.currency)}</Text> },
   ];
 
@@ -292,8 +348,8 @@ const CostingView = () => {
     { title: 'Item', dataIndex: 'item', align: 'center' },
     { title: 'Code', dataIndex: 'code', width: 130, align: 'center' },
     { title: 'Size', dataIndex: 'size', width: 90, align: 'center' },
-    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${(record.uom || '').toUpperCase()}`.trim() : '-' },
-    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 120, align: 'center', render: (v) => formatCurrency(v, 'USD') },
+    { title: 'Consumption', dataIndex: 'consumption', width: 130, align: 'center', render: (v, record) => v != null ? `${v} ${consumptionUomOf(record)}`.trim() : '-' },
+    { title: 'Cost ($ USD)', dataIndex: 'costUsd', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, 'USD') },
     { title: 'Price ($ USD)', dataIndex: 'priceUsd', width: 120, align: 'center', render: (v) => <Text strong>{formatCurrency(v, 'USD')}</Text> },
   ];
 
@@ -604,19 +660,26 @@ const CostingView = () => {
           {/* Approve/Reject route through the centralized approval engine when a flow
               is configured; legacy direct buttons are the no-flow fallback. */}
           {data.status === COSTING_STATUS.FINAL && (
-            <ApprovalActionBar
-              entityType="COST_SHEET"
-              entityId={data.id}
-              docLabel="Cost Sheet"
-              docNumber={data.costingId}
-              onActionComplete={() => loadData()}
-              fallback={canApprove ? (
-                <Space>
-                  <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
-                  <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
-                </Space>
-              ) : null}
-            />
+            <span style={{
+              display: 'inline-block',
+              borderRadius: 8,
+              transition: 'box-shadow 0.3s',
+              boxShadow: highlightApproval ? '0 0 0 3px var(--primary-color, #1677ff)' : 'none',
+            }}>
+              <ApprovalActionBar
+                entityType="COST_SHEET"
+                entityId={data.id}
+                docLabel="Cost Sheet"
+                docNumber={data.costingId}
+                onActionComplete={() => loadData()}
+                fallback={canApprove ? (
+                  <Space>
+                    <ActionButton action="approve" text="Approve" onClick={handleApprove} loading={approving} />
+                    <Button danger onClick={() => setRejectModalOpen(true)} loading={rejecting}>Reject</Button>
+                  </Space>
+                ) : null}
+              />
+            </span>
           )}
           {data.status === COSTING_STATUS.FINAL && canRevise && (
             <ActionButton
@@ -624,6 +687,23 @@ const CostingView = () => {
               text="Revise"
               onClick={() => { setReviseReason(''); setReviseModalOpen(true); }}
             />
+          )}
+          {/* Post-approval refer-back. Withdrawn entirely once an order consumes the
+              costing id — that order's prices are locked to this sheet. */}
+          {data.status === COSTING_STATUS.APPROVED && canRevise && !data.linkedOrderNo && (
+            <ActionButton
+              action="refer-back"
+              text="Revert Approval"
+              tooltip="Send this approved cost sheet back to Draft so it can be edited"
+              onClick={() => { setRevertReason(''); setRevertOpen(true); }}
+            />
+          )}
+          {data.status === COSTING_STATUS.APPROVED && canRevise && data.linkedOrderNo && (
+            <Tooltip title={`Order ${data.linkedOrderNo} has been raised against this costing — the approval can no longer be reverted`}>
+              <Tag color="default" style={{ borderRadius: 20, padding: '2px 12px' }}>
+                Locked by {data.linkedOrderNo}
+              </Tag>
+            </Tooltip>
           )}
         </Space>
       </PageHeader>
@@ -636,6 +716,8 @@ const CostingView = () => {
         size="small"
         style={{ marginBottom: 16 }}
       />
+
+      <ApprovalHistoryPanel entityType="COST_SHEET" entityId={data.id} style={{ marginBottom: 16 }} />
 
       <Collapse
         defaultActiveKey={['general', 'fabric', 'trims', 'manufacturing', 'overhead', 'summary']}
@@ -756,6 +838,19 @@ const CostingView = () => {
           );
         })()}
       </Modal>
+
+      {/* Revert Approval Dialog */}
+      <ApprovalReasonDialog
+        open={revertOpen}
+        onCancel={() => setRevertOpen(false)}
+        onConfirm={handleRevertApproval}
+        loading={reverting}
+        action={REVERT_ACTION}
+        docLabel="Cost Sheet"
+        docNumber={data.costingId}
+        reason={revertReason}
+        onReasonChange={setRevertReason}
+      />
 
       {/* PDF Preview Modal */}
       <CostingPdfPreviewModal

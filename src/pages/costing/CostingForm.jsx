@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   App,
   Form,
@@ -25,6 +25,7 @@ import {
   Segmented,
   Alert,
   Progress,
+  Spin,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -74,14 +75,22 @@ import {
   calcAutoProfit,
   formatCurrency,
 } from '../../utils/costingConstants';
+import {
+  conversionApplies,
+  convertGramsTo,
+  formatConversionLabel,
+  normaliseUomSymbol,
+} from '../../utils/uomConversions';
 import { getCurrencySymbol } from '../../utils/orderConstants';
 import { getBuyers } from '../../services/master/buyerService';
 import { getStylesByBuyerId, saveStyle } from '../../services/master/styleService';
 import { uploadFile, deleteFile } from '../../services/core/fileService';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
-import { searchItems } from '../../services/master/itemService';
+import { searchVariants } from '../../services/master/variantService';
 import { getAllCategories } from '../../services/master/masterDataService';
 import { getActiveProcesses, createProcess } from '../../services/master/processService';
+import { getAllSizePresets } from '../../services/master/sizePresetService';
+import { getActiveOverheads, createOverhead } from '../../services/master/overheadService';
 import { getSuppliers } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useTheme } from '../../context/ThemeContext';
@@ -99,6 +108,70 @@ import BuyerPriceTrendModal from './BuyerPriceTrendModal';
 const { Text } = Typography;
 const { Dragger } = Upload;
 
+// Costing fabric/trim rows are picked from item variants. The server returns at most 50
+// per call, which comfortably covers a category's active variants for a dropdown.
+const VARIANT_PICKER_LIMIT = 50;
+
+const fetchVariantsForCategory = async (categoryName, q = '') => {
+  if (!categoryName) return [];
+  try {
+    const res = await searchVariants({ category: categoryName, q, limit: VARIANT_PICKER_LIMIT });
+    return res?.data || res || [];
+  } catch (error) {
+    console.error(`Failed to load variants for category "${categoryName}":`, error);
+    return [];
+  }
+};
+
+// Merge freshly searched variants into an existing list, keyed by id so a variant
+// already present is refreshed rather than duplicated.
+const mergeVariantsById = (prev, incoming) => {
+  const byId = new Map((prev || []).map((v) => [v.id, v]));
+  (incoming || []).forEach((v) => byId.set(v.id, v));
+  return [...byId.values()];
+};
+
+// Techpack extraction matches at item level; resolve that to a concrete variant.
+const firstVariantOfItem = (variants, itemId) =>
+  itemId ? (variants || []).find((v) => v.itemId === itemId) || null : null;
+
+// Label with the variant name; the code is the searchable secondary identifier.
+const toVariantOptions = (variants) =>
+  (variants || []).map((v) => ({
+    value: v.id,
+    label: v.variantName || v.variantCode,
+    variantCode: v.variantCode,
+  }));
+
+/**
+ * The UOM fields a costing row inherits from its variant.
+ *
+ * Quantities are captured in the SECONDARY (consumption) UOM while rates are quoted per
+ * PRIMARY (purchase) UOM, so a row must carry both plus the factor bridging them. The
+ * "does a conversion actually apply?" question is answered once, here — the factor is
+ * stored only when it genuinely applies, leaving every downstream formula free to treat
+ * null as "pass the quantity through".
+ *
+ * Note `uomId` takes the SECONDARY id: it is the unit `consumption` is expressed in, and
+ * persisting the primary id there is what made saved sheets read "0.0590 KILOGRAMS" for a
+ * row the form displayed as GMS.
+ */
+const variantUomFields = (variant) => {
+  const factorApplies = conversionApplies(
+    variant?.uomId,
+    variant?.secondaryUomId,
+    variant?.uomConversionFactor,
+  );
+  return {
+    uom: variant?.secondaryUomSymbol || variant?.uomSymbol || '',
+    uomId: variant?.secondaryUomId ?? variant?.uomId ?? null,
+    primaryUom: variant?.uomSymbol || '',
+    primaryUomId: variant?.uomId ?? null,
+    secondaryUomId: variant?.secondaryUomId ?? null,
+    uomConversionFactor: factorApplies ? Number(variant.uomConversionFactor) : null,
+  };
+};
+
 const CostingForm = () => {
   const { message } = App.useApp();
   const { id } = useParams();
@@ -111,6 +184,34 @@ const CostingForm = () => {
   // Watch Section A fields for display
   const watchedSeasonCode = Form.useWatch('seasonCode', form);
   const watchedSeasonYear = Form.useWatch('seasonYear', form);
+
+  // Sizes are picked from the Size Presets master, grouped by preset. A size that
+  // appears in several presets is offered once, under the first preset that carries
+  // it — duplicate values across option groups break AntD's multi-select.
+  const [sizePresetGroups, setSizePresetGroups] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    getAllSizePresets()
+      .then((res) => {
+        if (cancelled) return;
+        const presets = (res?.data ?? res ?? []).filter((p) => p.isActive !== false);
+        const seen = new Set();
+        const groups = presets
+          .map((p) => ({
+            label: p.name,
+            options: (p.sizes || [])
+              .map((s) => String(s).trim().toUpperCase())
+              .filter((s) => s && !seen.has(s) && seen.add(s))
+              .map((s) => ({ value: s, label: s })),
+          }))
+          .filter((g) => g.options.length > 0);
+        setSizePresetGroups(groups);
+      })
+      .catch(() => {
+        // Leave the options empty — the field's placeholder points at the master.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   // Watch Section A sizes to use as options in other sections
   const formSizes = Form.useWatch('sizes', form) || [];
@@ -167,16 +268,22 @@ const CostingForm = () => {
   // API-fetched dropdown options
   const [buyerOptions, setBuyerOptions] = useState([]);
   const [styleOptions, setStyleOptions] = useState([]);
-  const [fabricItemOptions, setFabricItemOptions] = useState([]);
+  // Raw item lists per category — used for consumption-UOM display and techpack matching.
   const [fabricItemsRaw, setFabricItemsRaw] = useState([]);
   const [localTrimItemsRaw, setLocalTrimItemsRaw] = useState([]);
   const [importedTrimItemsRaw, setImportedTrimItemsRaw] = useState([]);
+  // Select-ready {value,label} projections of the raw lists above.
+  const [fabricItemOptions, setFabricItemOptions] = useState([]);
   const [localTrimOptions, setLocalTrimOptions] = useState([]);
   const [importedTrimOptions, setImportedTrimOptions] = useState([]);
+  // Category names behind each picker, kept so the dropdowns can search the server later.
+  const [variantCategories, setVariantCategories] = useState({ fabric: '', localTrim: '', importedTrim: '' });
+  // Per-picker debounce handles for the variant search above.
+  const variantSearchTimers = useRef({});
+  useEffect(() => () => Object.values(variantSearchTimers.current).forEach(clearTimeout), []);
   const [manufacturingProcesses, setManufacturingProcesses] = useState([]);
   const [overheadItems, setOverheadItems] = useState([]);
   const [supplierOptions, setSupplierOptions] = useState([]);
-  const [categoryOptions, setCategoryOptions] = useState([]);
 
   // Quick Add modal state
   const [quickAddProcessOpen, setQuickAddProcessOpen] = useState(false);
@@ -194,7 +301,8 @@ const CostingForm = () => {
   const [quickAddStyleImageUrl, setQuickAddStyleImageUrl] = useState(null);  // blob preview
   const canAddStyle = hasPermission('style-master', 'add');
   const canAddProcess = hasPermission('process-master', 'add');
-  const canAddOverhead = hasPermission('process-master', 'add');
+  // Section E quick-add creates an Overhead master record, so it is gated on that module.
+  const canAddOverhead = hasPermission('overhead-master', 'add');
   const [stylesLoading, setStylesLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
 
@@ -218,6 +326,9 @@ const CostingForm = () => {
   const [knitsModalOpen, setKnitsModalOpen] = useState(false);
   const [knitsRowKey, setKnitsRowKey] = useState(null);
   const [knitsParts, setKnitsParts] = useState([]);
+  // Consumption UOM of the row the knits calculator is open for — the modal shows its
+  // total in this unit so what the user approves is what lands in the row.
+  const [knitsTargetUom, setKnitsTargetUom] = useState('');
 
   // Techpack import modal
   const [techpackModalOpen, setTechpackModalOpen] = useState(false);
@@ -255,7 +366,6 @@ const CostingForm = () => {
         // Fetch categories to find Fabric, Local Trims, Imported Trims
         const catRes = await getAllCategories();
         const categories = catRes.data || catRes || [];
-        setCategoryOptions(categories.filter((c) => c.isActive !== false).map((c) => ({ value: c.name, label: c.name })));
 
         const fabricCat = categories.find((c) => c.name === 'Fabric');
         const localTrimCat = categories.find((c) => c.name?.toLowerCase().includes('local trim'));
@@ -271,49 +381,33 @@ const CostingForm = () => {
         // Resolve effective categories
         const effectiveLocalTrimCat = localTrimCat || generalTrimCat;
         const effectiveImportedTrimCat = importedTrimCat || generalTrimCat;
-        // Collect all unique category IDs and fetch items in a single API call
-        const catMap = {};
-        if (fabricCat) catMap.fabric = fabricCat.id;
-        if (effectiveLocalTrimCat) catMap.localTrim = effectiveLocalTrimCat.id;
-        if (effectiveImportedTrimCat) catMap.importedTrim = effectiveImportedTrimCat.id;
+        // Costing rows reference item *variants*, not items — the variant carries the
+        // fabric/trim identity the user picks and everything downstream keys on.
+        const [fabVariants, ltVariants, itVariants] = await Promise.all([
+          fetchVariantsForCategory(fabricCat?.name),
+          fetchVariantsForCategory(effectiveLocalTrimCat?.name),
+          fetchVariantsForCategory(effectiveImportedTrimCat?.name),
+        ]);
 
-        const uniqueCatIds = [...new Set(Object.values(catMap))];
+        setFabricItemsRaw(fabVariants);
+        setFabricItemOptions(toVariantOptions(fabVariants));
+        setLocalTrimItemsRaw(ltVariants);
+        setLocalTrimOptions(toVariantOptions(ltVariants));
+        setImportedTrimItemsRaw(itVariants);
+        setImportedTrimOptions(toVariantOptions(itVariants));
+        setVariantCategories({
+          fabric: fabricCat?.name || '',
+          localTrim: effectiveLocalTrimCat?.name || '',
+          importedTrim: effectiveImportedTrimCat?.name || '',
+        });
 
-        if (uniqueCatIds.length > 0) {
-          const res = await searchItems({ categoryIds: uniqueCatIds, size: 1000 });
-          const allItems = res.data?.content || res.data || [];
-
-          // Group items by categoryId
-          const byCat = {};
-          for (const item of allItems) {
-            const cid = item.categoryId;
-            if (!byCat[cid]) byCat[cid] = [];
-            byCat[cid].push(item);
-          }
-
-          const toOptions = (items) => (items || []).map((item) => ({ value: item.id, label: item.itemName, itemCode: item.itemCode }));
-
-          if (catMap.fabric) {
-            const fabItems = byCat[catMap.fabric] || [];
-            setFabricItemsRaw(fabItems);
-            setFabricItemOptions(toOptions(fabItems));
-          }
-          if (catMap.localTrim) {
-            const ltItems = byCat[catMap.localTrim] || [];
-            setLocalTrimItemsRaw(ltItems);
-            setLocalTrimOptions(toOptions(ltItems));
-          }
-          if (catMap.importedTrim) {
-            const itItems = byCat[catMap.importedTrim] || [];
-            setImportedTrimItemsRaw(itItems);
-            setImportedTrimOptions(toOptions(itItems));
-          }
-        }
-
-        // Fetch processes (Manufacturing), processes (Overheads), and suppliers
+        // The two sections read different masters: Section D takes Manufacturing
+        // processes from the PROCESS master, Section E takes rows from the OVERHEAD
+        // master (mst_overheads) — overhead rows are a FK to it and CostSheetService
+        // resolves their description from it.
         const [mfgResult, ovhResult, suppResult] = await Promise.allSettled([
           getActiveProcesses('Manufacturing'),
-          getActiveProcesses('Overheads'),
+          getActiveOverheads(),
           getSuppliers(),
         ]);
         if (mfgResult.status === 'fulfilled') {
@@ -322,7 +416,7 @@ const CostingForm = () => {
         }
         if (ovhResult.status === 'fulfilled') {
           const ovhs = Array.isArray(ovhResult.value) ? ovhResult.value : ovhResult.value?.data || [];
-          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.processName, defaultCost: o.defaultCost || 0 })));
+          setOverheadItems(ovhs.map((o) => ({ value: o.id, label: o.overheadName, defaultCost: o.defaultCost || 0 })));
         }
         if (suppResult.status === 'fulfilled') {
           const supps = Array.isArray(suppResult.value) ? suppResult.value : suppResult.value?.data || [];
@@ -424,13 +518,20 @@ const CostingForm = () => {
       // and the Table + update/delete functions depend on `key` for row identity.
       const withKeys = (rows, prefix) =>
         (rows || []).map((r, i) => ({ ...r, key: r.key || `${prefix}_${Date.now()}_${i}` }));
-      // Normalise UOM: API returns uomId + uomName; set uom (symbol) for display/conversion
-      setFabricRows(withKeys(cs.fabricRows, 'f').map((r) => ({
-        ...r,
-        uom: r.uom || r.uomSymbol || r.uomName || '',
-      })));
-      setLocalTrims(withKeys(cs.localTrims, 'lt'));
-      setImportedTrims(withKeys(cs.importedTrims, 'it'));
+      // Normalise UOM: the API returns uomId/uomName/uomSymbol for the consumption unit plus
+      // the snapshotted purchase unit and factor. Reading them off the row (rather than
+      // re-resolving from the variant) keeps a saved sheet priced exactly as it was saved,
+      // and keeps working when the row's variant falls outside the 50-row picker window.
+      const withUom = (rows, prefix) =>
+        withKeys(rows, prefix).map((r) => ({
+          ...r,
+          uom: r.uom || r.uomSymbol || r.uomName || '',
+          primaryUom: r.primaryUom || r.primaryUomSymbol || '',
+          uomConversionFactor: r.uomConversionFactor ?? null,
+        }));
+      setFabricRows(withUom(cs.fabricRows, 'f'));
+      setLocalTrims(withUom(cs.localTrims, 'lt'));
+      setImportedTrims(withUom(cs.importedTrims, 'it'));
       setManufacturingRows(withKeys(cs.manufacturingRows, 'm'));
       setOverheadRows(withKeys(cs.overheadRows, 'o'));
       setAgentCommissionPct(cs.agentCommissionPct || 0);
@@ -546,9 +647,21 @@ const CostingForm = () => {
     return importedTrims.reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
   }, [importedTrims]);
 
+  // The exchange rate converts between USD and the costing currency. When the sheet is
+  // already costed in USD there is nothing to convert — applying the rate regardless
+  // inflated imported-trim costs by ~95x and shrank the final price by the same factor.
+  const usdToCostingRate = useMemo(
+    () => (currency === 'USD' ? 1 : Number(actualRate) || 1),
+    [currency, actualRate]
+  );
+  const costingToQuoteRate = useMemo(
+    () => (currency === quoteCurrency ? 1 : Number(actualRate) || 1),
+    [currency, quoteCurrency, actualRate]
+  );
+
   const totalAccessoriesCost = useMemo(() => {
-    return totalLocalTrimsCost + totalImportedTrimsCostUsd * actualRate;
-  }, [totalLocalTrimsCost, totalImportedTrimsCostUsd, actualRate]);
+    return totalLocalTrimsCost + totalImportedTrimsCostUsd * usdToCostingRate;
+  }, [totalLocalTrimsCost, totalImportedTrimsCostUsd, usdToCostingRate]);
 
   const totalManufacturingCost = useMemo(() => {
     return manufacturingRows.reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
@@ -572,8 +685,8 @@ const CostingForm = () => {
   }, [totalMakingPrice, totalOverheadCharges]);
 
   const finalPrice = useMemo(() => {
-    return calcFinalPrice(totalPrice, actualRate);
-  }, [totalPrice, actualRate]);
+    return calcFinalPrice(totalPrice, costingToQuoteRate);
+  }, [totalPrice, costingToQuoteRate]);
 
   const finalPriceUsd = useMemo(() => {
     if (quoteCurrency === 'USD') return finalPrice;
@@ -605,7 +718,7 @@ const CostingForm = () => {
       const fabCost = fabricRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.netCost) || 0), 0);
       const localCost = localTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.price) || 0), 0);
       const importCostUsd = importedTrims.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.priceUsd) || 0), 0);
-      const accCost = localCost + importCostUsd * (parseFloat(actualRate) || 1);
+      const accCost = localCost + importCostUsd * usdToCostingRate;
       const mfgCost = manufacturingRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
       const ovhCost = overheadRows.filter((r) => matchesSize(r, sizeKey)).reduce((sum, r) => sum + (Number(r.cost) || 0), 0);
       const makingPrice = calcTotalMakingPrice(fabCost, accCost, mfgCost, ovhCost);
@@ -616,7 +729,7 @@ const CostingForm = () => {
 
       const overheadCharges = calcTotalOverheadCharges(sizeAgent, sizeProfit, makingPrice);
       const sizeTotalPrice = makingPrice + overheadCharges;
-      const sizeFinalPrice = calcFinalPrice(sizeTotalPrice, actualRate);
+      const sizeFinalPrice = calcFinalPrice(sizeTotalPrice, costingToQuoteRate);
       const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
 
       return {
@@ -627,7 +740,8 @@ const CostingForm = () => {
       };
     });
   }, [uniqueSizeKeys, fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows,
-      actualRate, agentCommissionPct, profitPct, syncPercentages, perSizeOverrides, quoteCurrency, usdToInrRate]);
+      actualRate, usdToCostingRate, costingToQuoteRate,
+      agentCommissionPct, profitPct, syncPercentages, perSizeOverrides, quoteCurrency, usdToInrRate]);
 
   // Auto-calculate profit when target price changes
   useEffect(() => {
@@ -841,16 +955,20 @@ const CostingForm = () => {
     if (result.fabricRows?.length) {
       setFabricRows(
         result.fabricRows.map((r, i) => {
-          const rawItem = r.matchedItemId ? fabricItemsRaw.find((item) => item.id === r.matchedItemId) : null;
+          // Techpack extraction matches at item level; costing rows key on a variant,
+          // so default to the item's first variant and let the user refine it.
+          const variant = firstVariantOfItem(fabricItemsRaw, r.matchedItemId);
           return {
             key:              `f_import_${Date.now()}_${i}`,
             itemId:           r.matchedItemId   || null,
-            fabricType:       r.matchedItemName || r.extractedName || '',
+            variantId:        variant?.id       || null,
+            variantCode:      variant?.variantCode || '',
+            fabricType:       variant?.variantName || r.matchedItemName || r.extractedName || '',
             classification:   r.classification  || 'Woven',
-            description:      r.notes           || '',
+            description:      variant?.description || r.notes || '',
             consumption:      '',
-            uom:              rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
-            uomId:            rawItem?.uomId || null,
+            uom:              variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || '',
+            uomId:            variant?.uomId || null,
             fabricPrice:      '',
             fabricWidthStd:   '',
             fabricWidthVendor: '',
@@ -867,36 +985,44 @@ const CostingForm = () => {
     // 4. Map local trim rows
     if (result.localTrimRows?.length) {
       setLocalTrims(
-        result.localTrimRows.map((r, i) => ({
-          key:         `lt_import_${Date.now()}_${i}`,
-          itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
-          size:        '',
-          consumption: r.quantity || '',
-          uom:         r.uom || 'pcs',
-          cost:        '',
-          price:       0,
-          sizes:       '',
-        }))
+        result.localTrimRows.map((r, i) => {
+          const variant = firstVariantOfItem(localTrimItemsRaw, r.matchedItemId);
+          return {
+            key:         `lt_import_${Date.now()}_${i}`,
+            itemId:      r.matchedItemId   || null,
+            variantId:   variant?.id       || null,
+            item:        variant?.variantName || r.matchedItemName || r.extractedName || '',
+            code:        variant?.variantCode || '',
+            size:        '',
+            consumption: r.quantity || '',
+            uom:         variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || 'pcs',
+            cost:        '',
+            price:       0,
+            sizes:       '',
+          };
+        })
       );
     }
 
     // 5. Map imported trim rows
     if (result.importedTrimRows?.length) {
       setImportedTrims(
-        result.importedTrimRows.map((r, i) => ({
-          key:         `it_import_${Date.now()}_${i}`,
-          itemId:      r.matchedItemId   || null,
-          item:        r.matchedItemName || r.extractedName || '',
-          code:        '',
-          size:        '',
-          consumption: r.quantity || '',
-          uom:         r.uom || 'pcs',
-          costUsd:     '',
-          priceUsd:    0,
-          sizes:       '',
-        }))
+        result.importedTrimRows.map((r, i) => {
+          const variant = firstVariantOfItem(importedTrimItemsRaw, r.matchedItemId);
+          return {
+            key:         `it_import_${Date.now()}_${i}`,
+            itemId:      r.matchedItemId   || null,
+            variantId:   variant?.id       || null,
+            item:        variant?.variantName || r.matchedItemName || r.extractedName || '',
+            code:        variant?.variantCode || '',
+            size:        '',
+            consumption: r.quantity || '',
+            uom:         variant?.secondaryUomSymbol || variant?.uomSymbol || r.uom || 'pcs',
+            costUsd:     '',
+            priceUsd:    0,
+            sizes:       '',
+          };
+        })
       );
     }
 
@@ -925,7 +1051,10 @@ const CostingForm = () => {
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = { ...r, [field]: value };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
       })
     );
@@ -939,12 +1068,18 @@ const CostingForm = () => {
       {
         key: `f_${Date.now()}`,
         itemId: null,
+        variantId: null,
+        variantCode: '',
         fabricType: '',
         classification: 'Woven',
         description: '',
         consumption: '',
         uom: '',
         uomId: null,
+        primaryUom: '',
+        primaryUomId: null,
+        secondaryUomId: null,
+        uomConversionFactor: null,
         fabricPrice: '',
         fabricWidthStd: '',
         fabricWidthVendor: '',
@@ -958,32 +1093,40 @@ const CostingForm = () => {
     setIsDirty(true);
   };
 
-  const handleFabricItemSelect = (key, itemId, option) => {
-    // Set itemId and fabricType from the selected item
-    const rawItem = fabricItemsRaw.find((item) => item.id === itemId);
+  const handleFabricItemSelect = (key, variantId) => {
+    // The row is identified by the variant; itemId is carried along for PO/BOM linkage.
+    const variant = fabricItemsRaw.find((v) => v.id === variantId);
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== key) return r;
         const updated = {
           ...r,
-          itemId,
-          fabricType: option.label,
+          variantId,
+          variantCode: variant?.variantCode || '',
+          itemId: variant?.itemId ?? null,
+          // The fabric name shown to the user is the variant's name (server reads it back from the variant).
+          fabricType: variant?.variantName || variant?.variantCode || '',
           // Auto-populate description from the item master (CR C-6); keep any existing text otherwise
-          description: rawItem?.description || r.description || '',
-          // Set UOM from item's secondary UOM (fallback to primary)
-          uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || r.uom || '',
-          uomId: rawItem?.uomId || r.uomId || null,
-          primaryUom: rawItem?.uomSymbol || '',
+          description: variant?.description || r.description || '',
+          // Consumption UOM, purchase UOM and the factor bridging them
+          ...variantUomFields(variant),
         };
         // Auto-set classification from subcategory
-        if (rawItem?.subCategoryName) {
-          const subName = rawItem.subCategoryName.toLowerCase();
+        if (variant?.subCategoryName) {
+          const subName = variant.subCategoryName.toLowerCase();
           if (subName.includes('knit')) updated.classification = 'Knits';
           else if (subName.includes('woven')) updated.classification = 'Woven';
         }
+        // Switching fabric can change the conversion factor, which re-prices the row.
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
-      })
+      }),
     );
+    // Preserve past-PO price suggestions keyed by the parent item.
+    if (variant.itemId) loadSuggestions('fabric', variant.itemId);
     setIsDirty(true);
   };
 
@@ -1010,7 +1153,7 @@ const CostingForm = () => {
         const updated = typeof fieldOrObj === 'object'
           ? { ...r, ...fieldOrObj }
           : { ...r, [fieldOrObj]: value };
-        updated.price = calcTrimPrice(updated.consumption, updated.cost);
+        updated.price = calcTrimPrice(updated.consumption, updated.cost, updated.uomConversionFactor);
         return updated;
       })
     );
@@ -1020,7 +1163,7 @@ const CostingForm = () => {
   const addLocalTrim = () => {
     setLocalTrims((prev) => [
       ...prev,
-      { key: `lt_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', cost: '', price: 0, sizes: '' },
+      { key: `lt_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', uomId: null, primaryUom: '', primaryUomId: null, secondaryUomId: null, uomConversionFactor: null, cost: '', price: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1048,7 +1191,7 @@ const CostingForm = () => {
         const updated = typeof fieldOrObj === 'object'
           ? { ...r, ...fieldOrObj }
           : { ...r, [fieldOrObj]: value };
-        updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd);
+        updated.priceUsd = calcTrimPrice(updated.consumption, updated.costUsd, updated.uomConversionFactor);
         return updated;
       })
     );
@@ -1058,7 +1201,7 @@ const CostingForm = () => {
   const addImportedTrim = () => {
     setImportedTrims((prev) => [
       ...prev,
-      { key: `it_${Date.now()}`, itemId: null, item: '', code: '', size: '', consumption: '', uom: '', costUsd: '', priceUsd: 0, sizes: '' },
+      { key: `it_${Date.now()}`, itemId: null, variantId: null, item: '', code: '', size: '', consumption: '', uom: '', uomId: null, primaryUom: '', primaryUomId: null, secondaryUomId: null, uomConversionFactor: null, costUsd: '', priceUsd: 0, sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1127,7 +1270,7 @@ const CostingForm = () => {
   const addOverheadRow = () => {
     setOverheadRows((prev) => [
       ...prev,
-      { key: `o_${Date.now()}`, processId: null, description: '', cost: '', comments: '', sizes: '' },
+      { key: `o_${Date.now()}`, overheadId: null, description: '', cost: '', comments: '', sizes: '' },
     ]);
     setIsDirty(true);
   };
@@ -1154,20 +1297,35 @@ const CostingForm = () => {
     setKnitsRowKey(rowKey);
     const row = fabricRows.find((r) => r.key === rowKey);
     setKnitsParts(row?.knitsParts || []);
+    // The modal shows its total in the row's consumption UOM, so it needs that symbol.
+    setKnitsTargetUom(row ? getConsumptionUom(row, fabricItemsRaw) : '');
     setKnitsModalOpen(true);
   };
 
-  const handleKnitsApply = (totalConsumption, parts) => {
+  /**
+   * The calculator returns GRAMS (what its formula produces). Restate that in the row's
+   * consumption UOM before storing, so a 59.33 g garment lands as 59.33 in a GMS row and
+   * as 0.0593 in a KG row — rather than always as kilograms regardless of the label.
+   */
+  const handleKnitsApply = (totalGrams, parts) => {
     setFabricRows((prev) =>
       prev.map((r) => {
         if (r.key !== knitsRowKey) return r;
-        const finalConsumption = Math.round(totalConsumption * 10000) / 10000;
+        const targetUom = getConsumptionUom(r, fabricItemsRaw);
+        const converted = convertGramsTo(totalGrams, targetUom) ?? 0;
+        const finalConsumption = Math.round(converted * 10000) / 10000;
         const updated = { ...r, consumption: finalConsumption, knitsParts: parts };
-        updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+        updated.netCost = calcFabricNetCost(
+          updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+          updated.uomConversionFactor,
+        );
         return updated;
       })
     );
     setKnitsModalOpen(false);
+    // Without this, applying the calculator then saving reported "No changes detected"
+    // and silently discarded the result.
+    setIsDirty(true);
   };
 
   // AI Consumption modal handlers
@@ -1178,6 +1336,17 @@ const CostingForm = () => {
   };
 
   const handleConsumptionApply = (result) => {
+    // The AI reports its own UOM (kg for knits, m for woven). The row's consumption UOM
+    // comes from the item master and may disagree — applying the number regardless is how
+    // a kilogram figure ends up in a GMS field, so say so instead of hiding it.
+    const targetRow = fabricRows.find((r) => r.key === consumptionRowKey);
+    const rowUom = targetRow ? getConsumptionUom(targetRow, fabricItemsRaw) : '';
+    if (rowUom && result.uom && normaliseUomSymbol(rowUom) !== normaliseUomSymbol(result.uom)) {
+      message.warning(
+        `AI calculated in ${String(result.uom).toUpperCase()} but this fabric is consumed in ` +
+        `${rowUom.toUpperCase()}. Check the value — it was applied as-is.`,
+      );
+    }
     if (result.splitBySizes) {
       // Replace the source row with one row per size, each with its specific consumption
       setFabricRows((prev) => {
@@ -1191,7 +1360,10 @@ const CostingForm = () => {
             sizes:       size,
             consumption: c,
             uom:         source.uom || result.uom,
-            netCost:     calcFabricNetCost(c, source.fabricPrice, source.allowancePct, source.wastagePct),
+            netCost:     calcFabricNetCost(
+              c, source.fabricPrice, source.allowancePct, source.wastagePct,
+              source.uomConversionFactor,
+            ),
           };
         });
         return [...prev.filter((r) => r.key !== consumptionRowKey), ...newRows];
@@ -1201,7 +1373,10 @@ const CostingForm = () => {
         prev.map((r) => {
           if (r.key !== consumptionRowKey) return r;
           const updated = { ...r, consumption: result.consumption, uom: r.uom || result.uom };
-          updated.netCost = calcFabricNetCost(updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct);
+          updated.netCost = calcFabricNetCost(
+            updated.consumption, updated.fabricPrice, updated.allowancePct, updated.wastagePct,
+            updated.uomConversionFactor,
+          );
           return updated;
         })
       );
@@ -1232,6 +1407,8 @@ const CostingForm = () => {
     setConsumptionModalOpen(false);
     setKnitsRowKey(consumptionRowKey);
     setKnitsParts(preparedParts);
+    const row = fabricRows.find((r) => r.key === consumptionRowKey);
+    setKnitsTargetUom(row ? getConsumptionUom(row, fabricItemsRaw) : '');
     setKnitsModalOpen(true);
   };
 
@@ -1323,6 +1500,16 @@ const CostingForm = () => {
     const header = form.getFieldsValue(['buyerId', 'styleNo', 'garmentName']);
     if (!header.buyerId || !header.styleNo || !header.garmentName) {
       message.error('Please select Buyer, Style and Garment before saving a draft.');
+      return;
+    }
+    // Sizes are mandatory even for drafts: the server enforces @NotEmpty(sizes) on
+    // every save, so blocking here shows the inline field error instead of letting
+    // the draft die on a server 400 (B-052).
+    try {
+      await form.validateFields(['sizes']);
+    } catch {
+      form.scrollToField('sizes');
+      message.error('At least one size is required — select sizes from a size preset.');
       return;
     }
     // For draft, validate but allow save even with warnings for optional fields
@@ -1476,7 +1663,7 @@ const CostingForm = () => {
               const sizeFabric = fabricRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.netCost) || 0), 0);
               const sizeLocalTrims = localTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.price) || 0), 0);
               const sizeImportedTrims = importedTrims.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.priceUsd) || 0), 0);
-              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * actualRate;
+              const sizeAccessories = sizeLocalTrims + sizeImportedTrims * usdToCostingRate;
               const sizeMfg = manufacturingRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
               const sizeMarkup = overheadRows.filter((r) => r.sizes === sk).reduce((s, r) => s + (Number(r.cost) || 0), 0);
               const sizeMaking = sizeFabric + sizeAccessories + sizeMfg + sizeMarkup;
@@ -1484,7 +1671,7 @@ const CostingForm = () => {
               const sizeProfit = syncPercentages ? profitPct : (perSizeOverrides[sk]?.profitPct ?? profitPct);
               const sizeOverhead = ((sizeAgent + sizeProfit) / 100) * sizeMaking;
               const sizeTotalPrice = sizeMaking + sizeOverhead;
-              const sizeFinalPrice = actualRate ? sizeTotalPrice / actualRate : 0;
+              const sizeFinalPrice = costingToQuoteRate ? sizeTotalPrice / costingToQuoteRate : 0;
               const sizeFinalPriceUsd = quoteCurrency === 'USD' ? sizeFinalPrice : calcFinalPriceUsd(sizeFinalPrice, quoteCurrency, actualRate, usdToInrRate);
               return {
                 sizes: sk, agentCommissionPct: sizeAgent, profitPct: sizeProfit,
@@ -1619,11 +1806,111 @@ const CostingForm = () => {
 
   // ==================== HELPERS ====================
 
-  const getConsumptionUom = (record, rawItems) => {
-    if (!record.itemId) return '';
-    const item = rawItems?.find((i) => i.id === record.itemId);
-    return item?.secondaryUomSymbol || item?.uomSymbol || '';
+  /**
+   * Unit that `consumption` is expressed in: the item's secondary UOM when it has one.
+   *
+   * Prefers the row's own snapshot over the variant list, because the picker holds only 50
+   * variants per category — a reloaded row whose variant falls outside that window would
+   * otherwise lose its unit entirely. The snapshot is written on every variant select, so
+   * it is never staler than the list.
+   */
+  const getConsumptionUom = (record, rawVariants) => {
+    if (record.uom) return record.uom;
+    if (!record.variantId) return '';
+    const variant = rawVariants?.find((v) => v.id === record.variantId);
+    return variant?.secondaryUomSymbol || variant?.uomSymbol || '';
   };
+
+  /** Unit the row's rate is quoted per — the item's primary (purchase) UOM. */
+  const getRateUom = (record, rawVariants) => {
+    if (record.primaryUom) return record.primaryUom;
+    if (!record.variantId) return '';
+    const variant = rawVariants?.find((v) => v.id === record.variantId);
+    return variant?.uomSymbol || '';
+  };
+
+  /**
+   * Rate input for fabric price / trim cost, annotated with the PURCHASE unit it is quoted
+   * per ("/kg", "/cone").
+   *
+   * The unit is per-row rather than per-column — one table can hold a fabric bought by the
+   * kilo and another bought by the metre — so it belongs on the input, exactly as the
+   * Consumption column already annotates its own secondary unit. Where the two units differ
+   * a tooltip spells out the bridge ("1 kg = 1000 GMS"), so a ₹600/kg rate sitting beside a
+   * 59.33 GMS quantity reads as deliberate instead of inconsistent.
+   */
+  const renderRateInput = ({ value, record, rawVariants, onChange, placeholder = 'Rate' }) => {
+    const rateUom = getRateUom(record, rawVariants);
+    const consumptionUom = getConsumptionUom(record, rawVariants);
+    const factor = record.uomConversionFactor;
+    const input = (
+      <InputNumber
+        value={value}
+        min={0}
+        step={0.01}
+        controls={false}
+        placeholder={placeholder}
+        onChange={onChange}
+        size="small"
+        style={{ width: '100%' }}
+        addonAfter={rateUom ? `/${rateUom}` : undefined}
+        {...numericInputProps}
+      />
+    );
+    if (!(Number(factor) > 0) || !rateUom || !consumptionUom) return input;
+    return (
+      <Tooltip title={formatConversionLabel(rateUom, consumptionUom, factor)}>
+        {input}
+      </Tooltip>
+    );
+  };
+
+  // Match on both variant name and code so users can search either.
+  const variantFilterOption = (input, option) => {
+    const needle = String(input).toLowerCase();
+    return (
+      String(option?.label ?? '').toLowerCase().includes(needle) ||
+      String(option?.variantCode ?? '').toLowerCase().includes(needle)
+    );
+  };
+
+  // The variants API returns at most 50 rows per call, so the initial preload alone
+  // leaves larger categories partly unreachable. Searching the server as the user types
+  // keeps every variant selectable; matches are merged into the raw list too, so the
+  // row's onChange can still resolve the picked variant by id.
+  const handleVariantSearch = useCallback(
+    (slot, setRaw, setOptions) => (text) => {
+      const q = (text || '').trim();
+      clearTimeout(variantSearchTimers.current[slot]);
+      const categoryName = variantCategories[slot];
+      if (!categoryName || q.length < 2) return;
+      variantSearchTimers.current[slot] = setTimeout(async () => {
+        const list = await fetchVariantsForCategory(categoryName, q);
+        if (!list.length) return;
+        setRaw((prev) => mergeVariantsById(prev, list));
+        setOptions((prev) => {
+          const byValue = new Map((prev || []).map((o) => [o.value, o]));
+          toVariantOptions(list).forEach((o) => byValue.set(o.value, o));
+          return [...byValue.values()];
+        });
+      }, 300);
+    },
+    [variantCategories],
+  );
+
+  // Stable per-picker search handlers (AntD 6 takes these via showSearch.onSearch).
+  const onFabricVariantSearch = useMemo(
+    () => handleVariantSearch('fabric', setFabricItemsRaw, setFabricItemOptions),
+    [handleVariantSearch],
+  );
+  const onLocalTrimVariantSearch = useMemo(
+    () => handleVariantSearch('localTrim', setLocalTrimItemsRaw, setLocalTrimOptions),
+    [handleVariantSearch],
+  );
+  const onImportedTrimVariantSearch = useMemo(
+    () => handleVariantSearch('importedTrim', setImportedTrimItemsRaw, setImportedTrimOptions),
+    [handleVariantSearch],
+  );
 
   // ==================== COLUMN DEFINITIONS ====================
 
@@ -1648,17 +1935,16 @@ const CostingForm = () => {
     },
     {
       title: 'Fabric Name',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       width: 240,
       render: (val, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={fabricItemOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption, onSearch: onFabricVariantSearch }}
           placeholder="Select"
-          onChange={(v, opt) => handleFabricItemSelect(record.key, v, opt)}
+          onChange={(v) => handleFabricItemSelect(record.key, v)}
           onFocus={() => loadSuggestions('fabric', record.itemId)}
           size="small"
         />
@@ -1693,7 +1979,9 @@ const CostingForm = () => {
     {
       title: 'Consumption',
       dataIndex: 'consumption',
-      width: 160,
+      // Holds the quantity, its unit addon and two calculator buttons. Sized for the unit
+      // rendering as a full word ("KILOGRAMS") when only uomName is available.
+      width: 210,
       render: (val, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <InputNumber
@@ -1734,20 +2022,14 @@ const CostingForm = () => {
     {
       title: `Price (${getCurrencySymbol(currency)})`,
       dataIndex: 'fabricPrice',
-      width: 130,
-      render: (val, record) => (
-        <InputNumber
-          value={val}
-          min={0}
-          step={0.01}
-          controls={false}
-          placeholder="Price"
-          onChange={(v) => updateFabricRow(record.key, 'fabricPrice', v)}
-          size="small"
-          style={{ width: '100%' }}
-          {...numericInputProps}
-        />
-      ),
+      // Wide enough for a 5-figure rate plus the "/kg" unit addon without truncating.
+      width: 200,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: fabricItemsRaw,
+        onChange: (v) => updateFabricRow(record.key, 'fabricPrice', v),
+      }),
     },
     {
       title: 'Width (Std)',
@@ -1859,18 +2141,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={localTrimOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption, onSearch: onLocalTrimVariantSearch }}
           placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = localTrimItemsRaw.find((i) => i.id === v);
-            updateLocalTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
+          onChange={(v) => {
+            const variant = localTrimItemsRaw.find((i) => i.id === v);
+            updateLocalTrim(record.key, {
+              variantId: v,
+              itemId: variant?.itemId ?? null,
+              item: variant?.variantName || variant?.variantCode || '',
+              code: variant?.variantCode || '',
+              ...variantUomFields(variant),
+            });
           }}
           size="small"
         />
@@ -1903,10 +2190,14 @@ const CostingForm = () => {
     {
       title: `Cost (${getCurrencySymbol(currency)})`,
       dataIndex: 'cost',
-      width: 120,
-      render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateLocalTrim(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
-      ),
+      width: 190,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: localTrimItemsRaw,
+        onChange: (v) => updateLocalTrim(record.key, 'cost', v),
+        placeholder: 'Cost',
+      }),
     },
     {
       title: `Price (${getCurrencySymbol(currency)})`,
@@ -1949,18 +2240,23 @@ const CostingForm = () => {
     },
     {
       title: 'Item',
-      dataIndex: 'itemId',
+      dataIndex: 'variantId',
       render: (_, record) => (
         <Select
-          value={record.itemId || undefined}
+          value={record.variantId || undefined}
           style={{ width: '100%' }}
           options={importedTrimOptions}
-          showSearch
-          optionFilterProp="label"
+          showSearch={{ filterOption: variantFilterOption, onSearch: onImportedTrimVariantSearch }}
           placeholder="Select item"
-          onChange={(v, opt) => {
-            const rawItem = importedTrimItemsRaw.find((i) => i.id === v);
-            updateImportedTrim(record.key, { itemId: v, item: opt.label, code: opt.itemCode || '', uom: rawItem?.secondaryUomSymbol || rawItem?.uomSymbol || '' });
+          onChange={(v) => {
+            const variant = importedTrimItemsRaw.find((i) => i.id === v);
+            updateImportedTrim(record.key, {
+              variantId: v,
+              itemId: variant?.itemId ?? null,
+              item: variant?.variantName || variant?.variantCode || '',
+              code: variant?.variantCode || '',
+              ...variantUomFields(variant),
+            });
           }}
           size="small"
         />
@@ -1993,10 +2289,14 @@ const CostingForm = () => {
     {
       title: 'Cost ($ USD)',
       dataIndex: 'costUsd',
-      width: 120,
-      render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateImportedTrim(record.key, 'costUsd', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
-      ),
+      width: 190,
+      render: (val, record) => renderRateInput({
+        value: val,
+        record,
+        rawVariants: importedTrimItemsRaw,
+        onChange: (v) => updateImportedTrim(record.key, 'costUsd', v),
+        placeholder: 'Cost',
+      }),
     },
     {
       title: 'Price ($ USD)',
@@ -2030,8 +2330,8 @@ const CostingForm = () => {
   const effectiveOvhOptions = useMemo(() => {
     const apiIds = new Set(overheadItems.map((o) => o.value));
     const extras = overheadRows
-      .filter((r) => r.processId && !apiIds.has(r.processId))
-      .map((r) => ({ value: r.processId, label: r.description || `Overhead #${r.processId}` }));
+      .filter((r) => r.overheadId && !apiIds.has(r.overheadId))
+      .map((r) => ({ value: r.overheadId, label: r.description || `Overhead #${r.overheadId}` }));
     return [...overheadItems, ...extras.filter((e, i, arr) => arr.findIndex((x) => x.value === e.value) === i)];
   }, [overheadItems, overheadRows]);
 
@@ -2153,11 +2453,11 @@ const CostingForm = () => {
     },
     {
       title: 'Description',
-      dataIndex: 'processId',
+      dataIndex: 'overheadId',
       width: 200,
       render: (val, record) => (
         <Select
-          value={record.processId || undefined}
+          value={record.overheadId || undefined}
           style={{ width: '100%' }}
           options={effectiveOvhOptions}
           showSearch
@@ -2166,7 +2466,7 @@ const CostingForm = () => {
           onChange={(v, opt) => {
             const defaultCost = opt.defaultCost || 0;
             updateOverheadRow(record.key, {
-              processId: v,
+              overheadId: v,
               description: opt.label,
               ...(defaultCost > 0 && !record.cost ? { cost: defaultCost } : {}),
             });
@@ -2360,19 +2660,22 @@ const CostingForm = () => {
                 </Form.Item>
               </Col>
               <Col xs={16}>
-                <Form.Item label="Sizes" name="sizes">
+                <Form.Item
+                  label="Sizes"
+                  name="sizes"
+                  rules={[{ required: true, message: 'At least one size is required' }]}
+                >
                   <Select
-                    mode="tags"
-                    placeholder="Select or type sizes (e.g. S, M, L, XL)"
+                    // Selection-only from the Size Presets master — free-typed sizes
+                    // drifted from the presets the order matrix is built on (B-052).
+                    mode="multiple"
+                    showSearch
+                    placeholder={sizePresetGroups.length
+                      ? 'Select sizes from a size preset'
+                      : 'No size presets defined — add one in Size Presets master'}
                     style={{ width: '100%' }}
-                    tokenSeparators={[',']}
-                    options={['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', '4XL'].map((s) => ({ value: s, label: s }))}
-                    onChange={(vals) => {
-                      // Normalise to upper-case + de-duplicate so "s" and "S" never coexist (CR C-15)
-                      const norm = [...new Set((vals || []).map((v) => String(v).trim().toUpperCase()).filter(Boolean))];
-                      form.setFieldsValue({ sizes: norm });
-                      setIsDirty(true);
-                    }}
+                    options={sizePresetGroups}
+                    onChange={() => setIsDirty(true)}
                   />
                 </Form.Item>
               </Col>
@@ -2453,6 +2756,11 @@ const CostingForm = () => {
               loading={garmentImageUploading || garmentImageLoading}
               compact
               placeholder="Add garment image"
+              infoMessage={
+                isEdit && id
+                  ? 'Image changes are saved immediately and independently of the other cost sheet fields.'
+                  : 'The image will be uploaded automatically when you save the cost sheet.'
+              }
             />
           </div>
         </div>
@@ -2653,7 +2961,7 @@ const CostingForm = () => {
               Total Accessories Cost: {formatCurrency(totalAccessoriesCost, currency)}
             </Text>
             <Text type="secondary" style={{ marginLeft: 16, fontSize: 12 }}>
-              (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {actualRate} rate)
+              (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {usdToCostingRate} rate)
             </Text>
           </Card>
           <Input.TextArea
@@ -3202,6 +3510,7 @@ const CostingForm = () => {
         onApply={handleKnitsApply}
         onCancel={() => setKnitsModalOpen(false)}
         initialParts={knitsParts}
+        targetUom={knitsTargetUom}
       />
 
       {/* Techpack AI Import Modal */}
@@ -3226,6 +3535,17 @@ const CostingForm = () => {
         onCancel={() => setWovenModalOpen(false)}
         onApply={(consumption) => {
           if (wovenRowKey) {
+            // This calculator always works in METRES. If the row is consumed in some other
+            // unit the figure is not comparable, so flag it rather than applying silently.
+            const row = fabricRows.find((r) => r.key === wovenRowKey);
+            const rowUom = row ? getConsumptionUom(row, fabricItemsRaw) : '';
+            if (rowUom && !['m', 'mtr', 'mtrs', 'meter', 'meters', 'metre', 'metres']
+              .includes(normaliseUomSymbol(rowUom))) {
+              message.warning(
+                `Calculated in METRES but this fabric is consumed in ${rowUom.toUpperCase()}. ` +
+                'Check the value — it was applied as-is.',
+              );
+            }
             updateFabricRow(wovenRowKey, 'consumption', consumption);
           }
           setWovenModalOpen(false);
@@ -3298,7 +3618,9 @@ const CostingForm = () => {
         <Form form={quickAddProcessForm} layout="vertical" onFinish={async (values) => {
           setQuickAddProcessLoading(true);
           try {
-            const created = await createProcess({ ...values, isActive: true });
+            // Section D only ever lists 'Manufacturing' processes, so the category
+            // is implied — asking for it could only produce an unusable record.
+            const created = await createProcess({ ...values, category: 'Manufacturing', isActive: true });
             setManufacturingProcesses((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
             if (pendingMfgRowKey) {
               updateManufacturingRow(pendingMfgRowKey, {
@@ -3318,14 +3640,6 @@ const CostingForm = () => {
         }}>
           <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
             <Input placeholder="e.g. Cutting, Sewing, Washing" maxLength={200} />
-          </Form.Item>
-          <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Please select a category' }]} initialValue="Manufacturing">
-            <Select
-              showSearch
-              optionFilterProp="label"
-              placeholder="Select category"
-              options={categoryOptions}
-            />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">
             <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />
@@ -3348,16 +3662,18 @@ const CostingForm = () => {
         <Form form={quickAddOverheadForm} layout="vertical" onFinish={async (values) => {
           setQuickAddOverheadLoading(true);
           try {
-            const created = await createProcess({ processName: values.processName, defaultCost: values.defaultCost, category: 'Overheads', isActive: true });
-            setOverheadItems((prev) => [...prev, { value: created.id, label: created.processName, defaultCost: created.defaultCost || 0 }]);
+            // Creates an OVERHEAD, not a process — cost sheet overhead rows are a FK
+            // to mst_overheads and the server resolves their description from it.
+            const created = await createOverhead({ overheadName: values.overheadName, defaultCost: values.defaultCost, isActive: true });
+            setOverheadItems((prev) => [...prev, { value: created.id, label: created.overheadName, defaultCost: created.defaultCost || 0 }]);
             if (pendingOvhRowKey) {
               updateOverheadRow(pendingOvhRowKey, {
-                processId: created.id,
-                description: created.processName,
+                overheadId: created.id,
+                description: created.overheadName,
                 ...(values.defaultCost > 0 ? { cost: values.defaultCost } : {}),
               });
             }
-            message.success(`Overhead "${created.processName}" created`);
+            message.success(`Overhead "${created.overheadName}" created`);
             setQuickAddOverheadOpen(false);
             quickAddOverheadForm.resetFields();
           } catch {
@@ -3366,7 +3682,7 @@ const CostingForm = () => {
             setQuickAddOverheadLoading(false);
           }
         }}>
-          <Form.Item name="processName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
+          <Form.Item name="overheadName" label="Overhead Name" rules={[{ required: true, message: 'Please enter an overhead name' }]}>
             <Input placeholder="e.g. Testing Fees, Freight, Commission" maxLength={200} />
           </Form.Item>
           <Form.Item name="defaultCost" label="Default Cost">
@@ -3508,12 +3824,8 @@ const CostingForm = () => {
               compact
               placeholder="Click or drag to upload style image"
               hint="PNG, JPG up to 10 MB"
+              infoMessage="The image will be uploaded automatically when the style is created."
             />
-            {quickAddStyleImage && (
-              <Typography.Text type="secondary" style={{ fontSize: 11, marginTop: 6, display: 'block' }}>
-                Will upload on create
-              </Typography.Text>
-            )}
           </div>
         </Form>
       </Modal>

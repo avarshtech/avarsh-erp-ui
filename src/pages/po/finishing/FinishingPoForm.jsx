@@ -9,8 +9,11 @@ import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import { FINISHING_PROCESS, getProcessLabel, PO_ACTION, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getFinishingPo, updateFinishingPo, changeFinishingPoStatus, getStockByBom, getPpApprovalStatus, getProcessingUnits,
-} from '../../../services/po/productionService';
+  getFinishingPo, updateFinishingPo, changeFinishingPoStatus,
+} from '../../../services/po/production/finishingPoService';
+import {
+  getStockByBom, getPpApprovalStatus, getProcessingUnits,
+} from '../../../services/po/production/productionLookupService';
 
 const { Text } = Typography;
 
@@ -38,7 +41,7 @@ const FinishingPoForm = () => {
       setItems(record.items || []);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-        setStock(await getStockByBom(record.orderId, 'packing'));
+        setStock(await getStockByBom(record, 'packing', { plannedQty: record.totalPlannedQty }));
       }
       form.setFieldsValue({
         plannedStartDate: record.plannedStartDate ? dayjs(record.plannedStartDate) : null,
@@ -55,7 +58,7 @@ const FinishingPoForm = () => {
     setItems(newItems);
     const total = newItems.reduce((s, i) => s + (i.plannedQty || 0), 0);
     if (po && (po.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-      getStockByBom(po.orderId, 'packing', { plannedQty: total }).then(setStock);
+      getStockByBom(po, 'packing', { plannedQty: total }).then(setStock);
     }
   };
 

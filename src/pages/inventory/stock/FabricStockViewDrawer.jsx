@@ -132,7 +132,7 @@ const FabricStockViewDrawer = ({ open, onClose, record }) => {
             }}
           >
             <BarcodeOutlined style={{ color: 'var(--text-secondary)', fontSize: 14 }} />
-            {record.itemCode}
+            {record.variantCode}
           </span>
           {record.subCategory && (
             <Tag color={SUB_CATEGORY_COLORS[record.subCategory] || 'default'} style={{ margin: 0 }}>

@@ -22,6 +22,7 @@
 
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { stylePayload } from '../../helpers/test-data.js';
 
 // Seed FKs confirmed present under the e2e H2 profile
 const FK = {
@@ -37,20 +38,46 @@ const round = (n, dp = 4) => Math.round(n * 10 ** dp) / 10 ** dp;
 
 let api;
 const created = [];
+// Variant-first contract: costing rows resolve their display names from the VARIANT,
+// not the item. The seeds carry no variants, so mint one per costing item up front.
+let fabricVariant;
+let trimVariant;
 
-test.beforeAll(async () => { api = await createAuthenticatedClient(); });
+async function ensureVariant(itemId, variantName) {
+  const { data: item } = await api.get(`/items/${itemId}`);
+  const existing = (item.variants || []).find((v) => v.variantName === variantName);
+  if (existing) return existing;
+  const res = await api.put(`/items/${itemId}`, {
+    ...item,
+    variants: [...(item.variants || []), { variantName, attributes: {}, isActive: true }],
+  });
+  if (res.status >= 300) throw new Error(`variant seed failed: ${res.status} ${JSON.stringify(res.data).slice(0, 200)}`);
+  return (res.data.variants || []).find((v) => v.variantName === variantName);
+}
+
+test.beforeAll(async () => {
+  api = await createAuthenticatedClient();
+  fabricVariant = await ensureVariant(FK.fabricItemId, 'Regression Fabric Variant');
+  trimVariant = await ensureVariant(FK.localTrimItemId, 'Regression Button Variant');
+});
 test.afterAll(async () => {
   for (const id of created) { try { await api.delete(`/cost-sheets/${id}`); } catch { /* already gone */ } }
   await api.dispose();
 });
 
-/** Build a fully-populated FOB cost-sheet payload. */
-function fullPayload(overrides = {}) {
+/**
+ * Build a fully-populated FOB cost-sheet payload.
+ *
+ * Async since the one-cost-sheet-per-style rule (2026-08): every sheet needs its own
+ * freshly-created style, so the builder mints one per call.
+ */
+async function fullPayload(overrides = {}) {
+  const { data: style } = await api.post('/styles', stylePayload(FK.buyerId));
   return {
     status: 'Draft',
     date: new Date().toISOString().split('T')[0],
     buyerId: FK.buyerId,
-    styleId: FK.styleId,
+    styleId: style.id,
     garmentName: 'CalcCheck Garment',
     season: 'SS26',
     currency: 'INR',
@@ -65,13 +92,14 @@ function fullPayload(overrides = {}) {
     profitPct: 12,
     targetPrice: 0,
     fabricRows: [{
-      itemId: FK.fabricItemId, classification: 'Woven', description: 'Body fabric',
+      itemId: FK.fabricItemId, variantId: fabricVariant?.id,
+      classification: 'Woven', description: 'Body fabric',
       consumption: 1.5, fabricPrice: 200, fabricWidthStd: '58', fabricWidthVendor: '56',
       allowancePct: 5, wastagePct: 3, sizes: '',
       netCost: round(1.5 * 200 * 1.05 * 1.03),
     }],
     localTrims: [{
-      itemId: FK.localTrimItemId, code: 'BTN-1', size: '20L',
+      itemId: FK.localTrimItemId, variantId: trimVariant?.id, code: 'BTN-1', size: '20L',
       consumption: 6, cost: 2, sizes: '', price: 12,
     }],
     importedTrims: [{
@@ -96,7 +124,7 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
   });
 
   test('Create persists every header field + all 5 row sections (FK names resolve)', async () => {
-    const res = await api.post('/cost-sheets', fullPayload());
+    const res = await api.post('/cost-sheets', await fullPayload());
     expect(res.status).toBe(200);
     created.push(res.data.id);
 
@@ -106,8 +134,10 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
     expect(got.status).toBe('Draft');
     expect(got.buyerId).toBe(FK.buyerId);
     expect(got.buyerName).toBe('H&M Hennes & Mauritz');     // resolved from FK on read
-    expect(got.styleId).toBe(FK.styleId);
-    expect(got.styleNo).toBe('AV-AW25-001');                // resolved from FK
+    // The style is minted per sheet now (one-cost-sheet-per-style rule) — assert the
+    // FK resolves to the created style rather than a fixed seeded one.
+    expect(got.styleId).toBeGreaterThan(0);
+    expect(got.styleNo).toContain('E2E-');                  // resolved from FK
     expect(got.garmentName).toBeTruthy();
     expect(got.season).toBe('SS26');
     expect(got.currency).toBe('INR');
@@ -124,7 +154,8 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
     // ----- fabric row -----
     const f = got.fabricRows[0];
     expect(f.itemId).toBe(FK.fabricItemId);
-    expect(f.fabricType).toBe('Cotton Single Jersey 180 GSM');  // resolved
+    // Resolved from the VARIANT since the item/variant refactor (B-005 direction).
+    expect(f.fabricType).toBe('Regression Fabric Variant');
     expect(f.classification).toBe('Woven');
     expect(f.description).toBe('Body fabric');
     expect(f.consumption).toBe(1.5);
@@ -138,7 +169,7 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
     // ----- local trim -----
     const lt = got.localTrims[0];
     expect(lt.itemId).toBe(FK.localTrimItemId);
-    expect(lt.item).toBe('4-Hole Polyester Button 20L');       // resolved
+    expect(lt.item).toBe('Regression Button Variant');         // resolved from the variant
     expect(lt.code).toBe('BTN-1');
     expect(lt.size).toBe('20L');
     expect(lt.consumption).toBe(6);
@@ -170,7 +201,7 @@ test.describe('Costing — API Search & Field Round-Trip', () => {
 
 test.describe('Costing — Backend Calc-Engine Verification', () => {
   test('All 8 summary totals are recomputed server-side per formula (FOB)', async () => {
-    const res = await api.post('/cost-sheets', fullPayload());
+    const res = await api.post('/cost-sheets', await fullPayload());
     expect(res.status).toBe(200);
     created.push(res.data.id);
     const got = (await api.get(`/cost-sheets/${res.data.id}`)).data;
@@ -200,7 +231,7 @@ test.describe('Costing — Backend Calc-Engine Verification', () => {
   });
 
   test('CMT costing type excludes fabric from the making price', async () => {
-    const res = await api.post('/cost-sheets', fullPayload({ costingType: 'CMT' }));
+    const res = await api.post('/cost-sheets', await fullPayload({ costingType: 'CMT' }));
     expect(res.status).toBe(200);
     created.push(res.data.id);
     const got = (await api.get(`/cost-sheets/${res.data.id}`)).data;
@@ -214,7 +245,7 @@ test.describe('Costing — Backend Calc-Engine Verification', () => {
   });
 
   test('Updating percentages recomputes overhead charges & total price', async () => {
-    const res = await api.post('/cost-sheets', fullPayload());
+    const res = await api.post('/cost-sheets', await fullPayload());
     created.push(res.data.id);
     const id = res.data.id;
 
@@ -233,7 +264,7 @@ test.describe('Costing — Backend Calc-Engine Verification', () => {
 
 test.describe('Costing — Delete rules', () => {
   test('Draft cost sheet can be deleted; GET afterwards is not 200', async () => {
-    const res = await api.post('/cost-sheets', fullPayload());
+    const res = await api.post('/cost-sheets', await fullPayload());
     const id = res.data.id;
     const del = await api.delete(`/cost-sheets/${id}`);
     expect(del.status).toBeGreaterThanOrEqual(200);

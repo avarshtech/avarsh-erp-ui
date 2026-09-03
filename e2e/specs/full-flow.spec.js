@@ -30,7 +30,7 @@ async function goTo(page, path) {
   ]).catch(() => {});
   if (await loginField.isVisible().catch(() => false)) {
     await loginField.fill('superadmin');
-    await page.getByPlaceholder('Password').fill('admin123');
+    await page.getByPlaceholder('Password').fill('admin98');
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
       page.getByRole('button', { name: /Sign In/i }).click(),
@@ -69,7 +69,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     await page.waitForLoadState('networkidle');
     await page.getByPlaceholder('Username').fill('superadmin');
     await page.waitForTimeout(600);
-    await page.getByPlaceholder('Password').fill('admin123');
+    await page.getByPlaceholder('Password').fill('admin98');
     await page.waitForTimeout(600);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
@@ -339,7 +339,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PHASE 4: PURCHASE ORDER — Supplier, Dates, T&C, Line Item
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PHASE 4: NEW PURCHASE ORDER ────────────────');
-    await goTo(page, '/purchase-orders/new');
+    await goTo(page, '/purchase-orders/supplier-po/new');
     await dismissModals(page);
     await page.waitForTimeout(2000);
 
@@ -384,7 +384,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     // PO LIST
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     console.log('\n  ── PO LIST ────────────────────────────────────');
-    await goTo(page, '/purchase-orders/list');
+    await goTo(page, '/purchase-orders/supplier-po/list');
     await page.waitForTimeout(2500);
     console.log('  ✓ PO List loaded');
 

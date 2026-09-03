@@ -1,10 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Row, Col, Alert, Button } from 'antd';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Row, Col, Alert, Button, Card, Tabs } from 'antd';
 import {
   ShoppingCartOutlined,
   FileTextOutlined,
   ShoppingOutlined,
   InboxOutlined,
+  ExperimentOutlined,
+  WarningOutlined,
+  ContainerOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { Navigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -14,6 +18,14 @@ import StatCard from '../components/StatCard';
 import RecentOrdersCard from '../components/dashboard/RecentOrdersCard';
 import PendingPosCard from '../components/dashboard/PendingPosCard';
 import QuickStatsCard from '../components/dashboard/QuickStatsCard';
+import SampleDeadlinesCard from '../components/dashboard/SampleDeadlinesCard';
+import SampleStatusBreakdownCard from '../components/dashboard/SampleStatusBreakdownCard';
+import useSampleDashboard from '../components/dashboard/useSampleDashboard';
+import useExpDocDashboard from '../components/dashboard/useExpDocDashboard';
+import ShipmentReadinessCard from '../components/dashboard/ShipmentReadinessCard';
+import ExportDocsPendingCard from '../components/dashboard/ExportDocsPendingCard';
+import SampleKpiRow from '../components/sample/SampleKpiRow';
+import SampleDeadlineAlert from '../components/sample/SampleDeadlineAlert';
 import { getDashboardSummary } from '../services/dashboard/dashboardService';
 
 const STATS_CONFIG = [
@@ -28,6 +40,42 @@ const Dashboard = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Sample Request widgets — render nothing for users without the module
+  const sample = useSampleDashboard();
+  // Export Documentation widgets — same contract: nothing renders without the module.
+  const expdoc = useExpDocDashboard();
+
+  const sampleQuickStats = useMemo(() => (sample.enabled && sample.data ? [
+    {
+      icon: <ExperimentOutlined style={{ fontSize: 24, color: '#8b5cf6' }} />,
+      label: 'Samples Due Today', value: sample.data.quickStats.dueToday, unit: 'SRs',
+      background: isDarkMode ? '#3b0764' : '#f5f3ff',
+    },
+    {
+      icon: <WarningOutlined style={{ fontSize: 24, color: 'var(--error-color)' }} />,
+      label: 'Overdue Samples', value: sample.data.quickStats.overdue, unit: 'SRs',
+      background: isDarkMode ? '#7f1d1d' : '#fef2f2',
+    },
+    {
+      icon: <CheckCircleOutlined style={{ fontSize: 24, color: 'var(--success-color)' }} />,
+      label: 'Samples Approved This Week', value: sample.data.quickStats.approvedThisWeek, unit: 'SRs',
+      background: isDarkMode ? '#14532d' : '#f0fdf4',
+    },
+  ] : []), [sample.enabled, sample.data, isDarkMode]);
+
+  const expDocQuickStats = useMemo(() => (expdoc.enabled && expdoc.data ? [
+    {
+      icon: <ContainerOutlined style={{ fontSize: 24, color: '#0369a1' }} />,
+      label: 'Export Docs Awaiting Approval', value: expdoc.data.quickStats.awaitingApproval, unit: 'docs',
+      background: isDarkMode ? '#082f49' : '#f0f9ff',
+    },
+    {
+      icon: <WarningOutlined style={{ fontSize: 24, color: 'var(--warning-color)' }} />,
+      label: 'Shipments At Risk', value: expdoc.data.quickStats.shipmentsAtRisk, unit: 'shipments',
+      background: isDarkMode ? '#78350f' : '#fffbeb',
+    },
+  ] : []), [expdoc.enabled, expdoc.data, isDarkMode]);
+
 
   const loadSummary = useCallback(async () => {
     setLoading(true);
@@ -65,6 +113,8 @@ const Dashboard = () => {
         />
       )}
 
+      {sample.enabled && <SampleDeadlineAlert alerts={sample.data?.alerts || []} />}
+
       {/* Stats Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         {STATS_CONFIG.map(({ key, title, icon, color, period }) => {
@@ -86,21 +136,85 @@ const Dashboard = () => {
         })}
       </Row>
 
-      {/* Recent Orders + Quick Stats */}
+      {/* Sample KPI second row (PRD §12.1) */}
+      {sample.enabled && (
+        <SampleKpiRow kpis={sample.data?.kpis} loading={sample.loading} style={{ marginBottom: 16 }} />
+      )}
+
+      {/* Recent Orders (+ Sample Deadlines tab) + Quick Stats */}
       <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
         <Col xs={24} lg={16}>
-          <RecentOrdersCard orders={data?.recentOrders} loading={loading} />
+          {sample.enabled ? (
+            <Tabs
+              defaultActiveKey="orders"
+              items={[
+                {
+                  key: 'orders',
+                  label: 'Recent Orders',
+                  children: <RecentOrdersCard orders={data?.recentOrders} loading={loading} />,
+                },
+                {
+                  key: 'samples',
+                  label: 'Sample Deadlines',
+                  children: <SampleDeadlinesCard deadlines={sample.data?.deadlines} loading={sample.loading} />,
+                },
+              ]}
+            />
+          ) : (
+            <RecentOrdersCard orders={data?.recentOrders} loading={loading} />
+          )}
         </Col>
         <Col xs={24} lg={8}>
-          <QuickStatsCard quickStats={data?.quickStats} isDarkMode={isDarkMode} loading={loading} />
+          <QuickStatsCard
+            quickStats={data?.quickStats}
+            isDarkMode={isDarkMode}
+            loading={loading}
+            extraItems={[...sampleQuickStats, ...expDocQuickStats]}
+          />
         </Col>
       </Row>
 
-      {/* Pending Purchase Orders */}
+      {/* Export Documentation (PRD §11.1 "Receives back") — shipment readiness and
+          what is waiting on whom. Absent entirely for users without the module. */}
+      {expdoc.enabled && (
+        <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+          <Col xs={24} lg={14}>
+            <Card title="Shipment Readiness" size="small">
+              <ShipmentReadinessCard
+                rows={expdoc.data?.readiness}
+                total={expdoc.data?.readinessTotal || 0}
+                loading={expdoc.loading}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} lg={10}>
+            <Card title="Export Documents Pending" size="small">
+              <ExportDocsPendingCard
+                rows={expdoc.data?.pending}
+                total={expdoc.data?.pendingTotal || 0}
+                loading={expdoc.loading}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
+
+
+      {/* Pending Purchase Orders + Sample Status Breakdown */}
       <Row gutter={[24, 24]}>
-        <Col xs={24}>
+        <Col xs={24} lg={sample.enabled ? 16 : 24}>
           <PendingPosCard pos={data?.pendingPurchaseOrders} loading={loading} />
         </Col>
+        {sample.enabled && (
+          <Col xs={24} lg={8}>
+            <SampleStatusBreakdownCard
+              byStatus={sample.data?.byStatus}
+              byType={sample.data?.byType}
+              pendingApprovals={sample.data?.kpis?.pendingApprovals || 0}
+              loading={sample.loading}
+            />
+          </Col>
+        )}
       </Row>
     </div>
   );

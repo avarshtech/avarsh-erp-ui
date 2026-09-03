@@ -8,6 +8,7 @@ import {
   FileOutlined,
   EyeOutlined,
   DownloadOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -75,6 +76,7 @@ const formatFileSize = (bytes) => {
  * @param {boolean}  props.compact      - Compact mode for inline use in forms
  * @param {string}   props.placeholder  - Custom placeholder text
  * @param {string}   props.hint         - Custom hint text below placeholder
+ * @param {string}   props.infoMessage  - Persistent info note shown below the control (both empty and preview states), e.g. explaining when the file is persisted
  */
 const FileUpload = ({
   accept = 'image/*',
@@ -91,6 +93,7 @@ const FileUpload = ({
   compact = false,
   placeholder = null,
   hint = null,
+  infoMessage = null,
 }) => {
   const { message } = App.useApp();
   const inputRef = useRef(null);
@@ -189,6 +192,16 @@ const FileUpload = ({
     [disabled, handleFileSelect],
   );
 
+  // Persistent info note shown below the control in both empty and preview states.
+  const infoNode = infoMessage ? (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 4, marginTop: 6 }}>
+      <InfoCircleOutlined style={{ fontSize: 14, lineHeight: 1.4, marginTop: 2, flexShrink: 0, color: 'var(--info-color)' }} />
+      <Text type="secondary" style={{ fontSize: 14, lineHeight: 1.4, opacity: 0.85 }}>
+        {infoMessage}
+      </Text>
+    </div>
+  ) : null;
+
   // ---------- Loading State ----------
   if (loading) {
     return (
@@ -214,6 +227,7 @@ const FileUpload = ({
   // ---------- File Preview ----------
   if (hasFile) {
     return (
+      <div>
       <div
         style={{
           display: 'flex',
@@ -300,11 +314,14 @@ const FileUpload = ({
           </Space>
         )}
       </div>
+      {infoNode}
+      </div>
     );
   }
 
   // ---------- Empty Upload Area ----------
   return (
+    <div>
     <div
       onClick={() => !disabled && inputRef.current?.click()}
       onDragOver={handleDragOver}
@@ -352,6 +369,8 @@ const FileUpload = ({
         onChange={handleInputChange}
         style={{ display: 'none' }}
       />
+    </div>
+    {infoNode}
     </div>
   );
 };

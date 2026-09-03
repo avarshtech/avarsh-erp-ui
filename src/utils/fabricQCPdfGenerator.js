@@ -81,7 +81,7 @@ const pivotDefects = (rolls, defects) => {
     const total = counts.reduce((s, c) => s + c, 0);
     return {
       rollNumber: r.rollNumber,
-      itemCode: r.itemCode || '',
+      itemCode: r.variantCode || '',
       qty: Number(r.qty) || 0,
       uom: r.uom || '',
       width: r.width ?? r.stdWidth,

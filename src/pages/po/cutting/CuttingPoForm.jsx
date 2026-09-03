@@ -14,9 +14,11 @@ import MarkerUploadCard from '../components/MarkerUploadCard';
 import PpSampleGate from '../components/PpSampleGate';
 import { PO_TYPE, PO_ACTION, isPpApproved, computeVariancePercent, VARIANCE_THRESHOLD } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom, getPpApprovalStatus,
-  getCuttingPo, createCuttingPo, updateCuttingPo, changeCuttingPoStatus, getOrderCoverage,
-} from '../../../services/po/productionService';
+  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom, getPpApprovalStatus, setPpApprovalStatus,
+} from '../../../services/po/production/productionLookupService';
+import {
+  getCuttingPo, createCuttingPo, updateCuttingPo, changeCuttingPoStatus, getCuttingPoCoverage,
+} from '../../../services/po/production/cuttingPoService';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
@@ -49,11 +51,10 @@ const CuttingPoForm = () => {
   useEffect(() => { getConfirmedOrders().then(setOrders); }, []);
 
   const hydrateFromOrder = useCallback(async (orderId, cadPerPc) => {
-    const [o, cons, pp] = await Promise.all([
-      getOrderForPo(orderId), getConsumptionComparison(orderId, cadPerPc), getPpApprovalStatus(orderId),
-    ]);
+    const [o, pp] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId)]);
+    const cons = await getConsumptionComparison(o, cadPerPc);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
-    setStock(normFabricStock(await getStockByBom(orderId, 'fabric', { cadPerPc: cons[0]?.cadPerPc })));
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc })));
     return o;
   }, []);
 
@@ -64,7 +65,7 @@ const CuttingPoForm = () => {
       if (!po) { message.error('Cutting PO not found'); return navigate('/purchase-orders/cutting-po/list'); }
       const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc);
       setItems(po.items || []);
-      getOrderCoverage(PO_TYPE.CUTTING, po.orderId, id).then(setCoverage);
+      getCuttingPoCoverage(po.orderId, id).then(setCoverage);
       if (o && po.allowancePercent != null && o.allowancePercent !== po.allowancePercent) {
         setAllowanceWarn({ stored: po.allowancePercent, live: o.allowancePercent });
       }
@@ -81,7 +82,18 @@ const CuttingPoForm = () => {
     const o = await hydrateFromOrder(orderId);
     setItems((o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
     setAllowanceWarn(null);
-    getOrderCoverage(PO_TYPE.CUTTING, orderId).then(setCoverage);
+    getCuttingPoCoverage(orderId).then(setCoverage);
+  };
+
+  // Allowance % is editable on the PO (decision ②) — default comes from the
+  // order's BOM items; changing it recomputes every row's planned qty.
+  const applyAllowance = (pct) => {
+    const val = pct == null ? 0 : pct;
+    setOrder((o) => ({ ...o, allowancePercent: val }));
+    setItems((rows) => rows.map((i) => ({
+      ...i, allowancePercent: val,
+      plannedQty: Math.ceil((i.orderQty || 0) * (1 + val / 100)),
+    })));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
@@ -104,7 +116,7 @@ const CuttingPoForm = () => {
 
   const refreshStock = (rows) => {
     setConsumption(rows);
-    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
   };
 
   // Editing Planned Qty re-derives the BOM-based requirement (per-garment from BOM × planned qty)
@@ -113,7 +125,7 @@ const CuttingPoForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order.id, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
   };
 
   const applyBulkRate = () => {
@@ -158,7 +170,16 @@ const CuttingPoForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
-        {ppStatus && <PpSampleGate status={ppStatus} />}
+        {ppStatus && (
+          <PpSampleGate
+            status={ppStatus}
+            onMarkApproved={order ? async () => {
+              const next = await setPpApprovalStatus(order.id, 'COMPLETED');
+              setPpStatus(next);
+              message.success('PP Sample marked approved for this order');
+            } : undefined}
+          />
+        )}
         <FormSection title="Order & Style" columns={2}>
           <Form.Item name="orderId" label="Confirmed Order" rules={[{ required: true, message: 'Select an order' }]}>
             <FormSelect placeholder="Select a confirmed order" disabled={isEdit} onChange={handleOrderSelect}
@@ -173,7 +194,11 @@ const CuttingPoForm = () => {
             <Text type="secondary">Style: <Text strong>{order.styleNo}</Text></Text>
             <Text type="secondary">Buyer: <Text strong>{order.buyer}</Text></Text>
             <Text type="secondary">BOM: <Text strong>{order.bomNo}</Text></Text>
-            <Text type="secondary">Allowance: <Text strong>{order.allowancePercent}%</Text></Text>
+            <Text type="secondary">
+              Allowance:{' '}
+              <InputNumber size="small" min={0} max={50} value={order.allowancePercent}
+                onChange={applyAllowance} style={{ width: 80 }} addonAfter="%" {...numericInputProps} />
+            </Text>
           </Space>
         )}
         {allowanceWarn && (

@@ -5,7 +5,7 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
 } from '@ant-design/icons';
-import { MODULE_GROUPS, MODULE_ICONS, MODULE_COLORS } from '../../../utils/reportConstants';
+import { MODULE_GROUPS, MODULE_ICONS, MODULE_COLORS, GROUPED_MODULES } from '../../../utils/reportConstants';
 
 /* ── Inline styles (MasterDashboard pattern) ── */
 
@@ -71,24 +71,38 @@ const ReportModuleNav = memo(function ReportModuleNav({
   const [collapsed, setCollapsed] = useState(false);
   const [hoveredKey, setHoveredKey] = useState(null);
 
-  // Build groups from MODULE_GROUPS, filtering out modules with 0 reports
-  const groups = useMemo(() =>
-    MODULE_GROUPS
+  // Build groups from MODULE_GROUPS, filtering out modules with 0 reports.
+  // Modules the UI has no group for still get listed under "Other" — otherwise a
+  // report whose module was added backend-side would be unreachable from the nav.
+  const groups = useMemo(() => {
+    const toItem = (mod) => ({
+      key: mod,
+      label: mod.replace(/_/g, ' '),
+      count: moduleCounts[mod] || 0,
+      Icon: MODULE_ICONS[mod] || AppstoreOutlined,
+      color: MODULE_COLORS[mod] || 'default',
+    });
+
+    const known = MODULE_GROUPS
       .map((group) => ({
         ...group,
-        items: group.modules
-          .filter((mod) => (moduleCounts[mod] || 0) > 0)
-          .map((mod) => ({
-            key: mod,
-            label: mod.replace(/_/g, ' '),
-            count: moduleCounts[mod] || 0,
-            Icon: MODULE_ICONS[mod] || AppstoreOutlined,
-            color: MODULE_COLORS[mod] || 'default',
-          })),
+        items: group.modules.filter((mod) => (moduleCounts[mod] || 0) > 0).map(toItem),
       }))
-      .filter((group) => group.items.length > 0),
-    [moduleCounts],
-  );
+      .filter((group) => group.items.length > 0);
+
+    const ungrouped = Object.keys(moduleCounts)
+      .filter((mod) => (moduleCounts[mod] || 0) > 0 && !GROUPED_MODULES.includes(mod))
+      .map(toItem);
+
+    return ungrouped.length
+      ? [...known, {
+          groupKey: 'other',
+          label: 'Other',
+          accent: 'var(--text-secondary)',
+          items: ungrouped,
+        }]
+      : known;
+  }, [moduleCounts]);
 
   const totalReports = useMemo(
     () => Object.values(moduleCounts).reduce((sum, c) => sum + c, 0),

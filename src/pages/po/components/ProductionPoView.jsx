@@ -5,19 +5,21 @@ import StatusSteps from '../../../components/StatusSteps';
 import { ActionButton } from '../../../components/buttons';
 import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from './MaterialStockPanel';
-import ProductionApprovalTimeline from './ProductionApprovalTimeline';
+import ProductionEngineHistory from './ProductionEngineHistory';
 import ProductionStatusBar from './ProductionStatusBar';
+import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
 import PpSampleGate from './PpSampleGate';
 import { PRODUCTION_PO_STATUS_CONFIG, PRODUCTION_PO_STATUS_FLOW } from '../../../utils/statusConfig';
 import {
   getStatusLabel, PO_TYPE, PO_TYPE_META, getProcessLabel, PROD_PO_STATUS,
   computeVariancePercent, getVarianceStatus, isPpApproved,
 } from '../../../utils/productionConstants';
-import { getStockByBom, getPpApprovalStatus } from '../../../services/po/productionService';
+import { getStockByBom, getPpApprovalStatus } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const { Text } = Typography;
 const KIND = { CUTTING: 'fabric', WORK_ORDER: 'trim', FINISHING: 'packing' };
+const ENGINE_ENTITY_TYPE = { CUTTING: 'CUTTING_PO', WORK_ORDER: 'WORK_ORDER', FINISHING: 'FINISHING_PO' };
 const STOCK_LABEL = { CUTTING: 'Fabric Stock', WORK_ORDER: 'Trim Stock', FINISHING: 'Packing Stock' };
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB') : '—');
 const money = (n) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
@@ -31,7 +33,7 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
   useEffect(() => {
     if (!open || !record?.orderId) return;
     let active = true;
-    getStockByBom(record.orderId, KIND[poType], { cadPerPc: record.cadConsumptionPerPc })
+    getStockByBom(record, KIND[poType], { cadPerPc: record.cadConsumptionPerPc, plannedQty: record.totalPlannedQty })
       .then((rows) => active && setStockRows(rows));
     getPpApprovalStatus(record.orderId).then((s) => active && setPpStatus(s));
     return () => { active = false; };
@@ -99,7 +101,9 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
     { key: 'overview', label: 'Overview', children: overview },
     { key: 'matrix', label: 'Size-Color Matrix', children: <SizeColorMatrix items={record.items || []} onChange={() => {}} editable={false} /> },
     { key: 'stock', label: STOCK_LABEL[poType], children: <MaterialStockPanel rows={stockRows} materialType={KIND[poType]} /> },
-    { key: 'history', label: 'Approval History', children: <ProductionApprovalTimeline history={record.approvalHistory || []} /> },
+    { key: 'history', label: 'Approval History',
+      children: <ProductionEngineHistory entityType={ENGINE_ENTITY_TYPE[poType]} entityId={record.id}
+        legacyHistory={record.approvalHistory || []} /> },
   ];
 
   return (
@@ -112,8 +116,16 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
           <ActionButton action="print" text="Print PO" disabled={record.status === PROD_PO_STATUS.DRAFT}
             tooltip={record.status === PROD_PO_STATUS.DRAFT ? 'Submit/approve before printing for a unit/vendor' : undefined}
             onClick={() => generateProductionPoPdf(record, poType)} />
-          <ProductionStatusBar poType={poType} record={record} ppApproved={ppApproved}
-            onChanged={(u) => { onChanged?.(u); onClose?.(); }} />
+          <ApprovalActionBar
+            entityType={ENGINE_ENTITY_TYPE[poType]}
+            entityId={record.id}
+            docLabel={meta.label}
+            docNumber={record[meta.noField]}
+            onActionComplete={() => { onChanged?.(); onClose?.(); }}
+            fallback={
+              <ProductionStatusBar poType={poType} record={record} ppApproved={ppApproved}
+                onChanged={(u) => { onChanged?.(u); onClose?.(); }} />
+            } />
         </Space>
       }
       title={

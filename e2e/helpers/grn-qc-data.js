@@ -403,9 +403,34 @@ export async function draftQc(api, payload) {
   return data;
 }
 
-/** Approve a QC and return the response. */
-export async function approveQc(api, qcId, reason = 'E2E auto-approve') {
-  const { data, status } = await api.post(`/qc/${qcId}/approve`, { reason });
+/**
+ * A second full-permission user for QC decisions. QCService forbids actioning your
+ * own submission, and since the auditor fix (B-059) the creator identity is actually
+ * recorded — so the old pattern of superadmin approving superadmin's QC now correctly
+ * 409s. Cached per process; created on first use.
+ */
+let _qcApprover = null;
+export async function qcApproverClient(api) {
+  if (_qcApprover) return _qcApprover;
+  const { createAuthenticatedClient } = await import('./api-client.js');
+  const { data: users } = await api.get('/users');
+  const list = Array.isArray(users) ? users : users?.content || [];
+  if (!list.some((u) => u.username === 'e2e-director')) {
+    const { data: roles } = await api.get('/roles');
+    const superRole = (Array.isArray(roles) ? roles : roles?.content || []).find((r) => r.name === 'Super Admin');
+    await api.post('/users', {
+      name: 'E2E Director', username: 'e2e-director', password: 'Director@123',
+      email: 'e2e-director@avarsh.com', roleId: superRole.id, isActive: true,
+    });
+  }
+  _qcApprover = await createAuthenticatedClient('e2e-director', 'Director@123');
+  return _qcApprover;
+}
+
+/** Approve a QC (as a second user — the creator cannot action their own) and return it. */
+export async function approveQc(api, qcId, reason = 'E2E auto-approve', extra = {}) {
+  const approver = await qcApproverClient(api);
+  const { data, status } = await approver.post(`/qc/${qcId}/approve`, { reason, ...extra });
   if (!data?.id) throw new Error(`QC approve failed: status=${status}`);
   return data;
 }

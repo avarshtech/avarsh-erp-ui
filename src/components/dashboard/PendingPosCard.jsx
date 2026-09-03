@@ -49,7 +49,7 @@ const PendingPosCard = memo(function PendingPosCard({ pos = [], loading = false 
   ], []);
 
   return (
-    <Card title="Pending Purchase Orders" extra={<a href="/purchase-orders/list">View All</a>}>
+    <Card title="Pending Supplier PO" extra={<a href="/purchase-orders/supplier-po/list">View All</a>}>
       <Table
         rowKey={(r) => r.poNumber}
         columns={columns}

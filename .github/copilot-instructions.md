@@ -246,7 +246,7 @@ const POForm = () => {
       });
     } catch (error) {
       message.error('Failed to load PO data');
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } finally {
       setLoading(false);
     }
@@ -269,7 +269,7 @@ const POForm = () => {
         await createPurchaseOrder(payload);
         message.success('PO created successfully');
       }
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } catch (error) {
       message.error('Failed to save PO');
     } finally {
@@ -395,8 +395,8 @@ const MyComponent = () => {
 1. **Preserve the New PO List Page**: The target repo (`avarsh-erp-ui`) already has a `POList.jsx` page at `src/pages/po/POList.jsx`. **DO NOT replace or significantly change this page's list/table structure** - only enhance it with migrated functionality.
 
 2. **Add/Edit as Full Page (NOT Dialog)**: Unlike the old repo where Add/Edit was in a dialog, the new UI uses **separate full-page routes** for creating and editing POs:
-   - **New PO**: Separate route/page (e.g., `/purchase-orders/new` → `POForm.jsx`)
-   - **Edit PO**: Separate route/page (e.g., `/purchase-orders/edit/:id` → `POForm.jsx`)
+   - **New Supplier PO**: Separate route/page (`/purchase-orders/supplier-po/new` → `POForm.jsx`)
+   - **Edit Supplier PO**: Separate route/page (`/purchase-orders/supplier-po/edit/:id` → `POForm.jsx`)
    - Keep the current route structure in `avarsh-erp-ui` - do not convert to dialog
    - Migrate the form logic and business rules from the source repo's `POFormLayer.jsx` into this full-page form
    - Support Save as Draft and Submit for Approval actions

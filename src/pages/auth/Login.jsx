@@ -6,11 +6,15 @@ import { authenticateUser, isAuthenticated, initializeSession } from '../../serv
 import { hasSessionActiveFlag } from '../../services/auth/sessionStore';
 import { useTheme } from '../../context/ThemeContext';
 import { getFirstAccessibleRoute } from '../../utils/permissions';
+import { applyUpdate, checkForUpdate, subscribeToUpdates } from '../../utils/swRegistration';
 import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
 import avarshLogoLight from '../../assets/images/avarsh-logo-light.png';
 import PwaInstallPrompt from '../../components/PwaInstallPrompt';
 
 const { Title, Text, Link } = Typography;
+
+// Guards against a reload loop if activating a waiting service worker fails.
+const UPDATE_ATTEMPT_KEY = 'avarsh-sw-update-attempted';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -42,6 +46,37 @@ const Login = () => {
     };
     checkAuth();
   }, [navigate, location]);
+
+  // The login screen is the safe moment to swap in a new build — no session, no
+  // unsaved work — so it applies here for browser and PWA alike. logoutUser()
+  // already applies a waiting update on its way here; this covers every other
+  // route in: idle timeout, session expiry, a bookmark, a PWA relaunch, or a
+  // deploy that landed while the form was just sitting open.
+  useEffect(() => {
+    if (checkingAuth || isAuthenticated()) return;
+
+    // Subscribing rather than checking once: the service worker may not have
+    // finished registering yet, and a deploy can land while this page is open.
+    const unsubscribe = subscribeToUpdates((ready) => {
+      if (!ready) return;
+      // A worker still waiting after we already tried means activation did not
+      // stick. Reloading again would loop, so leave it for the next tab.
+      if (sessionStorage.getItem(UPDATE_ATTEMPT_KEY)) return;
+
+      sessionStorage.setItem(UPDATE_ATTEMPT_KEY, '1');
+      applyUpdate();
+    });
+
+    // Don't wait on the background interval to notice a fresh deploy. The guard
+    // is cleared only once a real check has come back empty — clearing it on the
+    // subscription's synchronous "not ready yet" would wipe it on every load,
+    // before it could ever be read, turning a failed activation into a loop.
+    checkForUpdate().then((ready) => {
+      if (!ready) sessionStorage.removeItem(UPDATE_ATTEMPT_KEY);
+    });
+
+    return unsubscribe;
+  }, [checkingAuth]);
 
   useEffect(() => {
     const rememberedUsername = localStorage.getItem('rememberedUsername');

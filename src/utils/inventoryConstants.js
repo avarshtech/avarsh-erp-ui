@@ -26,6 +26,7 @@ export const GRN_STATUS = {
   PENDING_REVERSAL: 'Pending_Reversal',
   REVERSED: 'Reversed',
   CLOSED: 'Closed',
+  CANCELLED: 'Cancelled',
 };
 
 export const GRN_STATUS_LABELS = {
@@ -34,6 +35,7 @@ export const GRN_STATUS_LABELS = {
   [GRN_STATUS.PENDING_REVERSAL]: 'Pending Reversal',
   [GRN_STATUS.REVERSED]: 'Reversed',
   [GRN_STATUS.CLOSED]: 'Closed',
+  [GRN_STATUS.CANCELLED]: 'Cancelled',
 };
 
 // ─── QC STATUS ─────────────────────────────────────────────────────────────────
@@ -107,11 +109,20 @@ export const FABRIC_QC_PARAMETERS = [
   { key: 'tensileStrength', label: 'Tensile Strength', unit: 'N', type: 'number' },
 ];
 
-// ─── FABRIC QC — per-roll defect-count threshold (default; per item later) ─────
+// ─── FABRIC QC — per-roll defect-count threshold (guidance only) ──────────────
+// Shown to the inspector as a reference point. It does NOT decide the roll result —
+// that is selected by hand on the Pre-Roll Inspection grid.
 export const FABRIC_QC_DEFECT_FAIL_THRESHOLD = 3;
 
-// ─── FABRIC QC — width / GSM tolerance (±5%) ───────────────────────────────────
+// ─── FABRIC QC — width / GSM tolerance (±5%, guidance only) ───────────────────
 export const FABRIC_QC_TOLERANCE_PCT = 5;
+
+// ─── FABRIC QC — per-roll verdict, chosen by the inspector ────────────────────
+// Values match the backend RollResult enum so they round-trip without translation.
+export const ROLL_RESULT = {
+  PASS: 'PASS',
+  FAIL: 'FAIL',
+};
 
 // ─── FABRIC QC FAILED ROLL DISPOSITIONS (kept for legacy mock data) ────────────
 export const FABRIC_QC_DISPOSITIONS = [
@@ -164,3 +175,30 @@ export const INVENTORY_UOMS = [
 // ─── DOC NUMBER PREFIXES ───────────────────────────────────────────────────────
 export const GRN_DOC_PREFIX = 'GRN';
 export const QC_DOC_PREFIX = 'QC';
+
+// ─── GRN CATEGORY CLASSIFICATION ───────────────────────────────────────────────
+// A GRN is raised in one of two shapes: fabric is received as ROLLS, everything else
+// (trims, packing materials) is received as CARTONS. Which shape applies is decided by
+// the PO line's category.
+//
+// This used to be an exact match against a single category named "Trims", which meant a
+// line in "Local Trims", "Imported Trims" or "Packing Materials" matched neither form and
+// was unreceivable. Categories are user-defined master data, so the only safe rule is:
+// fabric is fabric, and anything that is not fabric is an accessory.
+export const GRN_CATEGORY = { FABRIC: 'Fabric', ACCESSORIES: 'Accessories' };
+
+/** True when a PO line's category is a fabric category. */
+export const isFabricCategory = (categoryName) =>
+  String(categoryName || '').trim().toLowerCase().includes('fabric');
+
+/**
+ * True when a PO line belongs in a GRN of the given kind (GRN_CATEGORY.*).
+ * A line whose item has NO category counts as an accessory rather than
+ * disappearing from both forms — requiring a truthy category made every PO
+ * containing an uncategorised trim silently vanish from the Accessories
+ * dropdown.
+ */
+export const matchesGrnCategory = (categoryName, grnCategory) =>
+  grnCategory === GRN_CATEGORY.FABRIC
+    ? isFabricCategory(categoryName)
+    : !isFabricCategory(categoryName);

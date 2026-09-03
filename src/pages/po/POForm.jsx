@@ -34,6 +34,8 @@ import {
   ExperimentOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../components/PageHeader';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import { ActionButton } from '../../components/buttons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -238,23 +240,26 @@ const VariantSelectionModal = ({ open, item, onSelect, currentVariantId }) => {
               }}
             >
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                {Object.entries(attrs).length > 0 ? (
-                  Object.entries(attrs).map(([key, val]) => {
-                    const kLower = key.toLowerCase();
-                    const isColorAttr = kLower.includes('color') || kLower.includes('colour');
-                    const showSwatch = isColorAttr && isPantoneCode(val);
-                    return (
-                      <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        {showSwatch && <PantoneColorSwatch value={val} size={16} />}
-                        <Text style={{ fontSize: 12 }}>
-                          {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
-                        </Text>
-                      </Tag>
-                    );
-                  })
-                ) : (
-                  <Text type="secondary">Default variant</Text>
-                )}
+                {/* The variant NAME is the identity since the item/variant refactor —
+                    labelling by attributes alone rendered every attribute-less variant
+                    as an indistinguishable "Default variant". */}
+                <Text strong style={{ fontSize: 13 }}>
+                  {variant.variantName || 'Default variant'}
+                </Text>
+                {variant.variantCode && <Tag color="blue">{variant.variantCode}</Tag>}
+                {Object.entries(attrs).map(([key, val]) => {
+                  const kLower = key.toLowerCase();
+                  const isColorAttr = kLower.includes('color') || kLower.includes('colour');
+                  const showSwatch = isColorAttr && isPantoneCode(val);
+                  return (
+                    <Tag key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {showSwatch && <PantoneColorSwatch value={val} size={16} />}
+                      <Text style={{ fontSize: 12 }}>
+                        {key.charAt(0).toUpperCase() + key.slice(1)}: {val}
+                      </Text>
+                    </Tag>
+                  );
+                })}
                 {isCurrent && (
                   <Tag color="green" style={{ marginLeft: 'auto', fontWeight: 600 }}>
                     Current
@@ -279,6 +284,7 @@ const TAX_OPTIONS = [
 ];
 
 const POForm = () => {
+  const { isSampleOrder } = useSampleOrderNos();
   const navigate = useNavigate();
   const { id } = useParams();
   const prevIdRef = useRef(id);
@@ -584,6 +590,8 @@ const POForm = () => {
           0,
         amount: item.totalAmount || item.amount || 0,
         variantId: item.variantId || null,
+        variantName: item.variantName || '',
+        variantCode: item.variantCode || '',
         variantAttributes: item.variantAttributes || null,
         hsnCode: item.hsnCode || '',
         categoryName: item.categoryName || '',
@@ -596,7 +604,7 @@ const POForm = () => {
       setLineItems(mappedItems.length > 0 ? mappedItems : [createEmptyLineItem()]);
     } catch {
       message.error('Failed to load purchase order');
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } finally {
       // Defer so React paints the form with populated values before hiding the skeleton
       requestAnimationFrame(() => setPageLoading(false));
@@ -729,6 +737,8 @@ const POForm = () => {
               unitPrice,
               gstPercent: gst,
               variantId: variant?.id || null,
+              variantName: variant?.variantName || '',
+              variantCode: variant?.variantCode || '',
               variantAttributes: variant?.attributes || null,
               hsnCode: item.hsnCode || '',
               categoryName: item.categoryName || '',
@@ -930,15 +940,33 @@ const POForm = () => {
 
   // BOM Line Selection confirm handler
   const handleBomLineSelectionConfirm = useCallback((selectedLines) => {
+    // The PO is raised in the item's purchase (primary) UOM. BOM lines saved before UOM
+    // conversion existed have no converted figure, so they fall back to the consumption UOM.
+    const bomPurchaseQty = (bomLine) => bomLine.purchaseQtyPrimary ?? bomLine.purchaseQty ?? 0;
+    const bomPurchaseUom = (bomLine) => bomLine.purchaseUom || bomLine.uom || '';
+    // The BOM line carries the purchase UOM as a symbol only. Resolve it to the master
+    // record so the saved line has a real uomId — without it the server persists no UOM
+    // and every downstream read (PO view, GRN) shows a blank unit.
+    const bomPurchaseUomId = (bomLine) => {
+      const symbol = bomPurchaseUom(bomLine).trim().toLowerCase();
+      if (!symbol) return null;
+      const match = (uoms || []).find(
+        (u) => (u.symbol || '').trim().toLowerCase() === symbol || (u.name || '').trim().toLowerCase() === symbol
+      );
+      return match?.id ?? null;
+    };
+
     const createPoLineFromBom = (bomLine, bomId) => ({
       key: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       itemId: bomLine.itemId,
       itemCode: bomLine.itemCode,
       itemName: bomLine.itemName || '',
       description: [bomLine.categoryName, bomLine.subCategoryName].filter(Boolean).join(' - '),
-      qty: String(bomLine.purchaseQty || 0),
-      uom: bomLine.uom || '',
-      uomId: null,
+      // The PO is raised in the BOM line's purchase UOM. When the item defines a UOM
+      // conversion the BOM snapshots the converted quantity; otherwise both are the same.
+      qty: String(bomPurchaseQty(bomLine)),
+      uom: bomPurchaseUom(bomLine),
+      uomId: bomPurchaseUomId(bomLine),
       primaryUom: '',
       primaryUomId: null,
       secondaryUom: '',
@@ -947,6 +975,8 @@ const POForm = () => {
       gstPercent: 0,
       amount: 0,
       variantId: bomLine.variantId || null,
+      variantName: bomLine.variantName || '',
+      variantCode: bomLine.variantCode || '',
       variantAttributes: bomLine.variants || null,
       hsnCode: bomLine.hsnCode || '',
       categoryName: bomLine.categoryName || '',
@@ -961,10 +991,11 @@ const POForm = () => {
       // Merge duplicate item+variant+uom lines
       const mergeMap = new Map();
       selectedLines.forEach(({ bomLine, bomId }) => {
-        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomLine.uom || ''}`;
+        // Group by the unit actually being purchased, so quantities only merge when comparable
+        const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomPurchaseUom(bomLine)}`;
         if (mergeMap.has(key)) {
           const existing = mergeMap.get(key);
-          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomLine.purchaseQty || 0));
+          existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomPurchaseQty(bomLine)));
           existing.bomLineSources.push({ bomId, lineId: bomLine.id });
         } else {
           mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
@@ -982,7 +1013,7 @@ const POForm = () => {
 
     setLineItems(newLines);
     setIsDirty(true);
-  }, [poType]);
+  }, [poType, uoms]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -1351,7 +1382,7 @@ const POForm = () => {
       }
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } catch {
       message.error('Failed to save purchase order');
     } finally {
@@ -1507,7 +1538,7 @@ const POForm = () => {
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     } catch {
       message.error('Failed to submit purchase order');
     } finally {
@@ -1524,10 +1555,10 @@ const POForm = () => {
         content: 'You have unsaved changes. Are you sure you want to leave?',
         okText: 'Leave',
         cancelText: 'Stay',
-        onOk: () => navigate('/purchase-orders/list'),
+        onOk: () => navigate('/purchase-orders/supplier-po/list'),
       });
     } else {
-      navigate('/purchase-orders/list');
+      navigate('/purchase-orders/supplier-po/list');
     }
   };
 
@@ -1566,17 +1597,17 @@ const POForm = () => {
         if (record._fromBom) {
           return (
             <div>
-              <Text strong style={{ fontSize: 13 }}>{record.itemCode}</Text>
+              <Text strong style={{ fontSize: 13 }}>{record.variantCode}</Text>
               <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>{record.itemName}</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>{record.variantName}</Text>
             </div>
           );
         }
         return (
           <ItemSearchInput
             value={
-              record.itemCode || record.itemName
-                ? `${record.itemCode || ''} - ${record.itemName || ''}`
+              record.variantCode || record.variantName
+                ? `${record.variantCode || ''} - ${record.variantName || ''}`
                 : ''
             }
             onSelect={(item) => handleItemSelect(item, record.key)}
@@ -1656,6 +1687,21 @@ const POForm = () => {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', flex: 1, minWidth: 0 }}>
               {hasMultipleVariants && (
                 <EditOutlined style={{ fontSize: 11, color: 'var(--primary-color)', flexShrink: 0 }} />
+              )}
+              {/* Variant identity leads; attributes follow as supporting detail. */}
+              {(record.variantName || record.variantCode) && (
+                <div style={{ width: '100%', minWidth: 0 }}>
+                  {record.variantName && (
+                    <Text strong style={{ fontSize: 11, display: 'block' }} ellipsis={{ tooltip: record.variantName }}>
+                      {record.variantName}
+                    </Text>
+                  )}
+                  {record.variantCode && (
+                    <Text type="secondary" style={{ fontSize: 10, fontFamily: 'monospace' }}>
+                      {record.variantCode}
+                    </Text>
+                  )}
+                </div>
               )}
               {Object.entries(attrs).length > 0 ? (
                 Object.entries(attrs).map(([key, val]) => {
@@ -2138,7 +2184,10 @@ const POForm = () => {
                 <Row gutter={[24, 12]}>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Order No</Text>
-                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                    <Text strong style={{ fontSize: 14, color: 'var(--primary-color)' }}>
+                      {order.orderNo}
+                      {isSampleOrder(order.orderNo) && <SampleOrderTag />}
+                    </Text>
                   </Col>
                   <Col xs={12} sm={8} md={6} lg={4}>
                     <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>Style</Text>
@@ -2363,8 +2412,8 @@ const POForm = () => {
             stages={lineItem.processingStages}
             poDate={form.getFieldValue('poDate')}
             deliveryDate={form.getFieldValue('deliveryDate')}
-            itemName={lineItem.itemName}
-            itemCode={lineItem.itemCode}
+            itemName={lineItem.variantName}
+            itemCode={lineItem.variantCode}
             variantAttributes={lineItem.variantAttributes}
           />
         ) : null;

@@ -2,26 +2,29 @@ import { memo, useMemo, useEffect } from 'react';
 import { Card, Table, Empty, Tag, Space, Typography, Tooltip } from 'antd';
 import { ProfileOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { formatNumber } from '../../../utils/formatters';
+import { matchesGrnCategory } from '../../../utils/inventoryConstants';
 
 const { Text } = Typography;
 
 const POLineItemPicker = memo(function POLineItemPicker({
-  category, // 'Fabric' | 'Trims'
+  category, // GRN_CATEGORY.FABRIC | GRN_CATEGORY.ACCESSORIES
   poLineItems = [],
   selectedIds = [],
   onSelectionChange,
   readOnly = false,
 }) {
-  // Auto-filter by category — categoryName is the exact mst_categories.name
-  // denormalized onto each PO line item (see adaptPO in inventoryService.js).
+  // Fabric lines are received as rolls, everything else as cartons. Categories are
+  // user-defined master data ("Local Trims", "Imported Trims", "Packing Materials"),
+  // so this classifies rather than exact-matching one name.
   const filtered = useMemo(
-    () => poLineItems.filter((li) => li.categoryName === category),
+    () => poLineItems.filter((li) => matchesGrnCategory(li.categoryName, category)),
     [poLineItems, category],
   );
 
   const columns = useMemo(
     () => [
-      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 170, render: (v) => <span style={{ whiteSpace: 'nowrap' }}>{v ?? '—'}</span> },
+      // The variant is the purchasable identity, so it stands in for the item code here.
+      { title: 'Item Code', dataIndex: 'itemCode', align: 'center', width: 170, render: (v, r) => <span style={{ whiteSpace: 'nowrap' }}>{r.variantCode || '—'}</span> },
       { title: 'Description', dataIndex: 'description', align: 'center', ellipsis: true },
       { title: 'UOM', dataIndex: 'uom', align: 'center', width: 70 },
       { title: 'PO Qty', dataIndex: 'orderedQty', align: 'center', width: 100, render: (v) => formatNumber(v, 1) },

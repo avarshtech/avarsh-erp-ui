@@ -59,6 +59,10 @@ const GROUP_ICONS = {
 };
 
 // Operation label helpers
+// Every operation id any module can return from getOperationsForModule() must
+// appear in BOTH maps. The label falls back to the raw id, but OP_COLORS is used
+// in string concatenation (`OP_COLORS[op] + '40'`), so a missing entry yields
+// "undefined40" — invalid CSS the browser drops, leaving the chip unstyled.
 const OP_LABELS = {
   view: 'View',
   add: 'Add',
@@ -68,6 +72,14 @@ const OP_LABELS = {
   reject: 'Reject',
   cancel: 'Cancel',
   refer_back: 'Refer Back',
+  verify: 'Verify',
+  post: 'Post',
+  finalize: 'Finalize',
+  revise: 'Revise',
+  override: 'Override',
+  print: 'Print',
+  reprint: 'Reprint',
+  publish: 'Publish',
 };
 
 const OP_COLORS = {
@@ -79,6 +91,14 @@ const OP_COLORS = {
   reject: '#f43f5e',
   cancel: '#64748b',
   refer_back: '#8b5cf6',
+  verify: '#14b8a6',
+  post: '#eab308',
+  finalize: '#16a34a',
+  revise: '#0ea5e9',
+  override: '#a855f7',
+  print: '#0891b2',
+  reprint: '#7c3aed',
+  publish: '#059669',
 };
 
 const RoleAccess = () => {
@@ -622,7 +642,7 @@ const RoleAccess = () => {
             )}
           </div>
           {isPOApproval && (
-            <Tooltip title="Requires Purchase Orders access to be enabled">
+            <Tooltip title="Requires Supplier PO access to be enabled">
               <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
             </Tooltip>
           )}
@@ -738,8 +758,8 @@ const RoleAccess = () => {
         {/* PO Approval dependency notice */}
         {permissions['purchase-orders']?.access && (
           <Alert
-            message="PO Approval Actions are linked to Purchase Orders access"
-            description="Approve, Reject, Cancel, and Refer Back operations require the Purchase Orders module to be enabled."
+            message="PO Approval Actions are linked to Supplier PO access"
+            description="Approve, Reject, Cancel, and Refer Back operations require the Supplier PO module to be enabled."
             type="info"
             showIcon
             icon={<LinkOutlined />}

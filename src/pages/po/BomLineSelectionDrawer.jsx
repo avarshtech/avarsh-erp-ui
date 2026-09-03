@@ -24,6 +24,8 @@ import {
 } from '@ant-design/icons';
 import { ActionButton } from '../../components/buttons';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
+import SampleOrderTag from '../../components/SampleOrderTag';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import RecentSuggestionsButton from '../../components/RecentSuggestionsButton';
 import { isPantoneCode } from '../../services/core/pantoneService';
 import { getRecentBoms } from '../../services/bom/bomService';
@@ -102,6 +104,7 @@ const BomLineSelectionDrawer = ({
   onConfirm,
 }) => {
   const { message } = App.useApp();
+  const { isSampleOrder } = useSampleOrderNos();
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [orderNoInput, setOrderNoInput] = useState('SG/');
   const [recentBoms, setRecentBoms] = useState([]);
@@ -269,8 +272,8 @@ const BomLineSelectionDrawer = ({
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <Text strong style={{ fontSize: 13 }}>{line.itemCode}</Text>
-            <Text type="secondary" style={{ fontSize: 13 }}>{line.itemName}</Text>
+            <Text strong style={{ fontSize: 13 }}>{line.variantCode || line.itemCode}</Text>
+            <Text type="secondary" style={{ fontSize: 13 }}>{line.variantName || line.itemName}</Text>
             {isLocked && (
               <Tag color="warning" icon={<LockOutlined />} style={{ fontSize: 11 }}>
                 PO Placed
@@ -305,12 +308,22 @@ const BomLineSelectionDrawer = ({
             </div>
           )}
         </div>
-        <div style={{ textAlign: 'right', minWidth: 90, flexShrink: 0 }}>
+        <div style={{ textAlign: 'right', minWidth: 110, flexShrink: 0 }}>
+          {/* Quantity the PO will be raised in; lines saved before UOM conversion fall back */}
           <Text strong style={{ fontSize: 13 }}>
-            {line.purchaseQty != null ? Number(line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '-'}
+            {(line.purchaseQtyPrimary ?? line.purchaseQty) != null
+              ? Number(line.purchaseQtyPrimary ?? line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })
+              : '-'}
           </Text>
           <br />
-          <Text type="secondary" style={{ fontSize: 11 }}>{line.uom || ''}</Text>
+          <Text type="secondary" style={{ fontSize: 11 }}>{line.purchaseUom || line.uom || ''}</Text>
+          {line.purchaseQtyPrimary != null && Number(line.uomConversionFactor) > 0 && (
+            <div>
+              <Text type="secondary" style={{ fontSize: 10 }}>
+                {Number(line.purchaseQty).toLocaleString('en-IN', { maximumFractionDigits: 2 })} {line.uom}
+              </Text>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -450,7 +463,10 @@ const BomLineSelectionDrawer = ({
                     <Row gutter={[16, 4]}>
                       <Col>
                         <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Order No</Text>
-                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>{order.orderNo}</Text>
+                        <Text strong style={{ fontSize: 13, color: 'var(--primary-color)' }}>
+                          {order.orderNo}
+                          {isSampleOrder(order.orderNo) && <SampleOrderTag />}
+                        </Text>
                       </Col>
                       <Col>
                         <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>Style</Text>

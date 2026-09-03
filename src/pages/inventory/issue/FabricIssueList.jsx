@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Card, Space, Input, DatePicker, Row, Col } from 'antd';
+import { App, Table, Card, Space, Input, DatePicker, Row, Col, Tag } from 'antd';
 import { SearchOutlined, ScissorOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -10,10 +10,11 @@ import StatCard from '../../../components/StatCard';
 import RecordLink from '../../../components/RecordLink';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { getFabricIssueList, getApprovedCuttingPOs } from '../../../services/inventory/inventoryService';
+import { listIssues, getIssueCuttingPos } from '../../../services/inventory/materialIssueService';
 import { formatNumber } from '../../../utils/formatters';
 import { generateFabricIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
+import CancelIssueModal from './CancelIssueModal';
 
 const { RangePicker } = DatePicker;
 
@@ -28,11 +29,12 @@ const FabricIssueList = ({ embedded = false }) => {
   const [searchText, setSearchText] = useState('');
   const [dateRange, setDateRange] = useState(null);
   const [viewDrawer, setViewDrawer] = useState({ open: false, record: null });
+  const [cancelModal, setCancelModal] = useState({ open: false, record: null });
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await getFabricIssueList({ search: searchText });
+      const res = await listIssues('FABRIC', { search: searchText });
       setData(res.content || []);
       setTotalElements(res.totalElements ?? (res.content || []).length);
     } catch {
@@ -45,7 +47,7 @@ const FabricIssueList = ({ embedded = false }) => {
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
-    getApprovedCuttingPOs()
+    getIssueCuttingPos()
       .then((res) => setPendingCuttingPOCount(res.totalElements ?? (res.content || []).length))
       .catch(() => { /* non-blocking */ });
   }, []);
@@ -80,26 +82,42 @@ const FabricIssueList = ({ embedded = false }) => {
     { title: 'Issued Qty', dataIndex: 'totalWeight', key: 'totalWeight', width: 140, align: 'center', render: (v, r) => `${formatNumber(v, 1)} ${r.uom || 'kg'}` },
     { title: 'BOM Req', dataIndex: 'bomRequired', key: 'bomRequired', width: 130, align: 'center', render: (v, r) => `${formatNumber(v, 1)} ${r.uom || 'kg'}` },
     {
-      title: 'Actions', key: 'actions', width: 110, fixed: 'right', align: 'center',
+      title: 'Status', dataIndex: 'status', key: 'status', width: 110, align: 'center',
+      render: (s) => s === 'CANCELLED'
+        ? <Tag color="default" style={{ textDecoration: 'line-through' }}>Cancelled</Tag>
+        : <Tag color="success">Completed</Tag>,
+    },
+    {
+      title: 'Actions', key: 'actions', width: 120, fixed: 'right', align: 'center',
       render: (_, record) => (
         <Space size={4}>
           <ActionButton action="view" size="small" onClick={() => setViewDrawer({ open: true, record })} />
-          {hasPermission('inventory-issue', 'update') && (
-            <ActionButton action="edit" size="small" onClick={() => navigate(`/inventory/issue/fabric/${record.id}`)} />
+          {record.status !== 'CANCELLED' && (
+            <ActionButton action="print" size="small" onClick={() => generateFabricIssueSlipPdf(record)} />
           )}
-          <ActionButton action="print" size="small" onClick={() => generateFabricIssueSlipPdf(record)} />
+          {record.status !== 'CANCELLED' && hasPermission('inventory-issue', 'update') && (
+            <ActionButton action="cancel" size="small" onClick={() => setCancelModal({ open: true, record })} />
+          )}
         </Space>
       ),
     },
-  ], [navigate]);
+  ], []);
 
   const drawer = (
-    <IssueViewDrawer
-      open={viewDrawer.open}
-      onClose={() => setViewDrawer({ open: false, record: null })}
-      record={viewDrawer.record}
-      type="fabric"
-    />
+    <>
+      <IssueViewDrawer
+        open={viewDrawer.open}
+        onClose={() => setViewDrawer({ open: false, record: null })}
+        record={viewDrawer.record}
+        type="fabric"
+      />
+      <CancelIssueModal
+        open={cancelModal.open}
+        record={cancelModal.record}
+        onClose={() => setCancelModal({ open: false, record: null })}
+        onCancelled={loadData}
+      />
+    </>
   );
 
   const content = (

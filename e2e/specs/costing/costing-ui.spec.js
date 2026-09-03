@@ -19,6 +19,8 @@ import { test, expect } from '@playwright/test';
 import { antSelect, antTableWaitForData } from '../../helpers/antd-helpers.js';
 import { ensureSessionActive, goToListPage, navigateWithAuth } from '../../helpers/navigation.js';
 import { formatCurrency } from '../../../src/utils/costingConstants.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { stylePayload } from '../../helpers/test-data.js';
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -87,7 +89,7 @@ test.describe('Costing — Form: Section A & Calculations', () => {
 
     // Fill Qty / Price / Allowance / Wastage (the two "%" inputs are allowance then wastage)
     await fabricRow.locator('input[placeholder="Qty"]').fill('2');
-    await fabricRow.locator('input[placeholder="Price"]').fill('100');
+    await fabricRow.locator('input[placeholder="Rate"]').fill('100');
     const pctInputs = fabricRow.locator('input[placeholder="%"]');
     await pctInputs.nth(0).fill('10');   // allowance
     await pctInputs.nth(1).fill('5');    // wastage
@@ -125,14 +127,44 @@ async function setSummaryPct(page, labelText, value) {
 
 test.describe('Costing — Create & Validation (UI)', () => {
   test('Create a Draft via the form → POST 200 → returns to list', async ({ page }) => {
+    // One cost sheet per style (rule added 2026-08): the first style in the dropdown
+    // is usually taken, so mint a fresh style for buyer 1 and pick it by name.
+    const api = await createAuthenticatedClient();
+    const { data: style } = await api.post('/styles', stylePayload(1));
+    await api.dispose();
+
     await navigateWithAuth(page, '/costing/new');
     await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
 
-    // Select a buyer, then a style (styles load after the buyer is chosen)
+    // Select a buyer, then the fresh style (styles load after the buyer is chosen).
+    // The style list is virtualized and long by now — type to filter before clicking.
     await pickFormSelect(page, '#buyerId', null);
     await page.waitForTimeout(800);
-    await pickFormSelect(page, '#styleNo', null);
+    await page.locator('#styleNo').click();
+    await page.keyboard.type(style.styleNo, { delay: 20 });
+    await page.waitForTimeout(400);
+    await page
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .last()
+      .locator('.ant-select-item-option')
+      .filter({ hasText: style.styleNo })
+      .first()
+      .click({ timeout: 10000 });
     await page.waitForTimeout(500);
+
+    // Sizes are mandatory server-side (@NotEmpty) even for drafts — pick one.
+    await page.locator('#sizes').click();
+    await page.keyboard.type('M', { delay: 30 });
+    await page.waitForTimeout(300);
+    const sizeOption = page
+      .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .last()
+      .locator('.ant-select-item-option')
+      .first();
+    if (await sizeOption.isVisible().catch(() => false)) await sizeOption.click();
+    else await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
 
     const [resp] = await Promise.all([
       page.waitForResponse(
@@ -144,6 +176,49 @@ test.describe('Costing — Create & Validation (UI)', () => {
     expect(resp.status()).toBeGreaterThanOrEqual(200);
     expect(resp.status()).toBeLessThan(300);
     await expect(page).toHaveURL(/\/costing\/list/, { timeout: 15000 });
+  });
+
+  test('Draft save without sizes is blocked inline; sizes offer preset options only (B-052)', async ({ page }) => {
+    // Sizes became preset-driven and mandatory for DRAFTS too: the client must block
+    // with the inline field error instead of letting the server 400 the save.
+    const api = await createAuthenticatedClient();
+    const { data: style } = await api.post('/styles', stylePayload(1));
+    await api.dispose();
+
+    await navigateWithAuth(page, '/costing/new');
+    await page.locator('#buyerId').waitFor({ state: 'visible', timeout: 15000 });
+
+    await pickFormSelect(page, '#buyerId', null);
+    await page.waitForTimeout(800);
+    await page.locator('#styleNo').click();
+    await page.keyboard.type(style.styleNo, { delay: 20 });
+    await page.waitForTimeout(400);
+    await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
+      .locator('.ant-select-item-option').filter({ hasText: style.styleNo }).first()
+      .click({ timeout: 10000 });
+    await page.waitForTimeout(400);
+
+    // Attempt the draft save with sizes EMPTY — must be refused with no POST fired.
+    let posted = false;
+    page.on('request', (r) => {
+      if (r.url().includes('/cost-sheets') && r.method() === 'POST') posted = true;
+    });
+    await page.getByRole('button', { name: /Save as Draft/i }).click();
+    await expect(page.getByText('At least one size is required').first()).toBeVisible({ timeout: 8000 });
+    expect(posted, 'no save request may leave the browser').toBe(false);
+
+    // The sizes dropdown offers ONLY preset-master options (grouped) — no free typing.
+    await page.locator('#sizes').click();
+    const dd = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    await expect(dd.locator('.ant-select-item-group').first()).toBeVisible({ timeout: 8000 });
+    await page.keyboard.type('ZZZ-NOT-A-SIZE');
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter'); // tags mode would commit this; multiple mode must not
+    await page.keyboard.press('Escape');
+    const chosen = await page.locator('#sizes').evaluate(
+      (el) => el.closest('.ant-select')?.innerText || '',
+    );
+    expect(chosen).not.toContain('ZZZ-NOT-A-SIZE');
   });
 
   test('Submitting an empty form surfaces required-field validation', async ({ page }) => {

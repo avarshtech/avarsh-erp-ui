@@ -10,7 +10,7 @@
 import {
   PROD_PO_STATUS, PP_SAMPLE_STATUS, PROCESSING_UNIT_TYPE,
   FINISHING_PROCESS, computePlannedQty,
-} from '../../utils/productionConstants';
+} from '../../../utils/productionConstants';
 
 // ─── Size-color matrix helper ──────────────────────────────────────────────────
 const SIZES = ['S', 'M', 'L', 'XL'];
@@ -34,22 +34,24 @@ const sumQty = (items, field) => items.reduce((s, i) => s + (i[field] || 0), 0);
 // kind: fabric | trim | packing. bomPerPc = consumption per garment.
 // lastGrnAt = when stock was last received (PRD §13: warn if > 48h old). A few are
 // intentionally stale (> 48h before the 2026-06-14 demo "today") to exercise the warning.
+// poNumber = procurement PO the material was received against (via GRN).
+// orderStock = qty received/earmarked against this order+PO; free stock = currentStock − orderStock.
 export const MATERIAL_CATALOG = {
-  'FAB-CJ40-WHT':     { itemName: 'Cotton Jersey 40s Reactive',          uom: 'kg',     kind: 'fabric',  bomPerPc: 0.135, currentStock: 900,   allocated: 140,  lastGrnAt: '2026-06-13T09:00:00' },
-  'FAB-VRT-BLK':      { itemName: 'Viscose Rayon Twill',                 uom: 'kg',     kind: 'fabric',  bomPerPc: 0.068, currentStock: 360,   allocated: 60,   lastGrnAt: '2026-06-10T09:00:00' },
-  'FAB-CVCP-NVY':     { itemName: 'CVC Pique 220 GSM',                   uom: 'kg',     kind: 'fabric',  bomPerPc: 0.150, currentStock: 400,   allocated: 30,   lastGrnAt: '2026-06-13T11:00:00' },
-  'FAB-DNM-IND':      { itemName: 'Indigo Denim 10oz Stretch',           uom: 'm',      kind: 'fabric',  bomPerPc: 0.360, currentStock: 520,   allocated: 90,   lastGrnAt: '2026-06-13T08:00:00' },
-  'FAB-PS75-BLU':     { itemName: '100% Polyester Satin 75D',            uom: 'm',      kind: 'fabric',  bomPerPc: 0.150, currentStock: 300,   allocated: 200,  lastGrnAt: '2026-06-13T10:00:00' },
-  'BTN-4H-15MM-NAT':  { itemName: '4-Hole Button 15mm Natural',          uom: 'pcs',    kind: 'trim',    bomPerPc: 5,     currentStock: 32000, allocated: 4000, lastGrnAt: '2026-06-13T09:30:00' },
-  'BTN-4H-15MM-NVY':  { itemName: '4-Hole Button 15mm Navy',             uom: 'pcs',    kind: 'trim',    bomPerPc: 5,     currentStock: 18000, allocated: 2000, lastGrnAt: '2026-06-13T09:30:00' },
-  'LBL-WVN-MAIN-SS26':{ itemName: 'Woven Main Label SS26',               uom: 'pcs',    kind: 'trim',    bomPerPc: 1,     currentStock: 26000, allocated: 5000, lastGrnAt: '2026-06-13T12:00:00' },
-  'LBL-CARE-POLY-STD':{ itemName: 'Printed Care Label Polyester',        uom: 'pcs',    kind: 'trim',    bomPerPc: 1,     currentStock: 24000, allocated: 3000, lastGrnAt: '2026-06-13T12:00:00' },
-  'THR-POLY-40-WHT':  { itemName: 'Polyester Sewing Thread 40/2 White',  uom: 'cones',  kind: 'trim',    bomPerPc: 0.007, currentStock: 120,   allocated: 20,   lastGrnAt: '2026-06-09T09:00:00' },
-  'POLY-BAG-STD':     { itemName: 'Polybag Standard (per garment)',      uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 21000, allocated: 6000, lastGrnAt: '2026-06-13T09:00:00' },
-  'CTN-MASTER-5PLY':  { itemName: 'Master Carton 5-Ply',                 uom: 'pcs',    kind: 'packing', bomPerPc: 0.05,  currentStock: 900,   allocated: 120,  lastGrnAt: '2026-06-13T09:00:00' },
-  'TAG-HANG-SS26':    { itemName: 'Hangtag SS26 Collection',             uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 13500, allocated: 2500, lastGrnAt: '2026-06-13T09:00:00' },
-  'STK-SIZE':         { itemName: 'Size Sticker',                        uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 30000, allocated: 1000, lastGrnAt: '2026-06-13T09:00:00' },
-  'TIS-WRAP':         { itemName: 'Tissue Wrap Sheet',                   uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 8000,  allocated: 7200, lastGrnAt: '2026-06-08T09:00:00' },
+  'FAB-CJ40-WHT':     { itemName: 'Cotton Jersey 40s Reactive',          uom: 'kg',     kind: 'fabric',  bomPerPc: 0.135, currentStock: 900,   allocated: 140,  lastGrnAt: '2026-06-13T09:00:00', poNumber: 'PO/25-26/0041', orderStock: 600 },
+  'FAB-VRT-BLK':      { itemName: 'Viscose Rayon Twill',                 uom: 'kg',     kind: 'fabric',  bomPerPc: 0.068, currentStock: 360,   allocated: 60,   lastGrnAt: '2026-06-10T09:00:00', poNumber: 'PO/25-26/0042', orderStock: 240 },
+  'FAB-CVCP-NVY':     { itemName: 'CVC Pique 220 GSM',                   uom: 'kg',     kind: 'fabric',  bomPerPc: 0.150, currentStock: 400,   allocated: 30,   lastGrnAt: '2026-06-13T11:00:00', poNumber: 'PO/25-26/0047', orderStock: 260 },
+  'FAB-DNM-IND':      { itemName: 'Indigo Denim 10oz Stretch',           uom: 'm',      kind: 'fabric',  bomPerPc: 0.360, currentStock: 520,   allocated: 90,   lastGrnAt: '2026-06-13T08:00:00', poNumber: 'PO/25-26/0053', orderStock: 360 },
+  'FAB-PS75-BLU':     { itemName: '100% Polyester Satin 75D',            uom: 'm',      kind: 'fabric',  bomPerPc: 0.150, currentStock: 300,   allocated: 200,  lastGrnAt: '2026-06-13T10:00:00', poNumber: 'PO/25-26/0055', orderStock: 180 },
+  'BTN-4H-15MM-NAT':  { itemName: '4-Hole Button 15mm Natural',          uom: 'pcs',    kind: 'trim',    bomPerPc: 5,     currentStock: 32000, allocated: 4000, lastGrnAt: '2026-06-13T09:30:00', poNumber: 'PO/25-26/0060', orderStock: 20000 },
+  'BTN-4H-15MM-NVY':  { itemName: '4-Hole Button 15mm Navy',             uom: 'pcs',    kind: 'trim',    bomPerPc: 5,     currentStock: 18000, allocated: 2000, lastGrnAt: '2026-06-13T09:30:00', poNumber: 'PO/25-26/0061', orderStock: 12000 },
+  'LBL-WVN-MAIN-SS26':{ itemName: 'Woven Main Label SS26',               uom: 'pcs',    kind: 'trim',    bomPerPc: 1,     currentStock: 26000, allocated: 5000, lastGrnAt: '2026-06-13T12:00:00', poNumber: 'PO/25-26/0062', orderStock: 16000 },
+  'LBL-CARE-POLY-STD':{ itemName: 'Printed Care Label Polyester',        uom: 'pcs',    kind: 'trim',    bomPerPc: 1,     currentStock: 24000, allocated: 3000, lastGrnAt: '2026-06-13T12:00:00', poNumber: 'PO/25-26/0062', orderStock: 15000 },
+  'THR-POLY-40-WHT':  { itemName: 'Polyester Sewing Thread 40/2 White',  uom: 'cones',  kind: 'trim',    bomPerPc: 0.007, currentStock: 120,   allocated: 20,   lastGrnAt: '2026-06-09T09:00:00', poNumber: 'PO/25-26/0063', orderStock: 80 },
+  'POLY-BAG-STD':     { itemName: 'Polybag Standard (per garment)',      uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 21000, allocated: 6000, lastGrnAt: '2026-06-13T09:00:00', poNumber: 'PO/25-26/0070', orderStock: 12000 },
+  'CTN-MASTER-5PLY':  { itemName: 'Master Carton 5-Ply',                 uom: 'pcs',    kind: 'packing', bomPerPc: 0.05,  currentStock: 900,   allocated: 120,  lastGrnAt: '2026-06-13T09:00:00', poNumber: 'PO/25-26/0071', orderStock: 550 },
+  'TAG-HANG-SS26':    { itemName: 'Hangtag SS26 Collection',             uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 13500, allocated: 2500, lastGrnAt: '2026-06-13T09:00:00', poNumber: 'PO/25-26/0072', orderStock: 8000 },
+  'STK-SIZE':         { itemName: 'Size Sticker',                        uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 30000, allocated: 1000, lastGrnAt: '2026-06-13T09:00:00', poNumber: 'PO/25-26/0073', orderStock: 18000 },
+  'TIS-WRAP':         { itemName: 'Tissue Wrap Sheet',                   uom: 'pcs',    kind: 'packing', bomPerPc: 1,     currentStock: 8000,  allocated: 7200, lastGrnAt: '2026-06-08T09:00:00', poNumber: 'PO/25-26/0074', orderStock: 5000 },
 };
 
 // ─── Confirmed orders (source for raising POs) ──────────────────────────────────
@@ -299,6 +301,7 @@ export const buildStockRows = (order, kind, { cadPerPc, plannedQty } = {}) => {
       bomRequired, cadRequired, currentStock: m.currentStock, allocated: m.allocated,
       availableBalance, shortageSurplus: +(availableBalance - cadRequired).toFixed(2),
       lastGrnAt: m.lastGrnAt,
+      poNumber: m.poNumber, orderStock: m.orderStock, freeStock: m.currentStock - m.orderStock,
     };
   });
 };

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Drawer, Table, Divider, Typography, Grid, Row, Col } from 'antd';
+import { Drawer, Table, Divider, Typography, Grid, Row, Col, Tag, Alert, Space } from 'antd';
 import { ActionButton } from '../../../components/buttons';
 import { formatDate, formatNumber } from '../../../utils/formatters';
 import { generateIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
@@ -33,7 +33,7 @@ const fabricRollColumns = [
 ];
 
 const buildAccessoryItemColumns = () => [
-  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center' },
+  { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', ellipsis: true, align: 'center', render: (v, r) => r.variantCode || v || '—' },
   { title: 'Description', dataIndex: 'description', key: 'description', ellipsis: true, align: 'center' },
   { title: 'BOM Qty', dataIndex: 'bomQty', key: 'bomQty', align: 'center', render: (v) => formatNumber(v) },
   { title: 'Issue Qty', dataIndex: 'issuedQty', key: 'issuedQty', align: 'center', render: (v) => formatNumber(v) },
@@ -61,23 +61,43 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
 
   if (!record) return null;
 
+  const cancelled = record.status === 'CANCELLED';
+
   return (
     <Drawer
-      title={record.issueNumber}
+      title={
+        <Space size={10}>
+          <span>{record.issueNumber}</span>
+          {cancelled
+            ? <Tag color="default" style={{ textDecoration: 'line-through' }}>Cancelled</Tag>
+            : <Tag color="success">Completed</Tag>}
+        </Space>
+      }
       open={open}
       onClose={onClose}
       width={drawerWidth}
       footer={
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <ActionButton
-            action="print"
-            text="Print Issue Slip"
-            onClick={() => generateIssueSlipPdf(record, isFabric ? 'fabric' : 'accessories')}
-          />
+        <div style={{ display: 'flex', justifyContent: cancelled ? 'flex-end' : 'space-between', alignItems: 'center' }}>
+          {!cancelled && (
+            <ActionButton
+              action="print"
+              text="Print Issue Slip"
+              onClick={() => generateIssueSlipPdf(record, isFabric ? 'fabric' : 'accessories')}
+            />
+          )}
           <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
       }
     >
+      {cancelled && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 20 }}
+          message={`Cancelled${record.cancelledBy ? ` by ${record.cancelledBy}` : ''}${record.cancelledAt ? ` on ${formatDate(record.cancelledAt)}` : ''} — issued quantities were restored to stock.`}
+          description={record.cancelReason ? `Reason: ${record.cancelReason}` : null}
+        />
+      )}
       <SectionTitle>Issue Information</SectionTitle>
       <Row gutter={[24, 0]}>
         <Col xs={24} sm={12}>

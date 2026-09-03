@@ -45,7 +45,13 @@ const PageHeader = memo(function PageHeader({
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <h1>{title}</h1>
-            {status && <span>{status}</span>}
+            {/* Own gap: `status` is usually several badges, and relying on each
+                tag's trailing margin leaves them touching */}
+            {status && (
+              <span className="status-badge-group" style={{ display: 'inline-flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                {status}
+              </span>
+            )}
           </div>
           {subtitle && (
             <small style={{ color: 'var(--text-secondary)', fontSize: 13 }}>

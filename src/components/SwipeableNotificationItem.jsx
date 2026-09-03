@@ -12,6 +12,11 @@ import {
   NotificationOutlined,
   DeleteOutlined,
   CheckOutlined,
+  ContainerOutlined,
+  FileDoneOutlined,
+  WarningOutlined,
+  ClockCircleOutlined,
+  NumberOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -30,6 +35,20 @@ const NOTIFICATION_TYPE_CONFIG = {
   COSTING_UPDATE: { icon: <DollarOutlined />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
   BOM_UPDATE: { icon: <ToolOutlined />, color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.1)' },
   GRN_UPDATE: { icon: <InboxOutlined />, color: '#06b6d4', bg: 'rgba(6, 182, 212, 0.1)' },
+  // Export Documentation (PRD §23). Without these the rows fall back to
+  // GENERAL_ALERT — a legible icon, but every export event would look alike.
+  EXPDOC_PL_SUBMITTED: { icon: <ContainerOutlined />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+  EXPDOC_PL_APPROVED: { icon: <FileDoneOutlined />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
+  EXPDOC_PL_SENT_BACK: { icon: <RollbackOutlined />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+  EXPDOC_PL_CANCELLED: { icon: <CloseCircleOutlined />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+  EXPDOC_PL_REVISED: { icon: <RollbackOutlined />, color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.1)' },
+  EXPDOC_DOC_RELEASED: { icon: <FileDoneOutlined />, color: '#14b8a6', bg: 'rgba(20, 184, 166, 0.1)' },
+  EXPDOC_INVOICE_SUBMITTED: { icon: <DollarOutlined />, color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)' },
+  EXPDOC_INVOICE_APPROVED: { icon: <DollarOutlined />, color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' },
+  EXPDOC_INVOICE_SENT_BACK: { icon: <RollbackOutlined />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+  EXPDOC_SOURCE_STALE: { icon: <WarningOutlined />, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' },
+  EXPDOC_SERIES_EXHAUSTED: { icon: <NumberOutlined />, color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' },
+  EXPDOC_ETD_APPROACHING: { icon: <ClockCircleOutlined />, color: '#f97316', bg: 'rgba(249, 115, 22, 0.1)' },
   GENERAL_ALERT: { icon: <NotificationOutlined />, color: '#64748b', bg: 'rgba(100, 116, 139, 0.1)' },
 };
 

@@ -231,9 +231,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
 
     // Description with item details
     let descParts = [];
-    if (item.itemName) descParts.push(`<strong>${item.itemName}</strong>`);
+    const lineName = item.variantName;
+    const lineCode = item.variantCode;
+    if (lineName) descParts.push(`<strong>${lineName}</strong>`);
     if (item.description) descParts.push(item.description);
-    if (item.itemCode) descParts.push(`<span class="item-code">Code: ${item.itemCode}</span>`);
+    if (lineCode) descParts.push(`<span class="item-code">Code: ${lineCode}</span>`);
 
     // Variant attributes (excluding color which shows as swatch)
     const colorSwatches = extractColorSwatches(item);
@@ -688,6 +690,11 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
         <div class="label">Delivery Date</div>
         <div class="value">${formatDate(po.deliveryDate || po.expectedDeliveryDate)}</div>
       </div>
+      ${po.revisedDeliveryDate ? `
+      <div class="po-detail-item">
+        <div class="label">Revised Delivery Date</div>
+        <div class="value">${formatDate(po.revisedDeliveryDate)}</div>
+      </div>` : ''}
       <div class="po-detail-item">
         <div class="label">Tax Type</div>
         <div class="value">${gst.isIgst ? 'IGST' : 'CGST + SGST'}</div>

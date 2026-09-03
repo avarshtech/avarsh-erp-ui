@@ -207,7 +207,14 @@ const POList = () => {
       key: 'deliveryDate',
       width: 120,
       sorter: true,
-      render: (date) => formatDate(date),
+      // Shows the date the PO is actually tracking to; the original stays visible,
+      // struck through, so a revision is never mistaken for a data-entry change.
+      render: (date, record) => (record.revisedDeliveryDate ? (
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+          <span>{formatDate(record.revisedDeliveryDate)}<Tag color="warning" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>Revised</Tag></span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(date)}</span>
+        </div>
+      ) : formatDate(date)),
     },
     {
       title: 'Items',
@@ -259,7 +266,7 @@ const POList = () => {
             <ActionButton
               action="edit"
               size="small"
-              onClick={() => navigate(`/purchase-orders/edit/${record.id}`)}
+              onClick={() => navigate(`/purchase-orders/supplier-po/edit/${record.id}`)}
             />
           )}
           {record.status === PO_STATUS.DRAFT && canDelete && (
@@ -291,12 +298,12 @@ const POList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Purchase Orders">
+      <PageHeader title="Supplier PO">
         {hasPermission('purchase-orders', 'add') && (
           <ActionButton
             action="create"
-            text="New Purchase Order"
-            onClick={() => navigate('/purchase-orders/new')}
+            text="New Supplier PO"
+            onClick={() => navigate('/purchase-orders/supplier-po/new')}
           />
         )}
       </PageHeader>
@@ -364,12 +371,12 @@ const POList = () => {
           rowKey="id"
           scroll={{ x: 1200 }}
           onChange={handleTableChange}
-          pagination={getTablePagination(pagination, 'purchase orders')}
+          pagination={getTablePagination(pagination, 'supplier PO')}
           locale={{
             emptyText: (
               <EmptyState
-                title="No Purchase Orders"
-                description="No purchase orders found matching your criteria."
+                title="No Supplier PO"
+                description="No supplier PO found matching your criteria."
               />
             ),
           }}

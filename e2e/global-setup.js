@@ -4,7 +4,7 @@
  *
  * Environment variables:
  *   E2E_USERNAME — login username (default: superadmin)
- *   E2E_PASSWORD — login password (default: admin123)
+ *   E2E_PASSWORD — login password (default: admin98)
  */
 
 import { test as setup, expect } from '@playwright/test';
@@ -14,7 +14,7 @@ const authFile = './e2e/.auth/user.json';
 
 setup('authenticate', async ({ page }) => {
   const username = process.env['E2E_USERNAME'] || 'superadmin';
-  const password = process.env['E2E_PASSWORD'] || 'admin123';
+  const password = process.env['E2E_PASSWORD'] || 'admin98';
 
   // Listen for console errors to help debug login failures
   const consoleErrors = [];

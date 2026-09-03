@@ -27,10 +27,10 @@ const AdjustmentCountTable = memo(function AdjustmentCountTable({ items = [], on
   );
 
   const columns = useMemo(() => [
-    { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 150, align: 'center' },
+    { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 150, align: 'center', render: (v, r) => r.variantCode || v || '—' },
     {
       title: 'Item Name', dataIndex: 'itemName', key: 'itemName', width: 220, align: 'center', ellipsis: true,
-      render: (v) => <Tooltip title={v}>{v}</Tooltip>,
+      render: (v, r) => <Tooltip title={r.variantName || v}>{r.variantName || v}</Tooltip>,
     },
     { title: 'Variant', dataIndex: 'variantLabel', key: 'variantLabel', width: 160, align: 'center', ellipsis: true },
     ...(hasRollData ? [{
@@ -100,7 +100,7 @@ const AdjustmentCountTable = memo(function AdjustmentCountTable({ items = [], on
 
   return (
     <Table
-      rowKey={(r) => `${r.itemCode}-${r.variantLabel}-${r.rollNumber ?? 'norol'}`}
+      rowKey={(r) => r.rowId ?? r.id ?? `${r.itemCode}-${r.variantLabel}-${r.rollNumber ?? 'norol'}`}
       columns={columns}
       dataSource={items}
       pagination={false}

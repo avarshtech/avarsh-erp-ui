@@ -10,15 +10,19 @@ import {
   AuditOutlined,
   LoginOutlined,
   AppstoreOutlined,
+  ContainerOutlined,
+  DollarOutlined,
+  TagsOutlined,
+  BuildOutlined,
 } from '@ant-design/icons';
 
 export const MODULE_CONFIG = {
   PO: {
-    label: 'Purchase Order',
+    label: 'Supplier PO',
     color: '#4f46e5',
     bg: 'rgba(79, 70, 229, 0.08)',
     icon: ShoppingCartOutlined,
-    route: (id) => `/purchase-orders/list?viewId=${id}`,
+    route: (id) => `/purchase-orders/supplier-po/list?viewId=${id}`,
   },
   GRN: {
     label: 'GRN',
@@ -76,6 +80,54 @@ export const MODULE_CONFIG = {
     icon: DatabaseOutlined,
     route: () => `/inventory/stock`,
   },
+  // Export Documentation (PRD §11.1). Registered so the feed renders these events
+  // with their own label, colour and deep link the moment the backend emits them —
+  // without a key they would all arrive as an unroutable "Activity".
+  PACKING_ENTRY: {
+    label: 'Carton Packing',
+    color: '#0e7490',
+    bg: 'rgba(14, 116, 144, 0.08)',
+    icon: BuildOutlined,
+    route: (id) => `/export-docs/packing/edit/${id}`,
+  },
+  SHIPMENT: {
+    label: 'Shipment',
+    color: '#0369a1',
+    bg: 'rgba(3, 105, 161, 0.08)',
+    icon: ContainerOutlined,
+    route: (id) => `/export-docs/shipments/edit/${id}`,
+  },
+  PACKING_LIST: {
+    label: 'Packing List',
+    color: '#15803d',
+    bg: 'rgba(21, 128, 61, 0.08)',
+    icon: ProfileOutlined,
+    route: (id) => `/export-docs/packing-lists/edit/${id}`,
+  },
+  EXPORT_INVOICE: {
+    label: 'Export Invoice',
+    color: '#b45309',
+    bg: 'rgba(180, 83, 9, 0.08)',
+    icon: DollarOutlined,
+    route: (id) => `/export-docs/invoices/edit/${id}`,
+  },
+  STICKER_RUN: {
+    label: 'Carton Stickers',
+    color: '#7e22ce',
+    bg: 'rgba(126, 34, 206, 0.08)',
+    icon: TagsOutlined,
+    // The sticker workspace is addressed by PACKING LIST, not by run — a run id
+    // cannot open it, so the console is where this deep link can honestly land.
+    route: () => '/export-docs/stickers',
+  },
+  DOC_TEMPLATE: {
+    label: 'Buyer Template',
+    color: '#be123c',
+    bg: 'rgba(190, 18, 60, 0.08)',
+    icon: FileTextOutlined,
+    route: (id) => `/export-docs/templates/edit/${id}`,
+  },
+
   APPROVAL: {
     label: 'Approval',
     color: '#7c3aed',

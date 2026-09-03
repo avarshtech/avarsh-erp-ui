@@ -30,3 +30,6 @@ test-results/
 playwright-report/
 
 .claude/settings.local.json
+.playwright-mcp/
+
+docs/

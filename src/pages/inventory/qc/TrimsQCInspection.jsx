@@ -200,7 +200,7 @@ const TrimsQCInspection = () => {
 
   const lineItemOptions = useMemo(
     () => lineItemSource.map((li) => ({
-      label: `${li.itemCode || '—'} — ${li.description || '—'}`,
+      label: `${li.variantCode || li.itemCode || '—'} — ${li.variantName || li.description || '—'}`,
       value: li.poLineItemId || li.id,
     })),
     [lineItemSource],

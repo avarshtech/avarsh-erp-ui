@@ -128,6 +128,18 @@ export const approvePurchaseOrder = async (id, data = {}) => {
 };
 
 /**
+ * Revise the delivery date of a PO that is already with the supplier, moving the
+ * targets of its incomplete processing stages with it.
+ * @param {number} id - Purchase order ID
+ * @param {Object} data - { revisedDeliveryDate: 'YYYY-MM-DD', reason, stageUpdates: [{ lineItemId, stageIndex, completionDate }] }
+ * @returns {Promise<Object>} Updated purchase order, including lineItems and activities
+ */
+export const reviseDeliveryDate = async (id, data) => {
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/revise-delivery-date`, data);
+  return response.data;
+};
+
+/**
  * Reject a purchase order
  * @param {number} id - Purchase order ID
  * @param {Object} data - { reason, category?, version? }

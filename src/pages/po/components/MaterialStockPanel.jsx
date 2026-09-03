@@ -43,8 +43,11 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
   }, [rows, onChange]);
 
   const columns = useMemo(() => [
-    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v) => <Text strong>{v}</Text> },
-    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true },
+    // The variant is the purchasable identity, so it stands in for the item across
+    // these columns rather than being shown beside it.
+    { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v, r) => <Text strong>{r.variantCode || v}</Text> },
+    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true, render: (v, r) => r.variantName || v },
+    { title: 'PO No', dataIndex: 'poNumber', width: 150, render: (v) => v || '—' },
     { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
     { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 110, align: 'right',
       render: (v) => <Text type="secondary">{(v || 0).toFixed(3)}</Text> },
@@ -53,6 +56,10 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
       ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() }]
       : []),
     { title: 'Current Stock', dataIndex: 'currentStock', width: 120, align: 'right', render: (v) => (v || 0).toLocaleString() },
+    { title: 'Order Stock', dataIndex: 'orderStock', width: 120, align: 'right',
+      render: (v) => <Text style={{ color: '#1677ff' }}>{(v || 0).toLocaleString()}</Text> },
+    { title: 'Free Stock', dataIndex: 'freeStock', width: 120, align: 'right',
+      render: (v) => <Text style={{ color: '#389e0d' }}>{(v || 0).toLocaleString()}</Text> },
     { title: 'Allocated', dataIndex: 'allocated', width: 120, align: 'right',
       render: (v, r) => (allocatedEditable
         ? <InputNumber size="small" min={0} value={v} onChange={(val) => handleAllocated(r.key, val)} style={{ width: 100 }} {...numericInputProps} />
@@ -93,7 +100,7 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
         loading={loading}
         pagination={false}
         size="small"
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1500 }}
         title={() => <Text strong>{TYPE_LABEL[materialType]} Stock Availability</Text>}
         footer={() => (
           <Text type="secondary" style={{ fontSize: 12 }}>

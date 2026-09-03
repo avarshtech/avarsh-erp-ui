@@ -10,6 +10,7 @@ export const searchOrders = async (params = {}) => {
   const query = new URLSearchParams();
   if (params.search)         query.append('search',         params.search);
   if (params.status)         query.append('status',         params.status);
+  if (params.orderType)      query.append('orderType',      params.orderType);
   if (params.orderDateStart) query.append('orderDateStart', params.orderDateStart);
   if (params.orderDateEnd)   query.append('orderDateEnd',   params.orderDateEnd);
   if (params.page  !== undefined) query.append('page',  params.page);

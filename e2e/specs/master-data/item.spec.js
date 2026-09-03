@@ -150,7 +150,10 @@ test.describe.serial('Item — CRUD', () => {
       const { response, data } = await api.post('/items', payload);
       expect(response.ok()).toBeTruthy();
       expect(data).toBeTruthy();
-      expect(data.itemName).toBe(payload.itemName); // echo of what we sent
+      // Since the Item Master refactor, itemName is DERIVED server-side as
+      // "Category / Sub-Category / Item Type" — the client-sent name is ignored.
+      expect(data.itemName).toContain(' / ');
+      expect(data.itemName).toContain('E2E');
       expect(data.itemCode).toBeTruthy();           // generated — never assert a client value
       createdId = data.id;
       createdItem = data;
@@ -165,11 +168,13 @@ test.describe.serial('Item — CRUD', () => {
 
     test('API — Update modifies record', async () => {
       test.skip(!createdId, 'No record created to update');
-      // Backend exposes no GET /items/{id}; build the update from the created object.
-      const updated = { ...createdItem, itemName: `Updated ${createdItem.itemName}` };
+      // itemName is DERIVED from the classifier triple since the refactor — it cannot
+      // be edited. Update a real field instead and assert the derived name survives.
+      const updated = { ...createdItem, description: `Updated ${Date.now()}` };
       const { response, data } = await api.put(`/items/${createdId}`, updated);
       expect(response.ok()).toBeTruthy();
-      expect(data.itemName).toContain('Updated');
+      expect(data.description).toContain('Updated');
+      expect(data.itemName).toContain(' / ');
     });
 
     test('API — Delete removes record (API-only; the UI exposes no delete)', async () => {
@@ -187,6 +192,9 @@ test.describe.serial('Item — CRUD', () => {
     let uomA;
     let uomB;
     let plain = {}; // { catId, cat, subId, sub, typeId, type }
+    let plainB = {}; // same chain, second item type — free triple for the create test
+    let plainC = {}; // free triple for the cascade test
+    let plainD = {}; // free triple for the variants test
     let fabric = {};
     let seedItem;   // pre-existing item (with one variant) for search/filter/edit/autocomplete
 
@@ -208,6 +216,30 @@ test.describe.serial('Item — CRUD', () => {
       });
       plain = { catId: pCat.id, cat: pCat.name, subId: pSub.id, sub: pSub.name, typeId: pType.id, type: pType.name };
 
+      // A SECOND item type on the same chain, reserved for the UI create test: only
+      // one item may exist per Category/Sub-Category/Item Type since the refactor,
+      // and the seed item below occupies the first triple.
+      const { data: pType2 } = await api.post('/item-types', {
+        name: `E2E Plain TypeB ${S}`,
+        subCategoryId: pSub.id,
+        attributeIds: [attr.id],
+        uomIds: [uomA.id, uomB.id],
+      });
+      plainB = { ...plain, typeId: pType2.id, type: pType2.name };
+
+      // Two more free triples: one per create-path test (cascade, variants). Any test
+      // that OPENS the form on a taken triple flips into edit mode instead.
+      const { data: pType3 } = await api.post('/item-types', {
+        name: `E2E Plain TypeC ${S}`, subCategoryId: pSub.id,
+        attributeIds: [attr.id], uomIds: [uomA.id, uomB.id],
+      });
+      plainC = { ...plain, typeId: pType3.id, type: pType3.name };
+      const { data: pType4 } = await api.post('/item-types', {
+        name: `E2E Plain TypeD ${S}`, subCategoryId: pSub.id,
+        attributeIds: [attr.id], uomIds: [uomA.id, uomB.id],
+      });
+      plainD = { ...plain, typeId: pType4.id, type: pType4.name };
+
       // fabric chain: category name contains "Fabric" → secondary UOM required;
       // item type WITHOUT attributes → no variants section
       const { data: fCat } = await api.post('/categories', categoryPayload({ name: `E2E Fabric Cat ${S}` }));
@@ -224,16 +256,20 @@ test.describe.serial('Item — CRUD', () => {
       const { data: created } = await api.post('/items', itemPayload(
         { categoryId: plain.catId, subCategoryId: plain.subId, itemTypeId: plain.typeId, uomId: uomA.id },
         {
-          itemName: seedName,
+          itemName: seedName, // ignored since the refactor — name derives from the triple
           variants: [{
-            itemName: seedName,
+            // variantName is REQUIRED (>= 5 chars) since the Item Master refactor,
+            // and it is what item search matches on — keep it distinctive.
+            variantName: `Seed Variant ${S}`,
             isActive: true,
             attributes: { [attrName.toLowerCase()]: 'SeedShade' }, // camelCase("ShadeNNN") === lowercase
           }],
         },
       ));
       seedItem = created;
-      expect(seedItem?.id).toBeTruthy();
+      expect(seedItem?.id, `seed item create failed: ${JSON.stringify(created).slice(0, 300)}`).toBeTruthy();
+      // The searchable identity of the item is its variant, not the derived name.
+      seedItem.searchKey = `Seed Variant ${S}`;
     });
 
     test.afterAll(async () => { await api.dispose(); });
@@ -244,14 +280,16 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('List: columns, View/Edit actions present, NO delete action', async ({ page }) => {
-      for (const col of ['Item Code', 'Item Name', 'Category', 'Subcategory', 'Item Type', 'UOM', 'Status', 'Created', 'Actions']) {
+      // Since the refactor the list has NO "Item Name" column — the name is derived
+      // and the classifier renders as three separate cells (see bug B-040).
+      for (const col of ['Item Code', 'Category', 'Subcategory', 'Item Type', 'UOM', 'Status', 'Created', 'Actions']) {
         // exact — 'Category' would otherwise also match 'Subcategory'
         await expect(page.getByRole('columnheader', { name: col, exact: true })).toBeVisible();
       }
       await expect(page.getByText(/of \d+ items/)).toBeVisible();
 
-      await searchItems(page, seedItem.itemName);
-      const row = page.locator('.ant-table-row').filter({ hasText: seedItem.itemName });
+      await searchItems(page, seedItem.searchKey);
+      const row = page.locator('.ant-table-row').filter({ hasText: seedItem.itemCode });
       await expect(row).toBeVisible();
       await expect(row.locator('.anticon-eye')).toBeVisible();
       await expect(row.locator('.anticon-edit')).toBeVisible();
@@ -261,8 +299,8 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Search: debounced server-side search finds seeded item', async ({ page }) => {
-      await searchItems(page, seedItem.itemName);
-      const row = page.locator('.ant-table-row').filter({ hasText: seedItem.itemName });
+      await searchItems(page, seedItem.searchKey);
+      const row = page.locator('.ant-table-row').filter({ hasText: seedItem.itemCode });
       await expect(row).toBeVisible();
       await expect(row.locator('.ant-tag').first()).not.toBeEmpty(); // server-generated itemCode tag
     });
@@ -303,12 +341,12 @@ test.describe.serial('Item — CRUD', () => {
 
       // Status=Active → isActive=true; narrow by search first so the (active) seeded
       // item is deterministically on the page regardless of accumulated data/pagination
-      await searchItems(page, seedItem.itemName);
+      await searchItems(page, seedItem.searchKey);
       let pending = waitFiltered('isActive=true');
       await pickOption('All Status', 'Active');
       await pending;
       await antTableWaitForData(page);
-      await expect(page.locator('.ant-table-row').filter({ hasText: seedItem.itemName })).toBeVisible();
+      await expect(page.locator('.ant-table-row').filter({ hasText: seedItem.itemCode })).toBeVisible();
       await clearAll();
 
       // Category filter fires categoryId=
@@ -336,7 +374,10 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Create: full cascade enablement, all fields, variant attribute', async ({ page }) => {
-      const itemName = `E2E Full Item ${STAMP()}`;
+      // Uses the RESERVED second item type: one item per classifier triple since the
+      // refactor, and the seed item occupies the first one. Picking a taken triple
+      // would flip the form into edit mode instead of creating.
+      const variantName = `Crimson Variant ${STAMP()}`;
       const modal = await openAddItem(page);
 
       // children disabled until their parent is picked
@@ -344,23 +385,30 @@ test.describe.serial('Item — CRUD', () => {
       await expect(modalSelect(page, 'itemTypeId')).toHaveClass(/ant-select-disabled/);
       await expect(modalSelect(page, 'uomId')).toHaveClass(/ant-select-disabled/);
 
-      await antSelectType(page, modalSelect(page, 'categoryId'), plain.cat);
+      await antSelectType(page, modalSelect(page, 'categoryId'), plainB.cat);
       await expect(modalSelect(page, 'subCategoryId')).not.toHaveClass(/ant-select-disabled/);
-      await antSelectType(page, modalSelect(page, 'subCategoryId'), plain.sub);
+      await antSelectType(page, modalSelect(page, 'subCategoryId'), plainB.sub);
       await expect(modalSelect(page, 'itemTypeId')).not.toHaveClass(/ant-select-disabled/);
-      await antSelectType(page, modalSelect(page, 'itemTypeId'), plain.type);
+      await antSelectType(page, modalSelect(page, 'itemTypeId'), plainB.type);
       await expect(modalSelect(page, 'uomId')).not.toHaveClass(/ant-select-disabled/);
 
-      // item type has an attribute → variants section appears with 1 seeded variant
+      // item type has an attribute → variants section appears with 1 empty variant
       await expect(modal.getByText(/Item Variants \(1\)/)).toBeVisible();
 
-      // itemName has NO #itemName id (Form.Item wraps a div) — select by placeholder
-      await modal.getByPlaceholder('Enter Item Name').fill(itemName);
+      // The Item Name input is READ-ONLY since the refactor — it mirrors the triple.
+      const nameBox = modal.getByPlaceholder('Select Category, Subcategory and Item Type');
+      await expect(nameBox).toHaveValue(new RegExp(`${plainB.cat}.*/.*${plainB.sub}.*/.*${plainB.type}`));
+
       await antSelectType(page, modalSelect(page, 'uomId'), uomA.symbol);
-      await antSelectType(page, modalSelect(page, 'secondaryUomId'), uomB.symbol); // optional for non-fabric
+      await antSelectType(page, modalSelect(page, 'secondaryUomId'), uomB.symbol); // non-fabric: optional, needs a factor
+      const conversion = modal.getByPlaceholder('e.g. 144');
+      if (await conversion.isVisible().catch(() => false)) await conversion.fill('12');
       await modal.locator('#hsnCode').fill('610910');
       await antInputNumberFill(page, '#defaultAllowance', 5.5);
       await expect(modal.locator('#isActive')).toBeChecked(); // default true
+
+      // Variant name is REQUIRED (>= 5 chars) and is the item's searchable identity.
+      await modal.getByPlaceholder(/e\.g\. Single Jersey|Variant Name/i).first().fill(variantName);
       await modal.getByPlaceholder(`Enter ${attrName}`).fill('Crimson Red');
 
       const [resp] = await Promise.all([
@@ -370,8 +418,9 @@ test.describe.serial('Item — CRUD', () => {
       expect(resp.status()).toBeLessThan(300);
       await expect(page.locator('.ant-message').getByText(/Item created successfully/i)).toBeVisible({ timeout: 8000 });
 
-      await searchItems(page, itemName);
-      const row = page.locator('.ant-table-row').filter({ hasText: itemName });
+      // Search matches the VARIANT name; the row renders classifier cells.
+      await searchItems(page, variantName);
+      const row = page.locator('.ant-table-row').filter({ hasText: plainB.type });
       await expect(row).toBeVisible();
       await expect(row.locator('.ant-tag').first()).not.toBeEmpty(); // generated item code
       await expect(row.getByText('Active')).toBeVisible();
@@ -382,7 +431,8 @@ test.describe.serial('Item — CRUD', () => {
       await modal.getByRole('button', { name: /Save/i }).click();
       for (const msg of [
         'Category is required', 'Subcategory is required', 'Item Type is required',
-        'Item Name is required', 'UOM is required', 'HSN Code is required', 'Allowance is required',
+        // 'Item Name is required' no longer exists — the name is derived, not typed.
+        'UOM is required', 'HSN Code is required', 'Allowance is required',
       ]) {
         await expect(page.getByText(msg, { exact: true })).toBeVisible();
       }
@@ -390,7 +440,7 @@ test.describe.serial('Item — CRUD', () => {
 
     test('Cascade: changing category clears children and removes variants', async ({ page }) => {
       const modal = await openAddItem(page);
-      await pickChain(page, { cat: plain.cat, sub: plain.sub, type: plain.type });
+      await pickChain(page, { cat: plainC.cat, sub: plainC.sub, type: plainC.type });
       await antSelectType(page, modalSelect(page, 'uomId'), uomA.symbol);
       await expect(modal.getByText(/Item Variants \(/)).toBeVisible();
 
@@ -405,7 +455,6 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Conditional: fabric category requires a distinct secondary UOM; no variants without attributes', async ({ page }) => {
-      const itemName = `E2E Fabric Item ${STAMP()}`;
       const modal = await openAddItem(page);
       await pickChain(page, { cat: fabric.cat, sub: fabric.sub, type: fabric.type });
 
@@ -414,7 +463,6 @@ test.describe.serial('Item — CRUD', () => {
       // placeholder flips to "(required)" for fabric categories
       await expect(modal.getByText('Select Secondary UOM (required)')).toBeVisible();
 
-      await modal.getByPlaceholder('Enter Item Name').fill(itemName);
       await antSelectType(page, modalSelect(page, 'uomId'), uomA.symbol);
       await modal.locator('#hsnCode').fill('520811');
       await antInputNumberFill(page, '#defaultAllowance', 3);
@@ -423,13 +471,16 @@ test.describe.serial('Item — CRUD', () => {
       await modal.getByRole('button', { name: /Save/i }).click();
       await expect(page.getByText('Secondary UOM is required for fabric items', { exact: true })).toBeVisible();
 
-      // same as primary → blocked
+      // Same as primary: since the refactor this is LEGAL and means "no conversion" —
+      // the factor input must NOT appear (server discards the factor for equal UOMs).
       await antSelectType(page, modalSelect(page, 'secondaryUomId'), uomA.symbol);
-      await modal.getByRole('button', { name: /Save/i }).click();
-      await expect(page.getByText('Primary and Secondary UOM cannot be the same', { exact: true })).toBeVisible();
+      await expect(modal.getByPlaceholder('e.g. 144')).toBeHidden();
 
-      // distinct secondary UOM → saves
+      // distinct secondary UOM → the conversion factor becomes mandatory (refactor)
       await antSelectType(page, modalSelect(page, 'secondaryUomId'), uomB.symbol);
+      const conversion = modal.getByPlaceholder('e.g. 144');
+      await expect(conversion).toBeVisible();
+      await conversion.fill('3.2');
       const [resp] = await Promise.all([
         page.waitForResponse((r) => r.url().endsWith('/items') && r.request().method() === 'POST'),
         modal.getByRole('button', { name: /Save/i }).click(),
@@ -439,13 +490,14 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Variants: add-variant guard, duplicate-variant guard, multi-variant save', async ({ page }) => {
-      const itemName = `E2E Variant Item ${STAMP()}`;
+      const S2 = STAMP();
       const modal = await openAddItem(page);
-      await pickChain(page, { cat: plain.cat, sub: plain.sub, type: plain.type });
-      await modal.getByPlaceholder('Enter Item Name').fill(itemName);
+      await pickChain(page, { cat: plainD.cat, sub: plainD.sub, type: plainD.type });
       await antSelectType(page, modalSelect(page, 'uomId'), uomA.symbol);
       await modal.locator('#hsnCode').fill('610910');
       await antInputNumberFill(page, '#defaultAllowance', 2);
+
+      const variantNameBox = () => modal.getByPlaceholder(/e\.g\. Single Jersey|Variant Name/i);
 
       // guard: cannot add a new variant while the current one is empty
       await modal.getByRole('button', { name: /Add Variant/i }).click();
@@ -453,13 +505,14 @@ test.describe.serial('Item — CRUD', () => {
         page.locator('.ant-message').getByText(/Please fill at least one attribute before adding a new variant/i),
       ).toBeVisible({ timeout: 8000 });
 
-      // fill variant 1, then add variant 2
+      // fill variant 1 (name is required and unique-in-item since the refactor)
+      await variantNameBox().first().fill(`Variant Crimson ${S2}`);
       await modal.getByPlaceholder(`Enter ${attrName}`).fill('Crimson');
       await modal.getByRole('button', { name: /Add Variant/i }).click();
       await expect(modal.getByText(/Item Variants \(2\)/)).toBeVisible();
-      await expect(modal.getByText('Variant 2', { exact: true })).toBeVisible();
 
       // duplicate guard: variant 2 with identical attribute values is blocked
+      await variantNameBox().first().fill(`Variant Second ${S2}`);
       await modal.getByPlaceholder(`Enter ${attrName}`).fill('Crimson');
       await modal.getByRole('button', { name: /Save/i }).click();
       await expect(
@@ -478,8 +531,8 @@ test.describe.serial('Item — CRUD', () => {
     });
 
     test('Edit: via row action, Update gated until dirty, variant value round-trips', async ({ page }) => {
-      await searchItems(page, seedItem.itemName);
-      await page.locator('.ant-table-row').filter({ hasText: seedItem.itemName }).locator('.anticon-edit').click();
+      await searchItems(page, seedItem.searchKey);
+      await page.locator('.ant-table-row').filter({ hasText: seedItem.itemCode }).locator('.anticon-edit').click();
 
       const modal = itemModal(page);
       await modal.locator('#categoryId').waitFor({ state: 'visible', timeout: 20000 });
@@ -488,8 +541,11 @@ test.describe.serial('Item — CRUD', () => {
       // seeded variant attribute value resolved back into the form
       await expect(modal.getByPlaceholder(`Enter ${attrName}`)).toHaveValue('SeedShade');
 
-      await modal.locator('#hsnCode').fill('620920');
+      // HSN (like the classifier triple and UOMs) is LOCKED in edit mode by design —
+      // dirty the form through the fields that stay editable.
+      await expect(modal.locator('#hsnCode')).toBeDisabled();
       await antInputNumberFill(page, '#defaultAllowance', 7.25);
+      await modal.locator('#description').fill('Edited in regression');
       await expect(modal.getByRole('button', { name: /Update/i })).toBeEnabled();
 
       const [resp] = await Promise.all([
@@ -500,21 +556,25 @@ test.describe.serial('Item — CRUD', () => {
       await expect(page.locator('.ant-message').getByText(/Item updated successfully/i)).toBeVisible({ timeout: 8000 });
     });
 
-    test('Autocomplete: typing an existing name offers it and loads it (edit-by-search)', async ({ page }) => {
+    test('Existing-triple lookup: picking a taken combination loads that item for editing', async ({ page }) => {
+      // The name-autocomplete was REMOVED in the Item Master refactor (the name is
+      // derived, not typed). Its replacement: selecting a Category / Sub-Category /
+      // Item Type combination that already has an item fetches that item
+      // (GET /items/{id}) and switches the form to edit mode.
       const modal = await openAddItem(page);
 
       const [resp] = await Promise.all([
-        page.waitForResponse((r) => r.url().includes('/items/autocomplete'), { timeout: 15000 }),
-        modal.getByPlaceholder('Enter Item Name').fill(seedItem.itemName), // ≥3 chars + 300ms debounce
+        page.waitForResponse(
+          (r) => /\/items\/\d+$/.test(r.url()) && r.request().method() === 'GET',
+          { timeout: 20000 },
+        ),
+        pickChain(page, plain), // the seed item's classifier triple
       ]);
       expect(resp.status()).toBeLessThan(300);
 
-      // pick the suggestion → form switches to update mode for that item
-      await modal.getByText(seedItem.itemName, { exact: true }).click();
       await expect(modal.getByRole('button', { name: /Update/i })).toBeVisible({ timeout: 10000 });
-      // cascade populated from the loaded item (assert the select root's text — robust
-      // against the autocomplete→edit-mode render transition)
-      await expect(modalSelect(page, 'categoryId')).toContainText(plain.cat, { timeout: 10000 });
+      // The seeded variant hydrates into the form — the variant is the item identity.
+      await expect(modal.getByPlaceholder(`Enter ${attrName}`)).toHaveValue('SeedShade', { timeout: 10000 });
 
       await cancelItemModal(page);
     });

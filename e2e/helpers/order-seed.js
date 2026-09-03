@@ -7,14 +7,27 @@
  * so seedApprovedCosting returns an Approved sheet's costingId + derived FKs.
  */
 
+import { stylePayload } from './test-data.js';
+
 const FK = { buyerId: 1, styleId: 3, fabricItemId: 1 };
+
+/**
+ * A style may carry only ONE cost sheet (rule added 2026-08), so every costing seeded
+ * here gets its own fresh style — reusing a seeded style conflicts on the second run.
+ */
+export async function seedFreshStyle(api, buyerId) {
+  const res = await api.post('/styles', stylePayload(buyerId));
+  if (res.status >= 300) throw new Error(`seed style failed: ${res.status} ${JSON.stringify(res.data)}`);
+  return res.data;
+}
 
 /** Create + auto-approve a cost sheet; returns its identity for order creation. */
 export async function seedApprovedCosting(api, overrides = {}) {
+  const style = await seedFreshStyle(api, overrides.buyerId ?? FK.buyerId);
   const payload = {
     status: 'Final',
     date: new Date().toISOString().split('T')[0],
-    buyerId: FK.buyerId, styleId: FK.styleId, garmentName: 'Order Seed', season: 'SS26',
+    buyerId: FK.buyerId, styleId: style.id, garmentName: 'Order Seed', season: 'SS26',
     currency: 'INR', quoteCurrency: 'USD', actualRate: 83.5, todaysRate: 83.5,
     sizes: ['M'], costingType: 'FOB', pricingUnit: 'PIECE', agentCommissionPct: 5, profitPct: 10,
     fabricRows: [{ itemId: FK.fabricItemId, classification: 'Woven', consumption: 1, fabricPrice: 100, allowancePct: 0, wastagePct: 0, netCost: 100, sizes: '' }],

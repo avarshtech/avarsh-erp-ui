@@ -10,10 +10,11 @@ import axiosInstance from '../core/axiosInstance';
 import {
   MOCK_FABRIC_STOCK, MOCK_ACCESSORIES_STOCK, MOCK_FABRIC_ISSUES, MOCK_ACCESSORIES_ISSUES,
   MOCK_ADJUSTMENTS, MOCK_PRODUCTION_ORDERS, MOCK_DASHBOARD_STATS,
-  MOCK_ITEM_VARIANTS, MOCK_PURCHASE_ORDERS_FOR_GRN,
+  MOCK_PURCHASE_ORDERS_FOR_GRN,
   MOCK_FABRIC_GRNS, MOCK_ACCESSORIES_GRNS, MOCK_FABRIC_QC, MOCK_TRIMS_QC,
   MOCK_APPROVED_CUTTING_POS, MOCK_APPROVED_WORK_ORDERS,
 } from './inventoryMockData';
+import { getVariantsByIds } from '../master/variantService';
 import { getActiveDefectTypes as fetchActiveDefectTypes } from '../master/defectTypeService';
 import { getActiveTrimsQCCriteria as fetchActiveTrimsQCCriteria } from '../master/trimsQCCriteriaService';
 import { getItemMetaData } from '../master/itemService';
@@ -53,12 +54,22 @@ const adaptPO = (po) => {
       itemName: li.itemName,
       description: li.description || li.itemName,
       variantId: li.variantId,
+      variantName: li.variantName || '',
+      variantCode: li.variantCode || '',
       orderedQty: Number(li.quantity || 0),
       receivedQty: 0, // populated by enrichPOWithReceipts
       pendingQty: Number(li.quantity || 0),
       fullyReceived: false,
       rate: Number(li.unitPrice || 0),
-      uom: li.uomName || '',
+      // Tax %s survive the reshape — the GRN print reads poLi.sgst/cgst/igst
+      // to compute tax rows (they rendered as 0 when this mapping dropped them).
+      cgst: li.cgst,
+      sgst: li.sgst,
+      igst: li.igst,
+      // Symbol, not name: GRN/PO documents and the narrow UOM columns show "KG", and
+      // screens that source a UOM from the variant already snapshot the symbol. Falling
+      // back to the name keeps older POs readable rather than blank.
+      uom: li.uomSymbol || li.uomName || '',
       color: li.variantAttributes?.color || '',
       size: li.variantAttributes?.size || '',
       categoryName: li.categoryName || '',
@@ -72,9 +83,28 @@ const adaptPO = (po) => {
  */
 const adaptGRN = (grn) => {
   if (!grn) return null;
+  const lineItems = grn.lineItems || [];
+  // The API nests rolls and cartons under each line item and exposes no totalRolls /
+  // totalAmount / items fields. The GRN screens were built around a flat shape — the view
+  // modal reads grn.items/grn.cartons, the forms hydrate from grn.rolls/grn.cartons, and
+  // the list columns read grn.totalRolls/grn.totalAmount. Without this flattening they all
+  // silently render 0 and edit mode loads with no rolls at all.
+  //
+  // The server already stamps each roll and carton with its parent line's snapshot
+  // (item code, description, rate, uom, variantCode, variantName), so the flattened rows
+  // stand on their own.
+  const rolls = lineItems.flatMap((li) => li.rolls || []);
+  const cartons = lineItems.flatMap((li) => li.cartons || []);
   return {
     ...grn,
     type: (grn.type === 'Trims' || grn.grnType === 'Trims') ? 'Accessories' : 'Fabric',
+    items: grn.items || lineItems,
+    rolls: grn.rolls || rolls,
+    cartons: grn.cartons || cartons,
+    totalRolls: grn.totalRolls ?? rolls.length,
+    totalAmount:
+      grn.totalAmount ??
+      lineItems.reduce((sum, li) => sum + Number(li.receivingQty || 0) * Number(li.rate || 0), 0),
   };
 };
 
@@ -165,8 +195,10 @@ const buildFabricOffendingLines = (grn) =>
     const rolls = li.rolls || [];
     const sample = rolls[0] || {};
     const balance = Number(sample.balance);
-    const receivedQty = rolls.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0)
-                      + Number(li.receivingQty || 0);
+    // The server persists the line's receivingQty as the SUM of its rolls, so
+    // adding both double-counted every fabric receipt (the "2X" allowance bug).
+    const rollsQty = rolls.reduce((s, r) => s + (Number(r.receivingQty) || 0), 0);
+    const receivedQty = Number(li.receivingQty) > 0 ? Number(li.receivingQty) : rollsQty;
     const allowedPct = Number.isFinite(Number(sample.defaultAllowance)) ? Number(sample.defaultAllowance) : 0;
     if (!Number.isFinite(balance) || balance <= 0 || receivedQty <= balance) return null;
     const overPct = ((receivedQty - balance) / balance) * 100;
@@ -231,9 +263,11 @@ const detectGRNCategory = (g) => {
 export const getAllowanceExceedGRNs = async ({ dateStart, dateEnd } = {}) => {
   if (!dateStart || !dateEnd) return [];
   const { content } = await getGRNList({ dateStart, dateEnd });
+  // Reversed / Cancelled receipts are dead — never flag them as excess.
+  const live = (content || []).filter((g) => g.status !== 'Reversed' && g.status !== 'Cancelled');
   // If the list endpoint doesn't embed line items (live API), hydrate detail.
   const hydrated = await Promise.all(
-    (content || []).map(async (g) => {
+    live.map(async (g) => {
       const hasFabricLines = Array.isArray(g.lineItems)
         && g.lineItems.some((li) => li && typeof li === 'object' && Array.isArray(li.rolls));
       if (hasFabricLines || (Array.isArray(g.items) && g.items.length > 0)) return g;
@@ -333,9 +367,56 @@ export const getAllGRNsForValidation = async () => {
   return [];
 };
 
-// Variant lookup — still mock until item master variant API lands.
-export const getItemVariant = async (variantId) => { await delay(50); return MOCK_ITEM_VARIANTS[variantId] || null; };
-export const getItemVariantsBulk = (variantIds = []) => variantIds.map((id) => MOCK_ITEM_VARIANTS[id] || null);
+// ─── Variant lookup (real API) ───────────────────────────────────────────────
+// Adapts ItemVariantDTO to the shape GRN/QC screens consume (attributes.width/gsm,
+// primaryUom/secondaryUom, color/size, category).
+const adaptVariant = (v) => {
+  if (!v) return null;
+  const attrs = v.attributes || {};
+  const attrCI = (name) => {
+    const key = Object.keys(attrs).find((k) => k.toLowerCase() === name);
+    return key ? attrs[key] : undefined;
+  };
+  return {
+    id: v.id,
+    itemId: v.itemId,
+    itemCode: v.itemCode,
+    itemName: v.variantName || v.itemName,
+    variantCode: v.variantCode,
+    variantName: v.variantName,
+    color: attrCI('color') ?? attrCI('colour') ?? '-',
+    size: attrCI('size') ?? '-',
+    primaryUom: v.uomSymbol || '',
+    secondaryUom: v.secondaryUomSymbol || '',
+    category: v.categoryName || '',
+    attributes: attrs,
+  };
+};
+
+export const getItemVariant = async (variantId) => {
+  if (variantId == null) return null;
+  try {
+    const res = await getVariantsByIds([variantId]);
+    const list = res?.data || res || [];
+    return adaptVariant(list[0] || null);
+  } catch {
+    return null;
+  }
+};
+
+/** Bulk variant lookup. Preserves positional order of the input ids (nulls for misses). */
+export const getItemVariantsBulk = async (variantIds = []) => {
+  const ids = (variantIds || []).filter((id) => id != null);
+  if (ids.length === 0) return (variantIds || []).map(() => null);
+  try {
+    const res = await getVariantsByIds(ids);
+    const list = res?.data || res || [];
+    const byId = new Map(list.map((v) => [v.id, adaptVariant(v)]));
+    return (variantIds || []).map((id) => byId.get(id) || null);
+  } catch {
+    return (variantIds || []).map(() => null);
+  }
+};
 
 // ─── GRN write operations ────────────────────────────────────────────────────
 
@@ -431,6 +512,15 @@ export const submitTrimsGRN = (data) => submitGrn(data, 'Trims');
 export const deleteDraftGRN = async (grnId /* , type */) => {
   await axiosInstance.delete(`${GRN_ENDPOINT}/${grnId}`);
   return true;
+};
+
+/**
+ * Direct pre-QC cancellation — Draft / QC_Pending only, blocked once any QC
+ * inspection exists. Terminal; receipts drop out of the PO balance.
+ */
+export const cancelGRN = async (grnId, reason, version) => {
+  const response = await axiosInstance.post(`${GRN_ENDPOINT}/${grnId}/cancel`, { reason, version });
+  return adaptGRN(response.data ?? response);
 };
 
 // PO ↔ GRN status interlock runs server-side inside GRNService.
@@ -875,6 +965,15 @@ export const getAdjustmentList = async () => {
   };
 };
 
+export const getAdjustmentById = async (id) => {
+  if (USE_MOCK_INVENTORY_DATA) {
+    await delay(50);
+    return MOCK_ADJUSTMENTS.find((a) => a.id === Number(id)) || null;
+  }
+  const response = await axiosInstance.get(`${ADJUSTMENT_ENDPOINT}/${id}`);
+  return response.data ?? response;
+};
+
 // Nested metadata tree shaped like /items/meta so the filter card can
 // cascade Cat → SubCat → ItemType the same way the ItemMaster dialog does.
 const ADJUSTMENT_META_DATA = [
@@ -907,7 +1006,6 @@ export const getAdjustmentMetaData = async () => {
   // Reuse ItemMaster's metadata call — same endpoint, same auth path — so
   // whichever shape the backend returns, we handle it exactly like ItemMaster.
   const response = await getItemMetaData();
-  console.log(response);
   if (Array.isArray(response)) return response;
   if (response?.data && Array.isArray(response.data)) return response.data;
   if (response?.content && Array.isArray(response.content)) return response.content;
@@ -1020,5 +1118,9 @@ export const saveAdjustment = async (payload) => {
   return record;
 };
 
-// ─── DASHBOARD (mock) ──────────────────────────────────────────────────────────
-export const getDashboardStats = async () => { await delay(); return MOCK_DASHBOARD_STATS; };
+// ─── DASHBOARD ─────────────────────────────────────────────────────────────────
+export const getDashboardStats = async () => {
+  if (USE_MOCK_INVENTORY_DATA) { await delay(); return MOCK_DASHBOARD_STATS; }
+  const response = await axiosInstance.get('/dashboard/inventory');
+  return response.data ?? response;
+};

@@ -24,7 +24,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload,
-  submitGrn, draftGrn, submitQc, draftQc, approveQc,
+  submitGrn, draftGrn, submitQc, draftQc, approveQc, qcApproverClient,
   getDefectTypes, getPOStatus, getPOReceipts, today,
 } from '../../helpers/grn-qc-data.js';
 
@@ -151,7 +151,7 @@ async function createQcForGrn(grn, { approve = false } = {}) {
  */
 async function closeGrn(grnId) {
   const grnFresh = await fetchGrn(grnId);
-  const { data, status } = await api.post(
+  const { data, status } = await (await qcApproverClient(api)).post(
     `/grns/${grnId}/close-on-qc-approval`,
     { version: grnFresh.version },
   );
@@ -227,7 +227,7 @@ test.describe('GRN Workflow (API)', () => {
     expect(grnAfterReq.status).toBe('Pending_Reversal');
 
     // Approve reversal
-    const { status: appStatus } = await api.post(
+    const { status: appStatus } = await (await qcApproverClient(api)).post(
       `/grns/${grn.id}/reversal/approve`,
       { reason: 'Approved', version: grnAfterReq.version },
     );
@@ -272,7 +272,7 @@ test.describe('GRN Workflow (API)', () => {
     expect(grnPending.status).toBe('Pending_Reversal');
 
     // Reject reversal
-    const { status: rejStatus } = await api.post(
+    const { status: rejStatus } = await (await qcApproverClient(api)).post(
       `/grns/${grn.id}/reversal/reject`,
       { reason: 'No need to reverse', version: grnPending.version },
     );
@@ -337,9 +337,11 @@ test.describe('QC Workflow (API)', () => {
     createdQcIds.push(qcSubmitted.id);
     expect(['Submitted', 'Pending_Approval']).toContain(qcSubmitted.status);
 
-    // Reject QC
+    // Reject QC — as a second user: the creator cannot action their own submission,
+    // a guard that only started firing once the auditor fix (B-059) recorded identity.
     const qcBeforeReject = await fetchQc(qcSubmitted.id);
-    const { status: rejStatus } = await api.post(
+    const approver = await qcApproverClient(api);
+    const { status: rejStatus } = await approver.post(
       `/qc/${qcSubmitted.id}/reject`,
       { reason: 'Defects found — re-inspection needed', version: qcBeforeReject.version },
     );
@@ -406,7 +408,7 @@ test.describe('QC Workflow (API)', () => {
     expect(qcAfterReq.status).toBe('Referred_Back_Pending');
 
     // Approve the refer-back
-    const { status: rbAppStatus } = await api.post(
+    const { status: rbAppStatus } = await (await qcApproverClient(api)).post(
       `/qc/${qcApproved.id}/refer-back/approve`,
       { reason: 'Re-inspection warranted', version: qcAfterReq.version },
     );
@@ -468,7 +470,7 @@ test.describe('QC Workflow (API)', () => {
     expect(qcPending.status).toBe('Referred_Back_Pending');
 
     // Reject the refer-back request
-    const { status: rbRejStatus } = await api.post(
+    const { status: rbRejStatus } = await (await qcApproverClient(api)).post(
       `/qc/${qcApproved.id}/refer-back/reject`,
       { reason: 'Original inspection was correct', version: qcPending.version },
     );
@@ -637,7 +639,7 @@ test.describe('PO Status Interlocks (API)', () => {
     expect(reqStatus).toBe(200);
 
     const grnPending = await fetchGrn(grn.id);
-    const { status: approveStatus } = await api.post(
+    const { status: approveStatus } = await (await qcApproverClient(api)).post(
       `/grns/${grn.id}/reversal/approve`,
       { reason: 'Reversal approved', version: grnPending.version },
     );

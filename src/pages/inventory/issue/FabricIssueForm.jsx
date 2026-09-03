@@ -6,10 +6,11 @@ import { hasPermission, getCurrentUser } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import {
-  getApprovedCuttingPOs,
-  getFabricStock,
-  getFabricIssueById,
-} from '../../../services/inventory/inventoryService';
+  getIssueCuttingPos,
+  getIssuableRolls,
+  getIssue,
+  createFabricIssue,
+} from '../../../services/inventory/materialIssueService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { formatNumber } from '../../../utils/formatters';
 import FabricIssueRollPicker from './FabricIssueRollPicker';
@@ -44,7 +45,7 @@ const FabricIssueForm = () => {
   const { clearDirty } = useUnsavedChanges(isDirty);
 
   useEffect(() => {
-    getApprovedCuttingPOs()
+    getIssueCuttingPos()
       .then((res) => setCuttingPOs(res.content || []))
       .catch(() => message.error('Failed to load approved Cutting POs'));
   }, [message]);
@@ -56,7 +57,7 @@ const FabricIssueForm = () => {
     let cancelled = false;
     (async () => {
       try {
-        const record = await getFabricIssueById(id);
+        const record = await getIssue(id);
         if (cancelled || !record) return;
         setEditRecord(record);
         setLoadingEdit(false);
@@ -74,24 +75,10 @@ const FabricIssueForm = () => {
           remarks: record.remarks,
         });
         if (line) {
-          const res = await getFabricStock();
+          const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode);
           if (cancelled) return;
-          const flattened = (res.content || [])
-            .filter((item) => item.orderRef === line.orderNumber)
-            .flatMap((item) => (item.rolls || []).map((roll) => ({
-              id: `${item.id}::${roll.rollId}`,
-              rollId: roll.rollId,
-              rollNumber: roll.rollNumber,
-              fabricDescription: item.fabricDescription,
-              width: roll.width,
-              gsm: roll.gsm,
-              weight: roll.weight,
-              shadeLot: roll.shadeLot,
-              uom: item.uom,
-              orderRef: item.orderRef,
-            })));
-          setAvailableRolls(flattened);
-          const preselected = flattened
+          setAvailableRolls(rolls);
+          const preselected = rolls
             .filter((r) => (record.rolls || []).some((ir) => ir.rollId === r.rollId))
             .map((r) => r.id);
           setSelectedRollIds(preselected);
@@ -119,25 +106,10 @@ const FabricIssueForm = () => {
 
   const loadRollsForLine = useCallback(async (line) => {
     try {
-      // TODO: once backend lands, call /inventory/stock/fabric/issuable?orderRef=... which will
-      // filter server-side to IN_STOCK rolls for this cutting PO line's order number.
-      const res = await getFabricStock();
-      const content = res.content || [];
-      const flattened = content
-        .filter((item) => item.orderRef === line.orderNumber)
-        .flatMap((item) => (item.rolls || []).map((roll) => ({
-          id: `${item.id}::${roll.rollId}`,
-          rollId: roll.rollId,
-          rollNumber: roll.rollNumber,
-          fabricDescription: item.fabricDescription,
-          width: roll.width,
-          gsm: roll.gsm,
-          weight: roll.weight,
-          shadeLot: roll.shadeLot,
-          uom: item.uom,
-          orderRef: item.orderRef,
-        })));
-      setAvailableRolls(flattened);
+      // Server-side filtered: In_Stock rolls of this fabric item with remaining
+      // qty; order-earmarked rolls first, free stock after.
+      const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode);
+      setAvailableRolls(rolls);
     } catch {
       message.error('Failed to load available rolls');
     }
@@ -216,14 +188,17 @@ const FabricIssueForm = () => {
     selectedRollIds.forEach((key) => {
       const split = splitMap.get(key);
       if (split) {
-        const parent = availableRolls.find((r) => r.id === split.parentId);
+        // Object.entries stringifies keys — compare as strings so real
+        // numeric stock ids still match (mock ids were already strings).
+        const parent = availableRolls.find((r) => String(r.id) === String(split.parentId));
         // Issued slice is a NEW sub-roll with -A suffix — the remnant keeps
         // the original roll number and stays in stock (not selectable here).
-        if (parent) rolls.push({ ...parent, id: key, rollNumber: `${parent.rollNumber}-A`, weight: split.issueQty });
+        // stockId keeps the real inv_fabric_stock row id for the save payload.
+        if (parent) rolls.push({ ...parent, id: key, stockId: parent.id, rollNumber: `${parent.rollNumber}-A`, weight: split.issueQty });
         return;
       }
       const direct = availableRolls.find((r) => r.id === key);
-      if (direct) rolls.push(direct);
+      if (direct) rolls.push({ ...direct, stockId: direct.id });
     });
     return rolls;
   }, [selectedRollIds, availableRolls, rollSplits]);
@@ -234,8 +209,16 @@ const FabricIssueForm = () => {
     return { rollCount: selectedRolls.length, totalWeight, issuedPct };
   }, [selectedRolls, bomRequired]);
 
+  const [saving, setSaving] = useState(false);
+
   const handleSubmit = useCallback(() => {
-    form.validateFields().then(() => {
+    // Issues are physical stock movements — once COMPLETED they cannot be
+    // amended, only viewed (a cancel/reversal flow is a future enhancement).
+    if (isEdit) {
+      message.info('Completed issues cannot be amended — create a new issue instead');
+      return;
+    }
+    form.validateFields().then(async (values) => {
       if (!selectedRollIds.length) {
         message.warning('Select at least one roll to issue');
         return;
@@ -244,11 +227,27 @@ const FabricIssueForm = () => {
         message.error('UOM mismatch — resolve before submitting');
         return;
       }
-      message.success('Fabric issue issued successfully');
-      clearDirty();
-      navigate('/inventory/issue/fabric');
+      setSaving(true);
+      try {
+        const saved = await createFabricIssue({
+          cuttingPoId: selectedPO.id,
+          itemId: selectedLine?.id,
+          itemCode: selectedLine?.fabricCode,
+          receivedBy: values.receivedBy,
+          issueDate: values.issueDate?.format('YYYY-MM-DD'),
+          remarks: values.remarks,
+          rolls: selectedRolls.map((r) => ({ fabricStockId: r.stockId, issuedQty: r.weight })),
+        });
+        message.success(`${saved.issueNumber} issued — stock cleared from inventory`);
+        clearDirty();
+        navigate('/inventory/issue');
+      } catch (e) {
+        message.error(e.errorMessage || e.message || 'Failed to save issue');
+      } finally {
+        setSaving(false);
+      }
     }).catch(() => message.warning('Please fill all required fields'));
-  }, [form, message, navigate, clearDirty, selectedRollIds, uomMismatch]);
+  }, [form, message, navigate, clearDirty, selectedRollIds, uomMismatch, selectedPO, selectedLine, selectedRolls, isEdit]);
 
   const currentUserName = getCurrentUser()?.name || '—';
 
@@ -283,7 +282,7 @@ const FabricIssueForm = () => {
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
         {hasPermission('inventory-issue', isEdit ? 'update' : 'add') && (
-          <ActionButton action="save" text="Issue" onClick={handleSubmit} />
+          <ActionButton action="save" text="Issue" loading={saving} onClick={handleSubmit} />
         )}
       </PageHeader>
       {isEdit && loadingEdit ? (

@@ -35,7 +35,7 @@ const ReturnItemsTable = ({
     if (returnType === RETURN_TYPE.FABRIC) {
       return applyStyle([
         { title: 'Roll #', dataIndex: 'rollNumber', width: 110, fixed: 'left' },
-        { title: 'Item Code', dataIndex: 'itemCode', width: 140 },
+        { title: 'Item Code', dataIndex: 'itemCode', width: 140, render: (v, r) => r.variantCode || v || '—' },
         { title: 'Description', dataIndex: 'description' },
         { title: 'GRN #', dataIndex: 'grnNumber', width: 150 },
         { title: 'GRN Date', dataIndex: 'grnDate', width: 120, render: (v) => (v ? dayjs(v).format('DD-MMM-YYYY') : '—') },
@@ -47,7 +47,7 @@ const ReturnItemsTable = ({
       ]);
     }
     return applyStyle([
-      { title: 'Item Code', dataIndex: 'itemCode', width: 140, fixed: 'left' },
+      { title: 'Item Code', dataIndex: 'itemCode', width: 140, fixed: 'left', render: (v, r) => r.variantCode || v || '—' },
       { title: 'Description', dataIndex: 'description' },
       { title: 'Size', dataIndex: 'size', width: 90 },
       { title: 'Color', dataIndex: 'color', width: 110 },

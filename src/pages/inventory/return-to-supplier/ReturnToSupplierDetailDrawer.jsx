@@ -59,7 +59,7 @@ const ReturnToSupplierDetailDrawer = ({ returnId, open, onClose }) => {
     }));
 
   const itemColumns = styleCols([
-    { title: 'Item Code', dataIndex: 'itemCode', width: 140 },
+    { title: 'Item Code', dataIndex: 'itemCode', width: 140, render: (v, r) => r.variantCode || v || '—' },
     { title: 'Description', dataIndex: 'description', width: 220 },
     { title: 'Roll/Size', render: (_, r) => r.rollNumber || r.size || '—', width: 120 },
     { title: 'GRN #', dataIndex: 'grnNumber', width: 150 },
@@ -132,7 +132,7 @@ const ReturnToSupplierDetailDrawer = ({ returnId, open, onClose }) => {
         <Table
           size="small"
           columns={styleCols([
-            { title: 'Item Code', dataIndex: 'itemCode', width: 140 },
+            { title: 'Item Code', dataIndex: 'itemCode', width: 140, render: (v, r) => r.variantCode || v || '—' },
             { title: 'Description', dataIndex: 'description', width: 220 },
             { title: 'Roll/Size', render: (_, r) => r.rollNumber || r.size || '—', width: 120 },
             { title: 'Qty', dataIndex: 'qty', width: 130, render: (v, r) => qtyWithUom(v, r.uom) },

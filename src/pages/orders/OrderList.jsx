@@ -15,6 +15,7 @@ import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
 import SearchFilterBar from '../../components/SearchFilterBar';
 import RecordLink from '../../components/RecordLink';
+import SampleOrderTag from '../../components/SampleOrderTag';
 import CurrencyDisplay from '../../components/CurrencyDisplay';
 import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
@@ -38,6 +39,7 @@ const OrderList = () => {
   });
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
+  const [orderTypeFilter, setOrderTypeFilter] = useState(undefined);
   const [orderDateRange, setOrderDateRange] = useState(null);
   const [sortField, setSortField] = useState('id');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -86,6 +88,7 @@ const OrderList = () => {
         };
         if (debouncedSearch) params.search = debouncedSearch;
         if (statusFilter) params.status = statusFilter;
+        if (orderTypeFilter) params.orderType = orderTypeFilter;
         if (orderDateRange && orderDateRange.length === 2) {
           params.orderDateStart = orderDateRange[0].format('YYYY-MM-DD');
           params.orderDateEnd = orderDateRange[1].format('YYYY-MM-DD');
@@ -105,14 +108,14 @@ const OrderList = () => {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]
   );
 
   // Re-fetch on filter change
   useEffect(() => {
     fetchData(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, orderDateRange]);
+  }, [debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]);
 
   // Table change (pagination, sorting)
   const handleTableChange = (pag, _filters, sorter) => {
@@ -158,7 +161,10 @@ const OrderList = () => {
       width: 150,
       sorter: true,
       render: (text, record) => (
-        <RecordLink text={text} onClick={() => handleView(record)} />
+        <span style={{ whiteSpace: 'nowrap' }}>
+          <RecordLink text={text} onClick={() => handleView(record)} />
+          {record.orderType === 'SAMPLE' && <SampleOrderTag />}
+        </span>
       ),
     },
     {
@@ -287,6 +293,19 @@ const OrderList = () => {
                 value: statusFilter,
                 onChange: setStatusFilter,
                 options: statusOptions,
+              },
+            },
+            {
+              type: 'select',
+              span: { xs: 12, sm: 8, md: 4, lg: 3 },
+              props: {
+                placeholder: 'Type',
+                value: orderTypeFilter,
+                onChange: setOrderTypeFilter,
+                options: [
+                  { label: 'Bulk', value: 'BULK' },
+                  { label: 'Sample', value: 'SAMPLE' },
+                ],
               },
             },
             {

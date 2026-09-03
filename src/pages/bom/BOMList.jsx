@@ -19,16 +19,19 @@ import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
 import SearchFilterBar from '../../components/SearchFilterBar';
 import RecordLink from '../../components/RecordLink';
+import SampleOrderTag from '../../components/SampleOrderTag';
 import EmptyState from '../../components/EmptyState';
 import { BOM_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getTablePagination } from '../../utils/paginationConfig';
 import useDebouncedSearch from '../../hooks/useDebouncedSearch';
+import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 
 const { Text } = Typography;
 
 const BOMList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  const { isSampleOrder } = useSampleOrderNos();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [data, setData] = useState([]);
@@ -128,7 +131,10 @@ const BOMList = () => {
       width: 160,
       sorter: true,
       render: (text, record) => (
-        <RecordLink text={text} onClick={() => handleView(record)} />
+        <span style={{ whiteSpace: 'nowrap' }}>
+          <RecordLink text={text} onClick={() => handleView(record)} />
+          {isSampleOrder(text) && <SampleOrderTag />}
+        </span>
       ),
     },
     {
@@ -218,7 +224,7 @@ const BOMList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, isSampleOrder]);
 
   return (
     <div className="animate-fade-in-up">

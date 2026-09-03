@@ -39,7 +39,15 @@ const initialState = {
   // Users & Roles
   users: [],
   roles: [],
-  
+
+  // Order numbers of SAMPLE-type orders (drives sample badges across lifecycle screens)
+  sampleOrderNos: [],
+
+  // Cutting-room masters: fabric types (relaxation hours + stock UOM), cut/lay
+  // tables, and the code lists + thresholds the cutting screens read from
+  cuttingMasters: null,
+  sewingMasters: null,
+
   // Loading states per data type
   loading: {
     categories: false,
@@ -56,6 +64,9 @@ const initialState = {
     sizePresets: false,
     users: false,
     roles: false,
+    sampleOrderNos: false,
+    cuttingMasters: false,
+    sewingMasters: false,
   },
 
   // Error states per data type
@@ -74,6 +85,9 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
+    cuttingMasters: null,
+    sewingMasters: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -92,6 +106,9 @@ const initialState = {
     sizePresets: null,
     users: null,
     roles: null,
+    sampleOrderNos: null,
+    cuttingMasters: null,
+    sewingMasters: null,
   },
 };
 

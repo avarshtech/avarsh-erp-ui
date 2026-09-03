@@ -44,7 +44,7 @@ const AllowanceLineCard = memo(function AllowanceLineCard({ line }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Text strong style={{ fontSize: 14, display: 'block', fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)' }}>
-            {line.itemCode}
+            {line.variantCode || line.itemCode}
           </Text>
           <Text type="secondary" style={{ fontSize: 12, display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {line.description || '—'}

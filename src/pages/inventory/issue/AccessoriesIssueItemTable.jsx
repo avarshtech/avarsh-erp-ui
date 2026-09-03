@@ -9,7 +9,7 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
   const columns = useMemo(
     () => [
       { title: '#', width: 45, key: 'index', align: 'center', render: (_, __, i) => i + 1 },
-      { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140, align: 'center' },
+      { title: 'Item Code', dataIndex: 'itemCode', key: 'itemCode', width: 140, align: 'center', render: (v, r) => r.variantCode || v || '—' },
       { title: 'Description', dataIndex: 'description', key: 'description', width: 220, ellipsis: true, align: 'center' },
       { title: 'Color', dataIndex: 'color', key: 'color', width: 100, align: 'center' },
       { title: 'Size', dataIndex: 'size', key: 'size', width: 80, align: 'center' },

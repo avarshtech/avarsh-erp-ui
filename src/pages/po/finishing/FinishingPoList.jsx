@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Table, Card, Space, Tag, Segmented } from 'antd';
 import { UnorderedListOutlined, TableOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -14,7 +14,8 @@ import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { PROD_PO_STATUS, getStatusLabel, getProcessLabel, EDITABLE_STATUSES, PO_TYPE, FINISHING_PROCESSES } from '../../../utils/productionConstants';
-import { listFinishingPos, getVendors } from '../../../services/po/productionService';
+import { listFinishingPos, getFinishingPo } from '../../../services/po/production/finishingPoService';
+import { getVendors } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
@@ -55,6 +56,18 @@ const FinishingPoList = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Deep link from My Approvals (?viewId=X) — GRNList pattern.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const viewId = searchParams.get('viewId');
+    if (!viewId) return;
+    getFinishingPo(viewId)
+      .then((po) => po && setView({ open: true, record: po }))
+      .catch(() => message.error('Finishing PO not found'));
+    searchParams.delete('viewId');
+    setSearchParams(searchParams, { replace: true });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
   const vendorOptions = useMemo(() => vendors.map((v) => ({ value: v.id, label: v.name })), [vendors]);
 
@@ -81,7 +94,7 @@ const FinishingPoList = () => {
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.FINISHING)} />
           {EDITABLE_STATUSES.includes(r.status) && (
-            <PermissionGuard module="production" operation="update">
+            <PermissionGuard module="finishing-po" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/finishing-po/edit/${r.id}`)} />
             </PermissionGuard>
           )}
@@ -91,8 +104,8 @@ const FinishingPoList = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="Finishing POs">
-        <PermissionGuard module="production" operation="add">
+      <PageHeader title="Finishing PO">
+        <PermissionGuard module="finishing-po" operation="add">
           <ActionButton action="create" text="Generate Finishing POs" onClick={() => navigate('/purchase-orders/finishing-po/new')} />
         </PermissionGuard>
       </PageHeader>

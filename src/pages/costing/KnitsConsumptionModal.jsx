@@ -9,18 +9,28 @@ import {
   Space,
   Typography,
   Popconfirm,
+  Alert,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import {
   DEFAULT_KNITS_PARTS,
   calcKnitsGramsPerPart,
-  calcKnitsTotalConsumption,
+  calcKnitsTotalGrams,
 } from '../../utils/costingConstants';
+import { convertGramsTo, isMassUom, massDecimalPlaces } from '../../utils/uomConversions';
 import { useTheme } from '../../context/ThemeContext';
 
 const { Text } = Typography;
 
-const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
+/**
+ * Knits fabric consumption calculator.
+ *
+ * The formula produces GRAMS. `targetUom` is the consumption UOM of the fabric row this
+ * will be applied to, and the total is shown in that unit so what the user approves is
+ * exactly what lands in the row. `onApply` still hands back the raw grams total — the
+ * parent owns the conversion, since only it knows the row.
+ */
+const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts, targetUom }) => {
   const { isDarkMode } = useTheme();
   const [parts, setParts] = useState([]);
 
@@ -78,12 +88,16 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
     setParts((prev) => prev.filter((p) => p.key !== key));
   };
 
-  const totalConsumption = useMemo(() => {
-    return calcKnitsTotalConsumption(parts);
-  }, [parts]);
+  const totalGrams = useMemo(() => calcKnitsTotalGrams(parts), [parts]);
+
+  // A blank targetUom (no fabric picked yet) falls back to grams, matching the row —
+  // which shows no unit either until a variant is selected.
+  const displayUom = targetUom || 'GMS';
+  const nonMassUom = Boolean(targetUom) && !isMassUom(targetUom);
+  const totalInTargetUom = convertGramsTo(totalGrams, targetUom) ?? 0;
 
   const handleApply = () => {
-    onApply(totalConsumption, parts);
+    onApply(totalGrams, parts);
   };
 
   const columns = [
@@ -218,14 +232,32 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
           </Button>
         </Space>
       }
-      destroyOnClose
+      destroyOnHidden
     >
       <div style={{ marginBottom: 12 }}>
         <Text type="secondary" style={{ fontSize: 13 }}>
-          Enter garment part dimensions to auto-calculate total fabric consumption in kilograms.
-          You can also manually enter Grams per Part directly.
+          Enter garment part dimensions to auto-calculate total fabric consumption in{' '}
+          <Text strong style={{ fontSize: 13 }}>{displayUom.toUpperCase()}</Text> — the
+          consumption unit of the selected fabric. You can also manually enter Grams per Part
+          directly.
         </Text>
       </div>
+
+      {nonMassUom && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message={`This fabric is consumed in ${targetUom.toUpperCase()}, which is not a unit of weight`}
+          description={
+            <Text style={{ fontSize: 12 }}>
+              The knits formula calculates weight, so the total below is in grams and will be
+              applied as-is. Set the item&apos;s secondary UOM to a weight unit (GMS / KG), or use
+              the Woven calculator if this fabric is measured by length.
+            </Text>
+          }
+        />
+      )}
 
       <Table
         dataSource={parts}
@@ -253,7 +285,8 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts }) => {
                   strong
                   style={{ fontSize: 15, color: 'var(--primary-color)' }}
                 >
-                  {totalConsumption.toFixed(4)} kg
+                  {totalInTargetUom.toFixed(massDecimalPlaces(targetUom))}{' '}
+                  {displayUom.toUpperCase()}
                 </Text>
               </Table.Summary.Cell>
             </Table.Summary.Row>

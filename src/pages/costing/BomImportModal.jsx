@@ -30,10 +30,15 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
 
     (selectedBom.lines || []).forEach((line) => {
       const catName = (line.categoryName || '').toLowerCase();
+      // Carry the BOM line's variant identity so the imported costing row is variant-level
+      // (per-size BOM lines have no single variantId — those import item-level, user picks a variant).
       const row = {
         key: `bom_${Date.now()}_${Math.random()}`,
         itemId: line.itemId,
-        description: line.itemName || '',
+        variantId: line.variantId || null,
+        variantCode: line.variantCode || '',
+        variantName: line.variantName || '',
+        description: line.variantName || line.itemName || '',
         consumption: line.consumptionPerGarment || 0,
         uom: line.uom || '',
         sizes: '',
@@ -43,7 +48,7 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
       if (catName.includes('fabric')) {
         fabricRows.push({
           ...row,
-          fabricType: line.itemName || '',
+          fabricType: line.variantName || line.itemName || '',
           classification: 'Woven',
           fabricPrice: 0,
           allowancePct: 0,
@@ -51,9 +56,9 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
           netCost: 0,
         });
       } else if (catName.includes('import')) {
-        importedTrims.push({ ...row, item: line.itemName, code: line.itemCode || '', size: '', costUsd: 0, priceUsd: 0 });
+        importedTrims.push({ ...row, item: line.variantName || line.itemName, code: line.variantCode || line.itemCode || '', size: '', costUsd: 0, priceUsd: 0 });
       } else {
-        localTrims.push({ ...row, item: line.itemName, code: line.itemCode || '', size: '', cost: 0, price: 0 });
+        localTrims.push({ ...row, item: line.variantName || line.itemName, code: line.variantCode || line.itemCode || '', size: '', cost: 0, price: 0 });
       }
     });
 
@@ -62,10 +67,10 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
   };
 
   const columns = [
-    { title: 'Item', dataIndex: 'itemName', ellipsis: true },
+    { title: 'Item', dataIndex: 'itemName', ellipsis: true, render: (v, r) => r.variantName || v },
     { title: 'Category', dataIndex: 'categoryName', width: 120, render: (v) => <Tag>{v || '-'}</Tag> },
     { title: 'Consumption', dataIndex: 'consumptionPerGarment', width: 120, render: (v, r) => v ? `${Number(v).toFixed(4)} ${r.uom || ''}` : '-' },
-    { title: 'Code', dataIndex: 'itemCode', width: 100 },
+    { title: 'Code', dataIndex: 'itemCode', width: 100, render: (v, r) => r.variantCode || v },
   ];
 
   return (

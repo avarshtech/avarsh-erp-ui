@@ -14,8 +14,35 @@ import {
   deleteAllRead,
 } from '../services/core/notificationService';
 import { getAccessToken } from '../services/auth/sessionStore';
+import { USE_MOCK_EXPDOC_DATA } from '../services/expdoc/expDocEnv';
+import {
+  listExpDocNotifications,
+  markExpDocNotificationRead,
+  markExpDocNotificationUnread,
+  deleteExpDocNotification,
+  markAllExpDocNotificationsRead,
+  deleteReadExpDocNotifications,
+} from '../services/expdoc/expDocService';
 
 const { Text } = Typography;
+
+/*
+ * Export Documentation raises its events into a mock store while its backend is
+ * being built (PRD §23). They carry the API's own row shape and an id prefixed
+ * `expdoc-`, which is how every handler below knows which service owns a row.
+ * When the topics land on the server this whole seam is one flag away from gone.
+ */
+const isExpDoc = (row) => String(row?.id ?? '').startsWith('expdoc-');
+
+const loadExpDoc = async () => {
+  if (!USE_MOCK_EXPDOC_DATA) return [];
+  try {
+    const res = await listExpDocNotifications({ size: 50 });
+    return res.content || [];
+  } catch {
+    return [];
+  }
+};
 
 const NotificationCenter = () => {
   const navigate = useNavigate();
@@ -28,19 +55,45 @@ const NotificationCenter = () => {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState('All');
 
-  // Fetch unread count periodically (only when authenticated)
+  /*
+   * One fetch, two services.
+   *
+   * Neither of these sets state: they return data, and every setState below happens
+   * in a promise callback or a user event. An effect that calls a state-setting
+   * function synchronously re-renders before it has anything new to show.
+   */
+  const fetchMerged = useCallback(async () => {
+    let api = [];
+    try {
+      const data = await getNotifications(0, 50);
+      api = data.content || data || [];
+    } catch {
+      // API not ready
+    }
+    const mock = await loadExpDoc();
+    // One list, newest first, whichever service produced the row.
+    return [...api, ...mock].sort(
+      (a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+    );
+  }, []);
+
   const fetchCount = useCallback(async () => {
-    if (!getAccessToken()) return; // Skip if logged out
+    if (!getAccessToken()) return 0; // Skip if logged out
+    let apiCount = 0;
     try {
       const data = await getUnreadCount();
-      setUnreadCount(typeof data === 'number' ? data : data.count || 0);
+      apiCount = typeof data === 'number' ? data : data.count || 0;
     } catch {
       // Silently fail — API might not be ready yet
     }
+    const mock = await loadExpDoc();
+    return apiCount + mock.filter((n) => !n.isRead).length;
   }, []);
 
   useEffect(() => {
-    fetchCount();
+    let alive = true;
+    fetchCount().then((n) => { if (alive) setUnreadCount(n); });
+    return () => { alive = false; };
   }, [fetchCount]);
 
   // Listen for push notifications received while app is in foreground
@@ -50,31 +103,29 @@ const NotificationCenter = () => {
       if (event.data?.type === 'PUSH_RECEIVED') {
         // Increment count locally — no API call needed since the push IS the new notification
         setUnreadCount((prev) => prev + 1);
-        if (open) loadNotifications();
+        if (open) fetchMerged().then(setNotifications);
       }
     };
     navigator.serviceWorker?.addEventListener('message', handler);
     return () => navigator.serviceWorker?.removeEventListener('message', handler);
-  }, [open]);
+  }, [open, fetchMerged]);
 
-  // Fetch notifications when panel opens
+  // Fetch notifications when the panel opens. The spinner is raised by the click
+  // that opened it, which is a user event rather than a render.
   useEffect(() => {
-    if (open) {
-      loadNotifications();
-    }
-  }, [open]);
+    if (!open) return undefined;
+    let alive = true;
+    fetchMerged()
+      .then((rows) => { if (alive) { setNotifications(rows); setLoading(false); } })
+      .catch(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [open, fetchMerged]);
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    try {
-      const data = await getNotifications(0, 50);
-      setNotifications(data.content || data || []);
-    } catch {
-      // API not ready
-    } finally {
-      setLoading(false);
-    }
-  };
+  /** Opening the panel starts a load; closing it does not. */
+  const toggleOpen = useCallback((next) => {
+    if (next) setLoading(true);
+    setOpen(next);
+  }, []);
 
   const filteredNotifications = useMemo(() => {
     if (filter === 'Unread') return notifications.filter((n) => !n.isRead);
@@ -84,7 +135,7 @@ const NotificationCenter = () => {
 
   const handleMarkAsRead = useCallback(async (id) => {
     try {
-      await markAsRead(id);
+      await (isExpDoc({ id }) ? markExpDocNotificationRead(id) : markAsRead(id));
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
@@ -94,7 +145,7 @@ const NotificationCenter = () => {
 
   const handleMarkAsUnread = useCallback(async (id) => {
     try {
-      await markAsUnread(id);
+      await (isExpDoc({ id }) ? markExpDocNotificationUnread(id) : markAsUnread(id));
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: false } : n)));
       setUnreadCount((prev) => prev + 1);
     } catch {
@@ -105,7 +156,7 @@ const NotificationCenter = () => {
   const handleDelete = useCallback(async (id) => {
     try {
       const wasUnread = notifications.find((n) => n.id === id && !n.isRead);
-      await deleteNotification(id);
+      await (isExpDoc({ id }) ? deleteExpDocNotification(id) : deleteNotification(id));
       setNotifications((prev) => prev.filter((n) => n.id !== id));
       if (wasUnread) setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch {
@@ -115,7 +166,7 @@ const NotificationCenter = () => {
 
   const handleMarkAllAsRead = useCallback(async () => {
     try {
-      await markAllAsRead();
+      await Promise.all([markAllAsRead(), markAllExpDocNotificationsRead()]);
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch {
@@ -125,7 +176,7 @@ const NotificationCenter = () => {
 
   const handleClearRead = useCallback(async () => {
     try {
-      await deleteAllRead();
+      await Promise.all([deleteAllRead(), deleteReadExpDocNotifications()]);
       setNotifications((prev) => prev.filter((n) => !n.isRead));
     } catch {
       message.error('Failed to clear notifications');
@@ -221,7 +272,7 @@ const NotificationCenter = () => {
   );
 
   const bellButton = (
-    <button className="toolbar-icon-btn" onClick={() => setOpen(!open)}>
+    <button className="toolbar-icon-btn" onClick={() => toggleOpen(!open)}>
       <Badge
         count={unreadCount}
         size="small"
@@ -263,13 +314,12 @@ const NotificationCenter = () => {
   return (
     <Popover
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={toggleOpen}
       content={panelContent}
       trigger="click"
       placement="bottomRight"
       arrow={false}
-      overlayStyle={{ padding: 0 }}
-      overlayInnerStyle={{ padding: 0, borderRadius: 12, overflow: 'hidden' }}
+      styles={{ root: { padding: 0 }, container: { padding: 0, borderRadius: 12, overflow: 'hidden' } }}
     >
       {bellButton}
     </Popover>

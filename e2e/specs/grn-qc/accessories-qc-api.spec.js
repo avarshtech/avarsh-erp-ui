@@ -279,7 +279,7 @@ test.describe('Accessories QC — Validation (API)', () => {
     const payload = trimsQcPayload(baseGrn, basePoLineItemId, criteriaRows);
 
     const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate() + 2);
     payload.inspectionDate = tomorrow.toISOString().split('T')[0];
 
     const { status } = await api.post('/qc/submit', payload);

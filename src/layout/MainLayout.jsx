@@ -35,6 +35,10 @@ import {
   BarChartOutlined,
   TeamOutlined,
   AuditOutlined,
+  ScissorOutlined,
+  ExperimentOutlined,
+  FieldTimeOutlined,
+  ContainerOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -42,6 +46,7 @@ import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { consumeBuildChange, getDisplayVersion } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
@@ -175,7 +180,7 @@ const SidebarVersion = () => (
 );
 
 const MainLayoutInner = () => {
-  const { message } = App.useApp();
+  const { message, notification } = App.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -189,6 +194,25 @@ const MainLayoutInner = () => {
   // Auto-focus first input on route change + global keyboard shortcuts
   useFocusManagement();
   useKeyboardShortcuts();
+
+  // ── "You're on a new version" ──
+  // This layout only mounts once the user is signed in, so this fires on the
+  // first authenticated load of a build this browser has not run before — the
+  // first login after a deploy, for PWA and browser alike. consumeBuildChange()
+  // records the build, so it announces once per deploy and not again.
+  useEffect(() => {
+    if (!consumeBuildChange()) return;
+
+    const version = getDisplayVersion();
+    notification.success({
+      message: "Avarsh ERP Updated",
+      description: version
+        ? `You are now running version ${version}.`
+        : "You are now running the latest version.",
+      placement: "bottomRight",
+      duration: 6,
+    });
+  }, [notification]);
 
   // ── Pending approvals badge (refreshes on navigation + every 2 minutes) ──
   const [pendingApprovalCount, setPendingApprovalCount] = useState(0);
@@ -333,6 +357,19 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/tna",
+      icon: <FieldTimeOutlined />,
+      label: "Time & Action",
+      moduleId: ["tna", "tna-masters", "tna-replan-approval"],
+      children: [
+        { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
+        { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
+        { key: "/tna/replans", label: "Re-plan Approvals", moduleId: "tna-replan-approval" },
+        { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
+        { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
+      ],
+    },
+    {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
@@ -346,20 +383,73 @@ const MainLayoutInner = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: ["purchase-orders", "production"],
+      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po"],
       children: [
-        { key: "/purchase-orders/list", label: "PO List", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/new", label: "New PO", moduleId: "purchase-orders" },
-        { key: "/purchase-orders/cutting-po/list", label: "Cutting POs", moduleId: "production" },
-        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "production" },
-        { key: "/purchase-orders/finishing-po/list", label: "Finishing POs", moduleId: "production" },
+        { key: "/purchase-orders/supplier-po/list", label: "Supplier PO", moduleId: "purchase-orders" },
+        { key: "/purchase-orders/cutting-po/list", label: "Cutting PO", moduleId: "cutting-po" },
+        { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "work-order" },
+        { key: "/purchase-orders/finishing-po/list", label: "Finishing PO", moduleId: "finishing-po" },
+      ],
+    },
+    {
+      key: "/production",
+      icon: <ScissorOutlined />,
+      label: "Production",
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-masters"],
+      children: [
+        { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
+        { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
+        { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
+        // Carton packing lives under Export Documentation for now — see the note there.
+      ],
+    },
+    {
+      key: "/export-docs",
+      icon: <ContainerOutlined />,
+      label: "Export Documentation",
+      // Each child is its own RBAC module; the group shows if ANY is accessible.
+      // Carton Packing sits here rather than under Production because it is the only
+      // producer of the PRD §7.3 dataset these documents consume; the Finishing
+      // workspace reserves the eventual home for it.
+      moduleId: [
+        "export-packing", "export-shipments", "export-packing-list",
+        "export-stickers", "export-invoice", "export-templates",
+      ],
+      children: [
+        { key: "/export-docs/packing/list", label: "Carton Packing", moduleId: "export-packing" },
+        { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
+        { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
+        { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
+        { key: "/export-docs/invoices/list", label: "Export Invoices", moduleId: "export-invoice" },
+        { key: "/export-docs/templates/list", label: "Buyer Templates", moduleId: "export-templates" },
+        // Reports and the audit trail read packing lists, so they ride that key —
+        // a viewer of the documents may read what was done to them.
+        { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
+        { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
+        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
+        // Packing arrives in the next design session.
+      ],
+    },
+    {
+      // Placed below Production by user preference (PRD suggested BOM→PO slot)
+      key: "/sample-requests",
+      icon: <ExperimentOutlined />,
+      label: "Sample Requests",
+      // Each child is its own RBAC module (R2); the group shows if ANY is accessible.
+      // Creation happens via the list-page buttons — no "New …" menu items.
+      moduleId: ["sample-requests", "sample-dispatches", "sample-comments", "sample-invoices"],
+      children: [
+        { key: "/sample-requests/list", label: "SR List", moduleId: "sample-requests" },
+        { key: "/sample-requests/dispatches/list", label: "Dispatches", moduleId: "sample-dispatches" },
+        { key: "/sample-requests/comments", label: "Customer Comments", moduleId: "sample-comments" },
+        { key: "/sample-requests/invoices/list", label: "Invoices", moduleId: "sample-invoices" },
       ],
     },
     {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier"],
+      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier", "inventory-bill-passing"],
       children: [
         { key: "/inventory/dashboard", label: "Dashboard" },
         { key: "/inventory/grn/list", label: "GRN List" },
@@ -370,6 +460,7 @@ const MainLayoutInner = () => {
         { key: "/inventory/issue", label: "Material Issue" },
         { key: "/inventory/adjustment", label: "Stock Adjustment" },
         { key: "/inventory/return-to-supplier", label: "Return to Supplier" },
+        { key: "/inventory/bill-passing", label: "Bill Passing" },
       ],
     },
     {
@@ -511,8 +602,25 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/adjustment')) return ['/inventory/adjustment'];
     if (path.startsWith('/inventory/return-to-supplier')) return ['/inventory/return-to-supplier'];
     if (path.startsWith('/inventory/grn/allowance')) return ['/inventory/grn/allowance'];
+    if (path.startsWith('/inventory/bill-passing')) return ['/inventory/bill-passing'];
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
+    if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];
+    // Order matters: '/export-docs/packing-lists/...' also startsWith
+    // '/export-docs/packing', so the longer prefix must be tested first.
+    if (path.startsWith('/export-docs/packing-lists')) return ['/export-docs/packing-lists/list'];
+    if (path.startsWith('/export-docs/packing')) return ['/export-docs/packing/list'];
+    if (path.startsWith('/export-docs/shipments')) return ['/export-docs/shipments/list'];
+    if (path.startsWith('/export-docs/stickers')) return ['/export-docs/stickers'];
+    if (path.startsWith('/export-docs/invoices')) return ['/export-docs/invoices/list'];
+    if (path.startsWith('/export-docs/templates')) return ['/export-docs/templates/list'];
+    if (path.startsWith('/export-docs/reports')) return ['/export-docs/reports'];
+    if (path.startsWith('/export-docs/audit')) return ['/export-docs/audit'];
+    if (path.startsWith('/production/cutting')) return ['/production/cutting'];
+    if (path.startsWith('/production/sewing')) return ['/production/sewing'];
+    if (path.startsWith('/production/finishing')) return ['/production/finishing'];
+    if (path.startsWith('/production/masters')) return ['/production/masters'];
+    if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
@@ -542,6 +650,9 @@ const MainLayoutInner = () => {
     if (path.startsWith("/orders")) return ["/orders"];
     if (path.startsWith("/bom")) return ["/bom"];
     if (path.startsWith("/purchase-orders")) return ["/purchase-orders"];
+    if (path.startsWith("/tna")) return ["/tna"];
+    if (path.startsWith("/production")) return ["/production"];
+    if (path.startsWith("/export-docs")) return ["/export-docs"];
     if (path.startsWith("/inventory")) return ["/inventory"];
     if (path.startsWith("/costing")) return ["/costing"];
     if (path.startsWith("/reports")) return ["/reports"];
@@ -866,7 +977,12 @@ const MainLayoutInner = () => {
               outline: 'none',
             }}
           >
-            <Outlet />
+            {/* A render error used to unmount the whole tree and leave a white
+                page, indistinguishable from a slow load. Wrapping the routed
+                content keeps the shell and shows what went wrong. */}
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </Content>
         </Layout>
         <LiveActivityFeedWindow />

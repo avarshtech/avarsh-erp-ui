@@ -25,7 +25,7 @@ const ConsumptionComparisonPanel = ({
 
   const columns = [
     { title: 'Fabric Item', key: 'item', width: 220,
-      render: (_, r) => (<div><Text strong>{r.itemCode}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>{r.itemName}</Text></div>) },
+      render: (_, r) => (<div><Text strong>{r.variantCode || r.itemCode}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>{r.variantName || r.itemName}</Text></div>) },
     { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
     { title: 'BOM /Pc', dataIndex: 'bomPerPc', width: 90, align: 'right', render: (v) => (v || 0).toFixed(3) },
     { title: 'CAD /Pc', key: 'cad', width: 120, align: 'right',

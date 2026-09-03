@@ -263,10 +263,16 @@ gramsPerPart = (length × width × NOP × GSM) / 10000
 - `NOP` — Number Of Plies (layers in cutting)
 - `GSM` — Grams per Square Meter (fabric weight)
 
-### Total Consumption (kg)
+### Total Consumption (grams)
 ```
-totalConsumption(kg) = SUM(parts[].gramsPerPart) / 1000
+totalGrams = SUM(parts[].gramsPerPart)
 ```
+
+**Do NOT divide by 1000 here.** The calculator's output unit must match the consumption UOM
+of the fabric row it feeds, which is the item's **secondary** UOM — grams for one item,
+kilograms for another. Converting to kg unconditionally is what put a `0.059` figure into a
+field labelled `GMS` (wrong by 1000×). The caller restates the grams total via
+`convertGramsTo(grams, targetUom)` from `src/utils/uomConversions.js`.
 
 ```javascript
 export const calcKnitsGramsPerPart = (length, width, nop, gsm) => {
@@ -278,11 +284,24 @@ export const calcKnitsGramsPerPart = (length, width, nop, gsm) => {
   return (l * w * n * g) / 10000;
 };
 
-export const calcKnitsTotalConsumption = (parts) => {
-  const total = parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
-  return total / 1000;
-};
+export const calcKnitsTotalGrams = (parts) =>
+  parts.reduce((sum, p) => sum + (Number(p.gramsPerPart) || 0), 0);
 ```
+
+### Consumption UOM vs Rate UOM (costing rows)
+
+Quantities are captured in the item's **secondary** (consumption) UOM; rates are the purchase
+price per **primary** UOM. Never multiply the two directly:
+
+```
+netCost   = (consumption ÷ uomConversionFactor) × fabricPrice × (1 + allowance%) × (1 + wastage%)
+trimPrice = (consumption ÷ uomConversionFactor) × cost
+```
+
+`uomConversionFactor` is stored only when `conversionApplies(primaryUomId, secondaryUomId,
+factor)` is true, so a null factor safely means "pass the quantity through". Both the factor
+and the primary UOM are **snapshotted** onto the saved row — they are part of what the stored
+rate means, so a later item-master edit must not re-price a saved cost sheet.
 
 ---
 

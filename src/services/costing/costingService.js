@@ -133,6 +133,21 @@ export const rejectCostSheet = async (id, reason) => {
 };
 
 /**
+ * Revert the approval on an Approved cost sheet, sending it back to Draft so it
+ * can be edited. Rejected by the API (409) once an order has been raised against
+ * the costing id.
+ * PUT /api/v1/cost-sheets/{id}/revert-approval
+ * @param {number|string} id - Cost sheet ID
+ * @param {string} reason - Why the approval is being reverted (required)
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const revertCostSheetApproval = async (id, reason) => {
+  const response = await axiosInstance.put(
+    `${ENDPOINTS.COST_SHEETS}/${id}/revert-approval`, { comments: reason });
+  return response.data;
+};
+
+/**
  * Delete a cost sheet (Draft status only).
  * DELETE /api/v1/cost-sheets/{id}
  * @param {number|string} id - Cost sheet ID

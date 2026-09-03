@@ -29,7 +29,7 @@ const getFabricStockColumns = () => [
     fixed: 'left',
     width: 180,
     align: 'center',
-    render: (code) => code,
+    render: (code, r) => r.variantCode || '—',
   },
   {
     title: 'Fabric Description',

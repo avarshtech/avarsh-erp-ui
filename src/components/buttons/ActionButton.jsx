@@ -10,6 +10,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   RollbackOutlined,
+  UndoOutlined,
   StopOutlined,
   CopyOutlined,
   PrinterOutlined,
@@ -72,6 +73,14 @@ const ACTION_CONFIG = {
     iconType: 'default',
     textType: 'default',
     danger: true,
+  },
+  undo: {
+    icon: <UndoOutlined />,
+    colorVar: 'var(--btn-refer-back-color)',
+    iconType: 'default',
+    textType: 'default',
+    danger: false,
+    styled: true,
   },
   'refer-back': {
     icon: <RollbackOutlined />,

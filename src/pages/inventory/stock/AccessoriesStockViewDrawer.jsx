@@ -24,6 +24,13 @@ const CATEGORY_COLORS = {
 
 const variantColumns = (uom) => [
   {
+    title: 'Variant',
+    key: 'variantIdentity',
+    width: 200,
+    ellipsis: true,
+    render: (_, v) => v.variantName || v.variantCode || '—',
+  },
+  {
     title: 'Size',
     dataIndex: 'size',
     key: 'size',
@@ -118,7 +125,7 @@ const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
             }}
           >
             <BarcodeOutlined style={{ color: 'var(--text-secondary)', fontSize: 14 }} />
-            {record.itemCode}
+            {record.variantCode}
           </span>
           {record.category && (
             <Tag color={CATEGORY_COLORS[record.category] || 'default'} style={{ margin: 0 }}>

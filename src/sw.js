@@ -65,9 +65,19 @@ cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
 
 // ─── Runtime Caching: Master Data APIs ───
+// The live activity feed is an EventSource under /api/v1, and a streaming
+// response has no end: running it through a caching strategy means the handler
+// buffers a response that never completes and holds a fetch open for the life of
+// the connection. Leaving it unmatched lets the browser fetch it directly,
+// outside the service worker entirely.
+const isStreamingRequest = ({ url, request }) =>
+  request?.headers?.get('accept') === 'text/event-stream'
+  || url.pathname.includes('/activity-feed/stream');
+
 registerRoute(
-  ({ url }) =>
-    url.pathname.match(
+  ({ url, request }) =>
+    !isStreamingRequest({ url, request })
+    && url.pathname.match(
       /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
     ),
   new NetworkFirst({
@@ -83,7 +93,8 @@ registerRoute(
 
 // ─── Runtime Caching: Other API GET requests ───
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/v1/'),
+  ({ url, request }) =>
+    !isStreamingRequest({ url, request }) && url.pathname.startsWith('/api/v1/'),
   new NetworkFirst({
     cacheName: 'erp-api-data',
     plugins: [

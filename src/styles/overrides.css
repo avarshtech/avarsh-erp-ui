@@ -126,6 +126,29 @@
   border-color: var(--primary-color) !important;
 }
 
+/* Badge group beside a page/dialog title: the container owns the spacing via
+   `gap`, so individual tag margins must not add an uneven second gap. */
+.status-badge-group > .ant-tag,
+.status-badge-group > span > .ant-tag {
+  margin-inline-end: 0;
+}
+
+/* Rich option labels (text + a Tag/Badge): the selected value and the dropdown
+   row are line-height boxes, so a flex label stretches its tag to the full
+   control height and the tag's text rides high. Centre them everywhere. */
+.ant-select-selection-item > span,
+.ant-select-item-option-content > span {
+  align-items: center;
+}
+
+.ant-select-selection-item .ant-tag,
+.ant-select-item-option-content .ant-tag,
+.ant-select-selection-item .ant-badge,
+.ant-select-item-option-content .ant-badge {
+  align-self: center;
+  flex-shrink: 0;
+}
+
 
 /* DatePicker / TimePicker - all states */
 .ant-picker,
@@ -1088,6 +1111,15 @@ textarea.ant-input:active {
   text-align: center !important;
 }
 
+/* Roomier document tables (invoice/dispatch registers) — document numbers,
+   dates and status tags need breathing room so nothing clips or wraps.
+   The zero-height measure row rc-table injects for column sizing must keep its
+   inline padding:0 — padding it out leaves a phantom gap under the header. */
+.roomy-table .ant-table-thead > tr > th,
+.roomy-table .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
+  padding: 14px 16px !important;
+}
+
 /* Form item additional / extra text — visible below editor with padding */
 .ant-form-item-extra,
 .ant-form-item .ant-form-item-extra {
@@ -1896,3 +1928,34 @@ textarea.ant-input:active {
   background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
 }
 
+
+/* ============================================================
+   EXPORT DOCUMENTATION
+   ============================================================ */
+
+/* Carton rows carrying a structural error (V-02 / V-06). Tinted rather than
+   outlined so the row still reads as editable, and built from the error token
+   via color-mix so it tracks the theme instead of hard-coding a pink. */
+.expdoc-row-error > td {
+  background: color-mix(in srgb, var(--error-color) 8%, transparent) !important;
+}
+.expdoc-row-error:hover > td {
+  background: color-mix(in srgb, var(--error-color) 14%, transparent) !important;
+}
+
+/* Order-vs-packed rows outside the buyer tolerance. Same construction as the
+   carton error row: a token tint, so it tracks the theme. */
+.expdoc-row-warn > td {
+  background: color-mix(in srgb, var(--warning-color) 8%, transparent) !important;
+}
+.expdoc-row-warn:hover > td {
+  background: color-mix(in srgb, var(--warning-color) 14%, transparent) !important;
+}
+
+/* A row offered for context but not for selection — an ineligible packing list in
+   the invoice picker. Muted rather than hidden, because the reason it cannot be
+   picked is more useful than its absence. Opacity only, so the text keeps its own
+   contrast in both themes. */
+.expdoc-row-muted > td {
+  opacity: 0.55;
+}
