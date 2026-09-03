@@ -1,10 +1,23 @@
 /**
- * Real `/api/v1/sample-*` client — functions are added per cutover stage.
- *
- * srService.js is the only file screens import; it delegates here instead of
- * to the srMock* modules as each stage lands.
+ * Real `/api/v1/sample-*` client. srService.js is the only file screens import;
+ * it delegates here.
  */
 import axiosInstance, { upload } from '../core/axiosInstance';
+
+/**
+ * One-shot cleanup of the pre-cutover demo data.
+ *
+ * Every Sample Request screen ran off `avarsh.sr.mockStore.v1` in localStorage
+ * until this module replaced the mock. That key is now dead weight in the
+ * browser of anyone who used the mock build — a few hundred KB of sample
+ * requests, dispatches and invoices that no code reads. Clearing it at module
+ * load costs one call on the first import and nothing afterwards.
+ */
+try {
+  localStorage.removeItem('avarsh.sr.mockStore.v1');
+} catch {
+  // Private-mode / storage-disabled browsers: nothing to clean up anyway.
+}
 
 /** Every Sample Request endpoint hangs off this path (axiosInstance owns /api/v1). */
 export const BASE = '/sample-requests';

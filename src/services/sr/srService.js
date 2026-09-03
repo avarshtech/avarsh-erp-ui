@@ -4,9 +4,9 @@
  * Each stage of the cutover repointed a block of these exports from the srMock*
  * modules to srApi.js, so a screen never learned which side it was talking to.
  *
- * Every export is now real. The mock modules stay on disk until the last stage
- * deletes them all at once, but nothing imports them any more — this file was
- * the last reader, through the comment-sheet importer.
+ * Every export is real and the mock modules are gone. The file survives the
+ * demolition on purpose: it is the one import path the screens know, so a later
+ * endpoint move is a one-line change here rather than a sweep of the pages.
  */
 import * as srApi from './srApi';
 

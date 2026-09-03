@@ -84,7 +84,12 @@ const SearchFilterBar = memo(function SearchFilterBar({
         />
       </Col>
 
-      {filters.map((filter, index) => renderFilter(filter, filter.key ?? filter.type ?? index))}
+      {/* The index is part of the fallback key on purpose: a screen with two
+          unkeyed filters of the same type (three selects on the SR list) gave
+          every one of them the key "select", which React reports as duplicate
+          children and is free to omit or duplicate. The arrays are static per
+          screen, so the index is stable. */}
+      {filters.map((filter, index) => renderFilter(filter, filter.key ?? `${filter.type}-${index}`))}
 
       {extra && <Col>{extra}</Col>}
 
