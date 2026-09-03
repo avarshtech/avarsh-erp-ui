@@ -144,3 +144,106 @@ export const createSampleTrimsIssue = async (payload) => (await axiosInstance.po
  * row while the survivors are counted.
  */
 export const cancelSampleIssue = async (id, reason) => (await axiosInstance.post(`${ISSUES}/${id}/cancel`, { reason })).data;
+
+// ── Dispatches ──────────────────────────────────────────────────────────────
+// One dispatch groups many In-Production requests of a single customer. Only
+// ids travel from here: the buyer name and country, the courier name and the
+// buying-office label are all resolved and snapshotted server-side, so nothing
+// this browser believes about a parcel can contradict what shipped.
+
+const DISPATCHES = '/sample-dispatches';
+
+export const searchDispatches = async (params = {}) => toPage((await axiosInstance.get(DISPATCHES, { params })).data);
+
+export const getDispatch = async (id) => (await axiosInstance.get(`${DISPATCHES}/${id}`)).data;
+
+/**
+ * In-production requests still free to ship. Pass the draft being edited and
+ * its own requests stay in the list — the server does the merge the form used
+ * to do by hand, so "available" has one definition instead of two.
+ */
+export const listDispatchableSrs = async (buyerId, dispatchId) => (
+  await axiosInstance.get(`${DISPATCHES}/dispatchable-srs`, { params: { buyerId, dispatchId } })
+).data || [];
+
+/**
+ * Customers with something waiting to ship. `buyerId` travels with the name
+ * because a hand delivery offers that buyer's own shipping locations as its
+ * buying office; `overseas` is decided against the organisation's country.
+ */
+export const listDispatchableCustomers = async () => (await axiosInstance.get(`${DISPATCHES}/customers`)).data || [];
+
+export const createDispatch = async (dto) => (await axiosInstance.post(DISPATCHES, dto)).data;
+
+export const updateDispatch = async (id, dto) => (await axiosInstance.put(`${DISPATCHES}/${id}`, dto)).data;
+
+export const deleteDispatch = async (id) => { await axiosInstance.delete(`${DISPATCHES}/${id}`); };
+
+/**
+ * The parcel leaves — irreversible. An overseas consignment whose requests are
+ * not all covered by an issued commercial invoice comes back 409
+ * INVOICE_REQUIRED with `uncoveredSrs`; axiosInstance stamps `error.code` and
+ * skips its toast so the screen can show the modal instead.
+ */
+export const markDispatched = async (id, version) => (
+  await axiosInstance.post(`${DISPATCHES}/${id}/mark-dispatched`, { version })
+).data;
+
+// ── Invoices ────────────────────────────────────────────────────────────────
+// Two kinds under one path: COMMERCIAL travels with an overseas parcel and is
+// what unlocks its dispatch, SAMPLE is the chargeable recovery document raised
+// afterwards. The series and the number are decided server-side from the
+// organisation profile — a payload cannot claim a number it was not given.
+
+const INVOICES = '/sample-invoices';
+
+/**
+ * Both row tables key by `key` and a manual line has no id to key by. The
+ * server sends one on every line; this only backstops a line that arrives
+ * without, so a missing key can never collapse two rows into one.
+ */
+const withLineKeys = (inv) => (inv && Array.isArray(inv.lines)
+  ? { ...inv, lines: inv.lines.map((l, i) => ({ ...l, key: l.key || (l.id ? `l${l.id}` : `m${i}`) })) }
+  : inv);
+
+/**
+ * Not a page: the screen filters and sorts client-side over one financial
+ * year, and the four cards above it count everything regardless of the filters.
+ */
+export const listInvoices = async (params = {}) => {
+  const data = (await axiosInstance.get(INVOICES, { params })).data;
+  return {
+    content:       data?.content       || [],
+    totalElements: data?.totalElements || 0,
+    stats:         data?.stats         || null,
+  };
+};
+
+export const getInvoice = async (id) => withLineKeys((await axiosInstance.get(`${INVOICES}/${id}`)).data);
+
+/**
+ * The requests this kind of invoice may cover — and the ones it may not, each
+ * carrying the reason, because that is what the picker greys the row with.
+ */
+export const listEligibleSrs = async ({ type, consigneeBuyerId, dispatchId } = {}) => (
+  await axiosInstance.get(`${INVOICES}/eligible-srs`, { params: { type, consigneeBuyerId, dispatchId } })
+).data || [];
+
+export const createInvoice = async (payload) => withLineKeys((await axiosInstance.post(INVOICES, payload)).data);
+
+export const updateInvoice = async (id, payload) => withLineKeys((await axiosInstance.put(`${INVOICES}/${id}`, payload)).data);
+
+/** Assigns the number out of the series and locks the document — irreversible. */
+export const issueInvoice = async (id, version) => withLineKeys(
+  (await axiosInstance.post(`${INVOICES}/${id}/issue`, { version })).data,
+);
+
+/** Withdraws an issued invoice and releases the requests it covered. */
+export const cancelInvoice = async (id, reason, version) => withLineKeys(
+  (await axiosInstance.post(`${INVOICES}/${id}/cancel`, { reason, version })).data,
+);
+
+/** Copies any invoice into a fresh draft dated today — how an issued one is corrected. */
+export const duplicateInvoice = async (id) => withLineKeys(
+  (await axiosInstance.post(`${INVOICES}/${id}/duplicate`)).data,
+);

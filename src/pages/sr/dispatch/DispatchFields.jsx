@@ -1,20 +1,30 @@
 import { useCallback, useMemo } from 'react';
 import {
-  App, Form, Segmented, Select, Input, InputNumber, DatePicker, Upload, Button, Alert, Row, Col,
+  App, Form, Segmented, Select, Input, InputNumber, DatePicker, Upload, Button, Alert, Row, Col, Space,
 } from 'antd';
-import { UploadOutlined } from '@ant-design/icons';
+import { UploadOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { DELIVERY_METHODS, DELIVERY_METHOD_LABELS, DISPATCH_MODE_OPTIONS } from '../../../utils/sampleRequestConstants';
+import { downloadStoredFile } from '../../../services/core/fileService';
 
 const { TextArea } = Input;
 const MAX_DOC_BYTES = 5 * 1024 * 1024;
+
+/** The buyer's own shipping location, worded the way the server snapshots it. */
+const locationLabel = (l) => (l.city ? `${l.label} — ${l.city}` : l.label);
 
 /**
  * Dispatch capture fields (PRD §8.4) — presentational section rendered inside
  * DispatchForm's <Form>. Delivery Method drives the mandatory set: Courier →
  * Tracking No mandatory; Local/Hand → Buying Office + Handed Over To mandatory,
  * tracking optional (docket only). A courier flagged isLocal flips the method.
+ *
+ * The Buying Office is one of the consignee's own shipping locations: the form
+ * sends the location id and the server snapshots its label onto the dispatch,
+ * so a location later renamed does not rewrite where a parcel already went.
  */
-const DispatchFields = ({ form, couriers, offices, mastersLoading, docs, setDocs, currentUserLabel }) => {
+const DispatchFields = ({
+  form, couriers, locations, mastersLoading, documents, pendingFiles, setPendingFiles, currentUserLabel,
+}) => {
   const { message } = App.useApp();
   const method = Form.useWatch('deliveryMethod', form) || DELIVERY_METHODS.COURIER;
   const isLocal = method === DELIVERY_METHODS.LOCAL_HAND;
@@ -36,17 +46,26 @@ const DispatchFields = ({ form, couriers, offices, mastersLoading, docs, setDocs
       message.error(`${file.name} exceeds 5 MB`);
       return Upload.LIST_IGNORE;
     }
-    setDocs((prev) => [...prev, { name: file.name, size: file.size, type: file.type }]);
-    return false; // mock phase — metadata only; real phase uses fileService
-  }, [message, setDocs]);
+    // Staged, not sent: the upload needs a dispatch id, so it waits for the save
+    setPendingFiles((prev) => [...prev, file]);
+    return false;
+  }, [message, setPendingFiles]);
 
-  const handleRemoveDoc = useCallback((file) => {
-    setDocs((prev) => prev.filter((f) => f.name !== file.name));
-  }, [setDocs]);
+  const handleRemovePending = useCallback((file) => {
+    setPendingFiles((prev) => prev.filter((f) => f.uid !== file.uid));
+  }, [setPendingFiles]);
+
+  const handleDownload = useCallback(async (doc) => {
+    try {
+      await downloadStoredFile(doc);
+    } catch {
+      message.error(`Failed to download ${doc.originalFilename || 'the document'}`);
+    }
+  }, [message]);
 
   const fileList = useMemo(
-    () => docs.map((f, i) => ({ uid: String(i), name: f.name, status: 'done' })),
-    [docs],
+    () => pendingFiles.map((f) => ({ uid: f.uid, name: f.name, status: 'done' })),
+    [pendingFiles],
   );
 
   const courierOptions = useMemo(
@@ -54,7 +73,10 @@ const DispatchFields = ({ form, couriers, offices, mastersLoading, docs, setDocs
     [couriers],
   );
 
-  const officeOptions = useMemo(() => offices.map((o) => ({ value: o.name, label: o.name })), [offices]);
+  const officeOptions = useMemo(
+    () => (locations || []).map((l) => ({ value: l.id, label: locationLabel(l) })),
+    [locations],
+  );
 
   return (
     <>
@@ -116,9 +138,16 @@ const DispatchFields = ({ form, couriers, offices, mastersLoading, docs, setDocs
         {isLocal && (
           <>
             <Col xs={24} sm={10}>
-              <Form.Item name="buyingOffice" label="Buying Office / Location" rules={[{ required: true, message: 'Select buying office' }]}>
+              <Form.Item
+                name="buyingOfficeLocationId"
+                label="Buying Office / Location"
+                rules={[{ required: true, message: 'Select buying office' }]}
+                extra={!mastersLoading && officeOptions.length === 0
+                  ? 'This buyer has no active shipping location — add one in Master Data → Buyers'
+                  : "The consignee's own shipping locations"}
+              >
                 <Select
-                  placeholder="Named local delivery locations"
+                  placeholder="Buyer shipping locations"
                   loading={mastersLoading}
                   options={officeOptions}
                 />
@@ -149,11 +178,29 @@ const DispatchFields = ({ form, couriers, offices, mastersLoading, docs, setDocs
         <TextArea rows={1} />
       </Form.Item>
       <Form.Item label="Dispatch Documents" extra="Packing list, AWB copy, or signed delivery challan · PDF or image · max 5 MB per file">
+        {(documents || []).length > 0 && (
+          <Space direction="vertical" size={2} style={{ display: 'flex', marginBottom: 8 }}>
+            {documents.map((doc) => (
+              <Space key={doc.fileId || doc.id} size={4}>
+                <PaperClipOutlined style={{ color: 'var(--text-secondary)' }} />
+                <span>{doc.originalFilename}</span>
+                <Button
+                  size="small"
+                  type="link"
+                  icon={<DownloadOutlined />}
+                  onClick={() => handleDownload(doc)}
+                >
+                  Download
+                </Button>
+              </Space>
+            ))}
+          </Space>
+        )}
         <Upload
           multiple
           accept=".pdf,image/*"
           beforeUpload={beforeUpload}
-          onRemove={handleRemoveDoc}
+          onRemove={handleRemovePending}
           fileList={fileList}
         >
           <Button icon={<UploadOutlined />}>Add document</Button>

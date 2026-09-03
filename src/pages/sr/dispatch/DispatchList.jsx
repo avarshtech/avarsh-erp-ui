@@ -4,10 +4,11 @@ import { SendOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchDispatches, deleteDispatch, markDispatched } from '../../../services/sr/srService';
 import { hasPermission } from '../../../utils/permissions';
-import { errorText, toastUnlessHandled } from '../../../utils/apiError';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { DISPATCH_STATUS, DISPATCH_STATUS_LABELS, DELIVERY_METHOD_LABELS, getDispatchStatusLabel } from '../../../utils/sampleRequestConstants';
 import { SR_DISPATCH_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatDate } from '../../../utils/formatters';
+import { getTablePagination } from '../../../utils/paginationConfig';
 import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -16,6 +17,7 @@ import RecordLink from '../../../components/RecordLink';
 import StatusTag from '../../../components/StatusTag';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import DispatchView from './DispatchView';
+import { invoiceRequiredModal } from './invoiceRequired';
 
 const { Text } = Typography;
 
@@ -36,6 +38,9 @@ const DispatchList = () => {
   });
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
+  // The endpoint pages, so the table has to — otherwise the register silently
+  // stops at the server's default page and older parcels vanish from the screen.
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [customerFilter, setCustomerFilter] = useState(undefined);
@@ -44,23 +49,41 @@ const DispatchList = () => {
   const canUpdate = hasPermission('sample-dispatches', 'update');
   const canDelete = hasPermission('sample-dispatches', 'delete');
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);
     try {
-      const params = {};
+      const params = {
+        page: (page || pagination.current) - 1,
+        size: pageSize || pagination.pageSize,
+      };
       if (debouncedSearch) params.search = debouncedSearch;
       if (statusFilter) params.status = statusFilter;
       if (customerFilter) params.customer = customerFilter;
       const response = await searchDispatches(params);
       setData(response.content || []);
+      setPagination((prev) => ({
+        ...prev,
+        current: page || prev.current,
+        pageSize: pageSize || prev.pageSize,
+        total: response.totalElements || 0,
+      }));
     } catch (e) {
       toastUnlessHandled(message, e, 'Failed to load dispatches');
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, statusFilter, customerFilter, message]);
+  }, [pagination.current, pagination.pageSize, debouncedSearch, statusFilter, customerFilter, message]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // A changed filter goes back to page 1; paging and refresh call fetchData directly
+  useEffect(() => {
+    fetchData(1, pagination.pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, statusFilter, customerFilter]);
+
+  const refresh = useCallback(
+    () => fetchData(pagination.current, pagination.pageSize),
+    [fetchData, pagination.current, pagination.pageSize],
+  );
 
   const goForm = useCallback((id) => navigate(`/sample-requests/dispatches/edit/${id}`), [navigate]);
 
@@ -83,17 +106,17 @@ const DispatchList = () => {
         try {
           await markDispatched(record.id, record.version);
           message.success(`${record.dispatchNo} dispatched — ${record.srCount} SR(s) moved to Dispatched`);
-          fetchData();
+          refresh();
         } catch (e) {
           if (e.code === 'INVOICE_REQUIRED') {
-            modal.warning({ title: 'Commercial invoice required', content: errorText(e) });
+            modal.warning(invoiceRequiredModal(e));
           } else {
             toastUnlessHandled(message, e, 'Failed to dispatch');
           }
         }
       },
     });
-  }, [modal, message, fetchData]);
+  }, [modal, message, refresh]);
 
   const handleDelete = useCallback((record) => {
     modal.confirm({
@@ -105,13 +128,13 @@ const DispatchList = () => {
         try {
           await deleteDispatch(record.id);
           message.success(`${record.dispatchNo} deleted`);
-          fetchData();
+          refresh();
         } catch (e) {
           toastUnlessHandled(message, e, 'Failed to delete');
         }
       },
     });
-  }, [modal, message, fetchData]);
+  }, [modal, message, refresh]);
 
   const columns = useMemo(() => [
     {
@@ -259,7 +282,7 @@ const DispatchList = () => {
             { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Status', value: statusFilter, onChange: setStatusFilter, options: statusOptions } },
             { type: 'select', span: { xs: 12, sm: 8, md: 5, lg: 4 }, props: { placeholder: 'Customer', value: customerFilter, onChange: setCustomerFilter, options: customerOptions } },
           ]}
-          onRefresh={fetchData}
+          onRefresh={refresh}
           style={{ marginBottom: 16 }}
         />
 
@@ -269,7 +292,8 @@ const DispatchList = () => {
           loading={loading}
           rowKey="id"
           scroll={{ x: 1425 }}
-          pagination={false}
+          onChange={(pag) => fetchData(pag.current, pag.pageSize)}
+          pagination={getTablePagination(pagination, 'dispatches')}
           onRow={(record) => ({
             // Row click views; editing a draft is the explicit pencil action
             onClick: () => setViewId(record.id),

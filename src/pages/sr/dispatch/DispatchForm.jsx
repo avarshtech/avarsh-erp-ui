@@ -1,25 +1,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  App, Card, Form, Table, Select, Tag, Typography, Alert, Button, Space, Skeleton, Row, Col,
+  App, Card, Form, Typography, Alert, Button, Space, Skeleton, Row, Col,
 } from 'antd';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import {
-  getDispatch, createDispatch, updateDispatch, markDispatched,
-  listDispatchableSrs, listDispatchableCustomers, listBuyingOffices,
-} from '../../../services/sr/srService';
+import { createDispatch, updateDispatch, markDispatched } from '../../../services/sr/srService';
+import { uploadFile } from '../../../services/core/fileService';
 import useSampleMasters from '../../../hooks/useSampleMasters';
-import {
-  DELIVERY_METHODS, DISPATCH_STATUS, getDispatchStatusLabel,
-} from '../../../utils/sampleRequestConstants';
+import { DELIVERY_METHODS, DISPATCH_STATUS, getDispatchStatusLabel } from '../../../utils/sampleRequestConstants';
 import { SR_DISPATCH_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { hasPermission, getCurrentUser } from '../../../utils/permissions';
-import { errorText, toastUnlessHandled } from '../../../utils/apiError';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
-import DaysRemainingTag from '../DaysRemainingTag';
 import DispatchFields from './DispatchFields';
+import DispatchSrTable from './DispatchSrTable';
+import useDispatchFormData from './useDispatchFormData';
+import { invoiceRequiredModal } from './invoiceRequired';
 
 const { Text } = Typography;
 const LIST_PATH = '/sample-requests/dispatches/list';
@@ -29,9 +27,12 @@ const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 /**
  * Dispatch create/edit (R2): groups many In-Production SRs of ONE customer into
  * a single shipment. Overseas consignees are gated on an issued COMMERCIAL
- * invoice covering every SR (service enforces — INVOICE_REQUIRED names the
+ * invoice covering every SR (the server enforces it — INVOICE_REQUIRED names the
  * uncovered ones). Mark as Dispatched is irreversible; once dispatched the
  * record is immutable and opens in the list's read-only dialog instead.
+ *
+ * Only ids are sent: the buyer's name and country, the courier's name and the
+ * buying-office label are resolved and snapshotted server-side.
  */
 const DispatchForm = () => {
   const { message, modal } = App.useApp();
@@ -39,17 +40,17 @@ const DispatchForm = () => {
   const { id } = useParams();
   const [form] = Form.useForm();
 
-  const [loading, setLoading] = useState(Boolean(id));
-  const [record, setRecord] = useState(null);
   const { couriers, loading: couriersLoading } = useSampleMasters();
-  const [offices, setOffices] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [mastersLoading, setMastersLoading] = useState(true);
-  const [customer, setCustomer] = useState(undefined);
-  const [srRows, setSrRows] = useState([]);
-  const [srsLoading, setSrsLoading] = useState(false);
+  const {
+    loading, record, adopt, buyerId, setBuyerId,
+    customers, customersLoading, srRows, srsLoading, locations, locationsLoading,
+  } = useDispatchFormData({ id, message });
+
   const [selectedIds, setSelectedIds] = useState([]);
-  const [docs, setDocs] = useState([]);
+  // Saved documents come back on the DTO; newly picked ones are Files held here
+  // until a save gives them an id to hang off.
+  const [documents, setDocuments] = useState([]);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [saving, setSaving] = useState(false);
   const [invoicing, setInvoicing] = useState(false);
   const [dispatching, setDispatching] = useState(false);
@@ -63,85 +64,81 @@ const DispatchForm = () => {
     return `${name} (logged-in)`;
   }, []);
 
-  const loadSrs = useCallback(async (buyer, ownSrs = []) => {
-    setSrsLoading(true);
-    try {
-      // The service excludes SRs on ANY dispatch (own included) — merge the
-      // dispatch's own SRs back in as pre-checked selectable rows on edit.
-      const rows = await listDispatchableSrs(buyer);
-      setSrRows([...ownSrs, ...rows.filter((r) => !ownSrs.some((s) => s.id === r.id))]);
-    } catch (e) {
-      toastUnlessHandled(message, e, 'Failed to load dispatchable SRs');
-    } finally { setSrsLoading(false); }
-  }, [message]);
-
+  // Adopt the loaded dispatch's selection and documents once it arrives
   useEffect(() => {
-    Promise.all([
-      listBuyingOffices().then(setOffices).catch(() => {}),
-      listDispatchableCustomers().then(setCustomers).catch(() => {}),
-    ]).finally(() => setMastersLoading(false));
-  }, []);
+    if (!record) return;
+    setSelectedIds(record.srIds || []);
+    setDocuments(record.documents || []);
+  }, [record]);
 
-  useEffect(() => {
-    if (!id) return undefined;
-    let cancelled = false;
-    getDispatch(id)
-      .then((d) => {
-        if (cancelled) return;
-        setRecord(d);
-        setCustomer(d.buyerName);
-        setSelectedIds(d.srIds || []);
-        setDocs(d.documents || []);
-        if (d.status === DISPATCH_STATUS.DRAFT) loadSrs(d.buyerName, d.srs || []);
-      })
-      .catch((e) => { if (!cancelled) toastUnlessHandled(message, e, 'Failed to load dispatch'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [id, loadSrs, message]);
+  const overseas = Boolean(record
+    ? record.overseas
+    : customers.find((c) => c.buyerId === buyerId)?.overseas);
 
-  const buyerCountry = useMemo(() => {
-    if (record) return record.buyerCountry || '';
-    return customers.find((c) => c.name === customer)?.country || '';
-  }, [record, customers, customer]);
-  const overseas = Boolean(buyerCountry) && buyerCountry.trim().toLowerCase() !== 'india';
-
-  const handleCustomerChange = useCallback((name) => {
-    setCustomer(name);
+  const handleBuyerChange = useCallback((next) => {
+    setBuyerId(next);
     setSelectedIds([]);
     setDirty(true);
-    loadSrs(name);
-  }, [loadSrs]);
+  }, [setBuyerId]);
 
-  const setDocsDirty = useCallback((updater) => { setDocs(updater); setDirty(true); }, []);
+  const handleSelectionChange = useCallback((keys) => { setSelectedIds(keys); setDirty(true); }, []);
+
+  const stageFiles = useCallback((updater) => { setPendingFiles(updater); setDirty(true); }, []);
 
   const buildDto = useCallback((values) => ({
     // Optimistic locking — the server rejects a stale version with 409
     version: record?.version,
-    buyerName: customer,
-    buyerCountry,
+    buyerId,
     srIds: selectedIds,
     deliveryMethod: values.deliveryMethod,
     dispatchedDate: values.dispatchedDate ? values.dispatchedDate.format('YYYY-MM-DD') : null,
     courierId: values.courierId,
-    courierName: couriers.find((c) => c.id === values.courierId)?.name || '',
     trackingNo: values.trackingNo || null,
     dispatchMode: values.dispatchMode,
     packages: values.packages ?? null,
     courierCost: values.courierCost ?? null,
-    buyingOffice: values.buyingOffice || null,
+    // The label is snapshotted server-side from the buyer's shipping location
+    buyingOfficeLocationId: values.buyingOfficeLocationId ?? null,
     handedOverTo: values.handedOverTo || null,
     acknowledgement: values.acknowledgement || null,
     remarks: values.remarks || '',
-    documents: docs,
-  }), [record, customer, buyerCountry, selectedIds, couriers, docs]);
+  }), [record, buyerId, selectedIds]);
+
+  /**
+   * Files need an entity to hang off, so they go up after the dispatch has an
+   * id. A failed upload does not roll the save back — the draft is still there
+   * to retry from, which is better than losing the shipment details with it.
+   */
+  const uploadPending = useCallback(async (entityId) => {
+    if (!pendingFiles.length) return [];
+    const results = await Promise.allSettled(pendingFiles.map((file) => uploadFile(file, {
+      module: 'SAMPLE_REQUEST',
+      entity: 'SAMPLE_DISPATCH',
+      entityId,
+      fileCategory: 'DOCUMENT',
+    })));
+    setPendingFiles([]);
+    const uploaded = results.filter((r) => r.status === 'fulfilled').map((r) => r.value);
+    const failed = results.length - uploaded.length;
+    if (failed) {
+      message.warning(`Dispatch saved, but ${failed} document${failed > 1 ? 's' : ''} failed to upload. Edit the dispatch to retry.`);
+    }
+    return uploaded;
+  }, [pendingFiles, message]);
 
   const persistDraft = useCallback(async () => {
     const dto = buildDto(form.getFieldsValue());
     const saved = record?.id ? await updateDispatch(record.id, dto) : await createDispatch(dto);
-    setRecord(saved);
+    const uploaded = await uploadPending(saved.id);
+    const next = uploaded.length
+      ? { ...saved, documents: [...(saved.documents || []), ...uploaded] }
+      : saved;
+    // The effect above republishes the selection and the documents off the
+    // adopted record, so the server's answer is the only authority for both.
+    adopt(next);
     setDirty(false);
-    return saved;
-  }, [buildDto, form, record]);
+    return next;
+  }, [buildDto, form, record, uploadPending, adopt]);
 
   const handleSaveDraft = useCallback(async () => {
     setSaving(true);
@@ -153,7 +150,7 @@ const DispatchForm = () => {
   }, [persistDraft, message, navigate]);
 
   const handleGenerateInvoice = useCallback(async () => {
-    if (record?.id) {
+    if (record?.id && !dirty) {
       navigate(`/sample-requests/invoices/new?dispatchId=${record.id}`);
       return;
     }
@@ -163,7 +160,7 @@ const DispatchForm = () => {
       message.success(`${saved.dispatchNo} saved as draft`);
       navigate(`/sample-requests/invoices/new?dispatchId=${saved.id}`);
     } catch (e) { toastUnlessHandled(message, e, 'Failed to save draft'); } finally { setInvoicing(false); }
-  }, [record, persistDraft, message, navigate]);
+  }, [record, dirty, persistDraft, message, navigate]);
 
   const handleMarkDispatched = useCallback(async () => {
     try { await form.validateFields(); } catch { return; /* validation errors shown inline */ }
@@ -180,7 +177,7 @@ const DispatchForm = () => {
           navigate(LIST_PATH);
         } catch (e) {
           if (e.code === 'INVOICE_REQUIRED') {
-            modal.warning({ title: 'Commercial invoice required', content: errorText(e) });
+            modal.warning(invoiceRequiredModal(e));
           } else {
             toastUnlessHandled(message, e, 'Failed to dispatch');
           }
@@ -200,32 +197,6 @@ const DispatchForm = () => {
     });
   }, [dirty, modal, navigate]);
 
-  const srColumns = useMemo(() => [
-    {
-      title: 'SR No', dataIndex: 'srNo', key: 'srNo', width: 140,
-      render: (t) => <Text strong style={{ whiteSpace: 'nowrap' }}>{t}</Text>,
-    },
-    { title: 'Style', dataIndex: 'styleNo', key: 'styleNo', width: 120 },
-    { title: 'Garment', dataIndex: 'garmentName', key: 'garmentName', ellipsis: true },
-    {
-      title: 'Sample Type', dataIndex: 'sampleTypeName', key: 'sampleTypeName', width: 160,
-      render: (n) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{n}</Tag>,
-    },
-    { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70, align: 'right' },
-    {
-      title: 'Dispatch Deadline', dataIndex: 'dispatchDeadline', key: 'dispatchDeadline', width: 210,
-      render: (d) => <DaysRemainingTag date={d} showDate />,
-    },
-  ], []);
-
-  const customerOptions = useMemo(() => {
-    const opts = customers.map((c) => ({ value: c.name, label: c.country ? `${c.name} · ${c.country}` : c.name }));
-    if (record && !opts.some((o) => o.value === record.buyerName)) {
-      opts.unshift({ value: record.buyerName, label: record.buyerCountry ? `${record.buyerName} · ${record.buyerCountry}` : record.buyerName });
-    }
-    return opts;
-  }, [customers, record]);
-
   const initialValues = useMemo(() => ({
     deliveryMethod: record?.deliveryMethod || DELIVERY_METHODS.COURIER,
     dispatchedDate: record?.dispatchedDate ? dayjs(record.dispatchedDate) : dayjs(),
@@ -234,7 +205,7 @@ const DispatchForm = () => {
     dispatchMode: record?.dispatchMode,
     packages: record?.packages ?? 1,
     courierCost: record?.courierCost,
-    buyingOffice: record?.buyingOffice,
+    buyingOfficeLocationId: record?.buyingOfficeLocationId,
     handedOverTo: record?.handedOverTo,
     acknowledgement: record?.acknowledgement,
     remarks: record?.remarks,
@@ -335,50 +306,46 @@ const DispatchForm = () => {
         />
       )}
 
-      <Card size="small" title="Customer & Sample Requests">
-        <div style={{ maxWidth: 380, marginBottom: 12 }}>
-          <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: 0.4 }}>Customer</Text>
-          <Select
-            style={{ width: '100%' }}
-            placeholder="Customers with dispatchable SRs"
-            showSearch
-            optionFilterProp="label"
-            loading={mastersLoading}
-            value={customer}
-            onChange={handleCustomerChange}
-            disabled={Boolean(record)}
-            options={customerOptions}
-          />
-        </div>
-        <Table
-          rowKey="id"
-          size="small"
-          columns={srColumns}
-          dataSource={srRows}
-          loading={srsLoading}
-          pagination={false}
-          scroll={{ x: 860 }}
-          rowSelection={{
-            selectedRowKeys: selectedIds,
-            onChange: (keys) => { setSelectedIds(keys); setDirty(true); },
-          }}
-          locale={{ emptyText: customer ? 'No dispatchable In-Production SRs for this customer' : 'Select a customer to list its dispatchable SRs' }}
+      {record?.companyCountryMissing && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="No company country configured — every consignee is treated as domestic and the invoice gate stays open. Set it under Admin → Company Profile."
         />
-        <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>{`${selectedIds.length} SR(s) selected`}</Text>
-      </Card>
+      )}
+
+      <DispatchSrTable
+        customers={customers}
+        customersLoading={customersLoading}
+        buyerId={buyerId}
+        onBuyerChange={handleBuyerChange}
+        locked={Boolean(record)}
+        current={record}
+        rows={srRows}
+        rowsLoading={srsLoading}
+        selectedIds={selectedIds}
+        onSelectionChange={handleSelectionChange}
+      />
 
       <Card size="small" title="Dispatch Details" style={{ marginTop: 16 }}>
         <Form form={form} layout="vertical" initialValues={initialValues} onValuesChange={() => setDirty(true)}>
           <DispatchFields
             form={form}
             couriers={couriers}
-            offices={offices}
-            mastersLoading={mastersLoading || couriersLoading}
-            docs={docs}
-            setDocs={setDocsDirty}
+            locations={locations}
+            mastersLoading={locationsLoading || couriersLoading}
+            documents={documents}
+            pendingFiles={pendingFiles}
+            setPendingFiles={stageFiles}
             currentUserLabel={currentUserLabel}
           />
         </Form>
+        {!record && pendingFiles.length > 0 && (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Documents upload when the draft is saved.
+          </Text>
+        )}
       </Card>
 
     </div>

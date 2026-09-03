@@ -70,7 +70,7 @@ const DispatchInfoCard = ({ sr }) => {
         <div style={{ marginTop: 8 }}>
           <Text type="secondary" style={labelStyle}>Documents</Text>
           {d.documents.map((doc) => (
-            <Tag key={doc.name || doc}>{doc.name || doc}</Tag>
+            <Tag key={doc.fileId || doc.id}>{doc.originalFilename}</Tag>
           ))}
         </div>
       )}
