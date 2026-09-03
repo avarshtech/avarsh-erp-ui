@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Row, Col, Card, Typography, Tag, Skeleton, Spin, Modal, Input, Button } from 'antd';
+import { App, Row, Col, Card, Typography, Tag, Skeleton, Spin, Modal, Input, Button, Alert } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import ViewDialog from '../../components/ViewDialog';
@@ -13,8 +13,9 @@ import {
 } from '../../utils/sampleRequestConstants';
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
+import { toastUnlessHandled } from '../../utils/apiError';
 import {
-  getSampleRequest, changeStatus, deleteSampleRequest, isOverseas, updateInstructions,
+  getSampleRequest, changeStatus, deleteSampleRequest, updateInstructions,
 } from '../../services/sr/srService';
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
@@ -24,7 +25,6 @@ import InvoicePanel from './view/InvoicePanel';
 import ActivityLogPanel from './view/ActivityLogPanel';
 import DispatchInfoCard from './view/DispatchInfoCard';
 import FeedbackSummaryCard from './view/FeedbackSummaryCard';
-import RaisePoDrawer from './form/RaisePoDrawer';
 
 const { Text, Title } = Typography;
 
@@ -35,7 +35,6 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const navigate = useNavigate();
   const [sr, setSr] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [poDrawer, setPoDrawer] = useState({ open: false, focusLine: null });
   const [instrModal, setInstrModal] = useState({ open: false, specialInstructions: '', remarks: '', saving: false });
 
   const canUpdate = hasPermission('sample-requests', 'update');
@@ -49,7 +48,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
     try {
       setSr(await getSampleRequest(id));
     } catch (e) {
-      message.error(e.message || 'Failed to load sample request');
+      toastUnlessHandled(message, e, 'Failed to load sample request');
       onClose?.();
     } finally { setLoading(false); }
   }, [message, onClose]);
@@ -65,7 +64,8 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   // in state until its fetch resolves, so gate every read on the id matching.
   const fresh = sr && sr.id === Number(srId) ? sr : null;
 
-  const overseas = useMemo(() => (sr ? isOverseas(sr) : false), [sr]);
+  // Decided by the server against the company's own country, not in the browser
+  const overseas = Boolean(sr?.overseas);
 
   const statusFlow = useMemo(() => {
     if (!sr) return SR_STATUS_FLOW_BASE;
@@ -86,10 +86,10 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
       content: `${sr?.srNo} → ${getSrStatusLabel(target)}. Every status change is logged with user and timestamp.`,
       onOk: async () => {
         try {
-          await changeStatus(sr.id, target);
+          await changeStatus(sr.id, target, sr.version);
           message.success(`${sr.srNo} → ${getSrStatusLabel(target)}`);
           refresh();
-        } catch (e) { message.error(e.message || 'Transition failed'); }
+        } catch (e) { toastUnlessHandled(message, e, 'Transition failed'); }
       },
     });
   }, [sr, modal, message, refresh]);
@@ -111,7 +111,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           message.success(`${sr.srNo} deleted`);
           onChanged?.();
           onClose?.();
-        } catch (e) { message.error(e.message || 'Failed to delete'); }
+        } catch (e) { toastUnlessHandled(message, e, 'Failed to delete'); }
       },
     }),
   }), [sr, doTransition, modal, message, navigate, onChanged, onClose]);
@@ -200,6 +200,30 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                 size="small"
               />
             </div>
+            {/*
+              Whether a sample counts as overseas decides whether a commercial
+              invoice gates its dispatch. Both halves of that comparison can be
+              missing, and silently treating an unknown as domestic is how a
+              shipment leaves without its customs paperwork — so say so.
+            */}
+            {sr.companyCountryMissing && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="Company country not configured"
+                description="Set the country on Admin → Company Profile. Until then every buyer counts as domestic, so no sample dispatch will ask for a commercial invoice."
+              />
+            )}
+            {sr.buyerCountryMissing && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`No shipping location on record for ${sr.buyerName || 'this buyer'}`}
+                description="Add an active shipping location to the buyer. Without a country this sample is treated as domestic and will dispatch without a commercial invoice."
+              />
+            )}
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={16}>
                 <SectionHeader srNo={sr.srNo} header={sr} />
@@ -242,7 +266,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                     </div>
                   )}
                 </Card>
-                <ViewMaterials sr={sr} onRaisePo={(line) => setPoDrawer({ open: true, focusLine: line })} />
+                <ViewMaterials sr={sr} />
               </Col>
               <Col xs={24} lg={8}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -264,13 +288,6 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           </Spin>
         )}
       </ViewDialog>
-      <RaisePoDrawer
-        open={poDrawer.open}
-        sr={sr}
-        focusLine={poDrawer.focusLine}
-        onClose={() => setPoDrawer({ open: false, focusLine: null })}
-        onCreated={refresh}
-      />
       {/* PRD §8.3 — at In Production, Special Instructions + Remarks stay editable */}
       <Modal
         title="Edit instructions"
@@ -284,12 +301,13 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
             await updateInstructions(sr.id, {
               specialInstructions: instrModal.specialInstructions,
               remarks: instrModal.remarks,
+              version: sr.version,
             });
             message.success('Instructions updated — change logged in the activity trail');
             setInstrModal((s) => ({ ...s, open: false, saving: false }));
             refresh();
           } catch (e) {
-            message.error(e.message || 'Failed to update');
+            toastUnlessHandled(message, e, 'Failed to update');
             setInstrModal((s) => ({ ...s, saving: false }));
           }
         }}

@@ -4,6 +4,7 @@ import { CommentOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
 import { searchSampleRequests, getSampleRequest } from '../../../services/sr/srService';
 import { hasPermission } from '../../../utils/permissions';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { SR_STATUS, getSrStatusLabel } from '../../../utils/sampleRequestConstants';
 import { SR_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatDate } from '../../../utils/formatters';
@@ -66,8 +67,8 @@ const CustomerCommentsPage = () => {
       let rows = response.content || [];
       if (!statusFilter) rows = rows.filter((r) => COMMENT_STATUSES.includes(r.status));
       setData(rows);
-    } catch {
-      message.error('Failed to load sample requests');
+    } catch (e) {
+      toastUnlessHandled(message, e, 'Failed to load sample requests');
     } finally { setLoading(false); }
   }, [debouncedSearch, statusFilter, message]);
 
@@ -79,7 +80,7 @@ const CustomerCommentsPage = () => {
       const record = await getSampleRequest(id);
       setDetail(record);
     } catch (e) {
-      message.error(e.message || 'Failed to load sample request');
+      toastUnlessHandled(message, e, 'Failed to load sample request');
       setDialog(CLOSED_DIALOG);
     } finally { setDetailLoading(false); }
   }, [message]);

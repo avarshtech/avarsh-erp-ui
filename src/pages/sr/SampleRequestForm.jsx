@@ -1,15 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Form, Card, Row, Col, Space, Skeleton, Alert, Result, Spin } from 'antd';
+import { App, Form, Card, Row, Col, Space, Skeleton, Alert, Result } from 'antd';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
-  createSampleRequest, updateSampleRequest, changeStatus, getSampleRequest,
-  listSampleTypes,
+  createSampleRequest, updateSampleRequest, changeStatus,
 } from '../../services/sr/srService';
 import { SR_STATUS } from '../../utils/sampleRequestConstants';
-import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
+import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
+import { toastUnlessHandled } from '../../utils/apiError';
+import useSampleMasters from '../../hooks/useSampleMasters';
 import useSampleRequestDraft from './useSampleRequestDraft';
 import SampleBomPicker from './form/SampleBomPicker';
 import SectionHeader from './form/SectionHeader';
@@ -17,8 +18,6 @@ import SectionDetails from './form/SectionDetails';
 import SectionDeadlines from './form/SectionDeadlines';
 import MaterialsTable from './form/MaterialsTable';
 import SummaryBar from './form/SummaryBar';
-import RaisePoDrawer from './form/RaisePoDrawer';
-import { getStockStatus } from '../../services/sr/srService';
 
 const toDate = (v) => (v ? dayjs(v) : null);
 
@@ -40,13 +39,13 @@ const SampleRequestForm = () => {
   const draft = useSampleRequestDraft({ id, bomId, orderNo });
   const [form] = Form.useForm();
   const [materials, setMaterials] = useState([]);
-  const [sampleTypes, setSampleTypes] = useState([]);
-  const [typesLoading, setTypesLoading] = useState(true);
-  const [poPreparing, setPoPreparing] = useState(false);
+  const { sampleTypes, loading: typesLoading } = useSampleMasters();
   const [savedId, setSavedId] = useState(id ? Number(id) : null);
+  // Optimistic-lock version of the last save — authoritative once we have one,
+  // since draft.record still carries the version the form was loaded with
+  const [savedVersion, setSavedVersion] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [poDrawer, setPoDrawer] = useState({ open: false, focusLine: null, sr: null });
 
   const substitution = Form.useWatch('colourSubstitutionAllowed', form);
   const sampleTypeId = Form.useWatch('sampleTypeId', form);
@@ -54,10 +53,6 @@ const SampleRequestForm = () => {
   const watchedSizes = Form.useWatch('sizes', form);
   const sizes = useMemo(() => watchedSizes || [], [watchedSizes]);
   const typeName = sampleTypes.find((t) => t.id === sampleTypeId)?.name || draft.record?.sampleTypeName || '';
-
-  useEffect(() => {
-    listSampleTypes().then(setSampleTypes).catch(() => {}).finally(() => setTypesLoading(false));
-  }, []);
 
   // Initialise once the draft resolves
   useEffect(() => {
@@ -115,7 +110,7 @@ const SampleRequestForm = () => {
     let shortfall = 0;
     materials.forEach((l) => {
       const required = computeSampleQtyRequired(l, sampleQty, sizes);
-      if (getStockStatus(l, required).status !== 'IN_STOCK') shortfall += 1;
+      if (stockStatusFor(l.stockAvailable, required) !== 'IN_STOCK') shortfall += 1;
     });
     return {
       total: materials.length,
@@ -123,18 +118,23 @@ const SampleRequestForm = () => {
       trims: materials.filter((l) => l.section !== 'FABRIC').length,
       available: materials.length - shortfall,
       shortfall,
-      posRaised: materials.filter((l) => l.poRef).length,
     };
   }, [materials, sampleQty, sizes]);
 
+  // Only what the server accepts. The header the BOM supplies — order, style,
+  // buyer, country, season, order qty — is deliberately absent: the server
+  // resolves all of it from bomId, and the sample type NAME is snapshotted
+  // there too. Material lines carry the two editable fields and nothing else;
+  // every spec column (and sampleQtyRequired) is re-materialised from the BOM
+  // on save, so spreading the line back would only leak computed columns.
   const buildPayload = () => {
     const v = form.getFieldsValue();
     return {
-      ...draft.header,
+      bomId: draft.header?.bomId ?? draft.record?.bomId ?? null,
+      // Optimistic locking — the server rejects a stale version with 409
+      version: savedVersion ?? draft.record?.version,
       sampleTypeId: v.sampleTypeId ?? null,
-      sampleTypeName: typeName,
       colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
-      round: 1, // rounds unused in R2 — dormant internal field
       sampleQty: v.sampleQty ?? null,
       sizes: v.sizes || [],
       colourReference: v.colourReference || '',
@@ -145,8 +145,9 @@ const SampleRequestForm = () => {
       buyerApprovalDeadline: v.buyerApprovalDeadline ? v.buyerApprovalDeadline.format('YYYY-MM-DD') : null,
       remarks: v.remarks || '',
       materials: materials.map((l) => ({
-        ...l,
-        sampleQtyRequired: computeSampleQtyRequired(l, v.sampleQty, v.sizes || []),
+        bomLineId: l.bomLineId,
+        colourDesign: l.colourDesign ?? '',
+        mandatory: Boolean(l.mandatory),
       })),
     };
   };
@@ -157,6 +158,7 @@ const SampleRequestForm = () => {
       ? await updateSampleRequest(savedId, payload)
       : await createSampleRequest(payload);
     setSavedId(saved.id);
+    setSavedVersion(saved.version ?? null);
     setIsDirty(false);
     return saved;
   };
@@ -167,7 +169,7 @@ const SampleRequestForm = () => {
       const saved = await persist();
       message.success(`${saved.srNo} saved as draft`);
       navigate('/sample-requests/list');
-    } catch (e) { message.error(e.message || 'Failed to save'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setSaving(false); }
   };
 
   const handleSubmit = async () => {
@@ -175,34 +177,11 @@ const SampleRequestForm = () => {
     setSaving(true);
     try {
       const saved = await persist();
-      await changeStatus(saved.id, SR_STATUS.SUBMITTED);
+      await changeStatus(saved.id, SR_STATUS.SUBMITTED, saved.version);
       message.success(`${saved.srNo} submitted`);
       navigate('/sample-requests/list');
-    } catch (e) { message.error(e.message || 'Failed to submit'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to submit'); } finally { setSaving(false); }
   };
-
-  const handleRaisePo = useCallback(async (focusLine) => {
-    setPoPreparing(true);
-    try {
-      let srId = savedId;
-      if (!srId) {
-        const saved = await persist();
-        srId = saved.id;
-        message.info(`${saved.srNo} saved as draft so the PO can link to it`);
-      }
-      const fresh = await getSampleRequest(srId);
-      setPoDrawer({ open: true, focusLine, sr: fresh });
-    } catch (e) {
-      message.error(e.message || 'Save the draft before raising a PO');
-    } finally { setPoPreparing(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedId, materials]);
-
-  const afterPoCreated = useCallback(async () => {
-    if (!savedId && !poDrawer.sr) return;
-    const fresh = await getSampleRequest(poDrawer.sr?.id || savedId);
-    setMaterials(fresh.materials || []);
-  }, [savedId, poDrawer.sr]);
 
   const handleCancel = () => {
     if (!isDirty) { navigate('/sample-requests/list'); return; }
@@ -320,7 +299,6 @@ const SampleRequestForm = () => {
         <ActionButton action="save" variant="draft" text="Save as Draft" loading={saving} onClick={handleSaveDraft} />
         <ActionButton action="send" text="Submit Sample Request" loading={saving} onClick={handleSubmit} />
       </PageHeader>
-      <Spin spinning={poPreparing} tip="Preparing sample PO…">
       <SectionHeader
         srNo={draft.record?.srNo}
         header={draft.header}
@@ -341,18 +319,9 @@ const SampleRequestForm = () => {
           typeName={typeName}
           onColourChange={onColourChange}
           onMandatoryChange={onMandatoryChange}
-          onRaisePo={handleRaisePo}
         />
-        <SummaryBar totals={totals} onRaisePoFromShortfall={() => handleRaisePo(null)} />
+        <SummaryBar totals={totals} />
       </Form>
-      </Spin>
-      <RaisePoDrawer
-        open={poDrawer.open}
-        sr={poDrawer.sr}
-        focusLine={poDrawer.focusLine}
-        onClose={() => setPoDrawer({ open: false, focusLine: null, sr: poDrawer.sr })}
-        onCreated={afterPoCreated}
-      />
     </div>
   );
 };

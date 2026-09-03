@@ -1,5 +1,5 @@
-import { Input, Tag, Switch, Tooltip, Button, Typography } from 'antd';
-import { LockOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { Input, Tag, Switch, Tooltip, Typography } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 import { isColourEditable, isMandatoryToggleEnabled } from '../../../utils/sampleFabricRules';
 import { computeSampleQtyRequired } from '../../../utils/sampleBomMapper';
 
@@ -20,12 +20,11 @@ const lockedCell = (value) => (
 /**
  * Section D columns (PRD v3 §8.2 D). Spec columns are always locked to BOM;
  * only Colour/Design unlocks when substitution is allowed AND the line is not
- * a mandatory trim (per-line override, OQ2). Raise PO is available on every
- * line — primary on shortfall lines — because stock status is indicative only.
+ * a mandatory trim (per-line override, OQ2). Stock status is indicative only.
  */
 export const buildMaterialsColumns = ({
   sr, sampleQty, sizes, readOnly = false,
-  onColourChange, onMandatoryChange, onRaisePo, poAllowed = true,
+  onColourChange, onMandatoryChange,
 }) => [
   { title: 'Line', dataIndex: 'lineNo', key: 'lineNo', width: 52, align: 'center' },
   { title: 'Fabric Type', dataIndex: 'fabricType', key: 'fabricType', width: 110, render: lockedCell },
@@ -110,46 +109,9 @@ export const buildMaterialsColumns = ({
     render: (_, line) => {
       const cfg = STOCK_TAG[line.stockStatus] || { color: 'default', label: '—' };
       return (
-        <Tooltip title="Indicative only — no live stock check in v1">
+        <Tooltip title="Live stock, read when this screen loaded — a parallel issue can change it">
           <Tag color={cfg.color}>{cfg.label}</Tag>
         </Tooltip>
-      );
-    },
-  },
-  {
-    title: 'Action',
-    key: 'action',
-    width: 215,
-    render: (_, line) => {
-      if (line.poRef) {
-        // "PO Pending · SPO/26-27/1001" stays on one line — the column is wide
-        // enough and the table scrolls horizontally
-        return (
-          <Tag
-            color={line.poRef.status === 'RECEIVED' ? 'green' : 'blue'}
-            style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}
-          >
-            {line.poRef.status === 'RECEIVED' ? 'Received' : 'PO Pending'} · {line.poRef.poNo}
-          </Tag>
-        );
-      }
-      if (!poAllowed) {
-        return (
-          <Tooltip title="POs can be raised only up to Dispatched — this sample has been assessed">
-            <Button size="small" disabled icon={<ShoppingCartOutlined />}>Raise PO</Button>
-          </Tooltip>
-        );
-      }
-      const shortfall = line.stockStatus && line.stockStatus !== 'IN_STOCK';
-      return (
-        <Button
-          size="small"
-          type={shortfall ? 'primary' : 'default'}
-          icon={<ShoppingCartOutlined />}
-          onClick={() => onRaisePo(line)}
-        >
-          Raise PO
-        </Button>
       );
     },
   },

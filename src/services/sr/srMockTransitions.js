@@ -123,5 +123,5 @@ export const recordFeedback = async (id, dto) => {
 
   stampStatus(sr, DECISION_TO_STATUS[dto.decision]);
   saveDb(db);
-  return { sampleRequest: decorate(sr) };
+  return decorate(sr);
 };

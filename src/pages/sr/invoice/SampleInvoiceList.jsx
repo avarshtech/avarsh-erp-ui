@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { listInvoices, cancelInvoice, duplicateInvoice, getInvoice } from '../../../services/sr/srService';
 import { hasPermission } from '../../../utils/permissions';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import {
   SAMPLE_INVOICE_STATUS, SAMPLE_INVOICE_STATUS_LABELS, getInvoiceStatusLabel,
   INVOICE_TYPES, INVOICE_TYPE_LABELS,
@@ -64,7 +65,7 @@ const SampleInvoiceList = () => {
       const res = await listInvoices(params);
       setRows(res.content);
       setStats(res.stats);
-    } catch { message.error('Failed to load invoices'); } finally { setLoading(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to load invoices'); } finally { setLoading(false); }
   }, [debouncedSearch, statusFilter, typeFilter, dateRange, message]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -75,7 +76,7 @@ const SampleInvoiceList = () => {
       const full = await getInvoice(record.id);
       if (!printSampleInvoice(full, profile)) message.error('Pop-up blocked — allow pop-ups to print');
     } catch (e) {
-      message.error(e.message || 'Failed to load invoice');
+      toastUnlessHandled(message, e, 'Failed to load invoice');
     } finally { hide(); }
   }, [profile, message]);
 
@@ -88,12 +89,12 @@ const SampleInvoiceList = () => {
     const { target, reason } = cancelState;
     setCancelState((s) => ({ ...s, saving: true }));
     try {
-      await cancelInvoice(target.id, reason.trim());
+      await cancelInvoice(target.id, reason.trim(), target.version);
       message.success(`${target.invoiceNo} cancelled — linked SRs released`);
       setCancelState({ target: null, reason: '', saving: false });
       fetchData();
     } catch (e) {
-      message.error(e.message || 'Failed to cancel');
+      toastUnlessHandled(message, e, 'Failed to cancel');
       setCancelState((s) => ({ ...s, saving: false }));
     }
   }, [cancelState, message, fetchData]);
@@ -103,7 +104,7 @@ const SampleInvoiceList = () => {
       const copy = await duplicateInvoice(record.id);
       message.success('Duplicated to a new draft');
       navigate(`/sample-requests/invoices/edit/${copy.id}`);
-    } catch (e) { message.error(e.message || 'Failed to duplicate'); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to duplicate'); }
   }, [message, navigate]);
 
   const columns = useMemo(() => [

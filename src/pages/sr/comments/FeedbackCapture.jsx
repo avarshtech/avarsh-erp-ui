@@ -6,16 +6,21 @@ import {
 import { UploadOutlined, FileSearchOutlined, InboxOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  recordFeedback, saveFeedbackDraft, listRejectionReasons,
-  getFeedbackCategoryLabels, parseCommentSheet,
+  recordFeedback, saveFeedbackDraft, parseCommentSheet,
 } from '../../../services/sr/srService';
 import {
   FEEDBACK_DECISIONS, FEEDBACK_DECISION_OPTIONS, FEEDBACK_DECISION_LABELS,
   SR_STATUS, getSrStatusLabel,
 } from '../../../utils/sampleRequestConstants';
+import { toastUnlessHandled } from '../../../utils/apiError';
+import useSampleMasters from '../../../hooks/useSampleMasters';
 
 const { Text } = Typography;
 const { TextArea } = Input;
+
+// Rendered as "<label> Comments", so the four keys must always resolve — the
+// server set replaces these once the masters cache fills
+const DEFAULT_LABELS = { fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' };
 
 const CONFIDENCE_TAG = {
   HIGH: { color: 'green', label: 'High' },
@@ -49,8 +54,8 @@ const extOf = (name) => String(name || '').split('.').pop().toLowerCase();
 const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
-  const [reasons, setReasons] = useState([]);
-  const [labels, setLabels] = useState({ fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' });
+  const { rejectionReasonOptions, feedbackLabels } = useSampleMasters();
+  const labels = { ...DEFAULT_LABELS, ...feedbackLabels };
   const [attachments, setAttachments] = useState(sr.feedback?.attachments || []);
   const [importStep, setImportStep] = useState(0);
   const [parsing, setParsing] = useState(false);
@@ -65,11 +70,6 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   // as is the whole form for a reader without sample-comments update rights
   // (the dialog footer hides its save actions on the same condition).
   const editable = canUpdate && [SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(sr.status);
-
-  useEffect(() => {
-    listRejectionReasons().then(setReasons).catch(() => {});
-    getFeedbackCategoryLabels(sr.buyerName).then(setLabels).catch(() => {});
-  }, [sr.buyerName]);
 
   useEffect(() => {
     const f = sr.feedback;
@@ -106,7 +106,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
       // The original file always attaches — the source of record is never the parse
       setAttachments((prev) => (prev.some((a) => a.name === file.name)
         ? prev : [...prev, { name: file.name, size: file.size, type: file.type, sourceOfImport: true }]));
-    } catch (e) { message.error(e.message || 'Failed to parse'); } finally { setParsing(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to parse'); } finally { setParsing(false); }
     return false;
   };
 
@@ -130,6 +130,8 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   };
 
   const buildDto = (v) => ({
+    // Optimistic locking — the server rejects a stale version with 409
+    version: sr.version,
     date: v.date ? v.date.format('YYYY-MM-DD') : null,
     from: v.from || '',
     decision: v.decision || null,
@@ -149,7 +151,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
       message.success('Comment record saved — status unchanged');
       onChanged?.();
     } catch (e) {
-      message.error(e.message || 'Failed to save');
+      toastUnlessHandled(message, e, 'Failed to save');
     }
   };
 
@@ -158,11 +160,11 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
     let values;
     try { values = await form.validateFields(); } catch { return; }
     try {
-      const { sampleRequest } = await recordFeedback(sr.id, buildDto(values));
-      message.success(`Comments saved — ${sampleRequest.srNo} is now ${getSrStatusLabel(sampleRequest.status)}`);
+      const updated = await recordFeedback(sr.id, buildDto(values));
+      message.success(`Comments saved — ${updated.srNo} is now ${getSrStatusLabel(updated.status)}`);
       onChanged?.();
       onClose?.();
-    } catch (e) { message.error(e.message || 'Failed to save comments'); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save comments'); }
   };
 
   // The dialog footer owns the buttons and awaits these for its loading state
@@ -310,7 +312,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
             <Select
               mode="multiple"
               placeholder="Multi-select from Master Data"
-              options={reasons.map((r) => ({ value: r.code, label: r.label }))}
+              options={rejectionReasonOptions}
             />
           </Form.Item>
         )}
@@ -321,8 +323,15 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
           <Col xs={24} sm={12}><Form.Item name="workmanship" label={`${labels.workmanship} Comments`}><TextArea rows={2} /></Form.Item></Col>
         </Row>
         <Form.Item name="additional" label="Additional Comments"><TextArea rows={1} placeholder="Anything not covered above…" /></Form.Item>
-        <Form.Item label="Attachments" extra="Buyer comment sheets or annotated photos · Excel, PDF or images · max 5 MB per file">
+        {/*
+          Disabled deliberately, not hidden. Comments now save to the server,
+          which stores attachments as real files rather than as a list of names
+          — that arrives with the file-upload stage. Left enabled, a buyer's
+          comment sheet would appear to attach and then be gone after save.
+        */}
+        <Form.Item label="Attachments" extra="Attaching files is not available yet — comment sheets can still be imported above, and the imported file is recorded in the trail">
           <Upload
+            disabled
             multiple
             accept=".xlsx,.xls,.pdf,image/*"
             beforeUpload={(file) => {
@@ -337,7 +346,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
             onRemove={(file) => setAttachments((prev) => prev.filter((f) => f.name !== file.name))}
             fileList={attachments.map((f, i) => ({ uid: String(i), name: f.name, status: 'done' }))}
           >
-            <Button icon={<UploadOutlined />}>Add attachment</Button>
+            <Button icon={<UploadOutlined />} disabled>Add attachment</Button>
           </Upload>
         </Form.Item>
       </Form>

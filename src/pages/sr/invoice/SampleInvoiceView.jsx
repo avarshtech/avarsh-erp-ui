@@ -11,6 +11,7 @@ import {
 } from '../../../utils/sampleRequestConstants';
 import { amountInWords } from '../../../utils/amountInWords';
 import { formatDate } from '../../../utils/formatters';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { getInvoice } from '../../../services/sr/srService';
 
 const { Text, Title } = Typography;
@@ -43,7 +44,7 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
     getInvoice(invoiceId)
       .then((data) => { if (!cancelled) setInv(data); })
       .catch((e) => {
-        if (!cancelled) { message.error(e.message || 'Failed to load invoice'); onClose?.(); }
+        if (!cancelled) { toastUnlessHandled(message, e, 'Failed to load invoice'); onClose?.(); }
       });
     return () => { cancelled = true; };
   }, [open, invoiceId, message, onClose]);

@@ -10,6 +10,7 @@ import {
   getDispatchStatusLabel, getSrStatusLabel,
 } from '../../../utils/sampleRequestConstants';
 import { formatDate } from '../../../utils/formatters';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import { getDispatch } from '../../../services/sr/srService';
 
 const { Text, Title } = Typography;
@@ -42,7 +43,7 @@ const DispatchView = ({ open, dispatchId, onClose, onEdit }) => {
     getDispatch(dispatchId)
       .then((data) => { if (!cancelled) setRecord(data); })
       .catch((e) => {
-        if (!cancelled) { message.error(e.message || 'Failed to load the dispatch'); onClose?.(); }
+        if (!cancelled) { toastUnlessHandled(message, e, 'Failed to load the dispatch'); onClose?.(); }
       });
     return () => { cancelled = true; };
   }, [open, dispatchId, message, onClose]);

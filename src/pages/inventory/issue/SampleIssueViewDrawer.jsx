@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { App, Drawer, Card, Row, Col, Table, Tag, Typography, Skeleton } from 'antd';
 import { getSampleIssue } from '../../../services/sr/srService';
 import { formatDate } from '../../../utils/formatters';
+import { toastUnlessHandled } from '../../../utils/apiError';
 
 const { Text, Title } = Typography;
 
@@ -49,7 +50,7 @@ const SampleIssueViewDrawer = ({ open, issueId, onClose }) => {
     getSampleIssue(issueId)
       .then((data) => { if (!cancelled) setIssue(data); })
       .catch((e) => {
-        if (!cancelled) { message.error(e.message || 'Failed to load the sample issue'); onClose?.(); }
+        if (!cancelled) { toastUnlessHandled(message, e, 'Failed to load the sample issue'); onClose?.(); }
       });
     return () => { cancelled = true; };
   }, [open, issueId, message, onClose]);

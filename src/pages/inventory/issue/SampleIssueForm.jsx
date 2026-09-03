@@ -10,6 +10,7 @@ import { ActionButton } from '../../../components/buttons';
 import { listIssuableSrs, createSampleIssue } from '../../../services/sr/srService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../utils/permissions';
+import { errorText, toastUnlessHandled } from '../../../utils/apiError';
 import { RAG_TAG_COLOR, deadlineLabel } from '../../../utils/deadlineUtils';
 import { formatDate } from '../../../utils/formatters';
 
@@ -86,8 +87,8 @@ const SampleIssueForm = () => {
         // Without this the empty-list branch below would show a green
         // "nothing awaiting issue" all-clear for what is actually a failure
         if (!cancelled) {
-          setLoadError(e.message || 'Failed to load submitted sample requests');
-          message.error(e.message || 'Failed to load submitted sample requests');
+          setLoadError(errorText(e, 'Failed to load submitted sample requests'));
+          toastUnlessHandled(message, e, 'Failed to load submitted sample requests');
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -165,7 +166,7 @@ const SampleIssueForm = () => {
           message.success(`${issue.issueNo} created — ${selected.srNo} is now In Production`);
           leave(BACK_TO_LIST);
         } catch (e) {
-          message.error(e.message || 'Failed to create the sample issue');
+          toastUnlessHandled(message, e, 'Failed to create the sample issue');
         } finally { setSubmitting(false); }
       },
     });

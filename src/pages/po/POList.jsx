@@ -7,6 +7,7 @@ import {
   App,
   Space,
 } from 'antd';
+import { LinkOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchPurchaseOrders,
@@ -27,6 +28,7 @@ import CurrencyDisplay from '../../components/CurrencyDisplay';
 import EmptyState from '../../components/EmptyState';
 import POView from './POView';
 import POVersionHistory from './POVersionHistory';
+import PoOrderMappingWorkspace from './order-mapping/PoOrderMappingWorkspace';
 
 const { Text } = Typography;
 
@@ -53,6 +55,8 @@ const POList = () => {
 
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
+  // General PO → customer order mapping workspace (mock phase)
+  const [mappingOpen, setMappingOpen] = useState(false);
   const [viewingPO, setViewingPO] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -299,13 +303,24 @@ const POList = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title="Supplier PO">
-        {hasPermission('purchase-orders', 'add') && (
-          <ActionButton
-            action="create"
-            text="New Supplier PO"
-            onClick={() => navigate('/purchase-orders/supplier-po/new')}
-          />
-        )}
+        <Space>
+          {canView && (
+            <ActionButton
+              action="custom"
+              icon={<LinkOutlined />}
+              text="Order Mapping"
+              tooltip="Link General POs to customer orders"
+              onClick={() => setMappingOpen(true)}
+            />
+          )}
+          {hasPermission('purchase-orders', 'add') && (
+            <ActionButton
+              action="create"
+              text="New Supplier PO"
+              onClick={() => navigate('/purchase-orders/supplier-po/new')}
+            />
+          )}
+        </Space>
       </PageHeader>
 
       <Card>
@@ -404,6 +419,8 @@ const POList = () => {
         poId={historyPO?.id}
         poNumber={historyPO?.poNumber}
       />
+
+      <PoOrderMappingWorkspace open={mappingOpen} onClose={() => setMappingOpen(false)} />
     </div>
   );
 };

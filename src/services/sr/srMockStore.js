@@ -54,10 +54,6 @@ export const nextSrNo = (db) => nextDocNo(db, SR_DOC_PREFIX.REQUEST);
  */
 export const nextInvoiceNo = (db, series = 'EXSG') => nextDocNo(db, series);
 
-// Mock sample-PO numbers — clearly distinct from real supplier POs (PO/FY/NNNN);
-// the real integration creates actual PO-module records flagged po_type=SAMPLE.
-export const nextSamplePoNo = (db) => nextDocNo(db, SR_DOC_PREFIX.SAMPLE_PO);
-
 /** Dispatch — one dispatch groups many SRs to one customer (R2) */
 export const nextDispatchNo = (db) => nextDocNo(db, SR_DOC_PREFIX.DISPATCH);
 

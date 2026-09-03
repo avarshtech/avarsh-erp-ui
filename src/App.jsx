@@ -78,6 +78,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
 import ApprovalFlowList from './pages/admin/ApprovalFlowList';
+import CompanyProfile from './pages/admin/CompanyProfile';
 import MasterDashboard from './pages/master/MasterDashboard';
 import Profile from './pages/Profile';
 
@@ -273,8 +274,7 @@ const ThemedApp = () => {
             <Route path="purchase-orders/work-order/edit/:id" element={<PermissionRoute module="work-order" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="finishing-po"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
-            {/* Production — Cutting (UI mock phase) */}
+            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />            {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
             <Route path="tna/plan/:planId" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />
@@ -373,6 +373,7 @@ const ThemedApp = () => {
             <Route path="admin/users" element={<PermissionRoute module="users"><UserManagement /></PermissionRoute>} />
             <Route path="admin/roles" element={<PermissionRoute module="roles"><RoleAccess /></PermissionRoute>} />
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows"><ApprovalFlowList /></PermissionRoute>} />
+            <Route path="admin/company-profile" element={<PermissionRoute module="company-profile"><CompanyProfile /></PermissionRoute>} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}

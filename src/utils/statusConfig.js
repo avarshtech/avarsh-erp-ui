@@ -27,6 +27,7 @@ import {
   INVOICE_STATUS,
   TEMPLATE_STATUS,
 } from './expDocConstants';
+import { MAPPING_STATUS } from './poOrderMappingConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -58,6 +59,15 @@ export const PO_STATUS_CONFIG = {
   [PO_STATUS.SENT_TO_SUPPLIER]:   { color: 'cyan',       icon: SendOutlined },
   [PO_STATUS.PARTIALLY_RECEIVED]: { color: 'geekblue',   icon: InboxOutlined },
   [PO_STATUS.COMPLETED]:          { color: 'green',      icon: CheckCircleOutlined },
+};
+
+// ==================== PO–ORDER MAPPING STATUS CONFIG ====================
+// How much of a General PO has been linked to customer orders (see poOrderMappingConstants).
+export const PO_ORDER_MAPPING_STATUS_CONFIG = {
+  [MAPPING_STATUS.UNMAPPED]:   { color: 'orange',  icon: ExclamationCircleOutlined },
+  [MAPPING_STATUS.PARTIAL]:    { color: 'blue',    icon: SwapOutlined },
+  [MAPPING_STATUS.MAPPED]:     { color: 'green',   icon: CheckCircleOutlined },
+  [MAPPING_STATUS.STOCK_ONLY]: { color: 'default', icon: InboxOutlined },
 };
 
 // ==================== BOM STATUS CONFIG ====================

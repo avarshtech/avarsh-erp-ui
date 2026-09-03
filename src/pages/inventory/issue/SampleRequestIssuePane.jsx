@@ -9,6 +9,7 @@ import { listSampleIssues } from '../../../services/sr/srService';
 import { SAMPLE_TYPE_LIST } from '../../../utils/sampleRequestConstants';
 import { RAG_TAG_COLOR, deadlineLabel } from '../../../utils/deadlineUtils';
 import { hasPermission } from '../../../utils/permissions';
+import { errorText, toastUnlessHandled } from '../../../utils/apiError';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import StatCard from '../../../components/StatCard';
 import RecordLink from '../../../components/RecordLink';
@@ -55,9 +56,9 @@ const SampleRequestIssuePane = () => {
       setLoadError(null);
     } catch (e) {
       // Without this the StatCards (loading={!stats}) would shimmer forever
-      setLoadError(e.message || 'Failed to load sample request issues');
+      setLoadError(errorText(e, 'Failed to load sample request issues'));
       setStats({ totalIssues: 0, awaitingIssue: 0, inProduction: 0 });
-      message.error(e.message || 'Failed to load sample request issues');
+      toastUnlessHandled(message, e, 'Failed to load sample request issues');
     } finally {
       setLoading(false);
     }

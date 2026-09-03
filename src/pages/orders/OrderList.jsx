@@ -4,11 +4,13 @@ import {
   Table,
   Card,
   Space,
+  Tag,
   Typography,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchOrders, deleteOrder, getOrderById } from '../../services/orders/orderService';
-import { hasPermission } from '../../utils/permissions';
+import { getOrderDelays } from '../../services/po/purchaseOrderService';
+import { hasPermission, hasModuleAccess } from '../../utils/permissions';
 import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
@@ -69,6 +71,25 @@ const OrderList = () => {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Supplier delay: one bounded lookup per page of orders, never one per row. Fails soft —
+  // if the PO endpoint is unavailable the column reads "—" and the Orders list is unaffected.
+  const [supplierDelays, setSupplierDelays] = useState({});
+  const canSeeSupplierDelay = hasModuleAccess('purchase-orders');
+
+  const loadSupplierDelays = useCallback(async (rows) => {
+    const orderIds = (rows || []).map((r) => r.id).filter(Boolean);
+    if (!canSeeSupplierDelay || orderIds.length === 0) {
+      setSupplierDelays({});
+      return;
+    }
+    try {
+      const delays = await getOrderDelays({ orderIds });
+      setSupplierDelays(Object.fromEntries((delays || []).map((d) => [d.orderId, d.delayDays])));
+    } catch {
+      setSupplierDelays({});
+    }
+  }, [canSeeSupplierDelay]);
+
   // Permissions
   const canView = hasPermission('orders', 'view');
   const canAdd = hasPermission('orders', 'add');
@@ -95,20 +116,22 @@ const OrderList = () => {
         }
 
         const response = await searchOrders(params);
-        setData(response.content || []);
+        const rows = response.content || [];
+        setData(rows);
         setPagination((prev) => ({
           ...prev,
           current: page || prev.current,
           pageSize: pageSize || prev.pageSize,
           total: response.totalElements || 0,
         }));
+        loadSupplierDelays(rows);
       } catch {
         message.error('Failed to load orders');
       } finally {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, loadSupplierDelays]
   );
 
   // Re-fetch on filter change
@@ -210,6 +233,19 @@ const OrderList = () => {
         <CurrencyDisplay amount={amount} currency={record.currency} />
       ),
     },
+    // Supplier slippage carried over from the POs feeding this order. Deliberately NOT sortable:
+    // the list sorts server-side by passing the column key straight into Sort.by(), and this is a
+    // derived value with no matching entity property.
+    ...(canSeeSupplierDelay ? [{
+      title: 'Supplier Delay',
+      key: 'supplierDelay',
+      width: 130,
+      render: (_, record) => {
+        const days = supplierDelays[record.id];
+        if (!days) return <Text type="secondary">—</Text>;
+        return <Tag color="error" style={{ margin: 0 }}>{days} day{days === 1 ? '' : 's'} late</Tag>;
+      },
+    }] : []),
     {
       title: 'Status',
       dataIndex: 'status',
@@ -256,7 +292,7 @@ const OrderList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, canSeeSupplierDelay, supplierDelays]);
 
   // Status filter options
   const statusOptions = useMemo(() =>

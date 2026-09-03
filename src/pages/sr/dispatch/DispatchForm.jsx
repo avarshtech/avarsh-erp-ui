@@ -6,13 +6,15 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   getDispatch, createDispatch, updateDispatch, markDispatched,
-  listDispatchableSrs, listDispatchableCustomers, listCouriers, listBuyingOffices,
+  listDispatchableSrs, listDispatchableCustomers, listBuyingOffices,
 } from '../../../services/sr/srService';
+import useSampleMasters from '../../../hooks/useSampleMasters';
 import {
   DELIVERY_METHODS, DISPATCH_STATUS, getDispatchStatusLabel,
 } from '../../../utils/sampleRequestConstants';
 import { SR_DISPATCH_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { hasPermission, getCurrentUser } from '../../../utils/permissions';
+import { errorText, toastUnlessHandled } from '../../../utils/apiError';
 import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
@@ -39,7 +41,7 @@ const DispatchForm = () => {
 
   const [loading, setLoading] = useState(Boolean(id));
   const [record, setRecord] = useState(null);
-  const [couriers, setCouriers] = useState([]);
+  const { couriers, loading: couriersLoading } = useSampleMasters();
   const [offices, setOffices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [mastersLoading, setMastersLoading] = useState(true);
@@ -69,13 +71,12 @@ const DispatchForm = () => {
       const rows = await listDispatchableSrs(buyer);
       setSrRows([...ownSrs, ...rows.filter((r) => !ownSrs.some((s) => s.id === r.id))]);
     } catch (e) {
-      message.error(e.message || 'Failed to load dispatchable SRs');
+      toastUnlessHandled(message, e, 'Failed to load dispatchable SRs');
     } finally { setSrsLoading(false); }
   }, [message]);
 
   useEffect(() => {
     Promise.all([
-      listCouriers().then(setCouriers).catch(() => {}),
       listBuyingOffices().then(setOffices).catch(() => {}),
       listDispatchableCustomers().then(setCustomers).catch(() => {}),
     ]).finally(() => setMastersLoading(false));
@@ -93,7 +94,7 @@ const DispatchForm = () => {
         setDocs(d.documents || []);
         if (d.status === DISPATCH_STATUS.DRAFT) loadSrs(d.buyerName, d.srs || []);
       })
-      .catch((e) => { if (!cancelled) message.error(e.message || 'Failed to load dispatch'); })
+      .catch((e) => { if (!cancelled) toastUnlessHandled(message, e, 'Failed to load dispatch'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [id, loadSrs, message]);
@@ -114,6 +115,8 @@ const DispatchForm = () => {
   const setDocsDirty = useCallback((updater) => { setDocs(updater); setDirty(true); }, []);
 
   const buildDto = useCallback((values) => ({
+    // Optimistic locking — the server rejects a stale version with 409
+    version: record?.version,
     buyerName: customer,
     buyerCountry,
     srIds: selectedIds,
@@ -130,7 +133,7 @@ const DispatchForm = () => {
     acknowledgement: values.acknowledgement || null,
     remarks: values.remarks || '',
     documents: docs,
-  }), [customer, buyerCountry, selectedIds, couriers, docs]);
+  }), [record, customer, buyerCountry, selectedIds, couriers, docs]);
 
   const persistDraft = useCallback(async () => {
     const dto = buildDto(form.getFieldsValue());
@@ -146,7 +149,7 @@ const DispatchForm = () => {
       const saved = await persistDraft();
       message.success(`${saved.dispatchNo} saved as draft`);
       navigate(LIST_PATH);
-    } catch (e) { message.error(e.message || 'Failed to save'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setSaving(false); }
   }, [persistDraft, message, navigate]);
 
   const handleGenerateInvoice = useCallback(async () => {
@@ -159,7 +162,7 @@ const DispatchForm = () => {
       const saved = await persistDraft();
       message.success(`${saved.dispatchNo} saved as draft`);
       navigate(`/sample-requests/invoices/new?dispatchId=${saved.id}`);
-    } catch (e) { message.error(e.message || 'Failed to save draft'); } finally { setInvoicing(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save draft'); } finally { setInvoicing(false); }
   }, [record, persistDraft, message, navigate]);
 
   const handleMarkDispatched = useCallback(async () => {
@@ -172,14 +175,14 @@ const DispatchForm = () => {
         setDispatching(true);
         try {
           const saved = await persistDraft();
-          const done = await markDispatched(saved.id);
+          const done = await markDispatched(saved.id, saved.version);
           message.success(`${done.dispatchNo} dispatched — ${done.srCount} SR(s) moved to Dispatched`);
           navigate(LIST_PATH);
         } catch (e) {
           if (e.code === 'INVOICE_REQUIRED') {
-            modal.warning({ title: 'Commercial invoice required', content: e.message });
+            modal.warning({ title: 'Commercial invoice required', content: errorText(e) });
           } else {
-            message.error(e.message || 'Failed to dispatch');
+            toastUnlessHandled(message, e, 'Failed to dispatch');
           }
         } finally { setDispatching(false); }
       },
@@ -370,7 +373,7 @@ const DispatchForm = () => {
             form={form}
             couriers={couriers}
             offices={offices}
-            mastersLoading={mastersLoading}
+            mastersLoading={mastersLoading || couriersLoading}
             docs={docs}
             setDocs={setDocsDirty}
             currentUserLabel={currentUserLabel}

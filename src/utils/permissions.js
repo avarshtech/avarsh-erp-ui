@@ -35,7 +35,9 @@
  *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "couriers":         { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "approval-flows":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "company-profile":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
  *   "ai-assistant":     { "access": true, "operations": { "view": true } }
  * }
  */
@@ -136,8 +138,7 @@ export const MODULES = {
     name: 'Finishing PO',
     path: '/purchase-orders/finishing-po/list',
     group: 'transactions',
-  },
-  TNA: {
+  },  TNA: {
     id: 'tna',
     name: 'Time & Action',
     path: '/tna/control-tower',
@@ -351,6 +352,12 @@ export const MODULES = {
     path: '/master → Overheads tab',
     group: 'master',
   },
+  COURIERS: {
+    id: 'couriers',
+    name: 'Couriers',
+    path: '/master → Couriers tab',
+    group: 'master',
+  },
   USERS: {
     id: 'users',
     name: 'Users',
@@ -374,6 +381,12 @@ export const MODULES = {
     id: 'approval-flows',
     name: 'Approval Flows',
     path: '/admin/approval-flows',
+    group: 'admin',
+  },
+  COMPANY_PROFILE: {
+    id: 'company-profile',
+    name: 'Company Profile',
+    path: '/admin/company-profile',
     group: 'admin',
   },
   // ── HR & Payroll ──
@@ -520,8 +533,7 @@ export const PERMISSION_GROUPS = [
       { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within Supplier PO)' },
       { id: 'cutting-po', name: 'Cutting PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
       { id: 'work-order', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/work-order/list' },
-      { id: 'finishing-po', name: 'Finishing PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/finishing-po/list' },
-      { id: 'tna', name: 'Time & Action (TNA)', operations: STANDARD_OPERATIONS, path: '/tna/control-tower' },
+      { id: 'finishing-po', name: 'Finishing PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/finishing-po/list' },      { id: 'tna', name: 'Time & Action (TNA)', operations: STANDARD_OPERATIONS, path: '/tna/control-tower' },
       { id: 'tna-masters', name: 'TNA Masters', operations: STANDARD_OPERATIONS, path: '/tna/masters' },
       { id: 'tna-replan-approval', name: 'TNA Re-plan Approvals', operations: ['view', 'approve'], path: '/tna/replans' },
       { id: 'production-cutting', name: 'Production — Cutting', operations: STANDARD_OPERATIONS, path: '/production/cutting' },
@@ -572,6 +584,7 @@ export const PERMISSION_GROUPS = [
       { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'overhead-master', name: 'Overheads',                  description: 'Costing, Shipment',     operations: STANDARD_OPERATIONS },
+      { id: 'couriers',        name: 'Couriers',                   description: 'Sample Dispatch',       operations: STANDARD_OPERATIONS },
     ],
   },
   {
@@ -598,6 +611,7 @@ export const PERMISSION_GROUPS = [
       { id: 'users', name: 'User Management', operations: STANDARD_OPERATIONS, path: '/admin/users' },
       { id: 'roles', name: 'Role & Access', operations: STANDARD_OPERATIONS, path: '/admin/roles' },
       { id: 'approval-flows', name: 'Approval Flows', operations: STANDARD_OPERATIONS, path: '/admin/approval-flows' },
+      { id: 'company-profile', name: 'Company Profile', operations: ['view', 'add', 'update'], path: '/admin/company-profile' },
     ],
   },
 ];
@@ -849,8 +863,7 @@ export const getFirstAccessibleRoute = () => {
     { route: '/purchase-orders/supplier-po/list', moduleId: 'purchase-orders' },
     { route: '/purchase-orders/cutting-po/list', moduleId: 'cutting-po' },
     { route: '/purchase-orders/work-order/list', moduleId: 'work-order' },
-    { route: '/purchase-orders/finishing-po/list', moduleId: 'finishing-po' },
-    { route: '/production/cutting', moduleId: 'production-cutting' },
+    { route: '/purchase-orders/finishing-po/list', moduleId: 'finishing-po' },    { route: '/production/cutting', moduleId: 'production-cutting' },
     { route: '/production/sewing', moduleId: 'production-sewing' },
     { route: '/production/finishing', moduleId: 'production-finishing' },
     { route: '/export-docs/packing/list', moduleId: 'export-packing' },
@@ -862,8 +875,8 @@ export const getFirstAccessibleRoute = () => {
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
     { route: '/reports/list', moduleId: 'reports' },
-    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master'] },
-    { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
+    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master', 'couriers'] },
+    { route: '/admin/dashboard', moduleId: ['users', 'roles', 'company-profile'] },
   ];
 
   for (const entry of routeModuleMap) {
