@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import StatusTag from '../StatusTag';
 import { SR_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getSrStatusLabel } from '../../utils/sampleRequestConstants';
-import { RAG_TAG_COLOR, deadlineLabel } from '../../utils/deadlineUtils';
+import { RAG_TAG_COLOR, deadlineLabel, deadlineRag } from '../../utils/deadlineUtils';
 import { formatDate } from '../../utils/formatters';
 
 const { Text } = Typography;
@@ -47,7 +47,9 @@ const SampleDeadlinesCard = memo(function SampleDeadlinesCard({ deadlines, loadi
     { title: 'Buyer Deadline', dataIndex: 'buyerApprovalDeadline', key: 'buyerApprovalDeadline', width: 130, render: (d) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span> },
     {
       title: 'Days Remaining', key: 'days', width: 140,
-      render: (_, r) => <Tag color={RAG_TAG_COLOR[r.rag] || 'default'} style={{ whiteSpace: 'nowrap' }}>{deadlineLabel(r.days)}</Tag>,
+      // The server sends the day count; the colour is decided here, from the
+      // same thresholds every other sampling screen applies to a date.
+      render: (_, r) => <Tag color={RAG_TAG_COLOR[deadlineRag(r.days)] || 'default'} style={{ whiteSpace: 'nowrap' }}>{deadlineLabel(r.days)}</Tag>,
     },
   ];
 

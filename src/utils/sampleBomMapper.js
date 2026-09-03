@@ -44,6 +44,20 @@ export const buildMaterialsFromBom = (bom) => (bom?.lines || []).map((line, idx)
   return mapped;
 });
 
+/**
+ * Stock verdict for one material line. Availability is the server's live
+ * rollup; the requirement moves with the sample qty and sizes the user is still
+ * typing, so this is derived per render and never frozen onto the line.
+ * The detail view reads the server's own `stockStatus` instead — there the
+ * quantities are settled.
+ */
+export const stockStatusFor = (available, required = 0) => {
+  const have = Number(available) || 0;
+  if (have <= 0) return 'OUT_OF_STOCK';
+  if (required && have < Number(required)) return 'SHORTFALL';
+  return 'IN_STOCK';
+};
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 /**

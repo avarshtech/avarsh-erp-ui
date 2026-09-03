@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Row, Col, Card, Typography, Tag, Skeleton, Spin, Modal, Input, Button } from 'antd';
+import { App, Row, Col, Card, Typography, Tag, Skeleton, Spin, Modal, Input, Button, Alert } from 'antd';
 import { EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import ViewDialog from '../../components/ViewDialog';
@@ -15,7 +15,7 @@ import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
 import { toastUnlessHandled } from '../../utils/apiError';
 import {
-  getSampleRequest, changeStatus, deleteSampleRequest, isOverseas, updateInstructions,
+  getSampleRequest, changeStatus, deleteSampleRequest, updateInstructions,
 } from '../../services/sr/srService';
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
@@ -64,7 +64,8 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   // in state until its fetch resolves, so gate every read on the id matching.
   const fresh = sr && sr.id === Number(srId) ? sr : null;
 
-  const overseas = useMemo(() => (sr ? isOverseas(sr) : false), [sr]);
+  // Decided by the server against the company's own country, not in the browser
+  const overseas = Boolean(sr?.overseas);
 
   const statusFlow = useMemo(() => {
     if (!sr) return SR_STATUS_FLOW_BASE;
@@ -199,6 +200,30 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                 size="small"
               />
             </div>
+            {/*
+              Whether a sample counts as overseas decides whether a commercial
+              invoice gates its dispatch. Both halves of that comparison can be
+              missing, and silently treating an unknown as domestic is how a
+              shipment leaves without its customs paperwork — so say so.
+            */}
+            {sr.companyCountryMissing && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="Company country not configured"
+                description="Set the country on Admin → Company Profile. Until then every buyer counts as domestic, so no sample dispatch will ask for a commercial invoice."
+              />
+            )}
+            {sr.buyerCountryMissing && (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message={`No shipping location on record for ${sr.buyerName || 'this buyer'}`}
+                description="Add an active shipping location to the buyer. Without a country this sample is treated as domestic and will dispatch without a commercial invoice."
+              />
+            )}
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={16}>
                 <SectionHeader srNo={sr.srNo} header={sr} />

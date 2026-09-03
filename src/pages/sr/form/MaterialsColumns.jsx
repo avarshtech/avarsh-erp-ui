@@ -109,7 +109,7 @@ export const buildMaterialsColumns = ({
     render: (_, line) => {
       const cfg = STOCK_TAG[line.stockStatus] || { color: 'default', label: '—' };
       return (
-        <Tooltip title="Indicative only — no live stock check in v1">
+        <Tooltip title="Live stock, read when this screen loaded — a parallel issue can change it">
           <Tag color={cfg.color}>{cfg.label}</Tag>
         </Tooltip>
       );

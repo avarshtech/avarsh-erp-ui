@@ -8,7 +8,7 @@ import {
   createSampleRequest, updateSampleRequest, changeStatus,
 } from '../../services/sr/srService';
 import { SR_STATUS } from '../../utils/sampleRequestConstants';
-import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
+import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
 import { toastUnlessHandled } from '../../utils/apiError';
 import useSampleMasters from '../../hooks/useSampleMasters';
 import useSampleRequestDraft from './useSampleRequestDraft';
@@ -18,7 +18,6 @@ import SectionDetails from './form/SectionDetails';
 import SectionDeadlines from './form/SectionDeadlines';
 import MaterialsTable from './form/MaterialsTable';
 import SummaryBar from './form/SummaryBar';
-import { getStockStatus } from '../../services/sr/srService';
 
 const toDate = (v) => (v ? dayjs(v) : null);
 
@@ -111,7 +110,7 @@ const SampleRequestForm = () => {
     let shortfall = 0;
     materials.forEach((l) => {
       const required = computeSampleQtyRequired(l, sampleQty, sizes);
-      if (getStockStatus(l, required).status !== 'IN_STOCK') shortfall += 1;
+      if (stockStatusFor(l.stockAvailable, required) !== 'IN_STOCK') shortfall += 1;
     });
     return {
       total: materials.length,
@@ -122,14 +121,19 @@ const SampleRequestForm = () => {
     };
   }, [materials, sampleQty, sizes]);
 
+  // Only what the server accepts. The header the BOM supplies — order, style,
+  // buyer, country, season, order qty — is deliberately absent: the server
+  // resolves all of it from bomId, and the sample type NAME is snapshotted
+  // there too. Material lines carry the two editable fields and nothing else;
+  // every spec column (and sampleQtyRequired) is re-materialised from the BOM
+  // on save, so spreading the line back would only leak computed columns.
   const buildPayload = () => {
     const v = form.getFieldsValue();
     return {
-      ...draft.header,
+      bomId: draft.header?.bomId ?? draft.record?.bomId ?? null,
       // Optimistic locking — the server rejects a stale version with 409
       version: savedVersion ?? draft.record?.version,
       sampleTypeId: v.sampleTypeId ?? null,
-      sampleTypeName: typeName,
       colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
       sampleQty: v.sampleQty ?? null,
       sizes: v.sizes || [],
@@ -141,8 +145,9 @@ const SampleRequestForm = () => {
       buyerApprovalDeadline: v.buyerApprovalDeadline ? v.buyerApprovalDeadline.format('YYYY-MM-DD') : null,
       remarks: v.remarks || '',
       materials: materials.map((l) => ({
-        ...l,
-        sampleQtyRequired: computeSampleQtyRequired(l, v.sampleQty, v.sizes || []),
+        bomLineId: l.bomLineId,
+        colourDesign: l.colourDesign ?? '',
+        mandatory: Boolean(l.mandatory),
       })),
     };
   };

@@ -37,7 +37,7 @@ const SummaryBar = ({ totals, readOnly = false }) => (
         <Counter
           label="Materials Available"
           value={totals.available}
-          caption="Indicative — no live stock check in v1"
+          caption="Live stock as of page load"
           color="var(--success-color)"
         />
       </Col>

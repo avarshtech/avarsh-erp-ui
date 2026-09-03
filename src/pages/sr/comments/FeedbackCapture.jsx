@@ -323,8 +323,15 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
           <Col xs={24} sm={12}><Form.Item name="workmanship" label={`${labels.workmanship} Comments`}><TextArea rows={2} /></Form.Item></Col>
         </Row>
         <Form.Item name="additional" label="Additional Comments"><TextArea rows={1} placeholder="Anything not covered above…" /></Form.Item>
-        <Form.Item label="Attachments" extra="Buyer comment sheets or annotated photos · Excel, PDF or images · max 5 MB per file">
+        {/*
+          Disabled deliberately, not hidden. Comments now save to the server,
+          which stores attachments as real files rather than as a list of names
+          — that arrives with the file-upload stage. Left enabled, a buyer's
+          comment sheet would appear to attach and then be gone after save.
+        */}
+        <Form.Item label="Attachments" extra="Attaching files is not available yet — comment sheets can still be imported above, and the imported file is recorded in the trail">
           <Upload
+            disabled
             multiple
             accept=".xlsx,.xls,.pdf,image/*"
             beforeUpload={(file) => {
@@ -339,7 +346,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
             onRemove={(file) => setAttachments((prev) => prev.filter((f) => f.name !== file.name))}
             fileList={attachments.map((f, i) => ({ uid: String(i), name: f.name, status: 'done' }))}
           >
-            <Button icon={<UploadOutlined />}>Add attachment</Button>
+            <Button icon={<UploadOutlined />} disabled>Add attachment</Button>
           </Upload>
         </Form.Item>
       </Form>
