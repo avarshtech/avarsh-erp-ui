@@ -22,8 +22,10 @@ import { changeOrderStatus } from '../../services/orders/orderService';
 import ApprovalActionBar from '../../components/approval/ApprovalActionBar';
 import ApprovalHistoryPanel from '../../components/approval/ApprovalHistoryPanel';
 import { getFilesByEntity, downloadFileAsBlob } from '../../services/core/fileService';
+import { getOrderDelays } from '../../services/po/purchaseOrderService';
 import {
   hasPermission,
+  hasModuleAccess,
   canSubmitOrder,
   canReferBackOrder,
   canCancelOrder,
@@ -40,6 +42,7 @@ import StatusTag from '../../components/StatusTag';
 import SampleOrderTag from '../../components/SampleOrderTag';
 import OrderSrSummaryCard from '../sr/OrderSrSummaryCard';
 import OrderPackingSummaryCard from '../expdoc/OrderPackingSummaryCard';
+import OrderPoDelayCard from './OrderPoDelayCard';
 import ViewDialog from '../../components/ViewDialog';
 import DetailCard from '../../components/DetailCard';
 import LineItemCard from '../../components/LineItemCard';
@@ -82,6 +85,9 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
   // Style image
   const [styleImageUrl, setStyleImageUrl] = useState(null);
   const [styleImageLoading, setStyleImageLoading] = useState(false);
+
+  // Supplier delay carried over from the POs feeding this order — { delayDays, pos } or null
+  const [supplierDelay, setSupplierDelay] = useState(null);
 
   const referBackTextareaRef = useRef(null);
   const cancelTextareaRef = useRef(null);
@@ -135,6 +141,20 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
     return () => { cancelled = true; };
   }, [open, orderData?.styleId]);
+
+  // Supplier slippage carried over from the POs feeding this order — one lookup per open, shared
+  // by the line pills and the detail card. Fails soft: the order renders unchanged without it.
+  useEffect(() => {
+    if (!open || !orderData?.id || !hasModuleAccess('purchase-orders')) {
+      setSupplierDelay(null);
+      return;
+    }
+    let cancelled = false;
+    getOrderDelays({ orderId: orderData.id })
+      .then((rows) => { if (!cancelled) setSupplierDelay(rows?.[0] || null); })
+      .catch(() => { if (!cancelled) setSupplierDelay(null); });
+    return () => { cancelled = true; };
+  }, [open, orderData?.id]);
 
   // Handle pending action from push notification deep link
   const status = orderData?.status;
@@ -823,6 +843,9 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
         <OrderSrSummaryCard orderNo={orderNo} />
         <OrderPackingSummaryCard orderNo={orderNo} />
 
+        {/* ── POs whose delivery date slipped after this order was placed ── */}
+        <OrderPoDelayCard pos={supplierDelay?.pos} />
+
         {/* ── Order Lines ── */}
         <Title level={5} style={{ marginBottom: 12 }}>
           Order Lines ({orderLines.length})
@@ -839,6 +862,10 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                 { label: 'Qty', value: (line.lineQty || 0).toLocaleString() },
                 ...(line.dispatchDate ? [{ label: 'Dispatch', value: formatDate(line.dispatchDate) }] : []),
                 ...(line.leadTime != null ? [{ label: 'Lead Time', value: `${line.leadTime} days` }] : []),
+                // The order's lead time is unchanged — this is the supplier slipping against it.
+                ...(supplierDelay?.delayDays > 0
+                  ? [{ label: 'Supplier Delay', value: `${supplierDelay.delayDays} days` }]
+                  : []),
               ]}
               style={{ marginBottom: 12 }}
             >

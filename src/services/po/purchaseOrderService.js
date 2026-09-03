@@ -140,6 +140,27 @@ export const reviseDeliveryDate = async (id, data) => {
 };
 
 /**
+ * Supplier slippage attributed to customer orders — the largest revised-minus-original delivery
+ * gap across the POs feeding each order. Orders with no slipped PO are simply absent.
+ *
+ * Pass `orderId` for one order's detail (contributing POs attached), or `orderIds` for a list
+ * screen (headline number only). One of the two is required.
+ *
+ * @param {{ orderId?: number, orderIds?: number[] }} params
+ * @returns {Promise<Array<{ orderId: number, delayDays: number, pos?: Array }>>}
+ */
+export const getOrderDelays = async ({ orderId, orderIds } = {}) => {
+  const queryParams = new URLSearchParams();
+  if (orderId != null) {
+    queryParams.append('orderId', orderId);
+  } else {
+    (orderIds || []).forEach((id) => queryParams.append('orderIds', id));
+  }
+  const response = await axiosInstance.get(`${ENDPOINTS.PURCHASE_ORDERS}/order-delays?${queryParams.toString()}`);
+  return response.data;
+};
+
+/**
  * Reject a purchase order
  * @param {number} id - Purchase order ID
  * @param {Object} data - { reason, category?, version? }

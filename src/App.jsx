@@ -267,8 +267,7 @@ const ThemedApp = () => {
             <Route path="purchase-orders/work-order/edit/:id" element={<PermissionRoute module="work-order" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="finishing-po"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
-            {/* Production — Cutting (UI mock phase) */}
+            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />            {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
             <Route path="tna/plan/:planId" element={<PermissionRoute module="tna"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />
