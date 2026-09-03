@@ -15,6 +15,7 @@ import {
   INVOICE_TYPES, INVOICE_TYPE_LABELS, INVOICE_TYPE_SERIES,
 } from '../../../utils/sampleRequestConstants';
 import { printSampleInvoice } from '../../../utils/sampleInvoicePdfGenerator';
+import { toastUnlessHandled } from '../../../utils/apiError';
 import useCompanyProfile from './useCompanyProfile';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import InvoiceStepStyles from './InvoiceStepStyles';
@@ -152,7 +153,7 @@ const SampleInvoiceForm = () => {
           setInv(base);
         }
       } catch (e) {
-        message.error(e.message || 'Failed to load');
+        toastUnlessHandled(message, e, 'Failed to load');
       } finally { setLoading(false); }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -287,10 +288,11 @@ const SampleInvoiceForm = () => {
 
   // ── Persistence ──
   const persist = async () => {
-    if (inv.id) return updateInvoice(inv.id, inv);
-    const created = await createInvoice(inv);
-    setInv(created);
-    return created;
+    // Both branches adopt the saved record so a second save — Issue retried
+    // after a validation failure — sends the version the server just wrote
+    const saved = inv.id ? await updateInvoice(inv.id, inv) : await createInvoice(inv);
+    setInv(saved);
+    return saved;
   };
 
   const handleSaveDraft = async () => {
@@ -300,7 +302,7 @@ const SampleInvoiceForm = () => {
       setIsDirty(false);
       message.success('Invoice saved as draft — number is assigned on issue');
       leave(LIST_PATH);
-    } catch (e) { message.error(e.message || 'Failed to save'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setSaving(false); }
   };
 
   const handleIssue = () => {
@@ -314,11 +316,11 @@ const SampleInvoiceForm = () => {
         setSaving(true);
         try {
           const saved = await persist();
-          const issued = await issueInvoice(saved.id);
+          const issued = await issueInvoice(saved.id, saved.version);
           setIsDirty(false);
           message.success(`Invoice ${issued.invoiceNo} issued — ${issued.currency} ${issued.declaredValue?.toFixed(2)}`);
           leave(LIST_PATH);
-        } catch (e) { message.error(e.message || 'Failed to issue'); } finally { setSaving(false); }
+        } catch (e) { toastUnlessHandled(message, e, 'Failed to issue'); } finally { setSaving(false); }
       },
     });
   };

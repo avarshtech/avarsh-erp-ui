@@ -10,7 +10,7 @@ import { SAMPLE_TYPE_LIST } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
 import { docNo, fiscalYearLabel, SR_DOC_PREFIX } from './srDocNumbers';
 
-export const SEED_VERSION = 9;
+export const SEED_VERSION = 10;
 
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
 const ts = (offsetDays, time = '10:00') =>
@@ -95,7 +95,6 @@ const FABRIC = (lineNo, over = {}) => ({
   colourDesign: 'Classic Blue 19-4052',
   originalColourDesign: 'Classic Blue 19-4052',
   mandatory: false,
-  poRef: null,
   ...over,
 });
 
@@ -112,7 +111,6 @@ const TRIM = (lineNo, over = {}) => ({
   colourDesign: 'Tortoise TB-12',
   originalColourDesign: 'Tortoise TB-12',
   mandatory: false,
-  poRef: null,
   ...over,
 });
 
@@ -592,7 +590,6 @@ export const buildSeedDb = () => {
     requests,
     dispatches,
     invoices,
-    samplePos: [],
     sampleIssues,
     masters: {
       sampleTypes: SEED_SAMPLE_TYPES,

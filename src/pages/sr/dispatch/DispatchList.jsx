@@ -4,6 +4,7 @@ import { SendOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchDispatches, deleteDispatch, markDispatched } from '../../../services/sr/srService';
 import { hasPermission } from '../../../utils/permissions';
+import { errorText, toastUnlessHandled } from '../../../utils/apiError';
 import { DISPATCH_STATUS, DISPATCH_STATUS_LABELS, DELIVERY_METHOD_LABELS, getDispatchStatusLabel } from '../../../utils/sampleRequestConstants';
 import { SR_DISPATCH_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatDate } from '../../../utils/formatters';
@@ -53,7 +54,7 @@ const DispatchList = () => {
       const response = await searchDispatches(params);
       setData(response.content || []);
     } catch (e) {
-      message.error(e.message || 'Failed to load dispatches');
+      toastUnlessHandled(message, e, 'Failed to load dispatches');
     } finally {
       setLoading(false);
     }
@@ -80,14 +81,14 @@ const DispatchList = () => {
       okText: 'Mark as Dispatched',
       onOk: async () => {
         try {
-          await markDispatched(record.id);
+          await markDispatched(record.id, record.version);
           message.success(`${record.dispatchNo} dispatched — ${record.srCount} SR(s) moved to Dispatched`);
           fetchData();
         } catch (e) {
           if (e.code === 'INVOICE_REQUIRED') {
-            modal.warning({ title: 'Commercial invoice required', content: e.message });
+            modal.warning({ title: 'Commercial invoice required', content: errorText(e) });
           } else {
-            message.error(e.message || 'Failed to dispatch');
+            toastUnlessHandled(message, e, 'Failed to dispatch');
           }
         }
       },
@@ -106,7 +107,7 @@ const DispatchList = () => {
           message.success(`${record.dispatchNo} deleted`);
           fetchData();
         } catch (e) {
-          message.error(e.message || 'Failed to delete');
+          toastUnlessHandled(message, e, 'Failed to delete');
         }
       },
     });

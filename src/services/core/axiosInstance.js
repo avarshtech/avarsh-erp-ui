@@ -81,6 +81,14 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // Sample dispatch blocked on its commercial invoice — the screen shows a
+      // modal naming the uncovered SRs, so skip the default toast
+      if (status === 409 && data?.error === 'INVOICE_REQUIRED') {
+        error.errorMessage = data.message;
+        error.code = 'INVOICE_REQUIRED';
+        return Promise.reject(error);
+      }
+
       // Attempt token refresh on 401 (except for login/refresh/logout endpoints)
       if (
         status === 401 &&

@@ -13,6 +13,7 @@ import {
 } from '../../utils/sampleRequestConstants';
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
+import { toastUnlessHandled } from '../../utils/apiError';
 import {
   getSampleRequest, changeStatus, deleteSampleRequest, isOverseas, updateInstructions,
 } from '../../services/sr/srService';
@@ -24,7 +25,6 @@ import InvoicePanel from './view/InvoicePanel';
 import ActivityLogPanel from './view/ActivityLogPanel';
 import DispatchInfoCard from './view/DispatchInfoCard';
 import FeedbackSummaryCard from './view/FeedbackSummaryCard';
-import RaisePoDrawer from './form/RaisePoDrawer';
 
 const { Text, Title } = Typography;
 
@@ -35,7 +35,6 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const navigate = useNavigate();
   const [sr, setSr] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [poDrawer, setPoDrawer] = useState({ open: false, focusLine: null });
   const [instrModal, setInstrModal] = useState({ open: false, specialInstructions: '', remarks: '', saving: false });
 
   const canUpdate = hasPermission('sample-requests', 'update');
@@ -49,7 +48,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
     try {
       setSr(await getSampleRequest(id));
     } catch (e) {
-      message.error(e.message || 'Failed to load sample request');
+      toastUnlessHandled(message, e, 'Failed to load sample request');
       onClose?.();
     } finally { setLoading(false); }
   }, [message, onClose]);
@@ -86,10 +85,10 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
       content: `${sr?.srNo} → ${getSrStatusLabel(target)}. Every status change is logged with user and timestamp.`,
       onOk: async () => {
         try {
-          await changeStatus(sr.id, target);
+          await changeStatus(sr.id, target, sr.version);
           message.success(`${sr.srNo} → ${getSrStatusLabel(target)}`);
           refresh();
-        } catch (e) { message.error(e.message || 'Transition failed'); }
+        } catch (e) { toastUnlessHandled(message, e, 'Transition failed'); }
       },
     });
   }, [sr, modal, message, refresh]);
@@ -111,7 +110,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           message.success(`${sr.srNo} deleted`);
           onChanged?.();
           onClose?.();
-        } catch (e) { message.error(e.message || 'Failed to delete'); }
+        } catch (e) { toastUnlessHandled(message, e, 'Failed to delete'); }
       },
     }),
   }), [sr, doTransition, modal, message, navigate, onChanged, onClose]);
@@ -242,7 +241,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                     </div>
                   )}
                 </Card>
-                <ViewMaterials sr={sr} onRaisePo={(line) => setPoDrawer({ open: true, focusLine: line })} />
+                <ViewMaterials sr={sr} />
               </Col>
               <Col xs={24} lg={8}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -264,13 +263,6 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           </Spin>
         )}
       </ViewDialog>
-      <RaisePoDrawer
-        open={poDrawer.open}
-        sr={sr}
-        focusLine={poDrawer.focusLine}
-        onClose={() => setPoDrawer({ open: false, focusLine: null })}
-        onCreated={refresh}
-      />
       {/* PRD §8.3 — at In Production, Special Instructions + Remarks stay editable */}
       <Modal
         title="Edit instructions"
@@ -284,12 +276,13 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
             await updateInstructions(sr.id, {
               specialInstructions: instrModal.specialInstructions,
               remarks: instrModal.remarks,
+              version: sr.version,
             });
             message.success('Instructions updated — change logged in the activity trail');
             setInstrModal((s) => ({ ...s, open: false, saving: false }));
             refresh();
           } catch (e) {
-            message.error(e.message || 'Failed to update');
+            toastUnlessHandled(message, e, 'Failed to update');
             setInstrModal((s) => ({ ...s, saving: false }));
           }
         }}

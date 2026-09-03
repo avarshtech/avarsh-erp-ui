@@ -47,6 +47,7 @@ const initialState = {
   // tables, and the code lists + thresholds the cutting screens read from
   cuttingMasters: null,
   sewingMasters: null,
+  sampleMasters: null,
 
   // Loading states per data type
   loading: {
@@ -67,6 +68,7 @@ const initialState = {
     sampleOrderNos: false,
     cuttingMasters: false,
     sewingMasters: false,
+    sampleMasters: false,
   },
 
   // Error states per data type
@@ -88,6 +90,7 @@ const initialState = {
     sampleOrderNos: null,
     cuttingMasters: null,
     sewingMasters: null,
+    sampleMasters: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -109,6 +112,7 @@ const initialState = {
     sampleOrderNos: null,
     cuttingMasters: null,
     sewingMasters: null,
+    sampleMasters: null,
   },
 };
 

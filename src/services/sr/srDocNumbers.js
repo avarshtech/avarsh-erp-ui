@@ -18,7 +18,6 @@ export const SR_DOC_PREFIX = {
   REQUEST: 'SRQ',
   DISPATCH: 'DSP',
   ISSUE: 'SRI',
-  SAMPLE_PO: 'SPO',
 };
 
 /** Indian financial year code, e.g. 2026-08 → "26-27" (FY starts April 1). */

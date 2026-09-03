@@ -7,7 +7,6 @@
 import { USE_MOCK_SR_DATA } from './srEnv';
 import * as mockApi from './srMockApi';
 import * as mockTransitions from './srMockTransitions';
-import * as mockPos from './srMockPos';
 import * as mockInvoices from './srMockInvoices';
 import * as mockMasters from './srMockMasters';
 import * as mockImport from './srMockImport';
@@ -20,7 +19,6 @@ const guard = (impl) => (USE_MOCK_SR_DATA ? impl : new Proxy({}, { get: () => no
 
 const api = guard(mockApi);
 const transitions = guard(mockTransitions);
-const pos = guard(mockPos);
 const invoices = guard(mockInvoices);
 const masters = guard(mockMasters);
 const importer = guard(mockImport);
@@ -32,17 +30,17 @@ const issues = guard(mockIssues);
 export const searchSampleRequests = (...a) => api.searchSampleRequests(...a);
 export const getSampleRequest = (...a) => api.getSampleRequest(...a);
 export const createSampleRequest = (...a) => api.createSampleRequest(...a);
-export const updateSampleRequest = (...a) => api.updateSampleRequest(...a);
-export const updateInstructions = (...a) => api.updateInstructions(...a);   // In Production only (PRD §8.3)
+export const updateSampleRequest = (...a) => api.updateSampleRequest(...a); // (id, payload{version})
+export const updateInstructions = (...a) => api.updateInstructions(...a);   // In Production only (PRD §8.3); payload carries version
 export const deleteSampleRequest = (...a) => api.deleteSampleRequest(...a);
 export const listByOrderNo = (...a) => api.listByOrderNo(...a);          // GET /by-order/{orderNo}
 export const getActivity = (...a) => api.getActivity(...a);              // GET /{id}/activity
 export const listSrBuyers = (...a) => api.listSrBuyers(...a);            // GET /buyers facet
 
 // ── Workflow ── POST /{id}/status · /{id}/feedback (dispatch = own entity below)
-export const changeStatus = (...a) => transitions.changeStatus(...a);
-export const saveFeedbackDraft = (...a) => transitions.saveFeedbackDraft(...a);
-export const recordFeedback = (...a) => transitions.recordFeedback(...a);
+export const changeStatus = (...a) => transitions.changeStatus(...a);        // (id, target, version)
+export const saveFeedbackDraft = (...a) => transitions.saveFeedbackDraft(...a); // (id, dto{version})
+export const recordFeedback = (...a) => transitions.recordFeedback(...a);    // (id, dto{version}) → SR
 export const isOverseas = (...a) => transitions.isOverseas(...a);
 
 // ── Dispatches (R2) ── /sample-dispatches CRUD + /{id}/mark-dispatched
@@ -51,9 +49,9 @@ export const getDispatch = (...a) => dispatches.getDispatch(...a);
 export const listDispatchableSrs = (...a) => dispatches.listDispatchableSrs(...a);
 export const listDispatchableCustomers = (...a) => dispatches.listDispatchableCustomers(...a);
 export const createDispatch = (...a) => dispatches.createDispatch(...a);
-export const updateDispatch = (...a) => dispatches.updateDispatch(...a);
+export const updateDispatch = (...a) => dispatches.updateDispatch(...a);    // (id, dto{version})
 export const deleteDispatch = (...a) => dispatches.deleteDispatch(...a);
-export const markDispatched = (...a) => dispatches.markDispatched(...a);
+export const markDispatched = (...a) => dispatches.markDispatched(...a);    // (id, version)
 
 // ── Sample Request Issue (R2) ── material issue gates Submitted → In Production
 export const listIssuableSrs = (...a) => issues.listIssuableSrs(...a);
@@ -61,20 +59,14 @@ export const createSampleIssue = (...a) => issues.createSampleIssue(...a);
 export const listSampleIssues = (...a) => issues.listSampleIssues(...a);
 export const getSampleIssue = (...a) => issues.getSampleIssue(...a);
 
-// ── Sample POs (mock this phase; real = PO module w/ po_type=SAMPLE) ──
-export const createSamplePo = (...a) => pos.createSamplePo(...a);
-export const listSamplePos = (...a) => pos.listSamplePos(...a);
-export const canRaisePo = (...a) => pos.canRaisePo(...a);
-export const markSamplePoReceived = (...a) => pos.markSamplePoReceived(...a);
-
 // ── Commercial invoices ── /sample-invoices + /{id}/issue|cancel|duplicate
 export const listInvoices = (...a) => invoices.listInvoices(...a);
 export const getInvoice = (...a) => invoices.getInvoice(...a);
 export const listEligibleSrs = (...a) => invoices.listEligibleSrs(...a);
 export const createInvoice = (...a) => invoices.createInvoice(...a);
 export const updateInvoice = (...a) => invoices.updateInvoice(...a);
-export const issueInvoice = (...a) => invoices.issueInvoice(...a);
-export const cancelInvoice = (...a) => invoices.cancelInvoice(...a);
+export const issueInvoice = (...a) => invoices.issueInvoice(...a);          // (id, version)
+export const cancelInvoice = (...a) => invoices.cancelInvoice(...a);        // (id, reason, version)
 export const duplicateInvoice = (...a) => invoices.duplicateInvoice(...a);
 
 // ── Masters ── /sample-requests/masters/* (sample types are a FIXED list of 8)

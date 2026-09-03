@@ -37,7 +37,6 @@ export const buildMaterialsFromBom = (bom) => (bom?.lines || []).map((line, idx)
     colourDesign: colourOf(line),
     originalColourDesign: colourOf(line),
     mandatory: false,
-    poRef: null,
   };
   // Buyer-specified trims (threads, labels) default to mandatory — locked to
   // spec even when substitution is allowed (per-line override, OQ2).

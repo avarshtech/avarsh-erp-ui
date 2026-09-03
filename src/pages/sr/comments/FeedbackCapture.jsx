@@ -13,6 +13,7 @@ import {
   FEEDBACK_DECISIONS, FEEDBACK_DECISION_OPTIONS, FEEDBACK_DECISION_LABELS,
   SR_STATUS, getSrStatusLabel,
 } from '../../../utils/sampleRequestConstants';
+import { toastUnlessHandled } from '../../../utils/apiError';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -106,7 +107,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
       // The original file always attaches — the source of record is never the parse
       setAttachments((prev) => (prev.some((a) => a.name === file.name)
         ? prev : [...prev, { name: file.name, size: file.size, type: file.type, sourceOfImport: true }]));
-    } catch (e) { message.error(e.message || 'Failed to parse'); } finally { setParsing(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to parse'); } finally { setParsing(false); }
     return false;
   };
 
@@ -130,6 +131,8 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   };
 
   const buildDto = (v) => ({
+    // Optimistic locking — the server rejects a stale version with 409
+    version: sr.version,
     date: v.date ? v.date.format('YYYY-MM-DD') : null,
     from: v.from || '',
     decision: v.decision || null,
@@ -149,7 +152,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
       message.success('Comment record saved — status unchanged');
       onChanged?.();
     } catch (e) {
-      message.error(e.message || 'Failed to save');
+      toastUnlessHandled(message, e, 'Failed to save');
     }
   };
 
@@ -158,11 +161,11 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
     let values;
     try { values = await form.validateFields(); } catch { return; }
     try {
-      const { sampleRequest } = await recordFeedback(sr.id, buildDto(values));
-      message.success(`Comments saved — ${sampleRequest.srNo} is now ${getSrStatusLabel(sampleRequest.status)}`);
+      const updated = await recordFeedback(sr.id, buildDto(values));
+      message.success(`Comments saved — ${updated.srNo} is now ${getSrStatusLabel(updated.status)}`);
       onChanged?.();
       onClose?.();
-    } catch (e) { message.error(e.message || 'Failed to save comments'); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save comments'); }
   };
 
   // The dialog footer owns the buttons and awaits these for its loading state

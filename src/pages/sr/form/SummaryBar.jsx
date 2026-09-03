@@ -1,5 +1,4 @@
-import { Card, Row, Col, Form, Input, Button, Typography } from 'antd';
-import { ShoppingCartOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Form, Input, Typography } from 'antd';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -7,9 +6,9 @@ const { TextArea } = Input;
 /**
  * Section E — summary counters + remarks (PRD v3 §8.2 E, Figure 8). Each
  * counter is a roomy accented block with a caption explaining what the number
- * means; the shortfall counter doubles as a route into the Raise PO drawer.
+ * means.
  */
-const Counter = ({ label, value, caption, color, extra }) => (
+const Counter = ({ label, value, caption, color }) => (
   <Card
     size="small"
     style={{ borderTop: `3px solid ${color}`, height: '100%' }}
@@ -20,14 +19,13 @@ const Counter = ({ label, value, caption, color, extra }) => (
     </Text>
     <div style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.3, color }}>{value}</div>
     {caption && <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{caption}</Text>}
-    {extra}
   </Card>
 );
 
-const SummaryBar = ({ totals, onRaisePoFromShortfall, readOnly = false }) => (
+const SummaryBar = ({ totals, readOnly = false }) => (
   <Card size="small" style={{ marginBottom: 16 }} title={<Title level={5} style={{ margin: 0 }}>E · Summary &amp; Actions</Title>}>
     <Row gutter={[16, 16]}>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} lg={8}>
         <Counter
           label="Total Material Lines"
           value={totals.total}
@@ -35,7 +33,7 @@ const SummaryBar = ({ totals, onRaisePoFromShortfall, readOnly = false }) => (
           color="#8b5cf6"
         />
       </Col>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} lg={8}>
         <Counter
           label="Materials Available"
           value={totals.available}
@@ -43,25 +41,12 @@ const SummaryBar = ({ totals, onRaisePoFromShortfall, readOnly = false }) => (
           color="var(--success-color)"
         />
       </Col>
-      <Col xs={24} sm={12} lg={6}>
+      <Col xs={24} sm={12} lg={8}>
         <Counter
           label="Shortfall Items"
           value={totals.shortfall}
           caption={totals.shortfall ? 'Special qualities are often bought in for the sample' : 'Nothing flagged short'}
           color={totals.shortfall ? 'var(--error-color)' : 'var(--success-color)'}
-          extra={totals.shortfall > 0 && !readOnly && (
-            <Button type="link" size="small" style={{ padding: 0 }} icon={<ShoppingCartOutlined />} onClick={onRaisePoFromShortfall}>
-              Raise PO →
-            </Button>
-          )}
-        />
-      </Col>
-      <Col xs={24} sm={12} lg={6}>
-        <Counter
-          label="Sample POs Raised"
-          value={totals.posRaised}
-          caption={totals.posRaised ? 'PO Pending until goods are received' : 'None yet against this SR'}
-          color="#fa8c16"
         />
       </Col>
     </Row>

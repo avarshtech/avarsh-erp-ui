@@ -4,6 +4,7 @@ import { getOrderByOrderNo } from '../../services/orders/orderService';
 import { getBuyerById } from '../../services/master/buyerService';
 import { getSampleRequest } from '../../services/sr/srService';
 import { buildMaterialsFromBom } from '../../utils/sampleBomMapper';
+import { errorText } from '../../utils/apiError';
 import { isSrEditable } from '../../utils/sampleRequestConstants';
 
 /**
@@ -76,7 +77,7 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
       const resolvedOrder = order || (bom?.orderNo ? await getOrderByOrderNo(bom.orderNo) : null);
       setState(await loadFromBom(bom, resolvedOrder));
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: e.message || 'Failed to load BOM/Order' }));
+      setState((s) => ({ ...s, loading: false, error: errorText(e, 'Failed to load BOM/Order') }));
     }
   };
 
@@ -99,7 +100,7 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
         orderSizes: record.sizes || [],
       });
     } catch (e) {
-      setState((s) => ({ ...s, loading: false, error: e.message || 'Failed to load sample request' }));
+      setState((s) => ({ ...s, loading: false, error: errorText(e, 'Failed to load sample request') }));
     }
   };
 

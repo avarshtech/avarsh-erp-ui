@@ -60,7 +60,6 @@ export const decorate = (sr, db = null) => {
   out.totalMaterialLines = out.materials.length;
   out.shortfallCount = out.materials.filter((m) => m.stockStatus !== 'IN_STOCK').length;
   out.availableCount = out.totalMaterialLines - out.shortfallCount;
-  out.samplePosRaised = out.materials.filter((m) => m.poRef).length;
   out.isOverdue = out.status !== SR_STATUS.DISPATCHED
     && !['APPROVED', 'REJECTED', 'REVISION_REQUIRED', 'FEEDBACK_RECEIVED'].includes(out.status)
     && out.daysToDispatch != null && out.daysToDispatch < 0;

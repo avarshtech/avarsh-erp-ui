@@ -6,6 +6,7 @@ import {
   listSampleTypes, listSrBuyers, getSampleDashboard,
 } from '../../services/sr/srService';
 import { hasPermission } from '../../utils/permissions';
+import { toastUnlessHandled } from '../../utils/apiError';
 import { SR_STATUS_LABELS } from '../../utils/sampleRequestConstants';
 import { ActionButton } from '../../components/buttons';
 import PageHeader from '../../components/PageHeader';
@@ -89,8 +90,8 @@ const SampleRequestList = () => {
         pageSize: pageSize || prev.pageSize,
         total: response.totalElements || 0,
       }));
-    } catch {
-      message.error('Failed to load sample requests');
+    } catch (e) {
+      toastUnlessHandled(message, e, 'Failed to load sample requests');
     } finally {
       setLoading(false);
     }
@@ -125,7 +126,7 @@ const SampleRequestList = () => {
           message.success(`${record.srNo} deleted`);
           refreshAll();
         } catch (e) {
-          message.error(e.message || 'Failed to delete');
+          toastUnlessHandled(message, e, 'Failed to delete');
         }
       },
     });

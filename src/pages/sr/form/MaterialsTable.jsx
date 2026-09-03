@@ -14,7 +14,7 @@ const { Title, Text } = Typography;
  */
 const MaterialsTable = ({
   materials, sr, sampleQty, sizes, typeName,
-  onColourChange, onMandatoryChange, onRaisePo, readOnly = false, poAllowed = true,
+  onColourChange, onMandatoryChange, readOnly = false,
 }) => {
   const enriched = useMemo(() => (materials || []).map((line) => {
     if (line.stockStatus) return line;
@@ -24,8 +24,8 @@ const MaterialsTable = ({
   }), [materials, sampleQty, sizes]);
 
   const columns = useMemo(() => buildMaterialsColumns({
-    sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange, onRaisePo, poAllowed,
-  }), [sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange, onRaisePo, poAllowed]);
+    sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange,
+  }), [sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange]);
 
   const fabric = useMemo(() => enriched.filter((l) => l.section === 'FABRIC'), [enriched]);
   const trims = useMemo(() => enriched.filter((l) => l.section !== 'FABRIC'), [enriched]);
@@ -45,7 +45,7 @@ const MaterialsTable = ({
         columns={columns}
         dataSource={fabric}
         pagination={false}
-        scroll={{ x: 1600 }}
+        scroll={{ x: 1400 }}
         style={{ marginBottom: 16 }}
       />
       <Text strong style={{ display: 'block', marginBottom: 8 }}>Trims &amp; Accessories</Text>
@@ -55,7 +55,7 @@ const MaterialsTable = ({
         columns={columns}
         dataSource={trims}
         pagination={false}
-        scroll={{ x: 1600 }}
+        scroll={{ x: 1400 }}
       />
     </Card>
   );
