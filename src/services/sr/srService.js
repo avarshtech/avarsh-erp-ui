@@ -1,25 +1,14 @@
 /**
  * Sample Request module API surface — the ONLY file screens import.
  *
- * Mid-cutover: each stage repoints a block of these exports from the srMock*
- * modules to srApi.js, so a screen never learns which side it is talking to.
- * Everything still marked mock keeps the signature its real endpoint will take.
+ * Each stage of the cutover repointed a block of these exports from the srMock*
+ * modules to srApi.js, so a screen never learned which side it was talking to.
  *
- * Real as of Stage 5: masters, SR CRUD + list, the BOM preview, status changes,
- * feedback, the dashboard, the sample issues, dispatches and invoices. Only the
- * comment-sheet import is still mock.
- *
- * The mock modules stay on disk until the last stage deletes them all at once;
- * this file no longer imports any of them except srMockImport.
+ * Every export is now real. The mock modules stay on disk until the last stage
+ * deletes them all at once, but nothing imports them any more — this file was
+ * the last reader, through the comment-sheet importer.
  */
-import { USE_MOCK_SR_DATA } from './srEnv';
 import * as srApi from './srApi';
-import * as mockImport from './srMockImport';
-
-const notReady = () => { throw new Error('Sample Request backend not implemented yet — mock phase'); };
-const guard = (impl) => (USE_MOCK_SR_DATA ? impl : new Proxy({}, { get: () => notReady }));
-
-const importer = guard(mockImport);
 
 // ── SR CRUD + list ── REAL: GET/POST /sample-requests, GET/PUT/DELETE /{id}
 // bomPreview is what a new request starts from: the server materialises the BOM
@@ -98,8 +87,10 @@ export const getHsnDefault = (...a) => srApi.getHsnDefault(...a);
 // listBuyingOffices is gone too — a hand delivery now picks one of the buyer's
 // own shipping locations, so there is no separate buying-office list to keep.
 
-// ── Comment-sheet import ── POST /{id}/comment-sheet:parse
-export const parseCommentSheet = (...a) => importer.parseCommentSheet(...a);
+// ── Comment-sheet import ── REAL: POST /{id}/comment-sheet/parse
+// Advisory only: it returns candidate rows and writes nothing, so the save
+// endpoints above stay the only things that touch the record.
+export const parseCommentSheet = (...a) => srApi.parseCommentSheet(...a);
 
 // ── Dashboard ── REAL: GET /sample-requests/dashboard
 export const getSampleDashboard = (...a) => srApi.getSampleDashboard(...a);

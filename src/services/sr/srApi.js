@@ -4,7 +4,7 @@
  * srService.js is the only file screens import; it delegates here instead of
  * to the srMock* modules as each stage lands.
  */
-import axiosInstance from '../core/axiosInstance';
+import axiosInstance, { upload } from '../core/axiosInstance';
 
 /** Every Sample Request endpoint hangs off this path (axiosInstance owns /api/v1). */
 export const BASE = '/sample-requests';
@@ -85,6 +85,20 @@ export const saveFeedbackDraft = async (id, dto) => (await axiosInstance.put(`${
 
 /** The buyer's verdict. Closes the request. */
 export const recordFeedback = async (id, dto) => (await axiosInstance.put(`${BASE}/${id}/feedback`, dto)).data;
+
+/**
+ * Reads a buyer's comment sheet and says what it found — writing nothing. The
+ * user ticks the rows to keep and the feedback endpoints above save them.
+ *
+ * Posted through the shared upload helper so the multipart boundary is set
+ * rather than the instance's JSON content type. Answers 503 AI_NOT_CONFIGURED
+ * where no extraction key is configured.
+ */
+export const parseCommentSheet = async (id, file) => {
+  const form = new FormData();
+  form.append('file', file);
+  return upload(`${BASE}/${id}/comment-sheet/parse`, form);
+};
 
 /**
  * What a new request starts from. The server materialises the BOM into sample
