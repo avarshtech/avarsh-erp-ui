@@ -6,17 +6,21 @@ import {
 import { UploadOutlined, FileSearchOutlined, InboxOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  recordFeedback, saveFeedbackDraft, listRejectionReasons,
-  getFeedbackCategoryLabels, parseCommentSheet,
+  recordFeedback, saveFeedbackDraft, parseCommentSheet,
 } from '../../../services/sr/srService';
 import {
   FEEDBACK_DECISIONS, FEEDBACK_DECISION_OPTIONS, FEEDBACK_DECISION_LABELS,
   SR_STATUS, getSrStatusLabel,
 } from '../../../utils/sampleRequestConstants';
 import { toastUnlessHandled } from '../../../utils/apiError';
+import useSampleMasters from '../../../hooks/useSampleMasters';
 
 const { Text } = Typography;
 const { TextArea } = Input;
+
+// Rendered as "<label> Comments", so the four keys must always resolve — the
+// server set replaces these once the masters cache fills
+const DEFAULT_LABELS = { fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' };
 
 const CONFIDENCE_TAG = {
   HIGH: { color: 'green', label: 'High' },
@@ -50,8 +54,8 @@ const extOf = (name) => String(name || '').split('.').pop().toLowerCase();
 const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
-  const [reasons, setReasons] = useState([]);
-  const [labels, setLabels] = useState({ fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' });
+  const { rejectionReasonOptions, feedbackLabels } = useSampleMasters();
+  const labels = { ...DEFAULT_LABELS, ...feedbackLabels };
   const [attachments, setAttachments] = useState(sr.feedback?.attachments || []);
   const [importStep, setImportStep] = useState(0);
   const [parsing, setParsing] = useState(false);
@@ -66,11 +70,6 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
   // as is the whole form for a reader without sample-comments update rights
   // (the dialog footer hides its save actions on the same condition).
   const editable = canUpdate && [SR_STATUS.DISPATCHED, SR_STATUS.FEEDBACK_RECEIVED].includes(sr.status);
-
-  useEffect(() => {
-    listRejectionReasons().then(setReasons).catch(() => {});
-    getFeedbackCategoryLabels(sr.buyerName).then(setLabels).catch(() => {});
-  }, [sr.buyerName]);
 
   useEffect(() => {
     const f = sr.feedback;
@@ -313,7 +312,7 @@ const FeedbackCapture = ({ sr, onChanged, onClose, canUpdate = true, ref }) => {
             <Select
               mode="multiple"
               placeholder="Multi-select from Master Data"
-              options={reasons.map((r) => ({ value: r.code, label: r.label }))}
+              options={rejectionReasonOptions}
             />
           </Form.Item>
         )}

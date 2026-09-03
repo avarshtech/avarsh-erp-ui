@@ -13,6 +13,7 @@ import {
   PlusCircleOutlined,
   IssuesCloseOutlined,
   SlidersOutlined,
+  CarOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -35,6 +36,7 @@ import BpDebitTypeMaster from './BpDebitTypeMaster';
 import BpChargeTypeMaster from './BpChargeTypeMaster';
 import BpIssueTypeMaster from './BpIssueTypeMaster';
 import BpToleranceSettings from './BpToleranceSettings';
+import CourierMaster from './CourierMaster';
 import { useStore } from '../../context/StoreContext';
 import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
@@ -200,6 +202,15 @@ const NAV_GROUPS = [
         Component: OverheadMaster,
         loadingKey: null,
         description: 'Overhead and markup cost categories for costing',
+      },
+      {
+        key: 'couriers',
+        label: 'Couriers',
+        icon: <CarOutlined />,
+        moduleId: 'couriers',
+        Component: CourierMaster,
+        loadingKey: null,
+        description: 'Carriers and hand delivery options for sample dispatches',
       },
     ],
   },

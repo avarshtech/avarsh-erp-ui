@@ -78,6 +78,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
 import ApprovalFlowList from './pages/admin/ApprovalFlowList';
+import CompanyProfile from './pages/admin/CompanyProfile';
 import MasterDashboard from './pages/master/MasterDashboard';
 import Profile from './pages/Profile';
 
@@ -366,6 +367,7 @@ const ThemedApp = () => {
             <Route path="admin/users" element={<PermissionRoute module="users"><UserManagement /></PermissionRoute>} />
             <Route path="admin/roles" element={<PermissionRoute module="roles"><RoleAccess /></PermissionRoute>} />
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows"><ApprovalFlowList /></PermissionRoute>} />
+            <Route path="admin/company-profile" element={<PermissionRoute module="company-profile"><CompanyProfile /></PermissionRoute>} />
             {/* Master Data */}
             <Route path="master" element={<MasterDashboard />} />
             {/* Profile */}

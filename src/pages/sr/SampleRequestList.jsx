@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  searchSampleRequests, deleteSampleRequest,
-  listSampleTypes, listSrBuyers, getSampleDashboard,
+  searchSampleRequests, deleteSampleRequest, listSrBuyers, getSampleDashboard,
 } from '../../services/sr/srService';
 import { hasPermission } from '../../utils/permissions';
 import { toastUnlessHandled } from '../../utils/apiError';
+import useSampleMasters from '../../hooks/useSampleMasters';
 import { SR_STATUS_LABELS } from '../../utils/sampleRequestConstants';
 import { ActionButton } from '../../components/buttons';
 import PageHeader from '../../components/PageHeader';
@@ -26,9 +26,9 @@ const SampleRequestList = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [dashboard, setDashboard] = useState(null);
-  const [sampleTypes, setSampleTypes] = useState([]);
+  const { sampleTypeOptions, loading: typesLoading } = useSampleMasters();
   const [buyers, setBuyers] = useState([]);
-  const [mastersLoading, setMastersLoading] = useState(true);
+  const [buyersLoading, setBuyersLoading] = useState(true);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || undefined);
@@ -53,11 +53,10 @@ const SampleRequestList = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Buyers are a facet of the sample requests themselves, so they are fetched
+  // per visit rather than cached with the masters
   useEffect(() => {
-    Promise.all([
-      listSampleTypes().then(setSampleTypes).catch(() => {}),
-      listSrBuyers().then(setBuyers).catch(() => {}),
-    ]).finally(() => setMastersLoading(false));
+    listSrBuyers().then(setBuyers).catch(() => {}).finally(() => setBuyersLoading(false));
   }, []);
 
   const refreshDashboard = useCallback(() => {
@@ -163,8 +162,8 @@ const SampleRequestList = () => {
           searchPlaceholder="Search SR No or Order No..."
           filters={[
             { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Status', value: statusFilter, onChange: setStatusFilter, options: statusOptions } },
-            { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Sample Type', value: typeFilter, onChange: setTypeFilter, loading: mastersLoading, options: sampleTypes.map((t) => ({ value: t.id, label: t.name })) } },
-            { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Buyer', value: buyerFilter, onChange: setBuyerFilter, loading: mastersLoading, options: buyers.map((b) => ({ value: b, label: b })) } },
+            { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Sample Type', value: typeFilter, onChange: setTypeFilter, loading: typesLoading, options: sampleTypeOptions } },
+            { type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 }, props: { placeholder: 'Buyer', value: buyerFilter, onChange: setBuyerFilter, loading: buyersLoading, options: buyers.map((b) => ({ value: b, label: b })) } },
             { type: 'rangePicker', span: { xs: 24, sm: 12, md: 6, lg: 5 }, props: { placeholder: ['Dispatch From', 'Dispatch To'], value: deadlineRange, onChange: setDeadlineRange } },
           ]}
           onRefresh={refreshAll}

@@ -1,10 +1,14 @@
 /**
  * Sample Request module API surface — the ONLY file screens import.
- * Mock-only during this phase; every function keeps the signature the future
- * real endpoints (/api/v1/sample-requests/…) will take, so integration swaps
- * the delegate without touching screens. (Endpoint map: see the plan/PRD v3.)
+ *
+ * Mid-cutover: each stage repoints a block of these exports from the srMock*
+ * modules to srApi.js, so a screen never learns which side it is talking to.
+ * Everything still marked mock keeps the signature its real endpoint will take.
+ * The mock modules stay on disk until the last block flips — srMockApi.decorate
+ * is imported by four of them.
  */
 import { USE_MOCK_SR_DATA } from './srEnv';
+import * as srApi from './srApi';
 import * as mockApi from './srMockApi';
 import * as mockTransitions from './srMockTransitions';
 import * as mockInvoices from './srMockInvoices';
@@ -69,16 +73,22 @@ export const issueInvoice = (...a) => invoices.issueInvoice(...a);          // (
 export const cancelInvoice = (...a) => invoices.cancelInvoice(...a);        // (id, reason, version)
 export const duplicateInvoice = (...a) => invoices.duplicateInvoice(...a);
 
-// ── Masters ── /sample-requests/masters/* (sample types are a FIXED list of 8)
-export const listSampleTypes = (...a) => masters.listSampleTypes(...a);
-export const listCouriers = (...a) => masters.listCouriers(...a);
-export const listBuyingOffices = (...a) => masters.listBuyingOffices(...a);
-export const listRejectionReasons = (...a) => masters.listRejectionReasons(...a);
-export const getFeedbackCategoryLabels = (...a) => masters.getFeedbackCategoryLabels(...a);
-export const listHsnCodes = (...a) => masters.listHsnCodes(...a);
-export const getHsnDefault = (...a) => masters.getHsnDefault(...a);
-export const getCompanyProfileExtra = (...a) => masters.getCompanyProfileExtra(...a);
+// ── Masters ── REAL: /sample-requests/masters/* (sample types are a FIXED list of 8)
+// Couriers are maintained on their own Master Data tab now. getCompanyProfileExtra
+// is gone: those fields live on the organisation record, and useCompanyProfile
+// derives them from its DTO.
+export const listSampleTypes = (...a) => srApi.listSampleTypes(...a);
+export const listCouriers = (...a) => srApi.listCouriers(...a);
+export const listRejectionReasons = (...a) => srApi.listRejectionReasons(...a);
+export const getFeedbackCategoryLabels = (...a) => srApi.getFeedbackCategoryLabels(...a);
+export const listHsnCodes = (...a) => srApi.listHsnCodes(...a);
+export const getHsnDefault = (...a) => srApi.getHsnDefault(...a);
+
+// Still mock. getStockStatus is replaced by the server-computed
+// materials[].stockStatus in Stage 2; listBuyingOffices survives only until the
+// dispatch screen moves to the buyer's shipping locations in Stage 5.
 export const getStockStatus = (...a) => masters.getStockStatus(...a);
+export const listBuyingOffices = (...a) => masters.listBuyingOffices(...a);
 
 // ── Comment-sheet import ── POST /{id}/comment-sheet:parse
 export const parseCommentSheet = (...a) => importer.parseCommentSheet(...a);

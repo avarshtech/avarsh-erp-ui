@@ -35,7 +35,9 @@
  *   "overhead-master":  { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "users":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "roles":            { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "couriers":         { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
  *   "approval-flows":   { "access": true, "operations": { "view": true, "add": true, "update": true, "delete": true } },
+ *   "company-profile":  { "access": true, "operations": { "view": true, "add": true, "update": true } },
  *   "ai-assistant":     { "access": true, "operations": { "view": true } }
  * }
  */
@@ -351,6 +353,12 @@ export const MODULES = {
     path: '/master → Overheads tab',
     group: 'master',
   },
+  COURIERS: {
+    id: 'couriers',
+    name: 'Couriers',
+    path: '/master → Couriers tab',
+    group: 'master',
+  },
   USERS: {
     id: 'users',
     name: 'Users',
@@ -374,6 +382,12 @@ export const MODULES = {
     id: 'approval-flows',
     name: 'Approval Flows',
     path: '/admin/approval-flows',
+    group: 'admin',
+  },
+  COMPANY_PROFILE: {
+    id: 'company-profile',
+    name: 'Company Profile',
+    path: '/admin/company-profile',
     group: 'admin',
   },
   // ── HR & Payroll ──
@@ -572,6 +586,7 @@ export const PERMISSION_GROUPS = [
       { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
       { id: 'overhead-master', name: 'Overheads',                  description: 'Costing, Shipment',     operations: STANDARD_OPERATIONS },
+      { id: 'couriers',        name: 'Couriers',                   description: 'Sample Dispatch',       operations: STANDARD_OPERATIONS },
     ],
   },
   {
@@ -598,6 +613,7 @@ export const PERMISSION_GROUPS = [
       { id: 'users', name: 'User Management', operations: STANDARD_OPERATIONS, path: '/admin/users' },
       { id: 'roles', name: 'Role & Access', operations: STANDARD_OPERATIONS, path: '/admin/roles' },
       { id: 'approval-flows', name: 'Approval Flows', operations: STANDARD_OPERATIONS, path: '/admin/approval-flows' },
+      { id: 'company-profile', name: 'Company Profile', operations: ['view', 'add', 'update'], path: '/admin/company-profile' },
     ],
   },
 ];
@@ -850,8 +866,8 @@ export const getFirstAccessibleRoute = () => {
     { route: '/grn/list', moduleId: 'grn' },
     { route: '/costing/list', moduleId: 'costing' },
     { route: '/reports/list', moduleId: 'reports' },
-    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master'] },
-    { route: '/admin/dashboard', moduleId: ['users', 'roles'] },
+    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master', 'couriers'] },
+    { route: '/admin/dashboard', moduleId: ['users', 'roles', 'company-profile'] },
   ];
 
   for (const entry of routeModuleMap) {

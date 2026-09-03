@@ -6,8 +6,9 @@ import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import {
   getDispatch, createDispatch, updateDispatch, markDispatched,
-  listDispatchableSrs, listDispatchableCustomers, listCouriers, listBuyingOffices,
+  listDispatchableSrs, listDispatchableCustomers, listBuyingOffices,
 } from '../../../services/sr/srService';
+import useSampleMasters from '../../../hooks/useSampleMasters';
 import {
   DELIVERY_METHODS, DISPATCH_STATUS, getDispatchStatusLabel,
 } from '../../../utils/sampleRequestConstants';
@@ -40,7 +41,7 @@ const DispatchForm = () => {
 
   const [loading, setLoading] = useState(Boolean(id));
   const [record, setRecord] = useState(null);
-  const [couriers, setCouriers] = useState([]);
+  const { couriers, loading: couriersLoading } = useSampleMasters();
   const [offices, setOffices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [mastersLoading, setMastersLoading] = useState(true);
@@ -76,7 +77,6 @@ const DispatchForm = () => {
 
   useEffect(() => {
     Promise.all([
-      listCouriers().then(setCouriers).catch(() => {}),
       listBuyingOffices().then(setOffices).catch(() => {}),
       listDispatchableCustomers().then(setCustomers).catch(() => {}),
     ]).finally(() => setMastersLoading(false));
@@ -373,7 +373,7 @@ const DispatchForm = () => {
             form={form}
             couriers={couriers}
             offices={offices}
-            mastersLoading={mastersLoading}
+            mastersLoading={mastersLoading || couriersLoading}
             docs={docs}
             setDocs={setDocsDirty}
             currentUserLabel={currentUserLabel}

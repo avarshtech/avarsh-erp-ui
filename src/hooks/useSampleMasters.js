@@ -1,21 +1,23 @@
-import { useCallback, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
-  listSampleTypes, listCouriers, listRejectionReasons, listHsnCodes,
+  listSampleTypes, listCouriers, listRejectionReasons, getFeedbackCategoryLabels,
 } from '../services/sr/srService';
 
 const EMPTY = Object.freeze({
-  sampleTypes: [], couriers: [], rejectionReasons: [], hsnCodes: [],
+  sampleTypes: [], couriers: [], rejectionReasons: [], feedbackLabels: {},
 });
 
 /**
  * Sample Request master data (StoreContext-cached, 5-min TTL): the sample type
- * list, the courier list, the rejection-reason codes and the HSN table —
- * fetched once and shared by the SR, dispatch, invoice and comments screens.
+ * list, the courier list, the rejection-reason codes and the feedback category
+ * labels — fetched once and shared by the SR, dispatch and comments screens
+ * instead of each one fetching its own copy.
  *
- * Sample types and couriers are stored by `id`; rejection reasons and HSN rows
- * are stored by `code`, so `options()`-style helpers keep a renamed label from
- * rewriting history.
+ * Documents store the `id` of a type or courier and the `code` of a reason, so
+ * the option helpers keep a renamed label from rewriting history. HSN codes are
+ * deliberately not here: only the invoice form needs them, through the facade's
+ * getHsnDefault.
  */
 const useSampleMasters = () => {
   const { sampleMasters, loading, setData, setLoading, isCacheValid } = useStore();
@@ -24,13 +26,13 @@ const useSampleMasters = () => {
     if (isCacheValid('sampleMasters') || loading.sampleMasters) return;
     setLoading('sampleMasters', true);
     Promise.all([
-      listSampleTypes(), listCouriers(), listRejectionReasons(), listHsnCodes(),
+      listSampleTypes(), listCouriers(), listRejectionReasons(), getFeedbackCategoryLabels(),
     ])
-      .then(([sampleTypes, couriers, rejectionReasons, hsnCodes]) => setData('sampleMasters', {
+      .then(([sampleTypes, couriers, rejectionReasons, feedbackLabels]) => setData('sampleMasters', {
         sampleTypes: sampleTypes || [],
         couriers: couriers || [],
         rejectionReasons: rejectionReasons || [],
-        hsnCodes: hsnCodes || [],
+        feedbackLabels: feedbackLabels || {},
       }))
       .catch(() => setData('sampleMasters', EMPTY))
       .finally(() => setLoading('sampleMasters', false));
@@ -53,23 +55,11 @@ const useSampleMasters = () => {
     [masters.rejectionReasons],
   );
 
-  /** HSN code for a fabric category, falling back to the Default row. */
-  const hsnFor = useCallback((category) => {
-    const hit = masters.hsnCodes.find(
-      (c) => category && c.category.toLowerCase() === String(category).toLowerCase(),
-    );
-    return (hit || masters.hsnCodes.find((c) => c.category === 'Default') || {}).code || '';
-  }, [masters.hsnCodes]);
-
   return {
-    sampleTypes: masters.sampleTypes,
-    couriers: masters.couriers,
-    rejectionReasons: masters.rejectionReasons,
-    hsnCodes: masters.hsnCodes,
+    ...masters,
     sampleTypeOptions,
     courierOptions,
     rejectionReasonOptions,
-    hsnFor,
     loading: loading.sampleMasters,
   };
 };

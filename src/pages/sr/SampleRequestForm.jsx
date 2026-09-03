@@ -6,11 +6,11 @@ import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
   createSampleRequest, updateSampleRequest, changeStatus,
-  listSampleTypes,
 } from '../../services/sr/srService';
 import { SR_STATUS } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired } from '../../utils/sampleBomMapper';
 import { toastUnlessHandled } from '../../utils/apiError';
+import useSampleMasters from '../../hooks/useSampleMasters';
 import useSampleRequestDraft from './useSampleRequestDraft';
 import SampleBomPicker from './form/SampleBomPicker';
 import SectionHeader from './form/SectionHeader';
@@ -40,8 +40,7 @@ const SampleRequestForm = () => {
   const draft = useSampleRequestDraft({ id, bomId, orderNo });
   const [form] = Form.useForm();
   const [materials, setMaterials] = useState([]);
-  const [sampleTypes, setSampleTypes] = useState([]);
-  const [typesLoading, setTypesLoading] = useState(true);
+  const { sampleTypes, loading: typesLoading } = useSampleMasters();
   const [savedId, setSavedId] = useState(id ? Number(id) : null);
   // Optimistic-lock version of the last save — authoritative once we have one,
   // since draft.record still carries the version the form was loaded with
@@ -55,10 +54,6 @@ const SampleRequestForm = () => {
   const watchedSizes = Form.useWatch('sizes', form);
   const sizes = useMemo(() => watchedSizes || [], [watchedSizes]);
   const typeName = sampleTypes.find((t) => t.id === sampleTypeId)?.name || draft.record?.sampleTypeName || '';
-
-  useEffect(() => {
-    listSampleTypes().then(setSampleTypes).catch(() => {}).finally(() => setTypesLoading(false));
-  }, []);
 
   // Initialise once the draft resolves
   useEffect(() => {
