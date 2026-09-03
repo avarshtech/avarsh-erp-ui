@@ -11,8 +11,13 @@ const MIN_CHARS = 20;
  * Cancel a COMPLETED material issue. The server restores every issued
  * quantity to its exact source stock lot, so this is the correction path
  * (there is no edit) — cancel, then raise a fresh issue.
+ *
+ * `cancelFn` exists because a sample issue cancels through its own endpoint:
+ * only that one locks the sample request while the surviving documents are
+ * counted, which is what decides whether the sample drops back to Submitted.
+ * The bulk registers pass nothing and keep the material-issue endpoint.
  */
-const CancelIssueModal = ({ open, record, onClose, onCancelled }) => {
+const CancelIssueModal = ({ open, record, onClose, onCancelled, cancelFn = cancelIssue }) => {
   const { message } = App.useApp();
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -24,7 +29,7 @@ const CancelIssueModal = ({ open, record, onClose, onCancelled }) => {
     }
     setBusy(true);
     try {
-      await cancelIssue(record.id, reason.trim());
+      await cancelFn(record.id, reason.trim());
       message.success(`${record.issueNumber} cancelled — stock restored`);
       setReason('');
       onCancelled?.();

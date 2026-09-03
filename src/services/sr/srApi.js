@@ -95,3 +95,52 @@ export const recordFeedback = async (id, dto) => (await axiosInstance.put(`${BAS
 export const bomPreview = async ({ bomId, orderNo } = {}) => (
   await axiosInstance.get(`${BASE}/bom-preview`, { params: bomId ? { bomId } : { orderNo } })
 ).data;
+
+// ── Sample issues ───────────────────────────────────────────────────────────
+// A sample issue is an ordinary material issue with source_type SAMPLE_REQUEST,
+// so it lives under its own path but answers with MaterialIssueResponse — the
+// same shape the bulk registers, IssueViewDrawer and the slip PDF already read.
+// Fabric and trims are SEPARATE documents against one request: the store picks
+// rolls off a rack and counts trims out of a bin on different days.
+
+const ISSUES = '/sample-issues';
+
+/**
+ * The register: rows plus the three cards above them and the requests nobody
+ * has issued to yet. Filters (`search`, `dateFrom`, `dateTo`, `type`, `page`,
+ * `size`) bind straight from the query string; `sourceType` is forced server
+ * side, so this never returns a bulk document.
+ */
+export const listSampleIssues = async (params = {}) => (await axiosInstance.get(ISSUES, { params })).data;
+
+export const getSampleIssue = async (id) => (await axiosInstance.get(`${ISSUES}/${id}`)).data;
+
+/**
+ * Submitted and in-production requests, each carrying `fabricLines[]` and
+ * `trimLines[]` with required qty, live stock and what is already issued — so
+ * neither form needs a second call once a request is picked.
+ */
+export const listIssuableSrs = async () => (await axiosInstance.get(`${ISSUES}/issuable-srs`)).data || [];
+
+/**
+ * The rolls behind one fabric line, already ordered by the server: this order's
+ * rolls, then free stock, then rolls earmarked to another order (flagged with
+ * `earmarkedTo` — a bulk PO legitimately supplies sample material).
+ */
+export const getSampleIssuableRolls = async (srId, lineNo) => (
+  await axiosInstance.get(`${ISSUES}/issuable-rolls`, { params: { srId, lineNo } })
+).data || [];
+
+/** One fabric line, picked roll by roll; a partial roll leaves its remnant in stock. */
+export const createSampleFabricIssue = async (payload) => (await axiosInstance.post(`${ISSUES}/fabric`, payload)).data;
+
+/** Trims by quantity — the server consumes lots FIFO, right colour first. */
+export const createSampleTrimsIssue = async (payload) => (await axiosInstance.post(`${ISSUES}/trims`, payload)).data;
+
+/**
+ * Puts the material back and, when no completed document remains, returns the
+ * request to Submitted. Sample issues cancel HERE, not through the bulk
+ * endpoint — that one refuses them, because only this path holds the request
+ * row while the survivors are counted.
+ */
+export const cancelSampleIssue = async (id, reason) => (await axiosInstance.post(`${ISSUES}/${id}/cancel`, { reason })).data;

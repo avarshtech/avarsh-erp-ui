@@ -50,9 +50,18 @@ const buildAccessoryItemColumns = () => [
   },
 ];
 
+/**
+ * What document this issue was raised against. Sample issues ride the same
+ * table as the bulk ones, so the record decides the labels: a sample names its
+ * sample request and its order, never a Cutting PO or a production unit that
+ * it does not have.
+ */
+const SOURCE_SAMPLE = 'SAMPLE_REQUEST';
+
 const IssueViewDrawer = ({ open, onClose, record, type }) => {
   const screens = useBreakpoint();
   const isFabric = type === 'fabric';
+  const isSample = record?.sourceType === SOURCE_SAMPLE;
   // lg+ gets a roomier drawer so the Items table (Item Code + Description +
   // 3 qty columns) doesn't clip the rightmost header. Tablet stays at 820.
   const drawerWidth = screens.lg ? 900 : screens.md ? 820 : '100%';
@@ -102,11 +111,15 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
       <Row gutter={[24, 0]}>
         <Col xs={24} sm={12}>
           <InfoField
-            label={isFabric ? 'Cutting PO' : 'Work Order'}
-            value={isFabric ? record.cuttingPO : record.workOrder}
+            label={isSample ? 'Sample Request' : (isFabric ? 'Cutting PO' : 'Work Order')}
+            value={isSample ? record.sampleRequestNo : (isFabric ? record.cuttingPO : record.workOrder)}
           />
         </Col>
-        {isFabric && (
+        {isSample ? (
+          <Col xs={24} sm={12}>
+            <InfoField label="Order" value={record.orderNo} />
+          </Col>
+        ) : isFabric && (
           <Col xs={24} sm={12}>
             <InfoField label="PO Line" value={record.cuttingPOLine} />
           </Col>
@@ -119,9 +132,12 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
             <InfoField label="Fabric" value={record.fabric} />
           </Col>
         )}
-        <Col xs={24} sm={12}>
-          <InfoField label="Production Unit" value={record.productionUnit} />
-        </Col>
+        {/* A sample is made in the sampling room, not on a production line */}
+        {!isSample && (
+          <Col xs={24} sm={12}>
+            <InfoField label="Production Unit" value={record.productionUnit} />
+          </Col>
+        )}
         <Col xs={24} sm={12}>
           <InfoField label="Issue Date" value={formatDate(record.issueDate)} />
         </Col>

@@ -37,7 +37,8 @@ const OpeningStockBatchForm = lazy(() => import('./pages/inventory/opening-stock
 const MaterialIssuePage = lazy(() => import('./pages/inventory/issue/MaterialIssuePage'));
 const FabricIssueForm = lazy(() => import('./pages/inventory/issue/FabricIssueForm'));
 const AccessoriesIssueForm = lazy(() => import('./pages/inventory/issue/AccessoriesIssueForm'));
-const SampleIssueForm = lazy(() => import('./pages/inventory/issue/SampleIssueForm'));
+const SampleFabricIssueForm = lazy(() => import('./pages/inventory/issue/SampleFabricIssueForm'));
+const SampleTrimsIssueForm = lazy(() => import('./pages/inventory/issue/SampleTrimsIssueForm'));
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
@@ -345,8 +346,9 @@ const ThemedApp = () => {
             <Route path="inventory/issue/fabric/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><FabricIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/issue/accessories/:id" element={<PermissionRoute module="inventory-issue" operation="update"><Suspense fallback={<PageSkeleton />}><AccessoriesIssueForm /></Suspense></PermissionRoute>} />
-            {/* Sample issue: one document covering a whole SR (fabric + trims); the only Submitted → In Production trigger */}
-            <Route path="inventory/issue/sample/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><SampleIssueForm /></Suspense></PermissionRoute>} />
+            {/* Sample issues: fabric and trims are separate documents against one SR; the first of either is the only Submitted → In Production trigger */}
+            <Route path="inventory/issue/sample/fabric/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><SampleFabricIssueForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/issue/sample/trims/new" element={<PermissionRoute module="inventory-issue" operation="add"><Suspense fallback={<PageSkeleton />}><SampleTrimsIssueForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentList /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />

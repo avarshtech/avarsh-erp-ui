@@ -5,14 +5,14 @@
  * modules to srApi.js, so a screen never learns which side it is talking to.
  * Everything still marked mock keeps the signature its real endpoint will take.
  *
- * Real as of Stage 2: masters, SR CRUD + list, the BOM preview, status changes,
- * feedback and the dashboard. Still mock: dispatches, sample issues, invoices,
- * buying offices and the comment-sheet import.
+ * Real as of Stage 3: masters, SR CRUD + list, the BOM preview, status changes,
+ * feedback, the dashboard and the sample issues. Still mock: dispatches,
+ * invoices, buying offices and the comment-sheet import.
  *
- * The mock modules stay on disk until the last block flips. srMockApi and
- * srMockTransitions are no longer imported HERE, but srMockDispatches,
- * srMockInvoices, srMockIssues each pull `decorate`/`stampStatus` out of them —
- * deleting either file would break every screen still on the mock.
+ * The mock modules stay on disk until the last block flips. srMockApi,
+ * srMockTransitions and srMockIssues are no longer imported HERE, but
+ * srMockDispatches and srMockInvoices each pull `decorate`/`stampStatus` out of
+ * srMockApi — deleting it would break every screen still on the mock.
  */
 import { USE_MOCK_SR_DATA } from './srEnv';
 import * as srApi from './srApi';
@@ -20,7 +20,6 @@ import * as mockInvoices from './srMockInvoices';
 import * as mockMasters from './srMockMasters';
 import * as mockImport from './srMockImport';
 import * as mockDispatches from './srMockDispatches';
-import * as mockIssues from './srMockIssues';
 
 const notReady = () => { throw new Error('Sample Request backend not implemented yet — mock phase'); };
 const guard = (impl) => (USE_MOCK_SR_DATA ? impl : new Proxy({}, { get: () => notReady }));
@@ -29,7 +28,6 @@ const invoices = guard(mockInvoices);
 const masters = guard(mockMasters);
 const importer = guard(mockImport);
 const dispatches = guard(mockDispatches);
-const issues = guard(mockIssues);
 
 // ── SR CRUD + list ── REAL: GET/POST /sample-requests, GET/PUT/DELETE /{id}
 // bomPreview is what a new request starts from: the server materialises the BOM
@@ -62,11 +60,19 @@ export const updateDispatch = (...a) => dispatches.updateDispatch(...a);    // (
 export const deleteDispatch = (...a) => dispatches.deleteDispatch(...a);
 export const markDispatched = (...a) => dispatches.markDispatched(...a);    // (id, version)
 
-// ── Sample Request Issue (R2) ── material issue gates Submitted → In Production
-export const listIssuableSrs = (...a) => issues.listIssuableSrs(...a);
-export const createSampleIssue = (...a) => issues.createSampleIssue(...a);
-export const listSampleIssues = (...a) => issues.listSampleIssues(...a);
-export const getSampleIssue = (...a) => issues.getSampleIssue(...a);
+// ── Sample Request Issue ── REAL: /sample-issues (+ /fabric, /trims, /{id}/cancel)
+// Material issue gates Submitted → In Production, and cancelling the last one
+// gates it back. Fabric and trims are SEPARATE documents against one request,
+// so the single createSampleIssue the mock had is replaced by two creators —
+// the fabric one picks rolls, the trims one takes quantities. Rows come back as
+// MaterialIssueResponse, which is why the shared IssueViewDrawer reads them.
+export const listIssuableSrs = (...a) => srApi.listIssuableSrs(...a);
+export const listSampleIssues = (...a) => srApi.listSampleIssues(...a);              // ({search,dateFrom,dateTo,type,page,size})
+export const getSampleIssue = (...a) => srApi.getSampleIssue(...a);
+export const getSampleIssuableRolls = (...a) => srApi.getSampleIssuableRolls(...a);  // (srId, lineNo)
+export const createSampleFabricIssue = (...a) => srApi.createSampleFabricIssue(...a);
+export const createSampleTrimsIssue = (...a) => srApi.createSampleTrimsIssue(...a);
+export const cancelSampleIssue = (...a) => srApi.cancelSampleIssue(...a);            // (id, reason)
 
 // ── Commercial invoices ── /sample-invoices + /{id}/issue|cancel|duplicate
 export const listInvoices = (...a) => invoices.listInvoices(...a);

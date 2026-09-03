@@ -160,14 +160,17 @@ const renderAccessoryItemsTable = (rows) => {
 
 // ─── Derived labels / defaults ───────────────────────────────────────────────
 
-const resolveTypeMeta = (type) => {
+/** A sample issue rides the same table as a bulk one but names a different source. */
+const SOURCE_SAMPLE = 'SAMPLE_REQUEST';
+
+const resolveTypeMeta = (type, isSample = false) => {
   if (type === 'fabric') {
     return {
       docTitle: 'Fabric Issue Slip',
       docSubtitle: 'Gate Pass · Delivery Note',
       accentLabel: 'Fabric',
-      jobLabel: 'Cutting PO',
-      processStage: 'Cutting',
+      jobLabel: isSample ? 'Sample Request' : 'Cutting PO',
+      processStage: isSample ? 'Sampling' : 'Cutting',
       dispatchDept: 'Fabric Stores',
     };
   }
@@ -175,8 +178,8 @@ const resolveTypeMeta = (type) => {
     docTitle: 'Accessories Issue Slip',
     docSubtitle: 'Gate Pass · Delivery Note',
     accentLabel: 'Trims & Accessories',
-    jobLabel: 'Work Order',
-    processStage: 'Production',
+    jobLabel: isSample ? 'Sample Request' : 'Work Order',
+    processStage: isSample ? 'Sampling' : 'Production',
     dispatchDept: 'Trims Stores',
   };
 };
@@ -184,7 +187,8 @@ const resolveTypeMeta = (type) => {
 // ─── Build full HTML document ────────────────────────────────────────────────
 
 const buildHtml = (issue, type, rows, org) => {
-  const meta = resolveTypeMeta(type);
+  const isSample = issue.sourceType === SOURCE_SAMPLE;
+  const meta = resolveTypeMeta(type, isSample);
   const isFabric = type === 'fabric';
 
   const companyName = org?.organisationName || 'Company Name';
@@ -196,8 +200,19 @@ const buildHtml = (issue, type, rows, org) => {
   const orgGstin = org?.gstin || '';
   const orgPan = org?.pan || '';
 
-  const jobNumber = isFabric ? issue.cuttingPO : issue.workOrder;
-  const orderReference = issue.cuttingPOLine || issue.orderReference || issue.orderRef || '';
+  // A sample slip names its sample request and the order it belongs to; the
+  // Cutting PO / PO line it has no equivalent of are never printed empty.
+  const jobNumber = isSample ? issue.sampleRequestNo : (isFabric ? issue.cuttingPO : issue.workOrder);
+  const orderReferenceLabel = isSample ? 'Order' : 'Order Reference';
+  const orderReference = isSample
+    ? (issue.orderNo || '')
+    : (issue.cuttingPOLine || issue.orderReference || issue.orderRef || '');
+  // Sampling has no production unit — hoisted so the bulk slip keeps its exact
+  // indentation while the sample slip drops the row entirely.
+  const productionUnitRow = isSample ? '' : `<div class="row">
+          <div class="label">Production Unit</div>
+          <div class="value">${valueOrDash(issue.productionUnit)}</div>
+        </div>`;
   const buyerPO = issue.buyerPO || issue.buyOrderNo || '';
   const garmentName = issue.garmentName || issue.garment || '';
   const dispatchedVia = issue.sendThrough || issue.dispatchedVia || '';
@@ -724,7 +739,7 @@ const buildHtml = (issue, type, rows, org) => {
         </div>
         ${orderReference ? `
         <div class="row">
-          <div class="label">Order Reference</div>
+          <div class="label">${orderReferenceLabel}</div>
           <div class="value mono">${escapeHtml(orderReference)}</div>
         </div>` : ''}
         ${buyerPO ? `
@@ -742,10 +757,7 @@ const buildHtml = (issue, type, rows, org) => {
           <div class="label">Fabric</div>
           <div class="value">${escapeHtml(issue.fabric)}</div>
         </div>` : ''}
-        <div class="row">
-          <div class="label">Production Unit</div>
-          <div class="value">${valueOrDash(issue.productionUnit)}</div>
-        </div>
+        ${productionUnitRow}
         ${dispatchedVia ? `
         <div class="row">
           <div class="label">Dispatched Via</div>
