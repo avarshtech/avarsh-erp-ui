@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { allowancePerSize, plannedPerSize, sizeJumps, totalAllowanceQty } from '../../../utils/cuttingCalc';
 import { getMarkerPlan, saveMarkerPlan, relaxedCutPos, setSizeSetStatus } from '../../../services/production/cuttingService';
 import CuttingStatusTag from './CuttingStatusTag';
@@ -30,6 +31,7 @@ const blankMarker = () => ({
  */
 const MarkerPlanForm = () => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -43,13 +45,16 @@ const MarkerPlanForm = () => {
         const [record, pos] = await Promise.all([isEdit ? getMarkerPlan(id) : Promise.resolve(null), relaxedCutPos()]);
         setCutPos(pos);
         setPlan(record || {
-          cuttingPoId: pos[0]?.id, planDate: dayjs().format('YYYY-MM-DD'),
+          cuttingPoId: defaultCutPoId(pos), planDate: dayjs().format('YYYY-MM-DD'),
           planStartDate: dayjs().format('YYYY-MM-DD'), planEndDate: dayjs().add(10, 'day').format('YYYY-MM-DD'),
           fabricWidthRaw: null, cuttableWidth: null, allowancePct: 5,
           status: 'DRAFT', markers: [blankMarker()],
         });
       } catch { message.error('Failed to load marker plan'); }
     })();
+    // The remembered Cut PO only seeds a new record; it must not reload the
+    // form when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
 
   const patch = useCallback((p) => setPlan((prev) => ({ ...prev, ...p })), []);
@@ -167,7 +172,10 @@ const MarkerPlanForm = () => {
             <FieldLabel>Cut PO # (relaxation-complete only)</FieldLabel>
             <FormSelect value={plan.cuttingPoId} style={{ width: 240 }} disabled={isEdit} placeholder="Cut PO"
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-              onChange={(v) => patch({ cuttingPoId: v, markers: [blankMarker()] })} />
+              onChange={(v) => {
+                selectCutPo(cutPos.find((p) => p.id === v));
+                patch({ cuttingPoId: v, markers: [blankMarker()] });
+              }} />
           </div>
           <div>
             <FieldLabel>Plan St. Dt</FieldLabel>

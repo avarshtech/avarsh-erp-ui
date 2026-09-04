@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getActiveParts } from '../../../services/master/partsService';
 import { getActiveProcesses } from '../../../services/master/processService';
 import { savePanelIssue } from '../../../services/production/cuttingService';
@@ -9,6 +10,7 @@ import { savePanelIssue } from '../../../services/production/cuttingService';
 /** FR-08 — send cut panels out for printing / embroidery / washing with a DC. */
 const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPoId, setCutPoId] = useState(null);
   const [processId, setProcessId] = useState(null);
   const [lines, setLines] = useState([]);
@@ -17,6 +19,8 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
   // Panels are the shared parts master; processes are the shared process master.
   const [parts, setParts] = useState([]);
   const [processes, setProcesses] = useState([]);
+  useEffect(() => { if (open) setCutPoId(defaultCutPoId(cutPos)); }, [open, cutPos, defaultCutPoId]);
+
   useEffect(() => {
     if (!open) return;
     getActiveParts().then(setParts).catch(() => setParts([]));
@@ -110,7 +114,11 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
         <FormSelect value={cutPoId} style={{ width: 230 }} placeholder="Cut PO"
           options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-          onChange={(v) => { setCutPoId(v); setLines([]); }} />
+          onChange={(v) => {
+            selectCutPo(cutPos.find((p) => p.id === v));
+            setCutPoId(v);
+            setLines([]);
+          }} />
         <FormSelect value={processId} style={{ width: 190 }} placeholder="Process"
           options={processOptions} onChange={setProcessId} />
         <Button icon={<PlusOutlined />} size="small" disabled={!cutPoId}

@@ -5,6 +5,7 @@ import StatCard from '../../../components/StatCard';
 import { FormSelect } from '../../../components/form';
 import { formatNumber } from '../../../utils/formatters';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getReconciliation, saveEndBit, returnToInventory, getCutPos } from '../../../services/production/cuttingService';
 
 /**
@@ -15,6 +16,7 @@ import { getReconciliation, saveEndBit, returnToInventory, getCutPos } from '../
 const ReconciliationTab = () => {
   const { message, modal } = App.useApp();
   const [cutPos, setCutPos] = useState([]);
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPoId, setCutPoId] = useState(null);
   const [recon, setRecon] = useState(null);
   const { threshold } = useCuttingMasters();
@@ -23,9 +25,11 @@ const ReconciliationTab = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getCutPos().then((pos) => { setCutPos(pos); setCutPoId(pos[0]?.id ?? null); })
+    getCutPos().then((pos) => { setCutPos(pos); setCutPoId(defaultCutPoId(pos)); })
       .catch(() => message.error('Failed to load Cut POs'));
-  }, [message]);
+  }, [message, defaultCutPoId]);
+
+  const pickCutPo = (v) => { selectCutPo(cutPos.find((p) => p.id === v)); setCutPoId(v); };
 
   const load = useCallback(async () => {
     if (!cutPoId) return;
@@ -128,7 +132,7 @@ const ReconciliationTab = () => {
       <Card>
         <Space style={{ marginBottom: 16 }}>
           <FormSelect value={cutPoId} style={{ width: 280 }} placeholder="Cut PO"
-            options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))} onChange={setCutPoId} />
+            options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))} onChange={pickCutPo} />
         </Space>
         <div style={{ textAlign: 'center', padding: 60 }}><Spin /></div>
       </Card>
@@ -140,7 +144,7 @@ const ReconciliationTab = () => {
       <Card style={{ marginBottom: 16 }}>
         <Space size="large" wrap>
           <FormSelect value={cutPoId} style={{ width: 280 }}
-            options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))} onChange={setCutPoId} />
+            options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))} onChange={pickCutPo} />
           <div style={{ minWidth: 260 }}>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
               Utilization {recon.utilizationPct}% {recon.utilizationPct < recon.utilizationWarnPct && '— below target'}

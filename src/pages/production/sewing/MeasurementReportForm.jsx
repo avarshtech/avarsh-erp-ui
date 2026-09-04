@@ -7,6 +7,7 @@ import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { uploadFile } from '../../../services/core/fileService';
 import { pointStatus, measurementResult } from '../../../utils/sewingCalc';
@@ -34,6 +35,7 @@ const MeasurementReportForm = () => {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const { options } = useSewingMasters();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
   const [report, setReport] = useState(null);
   const [orders, setOrders] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -54,7 +56,7 @@ const MeasurementReportForm = () => {
         ]);
         setOrders(ords);
         setEmployees(staff.content);
-        const first = ords[0];
+        const first = ords.find((o) => o.id === defaultOrderId(ords));
         setReport(record || {
           orderId: first?.id,
           stage: null,
@@ -66,6 +68,9 @@ const MeasurementReportForm = () => {
         });
       } catch { message.error('Failed to load the report'); } finally { setLoading(false); }
     })();
+    // The remembered order only seeds a new record; it must not reload the
+    // form when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
 
   // Default the stage once the master has loaded, rather than assuming a code.
@@ -196,6 +201,7 @@ const MeasurementReportForm = () => {
               options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
               onChange={(v) => {
                 const o = orders.find((x) => x.id === v);
+                selectOrder(o);
                 patch({ orderId: v, size: o?.sizes?.[0], points: [] });
               }} />
           </div>

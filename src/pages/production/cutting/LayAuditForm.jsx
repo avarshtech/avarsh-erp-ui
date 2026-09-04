@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getLayAudit, saveLayAudit, getCutPos, getRolls, listMarkersForPo, nextLayNo } from '../../../services/production/cuttingService';
 import LayAuditRollGrid from './LayAuditRollGrid';
@@ -16,6 +17,7 @@ const FieldLabel = ({ children }) => (
 /** FR-03 — full-page lay/spread record with per-roll weight and variance math. */
 const LayAuditForm = () => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
@@ -33,12 +35,15 @@ const LayAuditForm = () => {
       .then(([record, pos]) => {
         setCutPos(pos);
         setLay(record || {
-          cuttingPoId: pos[0]?.id, markerId: null, layNo: null, layDate: dayjs().format('YYYY-MM-DD'),
+          cuttingPoId: defaultCutPoId(pos), markerId: null, layNo: null, layDate: dayjs().format('YYYY-MM-DD'),
           layLength: null, plies: null, width: null, startTime: null, endTime: null, rolls: [],
         });
       })
       .catch(() => message.error('Failed to load lay audit'))
       .finally(() => setLoading(false));
+    // The remembered Cut PO only seeds a new record; it must not reload the
+    // form when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
 
   useEffect(() => {
@@ -98,7 +103,10 @@ const LayAuditForm = () => {
             <FieldLabel>Cut PO #</FieldLabel>
             <FormSelect value={lay.cuttingPoId} style={{ width: 240 }} disabled={isEdit}
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-              onChange={(v) => patch({ cuttingPoId: v, markerId: null, layNo: null, rolls: [] })} />
+              onChange={(v) => {
+                selectCutPo(cutPos.find((p) => p.id === v));
+                patch({ cuttingPoId: v, markerId: null, layNo: null, rolls: [] });
+              }} />
           </div>
           <div>
             <FieldLabel>Marker # (mandatory)</FieldLabel>

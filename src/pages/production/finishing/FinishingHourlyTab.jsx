@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { HOURLY_STATIONS } from '../../../utils/finishingConstants';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getHourlySheet, saveHourlySheet, getEmployees, getOrders, rowTotal } from '../../../services/production/finishingService';
 import FinishingHourlyGrid from './FinishingHourlyGrid';
 
@@ -14,6 +15,7 @@ const FieldLabel = ({ children }) => (
 /** PRD Modules 2/3/6 — the three hourly stations behind one switcher (§19 pattern). */
 const FinishingHourlyTab = () => {
   const { message } = App.useApp();
+  const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [station, setStation] = useState(HOURLY_STATIONS[0].key);
   const [date, setDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [sheet, setSheet] = useState(null);
@@ -27,9 +29,12 @@ const FinishingHourlyTab = () => {
     setSheet(null);
     try {
       const [sh, emps, ords] = await Promise.all([getHourlySheet({ station, date }), getEmployees(station), getOrders()]);
-      setSheet(sh); setEmployees(emps); setOrders(ords);
+      // A sheet that has not been saved yet opens on whatever order the module
+      // is working; a saved one keeps the order it was booked against.
+      setSheet(sh.id ? sh : { ...sh, orderId: defaultOrderId(ords) });
+      setEmployees(emps); setOrders(ords);
     } catch { message.error('Failed to load hourly sheet'); }
-  }, [station, date, message]);
+  }, [station, date, message, defaultOrderId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -68,7 +73,10 @@ const FinishingHourlyTab = () => {
                 <FieldLabel>Order</FieldLabel>
                 <FormSelect value={sheet.orderId} style={{ width: 220 }}
                   options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-                  onChange={(v) => setSheet((prev) => ({ ...prev, orderId: v }))} />
+                  onChange={(v) => {
+                    selectOrder(orders.find((o) => o.id === v));
+                    setSheet((prev) => ({ ...prev, orderId: v }));
+                  }} />
               </div>
               <div>
                 <FieldLabel>Target / employee / day</FieldLabel>

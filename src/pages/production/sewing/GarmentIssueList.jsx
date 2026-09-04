@@ -41,6 +41,16 @@ const GarmentIssueList = () => {
       )),
     },
     { title: 'Total Pcs', dataIndex: 'totalQty', width: 90, align: 'center', render: (v) => <strong>{v}</strong> },
+    {
+      // Finishing posts back what it took in, so the sewing floor can see which
+      // notes are still outstanding without ringing the next department.
+      title: 'Received', key: 'received', width: 140, align: 'center',
+      render: (_, r) => {
+        if (r.fullyReceived) return <Tag color="green">All {r.totalReceived} in</Tag>;
+        if (!r.totalReceived) return <Tag>Not received</Tag>;
+        return <Tag color="gold">{r.totalReceived} of {r.totalQty} — {r.remainingQty} to come</Tag>;
+      },
+    },
     { title: 'Issued By', dataIndex: 'issuedBy', width: 170, ellipsis: true },
     { title: 'Received By', dataIndex: 'receivedBy', width: 130 },
     { title: 'Status', dataIndex: 'status', width: 140, render: (v) => <SewingStatusTag status={v} /> },
@@ -53,7 +63,7 @@ const GarmentIssueList = () => {
         <ActionButton action="create" text="New Garment Issue" onClick={() => setDrawerOpen(true)} />
       </Space>
       <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}
-        scroll={{ x: 1150 }} pagination={getTablePagination({ pageSize: 10 }, 'issues')}
+        scroll={{ x: 1290 }} pagination={getTablePagination({ pageSize: 10 }, 'issues')}
         locale={{ emptyText: <EmptyState title="No garment issues" description="Issue finished garments size-wise to the finishing floor" /> }} />
       <GarmentIssueDrawer open={drawerOpen} orders={orders}
         onClose={() => setDrawerOpen(false)} onSaved={() => { setDrawerOpen(false); load(); }} />

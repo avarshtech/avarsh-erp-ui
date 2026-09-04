@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, Input } from 'antd';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { issueBundles } from '../../../services/production/cuttingService';
 
 /** FR-07 — hand bundled cut parts over to a sewing line (partial issue allowed). */
 const BundleIssueDrawer = ({ open, cutPos, bundles, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPoId, setCutPoId] = useState(null);
   const [workOrderNo, setWorkOrderNo] = useState('WO/26-27/1001');
   const [sizeFilter, setSizeFilter] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setCutPoId(defaultCutPoId(cutPos)); }, [open, cutPos, defaultCutPoId]);
 
   const available = useMemo(() => bundles.filter((b) => b.status === 'BUNDLED'
     && (!cutPoId || b.cuttingPoId === Number(cutPoId))
@@ -54,7 +58,11 @@ const BundleIssueDrawer = ({ open, cutPos, bundles, onClose, onSaved }) => {
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
         <FormSelect value={cutPoId} style={{ width: 220 }} placeholder="Cut PO"
           options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-          onChange={(v) => { setCutPoId(v); setSelectedIds([]); }} />
+          onChange={(v) => {
+            selectCutPo(cutPos.find((p) => p.id === v));
+            setCutPoId(v);
+            setSelectedIds([]);
+          }} />
         <Input value={workOrderNo} style={{ width: 170 }} placeholder="Work Order #" onChange={(e) => setWorkOrderNo(e.target.value)} />
         <FormSelect value={sizeFilter} style={{ width: 130 }} placeholder="All sizes" allowClear
           options={sizes.map((s) => ({ value: s, label: `Size ${s}` }))} onChange={setSizeFilter} />

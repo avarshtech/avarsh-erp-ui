@@ -16,7 +16,7 @@ const FabricRelaxationList = () => {
   const [rows, setRows] = useState([]);
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drawer, setDrawer] = useState({ open: false, record: null });
+  const [drawer, setDrawer] = useState({ open: false, record: null, readOnly: false });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,11 +55,14 @@ const FabricRelaxationList = () => {
     { title: 'Shrink % (post)', dataIndex: 'shrinkagePostPct', width: 120, align: 'center', render: (v) => (v ?? '—') },
     { title: 'Status', dataIndex: 'status', width: 150, render: (v) => <CuttingStatusTag status={v} /> },
     {
-      title: 'Actions', key: 'actions', width: 130, fixed: 'right', align: 'center',
+      title: 'Actions', key: 'actions', width: 160, fixed: 'right', align: 'center',
       render: (_, r) => (
         <Space size={4}>
+          <ActionButton action="view" size="small"
+            onClick={() => setDrawer({ open: true, record: r, readOnly: true })} />
           {r.status === 'IN_PROGRESS' && (
-            <ActionButton action="edit" size="small" onClick={() => setDrawer({ open: true, record: r })} />
+            <ActionButton action="edit" size="small"
+              onClick={() => setDrawer({ open: true, record: r, readOnly: false })} />
           )}
           {r.status === 'COMPLETED' && (
             <Tooltip title="Generate Relaxation Report (required before Lay Audit)">
@@ -75,7 +78,8 @@ const FabricRelaxationList = () => {
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <span style={{ color: 'var(--text-secondary)' }}>Rolls cannot be selected for laying until relaxation is completed and its report generated.</span>
-        <ActionButton action="create" text="Start Relaxation" onClick={() => setDrawer({ open: true, record: null })} />
+        <ActionButton action="create" text="Start Relaxation"
+          onClick={() => setDrawer({ open: true, record: null, readOnly: false })} />
       </Space>
       <Table
         rowKey="id"
@@ -83,16 +87,17 @@ const FabricRelaxationList = () => {
         columns={columns}
         dataSource={rows}
         loading={loading}
-        scroll={{ x: 1150 }}
+        scroll={{ x: 1180 }}
         pagination={getTablePagination({ pageSize: 10 }, 'relaxations')}
         locale={{ emptyText: <EmptyState title="No relaxation records" description="Start relaxation once fabric is received" /> }}
       />
       <FabricRelaxationDrawer
         open={drawer.open}
         record={drawer.record}
+        readOnly={drawer.readOnly}
         receipts={receipts}
-        onClose={() => setDrawer({ open: false, record: null })}
-        onSaved={() => { setDrawer({ open: false, record: null }); load(); }}
+        onClose={() => setDrawer({ open: false, record: null, readOnly: false })}
+        onSaved={() => { setDrawer({ open: false, record: null, readOnly: false }); load(); }}
       />
     </Card>
   );

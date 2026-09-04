@@ -5,8 +5,12 @@ import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveRelaxation } from '../../../services/production/cuttingService';
 
-/** FR-02 drawer — start or complete a relaxation; warns when ended before the fabric-type minimum. */
-const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) => {
+/**
+ * FR-02 drawer - start or complete a relaxation; warns when ended before the
+ * fabric-type minimum. Opened read-only it is the record of what was done,
+ * which is what the lay audit is signed against.
+ */
+const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onClose, onSaved }) => {
   const { message } = App.useApp();
   const { fabricTypes, fabricTypeByName } = useCuttingMasters();
   const [form] = Form.useForm();
@@ -67,19 +71,21 @@ const FabricRelaxationDrawer = ({ open, record, receipts, onClose, onSaved }) =>
 
   return (
     <Drawer
-      title={record ? `Complete Relaxation — ${record.relaxationNo}` : 'Start Fabric Relaxation'}
-      size={560}
+      title={record
+        ? `${readOnly ? 'Relaxation' : 'Complete Relaxation'} — ${record.relaxationNo}`
+        : 'Start Fabric Relaxation'}
+      width={620}
       open={open}
       onClose={onClose}
       destroyOnHidden
       footer={(
         <Space style={{ float: 'right' }}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" loading={saving} onClick={handleSave}>Save</Button>
+          <Button onClick={onClose}>{readOnly ? 'Close' : 'Cancel'}</Button>
+          {!readOnly && <Button type="primary" loading={saving} onClick={handleSave}>Save</Button>}
         </Space>
       )}
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" disabled={readOnly}>
         <Form.Item name="receiptId" label="Fabric Receipt #" rules={[{ required: true, message: 'Select receipt' }]}>
           <FormSelect placeholder="Select confirmed receipt" disabled={Boolean(record)}
             options={receipts.map((r) => ({ value: r.id, label: `${r.receiptNo} (${r.receivedRollCount} rolls)` }))}

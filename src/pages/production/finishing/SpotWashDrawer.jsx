@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import { STAIN_TYPES } from '../../../utils/finishingConstants';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { saveSpotWash } from '../../../services/production/finishingService';
 
 const FieldLabel = ({ children }) => (
@@ -15,10 +16,13 @@ const emptyForm = { orderId: null, stainType: null, employeeId: null, date: dayj
 /** PRD Module 4 — spot wash batch entry with In = Pass + Reject rule. */
 const SpotWashDrawer = ({ open, orders, employees, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { if (open) setForm(emptyForm); }, [open]);
+  useEffect(() => {
+    if (open) setForm({ ...emptyForm, orderId: defaultOrderId(orders) });
+  }, [open, orders, defaultOrderId]);
 
   const patch = (p) => setForm((prev) => ({ ...prev, ...p }));
   const unbalanced = form.pcsIn != null && form.pcsIn !== (form.pcsPass || 0) + (form.pcsReject || 0);
@@ -46,7 +50,8 @@ const SpotWashDrawer = ({ open, orders, employees, onClose, onSaved }) => {
         <div>
           <FieldLabel>Order</FieldLabel>
           <FormSelect value={form.orderId} style={{ width: 220 }} placeholder="Order"
-            options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))} onChange={(v) => patch({ orderId: v })} />
+            options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
+            onChange={(v) => { selectOrder(orders.find((o) => o.id === v)); patch({ orderId: v }); }} />
         </div>
         <div>
           <FieldLabel>Date</FieldLabel>

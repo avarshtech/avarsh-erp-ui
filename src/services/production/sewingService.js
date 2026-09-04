@@ -28,6 +28,7 @@ export {
   issuedBySize,
   getIssueOpeningLines,
   saveGarmentIssue,
+  recordGarmentIssueReceipt,
 
   listHourly,
   getHourlySheet,
@@ -36,6 +37,7 @@ export {
   setHourlyStatus,
 
   getBomItems,
+  getBomLabelItems,
   listTrimCards,
   saveTrimCard,
 

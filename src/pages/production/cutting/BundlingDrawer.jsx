@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, InputNumber, Table, Alert, Descriptions } from 'antd';
 import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getCuttingReport, generateBundles, previewBundling } from '../../../services/production/cuttingService';
 
 /**
@@ -10,6 +11,7 @@ import { getCuttingReport, generateBundles, previewBundling } from '../../../ser
  */
 const BundlingDrawer = ({ open, cutPos, tmbChecks, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPoId, setCutPoId] = useState(null);
   const [bundleSize, setBundleSize] = useState(50);
   const [report, setReport] = useState(null);
@@ -18,6 +20,8 @@ const BundlingDrawer = ({ open, cutPos, tmbChecks, onClose, onSaved }) => {
   const { numericOptions } = useCuttingMasters();
   // Standard bundle sizes are a maintained list; anything else is entered as custom.
   const bundleSizes = useMemo(() => numericOptions('BUNDLE_SIZE').map((o) => o.value), [numericOptions]);
+
+  useEffect(() => { if (open) setCutPoId(defaultCutPoId(cutPos)); }, [open, cutPos, defaultCutPoId]);
 
   useEffect(() => {
     if (!open || !cutPoId) { setReport(null); setPreview(null); return; }
@@ -69,7 +73,7 @@ const BundlingDrawer = ({ open, cutPos, tmbChecks, onClose, onSaved }) => {
           <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Cut PO</div>
           <FormSelect value={cutPoId} style={{ width: '100%' }} placeholder="Select Cut PO"
             options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo} · ${p.color}` }))}
-            onChange={setCutPoId} />
+            onChange={(v) => { selectCutPo(cutPos.find((p) => p.id === v)); setCutPoId(v); }} />
         </div>
         {report && (
           <Descriptions size="small" column={2} bordered

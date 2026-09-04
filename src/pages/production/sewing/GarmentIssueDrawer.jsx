@@ -2,16 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Button, Space, Table, InputNumber, Alert, Input } from 'antd';
 import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { saveGarmentIssue, getIssueOpeningLines } from '../../../services/production/sewingService';
 
 /** PRD 4.4 — size-wise issue with Order / Prev Issued / Current / Total / Balance columns. */
 const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
   const [orderId, setOrderId] = useState(null);
   const [lines, setLines] = useState([]);
   const [issuedBy, setIssuedBy] = useState('');
   const [receivedBy, setReceivedBy] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setOrderId(defaultOrderId(orders)); }, [open, orders, defaultOrderId]);
 
   useEffect(() => {
     if (!open || !orderId) { setLines([]); return; }
@@ -88,7 +92,7 @@ const GarmentIssueDrawer = ({ open, orders, onClose, onSaved }) => {
         <Space size="middle" wrap>
           <FormSelect value={orderId} style={{ width: 320 }} placeholder="Select order"
             options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo} · ${o.color || ''}` }))}
-            onChange={setOrderId} />
+            onChange={(v) => { selectOrder(orders.find((o) => o.id === v)); setOrderId(v); }} />
           <Input style={{ width: 170 }} placeholder="Issued by" value={issuedBy}
             onChange={(e) => setIssuedBy(e.target.value)} />
           <Input style={{ width: 170 }} placeholder="Received by" value={receivedBy}

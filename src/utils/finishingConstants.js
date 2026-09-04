@@ -54,8 +54,6 @@ export const CHECK_STAGES = [
   { key: 'FINAL', label: 'Final (AQL 2.5)' },
 ];
 
-/** Label verification points, mandatory at pre-final (PRD 8.3). */
-export const LABEL_CHECKS = ['Brand label', 'Size label', 'Care label', 'Country of origin'];
 
 export const SHADE_BANDS = [
   { band: 'A', label: 'Lightest', color: '#bae0ff' },

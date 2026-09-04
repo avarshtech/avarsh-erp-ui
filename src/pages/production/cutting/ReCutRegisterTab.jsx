@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { SEWING_LINES } from '../../../utils/cuttingConstants';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
@@ -16,6 +17,7 @@ const EMPTY_DRAFT = { entryDate: null, cuttingPoId: null, lineName: null, part: 
 /** FR-11 — chronological re-cut register with reason tracking and a >2% alert. */
 const ReCutRegisterTab = () => {
   const { message } = App.useApp();
+  const { selectCutPo } = useModuleSelection('cutting');
   const [entries, setEntries] = useState([]);
   const [cutPos, setCutPos] = useState([]);
   const [rolls, setRolls] = useState([]);
@@ -103,7 +105,10 @@ const ReCutRegisterTab = () => {
             <DatePicker size="small" format="DD-MMM-YYYY" value={draft.entryDate} allowClear={false} onChange={(d) => setDraft((x) => ({ ...x, entryDate: d }))} />
             <FormSelect size="small" value={draft.cuttingPoId} style={{ width: 210 }} placeholder="Cut PO"
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
-              onChange={(v) => setDraft((x) => ({ ...x, cuttingPoId: v, rollNo: null }))} />
+              onChange={(v) => {
+                selectCutPo(cutPos.find((p) => p.id === v));
+                setDraft((x) => ({ ...x, cuttingPoId: v, rollNo: null }));
+              }} />
             <FormSelect size="small" value={draft.lineName} style={{ width: 110 }} placeholder="Line"
               options={SEWING_LINES.map((l) => ({ value: l, label: l }))} onChange={(v) => setDraft((x) => ({ ...x, lineName: v }))} />
             <FormSelect size="small" value={draft.part} style={{ width: 120 }} placeholder="Part"

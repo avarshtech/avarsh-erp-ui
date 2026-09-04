@@ -7,7 +7,6 @@ import * as mockApi from './finishingMockApi';
 
 export const USE_MOCK_FINISHING_DATA = true;
 
-export const getOrders = (...a) => mockApi.getOrders(...a);
 export const getEmployees = (...a) => mockApi.getEmployees(...a);
 
 export const listReceivings = (...a) => mockApi.listReceivings(...a);
@@ -48,5 +47,12 @@ export const getFinishingDashboard = (...a) => mockApi.getFinishingDashboard(...
 // is cut over to the backend.
 export { specPoints, fullMeasurementChart } from './finishingMockData';
 
-// Cross-module and real: the sewing garment issues finishing receives against.
-export { listGarmentIssues } from './sewingApi';
+// Cross-module and real. Orders come from the API rather than the finishing
+// seed so a receipt lands on the sewing issue it actually belongs to, and so
+// the order picked in Sewing is the same one Finishing opens on.
+export {
+  getOrders,
+  listGarmentIssues,
+  recordGarmentIssueReceipt,
+  getBomLabelItems,
+} from './sewingApi';

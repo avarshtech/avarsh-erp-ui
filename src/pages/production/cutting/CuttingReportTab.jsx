@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Card, Space, Row, Col, Spin } from 'antd';
 import { InboxOutlined, ScissorOutlined, WarningOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import StatCard from '../../../components/StatCard';
 import { formatNumber } from '../../../utils/formatters';
 import { getCuttingReport, getCutPos } from '../../../services/production/cuttingService';
@@ -10,15 +11,16 @@ import CuttingReportPivot from './CuttingReportPivot';
 /** FR-05 — size-wise cutting progress with ratio-based lay entries and fabric balance. */
 const CuttingReportTab = () => {
   const { message } = App.useApp();
+  const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPos, setCutPos] = useState([]);
   const [cutPoId, setCutPoId] = useState(null);
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getCutPos().then((pos) => { setCutPos(pos); setCutPoId(pos[0]?.id ?? null); })
+    getCutPos().then((pos) => { setCutPos(pos); setCutPoId(defaultCutPoId(pos)); })
       .catch(() => message.error('Failed to load Cut POs'));
-  }, [message]);
+  }, [message, defaultCutPoId]);
 
   const load = useCallback(async () => {
     if (!cutPoId) return;
@@ -39,7 +41,7 @@ const CuttingReportTab = () => {
             <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Cut PO</div>
             <FormSelect value={cutPoId} style={{ width: 280 }}
               options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo} · ${p.color}` }))}
-              onChange={setCutPoId} />
+              onChange={(v) => { selectCutPo(cutPos.find((p) => p.id === v)); setCutPoId(v); }} />
           </div>
           {report && (
             <Space size="large" wrap style={{ color: 'var(--text-secondary)' }}>

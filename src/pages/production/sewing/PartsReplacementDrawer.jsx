@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
 import { getActiveParts } from '../../../services/master/partsService';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { saveReplacement } from '../../../services/production/sewingService';
 
 const blankPart = () => ({ size: null, serialNo: '', partId: null, reason: null, pieces: null });
@@ -13,6 +14,7 @@ const blankPart = () => ({ size: null, serialNo: '', partId: null, reason: null,
 const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
   const { options, lineOptions } = useSewingMasters();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
   const [partOptions, setPartOptions] = useState([]);
   const [orderId, setOrderId] = useState(null);
   const [lineId, setLineId] = useState(null);
@@ -24,6 +26,8 @@ const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
 
   // Panel names come from the shared parts master rather than a cutting-module
   // constant, so both floors name the same panel the same way.
+  useEffect(() => { if (open) setOrderId(defaultOrderId(orders)); }, [open, orders, defaultOrderId]);
+
   useEffect(() => {
     if (!open || partOptions.length) return;
     getActiveParts()
@@ -115,7 +119,11 @@ const PartsReplacementDrawer = ({ open, orders, onClose, onSaved }) => {
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
         <FormSelect value={orderId} style={{ width: 260 }} placeholder="Order"
           options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-          onChange={(v) => { setOrderId(v); setParts([]); }} />
+          onChange={(v) => {
+            selectOrder(orders.find((o) => o.id === v));
+            setOrderId(v);
+            setParts([]);
+          }} />
         <FormSelect value={lineId} style={{ width: 140 }} placeholder="Line" allowClear
           options={lineOptions} onChange={(v) => setLineId(v ?? null)} />
         <Input style={{ width: 180 }} placeholder="Requested by" value={requestedBy}

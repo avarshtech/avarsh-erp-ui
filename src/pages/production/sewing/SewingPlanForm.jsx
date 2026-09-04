@@ -6,6 +6,7 @@ import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { targetPerHour, totalSamOf, cmRatePerPc } from '../../../utils/sewingCalc';
 import {
   getPlan, savePlan, setPlanStatus, getOrders, getSuggestedOperations,
@@ -32,6 +33,7 @@ const SewingPlanForm = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { lines, linesByFactory } = useSewingMasters();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
 
   useEffect(() => {
     (async () => {
@@ -41,16 +43,20 @@ const SewingPlanForm = () => {
           isEdit ? getPlan(id) : Promise.resolve(null), getOrders(),
         ]);
         setOrders(ords);
+        const opening = ords.find((o) => o.id === defaultOrderId(ords));
         setPlan(record || {
-          orderId: ords[0]?.id, lineId: null, planDate: dayjs().format('YYYY-MM-DD'),
+          orderId: opening?.id, lineId: null, planDate: dayjs().format('YYYY-MM-DD'),
           startDate: dayjs().add(3, 'day').format('YYYY-MM-DD'), endDate: dayjs().add(25, 'day').format('YYYY-MM-DD'),
-          totalQty: ords[0]?.orderQty, operators: 6, helpers: 2, workingHours: 8,
+          totalQty: opening?.orderQty, operators: 6, helpers: 2, workingHours: 8,
           targetEfficiencyPct: 60, pricePerPiece: null, otherChargesPct: 8,
           loadingDate: dayjs().add(3, 'day').format('YYYY-MM-DD'),
           settingHours: 4, status: 'DRAFT', operations: [],
         });
       } catch { message.error('Failed to load plan'); } finally { setLoading(false); }
     })();
+    // The remembered order only seeds a new record; it must not reload the
+    // form when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
 
   const order = useMemo(() => orders.find((o) => o.id === plan?.orderId), [orders, plan]);
@@ -137,6 +143,7 @@ const SewingPlanForm = () => {
               options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
               onChange={(v) => {
                 const o = orders.find((x) => x.id === v);
+                selectOrder(o);
                 patch({ orderId: v, totalQty: o?.orderQty });
               }} />
           </div>

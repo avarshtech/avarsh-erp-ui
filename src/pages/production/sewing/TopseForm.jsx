@@ -7,6 +7,7 @@ import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { TOPSE_TRAFFIC_META, CATEGORY_COLORS, topseHourOptions } from '../../../utils/sewingConstants';
 import { topseTotals } from '../../../utils/sewingCalc';
@@ -25,6 +26,7 @@ const TopseForm = () => {
   const { id } = useParams();
   const isEdit = Boolean(id);
   const { lineOptions, defectCategories, defectTypesOf, threshold } = useSewingMasters();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
   const [report, setReport] = useState(null);
   const [orders, setOrders] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -44,11 +46,14 @@ const TopseForm = () => {
         setOrders(ords);
         setEmployees(staff.content);
         setReport(record || {
-          orderId: ords[0]?.id, lineId: null, reportDate: dayjs().format('YYYY-MM-DD'),
+          orderId: defaultOrderId(ords), lineId: null, reportDate: dayjs().format('YYYY-MM-DD'),
           totalInspected: null, inspectorId: null, defects: [],
         });
       } catch { message.error('Failed to load the report'); }
     })();
+    // The remembered order only seeds a new record; it must not reload the
+    // form when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
 
   // Default the line once the master has loaded, rather than assuming a name.
@@ -161,7 +166,10 @@ const TopseForm = () => {
             <FieldLabel>Order</FieldLabel>
             <FormSelect value={report.orderId} style={{ width: 240 }} disabled={isEdit}
               options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-              onChange={(v) => patch({ orderId: v })} />
+              onChange={(v) => {
+                selectOrder(orders.find((o) => o.id === v));
+                patch({ orderId: v });
+              }} />
           </div>
           <div>
             <FieldLabel>Line</FieldLabel>

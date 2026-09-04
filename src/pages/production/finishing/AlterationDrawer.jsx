@@ -4,29 +4,36 @@ import { PlusOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
 import { FACTORIES } from '../../../utils/cuttingConstants';
 import { DEFECT_LIBRARY, DEFECT_SOURCES, DEFECT_SEVERITIES } from '../../../utils/finishingConstants';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { saveAlterationBatch } from '../../../services/production/finishingService';
 
 const FieldLabel = ({ children }) => (
   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>{children}</div>
 );
 
-const blankRow = () => ({ size: null, qtyChecked: null, alterPcs: null, defectCode: null, source: null, productionUnit: FACTORIES[0] });
+const blankRow = () => ({ size: null, qtyChecked: null, alterPcs: null, defectCode: null, source: null });
 
 /**
- * Rev — select the Order #, log the defect table (Size / Qty Checked / No. of
- * Alter Pcs / Defect Code / Source / Production Unit) and issue to production.
+ * Select the Order # and the unit the batch is going to, log the defect table
+ * (Size / Qty Checked / No. of Alter Pcs / Defect Code / Source) and issue.
+ *
+ * One batch goes to one unit, so the unit belongs in the header rather than
+ * repeated down every row where it can silently disagree with itself.
  */
 const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
+  const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [orderId, setOrderId] = useState(null);
+  const [productionUnit, setProductionUnit] = useState(FACTORIES[0]);
   const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setOrderId(orders[0]?.id);
+    setOrderId(defaultOrderId(orders));
+    setProductionUnit(FACTORIES[0]);
     setRows([blankRow()]);
-  }, [open, orders]);
+  }, [open, orders, defaultOrderId]);
 
   const order = useMemo(() => orders.find((o) => o.id === orderId), [orders, orderId]);
   const setRow = useCallback((idx, patch) => {
@@ -67,13 +74,6 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
       ),
     },
     {
-      title: 'Production Unit', dataIndex: 'productionUnit', width: 160,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 145 }}
-          options={FACTORIES.map((f) => ({ value: f, label: f }))} onChange={(val) => setRow(idx, { productionUnit: val })} />
-      ),
-    },
-    {
       title: '', key: 'del', width: 46, align: 'center',
       render: (_, __, idx) => (
         <Button size="small" type="text" danger icon={<DeleteOutlined />}
@@ -88,14 +88,16 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
     if (valid.length < rows.length) return message.warning('Complete or remove the incomplete rows');
     setSaving(true);
     try {
-      await saveAlterationBatch({ orderId, color: order?.color, rows: valid });
-      message.success(`${valid.reduce((s, r) => s + r.alterPcs, 0)} pcs issued to production for alteration`);
+      await saveAlterationBatch({
+        orderId, color: order?.color, rows: valid.map((r) => ({ ...r, productionUnit })),
+      });
+      message.success(`${valid.reduce((s, r) => s + r.alterPcs, 0)} pcs issued to ${productionUnit} for alteration`);
       onSaved();
     } catch { message.error('Failed to issue alterations'); } finally { setSaving(false); }
   };
 
   return (
-    <Drawer title="Log Alterations — Issue to Production" open={open} onClose={onClose} size={980} destroyOnHidden
+    <Drawer title="Log Alterations — Issue to Production" open={open} onClose={onClose} width={980} destroyOnHidden
       footer={(
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onClose}>Cancel</Button>
@@ -107,7 +109,17 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
           <FieldLabel>Order #</FieldLabel>
           <FormSelect value={orderId} style={{ width: 240 }}
             options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-            onChange={(v) => { setOrderId(v); setRows([blankRow()]); }} />
+            onChange={(v) => {
+              const o = orders.find((x) => x.id === v);
+              selectOrder(o);
+              setOrderId(v);
+              setRows([blankRow()]);
+            }} />
+        </div>
+        <div>
+          <FieldLabel>Issue to Unit</FieldLabel>
+          <FormSelect value={productionUnit} style={{ width: 200 }}
+            options={FACTORIES.map((f) => ({ value: f, label: f }))} onChange={setProductionUnit} />
         </div>
         {order && <Tag style={{ alignSelf: 'end' }}>{order.buyer} · {order.color}</Tag>}
       </Space>
@@ -118,7 +130,7 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
             <Button icon={<PlusOutlined />} size="small" onClick={() => setRows((prev) => [...prev, blankRow()])}>Add Row</Button>
           </Space>
         )}
-        rowKey={(r) => rows.indexOf(r)} size="small" columns={columns} dataSource={rows} pagination={false} scroll={{ x: 900 }}
+        rowKey={(r) => rows.indexOf(r)} size="small" columns={columns} dataSource={rows} pagination={false} scroll={{ x: 760 }}
         locale={{ emptyText: 'Add defect rows for this order' }} />
     </Drawer>
   );

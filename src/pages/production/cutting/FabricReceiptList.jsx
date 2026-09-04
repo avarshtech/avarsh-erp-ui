@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Table, Space } from 'antd';
+import { App, Card, Table, Space, Tooltip } from 'antd';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
@@ -15,7 +15,7 @@ const FabricReceiptList = () => {
   const [rows, setRows] = useState([]);
   const [cutPos, setCutPos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawer, setDrawer] = useState({ open: false, mode: 'create', record: null });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,13 +41,24 @@ const FabricReceiptList = () => {
       render: (_, r) => `${formatNumber(r.receivedQty, 3)} ${r.rolls[0]?.uom || ''}`,
     },
     { title: 'Status', dataIndex: 'status', width: 160, render: (v) => <CuttingStatusTag status={v} /> },
+    {
+      title: 'Actions', key: 'actions', width: 110, fixed: 'right', align: 'center',
+      render: (_, r) => (
+        <Space size={4}>
+          <ActionButton action="view" size="small" onClick={() => setDrawer({ open: true, mode: 'view', record: r })} />
+          <Tooltip title="Correct which rolls arrived">
+            <ActionButton action="edit" size="small" onClick={() => setDrawer({ open: true, mode: 'edit', record: r })} />
+          </Tooltip>
+        </Space>
+      ),
+    },
   ], []);
 
   return (
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <span style={{ color: 'var(--text-secondary)' }}>Rolls issued from stores must be confirmed here before relaxation can start.</span>
-        <ActionButton action="create" text="New Fabric Receipt" onClick={() => setDrawerOpen(true)} />
+        <ActionButton action="create" text="New Fabric Receipt" onClick={() => setDrawer({ open: true, mode: 'create', record: null })} />
       </Space>
       <Table
         rowKey="id"
@@ -55,15 +66,17 @@ const FabricReceiptList = () => {
         columns={columns}
         dataSource={rows}
         loading={loading}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 1110 }}
         pagination={getTablePagination({ pageSize: 10 }, 'receipts')}
         locale={{ emptyText: <EmptyState title="No fabric receipts" description="Confirm rolls received from stores to begin" /> }}
       />
       <FabricReceiptDrawer
-        open={drawerOpen}
+        open={drawer.open}
+        mode={drawer.mode}
+        record={drawer.record}
         cutPos={cutPos}
-        onClose={() => setDrawerOpen(false)}
-        onSaved={() => { setDrawerOpen(false); load(); }}
+        onClose={() => setDrawer({ open: false, mode: 'create', record: null })}
+        onSaved={() => { setDrawer({ open: false, mode: 'create', record: null }); load(); }}
       />
     </Card>
   );

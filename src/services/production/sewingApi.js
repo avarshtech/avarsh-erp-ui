@@ -142,6 +142,12 @@ export const getBomItems = async (orderId) => {
   return data;
 };
 
+/** Only the labels on that BOM - what pre-final checking has to verify. */
+export const getBomLabelItems = async (orderId) => {
+  const { data } = await axiosInstance.get(`${BASE}/trim-cards/bom-labels`, { params: { orderId } });
+  return data;
+};
+
 export const saveTrimCard = async (payload) => {
   const { data } = await axiosInstance.post(`${BASE}/trim-cards`, payload);
   return data;
@@ -261,6 +267,12 @@ export const issuedBySize = async (orderId) => {
 /** The size-wise sheet a new note starts from, with balances carried forward. */
 export const getIssueOpeningLines = async (orderId) => {
   const { data } = await axiosInstance.get(`${BASE}/garment-issues/opening-lines`, { params: { orderId } });
+  return data;
+};
+
+/** Finishing recording what it took in against a garment issue. */
+export const recordGarmentIssueReceipt = async (id, lines) => {
+  const { data } = await axiosInstance.put(`${BASE}/garment-issues/${id}/receipt`, { lines });
   return data;
 };
 

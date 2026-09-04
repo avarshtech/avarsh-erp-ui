@@ -4,12 +4,14 @@ import dayjs from 'dayjs';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { listMetalDetection, listNeedleLog, getOrders, saveMetalDetection } from '../../../services/production/finishingService';
 import FinishingStatusTag from './FinishingStatusTag';
 
 /** PRD Module 9 — 100% metal detection with calibration gate + needle control log. */
 const MetalDetectionTab = () => {
   const { message } = App.useApp();
+  const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [rows, setRows] = useState([]);
   const [needles, setNeedles] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -30,12 +32,12 @@ const MetalDetectionTab = () => {
 
   const openLog = useCallback(() => {
     setEntry({
-      date: dayjs().format('YYYY-MM-DD'), machineNo: 'MD-01', orderId: orders[0]?.id,
+      date: dayjs().format('YYYY-MM-DD'), machineNo: 'MD-01', orderId: defaultOrderId(orders),
       calibrationOk: false, calibratedAt: null, testCards: [],
       totalScanned: null, pass: null, fail: 0, rescan: 0, finalReject: 0, remarks: '',
     });
     setLogOpen(true);
-  }, [orders]);
+  }, [orders, defaultOrderId]);
 
   const handleLogSave = async () => {
     if (!entry.calibrationOk) return message.warning('Calibration must be done at shift start — scanning is blocked without it (PRD 12.3)');
@@ -125,7 +127,10 @@ const MetalDetectionTab = () => {
                 onChange={(v) => setEntry((prev) => ({ ...prev, machineNo: v }))} />
               <FormSelect value={entry.orderId} style={{ width: 230 }}
                 options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-                onChange={(v) => setEntry((prev) => ({ ...prev, orderId: v }))} />
+                onChange={(v) => {
+                  selectOrder(orders.find((o) => o.id === v));
+                  setEntry((prev) => ({ ...prev, orderId: v }));
+                }} />
             </Space>
             <Space size="middle" wrap>
               <Checkbox checked={entry.calibrationOk}

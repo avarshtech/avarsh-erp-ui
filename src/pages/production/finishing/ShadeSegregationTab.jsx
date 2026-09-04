@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Card, Table, Space, Tag } from 'antd';
 import dayjs from 'dayjs';
+import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { SHADE_BANDS } from '../../../utils/finishingConstants';
 import { listShadeGroups, getOrders, getEmployees } from '../../../services/production/finishingService';
 import FinishingStatusTag from './FinishingStatusTag';
+import ShadeGroupDrawer from './ShadeGroupDrawer';
 
 const bandTag = (band) => {
   const cfg = SHADE_BANDS.find((b) => b.band === band);
@@ -23,6 +25,7 @@ const ShadeSegregationTab = () => {
   const [orders, setOrders] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -55,11 +58,16 @@ const ShadeSegregationTab = () => {
         <span style={{ color: 'var(--text-secondary)' }}>
           Shade bands per fabric lot via D65 light box. A carton may only hold one band — packing is blocked until segregation completes.
         </span>
-        <Space wrap>{SHADE_BANDS.map((b) => <span key={b.band}>{bandTag(b.band)}</span>)}</Space>
+        <Space wrap>
+          {SHADE_BANDS.map((b) => <span key={b.band}>{bandTag(b.band)}</span>)}
+          <ActionButton action="create" text="Add Shade Group" onClick={() => setDrawerOpen(true)} />
+        </Space>
       </Space>
       <Table rowKey="id" size="small" columns={columns} dataSource={rows} loading={loading}
         scroll={{ x: 1100 }} pagination={getTablePagination({ pageSize: 10 }, 'shade groups')}
         locale={{ emptyText: <EmptyState title="No shade groups" description="Segregate dyed lots before packing" /> }} />
+      <ShadeGroupDrawer open={drawerOpen} orders={orders} employees={employees}
+        onClose={() => setDrawerOpen(false)} onSaved={() => { setDrawerOpen(false); load(); }} />
     </Card>
   );
 };

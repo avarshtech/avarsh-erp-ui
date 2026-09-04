@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
+import useModuleSelection from '../../../hooks/useModuleSelection';
 import { getBomItems, saveTrimCard } from '../../../services/production/sewingService';
 
 const FieldLabel = ({ children }) => (
@@ -21,6 +22,7 @@ const blankItem = () => ({ bomLineId: null, name: '', category: 'Trims & Accesso
 const TrimVerificationDrawer = ({ open, record, orders, onClose, onSaved }) => {
   const { message, modal } = App.useApp();
   const { options } = useSewingMasters();
+  const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
   const [card, setCard] = useState(null);
   const [bomLoading, setBomLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -30,13 +32,13 @@ const TrimVerificationDrawer = ({ open, record, orders, onClose, onSaved }) => {
   useEffect(() => {
     if (!open) return;
     setCard(record ? { ...record } : {
-      orderId: orders[0]?.id,
+      orderId: defaultOrderId(orders),
       checkType: null,
       cardDate: dayjs().format('YYYY-MM-DD'),
       verifiedBy: '',
       items: null,
     });
-  }, [open, record, orders]);
+  }, [open, record, orders, defaultOrderId]);
 
   // Default the check type once the master has loaded, rather than assuming a code.
   useEffect(() => {
@@ -154,7 +156,10 @@ const TrimVerificationDrawer = ({ open, record, orders, onClose, onSaved }) => {
           <FieldLabel>Order</FieldLabel>
           <FormSelect value={card.orderId} style={{ width: 240 }} disabled={Boolean(record)}
             options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
-            onChange={(v) => setCard((prev) => ({ ...prev, orderId: v, items: null }))} />
+            onChange={(v) => {
+              selectOrder(orders.find((o) => o.id === v));
+              setCard((prev) => ({ ...prev, orderId: v, items: null }));
+            }} />
         </div>
         <div>
           <FieldLabel>Check Type</FieldLabel>

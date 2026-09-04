@@ -6,8 +6,12 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
-import { CHECK_STAGES, LABEL_CHECKS, DHU_ALERT_PCT } from '../../../utils/finishingConstants';
-import { getChecking, saveChecking, getOrders, aqlSample, dhuPct, specPoints, fullMeasurementChart } from '../../../services/production/finishingService';
+import { CHECK_STAGES, DHU_ALERT_PCT } from '../../../utils/finishingConstants';
+import useModuleSelection from '../../../hooks/useModuleSelection';
+import {
+  getChecking, saveChecking, getOrders, aqlSample, dhuPct, specPoints, fullMeasurementChart,
+  getBomLabelItems,
+} from '../../../services/production/finishingService';
 import CheckingDefectsCard from './CheckingDefectsCard';
 
 const FieldLabel = ({ children }) => (
@@ -21,12 +25,18 @@ const pointStatus = (p) => {
   return { label: 'PASS', color: 'green', dev };
 };
 
-const newSheet = (orders) => ({
-  stage: 'PRE_FINAL', orderId: orders[0]?.id, color: orders[0]?.color, date: dayjs().format('YYYY-MM-DD'),
-  target: 190, lotSize: null, passQty: null, alterQty: null, rejectQty: null, defects: [],
-  labelChecks: Object.fromEntries(LABEL_CHECKS.map((l) => [l, false])),
-  chartSize: orders[0]?.sizes[0], points: specPoints(orders[0]?.styleNo, orders[0]?.sizes[0]),
-});
+/** A BOM label line keyed the same way whether it is ticked now or read back later. */
+const labelKey = (item) => item.itemCode || item.name;
+
+const newSheet = (orders, orderId) => {
+  const order = orders.find((o) => o.id === orderId) || orders[0];
+  return {
+    stage: 'PRE_FINAL', orderId: order?.id, color: order?.color, date: dayjs().format('YYYY-MM-DD'),
+    target: 190, lotSize: null, passQty: null, alterQty: null, rejectQty: null, defects: [],
+    labelChecks: {},
+    chartSize: order?.sizes?.[0], points: specPoints(order?.styleNo, order?.sizes?.[0]),
+  };
+};
 
 /** Module 5 (rev) — checking sheet: Pass/Alter/Reject + defect log + measurement chart. */
 const CheckingForm = () => {
@@ -34,8 +44,10 @@ const CheckingForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = Boolean(id);
+  const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [sheet, setSheet] = useState(null);
   const [orders, setOrders] = useState([]);
+  const [labelItems, setLabelItems] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -45,11 +57,23 @@ const CheckingForm = () => {
         setOrders(ords);
         if (record) {
           const o = ords.find((x) => x.id === record.orderId);
-          setSheet({ chartSize: o?.sizes[0], points: record.points || specPoints(o?.styleNo, o?.sizes[0]), ...record });
-        } else setSheet(newSheet(ords));
+          setSheet({ chartSize: o?.sizes?.[0], points: record.points || specPoints(o?.styleNo, o?.sizes?.[0]), ...record });
+        } else setSheet(newSheet(ords, defaultOrderId(ords)));
       } catch { message.error('Failed to load checking sheet'); }
     })();
+    // The remembered order only seeds a new sheet; it must not reload the form
+    // when another screen in the module changes the selection mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit, message]);
+
+  // Labels come off the order BOM, so a style carrying a flag label or a second
+  // care label is verified without anyone editing a list in code.
+  useEffect(() => {
+    if (!sheet?.orderId) return;
+    getBomLabelItems(sheet.orderId)
+      .then(setLabelItems)
+      .catch(() => message.error('Failed to load the label items from the BOM'));
+  }, [sheet?.orderId, message]);
 
   const patch = useCallback((p) => setSheet((prev) => ({ ...prev, ...p })), []);
   const order = useMemo(() => orders.find((o) => o.id === sheet?.orderId), [orders, sheet?.orderId]);
@@ -63,6 +87,12 @@ const CheckingForm = () => {
     const verdict = aql ? (defects <= aql.accept ? 'ACCEPTED' : 'REJECTED') : null;
     return { checked, defects, dhu, aql, verdict };
   }, [sheet]);
+
+  /** Labels on the BOM that pre-final has not signed off yet. */
+  const pendingLabels = useMemo(() => {
+    if (!sheet || sheet.stage !== 'PRE_FINAL') return [];
+    return labelItems.filter((item) => !sheet.labelChecks?.[labelKey(item)]);
+  }, [sheet, labelItems]);
 
   const chartColumns = useMemo(() => [
     { title: 'Measurement Point', dataIndex: 'point', width: 190 },
@@ -87,6 +117,11 @@ const CheckingForm = () => {
 
   const handleSave = async () => {
     if (!totals.checked) return message.warning('Enter Pass / Alter / Reject quantities');
+    // Pre-final is where labels get caught. A wrong main or care label is a
+    // critical defect, and no later stage re-opens a carton to find it.
+    if (pendingLabels.length) {
+      return message.warning(`Verify every label first \u2014 ${pendingLabels.map((l) => l.name).join(', ')} still unticked`);
+    }
     setSaving(true);
     try {
       const saved = await saveChecking({ ...sheet, verdict: totals.verdict, sampleSize: totals.aql?.sample, acceptNo: totals.aql?.accept, rejectNo: totals.aql?.reject });
@@ -120,7 +155,11 @@ const CheckingForm = () => {
               options={orders.map((o) => ({ value: o.id, label: `${o.orderNo} · ${o.styleNo}` }))}
               onChange={(v) => {
                 const o = orders.find((x) => x.id === v);
-                patch({ orderId: v, color: o?.color, chartSize: o?.sizes[0], points: specPoints(o?.styleNo, o?.sizes[0]) });
+                selectOrder(o);
+                patch({
+                  orderId: v, color: o?.color, chartSize: o?.sizes?.[0], labelChecks: {},
+                  points: specPoints(o?.styleNo, o?.sizes?.[0]),
+                });
               }} />
           </div>
           <div>
@@ -186,15 +225,30 @@ const CheckingForm = () => {
       )}
 
       {sheet.stage === 'PRE_FINAL' && (
-        <Card title="Label Verification (mandatory at pre-final)" size="small" style={{ marginBottom: 16 }}>
-          <Space size="large" wrap>
-            {LABEL_CHECKS.map((l) => (
-              <Checkbox key={l} checked={sheet.labelChecks?.[l]}
-                onChange={(e) => patch({ labelChecks: { ...sheet.labelChecks, [l]: e.target.checked } })}>
-                {l}
-              </Checkbox>
-            ))}
-          </Space>
+        <Card size="small" style={{ marginBottom: 16 }}
+          title="Label Verification (mandatory at pre-final)"
+          extra={labelItems.length ? (
+            <Tag color={pendingLabels.length ? 'red' : 'green'}>
+              {labelItems.length - pendingLabels.length} of {labelItems.length} verified
+            </Tag>
+          ) : null}>
+          {labelItems.length === 0 ? (
+            <Alert type="warning" showIcon
+              title="No label items on the BOM for this order"
+              description="Nothing can be verified here until the BOM lists the brand, size and care labels for this style." />
+          ) : (
+            <Space size="large" wrap>
+              {labelItems.map((item) => (
+                <Checkbox key={labelKey(item)} checked={Boolean(sheet.labelChecks?.[labelKey(item)])}
+                  onChange={(e) => patch({ labelChecks: { ...sheet.labelChecks, [labelKey(item)]: e.target.checked } })}>
+                  {item.name}
+                  {item.specification && (
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{item.specification}</div>
+                  )}
+                </Checkbox>
+              ))}
+            </Space>
+          )}
         </Card>
       )}
 
