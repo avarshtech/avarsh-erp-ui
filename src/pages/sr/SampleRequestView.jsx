@@ -98,7 +98,9 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
     onEdit: () => { onClose?.(); navigate(`/sample-requests/edit/${sr?.id}`); },
     onSubmit: () => doTransition(SR_STATUS.SUBMITTED, 'Submit sample request'),
     onReturnToDraft: () => doTransition(SR_STATUS.DRAFT, 'Return to Draft for edits'),
-    onGoMaterialIssue: () => { onClose?.(); navigate(`/inventory/issue/sample/new?srId=${sr?.id}`); },
+    // Fabric first: it is the document that is normally raised first, and the
+    // trims one is a toggle away on the register the form returns to.
+    onGoMaterialIssue: () => { onClose?.(); navigate(`/inventory/issue/sample/fabric/new?srId=${sr?.id}`); },
     onGoDispatches: () => { onClose?.(); navigate('/sample-requests/dispatches/list'); },
     onGoComments: () => { onClose?.(); navigate(`/sample-requests/comments?srId=${sr?.id}`); },
     onDelete: () => modal.confirm({

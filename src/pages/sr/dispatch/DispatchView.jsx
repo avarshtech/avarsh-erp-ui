@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { App, Row, Col, Card, Tag, Typography, Collapse, Skeleton } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
 import ViewDialog from '../../../components/ViewDialog';
 import StatusTag from '../../../components/StatusTag';
 import ActivityTimeline from '../../../components/ActivityTimeline';
@@ -12,6 +13,7 @@ import {
 import { formatDate } from '../../../utils/formatters';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { getDispatch } from '../../../services/sr/srService';
+import { downloadStoredFile } from '../../../services/core/fileService';
 
 const { Text, Title } = Typography;
 
@@ -47,6 +49,14 @@ const DispatchView = ({ open, dispatchId, onClose, onEdit }) => {
       });
     return () => { cancelled = true; };
   }, [open, dispatchId, message, onClose]);
+
+  const handleDownload = useCallback(async (file) => {
+    try {
+      await downloadStoredFile(file);
+    } catch {
+      message.error(`Failed to download ${file.originalFilename || 'the document'}`);
+    }
+  }, [message]);
 
   const current = !loading && record ? record : null;
   const draft = current?.status === DISPATCH_STATUS.DRAFT;
@@ -133,7 +143,16 @@ const DispatchView = ({ open, dispatchId, onClose, onEdit }) => {
             {(current.documents || []).length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <Text type="secondary" style={labelStyle}>Documents</Text>
-                {(current.documents || []).map((f) => <Tag key={f.name || f}>{f.name || f}</Tag>)}
+                {current.documents.map((f) => (
+                  <Tag
+                    key={f.fileId || f.id}
+                    icon={<DownloadOutlined />}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => handleDownload(f)}
+                  >
+                    {f.originalFilename}
+                  </Tag>
+                ))}
               </div>
             )}
           </Card>

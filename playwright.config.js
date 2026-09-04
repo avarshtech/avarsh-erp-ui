@@ -127,6 +127,19 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Sample Requests — the module came off its localStorage mock in seven
+      // stages; these specs are what proves it. Numbered because 02 raises the
+      // request 03 and 04 then dispatch, invoice and close.
+      name: 'sample-requests',
+      testDir: './e2e/specs/sample-requests',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'hr',
       testDir: './e2e/specs/hr',
       use: {

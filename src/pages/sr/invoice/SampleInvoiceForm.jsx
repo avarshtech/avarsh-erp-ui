@@ -318,7 +318,12 @@ const SampleInvoiceForm = () => {
           const saved = await persist();
           const issued = await issueInvoice(saved.id, saved.version);
           setIsDirty(false);
-          message.success(`Invoice ${issued.invoiceNo} issued — ${issued.currency} ${issued.declaredValue?.toFixed(2)}`);
+          // declaredValue is null while any rate is blank — issue rejects that,
+          // so this reads it defensively rather than printing "undefined"
+          const value = issued.declaredValue != null
+            ? ` — ${issued.currency} ${Number(issued.declaredValue).toFixed(2)}`
+            : '';
+          message.success(`Invoice ${issued.invoiceNo} issued${value}`);
           leave(LIST_PATH);
         } catch (e) { toastUnlessHandled(message, e, 'Failed to issue'); } finally { setSaving(false); }
       },

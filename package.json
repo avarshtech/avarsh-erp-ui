@@ -28,6 +28,7 @@
     "test:e2e:journey": "npx playwright test --project=journey",
     "test:e2e:approvals": "playwright test --project=approvals",
     "test:e2e:inventory": "playwright test --project=inventory",
+    "test:e2e:sample-requests": "playwright test --project=sample-requests",
     "test:e2e:reports": "playwright test --project=reports"
   },
   "dependencies": {

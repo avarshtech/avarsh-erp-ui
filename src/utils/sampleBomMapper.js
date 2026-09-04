@@ -1,48 +1,12 @@
-import { defaultMandatory } from './sampleFabricRules';
-
 /**
- * Maps REAL BOM lines into SR material lines (PRD v3 §8.2 D).
- * The BOM has no dedicated fabricType/classification/width columns — they are
- * derived the same way the BOM screens derive them:
- *  - fabric vs trim: categoryName contains "fabric" (BOMView.jsx:37 test)
- *  - width: variants.W | variants.Width (BOMForm convention)
- *  - colour/design: variants.Colour|Color|Design, else the variant name
- * Spec fields stay locked to these BOM values on the SR — only Colour/Design
- * and the per-line mandatory flag are SR-editable.
+ * What the sample request form still works out for itself.
+ *
+ * Materialising a BOM into material lines used to live here; the server does it
+ * now (`GET /sample-requests/bom-preview`, SampleBomMaterialiser), because the
+ * section, width and colour it derives have to agree with what is stored on the
+ * request. What is left are the two figures that move while the user is still
+ * typing, so they cannot come from a response.
  */
-
-const isFabricLine = (line) => (line?.categoryName || '').toLowerCase().includes('fabric');
-
-const widthOf = (line) =>
-  line?.variants?.W ?? line?.variants?.Width ?? line?.variants?.width ?? null;
-
-const colourOf = (line) =>
-  line?.variants?.Colour ?? line?.variants?.Color ?? line?.variants?.Design
-  ?? line?.variantName ?? '';
-
-export const buildMaterialsFromBom = (bom) => (bom?.lines || []).map((line, idx) => {
-  const fabric = isFabricLine(line);
-  const mapped = {
-    lineNo: idx + 1,
-    bomLineId: line.id ?? null,
-    section: fabric ? 'FABRIC' : 'TRIM',
-    fabricType: line.categoryName || (fabric ? 'Fabric' : 'Trim'),
-    classification: line.subCategoryName || '',
-    description: [line.itemName, line.itemCode ? `(${line.itemCode})` : ''].filter(Boolean).join(' '),
-    width: widthOf(line),
-    consumption: line.consumptionPerGarment ?? null,
-    consumptionMode: line.consumptionMode || 'SIMPLE',
-    consumptionMatrix: line.consumptionMatrix || null,
-    uom: line.uom || '',
-    colourDesign: colourOf(line),
-    originalColourDesign: colourOf(line),
-    mandatory: false,
-  };
-  // Buyer-specified trims (threads, labels) default to mandatory — locked to
-  // spec even when substitution is allowed (per-line override, OQ2).
-  mapped.mandatory = !fabric && defaultMandatory(mapped);
-  return mapped;
-});
 
 /**
  * Stock verdict for one material line. Availability is the server's live

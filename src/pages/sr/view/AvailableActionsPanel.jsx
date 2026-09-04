@@ -59,13 +59,16 @@ const AvailableActionsPanel = ({ sr, canUpdate, canDelete, canIssue, handlers })
         />
         <ActionRow
           // Gated on the issue screen's own permission — the route it opens is
-          // wrapped in PermissionRoute, so an ungated button dead-ends on a 403
-          enabled={s === SR_STATUS.SUBMITTED && canIssue}
+          // wrapped in PermissionRoute, so an ungated button dead-ends on a 403.
+          // Still offered In Production: fabric and trims are separate documents
+          // and are rarely issued the same day, so the second one has to be
+          // reachable from here and not only from the issue register.
+          enabled={(s === SR_STATUS.SUBMITTED || s === SR_STATUS.IN_PRODUCTION) && canIssue}
           reason={!canIssue
             ? 'Needs Material Issue (add) permission'
-            : 'Production starts when material is issued — available once Submitted'}
-          icon={<ToolOutlined />} primary
-          label="Issue Materials & Start Production"
+            : 'Production starts when material is issued — available from Submitted until dispatch'}
+          icon={<ToolOutlined />} primary={s === SR_STATUS.SUBMITTED}
+          label={s === SR_STATUS.IN_PRODUCTION ? 'Issue More Materials' : 'Issue Materials & Start Production'}
           onClick={handlers.onGoMaterialIssue}
         />
         <ActionRow

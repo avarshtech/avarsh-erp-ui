@@ -8,15 +8,22 @@ import FabricIssueList from './FabricIssueList';
 import AccessoriesIssueList from './AccessoriesIssueList';
 import SampleRequestIssuePane from './SampleRequestIssuePane';
 
+// The Sample Request segment issues fabric and trims as separate documents, so
+// its target depends on the register's toggle rather than on the segment alone.
+const SAMPLE_ISSUE = {
+  FABRIC: { path: '/inventory/issue/sample/fabric/new', text: 'New Fabric Issue' },
+  ACCESSORY: { path: '/inventory/issue/sample/trims/new', text: 'New Trims Issue' },
+};
+
 const NEW_ISSUE_PATH = {
   Fabric: '/inventory/issue/fabric/new',
   Accessories: '/inventory/issue/accessories/new',
-  SampleRequest: '/inventory/issue/sample/new',
+  SampleRequest: null,
 };
 const NEW_ISSUE_TEXT = {
   Fabric: 'New Fabric Issue',
   Accessories: 'New Accessories Issue',
-  SampleRequest: 'New Sample Issue',
+  SampleRequest: null,
 };
 
 const MaterialIssuePage = () => {
@@ -28,10 +35,18 @@ const MaterialIssuePage = () => {
     // hasOwn, not a bare lookup — 'constructor'/'toString' would pass truthiness
     return Object.prototype.hasOwnProperty.call(NEW_ISSUE_PATH, requested) ? requested : 'Fabric';
   });
+  // ?issueType= brings the sample register back to the side the form came from
+  const [issueType, setIssueType] = useState(() => {
+    const requested = searchParams.get('issueType');
+    return Object.prototype.hasOwnProperty.call(SAMPLE_ISSUE, requested) ? requested : 'FABRIC';
+  });
+
+  const isSample = activeSegment === 'SampleRequest';
+  const newIssue = isSample ? SAMPLE_ISSUE[issueType] : null;
 
   const handleNewIssue = useCallback(() => {
-    navigate(NEW_ISSUE_PATH[activeSegment]);
-  }, [activeSegment, navigate]);
+    navigate(isSample ? SAMPLE_ISSUE[issueType].path : NEW_ISSUE_PATH[activeSegment]);
+  }, [activeSegment, isSample, issueType, navigate]);
 
   return (
     <div className="animate-fade-in-up">
@@ -43,7 +58,7 @@ const MaterialIssuePage = () => {
         {hasPermission('inventory-issue', 'add') && (
           <ActionButton
             action="create"
-            text={NEW_ISSUE_TEXT[activeSegment]}
+            text={newIssue ? newIssue.text : NEW_ISSUE_TEXT[activeSegment]}
             onClick={handleNewIssue}
           />
         )}
@@ -69,7 +84,9 @@ const MaterialIssuePage = () => {
 
       {activeSegment === 'Fabric' && <FabricIssueList embedded />}
       {activeSegment === 'Accessories' && <AccessoriesIssueList embedded />}
-      {activeSegment === 'SampleRequest' && <SampleRequestIssuePane />}
+      {isSample && (
+        <SampleRequestIssuePane issueType={issueType} onIssueTypeChange={setIssueType} />
+      )}
     </div>
   );
 };

@@ -245,17 +245,50 @@
 | updateTermsConditions | PUT | `/terms-conditions/{id}` |
 | deleteTermsConditions | DELETE | `/terms-conditions/{id}` |
 
-### Sample Requests (UI MOCK phase — no backend yet)
-`src/services/sr/srService.js` is the single import surface; data lives in localStorage
-(`avarsh.sr.mockStore.v1`, TNA-pattern, `USE_MOCK_SR_DATA` in `srEnv.js`). The mock mirrors the
-planned contract so the swap is mechanical:
-`GET/POST /sample-requests` · `GET/PUT/DELETE /sample-requests/{id}` · `POST /{id}/status` ·
-`POST /{id}/dispatch` · `POST /{id}/feedback` (returns `{sampleRequest, revisionSr?}`) ·
-`POST /{id}/comment-sheet:parse` · `GET /{id}/activity` · `GET /by-order/{orderNo}` ·
-`GET /sample-requests/dashboard` · masters under `/sample-requests/masters/*` ·
-`/sample-invoices` CRUD + `/{id}/issue|cancel|duplicate`. Sample POs become real PO-module
-records (`po_type='SAMPLE'` + sr link) at API phase. Invoice exporter/bank blocks reuse the REAL
-`/organisation-info`; consignee + overseas detection use buyer shipping-location country.
+### Sample Requests
+`src/services/sr/srService.js` is still the single import surface every screen uses, but every
+export now delegates to `src/services/sr/srApi.js` and the real `com.avarsh.erp.sampling` module.
+The `srMock*` files, `srDocNumbers.js` and `srEnv.js` are deleted; `srApi.js` clears the old
+`avarsh.sr.mockStore.v1` key on load.
+
+| Function | Method | Endpoint |
+|---|---|---|
+| searchSampleRequests | GET | `/sample-requests` (search, status, sampleTypeId, buyer, deadlineFrom/To, overdue, pendingApproval, page, size, sort, direction) |
+| getSampleRequest | GET | `/sample-requests/{id}` |
+| bomPreview | GET | `/sample-requests/bom-preview?bomId=` or `?orderNo=` |
+| createSampleRequest / updateSampleRequest | POST / PUT | `/sample-requests` · `/sample-requests/{id}` |
+| updateInstructions | PATCH | `/sample-requests/{id}/instructions` |
+| deleteSampleRequest | DELETE | `/sample-requests/{id}` |
+| changeStatus | PUT | `/sample-requests/{id}/status` |
+| listByOrderNo | GET | `/sample-requests/by-order?orderNo=` (order nos carry `/`) |
+| listSrBuyers | GET | `/sample-requests/buyers` |
+| getSampleDashboard | GET | `/sample-requests/dashboard` |
+| saveFeedbackDraft / recordFeedback | PUT | `/sample-requests/{id}/feedback/draft` · `/sample-requests/{id}/feedback` |
+| parseCommentSheet | POST | `/sample-requests/{id}/comment-sheet/parse` (multipart) |
+| listSampleTypes / listCouriers / listRejectionReasons / getFeedbackCategoryLabels / listHsnCodes | GET | `/sample-requests/masters/{sample-types\|couriers\|rejection-reasons\|feedback-categories\|hsn-codes}` |
+| listIssuableSrs | GET | `/sample-issues/issuable-srs` |
+| getSampleIssuableRolls | GET | `/sample-issues/issuable-rolls?srId=&lineNo=` |
+| createSampleFabricIssue / createSampleTrimsIssue | POST | `/sample-issues/fabric` · `/sample-issues/trims` |
+| listSampleIssues / getSampleIssue | GET | `/sample-issues` · `/sample-issues/{id}` |
+| cancelSampleIssue | POST | `/sample-issues/{id}/cancel` |
+| searchDispatches | GET | `/sample-dispatches` |
+| getDispatch / createDispatch / updateDispatch / deleteDispatch | GET/POST/PUT/DELETE | `/sample-dispatches[/{id}]` |
+| listDispatchableSrs | GET | `/sample-dispatches/dispatchable-srs?buyerId=&dispatchId=` |
+| listDispatchableCustomers | GET | `/sample-dispatches/customers` |
+| markDispatched | POST | `/sample-dispatches/{id}/mark-dispatched` — 409 `INVOICE_REQUIRED` |
+| listInvoices | GET | `/sample-invoices` (answers `{content, totalElements, stats}`) |
+| getInvoice / createInvoice / updateInvoice | GET/POST/PUT | `/sample-invoices[/{id}]` |
+| listEligibleSrs | GET | `/sample-invoices/eligible-srs?type=&consigneeBuyerId=&dispatchId=` |
+| issueInvoice / cancelInvoice / duplicateInvoice | POST | `/sample-invoices/{id}/{issue\|cancel\|duplicate}` |
+| Couriers master | GET/POST/PUT/DELETE | `/couriers[/{id}]` |
+
+Notes: sample issues are `inv_material_issues` rows with `source_type='SAMPLE_REQUEST'` — they
+carry `sourceType`, `sampleRequestId` and `sampleRequestNo` instead of `cuttingPO`/`workOrder`,
+and the bulk registers exclude them. There are no sample POs: material comes off ordinary stock.
+`overseas` is decided server-side against `sys_organisation_info.country`, which also supplies the
+invoice series (`commercial_invoice_series` / `sample_invoice_series`) and the exporter/bank block
+on the printed invoice; buyer country comes from the first active shipping location. Every header
+mutation carries `version`.
 
 ### Files
 | Function | Method | Endpoint |

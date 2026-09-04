@@ -79,11 +79,13 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
           </Field>
         </Col>
         <Col span={12}>
-          <Field label="Invoice Series">
+          {/* Read-only: the series is the organisation's book for this invoice
+              type, set in the Company Profile and applied server-side. A picker
+              here would have been a control that changed nothing. */}
+          <Field label="Invoice Series" hint="Set per invoice type in Company Profile">
             <Select
-              style={{ width: '100%' }} disabled={locked} value={inv.series || 'EXSG'}
+              style={{ width: '100%' }} disabled value={inv.series || 'EXSG'}
               options={(profile.extra?.invoiceSeries || [{ code: 'EXSG', label: 'Full export' }]).map((s) => ({ value: s.code, label: `${s.code} — ${s.label}` }))}
-              onChange={(v) => patch({ series: v })}
             />
           </Field>
         </Col>

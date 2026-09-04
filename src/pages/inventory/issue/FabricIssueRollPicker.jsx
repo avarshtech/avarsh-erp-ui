@@ -63,6 +63,9 @@ const FabricIssueRollPicker = ({
   bomRequired = 0,
   uom = 'kg',
   uomMismatch = false,
+  // Sample issues are raised against a sample request, not a Cutting PO, so the
+  // one sentence that names the source document is the caller's to supply.
+  uomMismatchMessage = 'UOM mismatch between Cutting PO and available stock rolls — cannot proceed with this issue',
 }) => {
   // Garments-industry split model: the ORIGINAL roll number stays in stock
   // carrying the remnant qty. A NEW sub-roll with a derived suffix
@@ -149,7 +152,7 @@ const FabricIssueRollPicker = ({
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message="UOM mismatch between Cutting PO and available stock rolls — cannot proceed with this issue"
+          message={uomMismatchMessage}
         />
       )}
       <Table
