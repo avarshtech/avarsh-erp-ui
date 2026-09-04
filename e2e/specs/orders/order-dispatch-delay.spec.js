@@ -80,9 +80,16 @@ test.describe('Orders — dispatch shift from a supplier PO delay', () => {
       expect(line.dispatchDate).toBe(original.dispatchDate);
       expect(line.revisedDispatchDate).toBe(plusDays(line.dispatchDate, 10));
     }
-    // The old PO-side projection went with the card that rendered it.
-    const gone = await api.get(`/purchase-orders/order-delays?orderId=${order.id}`);
-    expect(gone.status).toBeGreaterThanOrEqual(400);
+    // Clients built before the order carried its own shift still read the old projection
+    // until their users sign out; it answers with the same headline figure, PO details gone.
+    const legacy = await api.get(`/purchase-orders/order-delays?orderId=${order.id}`);
+    expect(legacy.status).toBe(200);
+    expect(legacy.data).toEqual([{ orderId: order.id, delayDays: 10 }]);
+    const legacyList = await api.get(`/purchase-orders/order-delays?orderIds=${order.id}&orderIds=999999`);
+    expect(legacyList.status).toBe(200);
+    expect(legacyList.data).toEqual([{ orderId: order.id, delayDays: 10 }]);
+    // A non-numeric id on the by-id route is the caller's mistake, never a server error.
+    expect((await api.get('/purchase-orders/not-a-number')).status).toBe(400);
   });
 
   test('the Orders list and the order view show the revised date and never the PO', async ({ page }) => {
