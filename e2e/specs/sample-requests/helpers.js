@@ -9,13 +9,23 @@
  * the screens in 04 and 05 would only make those specs slower and more brittle
  * without testing anything new.
  *
- * Everything is built against the seeded SAMPLE order SMP/0001 (Next PLC, UK —
- * overseas against the seeded India organisation) from db/e2eseed.
+ * Everything is built against the seeded SAMPLE orders SMP/0001..SMP/0013 (Next
+ * PLC, UK — overseas against the seeded India organisation) from db/e2eseed.
+ * They are identical clones: a BOM carries at most one sample request, so a spec
+ * asks seedFreeSampleOrder for the next unused one rather than naming SMP/0001.
  */
 import { expect } from '@playwright/test';
 import { navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 
-export const SEED_ORDER_NO = 'SMP/0001';
+/**
+ * The pool, in the order it is handed out. Every entry is the same fixture —
+ * whichever one a spec is given, the buyer, style, size run and BOM lines are
+ * the same, so nothing downstream has to care which it got.
+ */
+export const SEED_ORDER_POOL = Array.from(
+  { length: 13 },
+  (_, i) => `SMP/${String(i + 1).padStart(4, '0')}`,
+);
 export const SEED_BUYER = 'Next PLC';
 
 /** Sample type ids are a fixed list of eight, seeded by the M1 migration. */
@@ -161,24 +171,52 @@ function ok(res, what) {
   return res.data;
 }
 
-/** The seeded sample order's BOM — every request in these specs starts here. */
-export async function seedBomId(api) {
-  const preview = ok(
-    await api.get(`/sample-requests/bom-preview?orderNo=${encodeURIComponent(SEED_ORDER_NO)}`),
-    'bom-preview',
+/**
+ * The next seeded sample order whose BOM has no request yet, as
+ * { orderNo, bomId }.
+ *
+ * A BOM carries at most one sample request, so the suite cannot keep raising
+ * against SMP/0001 — the second one of a run would be refused with a 409. The
+ * preview reports what a BOM already holds, which is exactly the question, so
+ * the walk asks it rather than tracking handed-out orders in the runner (a
+ * count in memory would go stale the moment a spec raised one another way).
+ *
+ * Workers are pinned to 1 in playwright.config.js, so two specs never claim the
+ * same order between the check and the raise.
+ */
+export async function seedFreeSampleOrder(api) {
+  for (const orderNo of SEED_ORDER_POOL) {
+    const preview = ok(
+      await api.get(`/sample-requests/bom-preview?orderNo=${encodeURIComponent(orderNo)}`),
+      'bom-preview',
+    );
+    if (!(preview.existingRequests || []).length) {
+      return { orderNo, bomId: preview.header.bomId };
+    }
+  }
+  throw new Error(
+    `All ${SEED_ORDER_POOL.length} seeded sample orders already carry a sample request. `
+    + 'Widen the pool in db/e2eseed/V20260904170000__seed_sampling_bom_pool.sql, '
+    + 'or start the run against a fresh database.',
   );
-  return preview.header.bomId;
+}
+
+/** Just the BOM id of the next free sample order. */
+export async function seedBomId(api) {
+  return (await seedFreeSampleOrder(api)).bomId;
 }
 
 /**
- * A DRAFT sample request against the seeded BOM. `materials` is left empty on
- * purpose: it carries per-line overrides only, and the server materialises the
- * lines from the BOM itself.
+ * A DRAFT sample request against the next free seeded BOM, or against `bomId`
+ * when a spec needs to say which. `materials` is left empty on purpose: it
+ * carries per-line overrides only, and the server materialises the lines from
+ * the BOM itself.
  */
-export async function raiseSr(api, { sampleTypeId = SAMPLE_TYPE.PROTO, sampleQty = 2, sizes = ['S', 'M'] } = {}) {
-  const bomId = await seedBomId(api);
+export async function raiseSr(api, {
+  sampleTypeId = SAMPLE_TYPE.PROTO, sampleQty = 2, sizes = ['S', 'M'], bomId,
+} = {}) {
   return ok(await api.post('/sample-requests', {
-    bomId,
+    bomId: bomId ?? await seedBomId(api),
     sampleTypeId,
     colourSubstitutionAllowed: true,
     sampleQty,

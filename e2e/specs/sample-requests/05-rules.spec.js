@@ -16,7 +16,8 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import {
   goTo, settle, inputFor, expectToast, button, tableRows,
-  raiseSr, submitSr, issueFabric, createDispatch, issueCommercialInvoice, SAMPLE_TYPE,
+  raiseSr, submitSr, issueFabric, createDispatch, issueCommercialInvoice,
+  seedFreeSampleOrder, SAMPLE_TYPE,
 } from './helpers.js';
 
 const MOCK_STORE_KEY = 'avarsh.sr.mockStore.v1';
@@ -53,6 +54,38 @@ test.describe('Sample Requests — the rules hold', () => {
     const rows = await tableRows(page);
     expect(rows.join('\n'), 'the request comes back from the API, not from the browser')
       .toContain(sr.srNo);
+  });
+
+  test('a BOM that already has a sample request cannot be given a second one', async ({ page }) => {
+    const free = await seedFreeSampleOrder(api);
+    const sr = await raiseSr(api, { sampleTypeId: SAMPLE_TYPE.PROTO, bomId: free.bomId });
+
+    // The deep link from the BOM screen skips the picker, so it is the path
+    // that would slip past a check living only in the dropdown.
+    await goTo(page, `/sample-requests/new?bomId=${free.bomId}&orderNo=${encodeURIComponent(free.orderNo)}`);
+
+    const warning = page.locator('.ant-alert-warning');
+    await expect(warning).toBeVisible({ timeout: 25000 });
+    await expect(warning).toContainText(`BOM #${free.bomId}`);
+    await expect(warning).toContainText(sr.srNo);
+
+    // Refused, not merely warned: the form never opens.
+    await expect(page.getByText('B · Sample Details')).toHaveCount(0);
+    // ...and the picker is still there, so another BOM can be chosen in place.
+    await expect(page.locator('.ant-select').first()).toBeEnabled();
+
+    // The server refuses it too, whatever the screen did.
+    const refused = await api.post('/sample-requests', {
+      bomId: free.bomId,
+      sampleTypeId: SAMPLE_TYPE.FIT,
+      colourSubstitutionAllowed: true,
+      sampleQty: 1,
+      sizes: ['M'],
+      priority: 'NORMAL',
+      materials: [],
+    });
+    expect(refused.status).toBe(409);
+    expect(JSON.stringify(refused.data)).toContain(sr.srNo);
   });
 
   test('a submitted request can no longer be edited or deleted', async ({ page }) => {

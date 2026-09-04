@@ -11,8 +11,9 @@
  */
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive } from '../../helpers/navigation.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  SEED_ORDER_NO, goTo, settle, pickOption, selectFor, inputFor, fillDate,
+  seedFreeSampleOrder, goTo, settle, pickOption, selectFor, inputFor, fillDate,
   confirmModal, expectToast, tableRows, button,
 } from './helpers.js';
 
@@ -22,8 +23,12 @@ const iso = (days) => {
   return d.toISOString().slice(0, 10);
 };
 
-/** Carried between the tests in this file — they are one story, in order. */
-const state = { srNo: null, fabricIssueNo: null, trimsIssueNo: null };
+/**
+ * Carried between the tests in this file — they are one story, in order.
+ * orderNo is claimed in beforeAll: a BOM carries one sample request, so the
+ * story has to start from a sample order nothing else has used yet.
+ */
+const state = { srNo: null, orderNo: null, fabricIssueNo: null, trimsIssueNo: null };
 
 /** Open the request's detail dialog off the list and wait for it to paint. */
 async function openSr(page, srNo) {
@@ -47,6 +52,15 @@ async function srStatus(page) {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Sample Requests — draft to production and back', () => {
+  test.beforeAll(async () => {
+    const api = await createAuthenticatedClient();
+    try {
+      state.orderNo = (await seedFreeSampleOrder(api)).orderNo;
+    } finally {
+      await api?.dispose();
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await ensureSessionActive(page);
   });
@@ -57,10 +71,10 @@ test.describe('Sample Requests — draft to production and back', () => {
     // The bare entry opens on the BOM picker — any BOM, sample or bulk.
     const picker = page.locator('.ant-select').first();
     await picker.click();
-    await page.keyboard.type(SEED_ORDER_NO);
+    await page.keyboard.type(state.orderNo);
     await settle(page, 1200);
     await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
-      .filter({ hasText: SEED_ORDER_NO }).first().click();
+      .filter({ hasText: state.orderNo }).first().click();
 
     // Header comes back materialised from the server, not assembled here.
     await expect(page.getByText('B · Sample Details')).toBeVisible({ timeout: 25000 });

@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
 import { ensureSessionActive } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  SEED_ORDER_NO, goTo, settle, button, expectToast, raiseSr, submitSr, getSr, watchConsole,
+  goTo, settle, button, expectToast, raiseSr, submitSr, getSr, watchConsole,
 } from './helpers.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -106,8 +106,8 @@ test.describe('Sample Requests — deadline revision', () => {
   });
 
   test('the order the sample was raised for carries the slip', async () => {
-    const order = ok(await api.get(`/orders/by-order-no?orderNo=${encodeURIComponent(SEED_ORDER_NO)}`), 'get order');
-    // Worst slip wins across every sample on the seeded order, so at least this one's.
+    const order = ok(await api.get(`/orders/by-order-no?orderNo=${encodeURIComponent(sr.orderNo)}`), 'get order');
+    // Worst slip wins across every sample on the order, so at least this one's.
     expect(order.dispatchDelayDays).toBeGreaterThanOrEqual(SHIFT);
     expect(order.dispatchDelaySource).toMatch(/^Sample SRQ\//);
   });
@@ -120,7 +120,7 @@ test.describe('Sample Requests — deadline revision', () => {
     expect(draft.revisedDispatchDeadline).toBeNull();
     expect(draft.revisedBuyerApprovalDeadline).toBeNull();
 
-    const order = ok(await api.get(`/orders/by-order-no?orderNo=${encodeURIComponent(SEED_ORDER_NO)}`), 'get order');
+    const order = ok(await api.get(`/orders/by-order-no?orderNo=${encodeURIComponent(sr.orderNo)}`), 'get order');
     expect(order.dispatchDelaySource ?? '').not.toBe(`Sample ${sr.srNo}`);
 
     const refused = await api.put(`/sample-requests/${sr.id}/revise-deadline`, {

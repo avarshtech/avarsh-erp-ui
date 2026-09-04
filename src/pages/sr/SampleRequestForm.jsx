@@ -204,6 +204,7 @@ const SampleRequestForm = () => {
           onPick={setPicked}
           resolving={draft.loading && Boolean(picked)}
           pickedBomId={picked?.bomId}
+          blocked={draft.blockedBom}
         />
       </div>
     );

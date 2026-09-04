@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Card, Select, Typography, Alert, Space, Spin } from 'antd';
+import { Link } from 'react-router-dom';
 import { LoadingOutlined } from '@ant-design/icons';
 import { searchBoms } from '../../../services/bom/bomService';
+import { getSrStatusLabel } from '../../../utils/sampleRequestConstants';
 import StatusTag from '../../../components/StatusTag';
 import SampleOrderTag from '../../../components/SampleOrderTag';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
@@ -22,8 +24,11 @@ const PAGE_SIZE = 50;
  * sample belongs to. Sample orders are badged so they stay easy to spot.
  * After a pick the dropdown itself carries the inline loading state and the
  * form page renders only once BOM + Order have resolved — no skeleton flash.
+ *
+ * `blocked` means the picked BOM already carries a sample request: the form does
+ * not open, and the screen stays here so another BOM can be picked in place.
  */
-const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null }) => {
+const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null, blocked = null }) => {
   const { setSearchText, debouncedSearch } = useDebouncedSearch();
   const { isSampleOrder } = useSampleOrderNos();
   // Results carry the term they answer, so "loading" is derived rather than a
@@ -99,6 +104,27 @@ const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null }) => {
           </Text>
         )}
       </div>
+      {blocked && (
+        <Alert
+          style={{ marginTop: 16 }}
+          type="warning"
+          showIcon
+          message={`BOM #${blocked.bomId} already has a sample request`}
+          description={(
+            <Space direction="vertical" size={4}>
+              <span>
+                A BOM carries one sample request. Pick a different BOM, or open the existing one:
+              </span>
+              {/* ?viewId= is the list's own deep link — it opens the detail dialog. */}
+              {blocked.requests.map((r) => (
+                <Link key={r.id} to={`/sample-requests/list?viewId=${r.id}`}>
+                  {[r.srNo, r.sampleTypeName, getSrStatusLabel(r.status)].filter(Boolean).join(' · ')}
+                </Link>
+              ))}
+            </Space>
+          )}
+        />
+      )}
       {!listLoading && !resolving && boms.length === 0 && !debouncedSearch && (
         <Alert
           style={{ marginTop: 16 }}
