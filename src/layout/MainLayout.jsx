@@ -356,19 +356,6 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/tna",
-      icon: <FieldTimeOutlined />,
-      label: "Time & Action",
-      moduleId: ["tna", "tna-masters", "tna-replan-approval"],
-      children: [
-        { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
-        { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
-        { key: "/tna/replans", label: "Re-plan Approvals", moduleId: "tna-replan-approval" },
-        { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
-        { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
-      ],
-    },
-    {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
@@ -391,46 +378,7 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      key: "/production",
-      icon: <ScissorOutlined />,
-      label: "Production",
-      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-masters"],
-      children: [
-        { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
-        { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
-        { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
-        // Carton packing lives under Export Documentation for now — see the note there.
-      ],
-    },
-    {
-      key: "/export-docs",
-      icon: <ContainerOutlined />,
-      label: "Export Documentation",
-      // Each child is its own RBAC module; the group shows if ANY is accessible.
-      // Carton Packing sits here rather than under Production because it is the only
-      // producer of the PRD §7.3 dataset these documents consume; the Finishing
-      // workspace reserves the eventual home for it.
-      moduleId: [
-        "export-packing", "export-shipments", "export-packing-list",
-        "export-stickers", "export-invoice", "export-templates",
-      ],
-      children: [
-        { key: "/export-docs/packing/list", label: "Carton Packing", moduleId: "export-packing" },
-        { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
-        { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
-        { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
-        { key: "/export-docs/invoices/list", label: "Export Invoices", moduleId: "export-invoice" },
-        { key: "/export-docs/templates/list", label: "Buyer Templates", moduleId: "export-templates" },
-        // Reports and the audit trail read packing lists, so they ride that key —
-        // a viewer of the documents may read what was done to them.
-        { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
-        { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
-        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
-        // Packing arrives in the next design session.
-      ],
-    },
-    {
-      // Placed below Production by user preference (PRD suggested BOM→PO slot)
+      // Sits directly after Purchase Orders by user preference (menu order set 2026-09-04)
       key: "/sample-requests",
       icon: <ExperimentOutlined />,
       label: "Sample Requests",
@@ -463,6 +411,65 @@ const MainLayoutInner = () => {
       ],
     },
     {
+      key: "/production",
+      icon: <ScissorOutlined />,
+      label: "Production",
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-masters"],
+      children: [
+        { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
+        { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
+        { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
+        // Carton packing lives under Export Documentation for now — see the note there.
+      ],
+    },
+    {
+      key: "/tna",
+      icon: <FieldTimeOutlined />,
+      label: "Time & Action",
+      moduleId: ["tna", "tna-masters", "tna-replan-approval"],
+      children: [
+        { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
+        { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
+        { key: "/tna/replans", label: "Re-plan Approvals", moduleId: "tna-replan-approval" },
+        { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
+        { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
+      ],
+    },
+    {
+      key: "/export-docs",
+      icon: <ContainerOutlined />,
+      label: "Export Documentation",
+      // Each child is its own RBAC module; the group shows if ANY is accessible.
+      // Carton Packing sits here rather than under Production because it is the only
+      // producer of the PRD §7.3 dataset these documents consume; the Finishing
+      // workspace reserves the eventual home for it.
+      moduleId: [
+        "export-packing", "export-shipments", "export-packing-list",
+        "export-stickers", "export-invoice", "export-templates",
+      ],
+      children: [
+        { key: "/export-docs/packing/list", label: "Carton Packing", moduleId: "export-packing" },
+        { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
+        { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
+        { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
+        { key: "/export-docs/invoices/list", label: "Export Invoices", moduleId: "export-invoice" },
+        { key: "/export-docs/templates/list", label: "Buyer Templates", moduleId: "export-templates" },
+        // Reports and the audit trail read packing lists, so they ride that key —
+        // a viewer of the documents may read what was done to them.
+        { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
+        { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
+        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
+        // Packing arrives in the next design session.
+      ],
+    },
+    {
+      key: "/master",
+      icon: <DatabaseOutlined />,
+      label: "Master Data",
+      // Master Data is visible if user has access to any master module
+      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
+    },
+    {
       key: "/reports",
       icon: <BarChartOutlined />,
       label: "Reports",
@@ -472,13 +479,6 @@ const MainLayoutInner = () => {
         { key: "/reports/ai-chat", label: "AI Assistant", moduleId: "ai-assistant" },
         { key: "/reports/saved", label: "Saved Reports", moduleId: "reports" },
       ],
-    },
-    {
-      key: "/master",
-      icon: <DatabaseOutlined />,
-      label: "Master Data",
-      // Master Data is visible if user has access to any master module
-      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
     },
     {
       key: "/hr",
