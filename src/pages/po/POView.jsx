@@ -87,6 +87,7 @@ import { ActionButton } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import SampleOrderTag from '../../components/SampleOrderTag';
 import useSampleOrderNos from '../../hooks/useSampleOrderNos';
+import useBusyAction from '../../hooks/useBusyAction';
 import { PO_STATUS_CONFIG } from '../../utils/statusConfig';
 import POVersionHistory from './POVersionHistory';
 import FabricStagesDialog from './FabricStagesDialog';
@@ -211,7 +212,8 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [po, setPo] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  // Key of the status action in flight (approve / reject / refer_back / cancel), so only its button spins
+  const { busy: activeAction, setBusy: setActiveAction, busyProps: actionBusyProps } = useBusyAction();
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
@@ -420,7 +422,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
 
   // Handle pending action from push notification deep link
   useEffect(() => {
-    if (!pendingAction || !po || actionLoading) return;
+    if (!pendingAction || !po || activeAction) return;
     const action = availableActions.find((a) => a.key === pendingAction);
     if (action) {
       handleStatusAction(action);
@@ -469,7 +471,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
 
   const executeStatusChange = async (action, reason) => {
     if (!po) return;
-    setActionLoading(true);
+    setActiveAction(action.key);
     try {
       // Dedicated endpoints for all decisions — the backend routes them through the
       // centralized approval engine when a flow is configured, or applies directly otherwise
@@ -503,7 +505,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
     } catch (err) {
       message.error(err?.response?.data?.message || `Failed to ${action.label.toLowerCase()} purchase order`);
     }
-    finally { setActionLoading(false); }
+    finally { setActiveAction(null); }
   };
 
   // ========================
@@ -1253,7 +1255,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                           action={action.key}
                           text={action.label}
                           onClick={() => handleStatusAction(action)}
-                          loading={actionLoading}
+                          {...actionBusyProps(action.key)}
                           danger={action.danger}
                         />
                       ))}
@@ -1269,7 +1271,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                     action={actionMap[action.key] || 'custom'}
                     text={action.label}
                     onClick={() => handleStatusAction(action)}
-                    loading={actionLoading}
+                    {...actionBusyProps(action.key)}
                     danger={action.danger}
                   />
                 );
@@ -1793,7 +1795,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
                     type="primary"
                     danger={statusAction.danger}
                     icon={statusAction.icon}
-                    loading={actionLoading}
+                    loading={activeAction === statusAction.key}
                     disabled={!canSubmit}
                     onClick={() => executeStatusChange(statusAction, actionReason)}
                     style={{

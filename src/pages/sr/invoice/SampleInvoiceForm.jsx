@@ -18,6 +18,7 @@ import { printSampleInvoice } from '../../../utils/sampleInvoicePdfGenerator';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import useCompanyProfile from './useCompanyProfile';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useBusyAction from '../../../hooks/useBusyAction';
 import InvoiceStepStyles from './InvoiceStepStyles';
 import InvoiceStepHeader from './InvoiceStepHeader';
 import InvoiceStepLines from './InvoiceStepLines';
@@ -79,7 +80,8 @@ const SampleInvoiceForm = () => {
   const [eligible, setEligible] = useState([]);
   const [dispatchNo, setDispatchNo] = useState(null);
   const [inv, setInv] = useState(null);
-  const [saving, setSaving] = useState(false);
+  // 'draft' | 'issue' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
   const [selecting, setSelecting] = useState(false);
 
   const [isDirty, setIsDirty] = useState(false);
@@ -296,13 +298,13 @@ const SampleInvoiceForm = () => {
   };
 
   const handleSaveDraft = async () => {
-    setSaving(true);
+    setBusy('draft');
     try {
       await persist();
       setIsDirty(false);
       message.success('Invoice saved as draft — number is assigned on issue');
       leave(LIST_PATH);
-    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setBusy(null); }
   };
 
   const handleIssue = () => {
@@ -313,7 +315,7 @@ const SampleInvoiceForm = () => {
         : 'Issue assigns the invoice number, locks the document permanently (corrections = cancel + duplicate), and links it to every SR it covers — unlocking Mark as Dispatched for them.',
       okText: 'Issue Invoice',
       onOk: async () => {
-        setSaving(true);
+        setBusy('issue');
         try {
           const saved = await persist();
           const issued = await issueInvoice(saved.id, saved.version);
@@ -325,7 +327,7 @@ const SampleInvoiceForm = () => {
             : '';
           message.success(`Invoice ${issued.invoiceNo} issued${value}`);
           leave(LIST_PATH);
-        } catch (e) { toastUnlessHandled(message, e, 'Failed to issue'); } finally { setSaving(false); }
+        } catch (e) { toastUnlessHandled(message, e, 'Failed to issue'); } finally { setBusy(null); }
       },
     });
   };
@@ -403,10 +405,10 @@ const SampleInvoiceForm = () => {
         <ActionButton action="close" text="Close" onClick={() => navigate(LIST_PATH)} />
         {!locked && (
           <>
-            <ActionButton action="save" variant="draft" text="Save as Draft" loading={saving} onClick={handleSaveDraft} />
+            <ActionButton action="save" variant="draft" text="Save as Draft" {...busyProps('draft')} onClick={handleSaveDraft} />
             <ActionButton
-              action="send" text="Issue Invoice" loading={saving}
-              disabled={issueBlockers.length > 0}
+              action="send" text="Issue Invoice"
+              {...busyProps('issue', issueBlockers.length > 0)}
               tooltip={issueBlockers.length ? `Blocked — still missing: ${issueBlockers.join(', ')}` : undefined}
               onClick={handleIssue}
             />

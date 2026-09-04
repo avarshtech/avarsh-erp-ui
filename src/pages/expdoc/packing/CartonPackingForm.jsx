@@ -8,6 +8,7 @@ import { ActionButton } from '../../../components/buttons';
 import { FormSection, FormInput, FormSelect } from '../../../components/form';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
+import useBusyAction from '../../../hooks/useBusyAction';
 import { hasPermission } from '../../../utils/permissions';
 import { validate } from '../../../utils/expDocValidation';
 import { PACKING_ENTRY_STATUS_CONFIG } from '../../../utils/statusConfig';
@@ -50,7 +51,8 @@ const CartonPackingForm = () => {
   const [sizes, setSizes] = useState([]);
   const [orderBreakdown, setOrderBreakdown] = useState([]);
   const [loading, setLoading] = useState(isEdit);
-  const [saving, setSaving] = useState(false);
+  // 'save' | 'complete' | 'reopen' | null — each header button spins only for its own action
+  const { busy, setBusy, busyProps } = useBusyAction();
   const [loadError, setLoadError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -258,7 +260,7 @@ const CartonPackingForm = () => {
   }, [form, sizes, orderBreakdown, groups, isEdit, id, record, clearDirty]);
 
   const handleSave = useCallback(async () => {
-    setSaving(true);
+    setBusy('save');
     try {
       const saved = await persist();
       message.success(`${saved.packingNo} saved`);
@@ -267,9 +269,9 @@ const CartonPackingForm = () => {
       if (e?.errorFields) message.warning('Complete the mandatory fields first');
       else if (!e.isOptimisticLockConflict) message.error(e.message || 'Failed to save');
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
-  }, [persist, message, isEdit, navigate]);
+  }, [persist, message, isEdit, navigate, setBusy]);
 
   const handleComplete = useCallback(() => {
     modal.confirm({
@@ -277,7 +279,7 @@ const CartonPackingForm = () => {
       content: 'Packing lists can then bind it without a warning. You can reopen it later, which will flag any document built from it as stale.',
       okText: 'Mark complete',
       onOk: async () => {
-        setSaving(true);
+        setBusy('complete');
         try {
           if (isDirty) await persist();
           const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.COMPLETED);
@@ -287,11 +289,11 @@ const CartonPackingForm = () => {
         } catch (e) {
           message.error(e.message || 'Could not complete this entry');
         } finally {
-          setSaving(false);
+          setBusy(null);
         }
       },
     });
-  }, [modal, id, isDirty, persist, message]);
+  }, [modal, id, isDirty, persist, message, setBusy]);
 
   const handleReopen = useCallback(() => {
     modal.confirm({
@@ -300,7 +302,7 @@ const CartonPackingForm = () => {
       okText: 'Reopen',
       okButtonProps: { danger: true },
       onOk: async () => {
-        setSaving(true);
+        setBusy('reopen');
         try {
           const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.OPEN);
           setRecord(saved);
@@ -309,11 +311,11 @@ const CartonPackingForm = () => {
         } catch (e) {
           message.error(e.message || 'Could not reopen this entry');
         } finally {
-          setSaving(false);
+          setBusy(null);
         }
       },
     });
-  }, [modal, id, message]);
+  }, [modal, id, message, setBusy]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loadError) {
@@ -381,13 +383,12 @@ const CartonPackingForm = () => {
         style={STICKY_HEADER}
       >
         <ActionButton action="close" text="Cancel" onClick={() => navigate('/export-docs/packing/list')} />
-        {!readOnly && <ActionButton action="save" text="Save" loading={saving} onClick={handleSave} />}
+        {!readOnly && <ActionButton action="save" text="Save" {...busyProps('save')} onClick={handleSave} />}
         {isEdit && record?.status === PACKING_ENTRY_STATUS.OPEN && canWrite && (
           <ActionButton
             action="approve"
             text="Mark complete"
-            loading={saving}
-            disabled={liveErrors.length > 0 || !groups.length}
+            {...busyProps('complete', liveErrors.length > 0 || !groups.length)}
             tooltip={
               liveErrors.length
                 ? `Blocked — ${liveErrors.length} structural error(s) must be fixed first`
@@ -397,7 +398,7 @@ const CartonPackingForm = () => {
           />
         )}
         {isEdit && record?.status === PACKING_ENTRY_STATUS.COMPLETED && canWrite && (
-          <ActionButton action="edit" text="Reopen" loading={saving} onClick={handleReopen} />
+          <ActionButton action="edit" text="Reopen" {...busyProps('reopen')} onClick={handleReopen} />
         )}
       </PageHeader>
 
@@ -420,7 +421,7 @@ const CartonPackingForm = () => {
         />
       )}
 
-      <Spin spinning={saving}>
+      <Spin spinning={busy !== null}>
         <Form form={form} layout="vertical" disabled={readOnly} onValuesChange={() => setIsDirty(true)}>
           <FormSection title="Order & Style" columns={4}>
             <Form.Item name="orderNo" label="Order" rules={[{ required: true, message: 'Select an order' }]}>

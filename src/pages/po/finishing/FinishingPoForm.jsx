@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import { FormDatePicker, FormInputNumber, FormSelect, FormSection } from '../../../components/form';
+import useBusyAction from '../../../hooks/useBusyAction';
 import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import { FINISHING_PROCESS, getProcessLabel, PO_ACTION, isPpApproved } from '../../../utils/productionConstants';
@@ -30,7 +31,8 @@ const FinishingPoForm = () => {
   const [units, setUnits] = useState([]);
   const [hasShortage, setHasShortage] = useState(false);
   const [booting, setBooting] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => { getProcessingUnits('UNIT').then(setUnits); }, []);
 
@@ -69,7 +71,7 @@ const FinishingPoForm = () => {
       content: 'One or more packing materials are short for this PO. Submit for approval anyway?',
       okText: 'Submit anyway', cancelText: 'Review', onOk: () => res(true), onCancel: () => res(false),
     })))) return;
-    setSaving(true);
+    setBusy(submit ? 'submit' : 'draft');
     try {
       const payload = {
         ...po,
@@ -85,7 +87,7 @@ const FinishingPoForm = () => {
       navigate('/purchase-orders/finishing-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
-    } finally { setSaving(false); }
+    } finally { setBusy(null); }
   };
 
   if (booting || !po) return <div style={{ textAlign: 'center', padding: 80 }}><Spin /></div>;
@@ -139,8 +141,8 @@ const FinishingPoForm = () => {
   return (
     <div className="animate-fade-in-up">
       <PageHeader title={`Edit ${po.finishingPoNo}`} backPath="/purchase-orders/finishing-po/list">
-        <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={() => save(false)} />
-        <ActionButton action="send" text="Save & Submit" loading={saving} disabled={!ppApproved}
+        <ActionButton action="save" variant="draft" text="Save Draft" {...busyProps('draft')} onClick={() => save(false)} />
+        <ActionButton action="send" text="Save & Submit" {...busyProps('submit', !ppApproved)}
           tooltip={!ppApproved ? 'PP Sample not yet approved for this order' : undefined} onClick={() => save(true)} />
       </PageHeader>
       <Card><Form form={form} layout="vertical"><Tabs items={tabs} /></Form></Card>

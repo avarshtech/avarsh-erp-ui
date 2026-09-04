@@ -22,6 +22,7 @@ import {
   updatePackingList,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
+import useBusyAction from '../../../hooks/useBusyAction';
 import PlCartonGrid from './PlCartonGrid';
 import PlValidationPanel from './PlValidationPanel';
 import PlOrderVsPackedPanel from './PlOrderVsPackedPanel';
@@ -68,7 +69,8 @@ const PackingListWorkspace = () => {
 
   const [pl, setPl] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // The key of the mutation in flight (see `run`), so only that action's button spins.
+  const { busy, setBusy, busyProps } = useBusyAction();
   const [loadError, setLoadError] = useState(null);
   const [reasonCfg, setReasonCfg] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -102,9 +104,12 @@ const PackingListWorkspace = () => {
     getShipment(pl.shipmentId).then(setShipment).catch(() => setShipment(null));
   }, [pl?.shipmentId]);
 
-  /** One funnel for every mutation: loading, toast and error in a single place. */
-  const run = useCallback(async (fn, successMsg) => {
-    setSaving(true);
+  /**
+   * One funnel for every mutation: loading, toast and error in a single place.
+   * `key` names the action so its own button (via `busyProps(key)`) is the one that spins.
+   */
+  const run = useCallback(async (key, fn, successMsg) => {
+    setBusy(key);
     try {
       const next = await fn();
       if (next?.id) setPl(next);
@@ -114,9 +119,9 @@ const PackingListWorkspace = () => {
       if (!e.isOptimisticLockConflict) message.error(e.message || 'Action failed');
       return null;
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
-  }, [message]);
+  }, [message, setBusy]);
 
   const issuesByRow = useMemo(() => {
     const map = {};
@@ -139,6 +144,7 @@ const PackingListWorkspace = () => {
     context: { title: item.title, message: item.message },
     okText: 'Acknowledge',
     onSubmit: (reason) => run(
+      'ack',
       () => acknowledgeWarning(pl.id, item, reason),
       'Reason recorded — it will be shown to the approver',
     ),
@@ -148,7 +154,7 @@ const PackingListWorkspace = () => {
     title: 'Submit for approval?',
     content: `${pl.plNo} will be locked for editing and sent to an approver. Every acknowledged warning is shown to them with your reason.`,
     okText: 'Submit',
-    onOk: () => run(() => changePlStatus(pl.id, PL_STATUS.SUBMITTED), `${pl.plNo} submitted`),
+    onOk: () => run('submit', () => changePlStatus(pl.id, PL_STATUS.SUBMITTED), `${pl.plNo} submitted`),
   });
 
   const handleApprove = () => modal.confirm({
@@ -164,7 +170,7 @@ const PackingListWorkspace = () => {
       </Space>
     ),
     okText: 'Approve',
-    onOk: () => run(() => changePlStatus(pl.id, PL_STATUS.APPROVED), `${pl.plNo} approved`),
+    onOk: () => run('approve', () => changePlStatus(pl.id, PL_STATUS.APPROVED), `${pl.plNo} approved`),
   });
 
   const handleSendBack = () => setReasonCfg({
@@ -173,7 +179,7 @@ const PackingListWorkspace = () => {
     label: 'What needs changing?',
     okText: 'Send back',
     danger: true,
-    onSubmit: (reason) => run(() => changePlStatus(pl.id, PL_STATUS.DRAFT, reason), `${pl.plNo} returned to draft`),
+    onSubmit: (reason) => run('sendback', () => changePlStatus(pl.id, PL_STATUS.DRAFT, reason), `${pl.plNo} returned to draft`),
   });
 
   const handleRevise = () => setReasonCfg({
@@ -186,7 +192,7 @@ const PackingListWorkspace = () => {
     },
     okText: 'Create revision',
     onSubmit: async (reason) => {
-      const next = await run(() => revisePackingList(pl.id, reason), 'Revision created');
+      const next = await run('revise', () => revisePackingList(pl.id, reason), 'Revision created');
       if (next?.id) navigate(`/export-docs/packing-lists/edit/${next.id}`, { replace: true });
     },
   });
@@ -197,7 +203,7 @@ const PackingListWorkspace = () => {
     label: 'Reason for cancelling',
     okText: 'Cancel packing list',
     danger: true,
-    onSubmit: (reason) => run(() => changePlStatus(pl.id, PL_STATUS.CANCELLED, reason), `${pl.plNo} cancelled`),
+    onSubmit: (reason) => run('cancel', () => changePlStatus(pl.id, PL_STATUS.CANCELLED, reason), `${pl.plNo} cancelled`),
   });
 
   const headerActions = useMemo(() => {
@@ -206,15 +212,15 @@ const PackingListWorkspace = () => {
     if (pl.status === PL_STATUS.DRAFT) {
       if (canUpdate && pl.canRefresh) {
         actions.push(
-          <ActionButton key="refresh" action="refresh" text="Refresh from packing" loading={saving}
-            onClick={() => run(() => refreshFromPacking(pl.id), 'Carton data refreshed')} />,
+          <ActionButton key="refresh" action="refresh" text="Refresh from packing" {...busyProps('refresh')}
+            onClick={() => run('refresh', () => refreshFromPacking(pl.id), 'Carton data refreshed')} />,
         );
       }
       if (canUpdate) {
         actions.push(
           <Tooltip key="submit" title={pl.canSubmit ? undefined : `Blocked — ${pl.submitBlockers[0] || 'open issues'}`}>
             <span>
-              <ActionButton action="send" text="Submit" loading={saving} disabled={!pl.canSubmit} onClick={handleSubmit} />
+              <ActionButton action="send" text="Submit" {...busyProps('submit', !pl.canSubmit)} onClick={handleSubmit} />
             </span>
           </Tooltip>,
         );
@@ -229,7 +235,7 @@ const PackingListWorkspace = () => {
             key="recall"
             action="undo"
             text="Recall submission"
-            loading={saving}
+            {...busyProps('recall')}
             onClick={() => setReasonCfg({
               key: 'recall',
               title: 'Recall this submission?',
@@ -240,7 +246,7 @@ const PackingListWorkspace = () => {
                 message: 'Nobody has approved it yet, so it comes straight back to you for editing.',
               },
               okText: 'Recall',
-              onSubmit: (reason) => run(() => recallPackingList(pl.id, reason), `${pl.plNo} recalled`),
+              onSubmit: (reason) => run('recall', () => recallPackingList(pl.id, reason), `${pl.plNo} recalled`),
             })}
           />,
         );
@@ -250,13 +256,13 @@ const PackingListWorkspace = () => {
       // is gated on `approve` — matching the invoice. On `update` it let any editor
       // bounce a document out of somebody else’s review queue.
       if (canApprovePerm) {
-        actions.push(<ActionButton key="back" action="refer-back" text="Send back" loading={saving} onClick={handleSendBack} />);
+        actions.push(<ActionButton key="back" action="refer-back" text="Send back" {...busyProps('sendback')} onClick={handleSendBack} />);
       }
       if (canApprovePerm) {
         actions.push(
           <Tooltip key="approve" title={pl.approveBlockedReason || undefined}>
             <span>
-              <ActionButton action="approve" text="Approve" loading={saving} disabled={!pl.canApprove} onClick={handleApprove} />
+              <ActionButton action="approve" text="Approve" {...busyProps('approve', !pl.canApprove)} onClick={handleApprove} />
             </span>
           </Tooltip>,
         );
@@ -265,10 +271,10 @@ const PackingListWorkspace = () => {
 
     if ([PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(pl.status)) {
       if (canRevisePerm) {
-        actions.push(<ActionButton key="revise" action="history" text="Revise" loading={saving} onClick={handleRevise} />);
+        actions.push(<ActionButton key="revise" action="history" text="Revise" {...busyProps('revise')} onClick={handleRevise} />);
       }
       if (canApprovePerm) {
-        actions.push(<ActionButton key="cancel" action="cancel" text="Cancel" loading={saving} onClick={handleCancel} />);
+        actions.push(<ActionButton key="cancel" action="cancel" text="Cancel" {...busyProps('cancel')} onClick={handleCancel} />);
       }
     }
 
@@ -281,7 +287,8 @@ const PackingListWorkspace = () => {
             <ActionButton
               action="send"
               text="Mark released"
-              onClick={() => run(() => markPackingListExported(pl.id), 'Documents released')}
+              {...busyProps('release')}
+              onClick={() => run('release', () => markPackingListExported(pl.id), 'Documents released')}
             />
           </span>
         </Tooltip>,
@@ -293,7 +300,7 @@ const PackingListWorkspace = () => {
     );
     return actions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pl, saving, canUpdate, canApprovePerm, canRevisePerm, run, message]);
+  }, [pl, busyProps, canUpdate, canApprovePerm, canRevisePerm, run, message]);
 
   if (loadError) {
     return (
@@ -346,7 +353,7 @@ const PackingListWorkspace = () => {
                   <a onClick={() => setOverrideOpen(true)}>Change</a>
                 )}
                 {pl.status === PL_STATUS.DRAFT && canOverridePerm && pl.templateOverride && (
-                  <a onClick={() => run(() => clearPlTemplateOverride(pl.id), 'Back to the buyer default')}>
+                  <a onClick={() => run('template', () => clearPlTemplateOverride(pl.id), 'Back to the buyer default')}>
                     Use the buyer default
                   </a>
                 )}
@@ -377,8 +384,9 @@ const PackingListWorkspace = () => {
           <PlHeaderEditor
             key={pl.version}
             pl={pl}
-            saving={saving}
+            saving={busy === 'header'}
             onSave={(values) => run(
+              'header',
               () => updatePackingList(pl.id, { ...values, version: pl.version }),
               'Document details saved',
             )}
@@ -606,10 +614,10 @@ const PackingListWorkspace = () => {
         buyerCode={pl.buyerCode}
         currentTemplateId={pl.templateId}
         currentLabel={pl.template ? `${pl.template.templateCode} v${pl.template.version}` : 'No template'}
-        confirming={saving}
+        confirming={busy === 'template'}
         onCancel={() => setOverrideOpen(false)}
         onSubmit={async (templateId, reason) => {
-          const next = await run(() => overridePlTemplate(pl.id, templateId, reason), 'Template overridden for this document');
+          const next = await run('template', () => overridePlTemplate(pl.id, templateId, reason), 'Template overridden for this document');
           if (next?.id) setOverrideOpen(false);
         }}
       />
@@ -623,7 +631,7 @@ const PackingListWorkspace = () => {
         okText={reasonCfg?.okText}
         danger={reasonCfg?.danger}
         minLength={reasonCfg?.minLength}
-        confirming={saving}
+        confirming={busy !== null}
         onCancel={() => setReasonCfg(null)}
         onSubmit={async (reason) => {
           const cfg = reasonCfg;

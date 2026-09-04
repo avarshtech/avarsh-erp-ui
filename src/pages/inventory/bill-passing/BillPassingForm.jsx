@@ -5,6 +5,7 @@ import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
+import useBusyAction from '../../../hooks/useBusyAction';
 import { useTheme } from '../../../context/ThemeContext';
 import { hasPermission } from '../../../utils/permissions';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
@@ -55,7 +56,8 @@ const BillPassingForm = () => {
   const [source, setSource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [saving, setSaving] = useState(false);
+  // The key of the mutation in flight (see `run`), so only that action's button spins.
+  const { busy, setBusy, busyProps } = useBusyAction();
   const [debitTypes, setDebitTypes] = useState([]);
   const [chargeTypes, setChargeTypes] = useState([]);
   const [issueTypes, setIssueTypes] = useState([]);
@@ -112,9 +114,12 @@ const BillPassingForm = () => {
 
   // ==================== MUTATION PLUMBING ====================
 
-  /** Runs a service call, folds the returned bill into state and toasts the outcome. */
-  const run = useCallback(async (fn, successMsg) => {
-    setSaving(true);
+  /**
+   * Runs a service call, folds the returned bill into state and toasts the outcome.
+   * `key` names the action so its own button (via `busyProps(key)`) is the one that spins.
+   */
+  const run = useCallback(async (key, fn, successMsg) => {
+    setBusy(key);
     try {
       const next = await fn();
       if (next?.id) setBill(next);
@@ -124,9 +129,9 @@ const BillPassingForm = () => {
       message.error(e.message || 'Action failed');
       return null;
     } finally {
-      setSaving(false);
+      setBusy(null);
     }
-  }, [message]);
+  }, [message, setBusy]);
 
   /** Local, in-progress edits (GRN picks, charges, adjustments) — recalculated live. */
   const patchBill = useCallback((patch) => {
@@ -146,7 +151,8 @@ const BillPassingForm = () => {
     setIsDirty(true);
   }, []);
 
-  const handleSave = useCallback(async () => {
+  // `busyKey` lets Submit's save-then-submit keep the Submit button spinning throughout.
+  const handleSave = useCallback(async (busyKey = 'save') => {
     let values;
     try {
       values = await form.validateFields();
@@ -154,7 +160,7 @@ const BillPassingForm = () => {
       message.warning('Please complete the invoice details before saving');
       return null;
     }
-    const next = await run(() => updateBill(bill.id, {
+    const next = await run(busyKey, () => updateBill(bill.id, {
       supplierInvoiceNo: values.supplierInvoiceNo,
       invoiceDate: values.invoiceDate.format('YYYY-MM-DD'),
       headerRemarks: values.headerRemarks || '',
@@ -173,8 +179,8 @@ const BillPassingForm = () => {
       content: 'The bill is saved, moves to the verification queue, and the header, GRN picks and charges become read-only.',
       okText: 'Save & Submit',
       onOk: async () => {
-        const saved = await handleSave();
-        if (saved) await run(() => submitBill(saved.id), 'Bill submitted for verification');
+        const saved = await handleSave('submit');
+        if (saved) await run('submit', () => submitBill(saved.id), 'Bill submitted for verification');
       },
     });
   }, [bill, handleSave, modal, run]);
@@ -191,7 +197,7 @@ const BillPassingForm = () => {
     }
     const cfg = reasonCfg;
     setReasonCfg(null);
-    await run(() => cfg.onSubmit(text), cfg.successMsg);
+    await run(cfg.key, () => cfg.onSubmit(text), cfg.successMsg);
   }, [reasonCfg, reasonText, run, message]);
 
   const handlePrint = useCallback(() => window.print(), []);
@@ -208,70 +214,76 @@ const BillPassingForm = () => {
 
     if (bill.status === S.DRAFT || bill.status === S.QUERY_RAISED) {
       if (canUpdate) {
-        push(<ActionButton key="save" action="save" variant="draft" text="Save" loading={saving} onClick={handleSave} />);
-        push(<ActionButton key="submit" action="save" text="Submit" loading={saving} onClick={handleSubmit} />);
+        push(<ActionButton key="save" action="save" variant="draft" text="Save" {...busyProps('save')} onClick={() => handleSave()} />);
+        push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit')} onClick={handleSubmit} />);
       }
     }
     if (bill.status === S.SUBMITTED && canVerify) {
-      push(<ActionButton key="verify" action="approve" text="Start Verification" loading={saving} onClick={() => modal.confirm({
+      push(<ActionButton key="verify" action="approve" text="Start Verification" {...busyProps('verify')} onClick={() => modal.confirm({
         title: `Start verification of ${bill.bpNumber}?`,
         content: 'The bill is locked to you for checking against the PO, GRN and QC records.',
         okText: 'Start',
-        onOk: () => run(() => startVerification(bill.id), 'Verification started'),
+        onOk: () => run('verify', () => startVerification(bill.id), 'Verification started'),
       })} />);
     }
     if ((bill.status === S.UNDER_VERIFICATION || bill.status === S.PENDING_APPROVAL) && (canVerify || canApprove)) {
-      push(<ActionButton key="query" action="refer-back" text="Raise Query" loading={saving} onClick={() => openReason({
+      push(<ActionButton key="query" action="refer-back" text="Raise Query" {...busyProps('query')} onClick={() => openReason({
+        key: 'query',
         title: 'Raise a query with the supplier', label: 'Query details', successMsg: 'Query raised',
         onSubmit: (t) => raiseQuery(bill.id, t),
       })} />);
-      push(<ActionButton key="hold" action="cancel" text="Hold" loading={saving} onClick={() => openReason({
+      push(<ActionButton key="hold" action="cancel" text="Hold" {...busyProps('hold')} onClick={() => openReason({
+        key: 'hold',
         title: 'Put this bill on hold', label: 'Hold reason', successMsg: 'Bill put on hold',
         onSubmit: (t) => holdBill(bill.id, t),
       })} />);
     }
     if (bill.status === S.UNDER_VERIFICATION && canVerify) {
-      push(<ActionButton key="approval" action="send" text="Send for Approval" loading={saving}
-        disabled={!bill.canSendForApproval && !bill.blockers?.length}
+      push(<ActionButton key="approval" action="send" text="Send for Approval"
+        {...busyProps('approval', !bill.canSendForApproval && !bill.blockers?.length)}
         onClick={() => {
           if (bill.blockers?.length) {
             openReason({
+              key: 'approval',
               title: 'Override and send for approval', label: 'Override justification',
               successMsg: 'Sent for approval with override',
               onSubmit: (t) => sendForApproval(bill.id, { overrideReason: t }),
             });
             return;
           }
-          run(() => sendForApproval(bill.id, {}), 'Sent for approval');
+          run('approval', () => sendForApproval(bill.id, {}), 'Sent for approval');
         }} />);
     }
     if (bill.status === S.ON_HOLD && canVerify) {
-      push(<ActionButton key="release" action="refresh" text="Release Hold" loading={saving} onClick={() => openReason({
+      push(<ActionButton key="release" action="refresh" text="Release Hold" {...busyProps('release')} onClick={() => openReason({
+        key: 'release',
         title: 'Release this bill from hold', label: 'Release remarks', successMsg: 'Hold released',
         onSubmit: (t) => releaseHold(bill.id, t),
       })} />);
     }
     if (bill.status === S.PENDING_APPROVAL && canApprove) {
-      push(<ActionButton key="approve" action="approve" text="Approve" loading={saving} onClick={() => modal.confirm({
+      push(<ActionButton key="approve" action="approve" text="Approve" {...busyProps('approve')} onClick={() => modal.confirm({
         title: `Approve ${bill.bpNumber}?`,
         content: `Net payable ${formatCurrency(bill.netPayable)} will be cleared for accounts.`,
         okText: 'Approve',
-        onOk: () => run(() => approveBill(bill.id, ''), 'Bill approved'),
+        onOk: () => run('approve', () => approveBill(bill.id, ''), 'Bill approved'),
       })} />);
-      push(<ActionButton key="reject" action="reject" text="Reject" loading={saving} onClick={() => openReason({
+      push(<ActionButton key="reject" action="reject" text="Reject" {...busyProps('reject')} onClick={() => openReason({
+        key: 'reject',
         title: 'Reject this bill', label: 'Rejection reason', danger: true, okText: 'Reject',
         successMsg: 'Bill rejected', onSubmit: (t) => rejectBill(bill.id, t),
       })} />);
     }
     if (bill.status === S.APPROVED) {
       if (canApprove) {
-        push(<ActionButton key="accounts" action="send" text="Send to Accounts" loading={saving} onClick={() => modal.confirm({
+        push(<ActionButton key="accounts" action="send" text="Send to Accounts" {...busyProps('accounts')} onClick={() => modal.confirm({
           title: `Send ${bill.bpNumber} to accounts?`,
           content: 'The bill is handed to Tally for payment processing and can no longer be reopened by verification.',
           okText: 'Send',
-          onOk: () => run(() => sendToAccounts(bill.id), 'Sent to accounts'),
+          onOk: () => run('accounts', () => sendToAccounts(bill.id), 'Sent to accounts'),
         })} />);
-        push(<ActionButton key="reopen" action="refer-back" text="Reopen" loading={saving} onClick={() => openReason({
+        push(<ActionButton key="reopen" action="refer-back" text="Reopen" {...busyProps('reopen')} onClick={() => openReason({
+          key: 'reopen',
           title: 'Reopen this bill for verification', label: 'Reopen reason', successMsg: 'Bill reopened',
           onSubmit: (t) => reopenBill(bill.id, t),
         })} />);
@@ -280,7 +292,8 @@ const BillPassingForm = () => {
     }
     if (bill.status === S.SENT_TO_ACCOUNTS) {
       if (canApprove) {
-        push(<ActionButton key="tally" action="save" variant="draft" text="Record Tally Ref" loading={saving} onClick={() => openReason({
+        push(<ActionButton key="tally" action="save" variant="draft" text="Record Tally Ref" {...busyProps('tally')} onClick={() => openReason({
+          key: 'tally',
           title: 'Record the Tally reference', label: 'Tally reference no', minLength: 3,
           placeholder: 'e.g. TLY/26-27/00412', successMsg: 'Tally reference recorded',
           onSubmit: (t) => recordTallyReference(bill.id, t),
@@ -289,7 +302,7 @@ const BillPassingForm = () => {
       push(<ActionButton key="print" action="print" text="Print Voucher" onClick={handlePrint} />);
     }
     return <Space wrap>{btns}</Space>;
-  }, [bill, saving, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
+  }, [bill, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
 
   // ==================== SECTION STYLES ====================
 
@@ -361,10 +374,10 @@ const BillPassingForm = () => {
             bill={bill}
             debitTypes={debitTypes}
             readOnly={!bill.debitsEditable}
-            onSave={(debit) => run(() => saveDebit(bill.id, debit), 'Debit saved')}
-            onSetStatus={(debitId, status, reason) => run(() => setDebitStatus(bill.id, debitId, status, reason), 'Debit updated')}
-            onDelete={(debitId) => run(() => deleteDebit(bill.id, debitId), 'Debit removed')}
-            onRefreshProposals={() => run(() => refreshProposedDebits(bill.id), 'Proposed debits refreshed')}
+            onSave={(debit) => run('debit', () => saveDebit(bill.id, debit), 'Debit saved')}
+            onSetStatus={(debitId, status, reason) => run('debit', () => setDebitStatus(bill.id, debitId, status, reason), 'Debit updated')}
+            onDelete={(debitId) => run('debit', () => deleteDebit(bill.id, debitId), 'Debit removed')}
+            onRefreshProposals={() => run('debit', () => refreshProposedDebits(bill.id), 'Proposed debits refreshed')}
           />
         ),
       },
@@ -389,9 +402,9 @@ const BillPassingForm = () => {
           <BpIssueLog
             bill={bill}
             issueTypes={issueTypes}
-            onAdd={(issue) => run(() => addIssue(bill.id, issue), 'Issue logged')}
-            onSetStatus={(issueId, status, remarks) => run(() => setIssueStatus(bill.id, issueId, status, remarks), 'Issue updated')}
-            onWithdraw={(issueId, reason) => run(() => withdrawIssue(bill.id, issueId, reason), 'Issue withdrawn')}
+            onAdd={(issue) => run('issue', () => addIssue(bill.id, issue), 'Issue logged')}
+            onSetStatus={(issueId, status, remarks) => run('issue', () => setIssueStatus(bill.id, issueId, status, remarks), 'Issue updated')}
+            onWithdraw={(issueId, reason) => run('issue', () => withdrawIssue(bill.id, issueId, reason), 'Issue withdrawn')}
           />
         ),
       },
@@ -403,8 +416,8 @@ const BillPassingForm = () => {
           <BpAttachments
             bill={bill}
             readOnly={readOnly}
-            onAdd={(att) => run(() => addAttachment(bill.id, att), 'Attachment added')}
-            onRemove={(attId) => run(() => removeAttachment(bill.id, attId), 'Attachment removed')}
+            onAdd={(att) => run('attachment', () => addAttachment(bill.id, att), 'Attachment added')}
+            onRemove={(attId) => run('attachment', () => removeAttachment(bill.id, attId), 'Attachment removed')}
           />
         ),
       },
@@ -526,7 +539,7 @@ const BillPassingForm = () => {
         width={480}
         destroyOnHidden
         okText={reasonCfg?.okText || 'Confirm'}
-        okButtonProps={{ danger: reasonCfg?.danger, loading: saving }}
+        okButtonProps={{ danger: reasonCfg?.danger, loading: busy !== null }}
         onOk={submitReason}
         onCancel={() => setReasonCfg(null)}
       >

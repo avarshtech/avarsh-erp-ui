@@ -11,6 +11,7 @@ import { SR_STATUS } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
 import { toastUnlessHandled } from '../../utils/apiError';
 import useSampleMasters from '../../hooks/useSampleMasters';
+import useBusyAction from '../../hooks/useBusyAction';
 import useSampleRequestDraft from './useSampleRequestDraft';
 import SampleBomPicker from './form/SampleBomPicker';
 import SectionHeader from './form/SectionHeader';
@@ -45,7 +46,8 @@ const SampleRequestForm = () => {
   // since draft.record still carries the version the form was loaded with
   const [savedVersion, setSavedVersion] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
+  // 'draft' | 'submit' | null — each header button spins only for its own action
+  const { setBusy, busyProps } = useBusyAction();
 
   const substitution = Form.useWatch('colourSubstitutionAllowed', form);
   const sampleTypeId = Form.useWatch('sampleTypeId', form);
@@ -164,23 +166,23 @@ const SampleRequestForm = () => {
   };
 
   const handleSaveDraft = async () => {
-    setSaving(true);
+    setBusy('draft');
     try {
       const saved = await persist();
       message.success(`${saved.srNo} saved as draft`);
       navigate('/sample-requests/list');
-    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setBusy(null); }
   };
 
   const handleSubmit = async () => {
     try { await form.validateFields(); } catch { message.warning('Complete the mandatory fields first'); return; }
-    setSaving(true);
+    setBusy('submit');
     try {
       const saved = await persist();
       await changeStatus(saved.id, SR_STATUS.SUBMITTED, saved.version);
       message.success(`${saved.srNo} submitted`);
       navigate('/sample-requests/list');
-    } catch (e) { toastUnlessHandled(message, e, 'Failed to submit'); } finally { setSaving(false); }
+    } catch (e) { toastUnlessHandled(message, e, 'Failed to submit'); } finally { setBusy(null); }
   };
 
   const handleCancel = () => {
@@ -296,8 +298,8 @@ const SampleRequestForm = () => {
         style={STICKY_HEADER}
       >
         <ActionButton action="close" text="Cancel" onClick={handleCancel} />
-        <ActionButton action="save" variant="draft" text="Save as Draft" loading={saving} onClick={handleSaveDraft} />
-        <ActionButton action="send" text="Submit Sample Request" loading={saving} onClick={handleSubmit} />
+        <ActionButton action="save" variant="draft" text="Save as Draft" {...busyProps('draft')} onClick={handleSaveDraft} />
+        <ActionButton action="send" text="Submit Sample Request" {...busyProps('submit')} onClick={handleSubmit} />
       </PageHeader>
       <SectionHeader
         srNo={draft.record?.srNo}
