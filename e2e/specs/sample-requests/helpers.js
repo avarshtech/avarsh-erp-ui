@@ -11,8 +11,9 @@
  *
  * Everything is built against the seeded SAMPLE orders SMP/0001..SMP/0013 (Next
  * PLC, UK — overseas against the seeded India organisation) from db/e2eseed.
- * They are identical clones: a BOM carries at most one sample request, so a spec
- * asks seedFreeSampleOrder for the next unused one rather than naming SMP/0001.
+ * They are identical clones: an order carries one sample of each type at a time
+ * and raiseSr defaults to Proto, so a spec asks seedFreeSampleOrder for the next
+ * untouched one rather than naming SMP/0001.
  */
 import { expect } from '@playwright/test';
 import { navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';

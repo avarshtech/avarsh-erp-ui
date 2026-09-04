@@ -1,11 +1,13 @@
 /**
  * Customer Comments closes the request.
  *
- * The buyer's decision is the end of the line: recording Approved moves the
- * request from Dispatched through Feedback Received to a terminal status in one
- * transaction, and a terminal request is read-only — no new round is opened, no
- * further edit is offered. That "and then nothing more happens" half is the
- * part worth a test, because it is invisible until someone tries.
+ * The buyer's decision is the end of the line for the request it is recorded
+ * on: recording Approved moves the request from Dispatched through Feedback
+ * Received to a terminal status in one transaction, and a terminal request is
+ * read-only — nothing is created here, no further edit is offered. (A rejected
+ * sample is re-made as a linked revision, raised from the closed request; 05
+ * covers that.) That "and then nothing more happens" half is the part worth a
+ * test, because it is invisible until someone tries.
  *
  * The request is walked to Dispatched through the API (raise, submit, issue,
  * invoice, ship — all of it covered by 02 and 03) so this spec spends its time

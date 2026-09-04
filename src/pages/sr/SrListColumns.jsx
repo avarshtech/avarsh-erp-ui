@@ -5,6 +5,7 @@ import { ActionButton } from '../../components/buttons';
 import { SR_STATUS_CONFIG } from '../../utils/statusConfig';
 import {
   getSrStatusLabel, SR_STATUS, isSrEditable, isSrDeletable, getEffectiveDispatchDeadline,
+  srRevisionLabel,
 } from '../../utils/sampleRequestConstants';
 import { formatDate } from '../../utils/formatters';
 import DaysRemainingTag from './DaysRemainingTag';
@@ -26,9 +27,10 @@ const renderDeadline = (original, revised) => {
 };
 
 /**
- * SR List columns (R2). Direct role/status-gated action buttons — invoices are
- * generated after DISPATCH creation (Dispatches → Invoices), never from here;
- * rounds are not used, so there is no Round column.
+ * SR List columns. Direct role/status-gated action buttons — invoices are
+ * generated after DISPATCH creation (Dispatches → Invoices), never from here.
+ * A revision is marked in the number cell rather than given a column of its
+ * own: most rows are first requests, and an empty column says nothing.
  */
 export const buildSrColumns = ({
   onView, onEdit, onDelete, canUpdate, canDelete,
@@ -38,8 +40,17 @@ export const buildSrColumns = ({
     dataIndex: 'srNo',
     key: 'srNo',
     fixed: 'left',
-    width: 150,
-    render: (text, record) => <RecordLink text={text} onClick={() => onView(record)} />,
+    width: 170,
+    render: (text, record) => (
+      <span style={{ whiteSpace: 'nowrap' }}>
+        <RecordLink text={text} onClick={() => onView(record)} />
+        {srRevisionLabel(record) && (
+          <Tag color="gold" style={{ marginInlineStart: 6, fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>
+            {srRevisionLabel(record)}
+          </Tag>
+        )}
+      </span>
+    ),
   },
   {
     title: 'Order No',

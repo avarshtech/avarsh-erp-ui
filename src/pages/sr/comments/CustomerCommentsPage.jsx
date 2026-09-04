@@ -254,7 +254,7 @@ const CustomerCommentsPage = () => {
             {/* The consequence of the primary action, stated beside it */}
             <Text type="secondary" style={{ flex: 1, minWidth: 240, fontSize: 12 }}>
               {feedbackEditable
-                ? 'Decisions are final — the SR closes at Approved / Rejected / Revision Required. No new round is created.'
+                ? 'Decisions are final — the SR closes at Approved / Rejected / Revision Required. A rejected sample is re-made by raising a revision from the closed SR.'
                 : ''}
             </Text>
             <Space>

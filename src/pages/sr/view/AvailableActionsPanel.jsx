@@ -1,18 +1,28 @@
 import { Card, Button, Space, Typography } from 'antd';
 import {
   EditOutlined, SendOutlined, ToolOutlined, RollbackOutlined, CommentOutlined,
-  DeleteOutlined, CarOutlined,
+  DeleteOutlined, CarOutlined, RetweetOutlined,
 } from '@ant-design/icons';
 import { SR_STATUS } from '../../../utils/sampleRequestConstants';
 
 const { Text } = Typography;
 
 /**
- * Available Actions (R2). Status- and role-gated; unavailable actions stay
+ * Available Actions. Status- and role-gated; unavailable actions stay
  * visible but DISABLED with the reason beneath the label. Production starts
  * via material issue (inventory), dispatching via the Dispatches screen, and
- * feedback on the Customer Comments page — those rows NAVIGATE there.
+ * feedback on the Customer Comments page — those rows NAVIGATE there. A
+ * rejected sample is re-made from here as a linked revision.
  */
+
+const revisionReason = (sr, canAdd) => {
+  if (!canAdd) return 'Needs add permission';
+  if (sr.status === SR_STATUS.APPROVED) return 'Approved — there is nothing to re-make';
+  if ([SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED].includes(sr.status)) {
+    return 'A revision has already been raised from this request';
+  }
+  return 'Available once the buyer rejects the sample or asks for a revision';
+};
 const ActionRow = ({ enabled, reason, icon, label, onClick, danger, primary }) => (
   <Button
     block
@@ -36,7 +46,7 @@ const ActionRow = ({ enabled, reason, icon, label, onClick, danger, primary }) =
   </Button>
 );
 
-const AvailableActionsPanel = ({ sr, canUpdate, canDelete, canIssue, handlers }) => {
+const AvailableActionsPanel = ({ sr, canAdd, canUpdate, canDelete, canIssue, handlers }) => {
   const s = sr.status;
   const terminal = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED].includes(s);
   return (
@@ -84,6 +94,13 @@ const AvailableActionsPanel = ({ sr, canUpdate, canDelete, canIssue, handlers })
           icon={<CommentOutlined />} primary
           label={s === SR_STATUS.FEEDBACK_RECEIVED ? 'Record Customer Decision' : 'Record Customer Feedback'}
           onClick={handlers.onGoComments}
+        />
+        <ActionRow
+          enabled={Boolean(sr.canRaiseRevision) && canAdd}
+          reason={revisionReason(sr, canAdd)}
+          icon={<RetweetOutlined />} primary
+          label={`Raise Revision${sr.revisionNo > 0 ? ` ${sr.revisionNo + 1}` : ''}`}
+          onClick={handlers.onRaiseRevision}
         />
         <ActionRow
           enabled={s === SR_STATUS.DRAFT && canDelete}

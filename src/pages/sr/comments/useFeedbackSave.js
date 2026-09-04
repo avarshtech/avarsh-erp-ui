@@ -61,7 +61,7 @@ const useFeedbackSave = ({
     }
   }, [sr.id, form, buildDto, uploadPending, onChanged, message]);
 
-  // Decisions are terminal (R2) — no round creation, so no special confirm
+  // Decisions are terminal for this SR — a revision is raised separately, so no special confirm
   const save = useCallback(async () => {
     let values;
     try { values = await form.validateFields(); } catch { return; }

@@ -21,6 +21,7 @@ export const updateSampleRequest = (...a) => srApi.updateSampleRequest(...a); //
 export const updateInstructions = (...a) => srApi.updateInstructions(...a);   // In Production only (PRD §8.3); payload carries version
 export const reviseDeadline = (...a) => srApi.reviseDeadline(...a);           // Submitted / In Production; payload{revisedDispatchDeadline, revisedBuyerApprovalDeadline?, reason, version}
 export const deleteSampleRequest = (...a) => srApi.deleteSampleRequest(...a);
+export const raiseSrRevision = (...a) => srApi.raiseSrRevision(...a);         // POST /{id}/revisions → the new Draft (Rev N+1)
 export const listByOrderNo = (...a) => srApi.listByOrderNo(...a);        // GET /by-order?orderNo= (order nos carry "/")
 export const listSrBuyers = (...a) => srApi.listSrBuyers(...a);          // GET /buyers facet
 export const bomPreview = (...a) => srApi.bomPreview(...a);              // GET /bom-preview?bomId= | ?orderNo=

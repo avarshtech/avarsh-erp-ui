@@ -15,11 +15,11 @@ const { Text } = Typography;
 const DEFAULT_LABELS = { fit: 'Fit', fabricShade: 'Fabric / Shade', measurement: 'Measurement', workmanship: 'Workmanship' };
 
 /**
- * Customer Comments capture (R2) — rendered inside the Customer Comments page
+ * Customer Comments capture — rendered inside the Customer Comments page
  * dialog. Two routes into the same fields: the manual form, or importing the
  * buyer's Excel/PDF comment sheet with a review-before-apply step. Decisions
- * are TERMINAL — no next round is ever created (the buyer's spec sheet means
- * ~95% of samples are never redone).
+ * are TERMINAL for this SR — nothing here creates a next round. A rejected
+ * sample is re-made by raising a revision from the closed SR on its own screen.
  *
  * Saving is driven from the dialog footer, so the two actions are exposed on a
  * ref instead of being rendered here; the caller awaits them for its own

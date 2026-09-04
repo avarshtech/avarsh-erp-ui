@@ -9,13 +9,13 @@ import DraftWatermark from '../../components/DraftWatermark';
 import { ActionButton } from '../../components/buttons';
 import { SR_STATUS_CONFIG, SR_STATUS_FLOW_BASE } from '../../utils/statusConfig';
 import {
-  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS, canReviseSrDeadline,
+  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS, canReviseSrDeadline, srRevisionLabel,
 } from '../../utils/sampleRequestConstants';
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
 import { toastUnlessHandled } from '../../utils/apiError';
 import {
-  getSampleRequest, changeStatus, deleteSampleRequest, updateInstructions,
+  getSampleRequest, changeStatus, deleteSampleRequest, updateInstructions, raiseSrRevision,
 } from '../../services/sr/srService';
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
@@ -31,7 +31,7 @@ const { Text, Title } = Typography;
 
 const TERMINALS = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED];
 
-const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
+const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [sr, setSr] = useState(null);
@@ -39,6 +39,8 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const [instrModal, setInstrModal] = useState({ open: false, specialInstructions: '', remarks: '', saving: false });
   const [reviseOpen, setReviseOpen] = useState(false);
 
+  // Raising a revision creates a document, so it is gated like create, not edit
+  const canAdd = hasPermission('sample-requests', 'add');
   const canUpdate = hasPermission('sample-requests', 'update');
   const canDelete = hasPermission('sample-requests', 'delete');
   // The issue screen lives in Inventory and carries its own permission
@@ -105,6 +107,21 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
     onGoMaterialIssue: () => { onClose?.(); navigate(`/inventory/issue/sample/fabric/new?srId=${sr?.id}`); },
     onGoDispatches: () => { onClose?.(); navigate('/sample-requests/dispatches/list'); },
     onGoComments: () => { onClose?.(); navigate(`/sample-requests/comments?srId=${sr?.id}`); },
+    // The new draft needs its own dates before it can be submitted, so land on it
+    onRaiseRevision: () => modal.confirm({
+      title: `Raise revision ${(sr?.revisionNo ?? 0) + 1} of ${sr?.srNo}?`,
+      content: 'A new Draft sample request is created against the same order and sample type, linked to this one. Header, colours and mandatory marks carry over; the deadlines start blank.',
+      okText: 'Raise Revision',
+      onOk: async () => {
+        try {
+          const created = await raiseSrRevision(sr.id);
+          message.success(`${created.srNo} raised as revision ${created.revisionNo} of ${sr.srNo}`);
+          onChanged?.();
+          onClose?.();
+          navigate(`/sample-requests/edit/${created.id}`);
+        } catch (e) { toastUnlessHandled(message, e, 'Failed to raise revision'); }
+      },
+    }),
     onDelete: () => modal.confirm({
       title: 'Delete Sample Request',
       content: `Delete ${sr?.srNo}? Only Draft SRs can be deleted.`,
@@ -142,6 +159,24 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           status: (
             <>
               <StatusTag status={sr.status} config={SR_STATUS_CONFIG} getLabel={getSrStatusLabel} />
+              {srRevisionLabel(sr) && (
+                <Tag color="gold" style={{ marginInlineEnd: 0 }}>
+                  {srRevisionLabel(sr)}
+                  {sr.parentSrNo && (
+                    <>
+                      {' · of '}
+                      <Button
+                        type="link"
+                        size="small"
+                        style={{ padding: 0, height: 'auto', fontSize: 'inherit' }}
+                        onClick={() => onOpenSr?.(sr.parentSrId)}
+                      >
+                        {sr.parentSrNo}
+                      </Button>
+                    </>
+                  )}
+                </Tag>
+              )}
               {sr.priority === 'URGENT' && <Tag color="red">Urgent</Tag>}
               {overseas && <Tag color="purple">overseas</Tag>}
             </>
@@ -278,7 +313,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
                     sr={sr}
                     onRevise={canUpdate && canReviseSrDeadline(sr.status) ? () => setReviseOpen(true) : undefined}
                   />
-                  <AvailableActionsPanel sr={sr} canUpdate={canUpdate} canDelete={canDelete} canIssue={canIssue} handlers={handlers} />
+                  <AvailableActionsPanel sr={sr} canAdd={canAdd} canUpdate={canUpdate} canDelete={canDelete} canIssue={canIssue} handlers={handlers} />
                   <InvoicePanel sr={sr} overseas={overseas} />
                 </div>
               </Col>

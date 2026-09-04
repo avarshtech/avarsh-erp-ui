@@ -13,45 +13,33 @@ import { isSrEditable } from '../../utils/sampleRequestConstants';
  *  - new bare      → needsPicker (BOM picker — any BOM, sample or bulk)
  *  - edit /:id     → the stored SR; only Draft SRs are editable
  *
- * A BOM that already carries a sample request resolves to needsPicker + blockedBom
- * rather than a draft, whichever of the two create entries it arrived through.
+ * Every mode carries `existingRequests` — what the BOM already has, per sample
+ * type — so the Sample Type field can disable a taken type before anything is
+ * typed. On edit it is fetched alongside the record and is best-effort: a
+ * preview that fails must not stop a draft from opening.
  */
 const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
   const [state, setState] = useState({
-    loading: true, error: null, needsPicker: false, blockedBom: null,
+    loading: true, error: null, needsPicker: false,
     mode: id ? 'edit' : 'create',
-    record: null, header: null, materials: [], orderSizes: [],
+    record: null, header: null, materials: [], orderSizes: [], existingRequests: [],
   });
 
   const loadCreate = async () => {
     if (!bomId && !orderNo) {
-      setState((s) => ({ ...s, loading: false, needsPicker: true, blockedBom: null }));
+      setState((s) => ({ ...s, loading: false, needsPicker: true }));
       return;
     }
     try {
       const preview = await bomPreview({ bomId, orderNo });
-      // One sample request per BOM. The form never opens on a BOM that already
-      // has one — the user is left on the picker with the existing SR named, so
-      // the next move (pick another BOM, or open that one) is right there. The
-      // server refuses the save too; this only stops the wasted typing.
-      const existing = preview.existingRequests || [];
-      if (existing.length) {
-        setState((s) => ({
-          ...s,
-          loading: false,
-          error: null,
-          needsPicker: true,
-          blockedBom: { bomId: preview.header?.bomId ?? bomId, requests: existing },
-        }));
-        return;
-      }
       setState({
-        loading: false, error: null, needsPicker: false, blockedBom: null, mode: 'create',
+        loading: false, error: null, needsPicker: false, mode: 'create',
         record: null,
         header: preview.header || null,
         materials: preview.materials || [],
         // Size run of the order — the Sizes field's options and its default
         orderSizes: preview.orderSizes || [],
+        existingRequests: preview.existingRequests || [],
       });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: errorText(e, 'Failed to load BOM/Order') }));
@@ -65,16 +53,21 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
         setState((s) => ({ ...s, loading: false, error: 'NOT_EDITABLE', record }));
         return;
       }
+      const existingRequests = record.bomId
+        ? await bomPreview({ bomId: record.bomId }).then((p) => p.existingRequests || []).catch(() => [])
+        : [];
       setState({
-        loading: false, error: null, needsPicker: false, blockedBom: null, mode: 'edit',
+        loading: false, error: null, needsPicker: false, mode: 'edit',
         record,
         header: {
           orderNo: record.orderNo, bomId: record.bomId, styleNo: record.styleNo,
           garmentName: record.garmentName, buyerName: record.buyerName,
           buyerCountry: record.buyerCountry, season: record.season, orderQty: record.orderQty ?? null,
+          parentSrId: record.parentSrId, parentSrNo: record.parentSrNo, revisionNo: record.revisionNo,
         },
         materials: record.materials || [],
         orderSizes: record.sizes || [],
+        existingRequests,
       });
     } catch (e) {
       setState((s) => ({ ...s, loading: false, error: errorText(e, 'Failed to load sample request') }));
@@ -85,9 +78,7 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
     // needsPicker intentionally survives the reload: after the user picks a
     // sample order, the PICKER stays on screen with an inline loading state in
     // its dropdown, and the form renders only once the preview has resolved.
-    // blockedBom is cleared here, unlike needsPicker: a warning about the last
-    // BOM must not sit over the one now loading.
-    setState((s) => ({ ...s, loading: true, error: null, blockedBom: null }));
+    setState((s) => ({ ...s, loading: true, error: null }));
     if (id) loadEdit(); else loadCreate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, bomId, orderNo]);

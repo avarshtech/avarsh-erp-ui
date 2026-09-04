@@ -1,4 +1,5 @@
-import { Card, Row, Col, Typography } from 'antd';
+import { Card, Row, Col, Typography, Tag } from 'antd';
+import { srRevisionLabel } from '../../../utils/sampleRequestConstants';
 
 const { Text, Title } = Typography;
 
@@ -13,13 +14,19 @@ const Field = ({ label, children }) => (
 
 /**
  * Section A — header auto-populated from the sample Order + BOM, read-only.
- * R2: no Sample Round (rounds unused) and no SAMPLE badge (everything in this
- * module is a sample).
+ * No SAMPLE badge (everything in this module is a sample). A revision says so
+ * beside its number, and names the request it re-makes.
  */
 const SectionHeader = ({ srNo, header }) => (
   <Card size="small" style={{ marginBottom: 16 }} title={<Title level={5} style={{ margin: 0 }}>A · Header — auto-populated from BOM &amp; Order</Title>}>
     <Row gutter={[24, 16]}>
-      <Field label="SR Number">{srNo || 'Auto on save (SRQ/FY/NNNN)'}</Field>
+      <Field label="SR Number">
+        {srNo || 'Auto on save (SRQ/FY/NNNN)'}
+        {srRevisionLabel(header) && (
+          <Tag color="gold" style={{ marginInlineStart: 8, fontSize: 11 }}>{srRevisionLabel(header)}</Tag>
+        )}
+      </Field>
+      {header?.parentSrNo && <Field label="Revision of">{header.parentSrNo}</Field>}
       <Field label="Order Number">{header?.orderNo}</Field>
       <Field label="BOM Reference">{header?.bomId ? `BOM #${header.bomId}` : '—'}</Field>
       <Field label="Style Number">{header?.styleNo}</Field>

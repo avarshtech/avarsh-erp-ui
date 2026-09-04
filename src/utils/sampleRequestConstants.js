@@ -40,6 +40,25 @@ export const SR_STATUS_LABELS = {
 
 export const getSrStatusLabel = (s) => SR_STATUS_LABELS[s] || (s || '').replace(/_/g, ' ');
 
+/** "Rev 2" for a revision; nothing for a first request, which is not "Rev 0" to anyone. */
+export const srRevisionLabel = (sr) => (sr?.revisionNo > 0 ? `Rev ${sr.revisionNo}` : '');
+
+/**
+ * Which sample types a BOM already carries, keyed by sample type id, each holding
+ * the LATEST request for that type. An order has one sample of each type at a
+ * time, so the latest row is what decides: open → taken, approved → closed,
+ * canRaiseRevision → re-made through a revision rather than a new request.
+ * `excludeId` is the request being edited, which must not count against itself.
+ * Rows arrive oldest first, so the last write per type is the latest.
+ */
+export const sampleTypeAvailability = (existingRequests = [], excludeId = null) => {
+  const latest = new Map();
+  existingRequests.forEach((r) => {
+    if (r.id !== excludeId && r.sampleTypeId != null) latest.set(r.sampleTypeId, r);
+  });
+  return latest;
+};
+
 // PRD v3 §14 — the only backward transition is Submitted → Draft.
 export const SR_TRANSITIONS = {
   [SR_STATUS.DRAFT]: [SR_STATUS.SUBMITTED],

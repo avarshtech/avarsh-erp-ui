@@ -204,7 +204,6 @@ const SampleRequestForm = () => {
           onPick={setPicked}
           resolving={draft.loading && Boolean(picked)}
           pickedBomId={picked?.bomId}
-          blocked={draft.blockedBom}
         />
       </div>
     );
@@ -312,6 +311,8 @@ const SampleRequestForm = () => {
           sampleTypes={sampleTypes}
           typesLoading={typesLoading}
           orderSizes={draft.orderSizes}
+          existingRequests={draft.existingRequests}
+          record={draft.record}
         />
         <SectionDeadlines form={form} />
         <MaterialsTable

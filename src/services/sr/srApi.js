@@ -82,6 +82,10 @@ export const reviseDeadline = async (id, payload) => (await axiosInstance.put(`$
 
 export const deleteSampleRequest = async (id) => { await axiosInstance.delete(`${BASE}/${id}`); };
 
+// The sample made again: a new Draft linked to a Rejected / Revision Required
+// request as its next revision. Unrelated to reviseDeadline above.
+export const raiseSrRevision = async (id) => (await axiosInstance.post(`${BASE}/${id}/revisions`)).data;
+
 /**
  * Order numbers carry slashes (SG/26-27/1001), so the order goes in the query
  * string — a path segment would split into two.

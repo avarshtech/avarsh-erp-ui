@@ -199,6 +199,10 @@ const SampleRequestList = () => {
         srId={viewId}
         onClose={() => setViewId(null)}
         onChanged={refreshAll}
+        // A revision links to the request it re-makes. The ?viewId= deep link
+        // cannot do that from inside the dialog (it is consumed once, on mount),
+        // so the dialog swaps its own id instead.
+        onOpenSr={setViewId}
       />
     </div>
   );

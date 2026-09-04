@@ -16,9 +16,15 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { ensureSessionActive, goToMasterEntity } from '../../helpers/navigation.js';
 import {
   goTo, settle, inputFor, expectToast, button, tableRows,
-  raiseSr, submitSr, issueFabric, createDispatch, issueCommercialInvoice,
+  raiseSr, submitSr, issueFabric, createDispatch, issueCommercialInvoice, getSr,
   seedFreeSampleOrder, SAMPLE_TYPE,
 } from './helpers.js';
+
+/** Fail loudly with the server's own message rather than a bare status code. */
+function ok(res, what) {
+  if (res.status >= 300) throw new Error(`${what} failed: ${res.status} ${JSON.stringify(res.data)}`);
+  return res.data;
+}
 
 const MOCK_STORE_KEY = 'avarsh.sr.mockStore.v1';
 
@@ -56,36 +62,82 @@ test.describe('Sample Requests — the rules hold', () => {
       .toContain(sr.srNo);
   });
 
-  test('a BOM that already has a sample request cannot be given a second one', async ({ page }) => {
+  test('an order carries one sample of each type at a time, and a rejected one is re-made as a linked revision', async ({ page }) => {
     const free = await seedFreeSampleOrder(api);
-    const sr = await raiseSr(api, { sampleTypeId: SAMPLE_TYPE.PROTO, bomId: free.bomId });
+    const proto = await raiseSr(api, { sampleTypeId: SAMPLE_TYPE.PROTO, bomId: free.bomId });
 
-    // The deep link from the BOM screen skips the picker, so it is the path
-    // that would slip past a check living only in the dropdown.
-    await goTo(page, `/sample-requests/new?bomId=${free.bomId}&orderNo=${encodeURIComponent(free.orderNo)}`);
-
-    const warning = page.locator('.ant-alert-warning');
-    await expect(warning).toBeVisible({ timeout: 25000 });
-    await expect(warning).toContainText(`BOM #${free.bomId}`);
-    await expect(warning).toContainText(sr.srNo);
-
-    // Refused, not merely warned: the form never opens.
-    await expect(page.getByText('B · Sample Details')).toHaveCount(0);
-    // ...and the picker is still there, so another BOM can be chosen in place.
-    await expect(page.locator('.ant-select').first()).toBeEnabled();
-
-    // The server refuses it too, whatever the screen did.
-    const refused = await api.post('/sample-requests', {
-      bomId: free.bomId,
-      sampleTypeId: SAMPLE_TYPE.FIT,
-      colourSubstitutionAllowed: true,
-      sampleQty: 1,
-      sizes: ['M'],
-      priority: 'NORMAL',
-      materials: [],
+    // A second Proto on the same order is the same request typed twice.
+    const duplicate = await api.post('/sample-requests', {
+      bomId: free.bomId, sampleTypeId: SAMPLE_TYPE.PROTO, colourSubstitutionAllowed: true,
+      sampleQty: 1, sizes: ['M'], priority: 'NORMAL', materials: [],
     });
-    expect(refused.status).toBe(409);
-    expect(JSON.stringify(refused.data)).toContain(sr.srNo);
+    expect(duplicate.status).toBe(409);
+    expect(JSON.stringify(duplicate.data)).toContain(proto.srNo);
+
+    // A Fit sample on the same order is a different sample, and goes through.
+    const fit = await raiseSr(api, { sampleTypeId: SAMPLE_TYPE.FIT, bomId: free.bomId });
+    expect(fit.id).not.toBe(proto.id);
+
+    // On the form, the taken types are disabled with the request that holds them,
+    // and the free ones are not. The deep link from the BOM screen skips the picker.
+    await goTo(page, `/sample-requests/new?bomId=${free.bomId}&orderNo=${encodeURIComponent(free.orderNo)}`);
+    await expect(page.getByText('B · Sample Details')).toBeVisible({ timeout: 25000 });
+    await page.locator('.ant-select').first().click();
+    const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
+    const protoOption = dropdown.locator('.ant-select-item-option', { hasText: 'Proto' }).first();
+    await expect(protoOption).toHaveClass(/ant-select-item-option-disabled/);
+    await expect(protoOption).toContainText(proto.srNo);
+    await expect(dropdown.locator('.ant-select-item-option', { hasText: 'Size Set' }).first())
+      .not.toHaveClass(/ant-select-item-option-disabled/);
+    await page.keyboard.press('Escape');
+
+    // Reject the Proto, and the way to re-make it is a revision, never a new request.
+    await submitSr(api, proto);
+    await issueFabric(api, proto.id);
+    const dispatch = await createDispatch(api, [proto.id]);
+    await issueCommercialInvoice(api, dispatch);
+    ok(await api.post(`/sample-dispatches/${dispatch.id}/mark-dispatched`, { version: dispatch.version }), 'mark dispatched');
+    const shipped = await getSr(api, proto.id);
+    ok(await api.put(`/sample-requests/${proto.id}/feedback`, {
+      date: new Date().toISOString().slice(0, 10), from: 'Next PLC QA', decision: 'REJECTED',
+      rejectionReasonCodes: [], comments: { fabricShade: 'Shade off - re-make' }, version: shipped.version,
+    }), 'reject');
+
+    const stillRefused = await api.post('/sample-requests', {
+      bomId: free.bomId, sampleTypeId: SAMPLE_TYPE.PROTO, colourSubstitutionAllowed: true,
+      sampleQty: 1, sizes: ['M'], priority: 'NORMAL', materials: [],
+    });
+    expect(stillRefused.status).toBe(409);
+    expect(JSON.stringify(stillRefused.data)).toMatch(/revision/i);
+
+    const rev1 = ok(await api.post(`/sample-requests/${proto.id}/revisions`), 'raise revision');
+    expect(rev1.revisionNo).toBe(1);
+    expect(rev1.parentSrId).toBe(proto.id);
+    expect(rev1.parentSrNo).toBe(proto.srNo);
+    expect(rev1.status).toBe('DRAFT');
+    expect(rev1.sampleTypeId).toBe(SAMPLE_TYPE.PROTO);
+    expect(rev1.dispatchDeadline, 'a re-make gets its own timeline').toBeNull();
+
+    // Only once: the revision of a revision is raised from the revision.
+    const twice = await api.post(`/sample-requests/${proto.id}/revisions`);
+    expect(twice.status).toBe(409);
+    expect(JSON.stringify(twice.data)).toContain(rev1.srNo);
+
+    // The detail dialog says what it is, and links back to what it re-makes.
+    await goTo(page, `/sample-requests/list?viewId=${rev1.id}`);
+    const detail = page.locator('.ant-modal-wrap:visible').first();
+    await expect(detail.getByText(rev1.srNo).first()).toBeVisible({ timeout: 20000 });
+    await expect(detail.getByText('Rev 1').first()).toBeVisible();
+    await detail.getByRole('button', { name: proto.srNo }).first().click();
+    // The dialog swaps to the parent in place: its own number leads the hero now.
+    await expect(detail.locator('.ant-tag', { hasText: 'Rejected' }).first()).toBeVisible({ timeout: 20000 });
+    await expect(detail.getByText('Rev 1')).toHaveCount(0);
+    // ...and it cannot be revised twice.
+    await expect(button(detail, /^Raise Revision/)).toBeDisabled();
+    await expect(detail.getByText('A revision has already been raised')).toBeVisible();
+    // The trail records it, behind the collapsed Activity Log.
+    await detail.getByText(/^Activity Log \(\d+\)$/).click();
+    await expect(detail.getByText('Revision raised').first()).toBeVisible();
   });
 
   test('a submitted request can no longer be edited or deleted', async ({ page }) => {
