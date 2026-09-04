@@ -19,6 +19,7 @@ export const getSampleRequest = (...a) => srApi.getSampleRequest(...a);
 export const createSampleRequest = (...a) => srApi.createSampleRequest(...a);
 export const updateSampleRequest = (...a) => srApi.updateSampleRequest(...a); // (id, payload{version})
 export const updateInstructions = (...a) => srApi.updateInstructions(...a);   // In Production only (PRD §8.3); payload carries version
+export const reviseDeadline = (...a) => srApi.reviseDeadline(...a);           // Submitted / In Production; payload{revisedDispatchDeadline, revisedBuyerApprovalDeadline?, reason, version}
 export const deleteSampleRequest = (...a) => srApi.deleteSampleRequest(...a);
 export const listByOrderNo = (...a) => srApi.listByOrderNo(...a);        // GET /by-order?orderNo= (order nos carry "/")
 export const listSrBuyers = (...a) => srApi.listSrBuyers(...a);          // GET /buyers facet

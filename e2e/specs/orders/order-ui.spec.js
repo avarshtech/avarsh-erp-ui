@@ -41,9 +41,11 @@ test.describe('Orders — List & Filters', () => {
     await goToListPage(page, '/orders/list');
     await antTableWaitForData(page);
     await expect(page.locator('.ant-table').first()).toBeVisible();
-    for (const col of ['Order No', 'Buyer', 'Total Qty', 'Status']) {
+    for (const col of ['Order No', 'Buyer', 'Total Qty', 'Dispatch', 'Status']) {
       await expect(page.getByRole('columnheader', { name: col, exact: true })).toBeVisible();
     }
+    // The PO-facing "Supplier Delay" figure was replaced by the revised dispatch date.
+    await expect(page.getByRole('columnheader', { name: 'Supplier Delay', exact: true })).toHaveCount(0);
   });
 
   test('Status filter fires a search request carrying status=', async ({ page }) => {

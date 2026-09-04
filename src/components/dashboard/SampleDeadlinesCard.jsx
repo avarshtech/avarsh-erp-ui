@@ -43,7 +43,19 @@ const SampleDeadlinesCard = memo(function SampleDeadlinesCard({ deadlines, loadi
         </span>
       ),
     },
-    { title: 'Dispatch Deadline', dataIndex: 'dispatchDeadline', key: 'dispatchDeadline', width: 130, render: (d) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span> },
+    {
+      title: 'Dispatch Deadline', dataIndex: 'dispatchDeadline', key: 'dispatchDeadline', width: 130,
+      // A re-agreed deadline sits on top with the original struck through; Days Remaining counts from it
+      render: (d, r) => (r.revisedDispatchDeadline ? (
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+          <span style={{ whiteSpace: 'nowrap' }}>
+            {formatDate(r.revisedDispatchDeadline)}
+            <Tag color="warning" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>Revised</Tag>
+          </span>
+          <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(d)}</span>
+        </div>
+      ) : <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span>),
+    },
     { title: 'Buyer Deadline', dataIndex: 'buyerApprovalDeadline', key: 'buyerApprovalDeadline', width: 130, render: (d) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span> },
     {
       title: 'Days Remaining', key: 'days', width: 140,

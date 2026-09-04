@@ -125,6 +125,12 @@ const IGNORED_CONSOLE = [
   // sampling defect, so filtering it here keeps this suite honest about its own
   // screens instead of failing on someone else's backlog.
   /\[antd: Alert\] `message` is deprecated/i,
+  // Same story for the shared StatusSteps component and Space: AntD 6 renamed Steps
+  // `direction`/`items.description` and Space `direction`, and every module's detail
+  // dialog still passes the old names. App-wide migrations, not sampling defects.
+  /\[antd: Steps\] `direction` is deprecated/i,
+  /\[antd: Steps\] `items\.description` is deprecated/i,
+  /\[antd: Space\] `direction` is deprecated/i,
 ];
 
 export function watchConsole(page) {

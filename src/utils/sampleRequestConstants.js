@@ -59,6 +59,19 @@ export const SR_ACTIVE_STATUSES = [
 export const isSrEditable = (s) => s === SR_STATUS.DRAFT;
 export const isSrDeletable = (s) => s === SR_STATUS.DRAFT;
 
+// ── Deadline revision ──
+// A draft is simply edited; once submitted the originals are frozen and a later agreement is
+// held beside them as a revision (revisedDispatchDeadline / revisedBuyerApprovalDeadline), which
+// the order the sample was raised for picks up on its own dispatch date. Past dispatch the
+// deadline is history, not something to agree.
+export const SR_DEADLINE_REVISABLE_STATUSES = [SR_STATUS.SUBMITTED, SR_STATUS.IN_PRODUCTION];
+export const canReviseSrDeadline = (s) => SR_DEADLINE_REVISABLE_STATUSES.includes(s);
+
+/** The deadline the team is tracking to: the revised one once agreed, else the original. */
+export const getEffectiveDispatchDeadline = (sr) => sr?.revisedDispatchDeadline || sr?.dispatchDeadline || null;
+export const getEffectiveBuyerApprovalDeadline = (sr) => sr?.revisedBuyerApprovalDeadline || sr?.buyerApprovalDeadline || null;
+export const isSrDeadlineRevised = (sr) => Boolean(sr?.revisedDispatchDeadline || sr?.revisedBuyerApprovalDeadline);
+
 // ── Buyer comment decisions (PRD §8.5) ──
 export const FEEDBACK_DECISIONS = {
   APPROVED: 'APPROVED',

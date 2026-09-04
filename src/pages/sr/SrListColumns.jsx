@@ -3,11 +3,27 @@ import StatusTag from '../../components/StatusTag';
 import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
 import { SR_STATUS_CONFIG } from '../../utils/statusConfig';
-import { getSrStatusLabel, SR_STATUS, isSrEditable, isSrDeletable } from '../../utils/sampleRequestConstants';
+import {
+  getSrStatusLabel, SR_STATUS, isSrEditable, isSrDeletable, getEffectiveDispatchDeadline,
+} from '../../utils/sampleRequestConstants';
 import { formatDate } from '../../utils/formatters';
 import DaysRemainingTag from './DaysRemainingTag';
 
 const { Text } = Typography;
+
+const renderDeadline = (original, revised) => {
+  if (!original && !revised) return <Text type="secondary">— not set —</Text>;
+  if (!revised) return formatDate(original);
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>
+      <span style={{ whiteSpace: 'nowrap' }}>
+        {formatDate(revised)}
+        <Tag color="warning" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>Revised</Tag>
+      </span>
+      <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(original)}</span>
+    </div>
+  );
+};
 
 /**
  * SR List columns (R2). Direct role/status-gated action buttons — invoices are
@@ -63,19 +79,21 @@ export const buildSrColumns = ({
       </span>
     ),
   },
+  // A re-agreed deadline sits on top with the original struck through, so a revision is never
+  // mistaken for an edit; the countdown below counts from the revised date.
   {
     title: 'Dispatch Deadline',
     dataIndex: 'dispatchDeadline',
     key: 'dispatchDeadline',
-    width: 130,
-    render: (date) => (date ? formatDate(date) : <Text type="secondary">— not set —</Text>),
+    width: 140,
+    render: (date, record) => renderDeadline(date, record.revisedDispatchDeadline),
   },
   {
     title: 'Buyer Deadline',
     dataIndex: 'buyerApprovalDeadline',
     key: 'buyerApprovalDeadline',
     width: 140,
-    render: (date) => (date ? formatDate(date) : <Text type="secondary">— not set —</Text>),
+    render: (date, record) => renderDeadline(date, record.revisedBuyerApprovalDeadline),
   },
   {
     title: 'Days Remaining',
@@ -92,7 +110,7 @@ export const buildSrColumns = ({
       if (record.status === SR_STATUS.FEEDBACK_RECEIVED) {
         return <Tag color="geekblue" style={{ whiteSpace: 'nowrap' }}>Decision pending</Tag>;
       }
-      return <DaysRemainingTag date={record.dispatchDeadline} />;
+      return <DaysRemainingTag date={getEffectiveDispatchDeadline(record)} />;
     },
   },
   {

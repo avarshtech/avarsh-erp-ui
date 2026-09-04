@@ -9,7 +9,7 @@ import DraftWatermark from '../../components/DraftWatermark';
 import { ActionButton } from '../../components/buttons';
 import { SR_STATUS_CONFIG, SR_STATUS_FLOW_BASE } from '../../utils/statusConfig';
 import {
-  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS,
+  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS, canReviseSrDeadline,
 } from '../../utils/sampleRequestConstants';
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
@@ -20,6 +20,7 @@ import {
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
 import DeadlinesPanel from './view/DeadlinesPanel';
+import ReviseDeadlineDialog from './view/ReviseDeadlineDialog';
 import AvailableActionsPanel from './view/AvailableActionsPanel';
 import InvoicePanel from './view/InvoicePanel';
 import ActivityLogPanel from './view/ActivityLogPanel';
@@ -36,6 +37,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
   const [sr, setSr] = useState(null);
   const [loading, setLoading] = useState(false);
   const [instrModal, setInstrModal] = useState({ open: false, specialInstructions: '', remarks: '', saving: false });
+  const [reviseOpen, setReviseOpen] = useState(false);
 
   const canUpdate = hasPermission('sample-requests', 'update');
   const canDelete = hasPermission('sample-requests', 'delete');
@@ -272,7 +274,10 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
               </Col>
               <Col xs={24} lg={8}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <DeadlinesPanel sr={sr} />
+                  <DeadlinesPanel
+                    sr={sr}
+                    onRevise={canUpdate && canReviseSrDeadline(sr.status) ? () => setReviseOpen(true) : undefined}
+                  />
                   <AvailableActionsPanel sr={sr} canUpdate={canUpdate} canDelete={canDelete} canIssue={canIssue} handlers={handlers} />
                   <InvoicePanel sr={sr} overseas={overseas} />
                 </div>
@@ -290,6 +295,13 @@ const SampleRequestView = ({ open, srId, onClose, onChanged }) => {
           </Spin>
         )}
       </ViewDialog>
+      {/* Submitted / In Production — the deadlines can be re-agreed; the originals stay as raised */}
+      <ReviseDeadlineDialog
+        open={reviseOpen}
+        sr={fresh}
+        onClose={() => setReviseOpen(false)}
+        onSaved={() => { setReviseOpen(false); refresh(); }}
+      />
       {/* PRD §8.3 — at In Production, Special Instructions + Remarks stay editable */}
       <Modal
         title="Edit instructions"

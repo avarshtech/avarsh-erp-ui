@@ -5,13 +5,15 @@ import {
   Card,
   Space,
   Tag,
+  Tooltip,
   Typography,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchOrders, deleteOrder, getOrderById } from '../../services/orders/orderService';
-import { getOrderDelays } from '../../services/po/purchaseOrderService';
-import { hasPermission, hasModuleAccess } from '../../utils/permissions';
-import { getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES } from '../../utils/orderConstants';
+import { hasPermission } from '../../utils/permissions';
+import {
+  getStatusLabel, EDITABLE_STATUSES, DELETABLE_STATUSES, hasDispatchDelay, getEarliestDispatchLine,
+} from '../../utils/orderConstants';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
 import StatusTag from '../../components/StatusTag';
 import PageHeader from '../../components/PageHeader';
@@ -71,25 +73,6 @@ const OrderList = () => {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Supplier delay: one bounded lookup per page of orders, never one per row. Fails soft —
-  // if the PO endpoint is unavailable the column reads "—" and the Orders list is unaffected.
-  const [supplierDelays, setSupplierDelays] = useState({});
-  const canSeeSupplierDelay = hasModuleAccess('purchase-orders');
-
-  const loadSupplierDelays = useCallback(async (rows) => {
-    const orderIds = (rows || []).map((r) => r.id).filter(Boolean);
-    if (!canSeeSupplierDelay || orderIds.length === 0) {
-      setSupplierDelays({});
-      return;
-    }
-    try {
-      const delays = await getOrderDelays({ orderIds });
-      setSupplierDelays(Object.fromEntries((delays || []).map((d) => [d.orderId, d.delayDays])));
-    } catch {
-      setSupplierDelays({});
-    }
-  }, [canSeeSupplierDelay]);
-
   // Permissions
   const canView = hasPermission('orders', 'view');
   const canAdd = hasPermission('orders', 'add');
@@ -124,14 +107,13 @@ const OrderList = () => {
           pageSize: pageSize || prev.pageSize,
           total: response.totalElements || 0,
         }));
-        loadSupplierDelays(rows);
       } catch {
         message.error('Failed to load orders');
       } finally {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, loadSupplierDelays]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]
   );
 
   // Re-fetch on filter change
@@ -233,19 +215,34 @@ const OrderList = () => {
         <CurrencyDisplay amount={amount} currency={record.currency} />
       ),
     },
-    // Supplier slippage carried over from the POs feeding this order. Deliberately NOT sortable:
-    // the list sorts server-side by passing the column key straight into Sort.by(), and this is a
-    // derived value with no matching entity property.
-    ...(canSeeSupplierDelay ? [{
-      title: 'Supplier Delay',
-      key: 'supplierDelay',
-      width: 130,
+    // Committed dispatch of the earliest line. Once an upstream slip (a supplier PO or a sample
+    // request running late) has been applied to the order, the date it is now tracking to sits on
+    // top and the original stays visible, struck through, so a revision is never mistaken for a
+    // data-entry change — the same shape as the PO list. Deliberately NOT sortable: the list sorts
+    // server-side by passing the column key straight into Sort.by(), and this is derived from the
+    // lines with no matching entity property.
+    {
+      title: 'Dispatch',
+      key: 'dispatch',
+      width: 150,
       render: (_, record) => {
-        const days = supplierDelays[record.id];
-        if (!days) return <Text type="secondary">—</Text>;
-        return <Tag color="error" style={{ margin: 0 }}>{days} day{days === 1 ? '' : 's'} late</Tag>;
+        const line = getEarliestDispatchLine(record);
+        if (!line) return <Text type="secondary">—</Text>;
+        if (!hasDispatchDelay(record) || !line.revisedDispatchDate) return formatDate(line.dispatchDate);
+        const days = record.dispatchDelayDays;
+        return (
+          <Tooltip title={`Pushed +${days} day${days === 1 ? '' : 's'} by ${record.dispatchDelaySource}`}>
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3, cursor: 'help' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {formatDate(line.revisedDispatchDate)}
+                <Tag color="error" style={{ marginLeft: 6, fontSize: 9, padding: '0 4px', lineHeight: '14px' }}>+{days}d</Tag>
+              </span>
+              <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: 11 }}>{formatDate(line.dispatchDate)}</span>
+            </div>
+          </Tooltip>
+        );
       },
-    }] : []),
+    },
     {
       title: 'Status',
       dataIndex: 'status',
@@ -292,7 +289,7 @@ const OrderList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, canSeeSupplierDelay, supplierDelays]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
 
   // Status filter options
   const statusOptions = useMemo(() =>

@@ -74,6 +74,12 @@ export const updateSampleRequest = async (id, payload) => (await axiosInstance.p
 /** The two fields that stay editable once the sample is In Production. */
 export const updateInstructions = async (id, payload) => (await axiosInstance.patch(`${BASE}/${id}/instructions`, payload)).data;
 
+/**
+ * Re-agree the deadlines of a Submitted / In Production request. The originals stay as raised;
+ * the linked order picks up the slip on its own dispatch date. Payload carries the version.
+ */
+export const reviseDeadline = async (id, payload) => (await axiosInstance.put(`${BASE}/${id}/revise-deadline`, payload)).data;
+
 export const deleteSampleRequest = async (id) => { await axiosInstance.delete(`${BASE}/${id}`); };
 
 /**

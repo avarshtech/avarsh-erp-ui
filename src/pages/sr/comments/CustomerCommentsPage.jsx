@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { searchSampleRequests, getSampleRequest } from '../../../services/sr/srService';
 import { hasPermission } from '../../../utils/permissions';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import { SR_STATUS, getSrStatusLabel } from '../../../utils/sampleRequestConstants';
+import { SR_STATUS, getSrStatusLabel, getEffectiveBuyerApprovalDeadline } from '../../../utils/sampleRequestConstants';
 import { SR_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { formatDate } from '../../../utils/formatters';
 import PageHeader from '../../../components/PageHeader';
@@ -145,8 +145,12 @@ const CustomerCommentsPage = () => {
       ),
     },
     {
-      title: 'Buyer Deadline', dataIndex: 'buyerApprovalDeadline', key: 'buyerApprovalDeadline', width: 130,
-      render: (date) => (date ? formatDate(date) : <Text type="secondary">— not set —</Text>),
+      title: 'Buyer Deadline', key: 'buyerApprovalDeadline', width: 130,
+      // The re-agreed date once there is one — what the buyer's window is actually measured against
+      render: (_, record) => {
+        const date = getEffectiveBuyerApprovalDeadline(record);
+        return date ? formatDate(date) : <Text type="secondary">— not set —</Text>;
+      },
     },
     {
       title: 'Feedback', key: 'feedback', width: 115,

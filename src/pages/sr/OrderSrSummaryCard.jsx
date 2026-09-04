@@ -3,7 +3,9 @@ import { Card, Table, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import StatusTag from '../../components/StatusTag';
 import { SR_STATUS_CONFIG } from '../../utils/statusConfig';
-import { getSrStatusLabel, SR_STATUS } from '../../utils/sampleRequestConstants';
+import {
+  getSrStatusLabel, SR_STATUS, getEffectiveDispatchDeadline, getEffectiveBuyerApprovalDeadline,
+} from '../../utils/sampleRequestConstants';
 import { hasModuleAccess } from '../../utils/permissions';
 import { listByOrderNo } from '../../services/sr/srService';
 import DaysRemainingTag from './DaysRemainingTag';
@@ -56,8 +58,11 @@ const OrderSrSummaryCard = ({ orderNo }) => {
     },
     {
       title: 'Latest Deadline', key: 'deadline', width: 210,
+      // Counts from the re-agreed deadline once there is one — the date the sample is tracking to
       render: (_, r) => {
-        const date = r.status === SR_STATUS.DISPATCHED ? r.buyerApprovalDeadline : r.dispatchDeadline;
+        const date = r.status === SR_STATUS.DISPATCHED
+          ? getEffectiveBuyerApprovalDeadline(r)
+          : getEffectiveDispatchDeadline(r);
         return <DaysRemainingTag date={date} showDate />;
       },
     },
