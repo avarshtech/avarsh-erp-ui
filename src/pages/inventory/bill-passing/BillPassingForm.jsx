@@ -12,6 +12,7 @@ import { hasPermission } from '../../../utils/permissions';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import { DATE_FORMAT } from '../../../utils/uiConstants';
 import { recalcBill, recalcTaxes, billLines, debitPercentOfInvoice } from '../../../utils/billPassingCalc';
+import { printBillPassingVoucher } from '../../../utils/billPassingVoucherPrint';
 import {
   BILL_PASSING_STATUS as S,
   BILL_PASSING_STATUS_COLOR,
@@ -213,7 +214,18 @@ const BillPassingForm = () => {
     await run(cfg.key, () => cfg.onSubmit(text), cfg.successMsg);
   }, [reasonCfg, reasonText, run, message]);
 
-  const handlePrint = useCallback(() => window.print(), []);
+  // The same voucher the view dialog prints. GSTIN and payment terms live on the
+  // supplier master, which the PO billing source already carries, so the window
+  // opens synchronously inside the click and pop-up blockers stay quiet.
+  const handlePrint = useCallback(() => {
+    if (!bill) return;
+    const ok = printBillPassingVoucher({
+      ...bill,
+      supplierGstin: source?.supplier?.gstin,
+      paymentTerms: source?.supplier?.paymentTerms,
+    });
+    if (!ok) message.warning('Allow pop-ups to print the bill passing voucher');
+  }, [bill, source, message]);
 
   // ==================== HEADER ACTIONS ====================
 

@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { amountInWords } from './amountInWords';
 import { billLinesWithGrn } from './billPassingCalc';
+import { openPrintWindow } from './printDoc';
 import {
   BILL_PASSING_STATUS_LABEL,
   CHARGE_TYPES,
@@ -18,7 +19,8 @@ import {
  * line by line, the debit break-up with its reason, and the Net Payable in
  * figures and in words. Same mechanism as the other document generators in
  * this folder: one self-contained HTML document written into a fresh
- * same-origin window, printed, then closed. No external CSS, fonts or images.
+ * same-origin window through openPrintWindow(), which prints it and leaves it
+ * open. No external CSS, fonts or images.
  */
 
 // ─── Escaping + formatting ───────────────────────────────────────────────────
@@ -273,19 +275,14 @@ export const buildBillPassingVoucherHtml = (bill) => {
 </html>`;
 };
 
-export const printBillPassingVoucher = (bill) => {
-  // Every interpolated value goes through esc(), so nothing user-entered can
-  // execute in the print window.
-  const html = buildBillPassingVoucherHtml(bill);
-  const printWindow = window.open('', '_blank');
-  if (!printWindow) return false;
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.onload = () => setTimeout(() => {
-    printWindow.print();
-    printWindow.close();
-  }, 400);
-  return true;
-};
+/**
+ * Every interpolated value goes through esc(), so nothing user-entered can
+ * execute in the print window. Returns false when the pop-up was blocked.
+ *
+ * The window is left open after the print dialog, like every other generated
+ * document: closing it on print() meant a cancelled dialog took the voucher
+ * away before Accounts could read it, re-print it or save it as a PDF.
+ */
+export const printBillPassingVoucher = (bill) => openPrintWindow(buildBillPassingVoucherHtml(bill));
 
 export default { buildBillPassingVoucherHtml, printBillPassingVoucher };
