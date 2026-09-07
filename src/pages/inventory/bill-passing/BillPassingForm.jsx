@@ -11,7 +11,7 @@ import { useTheme } from '../../../context/ThemeContext';
 import { hasPermission } from '../../../utils/permissions';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import { DATE_FORMAT } from '../../../utils/uiConstants';
-import { recalcBill, recalcTaxes, billLines, debitPercentOfInvoice } from '../../../utils/billPassingCalc';
+import { recalcBill, recalcTaxes, billLines, debitPercentOfInvoice, hasSupplierInvoice } from '../../../utils/billPassingCalc';
 import { printBillPassingVoucher } from '../../../utils/billPassingVoucherPrint';
 import {
   BILL_PASSING_STATUS as S,
@@ -165,8 +165,11 @@ const BillPassingForm = () => {
     setIsDirty(true);
   }, []);
 
-  // `busyKey` lets Submit's save-then-submit keep the Submit button spinning throughout.
-  const handleSave = useCallback(async (busyKey = 'save') => {
+  // `busyKey` lets Submit's save-then-submit keep the Submit button spinning
+  // throughout. `quiet` drops the "Bill saved" toast when the save is only the
+  // first half of a submit, so a refused submit shows one message, not a
+  // success followed by an error.
+  const handleSave = useCallback(async (busyKey = 'save', { quiet = false } = {}) => {
     let values;
     try {
       values = await form.validateFields();
@@ -182,7 +185,7 @@ const BillPassingForm = () => {
       grns: bill.grns,
       charges: bill.charges,
       taxes: bill.taxes,
-    }), 'Bill saved');
+    }), quiet ? null : 'Bill saved');
     if (next) { setIsDirty(false); clearDirty(); reloadSource(next); }
     return next;
   }, [form, run, bill, clearDirty, reloadSource, message]);
@@ -193,7 +196,7 @@ const BillPassingForm = () => {
       content: 'The bill is saved and moves to the verification queue. It stays editable until it is approved.',
       okText: 'Save & Submit',
       onOk: async () => {
-        const saved = await handleSave('submit');
+        const saved = await handleSave('submit', { quiet: true });
         if (saved) await run('submit', () => submitBill(saved.id), 'Bill submitted for verification');
       },
     });
@@ -229,6 +232,16 @@ const BillPassingForm = () => {
 
   // ==================== HEADER ACTIONS ====================
 
+  // Submit is refused without a billed line or the supplier invoice copy
+  // (BR-15). Mirroring those two checks here lets the button say why it is
+  // disabled instead of saving the bill and then failing the round trip.
+  const submitBlockReason = useMemo(() => {
+    if (!bill) return null;
+    if (!billLines(bill).length) return 'Select at least one GRN line to bill';
+    if (!hasSupplierInvoice(bill)) return 'Attach the supplier invoice before submitting (BR-15)';
+    return null;
+  }, [bill]);
+
   const headerActions = useMemo(() => {
     if (!bill) return null;
     const btns = [];
@@ -238,7 +251,8 @@ const BillPassingForm = () => {
       push(<ActionButton key="save" action="save" variant="draft" text="Save" {...busyProps('save')} onClick={() => handleSave()} />);
     }
     if (isBillSubmittable(bill.status) && canUpdate) {
-      push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit')} onClick={handleSubmit} />);
+      push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit', Boolean(submitBlockReason))}
+        tooltip={submitBlockReason || undefined} onClick={handleSubmit} />);
     }
     if (bill.status === S.SUBMITTED && canVerify) {
       push(<ActionButton key="verify" action="approve" text="Start Verification" {...busyProps('verify')} onClick={() => modal.confirm({
@@ -336,7 +350,7 @@ const BillPassingForm = () => {
       push(<ActionButton key="print" action="print" text="Print Voucher" onClick={handlePrint} />);
     }
     return <Space wrap>{btns}</Space>;
-  }, [bill, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
+  }, [bill, submitBlockReason, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
 
   // ==================== SECTION STYLES ====================
 

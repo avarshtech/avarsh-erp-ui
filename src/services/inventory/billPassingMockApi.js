@@ -14,7 +14,7 @@ import {
 } from '../../utils/billPassingConstants';
 import {
   recalcBill, recalcTaxes, buildReconciliation, buildExceptions, blockingExceptions,
-  proposeDebits, cumulativeBilledQty, debitPercentOfInvoice, billLines, billLinesWithGrn, round2, round3,
+  proposeDebits, cumulativeBilledQty, debitPercentOfInvoice, billLines, billLinesWithGrn, hasSupplierInvoice, round2, round3,
 } from '../../utils/billPassingCalc';
 
 const delay = (ms = 150) => new Promise((r) => setTimeout(r, ms));
@@ -343,9 +343,7 @@ export const submitBill = async (id) => {
     fail('VALIDATION', 'Invoice number, invoice date and basic amount are mandatory before submitting.');
   }
   if (!billLines(bill).length) fail('VALIDATION', 'Select at least one GRN line to bill.');
-  if (!(bill.attachments || []).some((a) => a.docType === 'SUPPLIER_INVOICE')) {
-    fail('VALIDATION', 'Attach the supplier invoice before submitting (BR-15).');
-  }
+  if (!hasSupplierInvoice(bill)) fail('VALIDATION', 'Attach the supplier invoice before submitting (BR-15).');
   assertNotDuplicate(db, bill);
   assertNoOverBilling(db, bill);
   return transition(db, bill, S.SUBMITTED, 'Submitted for verification', '', (b) => {

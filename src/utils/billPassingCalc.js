@@ -314,7 +314,7 @@ export const buildExceptions = (bill, tolerance = DEFAULT_TOLERANCE, opts = {}) 
   }
 
   // Missing invoice attachment before submit (BR-15).
-  if (opts.requireAttachment && !(bill?.attachments || []).some((a) => a.docType === 'SUPPLIER_INVOICE')) {
+  if (opts.requireAttachment && !hasSupplierInvoice(bill)) {
     out.push({
       code: 'MISSING_INVOICE_ATTACHMENT',
       severity: EXCEPTION_SEVERITY.BLOCK,
@@ -325,6 +325,10 @@ export const buildExceptions = (bill, tolerance = DEFAULT_TOLERANCE, opts = {}) 
 
   return out;
 };
+
+/** BR-15 — a scanned copy of the supplier invoice must be on file before submit. */
+export const hasSupplierInvoice = (bill) =>
+  (bill?.attachments || []).some((a) => a.docType === 'SUPPLIER_INVOICE');
 
 /** Anything that hard-stops approval; overrides are surfaced separately. */
 export const blockingExceptions = (exceptions) =>
