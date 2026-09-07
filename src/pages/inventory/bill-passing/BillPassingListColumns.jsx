@@ -16,8 +16,8 @@ const { Text } = Typography;
 
 const ALL_STATUSES = Object.values(BILL_PASSING_STATUS);
 
-// DRAFT + QUERY_RAISED — the only states where the header and its GRN selection
-// are still open. Derived from the shared helper so the grid and the workspace
+// Every state before APPROVED — the header and its GRN selection stay open until
+// the bill is passed. Derived from the shared helper so the grid and the workspace
 // can never disagree about what a status allows.
 const EDITABLE_STATUSES = new Set(ALL_STATUSES.filter(isBillEditable));
 

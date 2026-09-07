@@ -38,6 +38,7 @@ export const searchBillLines = (...a) => source.searchBillLines(...a);
 export const submitBill = (...a) => api.submitBill(...a);
 export const startVerification = (...a) => api.startVerification(...a);
 export const raiseQuery = (...a) => api.raiseQuery(...a);
+export const referBackBill = (...a) => api.referBackBill(...a);
 export const holdBill = (...a) => api.holdBill(...a);
 export const releaseHold = (...a) => api.releaseHold(...a);
 export const sendForApproval = (...a) => api.sendForApproval(...a);

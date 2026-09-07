@@ -11,6 +11,8 @@ export const BILL_PASSING_STATUS = {
   DRAFT: 'DRAFT',
   SUBMITTED: 'SUBMITTED',
   UNDER_VERIFICATION: 'UNDER_VERIFICATION',
+  /** Sent back to the clerk for correction by the verifier or approver. */
+  REFERRED_BACK: 'REFERRED_BACK',
   QUERY_RAISED: 'QUERY_RAISED',
   ON_HOLD: 'ON_HOLD',
   PENDING_APPROVAL: 'PENDING_APPROVAL',
@@ -24,6 +26,7 @@ export const BILL_PASSING_STATUS_COLOR = {
   DRAFT: 'default',
   SUBMITTED: 'processing',
   UNDER_VERIFICATION: 'processing',
+  REFERRED_BACK: 'volcano',
   QUERY_RAISED: 'orange',
   ON_HOLD: 'gold',
   PENDING_APPROVAL: 'purple',
@@ -36,6 +39,7 @@ export const BILL_PASSING_STATUS_LABEL = {
   DRAFT: 'Draft',
   SUBMITTED: 'Submitted',
   UNDER_VERIFICATION: 'Under Verification',
+  REFERRED_BACK: 'Referred Back',
   QUERY_RAISED: 'Query Raised',
   ON_HOLD: 'On Hold',
   PENDING_APPROVAL: 'Pending Approval',
@@ -68,6 +72,7 @@ export const QUICK_FILTER_STATUSES = {
     BILL_PASSING_STATUS.DRAFT,
     BILL_PASSING_STATUS.SUBMITTED,
     BILL_PASSING_STATUS.UNDER_VERIFICATION,
+    BILL_PASSING_STATUS.REFERRED_BACK,
     BILL_PASSING_STATUS.QUERY_RAISED,
     BILL_PASSING_STATUS.PENDING_APPROVAL,
   ],
@@ -77,12 +82,36 @@ export const QUICK_FILTER_STATUSES = {
   ALL: null,
 };
 
-// The header and its GRN selection are editable only in these states (BR-16).
+// The header, GRN selection, charges and attachments stay open until the bill
+// is passed (product review, 2026-09-07): every state before APPROVED. The
+// approved snapshot, the accounts hand-off and a rejection are frozen.
 const EDITABLE_STATUSES = new Set([
   BILL_PASSING_STATUS.DRAFT,
+  BILL_PASSING_STATUS.REFERRED_BACK,
   BILL_PASSING_STATUS.QUERY_RAISED,
+  BILL_PASSING_STATUS.SUBMITTED,
+  BILL_PASSING_STATUS.UNDER_VERIFICATION,
+  BILL_PASSING_STATUS.ON_HOLD,
+  BILL_PASSING_STATUS.PENDING_APPROVAL,
 ]);
 export const isBillEditable = (status) => EDITABLE_STATUSES.has(status);
+
+// States where the bill sits with the clerk and Submit (re)enters the queue.
+const SUBMITTABLE_STATUSES = new Set([
+  BILL_PASSING_STATUS.DRAFT,
+  BILL_PASSING_STATUS.REFERRED_BACK,
+  BILL_PASSING_STATUS.QUERY_RAISED,
+]);
+export const isBillSubmittable = (status) => SUBMITTABLE_STATUSES.has(status);
+
+// States a verifier or approver can hand back to the clerk for correction.
+const REFER_BACK_STATUSES = new Set([
+  BILL_PASSING_STATUS.SUBMITTED,
+  BILL_PASSING_STATUS.UNDER_VERIFICATION,
+  BILL_PASSING_STATUS.ON_HOLD,
+  BILL_PASSING_STATUS.PENDING_APPROVAL,
+]);
+export const canReferBackBill = (status) => REFER_BACK_STATUSES.has(status);
 
 // Only an unsubmitted draft can be removed; everything else is audit history.
 export const isBillDeletable = (status) => status === BILL_PASSING_STATUS.DRAFT;
@@ -90,11 +119,36 @@ export const isBillDeletable = (status) => status === BILL_PASSING_STATUS.DRAFT;
 // Debits are confirmed or dropped by the verifier while the bill is being checked.
 const DEBIT_EDITABLE_STATUSES = new Set([
   BILL_PASSING_STATUS.DRAFT,
+  BILL_PASSING_STATUS.REFERRED_BACK,
   BILL_PASSING_STATUS.QUERY_RAISED,
   BILL_PASSING_STATUS.SUBMITTED,
   BILL_PASSING_STATUS.UNDER_VERIFICATION,
 ]);
 export const areDebitsEditable = (status) => DEBIT_EDITABLE_STATUSES.has(status);
+
+/**
+ * The reason banner a bill carries in its current state, for the workspace and
+ * the view dialog. Returns null when nothing needs explaining. Rejection wins
+ * because it is terminal; the rest are keyed by the current status.
+ */
+export const getBillReason = (bill) => {
+  if (!bill) return null;
+  if (bill.rejectReason) return { type: 'error', label: 'Rejected', text: bill.rejectReason };
+  if (bill.status === BILL_PASSING_STATUS.REFERRED_BACK && bill.referBackReason) {
+    return { type: 'warning', label: 'Referred back for correction', text: bill.referBackReason };
+  }
+  if (bill.status === BILL_PASSING_STATUS.ON_HOLD && bill.holdReason) {
+    return { type: 'warning', label: 'On hold', text: bill.holdReason };
+  }
+  if (bill.status === BILL_PASSING_STATUS.QUERY_RAISED && bill.queryReason) {
+    return { type: 'warning', label: 'Query raised', text: bill.queryReason };
+  }
+  // A passed bill that was reopened lands in QUERY_RAISED with its own reason field.
+  if (bill.status === BILL_PASSING_STATUS.QUERY_RAISED && bill.reopenReason) {
+    return { type: 'warning', label: 'Reopened for correction', text: bill.reopenReason };
+  }
+  return null;
+};
 
 // ── Debit lines ────────────────────────────────────────────────────────────
 export const DEBIT_ORIGIN = {

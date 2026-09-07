@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { App, Card, Form, Input, DatePicker, Row, Col, Collapse, Typography, Tag, Alert, Space, Modal, Skeleton, Result } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { QuestionCircleOutlined } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
@@ -18,10 +19,13 @@ import {
   EXCEPTION_SEVERITY,
   ISSUE_STATUS,
   BP_MODULE_ID,
+  isBillSubmittable,
+  canReferBackBill,
+  getBillReason,
 } from '../../../utils/billPassingConstants';
 import {
   getBill, updateBill, getPoBillingSource,
-  submitBill, startVerification, raiseQuery, holdBill, releaseHold, sendForApproval,
+  submitBill, startVerification, raiseQuery, referBackBill, holdBill, releaseHold, sendForApproval,
   approveBill, rejectBill, reopenBill, sendToAccounts, recordTallyReference,
   listDebitTypes, listChargeTypes, listIssueTypes,
   saveDebit, setDebitStatus, deleteDebit, refreshProposedDebits,
@@ -69,7 +73,16 @@ const BillPassingForm = () => {
   const [reasonCfg, setReasonCfg] = useState(null);
   const [reasonText, setReasonText] = useState('');
 
-  const readOnly = !bill?.editable;
+  // Permissions come from the session token and do not change while the page is mounted.
+  const { canUpdate, canVerify, canApprove } = useMemo(() => ({
+    canUpdate: hasPermission(BP_MODULE_ID, 'update'),
+    canVerify: hasPermission(BP_MODULE_ID, 'verify'),
+    canApprove: hasPermission(BP_MODULE_ID, 'approve'),
+  }), []);
+
+  // Open until the bill is passed, but only to someone allowed to update it — a
+  // verify-only user gets the same read-only workspace they would after approval.
+  const readOnly = !bill?.editable || !canUpdate;
 
   // ==================== LOAD ====================
 
@@ -176,7 +189,7 @@ const BillPassingForm = () => {
   const handleSubmit = useCallback(() => {
     modal.confirm({
       title: `Submit ${bill.bpNumber}?`,
-      content: 'The bill is saved, moves to the verification queue, and the header, GRN picks and charges become read-only.',
+      content: 'The bill is saved and moves to the verification queue. It stays editable until it is approved.',
       okText: 'Save & Submit',
       onOk: async () => {
         const saved = await handleSave('submit');
@@ -206,28 +219,32 @@ const BillPassingForm = () => {
 
   const headerActions = useMemo(() => {
     if (!bill) return null;
-    const canUpdate = hasPermission(BP_MODULE_ID, 'update');
-    const canVerify = hasPermission(BP_MODULE_ID, 'verify');
-    const canApprove = hasPermission(BP_MODULE_ID, 'approve');
     const btns = [];
     const push = (el) => btns.push(el);
 
-    if (bill.status === S.DRAFT || bill.status === S.QUERY_RAISED) {
-      if (canUpdate) {
-        push(<ActionButton key="save" action="save" variant="draft" text="Save" {...busyProps('save')} onClick={() => handleSave()} />);
-        push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit')} onClick={handleSubmit} />);
-      }
+    if (bill.editable && canUpdate) {
+      push(<ActionButton key="save" action="save" variant="draft" text="Save" {...busyProps('save')} onClick={() => handleSave()} />);
+    }
+    if (isBillSubmittable(bill.status) && canUpdate) {
+      push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit')} onClick={handleSubmit} />);
     }
     if (bill.status === S.SUBMITTED && canVerify) {
       push(<ActionButton key="verify" action="approve" text="Start Verification" {...busyProps('verify')} onClick={() => modal.confirm({
         title: `Start verification of ${bill.bpNumber}?`,
-        content: 'The bill is locked to you for checking against the PO, GRN and QC records.',
+        content: 'You take up the bill for checking against the PO, GRN and QC records. The clerk can still correct it until it is approved, and every edit is logged on the activity trail.',
         okText: 'Start',
         onOk: () => run('verify', () => startVerification(bill.id), 'Verification started'),
       })} />);
     }
+    if (canReferBackBill(bill.status) && (canVerify || canApprove)) {
+      push(<ActionButton key="referback" action="refer-back" text="Refer Back" {...busyProps('referback')} onClick={() => openReason({
+        key: 'referback',
+        title: 'Refer this bill back for correction', label: 'What needs correcting', successMsg: 'Bill referred back',
+        onSubmit: (t) => referBackBill(bill.id, t),
+      })} />);
+    }
     if ((bill.status === S.UNDER_VERIFICATION || bill.status === S.PENDING_APPROVAL) && (canVerify || canApprove)) {
-      push(<ActionButton key="query" action="refer-back" text="Raise Query" {...busyProps('query')} onClick={() => openReason({
+      push(<ActionButton key="query" action="refer-back" icon={<QuestionCircleOutlined />} text="Raise Query" {...busyProps('query')} onClick={() => openReason({
         key: 'query',
         title: 'Raise a query with the supplier', label: 'Query details', successMsg: 'Query raised',
         onSubmit: (t) => raiseQuery(bill.id, t),
@@ -262,7 +279,12 @@ const BillPassingForm = () => {
       })} />);
     }
     if (bill.status === S.PENDING_APPROVAL && canApprove) {
-      push(<ActionButton key="approve" action="approve" text="Approve" {...busyProps('approve')} onClick={() => modal.confirm({
+      // The bill stays editable while it waits, so a blocker can appear after
+      // Send for Approval cleared it — the same gate applies here.
+      const blocked = Boolean(bill.blockers?.length);
+      push(<ActionButton key="approve" action="approve" text="Approve" {...busyProps('approve', blocked)}
+        tooltip={blocked ? 'Clear the blockers listed above before approving' : undefined}
+        onClick={() => modal.confirm({
         title: `Approve ${bill.bpNumber}?`,
         content: `Net payable ${formatCurrency(bill.netPayable)} will be cleared for accounts.`,
         okText: 'Approve',
@@ -302,7 +324,7 @@ const BillPassingForm = () => {
       push(<ActionButton key="print" action="print" text="Print Voucher" onClick={handlePrint} />);
     }
     return <Space wrap>{btns}</Space>;
-  }, [bill, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
+  }, [bill, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
 
   // ==================== SECTION STYLES ====================
 
@@ -323,6 +345,9 @@ const BillPassingForm = () => {
     () => (bill?.issues || []).filter((i) => i.status === ISSUE_STATUS.OPEN || i.status === ISSUE_STATUS.IN_PROGRESS).length,
     [bill],
   );
+
+  // Why the bill is back with the clerk (or parked), shown above the workspace.
+  const reason = getBillReason(bill);
 
   const label = (text, color, tag) => (
     <Space size={8}>
@@ -466,6 +491,10 @@ const BillPassingForm = () => {
         extra={headerActions}
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       />
+
+      {reason && (
+        <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} message={reason.label} description={reason.text} />
+      )}
 
       {bill?.blockers?.length > 0 && (
         <Alert

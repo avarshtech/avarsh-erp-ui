@@ -9,8 +9,8 @@
 import { loadDb, saveDb, nextBillNo } from './billPassingMockStore';
 import { getCurrentUser } from '../../utils/permissions';
 import {
-  BILL_PASSING_STATUS as S, DEBIT_STATUS, DEBIT_ORIGIN, ISSUE_STATUS,
-  QUICK_FILTER_STATUSES, isBillEditable, areDebitsEditable, DEFAULT_TOLERANCE,
+  BILL_PASSING_STATUS as S, BILL_PASSING_STATUS_LABEL, DEBIT_STATUS, DEBIT_ORIGIN, ISSUE_STATUS,
+  QUICK_FILTER_STATUSES, isBillEditable, isBillSubmittable, canReferBackBill, areDebitsEditable, DEFAULT_TOLERANCE,
 } from '../../utils/billPassingConstants';
 import {
   recalcBill, recalcTaxes, buildReconciliation, buildExceptions, blockingExceptions,
@@ -132,9 +132,11 @@ const assertGrnsBelongToPo = (db, bill) => {
 };
 
 const assertEditable = (bill) => {
-  if (!isBillEditable(bill.status)) {
-    fail('CONFLICT', `A bill in ${bill.status.replace(/_/g, ' ').toLowerCase()} cannot be edited. Raise a query or reopen it first.`);
+  if (isBillEditable(bill.status)) return;
+  if (bill.status === S.REJECTED) {
+    fail('CONFLICT', `${bill.bpNumber} was rejected and cannot be edited. Raise a new bill for this invoice.`);
   }
+  fail('CONFLICT', `A bill in ${bill.status.replace(/_/g, ' ').toLowerCase()} is frozen and cannot be edited. Reopen it first if a correction is needed.`);
 };
 
 // ── Bills: list, read, write ───────────────────────────────────────────────
@@ -176,7 +178,7 @@ export const searchBills = async (params = {}) => {
     stats: {
       pendingVerification: all.filter((b) => [S.SUBMITTED, S.UNDER_VERIFICATION].includes(b.status)).length,
       pendingApproval: all.filter((b) => b.status === S.PENDING_APPROVAL).length,
-      onHoldOrQuery: all.filter((b) => [S.ON_HOLD, S.QUERY_RAISED].includes(b.status)).length,
+      onHoldOrQuery: all.filter((b) => [S.ON_HOLD, S.QUERY_RAISED, S.REFERRED_BACK].includes(b.status)).length,
       passedThisMonth: all.filter((b) => [S.APPROVED, S.SENT_TO_ACCOUNTS].includes(b.status) && inMonth(b)).length,
       totalDebitMtd: round2(all.filter(inMonth).reduce((s, b) => s + b.debitTotal, 0)),
       sentToAccountsMtd: round2(all.filter((b) => b.status === S.SENT_TO_ACCOUNTS && inMonth(b)).reduce((s, b) => s + b.netPayable, 0)),
@@ -217,7 +219,7 @@ export const createBill = async (payload) => {
     submittedAt: null, approvedAt: null, sentToAccountsAt: null, tallyReferenceNo: null,
     duplicateOverrideBy: payload.duplicateOverrideBy || null,
     duplicateOverrideReason: payload.duplicateOverrideReason || null,
-    queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
+    referBackReason: null, queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
     version: 1,
   });
   bill.taxes = recalcTaxes(bill);
@@ -259,7 +261,10 @@ export const updateBill = async (id, payload) => {
   Object.assign(bill, recalcBill(bill));
   bill.taxes = recalcTaxes(bill);
   bill.version += 1;
-  pushActivity(bill, 'Bill updated');
+  // A change after submission is visible to whoever is verifying or approving,
+  // so the trail names the state the bill was in when it was edited.
+  pushActivity(bill, 'Bill updated',
+    isBillSubmittable(bill.status) ? '' : `Edited while ${BILL_PASSING_STATUS_LABEL[bill.status].toLowerCase()}`);
   saveDb(db);
   return clone(decorate(bill, db));
 };
@@ -333,7 +338,7 @@ export const submitBill = async (id) => {
   await delay(200);
   const db = loadDb();
   const bill = findBill(db, id);
-  if (![S.DRAFT, S.QUERY_RAISED].includes(bill.status)) fail('CONFLICT', 'Only a draft or queried bill can be submitted.');
+  if (!isBillSubmittable(bill.status)) fail('CONFLICT', 'Only a draft, referred-back or queried bill can be submitted.');
   if (!bill.supplierInvoiceNo || !bill.invoiceDate || !bill.invoiceBasicAmount) {
     fail('VALIDATION', 'Invoice number, invoice date and basic amount are mandatory before submitting.');
   }
@@ -346,6 +351,7 @@ export const submitBill = async (id) => {
   return transition(db, bill, S.SUBMITTED, 'Submitted for verification', '', (b) => {
     b.submittedAt = nowStamp();
     b.queryReason = null;
+    b.referBackReason = null;
   });
 };
 
@@ -366,6 +372,23 @@ export const raiseQuery = async (id, reason) => {
     fail('CONFLICT', 'Only a bill in verification or awaiting approval can be queried.');
   }
   return transition(db, bill, S.QUERY_RAISED, 'Query raised', reason, (b) => { b.queryReason = reason; });
+};
+
+/** Hand the bill back to the clerk for correction; Submit brings it back into the queue. */
+export const referBackBill = async (id, reason) => {
+  await delay();
+  const db = loadDb();
+  const bill = findBill(db, id);
+  if (!reason) fail('VALIDATION', 'A reason is mandatory when referring a bill back.');
+  if (!canReferBackBill(bill.status)) {
+    fail('CONFLICT', 'Only a bill in verification, on hold or awaiting approval can be referred back.');
+  }
+  return transition(db, bill, S.REFERRED_BACK, 'Referred back', reason, (b) => {
+    b.referBackReason = reason;
+    // A held bill leaves hold when it goes back to the clerk.
+    b.holdReason = null;
+    b.holdSince = null;
+  });
 };
 
 export const holdBill = async (id, reason) => {
@@ -417,6 +440,12 @@ export const approveBill = async (id, comments = '') => {
   const db = loadDb();
   const bill = findBill(db, id);
   if (bill.status !== S.PENDING_APPROVAL) fail('CONFLICT', 'Only a bill awaiting approval can be approved.');
+  // The bill stays editable while it waits, so the gate Send for Approval
+  // applied is re-run here against the current figures.
+  const blockers = blockingExceptions(buildExceptions(bill, db.tolerance, { requireAttachment: true }));
+  if (blockers.length) {
+    fail('VALIDATION', `Resolve before approval: ${blockers.map((b) => b.title).join('; ')}`);
+  }
   return transition(db, bill, S.APPROVED, 'Approved', comments || `Net payable ${bill.netPayable}`, (b) => {
     b.approvedAt = nowStamp();
     // Immutable snapshot: what was approved can never be silently altered.

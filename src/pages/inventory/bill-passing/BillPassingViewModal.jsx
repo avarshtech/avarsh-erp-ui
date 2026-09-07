@@ -15,6 +15,7 @@ import {
   BILL_PASSING_STATUS_LABEL,
   DEBIT_STATUS_COLOR,
   DEBIT_TYPES,
+  getBillReason,
 } from '../../../utils/billPassingConstants';
 import { printBillPassingVoucher } from '../../../utils/billPassingVoucherPrint';
 
@@ -25,6 +26,7 @@ const HERO_ACCENT = {
   DRAFT: 'var(--text-secondary)',
   SUBMITTED: 'var(--primary-color)',
   UNDER_VERIFICATION: 'var(--primary-color)',
+  REFERRED_BACK: 'var(--warning-color)',
   QUERY_RAISED: 'var(--warning-color)',
   ON_HOLD: 'var(--warning-color)',
   PENDING_APPROVAL: 'var(--primary-color)',
@@ -39,7 +41,7 @@ const showDate = (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '-');
 const sectionStyle = { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', margin: '20px 0 8px' };
 const totalRowStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 12px', borderBottom: '1px solid var(--border-color)' };
 
-const BillPassingViewModal = ({ open, onClose, billId }) => {
+const BillPassingViewModal = ({ open, onClose, onEdit, billId }) => {
   const { message } = App.useApp();
   const { isMobile, isTablet } = useResponsive();
   const [bill, setBill] = useState(null);
@@ -119,9 +121,7 @@ const BillPassingViewModal = ({ open, onClose, billId }) => {
     if (!printBillPassingVoucher(bill)) message.warning('Allow pop-ups to print the bill passing voucher');
   }, [bill, message]);
 
-  const reason = bill && (bill.rejectReason || bill.holdReason || bill.queryReason);
-  const reasonType = bill?.rejectReason ? 'error' : 'warning';
-  const reasonLabel = bill?.rejectReason ? 'Rejected' : bill?.holdReason ? 'On hold' : 'Query raised';
+  const reason = getBillReason(bill);
 
   return (
     <ViewDialog
@@ -144,6 +144,9 @@ const BillPassingViewModal = ({ open, onClose, billId }) => {
         <>
           <Space>
             <ActionButton action="print" text="Print Voucher" onClick={handlePrint} disabled={!bill} />
+            {onEdit && bill?.editable && (
+              <ActionButton action="edit" text="Edit" onClick={() => onEdit(bill)} />
+            )}
           </Space>
           <ActionButton action="close" text="Close" onClick={onClose} />
         </>
@@ -154,7 +157,7 @@ const BillPassingViewModal = ({ open, onClose, billId }) => {
       ) : (
         <>
           {reason && (
-            <Alert type={reasonType} showIcon style={{ marginBottom: 16 }} message={reasonLabel} description={reason} />
+            <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} message={reason.label} description={reason.text} />
           )}
 
           <DetailCard title="Bill Details">

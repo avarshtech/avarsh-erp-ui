@@ -52,7 +52,7 @@ const STATUS_OPTIONS = Object.entries(BILL_PASSING_STATUS_LABEL).map(([value, la
 const KPI_CARDS = [
   { key: 'pendingVerification', title: 'Pending Verification', icon: <FileSearchOutlined />, color: 'var(--primary-color)' },
   { key: 'pendingApproval', title: 'Pending Approval', icon: <AuditOutlined />, color: 'var(--warning-color)' },
-  { key: 'onHoldOrQuery', title: 'On Hold / Query', icon: <PauseCircleOutlined />, color: 'var(--error-color)' },
+  { key: 'onHoldOrQuery', title: 'On Hold / Query / Referred', icon: <PauseCircleOutlined />, color: 'var(--error-color)' },
   { key: 'passedThisMonth', title: 'Passed This Month', icon: <CheckCircleOutlined />, color: 'var(--success-color)' },
   { key: 'totalDebitMtd', title: 'Total Debit (MTD)', icon: <MinusCircleOutlined />, color: 'var(--warning-color)', currency: true },
   { key: 'sentToAccountsMtd', title: 'Sent to Accounts (MTD)', icon: <SendOutlined />, color: 'var(--success-color)', currency: true },
@@ -329,6 +329,7 @@ const BillPassingList = () => {
         open={Boolean(viewBillId)}
         billId={viewBillId}
         onClose={() => setViewBillId(null)}
+        onEdit={canUpdate ? handleEdit : undefined}
       />
 
       <BillPassingCreateModal

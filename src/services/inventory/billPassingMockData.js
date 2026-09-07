@@ -21,7 +21,7 @@ import {
 } from '../../utils/billPassingConstants';
 import { docNo, fiscalYearLabel, FIRST_DOC_NUMBER } from './billPassingDocNumbers';
 
-export const SEED_VERSION = 1;
+export const SEED_VERSION = 2;
 
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
 const ts = (offsetDays, time = '10:00') =>
@@ -271,7 +271,7 @@ function buildBills() {
     submittedAt: ts(-10, '11:24'),
     approvedAt: null, sentToAccountsAt: null, tallyReferenceNo: null,
     duplicateOverrideBy: null, duplicateOverrideReason: null,
-    queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
+    referBackReason: null, queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
     version: 3,
   };
 
@@ -325,7 +325,7 @@ function buildBills() {
     submittedAt: ts(-6, '10:07'),
     approvedAt: null, sentToAccountsAt: null, tallyReferenceNo: null,
     duplicateOverrideBy: null, duplicateOverrideReason: null,
-    queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
+    referBackReason: null, queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
     version: 2,
   };
 
@@ -357,7 +357,7 @@ function buildBills() {
     activity: activity([[ts(-2, '15:30'), 'Bill Passing Clerk', 'Draft created']]),
     submittedAt: null, approvedAt: null, sentToAccountsAt: null, tallyReferenceNo: null,
     duplicateOverrideBy: null, duplicateOverrideReason: null,
-    queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
+    referBackReason: null, queryReason: null, holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
     version: 1,
   };
 
@@ -396,6 +396,7 @@ function buildBills() {
     submittedAt: ts(-4, '09:15'),
     approvedAt: null, sentToAccountsAt: null, tallyReferenceNo: null,
     duplicateOverrideBy: null, duplicateOverrideReason: null,
+    referBackReason: null,
     queryReason: 'QC pending on the Lycra Jersey line of GRN/1007.',
     holdReason: null, holdSince: null, rejectReason: null, reopenReason: null,
     version: 2,
@@ -491,7 +492,40 @@ function buildBills() {
     version: 3,
   };
 
-  return [b1, b2, b3, b4, b5, b6, b7];
+  // 8 ── Referred back by the verifier. Bills 300 of the 553.56 kg DOT Print
+  //      line of KT/1263 (the balance stays open so PO/1004 remains billable
+  //      for the New Bill demo) while the Lycra line waits for QC. The clerk
+  //      keyed the challan date as the invoice date and left the freight off,
+  //      so it is back with them: editable, and Submit re-enters the queue.
+  const b8Basic = r2(300 * 605);
+  const b8Taxes = taxLines(b8Basic, 5, false);
+  const b8TaxTotal = r2(b8Taxes.reduce((s, t) => s + t.asPerInvoiceAmount, 0));
+  const b8 = {
+    ...b3,
+    id: 8,
+    bpNumber: bp(1008),
+    supplierId: 2, supplierName: supplierName(2),
+    poId: 4, poNumber: poNumberOf(4),
+    supplierInvoiceNo: '73', invoiceDate: d(-5), financialYear: FY,
+    challanNumbers: 'KT/1263',
+    invoiceBasicAmount: b8Basic, chargesTotal: 0, taxTotal: b8TaxTotal,
+    debitTotal: 0, adjustmentTotal: 0, netPayable: r2(b8Basic + b8TaxTotal),
+    status: BILL_PASSING_STATUS.REFERRED_BACK,
+    headerRemarks: 'DOT Print line billed in part - 300 of 553.56 kg. Balance and the Lycra line follow once its QC clears.',
+    grns: [billGrn(7, [billLine(1010, 300)])],
+    charges: [], taxes: b8Taxes, debits: [],
+    issues: [],
+    attachments: [{ id: 1, docType: 'SUPPLIER_INVOICE', fileName: 'KT-INV-73.pdf', size: 101376, mime: 'application/pdf', uploadedAt: ts(-1, '09:40'), uploadedBy: 'Stores' }],
+    activity: activity([
+      [ts(-1, '09:45'), 'Bill Passing Clerk', 'Submitted for verification'],
+      [ts(-1, '15:20'), 'Accounts Executive', 'Referred back', 'Invoice date keyed as the challan date; 1,800 freight on the invoice not entered'],
+    ]),
+    submittedAt: ts(-1, '09:45'),
+    referBackReason: 'The invoice date has been keyed as the challan date (KT/1263), and the 1,800 freight printed on the invoice has not been entered as a charge. Please correct both and resubmit.',
+    version: 3,
+  };
+
+  return [b1, b2, b3, b4, b5, b6, b7, b8];
 }
 
 /** A fresh database. Called by loadDb() when nothing valid is stored. */
