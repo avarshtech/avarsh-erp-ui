@@ -120,7 +120,9 @@ const BillPassingList = () => {
       }
     } catch (e) {
       if (seq !== reqRef.current) return;
-      message.error(e.message || 'Failed to load bill passing records');
+      // The interceptor has already shown the server's message; this is for
+      // the failure it cannot see, where the request never got an answer.
+      if (!e.response) message.error(e.message || 'Failed to load bill passing records');
       setRows([]);
       setTotal(0);
     } finally {
@@ -173,7 +175,9 @@ const BillPassingList = () => {
       message.success(`${record.bpNumber} deleted`);
       fetchData();
     } catch (e) {
-      message.error(e.message || 'Failed to delete bill');
+      // The interceptor has already shown the server's message; this is for
+      // the failure it cannot see, where the request never got an answer.
+      if (!e.response) message.error(e.message || 'Failed to delete bill');
     }
   }, [message, fetchData]);
 

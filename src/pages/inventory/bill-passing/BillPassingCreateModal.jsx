@@ -31,7 +31,8 @@ const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
     setPos([]);
     listBpSuppliers()
       .then(setSuppliers)
-      .catch((e) => message.error(e.message || 'Failed to load suppliers'));
+      // The interceptor already toasts anything the server answered.
+      .catch((e) => { if (!e.response) message.error(e.message || 'Failed to load suppliers'); });
   }, [open, message]);
 
   useEffect(() => {
@@ -40,7 +41,9 @@ const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
     setPosLoading(true);
     listBillablePos({ supplierId })
       .then((res) => { if (alive) setPos(res || []); })
-      .catch((e) => { if (alive) message.error(e.message || 'Failed to load billable purchase orders'); })
+      .catch((e) => {
+        if (alive && !e.response) message.error(e.message || 'Failed to load billable purchase orders');
+      })
       .finally(() => { if (alive) setPosLoading(false); });
     return () => { alive = false; };
   }, [open, supplierId, message]);

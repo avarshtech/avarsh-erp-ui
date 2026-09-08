@@ -114,8 +114,8 @@ export const getBillPassingLinesColumns = () => [
   },
   {
     title: 'Recd Date',
-    dataIndex: 'receivedDate',
-    key: 'receivedDate',
+    dataIndex: 'grnDate',
+    key: 'grnDate',
     width: 130,
     align: 'center',
     render: (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '-'),

@@ -134,7 +134,9 @@ const BillPassingForm = () => {
     try {
       setSource(await getPoBillingSource(b.poId, { excludeBillId: b.id }));
     } catch (e) {
-      message.error(e.message || 'Failed to refresh PO billing data');
+      // The interceptor has already shown the server's message; this is for
+      // the failure it cannot see, where the request never got an answer.
+      if (!e.response) message.error(e.message || 'Failed to refresh PO billing data');
     }
   }, [message]);
 
@@ -144,7 +146,7 @@ const BillPassingForm = () => {
    * Runs a service call, folds the returned bill into state and toasts the outcome.
    * `key` names the action so its own button (via `busyProps(key)`) is the one that spins.
    */
-  const run = useCallback(async (key, fn, successMsg) => {
+  const run = useCallback(async (key, fn, successMsg, onError) => {
     setBusy(key);
     try {
       const next = await fn();
@@ -158,6 +160,9 @@ const BillPassingForm = () => {
       if (successMsg) message.success(successMsg);
       return next;
     } catch (e) {
+      // A caller that can offer the user a way out of this particular failure
+      // says so by returning true, and nothing further is reported.
+      if (onError?.(e)) return null;
       // axiosInstance already toasts the server's message; only say something
       // when it could not have.
       if (!e.response) message.error(e.message || 'Action failed');
@@ -185,6 +190,36 @@ const BillPassingForm = () => {
     setIsDirty(true);
   }, []);
 
+  const openReason = useCallback((cfg) => { setReasonText(''); setReasonCfg(cfg); }, []);
+
+  /** Everything the server needs to save the bill, from the form and local edits. */
+  const savePayload = useCallback((values, duplicateOverrideReason) => ({
+    supplierInvoiceNo: values.supplierInvoiceNo,
+    invoiceDate: values.invoiceDate.format('YYYY-MM-DD'),
+    headerRemarks: values.headerRemarks || '',
+    adjustmentTotal: bill.adjustmentTotal,
+    grns: (bill.grns || []).map((g) => ({
+      grnId: g.grnId,
+      lines: (g.lines || []).map((l) => ({
+        grnLineItemId: l.grnLineItemId,
+        billedQty: l.billedQty,
+        invoiceRate: l.invoiceRate,
+      })),
+    })),
+    // A row the user just added has a temporary key rather than an id; the
+    // server assigns the real one and the panel re-seeds from the response.
+    charges: (bill.charges || []).map((c) => ({
+      ...c,
+      id: typeof c.id === 'string' && c.id.startsWith('tmp-') ? null : c.id,
+    })),
+    taxes: (bill.taxes || []).map((t) => ({
+      ...t,
+      id: typeof t.id === 'string' && t.id.startsWith('tmp-') ? null : t.id,
+    })),
+    duplicateOverrideReason,
+    version: bill.version,
+  }), [bill]);
+
   // `busyKey` lets Submit's save-then-submit keep the Submit button spinning
   // throughout. `quiet` drops the "Bill saved" toast when the save is only the
   // first half of a submit, so a refused submit shows one message, not a
@@ -197,34 +232,35 @@ const BillPassingForm = () => {
       message.warning('Please complete the invoice details before saving');
       return null;
     }
-    const next = await run(busyKey, () => updateBill(bill.id, {
-      supplierInvoiceNo: values.supplierInvoiceNo,
-      invoiceDate: values.invoiceDate.format('YYYY-MM-DD'),
-      headerRemarks: values.headerRemarks || '',
-      adjustmentTotal: bill.adjustmentTotal,
-      grns: (bill.grns || []).map((g) => ({
-        grnId: g.grnId,
-        lines: (g.lines || []).map((l) => ({
-          grnLineItemId: l.grnLineItemId,
-          billedQty: l.billedQty,
-          invoiceRate: l.invoiceRate,
-        })),
-      })),
-      // A row the user just added has a temporary key rather than an id; the
-      // server assigns the real one and the panel re-seeds from the response.
-      charges: (bill.charges || []).map((c) => ({
-        ...c,
-        id: typeof c.id === 'string' && c.id.startsWith('tmp-') ? null : c.id,
-      })),
-      taxes: (bill.taxes || []).map((t) => ({
-        ...t,
-        id: typeof t.id === 'string' && t.id.startsWith('tmp-') ? null : t.id,
-      })),
-      version: bill.version,
-    }), quiet ? null : 'Bill saved');
+    const next = await run(
+      busyKey,
+      () => updateBill(bill.id, savePayload(values)),
+      quiet ? null : 'Bill saved',
+      (e) => {
+        // BR-04 refuses an invoice number already booked this financial year.
+        // It is the one refusal with a way through: an approver may override it
+        // with a reason, which is how one supplier invoice covering two purchase
+        // orders gets billed at all. Offer that rather than only reporting it.
+        if (e.response?.data?.error !== 'DUPLICATE_INVOICE') return false;
+        openReason({
+          key: busyKey,
+          title: 'Override the duplicate invoice check?',
+          label: 'Why this invoice number is being booked a second time',
+          okText: 'Override and save',
+          placeholder: 'e.g. this supplier invoice covers two purchase orders',
+          successMsg: quiet ? null : 'Bill saved with a duplicate override',
+          onSubmit: async (text) => {
+            const saved = await updateBill(bill.id, savePayload(values, text));
+            reloadSource(saved);
+            return saved;
+          },
+        });
+        return true;
+      },
+    );
     if (next) reloadSource(next);
     return next;
-  }, [form, run, bill, reloadSource, message]);
+  }, [form, run, bill, savePayload, openReason, reloadSource, message]);
 
   const handleSubmit = useCallback(() => {
     modal.confirm({
@@ -240,8 +276,6 @@ const BillPassingForm = () => {
       },
     });
   }, [bill, handleSave, modal, run]);
-
-  const openReason = useCallback((cfg) => { setReasonText(''); setReasonCfg(cfg); }, []);
 
   const submitReason = useCallback(async () => {
     if (!reasonCfg) return;
@@ -566,6 +600,18 @@ const BillPassingForm = () => {
 
       {reason && (
         <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} title={reason.label} description={reason.text} />
+      )}
+
+      {/* Not status-gated: whoever approves this payable must see that the
+          duplicate-invoice check was set aside, and on whose reasoning. */}
+      {bill.duplicateOverrideReason && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="The duplicate invoice check was overridden on this bill"
+          description={bill.duplicateOverrideReason}
+        />
       )}
 
       {/* An approval flow, once an admin configures one, decides this bill

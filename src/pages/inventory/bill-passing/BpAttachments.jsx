@@ -66,7 +66,9 @@ const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRem
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      message.error(e.errorMessage || 'Could not download that document');
+      // The interceptor has already shown the server's message; this is for
+      // the failure it cannot see, where the request never got an answer.
+      if (!e.response) message.error(e.errorMessage || 'Could not download that document');
     }
   }, [message]);
 
