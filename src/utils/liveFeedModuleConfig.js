@@ -14,6 +14,7 @@ import {
   DollarOutlined,
   TagsOutlined,
   BuildOutlined,
+  FileDoneOutlined,
 } from '@ant-design/icons';
 
 export const MODULE_CONFIG = {
@@ -128,6 +129,13 @@ export const MODULE_CONFIG = {
     route: (id) => `/export-docs/templates/edit/${id}`,
   },
 
+  BILL_PASSING: {
+    label: 'Bill Passing',
+    color: '#0891b2',
+    bg: 'rgba(8, 145, 178, 0.08)',
+    icon: FileDoneOutlined,
+    route: (id) => `/inventory/bill-passing?viewId=${id}`,
+  },
   APPROVAL: {
     label: 'Approval',
     color: '#7c3aed',

@@ -255,6 +255,21 @@ const OK    = { level: 'green',  tagColor: 'green', textColor: 'var(--success-co
 const WATCH = { level: 'yellow', tagColor: 'gold',  textColor: 'var(--warning-color)', label: 'Review needed' };
 const BAD   = { level: 'red',    tagColor: 'red',   textColor: 'var(--error-color)',   label: 'Exceeds tolerance' };
 
+/**
+ * How a reconciliation cell is painted.
+ *
+ * The server sends a level and a label and never a colour — a Java DTO has no
+ * business knowing this application's theme tokens — so the screen maps one to
+ * the other here.
+ */
+const RECON_LEVEL_STYLE = { GREEN: OK, AMBER: WATCH, RED: BAD };
+
+export const reconCellStyle = (status) => {
+  const style = RECON_LEVEL_STYLE[status?.level] || OK;
+  // The server may override the label, e.g. "Covered by debits".
+  return { ...style, label: status?.label || style.label };
+};
+
 /** Percentage comparison (quantity, rate). An exact match is green. */
 export const getPercentToleranceStatus = (variancePercent, limitPercent) => {
   const abs = Math.abs(Number(variancePercent) || 0);
@@ -311,9 +326,10 @@ export const BP_DOC_PREFIX = 'BP';
 
 /**
  * Indian financial year code, e.g. 2026-08 → "26-27" (the FY starts April 1).
- * The single definition for the module: billPassingDocNumbers re-exports this
- * as `fiscalYearLabel` so the numbering series and the UI can never disagree
- * about which FY a bill falls in.
+ *
+ * The server owns the real value: it derives a bill's financial year from the
+ * invoice date, which is what the duplicate-invoice rule keys on. This is only
+ * for showing the user what number series a new bill will land in.
  */
 export const currentFinancialYear = (date = new Date()) => {
   const y = date.getFullYear() % 100;

@@ -8,6 +8,7 @@ import EmptyState from '../../../components/EmptyState';
 import FileUpload from '../../../components/FileUpload';
 import RecordLink from '../../../components/RecordLink';
 import { billLinesWithGrn } from '../../../utils/billPassingCalc';
+import { downloadFileAsBlob } from '../../../services/core/fileService';
 
 const { Text } = Typography;
 
@@ -29,7 +30,7 @@ const qcSegment = (grnType) => (String(grnType || '').toLowerCase() === 'trims' 
 
 /** FR-BP-901/902 — documents recorded against the bill, plus the ERP records it already links to. */
 const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRemove }) {
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   const navigate = useNavigate();
   const [docType, setDocType] = useState('SUPPLIER_INVOICE');
 
@@ -49,8 +50,25 @@ const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRem
   }, [bill]);
 
   const handleSelect = useCallback((file) => {
-    onAdd?.({ docType, fileName: file.name, size: file.size, mime: file.type });
+    onAdd?.({ docType, file });
   }, [docType, onAdd]);
+
+  /** The file itself lives in the shared store; fetch it and hand it to the browser. */
+  const handleDownload = useCallback(async (att) => {
+    try {
+      const blob = await downloadFileAsBlob(att.id);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = att.fileName || 'document';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      message.error(e.errorMessage || 'Could not download that document');
+    }
+  }, [message]);
 
   const confirmRemove = useCallback((att) => {
     modal.confirm({
@@ -130,8 +148,13 @@ const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRem
         renderItem={(att) => (
           <List.Item
             key={att.id}
-            actions={readOnly ? [] : [
-              <ActionButton key="del" action="delete" tooltip="Remove document" onClick={() => confirmRemove(att)} />,
+            actions={[
+              <ActionButton key="dl" action="download" tooltip="Download"
+                onClick={() => handleDownload(att)} />,
+              ...(readOnly ? [] : [
+                <ActionButton key="del" action="delete" tooltip="Remove document"
+                  onClick={() => confirmRemove(att)} />,
+              ]),
             ]}
           >
             <List.Item.Meta

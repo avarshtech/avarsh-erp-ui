@@ -8,13 +8,12 @@ import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import useResponsive from '../../../hooks/useResponsive';
 import { formatNumber } from '../../../utils/formatters';
-import { getBill, listBpSuppliers } from '../../../services/inventory/billPassingService';
+import { getBill } from '../../../services/inventory/billPassingService';
 import { billLinesWithGrn } from '../../../utils/billPassingCalc';
 import {
   BILL_PASSING_STATUS_COLOR,
   BILL_PASSING_STATUS_LABEL,
   DEBIT_STATUS_COLOR,
-  DEBIT_TYPES,
   getBillReason,
 } from '../../../utils/billPassingConstants';
 import { printBillPassingVoucher } from '../../../utils/billPassingVoucherPrint';
@@ -35,7 +34,6 @@ const HERO_ACCENT = {
   SENT_TO_ACCOUNTS: 'var(--success-color)',
 };
 
-const debitName = (code) => DEBIT_TYPES.find((t) => t.code === code)?.name || code || '-';
 const showDate = (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '-');
 
 const sectionStyle = { fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', margin: '20px 0 8px' };
@@ -53,14 +51,10 @@ const BillPassingViewModal = ({ open, onClose, onEdit, billId }) => {
     setLoading(true);
     (async () => {
       try {
+        // The bill carries the supplier's GSTIN and payment terms, which the
+        // voucher needs, so there is nothing extra to fetch.
         const data = await getBill(billId);
-        // The bill snapshot carries no GSTIN or payment terms; the voucher needs
-        // both, so enrich from the supplier master. A failure here is not fatal.
-        let supplier = null;
-        try {
-          supplier = (await listBpSuppliers()).find((s) => s.id === data.supplierId) || null;
-        } catch { /* optional enrichment */ }
-        if (!cancelled) setBill({ ...data, supplierGstin: supplier?.gstin, paymentTerms: supplier?.paymentTerms });
+        if (!cancelled) setBill(data);
       } catch (e) {
         if (!cancelled) { setBill(null); message.error(e.message || 'Failed to load the bill'); }
       } finally {
@@ -93,7 +87,9 @@ const BillPassingViewModal = ({ open, onClose, onEdit, billId }) => {
   ], []);
 
   const debitColumns = useMemo(() => [
-    { title: 'Debit Type', dataIndex: 'debitTypeCode', width: 170, render: (v) => debitName(v) },
+    // The server resolves the name from the master, so an admin-added type
+    // reads properly rather than as a raw code.
+    { title: 'Debit Type', dataIndex: 'debitTypeName', width: 170, render: (v, r) => v || r.debitTypeCode || '-' },
     { title: 'Reason', dataIndex: 'reasonText', ellipsis: true, render: (v, r) => [r.reasonCode, v, r.remarks].filter(Boolean).join(' - ') || '-' },
     { title: 'Qty', dataIndex: 'debitQty', align: 'center', width: 90, render: (v) => formatNumber(v, 3) },
     { title: 'Amount', dataIndex: 'debitAmount', align: 'right', width: 130, render: (v) => <CurrencyDisplay amount={v} currency="INR" color="var(--error-color)" /> },

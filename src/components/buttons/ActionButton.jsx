@@ -16,6 +16,7 @@ import {
   PrinterOutlined,
   HistoryOutlined,
   UploadOutlined,
+  DownloadOutlined,
   ReloadOutlined,
   ThunderboltOutlined,
   ArrowLeftOutlined,
@@ -124,6 +125,14 @@ const ACTION_CONFIG = {
   history: {
     icon: <HistoryOutlined />,
     colorVar: 'var(--btn-history-color)',
+    iconType: 'text',
+    textType: 'default',
+    danger: false,
+    styled: true,
+  },
+  download: {
+    icon: <DownloadOutlined />,
+    colorVar: 'var(--btn-print-color)',
     iconType: 'text',
     textType: 'default',
     danger: false,

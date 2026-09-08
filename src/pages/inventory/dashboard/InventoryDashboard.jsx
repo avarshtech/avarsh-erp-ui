@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { App, Card, Row, Col, Progress, Typography } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatCard from '../../../components/StatCard';
 import { getDashboardStats } from '../../../services/inventory/inventoryService';
@@ -14,8 +15,17 @@ const CATEGORY_COLORS = [
   '#13c2c2', '#faad14', '#2f54eb', '#a0d911', '#f5222d', '#597ef7',
 ];
 
+/** `quick` matches the segmented filter above the bill passing grid. */
+const BILL_CARDS = [
+  { key: 'billsPendingVerification', title: 'Bills Pending Verification', quick: 'PENDING', color: 'var(--primary-color)' },
+  { key: 'billsPendingApproval', title: 'Bills Pending Approval', quick: 'PENDING', color: 'var(--warning-color)' },
+  { key: 'billsParked', title: 'On Hold / Query / Referred', quick: 'ON_HOLD', color: 'var(--error-color)' },
+  { key: 'billPassingNetPayableMtd', title: 'Sent to Accounts (MTD)', quick: 'PASSED', color: 'var(--success-color)', currency: true },
+];
+
 const InventoryDashboard = () => {
   const { message } = App.useApp();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -93,6 +103,39 @@ const InventoryDashboard = () => {
             loading={loading}
           />
         </Col>
+      </Row>
+
+      {/* Supplier invoices waiting on someone. Each card opens the register
+          already filtered to what it counts. */}
+      <Text strong style={{ display: 'block', margin: '24px 0 12px', fontSize: 15 }}>
+        Bill Passing
+      </Text>
+      <Row gutter={[16, 16]}>
+        {BILL_CARDS.map((card) => (
+          <Col xs={24} sm={12} lg={6} key={card.key}>
+            <div
+              role="link"
+              tabIndex={0}
+              style={{ cursor: 'pointer' }}
+              onClick={() => navigate(`/inventory/bill-passing?quick=${card.quick}`)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/inventory/bill-passing?quick=${card.quick}`);
+                }
+              }}
+            >
+              <StatCard
+                title={card.title}
+                value={stats[card.key] ?? 0}
+                prefix={card.currency ? '₹' : undefined}
+                precision={card.currency ? 2 : undefined}
+                color={card.color}
+                loading={loading}
+              />
+            </div>
+          </Col>
+        ))}
       </Row>
     </div>
   );

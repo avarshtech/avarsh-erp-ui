@@ -53,13 +53,14 @@ const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
         supplierId,
         poId,
         supplierInvoiceNo: '',
+        // The server derives the financial year from this date, because that is
+        // what the duplicate-invoice rule keys on.
         invoiceDate: dayjs().format('YYYY-MM-DD'),
-        financialYear: currentFinancialYear(),
       });
       message.success(`${created.bpNumber} created as draft`);
       onCreated?.(created);
     } catch (e) {
-      message.error(e.message || 'Failed to create the bill');
+      if (!e.response) message.error(e.message || 'Failed to create the bill');
     } finally {
       setCreating(false);
     }

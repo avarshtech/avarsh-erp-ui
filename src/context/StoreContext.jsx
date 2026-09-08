@@ -48,6 +48,7 @@ const initialState = {
   cuttingMasters: null,
   sewingMasters: null,
   sampleMasters: null,
+  billPassingMasters: null,
 
   // Loading states per data type
   loading: {
@@ -69,6 +70,7 @@ const initialState = {
     cuttingMasters: false,
     sewingMasters: false,
     sampleMasters: false,
+    billPassingMasters: false,
   },
 
   // Error states per data type
@@ -91,6 +93,7 @@ const initialState = {
     cuttingMasters: null,
     sewingMasters: null,
     sampleMasters: null,
+    billPassingMasters: null,
   },
 
   // Last fetched timestamps (for cache invalidation)
@@ -113,6 +116,7 @@ const initialState = {
     cuttingMasters: null,
     sewingMasters: null,
     sampleMasters: null,
+    billPassingMasters: null,
   },
 };
 

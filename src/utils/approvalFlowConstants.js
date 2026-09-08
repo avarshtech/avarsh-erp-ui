@@ -15,6 +15,7 @@ export const ENTITY_TYPES = [
   { value: 'CUTTING_PO', label: 'Cutting PO' },
   { value: 'WORK_ORDER', label: 'Work Order (Sewing)' },
   { value: 'FINISHING_PO', label: 'Finishing PO' },
+  { value: 'BILL_PASSING', label: 'Bill Passing' },
 ];
 
 /**
@@ -49,6 +50,7 @@ export const ENTITY_TYPE_COLORS = {
   CUTTING_PO: 'blue',
   WORK_ORDER: 'purple',
   FINISHING_PO: 'cyan',
+  BILL_PASSING: 'gold',
 };
 
 /** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
@@ -70,6 +72,7 @@ export const entityActionUrl = (entityType, entityId) => {
     case 'CUTTING_PO': return `/purchase-orders/cutting-po/list?viewId=${entityId}`;
     case 'WORK_ORDER': return `/purchase-orders/work-order/list?viewId=${entityId}`;
     case 'FINISHING_PO': return `/purchase-orders/finishing-po/list?viewId=${entityId}`;
+    case 'BILL_PASSING': return `/inventory/bill-passing?viewId=${entityId}`;
     default: return '/';
   }
 };
@@ -122,6 +125,11 @@ export const CONDITION_FIELDS = {
   ],
   GRN: [],
   GRN_REVERSAL: [],
+  BILL_PASSING: [
+    { value: 'netPayable', label: 'Net Payable', type: 'number' },
+    { value: 'debitPercent', label: 'Debit % of Invoice', type: 'number' },
+    { value: 'supplierId', label: 'Supplier', type: 'number' },
+  ],
   QC: [
     { value: 'qcType', label: 'QC Type', type: 'select', options: ['Fabric', 'Accessories'] },
     { value: 'stage', label: 'Stage', type: 'select', options: ['INSPECTION', 'REFER_BACK'] },

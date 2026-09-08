@@ -1,6 +1,6 @@
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { NetworkFirst } from 'workbox-strategies';
+import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
 
@@ -88,6 +88,17 @@ registerRoute(
     ],
     networkTimeoutSeconds: 5,
   }),
+  'GET'
+);
+
+// ─── Bill Passing: never from cache ───
+// Registered before the catch-all below, because the first matching route
+// wins. A supplier bill's status and net payable decide whether money moves;
+// an approver reading a half-hour-old copy of either, with nothing on screen
+// to say it is stale, is not a risk worth the offline convenience.
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/v1/inventory/bill-passing'),
+  new NetworkOnly(),
   'GET'
 );
 

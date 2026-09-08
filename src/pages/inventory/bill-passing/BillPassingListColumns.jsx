@@ -3,7 +3,6 @@ import dayjs from 'dayjs';
 import RecordLink from '../../../components/RecordLink';
 import CurrencyDisplay from '../../../components/CurrencyDisplay';
 import { ActionButton } from '../../../components/buttons';
-import { billLines } from '../../../utils/billPassingCalc';
 import {
   BILL_PASSING_STATUS,
   BILL_PASSING_STATUS_COLOR,
@@ -31,7 +30,8 @@ const TALLY_EXPECTED_STATUSES = new Set([
   BILL_PASSING_STATUS.SENT_TO_ACCOUNTS,
 ]);
 
-const money = (record, key) => record?.reconciliation?.valueSummary?.[key];
+/** The three money columns, summarised onto the row by the server. */
+const money = (record, key) => record?.valueSummary?.[key];
 
 export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate = false, canDelete = false }) => [
   {
@@ -84,21 +84,9 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     key: 'material',
     width: 210,
     ellipsis: true,
-    render: (_, record) => {
-      const lines = billLines(record);
-      if (!lines.length) return '-';
-      const extra = lines.length - 1;
-      return (
-        <span>
-          {lines[0].description || lines[0].itemCode || '-'}
-          {extra > 0 && (
-            <Text style={{ marginLeft: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-              +{extra} more
-            </Text>
-          )}
-        </span>
-      );
-    },
+    // Summarised server-side and stored on the bill, so the grid never has to
+    // walk every line of every row to render one column.
+    render: (_, record) => record.materialSummary || '-',
   },
   {
     title: 'Total PO Value',
@@ -148,13 +136,13 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     // Unresolved mismatch cue: a bill that still has blockers cannot be passed,
     // so its payable figure is provisional and reads in the error colour.
     render: (amount, record) => {
-      const blocked = Boolean(record.blockers?.length);
+      const blocked = Number(record.blockerCount) > 0;
       return (
         <CurrencyDisplay
           amount={amount}
           currency="INR"
           color={blocked ? 'var(--error-color)' : undefined}
-          secondary={blocked ? `${record.blockers.length} unresolved` : undefined}
+          secondary={blocked ? `${record.blockerCount} unresolved` : undefined}
         />
       );
     },

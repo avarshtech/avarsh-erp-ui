@@ -150,13 +150,17 @@ const BillPassingList = () => {
     return () => { alive = false; };
   }, [supplierId]);
 
-  // Deep link from the approvals inbox / notifications (?viewId=X).
+  // Deep links: ?viewId=X from the approvals inbox, notifications and the feed;
+  // ?quick=PENDING from the dashboard's bill passing cards.
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
     const deepLinkId = searchParams.get('viewId');
-    if (!deepLinkId) return;
-    setViewBillId(deepLinkId);
+    const quick = searchParams.get('quick');
+    if (!deepLinkId && !quick) return;
+    if (deepLinkId) setViewBillId(deepLinkId);
+    if (quick && QUICK_FILTER_OPTIONS.some((o) => o.value === quick)) setQuickFilter(quick);
     searchParams.delete('viewId');
+    searchParams.delete('quick');
     setSearchParams(searchParams, { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

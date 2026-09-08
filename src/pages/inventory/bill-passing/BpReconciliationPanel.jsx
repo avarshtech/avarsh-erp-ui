@@ -2,7 +2,7 @@ import { memo, useMemo } from 'react';
 import { Alert, Col, Row, Table, Tag, Typography } from 'antd';
 import EmptyState from '../../../components/EmptyState';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
-import { EXCEPTION_SEVERITY } from '../../../utils/billPassingConstants';
+import { EXCEPTION_SEVERITY, reconCellStyle } from '../../../utils/billPassingConstants';
 
 const { Text } = Typography;
 
@@ -116,7 +116,7 @@ const BpReconciliationPanel = memo(function BpReconciliationPanel({ bill }) {
         width: 140,
         align: 'right',
         render: (v, r) => (
-          <Text strong style={{ color: r.status?.textColor }}>
+          <Text strong style={{ color: reconCellStyle(r.status).textColor }}>
             {Number(v) > 0 ? '+' : ''}
             {formatMeasure(r.key, v)}
           </Text>
@@ -129,7 +129,7 @@ const BpReconciliationPanel = memo(function BpReconciliationPanel({ bill }) {
         width: 120,
         align: 'right',
         render: (v, r) => (
-          <Text style={{ color: r.status?.textColor, fontWeight: 600 }}>
+          <Text style={{ color: reconCellStyle(r.status).textColor, fontWeight: 600 }}>
             {Number(v) > 0 ? '+' : ''}
             {formatNumber(v, 2)}%
           </Text>
@@ -141,7 +141,12 @@ const BpReconciliationPanel = memo(function BpReconciliationPanel({ bill }) {
         key: 'status',
         width: 160,
         align: 'center',
-        render: (s) => (s ? <Tag color={s.tagColor}>{s.label}</Tag> : dash),
+        // The server sends a level and a label; the palette is the screen's own.
+        render: (s) => {
+          if (!s) return dash;
+          const style = reconCellStyle(s);
+          return <Tag color={style.tagColor}>{style.label}</Tag>;
+        },
       },
     ];
   }, []);

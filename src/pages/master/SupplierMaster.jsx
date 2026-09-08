@@ -803,6 +803,18 @@ const SupplierMaster = () => {
             </Col>
           </Row>
 
+          <Row gutter={16}>
+            <Col span={8}>
+              <Form.Item
+                name="paymentTerms"
+                label="Payment Terms"
+                tooltip="Printed on the bill passing voucher accounts key into Tally."
+              >
+                <Input placeholder="e.g., 45 Days Credit" maxLength={100} />
+              </Form.Item>
+            </Col>
+          </Row>
+
           {/* --- Bank Details --- */}
           <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
             <BankOutlined style={{ marginRight: 6 }} />Bank Details

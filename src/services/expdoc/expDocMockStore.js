@@ -7,10 +7,10 @@
  * always read the current SEED_VERSION rather than trusting a remembered one.
  * Multi-tab is last-write-wins; acceptable for a mock phase.
  *
- * Modelled on billPassingMockStore.js rather than srMockStore.js: the SR store
- * writes to `memoryDb` when localStorage throws but never reads it back, so in a
- * private window every call silently reseeds and all edits are lost. `loadDb`
- * here checks `memoryDb` first.
+ * Deliberately unlike the old srMockStore.js, which wrote to `memoryDb` when
+ * localStorage threw but never read it back, so in a private window every call
+ * silently reseeded and all edits were lost. `loadDb` here checks `memoryDb`
+ * first.
  *
  * Quota note: carton data is stored as RANGES, never as one row per carton, so a
  * shipment of any size costs a handful of rows. That is what keeps an unbounded

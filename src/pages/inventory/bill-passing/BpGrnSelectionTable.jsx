@@ -11,7 +11,12 @@ import { LINE_BILLING_STATUS_COLOR, LINE_BILLING_STATUS_LABEL } from '../../../u
 
 const { Text } = Typography;
 
-const QC_APPROVED = 'Approved';
+/**
+ * QC states where the inspection is finished. Conditional_Pass is signed off
+ * with qualifications but is just as final as Approved, and the server treats
+ * it that way, so the per-row warning must too.
+ */
+const QC_DONE = ['Approved', 'Conditional_Pass'];
 const EPS = 0.0005;
 const fmtDate = (d) => (d ? dayjs(d).format('DD-MMM-YYYY') : '-');
 const qty = (v) => formatNumber(Number(v) || 0, 3);
@@ -146,7 +151,7 @@ const BpGrnSelectionTable = memo(function BpGrnSelectionTable({ source, bill, re
       render: (v, r) => (
         <Space size={4}>
           <Text strong style={{ fontSize: 12 }}>{v || '-'}</Text>
-          {r.qcStatus !== QC_APPROVED && (
+          {!QC_DONE.includes(r.qcStatus) && (
             <Tooltip title="QC pending — this bill cannot pass verification until QC completes.">
               <WarningOutlined style={{ color: 'var(--warning-color)' }} />
             </Tooltip>
