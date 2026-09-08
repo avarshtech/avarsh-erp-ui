@@ -27,29 +27,19 @@ const ORIGIN_COLOR = {
 const lineLabel = (l) =>
   l ? [l.grnNumber, l.itemCode, l.color, l.size].filter(Boolean).join(' · ') : '';
 
-/** FR-BP-501/502/503 — every deduction on the bill; only CONFIRMED ones reduce Net Payable. */
-const BpDebitTable = memo(function BpDebitTable({
-  bill, debitTypes = [], readOnly, onSave, onSetStatus, onDelete, onRefreshProposals,
-}) {
-  const { message, modal } = App.useApp();
+/**
+ * The add/edit dialog. It is mounted only while it is open — the form watches
+ * three fields, and a `useForm` instance that is not attached to a rendered
+ * `<Form>` warns on every render of the table behind it.
+ */
+const BpDebitEditor = ({ editing, debitTypes, lines, onSave, onClose }) => {
   const [form] = Form.useForm();
-  const [editing, setEditing] = useState(null);     // null = editor closed, {} = new row
-  const [dropTarget, setDropTarget] = useState(null);
-  const [dropReason, setDropReason] = useState('');
+  // Closed with an animation, then unmounted by `afterClose`.
+  const [open, setOpen] = useState(true);
 
-  const debits = useMemo(() => bill?.debits || [], [bill]);
-  const lines = useMemo(() => billLinesWithGrn(bill), [bill]);
   const lineById = useMemo(() => new Map(lines.map((l) => [l.grnLineItemId, l])), [lines]);
   const typeByCode = useMemo(() => new Map(debitTypes.map((t) => [t.code, t])), [debitTypes]);
-  const typeName = useCallback((code) => typeByCode.get(code)?.name || code || '-', [typeByCode]);
 
-  const confirmedTotal = useMemo(
-    () => round2(debits.filter((d) => d.status === DEBIT_STATUS.CONFIRMED)
-      .reduce((s, d) => s + (Number(d.debitAmount) || 0), 0)),
-    [debits],
-  );
-
-  // ── Editor ────────────────────────────────────────────────────────────────
   const watchedType = Form.useWatch('debitTypeCode', form);
   const watchedQty = Form.useWatch('debitQty', form);
   const watchedRate = Form.useWatch('rate', form);
@@ -99,12 +89,133 @@ const BpDebitTable = memo(function BpDebitTable({
         gstTreatment: v.gstTreatment,
       };
       if (editing?.id) payload.id = editing.id;
-      setEditing(null);
+      setOpen(false);
       onSave?.(payload);
     } catch {
       // validateFields already marks the offending fields inline
     }
   }, [form, lineById, typeByCode, editing, onSave]);
+
+  return (
+    <Modal
+      open={open}
+      title={editing?.id ? 'Edit debit' : 'Add debit'}
+      width={720}
+      okText={editing?.id ? 'Update debit' : 'Add debit'}
+      onOk={submitEditor}
+      onCancel={() => setOpen(false)}
+      afterClose={onClose}
+    >
+      <Form form={form} layout="vertical" initialValues={initialValues}>
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Debit Type" name="debitTypeCode"
+              rules={[{ required: true, message: 'Pick the debit type' }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Select debit type"
+                options={debitTypes.map((t) => ({ value: t.code, label: t.name }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="Reference GRN Line" name="grnLineItemId"
+              rules={[{ required: true, message: 'A reference GRN line is mandatory on every debit' }]}>
+              <Select
+                showSearch
+                optionFilterProp="label"
+                placeholder="Select the GRN line being debited"
+                onChange={onLinePicked}
+                options={lines.map((l) => ({ value: l.grnLineItemId, label: lineLabel(l) }))}
+              />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="QC Reference" name="qcNumber"
+              extra={selectedType?.requiresQc ? 'This is a quality debit, so the line must be QC inspected.' : null}
+              rules={[{ required: Boolean(selectedType?.requiresQc), message: 'Pick a QC-inspected line for a quality debit' }]}>
+              <Input disabled placeholder="Filled from the selected line" />
+            </Form.Item>
+          </Col>
+          <Col xs={24} md={12}>
+            <Form.Item label="GST Treatment" name="gstTreatment"
+              rules={[{ required: true, message: 'Choose how GST is treated' }]}>
+              <Select options={[
+                { value: GST_TREATMENT.WITH_GST, label: 'With GST' },
+                { value: GST_TREATMENT.WITHOUT_GST, label: 'Without GST' },
+              ]} />
+            </Form.Item>
+          </Col>
+          {quantityBased && (
+            <>
+              <Col xs={24} md={8}>
+                <Form.Item label="Qty" name="debitQty"
+                  rules={[{ required: true, message: 'Enter the quantity being debited' },
+                    { type: 'number', min: 0.001, message: 'Quantity must be greater than zero' }]}>
+                  <InputNumber style={{ width: '100%' }} controls={false} precision={3} min={0} {...numericInputProps} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item label="Rate" name="rate"
+                  rules={[{ required: true, message: 'Enter the rate' },
+                    { type: 'number', min: 0.01, message: 'Rate must be greater than zero' }]}>
+                  <InputNumber style={{ width: '100%' }} controls={false} precision={2} min={0} {...numericInputProps} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item label="Amount">
+                  <Input disabled value={formatCurrency(computedAmount)} />
+                </Form.Item>
+              </Col>
+            </>
+          )}
+          {!quantityBased && (
+            <Col xs={24} md={8}>
+              <Form.Item label="Amount" name="debitAmount"
+                rules={[{ required: true, message: 'Enter the debit amount' },
+                  { type: 'number', min: 0.01, message: 'Amount must be greater than zero' }]}>
+                <InputNumber style={{ width: '100%' }} controls={false} precision={2} min={0} {...numericInputProps} />
+              </Form.Item>
+            </Col>
+          )}
+          <Col xs={24}>
+            <Form.Item label="Reason" name="reasonText"
+              rules={[{ required: true, message: 'A reason is mandatory on every debit' }]}>
+              <TextArea rows={2} maxLength={300} showCount placeholder="Why this amount is being deducted from the supplier invoice" />
+            </Form.Item>
+          </Col>
+          <Col xs={24}>
+            <Form.Item label="Remarks" name="remarks">
+              <TextArea rows={2} maxLength={300} showCount placeholder="Optional note for the approver" />
+            </Form.Item>
+          </Col>
+        </Row>
+      </Form>
+    </Modal>
+  );
+};
+
+/** FR-BP-501/502/503 — every deduction on the bill; only CONFIRMED ones reduce Net Payable. */
+const BpDebitTable = memo(function BpDebitTable({
+  bill, debitTypes = [], readOnly, onSave, onSetStatus, onDelete, onRefreshProposals,
+}) {
+  const { message, modal } = App.useApp();
+  const [editing, setEditing] = useState(null);     // null = editor closed, {} = new row
+  const [dropTarget, setDropTarget] = useState(null);
+  const [dropReason, setDropReason] = useState('');
+
+  const debits = useMemo(() => bill?.debits || [], [bill]);
+  const lines = useMemo(() => billLinesWithGrn(bill), [bill]);
+  const lineById = useMemo(() => new Map(lines.map((l) => [l.grnLineItemId, l])), [lines]);
+  const typeByCode = useMemo(() => new Map(debitTypes.map((t) => [t.code, t])), [debitTypes]);
+  const typeName = useCallback((code) => typeByCode.get(code)?.name || code || '-', [typeByCode]);
+
+  const confirmedTotal = useMemo(
+    () => round2(debits.filter((d) => d.status === DEBIT_STATUS.CONFIRMED)
+      .reduce((s, d) => s + (Number(d.debitAmount) || 0), 0)),
+    [debits],
+  );
 
   const submitDrop = useCallback(() => {
     if (dropReason.trim().length < 5) {
@@ -266,102 +377,15 @@ const BpDebitTable = memo(function BpDebitTable({
         ) : null)}
       />
 
-      <Modal
-        open={Boolean(editing)}
-        title={editing?.id ? 'Edit debit' : 'Add debit'}
-        width={720}
-        destroyOnHidden
-        okText={editing?.id ? 'Update debit' : 'Add debit'}
-        onOk={submitEditor}
-        onCancel={() => setEditing(null)}
-      >
-        <Form form={form} layout="vertical" initialValues={initialValues} preserve={false}>
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <Form.Item label="Debit Type" name="debitTypeCode"
-                rules={[{ required: true, message: 'Pick the debit type' }]}>
-                <Select
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="Select debit type"
-                  options={debitTypes.map((t) => ({ value: t.code, label: t.name }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item label="Reference GRN Line" name="grnLineItemId"
-                rules={[{ required: true, message: 'A reference GRN line is mandatory on every debit' }]}>
-                <Select
-                  showSearch
-                  optionFilterProp="label"
-                  placeholder="Select the GRN line being debited"
-                  onChange={onLinePicked}
-                  options={lines.map((l) => ({ value: l.grnLineItemId, label: lineLabel(l) }))}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item label="QC Reference" name="qcNumber"
-                extra={selectedType?.requiresQc ? 'This is a quality debit, so the line must be QC inspected.' : null}
-                rules={[{ required: Boolean(selectedType?.requiresQc), message: 'Pick a QC-inspected line for a quality debit' }]}>
-                <Input disabled placeholder="Filled from the selected line" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item label="GST Treatment" name="gstTreatment"
-                rules={[{ required: true, message: 'Choose how GST is treated' }]}>
-                <Select options={[
-                  { value: GST_TREATMENT.WITH_GST, label: 'With GST' },
-                  { value: GST_TREATMENT.WITHOUT_GST, label: 'Without GST' },
-                ]} />
-              </Form.Item>
-            </Col>
-            {quantityBased && (
-              <>
-                <Col xs={24} md={8}>
-                  <Form.Item label="Qty" name="debitQty"
-                    rules={[{ required: true, message: 'Enter the quantity being debited' },
-                      { type: 'number', min: 0.001, message: 'Quantity must be greater than zero' }]}>
-                    <InputNumber style={{ width: '100%' }} controls={false} precision={3} min={0} {...numericInputProps} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item label="Rate" name="rate"
-                    rules={[{ required: true, message: 'Enter the rate' },
-                      { type: 'number', min: 0.01, message: 'Rate must be greater than zero' }]}>
-                    <InputNumber style={{ width: '100%' }} controls={false} precision={2} min={0} {...numericInputProps} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item label="Amount">
-                    <Input disabled value={formatCurrency(computedAmount)} />
-                  </Form.Item>
-                </Col>
-              </>
-            )}
-            {!quantityBased && (
-              <Col xs={24} md={8}>
-                <Form.Item label="Amount" name="debitAmount"
-                  rules={[{ required: true, message: 'Enter the debit amount' },
-                    { type: 'number', min: 0.01, message: 'Amount must be greater than zero' }]}>
-                  <InputNumber style={{ width: '100%' }} controls={false} precision={2} min={0} {...numericInputProps} />
-                </Form.Item>
-              </Col>
-            )}
-            <Col xs={24}>
-              <Form.Item label="Reason" name="reasonText"
-                rules={[{ required: true, message: 'A reason is mandatory on every debit' }]}>
-                <TextArea rows={2} maxLength={300} showCount placeholder="Why this amount is being deducted from the supplier invoice" />
-              </Form.Item>
-            </Col>
-            <Col xs={24}>
-              <Form.Item label="Remarks" name="remarks">
-                <TextArea rows={2} maxLength={300} showCount placeholder="Optional note for the approver" />
-              </Form.Item>
-            </Col>
-          </Row>
-        </Form>
-      </Modal>
+      {editing && (
+        <BpDebitEditor
+          editing={editing}
+          debitTypes={debitTypes}
+          lines={lines}
+          onSave={onSave}
+          onClose={() => setEditing(null)}
+        />
+      )}
 
       <Modal
         open={Boolean(dropTarget)}

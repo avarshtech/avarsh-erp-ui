@@ -153,7 +153,7 @@ const BillPassingViewModal = ({ open, onClose, onEdit, billId }) => {
       ) : (
         <>
           {reason && (
-            <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} message={reason.label} description={reason.text} />
+            <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} title={reason.label} description={reason.text} />
           )}
 
           <DetailCard title="Bill Details">

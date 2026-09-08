@@ -134,7 +134,7 @@ const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
         <Alert
           type="info"
           showIcon
-          message={`${selectedPo.grnCount} GRN(s) will be pulled in automatically`}
+          title={`${selectedPo.grnCount} GRN(s) will be pulled in automatically`}
           description={`${formatNumber(selectedPo.pendingQty, 3)} still unbilled on ${selectedPo.poNumber}. You can narrow the GRNs and quantities once the draft opens.`}
         />
       )}

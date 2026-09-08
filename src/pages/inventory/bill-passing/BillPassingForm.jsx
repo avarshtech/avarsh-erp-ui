@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { App, Card, Form, Input, DatePicker, Row, Col, Collapse, Typography, Tag, Alert, Space, Modal, Skeleton, Result } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -96,11 +96,6 @@ const BillPassingForm = () => {
         const b = await getBill(id);
         if (cancelled) return;
         setBill(b);
-        form.setFieldsValue({
-          supplierInvoiceNo: b.supplierInvoiceNo,
-          invoiceDate: b.invoiceDate ? dayjs(b.invoiceDate) : null,
-          headerRemarks: b.headerRemarks,
-        });
         const src = await getPoBillingSource(b.poId, { excludeBillId: b.id });
         if (!cancelled) setSource(src);
       } catch (e) {
@@ -110,7 +105,21 @@ const BillPassingForm = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, form, message]);
+  }, [id, message]);
+
+  // The header fields are pushed in only once the form is on screen. While the
+  // bill is loading the workspace renders a skeleton, and writing to a
+  // `useForm` instance whose <Form> has not mounted warns in the console.
+  const seededBillId = useRef(null);
+  useEffect(() => {
+    if (loading || !bill || seededBillId.current === bill.id) return;
+    seededBillId.current = bill.id;
+    form.setFieldsValue({
+      supplierInvoiceNo: bill.supplierInvoiceNo,
+      invoiceDate: bill.invoiceDate ? dayjs(bill.invoiceDate) : null,
+      headerRemarks: bill.headerRemarks,
+    });
+  }, [loading, bill, form]);
 
   /** Re-read the bill after the approval engine has acted on it. */
   const reloadBill = useCallback(async () => {
@@ -268,7 +277,11 @@ const BillPassingForm = () => {
   const submitBlockReason = useMemo(() => {
     if (!bill) return null;
     if (!billLines(bill).length) return 'Select at least one GRN line to bill';
-    if (!hasSupplierInvoice(bill)) return 'Attach the supplier invoice before submitting (BR-15)';
+    // Whether the invoice copy is mandatory is the server's rule, not ours: it
+    // is switched off where there is no file storage to attach one to.
+    if (bill.requireInvoiceAttachment && !hasSupplierInvoice(bill)) {
+      return 'Attach the supplier invoice before submitting (BR-15)';
+    }
     return null;
   }, [bill]);
 
@@ -552,7 +565,7 @@ const BillPassingForm = () => {
       />
 
       {reason && (
-        <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} message={reason.label} description={reason.text} />
+        <Alert type={reason.type} showIcon style={{ marginBottom: 16 }} title={reason.label} description={reason.text} />
       )}
 
       {/* An approval flow, once an admin configures one, decides this bill
@@ -572,7 +585,7 @@ const BillPassingForm = () => {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`${bill.blockers.length} blocker${bill.blockers.length > 1 ? 's' : ''} must be cleared before this bill can be approved`}
+          title={`${bill.blockers.length} blocker${bill.blockers.length > 1 ? 's' : ''} must be cleared before this bill can be approved`}
           description={<ul style={{ margin: 0, paddingLeft: 18 }}>{bill.blockers.map((b, i) => <li key={i}>{b}</li>)}</ul>}
         />
       )}
@@ -582,7 +595,7 @@ const BillPassingForm = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`${warnExceptions.length} tolerance warning${warnExceptions.length > 1 ? 's' : ''}`}
+          title={`${warnExceptions.length} tolerance warning${warnExceptions.length > 1 ? 's' : ''}`}
           description={<ul style={{ margin: 0, paddingLeft: 18 }}>{warnExceptions.map((x) => <li key={x.code}>{x.title} — {x.detail}</li>)}</ul>}
         />
       )}

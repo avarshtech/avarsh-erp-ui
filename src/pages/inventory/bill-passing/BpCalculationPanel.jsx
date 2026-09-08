@@ -200,16 +200,16 @@ function BpCalculationPanel({ bill, chargeTypes, readOnly, onChange }) {
       <Card style={summaryCardStyle}>
         <Row gutter={[24, 16]}>
           <Col xs={12} md={6}>
-            <Statistic title="Gross Invoice Amount" value={money(basic)} valueStyle={{ fontSize: 16 }} />
+            <Statistic title="Gross Invoice Amount" value={money(basic)} styles={{ content: { fontSize: 16 } }} />
           </Col>
           <Col xs={12} md={6}>
-            <Statistic title="+ Applicable Charges" value={money(totals.chargesTotal)} valueStyle={{ fontSize: 16, color: 'var(--primary-color)' }} />
+            <Statistic title="+ Applicable Charges" value={money(totals.chargesTotal)} styles={{ content: { fontSize: 16, color: 'var(--primary-color)' } }} />
           </Col>
           <Col xs={12} md={6}>
-            <Statistic title="+ GST / Taxes" value={money(totals.taxTotal)} valueStyle={{ fontSize: 16, color: 'var(--primary-color)' }} />
+            <Statistic title="+ GST / Taxes" value={money(totals.taxTotal)} styles={{ content: { fontSize: 16, color: 'var(--primary-color)' } }} />
           </Col>
           <Col xs={12} md={6}>
-            <Statistic title="- Debits (Confirmed)" value={money(totals.debitTotal)} valueStyle={{ fontSize: 16, color: 'var(--warning-color)' }} />
+            <Statistic title="- Debits (Confirmed)" value={money(totals.debitTotal)} styles={{ content: { fontSize: 16, color: 'var(--warning-color)' } }} />
           </Col>
         </Row>
 
@@ -235,7 +235,7 @@ function BpCalculationPanel({ bill, chargeTypes, readOnly, onChange }) {
             <Statistic
               title="NET PAYABLE"
               value={money(totals.netPayable)}
-              valueStyle={{ fontSize: 18, fontWeight: 700, color: netColor }}
+              styles={{ content: { fontSize: 18, fontWeight: 700, color: netColor } }}
             />
           </Col>
         </Row>

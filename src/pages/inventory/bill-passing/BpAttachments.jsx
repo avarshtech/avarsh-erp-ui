@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, App, Col, List, Row, Select, Space, Tag, Typography } from 'antd';
+import { App, Col, Row, Select, Space, Tag, Typography } from 'antd';
 import { FileTextOutlined, LinkOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import ActionButton from '../../../components/buttons/ActionButton';
@@ -98,13 +98,6 @@ const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRem
 
   return (
     <>
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 12 }}
-        message="Documents are recorded against this bill by name, type and size. Binary storage arrives with the API phase, so the file itself is not kept yet."
-      />
-
       {!readOnly && (
         <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
           <Col xs={24} md={7}>
@@ -134,48 +127,44 @@ const BpAttachments = memo(function BpAttachments({ bill, readOnly, onAdd, onRem
         The supplier invoice copy is mandatory before this bill can be submitted.
       </Text>
 
-      <List
-        size="small"
-        dataSource={attachments}
-        locale={{
-          emptyText: (
-            <EmptyState
-              title="No documents yet"
-              description="Record the supplier invoice copy, and any challan, weighment slip or transport copy that supports it."
-            />
-          ),
-        }}
-        renderItem={(att) => (
-          <List.Item
-            key={att.id}
-            actions={[
-              <ActionButton key="dl" action="download" tooltip="Download"
-                onClick={() => handleDownload(att)} />,
-              ...(readOnly ? [] : [
-                <ActionButton key="del" action="delete" tooltip="Remove document"
-                  onClick={() => confirmRemove(att)} />,
-              ]),
-            ]}
-          >
-            <List.Item.Meta
-              avatar={<FileTextOutlined style={{ fontSize: 20, color: 'var(--primary-color)' }} />}
-              title={(
-                <Space size={6} wrap>
-                  <Tag color={att.docType === 'SUPPLIER_INVOICE' ? 'blue' : 'default'}>
-                    {DOC_LABEL[att.docType] || att.docType}
-                  </Tag>
-                  <Text strong style={{ fontSize: 13 }}>{att.fileName}</Text>
-                </Space>
-              )}
-              description={(
-                <Text style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                  {`${sizeKb(att.size)} · Uploaded by ${att.uploadedBy || '-'} on ${stamp(att.uploadedAt)}`}
-                </Text>
-              )}
-            />
-          </List.Item>
-        )}
-      />
+      {attachments.length ? attachments.map((att, i) => (
+        <div
+          key={att.id}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '8px 0',
+            borderTop: i ? '1px solid var(--border-color)' : 'none',
+          }}
+        >
+          <FileTextOutlined style={{ fontSize: 20, color: 'var(--primary-color)' }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Space size={6} wrap>
+              <Tag color={att.docType === 'SUPPLIER_INVOICE' ? 'blue' : 'default'}>
+                {DOC_LABEL[att.docType] || att.docType}
+              </Tag>
+              <Text strong style={{ fontSize: 13 }}>{att.fileName}</Text>
+            </Space>
+            <div>
+              <Text style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                {`${sizeKb(att.size)} · Uploaded by ${att.uploadedBy || '-'} on ${stamp(att.uploadedAt)}`}
+              </Text>
+            </div>
+          </div>
+          <Space size={4}>
+            <ActionButton action="download" tooltip="Download" onClick={() => handleDownload(att)} />
+            {!readOnly && (
+              <ActionButton action="delete" tooltip="Remove document" onClick={() => confirmRemove(att)} />
+            )}
+          </Space>
+        </div>
+      )) : (
+        <EmptyState
+          title="No documents yet"
+          description="Record the supplier invoice copy, and any challan, weighment slip or transport copy that supports it."
+        />
+      )}
 
       <div style={{ marginTop: 16, padding: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 8 }}>
         <Space size={6} style={{ marginBottom: 6 }}>

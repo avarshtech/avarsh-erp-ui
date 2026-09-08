@@ -289,7 +289,7 @@ const BpGrnSelectionTable = memo(function BpGrnSelectionTable({ source, bill, re
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message="One GRN is one supplier challan — tick several challans to combine them on a single invoice, or bill only part of a line to split one challan across invoices."
+        title="One GRN is one supplier challan — tick several challans to combine them on a single invoice, or bill only part of a line to split one challan across invoices."
       />
       <Table
         rowKey="grnLineItemId"

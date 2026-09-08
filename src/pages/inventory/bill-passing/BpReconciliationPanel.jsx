@@ -157,7 +157,7 @@ const BpReconciliationPanel = memo(function BpReconciliationPanel({ bill }) {
       type={group.type}
       showIcon
       style={{ marginBottom: 12 }}
-      message={`${group.message} (${group.items.length})`}
+      title={`${group.message} (${group.items.length})`}
       description={
         <>
           <div style={{ marginBottom: 4 }}>{group.intro}</div>

@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { App, Col, Divider, Input, List, Row, Select, Space, Tag, Tooltip, Typography, Modal } from 'antd';
+import { App, Col, Divider, Input, Row, Select, Space, Tag, Tooltip, Typography, Modal } from 'antd';
 import dayjs from 'dayjs';
 import ActionButton from '../../../components/buttons/ActionButton';
 import ActivityTimeline from '../../../components/ActivityTimeline';
@@ -70,68 +70,72 @@ const BpIssueLog = memo(function BpIssueLog({ bill, issueTypes = [], onAdd, onSe
     setDialogText('');
   }, [dialog, dialogText, onWithdraw, onSetStatus, message]);
 
-  const renderItem = useCallback((issue) => {
+  const renderItem = useCallback((issue, i) => {
     const type = typeByCode.get(issue.issueTypeCode);
     const withdrawn = issue.status === ISSUE_STATUS.WITHDRAWN;
     return (
-      <List.Item
+      <div
         key={issue.id}
-        actions={withdrawn ? [] : [
-          issue.status === ISSUE_STATUS.OPEN && (
-            <ActionButton key="prog" action="edit" text="Mark In Progress" size="small"
-              tooltip="Someone is chasing this"
-              onClick={() => onSetStatus?.(issue.id, ISSUE_STATUS.IN_PROGRESS)} />
-          ),
-          issue.status !== ISSUE_STATUS.RESOLVED && (
-            <ActionButton key="res" action="approve" text="Resolve" size="small"
-              tooltip="Close this issue with a resolution note"
-              onClick={() => { setDialog({ mode: 'resolve', issue }); setDialogText(''); }} />
-          ),
-          <ActionButton key="wd" action="cancel" text="Withdraw" size="small"
-            tooltip="Withdraw with a reason — the issue stays on the log"
-            onClick={() => { setDialog({ mode: 'withdraw', issue }); setDialogText(''); }} />,
-        ].filter(Boolean)}
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 12,
+          padding: '8px 0',
+          borderTop: i ? '1px solid var(--border-color)' : 'none',
+        }}
       >
-        <List.Item.Meta
-          title={(
-            <Space size={6} wrap>
-              <Tooltip title={type?.blocking ? 'An open issue of this type blocks approval' : null}>
-                <Tag color={type?.blocking ? 'red' : 'blue'}>{type?.name || issue.issueTypeCode}</Tag>
-              </Tooltip>
-              <Tag color={ISSUE_STATUS_COLOR[issue.status] || 'default'}>
-                {STATUS_LABEL[issue.status] || issue.status}
-              </Tag>
-              {issue.autoLogged && <Tag color="default">system</Tag>}
-            </Space>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Space size={6} wrap>
+            <Tooltip title={type?.blocking ? 'An open issue of this type blocks approval' : null}>
+              <Tag color={type?.blocking ? 'red' : 'blue'}>{type?.name || issue.issueTypeCode}</Tag>
+            </Tooltip>
+            <Tag color={ISSUE_STATUS_COLOR[issue.status] || 'default'}>
+              {STATUS_LABEL[issue.status] || issue.status}
+            </Tag>
+            {issue.autoLogged && <Tag color="default">system</Tag>}
+          </Space>
+          <Paragraph
+            style={{
+              marginTop: 4,
+              marginBottom: 4,
+              color: withdrawn ? 'var(--text-secondary)' : undefined,
+              textDecoration: withdrawn ? 'line-through' : 'none',
+            }}
+          >
+            {issue.description}
+          </Paragraph>
+          {withdrawn && (
+            <Text style={{ fontSize: 12, color: 'var(--warning-color)', display: 'block' }}>
+              {`Withdrawn by ${issue.withdrawnBy || '-'} on ${stamp(issue.withdrawnAt)} — ${issue.withdrawReason || 'no reason recorded'}`}
+            </Text>
           )}
-          description={(
-            <div>
-              <Paragraph
-                style={{
-                  marginBottom: 4,
-                  color: withdrawn ? 'var(--text-secondary)' : undefined,
-                  textDecoration: withdrawn ? 'line-through' : 'none',
-                }}
-              >
-                {issue.description}
-              </Paragraph>
-              {withdrawn && (
-                <Text style={{ fontSize: 12, color: 'var(--warning-color)', display: 'block' }}>
-                  {`Withdrawn by ${issue.withdrawnBy || '-'} on ${stamp(issue.withdrawnAt)} — ${issue.withdrawReason || 'no reason recorded'}`}
-                </Text>
-              )}
-              {!withdrawn && issue.resolutionRemarks && (
-                <Text style={{ fontSize: 12, color: 'var(--success-color)', display: 'block' }}>
-                  {`Resolved by ${issue.resolvedBy || '-'} on ${stamp(issue.resolvedAt)} — ${issue.resolutionRemarks}`}
-                </Text>
-              )}
-              <Text style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                {`Raised by ${issue.raisedBy || '-'} on ${stamp(issue.raisedAt)}`}
-              </Text>
-            </div>
+          {!withdrawn && issue.resolutionRemarks && (
+            <Text style={{ fontSize: 12, color: 'var(--success-color)', display: 'block' }}>
+              {`Resolved by ${issue.resolvedBy || '-'} on ${stamp(issue.resolvedAt)} — ${issue.resolutionRemarks}`}
+            </Text>
           )}
-        />
-      </List.Item>
+          <Text style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            {`Raised by ${issue.raisedBy || '-'} on ${stamp(issue.raisedAt)}`}
+          </Text>
+        </div>
+        {!withdrawn && (
+          <Space size={4} wrap>
+            {issue.status === ISSUE_STATUS.OPEN && (
+              <ActionButton action="edit" text="Mark In Progress" size="small"
+                tooltip="Someone is chasing this"
+                onClick={() => onSetStatus?.(issue.id, ISSUE_STATUS.IN_PROGRESS)} />
+            )}
+            {issue.status !== ISSUE_STATUS.RESOLVED && (
+              <ActionButton action="approve" text="Resolve" size="small"
+                tooltip="Close this issue with a resolution note"
+                onClick={() => { setDialog({ mode: 'resolve', issue }); setDialogText(''); }} />
+            )}
+            <ActionButton action="cancel" text="Withdraw" size="small"
+              tooltip="Withdraw with a reason — the issue stays on the log"
+              onClick={() => { setDialog({ mode: 'withdraw', issue }); setDialogText(''); }} />
+          </Space>
+        )}
+      </div>
     );
   }, [typeByCode, onSetStatus]);
 
@@ -169,19 +173,12 @@ const BpIssueLog = memo(function BpIssueLog({ bill, issueTypes = [], onAdd, onSe
         </Col>
       </Row>
 
-      <List
-        size="small"
-        dataSource={issues}
-        renderItem={renderItem}
-        locale={{
-          emptyText: (
-            <EmptyState
-              title="No issues raised"
-              description="Log a question here whenever the invoice, the GRN or the QC result needs clarification before this bill can be passed."
-            />
-          ),
-        }}
-      />
+      {issues.length ? issues.map(renderItem) : (
+        <EmptyState
+          title="No issues raised"
+          description="Log a question here whenever the invoice, the GRN or the QC result needs clarification before this bill can be passed."
+        />
+      )}
 
       <Divider titlePlacement="start" style={{ marginTop: 16 }}>
         <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Bill activity</Text>

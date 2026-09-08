@@ -165,7 +165,7 @@ const BpQcPanel = memo(function BpQcPanel({ bill, source }) {
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message="QC results are pulled live from the QC module"
+        title="QC results are pulled live from the QC module"
         description="Inspected, accepted and rejected quantities are never re-keyed here. Open the QC number to read the full inspection report."
       />
       <Table
