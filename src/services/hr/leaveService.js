@@ -24,10 +24,11 @@ export const approveLeave = async (id) => {
  * Reject a leave application with reason.
  * PUT /api/v1/hr/leaves/{id}/reject?reason=
  */
+// The API reads the reason from the request body. Sending it as a query
+// parameter left the body empty, and the endpoint rejected the call outright
+// with "Required request body is missing".
 export const rejectLeave = async (id, reason) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, null, {
-    params: { reason },
-  });
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, { reason });
   return response.data;
 };
 
@@ -69,6 +70,20 @@ export const getLeavesByStatus = async (status) => {
 export const getLeaveBalances = async (employeeId, year) => {
   const response = await axiosInstance.get(`${BASE_URL}/balances`, {
     params: { employeeId, year },
+  });
+  return response.data;
+};
+
+/**
+ * Balances for several employees at once.
+ * GET /api/v1/hr/leaves/balances/bulk?employeeIds=1,2,3&year=
+ *
+ * The balance screen used to call getLeaveBalances once per employee, so a
+ * factory of 500 issued 500 concurrent requests.
+ */
+export const getLeaveBalancesBulk = async (employeeIds, year) => {
+  const response = await axiosInstance.get(`${BASE_URL}/balances/bulk`, {
+    params: { employeeIds: employeeIds.join(','), year },
   });
   return response.data;
 };

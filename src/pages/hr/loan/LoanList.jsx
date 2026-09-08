@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm } from 'antd';
+import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm, Tooltip } from 'antd';
 import { PlusOutlined, EyeOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getAllLoans, closeLoan, cancelLoan } from '../../../services/hr/loanService';
+import { searchLoans, closeLoan, cancelLoan } from '../../../services/hr/loanService';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { getTablePagination } from '../../../utils/paginationConfig';
 import PageHeader from '../../../components/PageHeader';
 import LoanDrawer from './LoanDrawer';
 
@@ -15,31 +16,48 @@ const formatCurrency = (val) =>
   val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const LoanList = () => {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
 
   const canAdd = hasPermission('hr-loans', 'add');
   const canUpdate = hasPermission('hr-loans', 'update');
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);
     try {
-      const result = await getAllLoans();
-      setData(Array.isArray(result) ? result : result?.content || []);
+      const result = await searchLoans({
+        status: statusFilter,
+        page: (page || pagination.current) - 1,
+        size: pageSize || pagination.pageSize,
+        sort: 'loanDate',
+        direction: 'desc',
+      });
+      setData(result.content);
+      setPagination((prev) => ({
+        ...prev,
+        current: (result.number ?? 0) + 1,
+        pageSize: result.size,
+        total: result.totalElements,
+      }));
     } catch {
-      message.error('Failed to load loans');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, [statusFilter, pagination.current, pagination.pageSize, message]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchData(1, pagination.pageSize);
+  }, [statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleTableChange = (pag) => {
+    fetchData(pag.current, pag.pageSize);
+  };
 
   const handleClose = useCallback(async (id) => {
     try {
@@ -47,7 +65,7 @@ const LoanList = () => {
       message.success('Loan closed successfully');
       fetchData();
     } catch {
-      message.error('Failed to close loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [message, fetchData]);
 
@@ -57,14 +75,9 @@ const LoanList = () => {
       message.success('Loan cancelled');
       fetchData();
     } catch {
-      message.error('Failed to cancel loan');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [message, fetchData]);
-
-  const filteredData = useMemo(() => {
-    if (!statusFilter) return data;
-    return data.filter((r) => r.status === statusFilter);
-  }, [data, statusFilter]);
 
   const columns = useMemo(
     () => [
@@ -75,8 +88,9 @@ const LoanList = () => {
         dataIndex: 'loanDate',
         key: 'loanDate',
         width: 110,
+        // Server returns newest-first; a client-side sorter would only reorder
+        // the current page, so sorting is left to the API.
         render: (val) => val ? dayjs(val).format('DD-MMM-YYYY') : '-',
-        sorter: (a, b) => dayjs(a.loanDate).unix() - dayjs(b.loanDate).unix(),
       },
       { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatCurrency },
       { title: 'EMI', dataIndex: 'emiAmount', key: 'emiAmount', width: 100, align: 'right', render: formatCurrency },
@@ -95,23 +109,50 @@ const LoanList = () => {
       {
         title: 'Actions',
         key: 'actions',
-        width: 140,
+        width: 240,
         fixed: 'right',
-        render: (_, r) => (
-          <Space size="small">
-            <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/hr/loans/${r.id}`)} />
-            {r.status === 'ACTIVE' && canUpdate && (
-              <>
-                <Popconfirm title="Close this loan?" onConfirm={() => handleClose(r.id)}>
-                  <Button type="link" size="small" icon={<CheckCircleOutlined />} />
-                </Popconfirm>
-                <Popconfirm title="Cancel this loan?" onConfirm={() => handleCancel(r.id)}>
-                  <Button type="link" size="small" danger icon={<StopOutlined />} />
-                </Popconfirm>
-              </>
-            )}
-          </Space>
-        ),
+        // Three unlabelled icons read as approve and reject, which is not what
+        // any of them do. They are view, stop recovering, and undo - and the
+        // last two are not interchangeable, so each says what it will do.
+        render: (_, r) => {
+          const outstanding = Number(r.balance) || 0;
+          return (
+            <Space size="small">
+              <Tooltip title="View the loan and its repayment schedule">
+                <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/hr/loans/${r.id}`)} />
+              </Tooltip>
+              {r.status === 'ACTIVE' && canUpdate && (
+                <>
+                  <Popconfirm
+                    title="Stop recovering this loan?"
+                    description={outstanding > 0
+                      ? `${formatCurrency(outstanding)} is still outstanding and will be written off. Payroll will stop deducting the EMI.`
+                      : 'Nothing is outstanding. The loan will be marked fully recovered.'}
+                    okText={outstanding > 0 ? 'Write off and close' : 'Close'}
+                    okButtonProps={outstanding > 0 ? { danger: true } : undefined}
+                    onConfirm={() => handleClose(r.id)}
+                  >
+                    <Tooltip title="Close: stop recovery and write off anything still owed">
+                      <Button type="link" size="small" icon={<CheckCircleOutlined />}>Close</Button>
+                    </Tooltip>
+                  </Popconfirm>
+                  <Popconfirm
+                    title="Cancel this loan?"
+                    description="For a loan raised in error. Only possible while nothing has been recovered; once an instalment has been taken, close it instead."
+                    okText="Cancel Loan"
+                    okButtonProps={{ danger: true }}
+                    cancelText="Keep"
+                    onConfirm={() => handleCancel(r.id)}
+                  >
+                    <Tooltip title="Cancel: undo a loan raised in error">
+                      <Button type="link" size="small" danger icon={<StopOutlined />}>Cancel</Button>
+                    </Tooltip>
+                  </Popconfirm>
+                </>
+              )}
+            </Space>
+          );
+        },
       },
     ],
     [navigate, canUpdate, handleClose, handleCancel],
@@ -119,7 +160,21 @@ const LoanList = () => {
 
   return (
     <>
-      <PageHeader title="Loans & Advances" />
+      {/*
+        This said "Loans & Advances" while the screen only ever listed loans,
+        so the obvious conclusion was that advances belonged here and the button
+        for them was missing. They are separate records with separate recovery
+        rules and live on their own screen; the header now says what this one is
+        and points at the other.
+      */}
+      <PageHeader
+        title="Loans"
+        extra={
+          <Button type="link" onClick={() => navigate('/hr/advances')}>
+            Salary Advances
+          </Button>
+        }
+      />
       <Row gutter={16} style={{ marginBottom: 16 }} align="middle">
         <Col>
           <Select
@@ -143,10 +198,11 @@ const LoanList = () => {
       <Table
         rowKey="id"
         loading={loading}
-        dataSource={filteredData}
+        dataSource={data}
         columns={columns}
-        scroll={{ x: 1100 }}
-        pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} loans` }}
+        scroll={{ x: 1300 }}
+        pagination={getTablePagination(pagination, 'loans')}
+        onChange={handleTableChange}
       />
       <LoanDrawer
         open={drawerOpen}

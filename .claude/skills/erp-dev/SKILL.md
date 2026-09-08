@@ -66,8 +66,8 @@ These banners ensure the user always knows what the agent is doing. Never skip t
 
 | Repo | Path | Stack |
 |------|------|-------|
-| **UI** | `f:/Ranjith/project/RK/Repos/avarsh-erp-ui` | React 19 + Vite 7 + Ant Design 6.x |
-| **API** | `f:/Ranjith/project/RK/Repos/erp-purchase` | Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway |
+| **UI** | `e:/avarsh-project/avarsh-erp-ui` | React 19 + Vite 7 + Ant Design 6.x |
+| **API** | `e:/avarsh-project/erp-purchase` | Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway |
 
 **API Base URL:** `https://api.avarshai.com/api/v1/`
 
@@ -80,7 +80,7 @@ These are cross-cutting integrity traps that corrupt data silently. Before editi
 | Subsystem | Landmine | Reference |
 |-----------|----------|-----------|
 | **Approval Flows** (`apv_*` tables — used by PO, Costing, Order, GRN, Work Order, Cutting PO, Production PO) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate 6 with "Could not generate fetch". | [`referential-integrity-patterns.md` → ⚠️ Approval Flow Integrity (CRITICAL)](.claude/skills/erp-dev/references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
-| **Flyway Migrations V1–V34** | Pushed to production — **immutable**. Never edit. Add a new V* file. | `CLAUDE.md` |
+| **Flyway Migrations V1–V28** | Pushed to production — **immutable**. Never edit. Add a new V* file. | [`migration-patterns.md`](.claude/skills/erp-dev/references/migration-patterns.md) |
 | **BOM PO-generated lines** | Locked once a PO is generated against them. | [`referential-integrity-patterns.md` → Line-Level Edit Protection](.claude/skills/erp-dev/references/referential-integrity-patterns.md) |
 
 **Trigger words that mean STOP and read the rules first:**
@@ -101,7 +101,7 @@ A prompt is **action-ready** if it satisfies enough of these to execute without 
 | R1 | NAMES the target repo, module, file, or component when applicable |
 | R2 | STATES the user-visible outcome or business intent |
 | R3 | SCOPE identifiable: new feature / bug fix / refactor / read-only / spike |
-| R4 | DEPRECATION/MIGRATION concerns flagged (AntD 6.x deprecated props; immutable Flyway V1–V34) |
+| R4 | DEPRECATION/MIGRATION concerns flagged (AntD 6.x deprecated props; immutable Flyway V1–V28) |
 | R5 | DEPENDENCIES named: API endpoint, master data, permissions, StoreContext, SessionContext, axiosInstance |
 | R6 | SUCCESS CRITERIA defined (browser works, no console errors, build green, etc.) |
 | R7 | AVOIDS vague verbs ("fix it", "update X", "make it better") without a concrete target |
@@ -132,7 +132,7 @@ Apply these to every task — they compound across a session.
 - Reference files by `[name.jsx:42](path#L42)` — do not paste file content into responses
 - Cite ERP master data via StoreContext keys (e.g. `partyTypes`, `uomList`) — do not re-fetch or describe
 - Use existing references in `.claude/skills/erp-dev/references/*.md` instead of re-deriving patterns
-- CLAUDE.md is already in context — do not re-read it
+- No CLAUDE.md exists in either repo — rely on the reference files and the code itself
 
 **Subagent prompts MUST be self-contained and ERP-engineered:**
 - Pass file paths + line numbers, not "the file you discussed"
@@ -166,7 +166,7 @@ The `erp_prompt_enhancer` UserPromptSubmit hook DEFERS to this skill's plan-mode
 
 You have full tool access. Execute everything yourself:
 - File reads, searches, edits, writes — use Read, Grep, Glob, Edit, Write
-- Build verification — run `npm run build`, `./mvnw compile` via Bash
+- Build verification — run `npm run build`, `./gradlew compileJava` via Bash
 - File creation — use Write tool
 - Progress tracking — use TodoWrite
 
@@ -213,7 +213,7 @@ When implementing full-stack features, ALWAYS follow this order:
 | Read/search/grep any file in either repo | Always execute |
 | Create/edit files in either repo | Always execute |
 | `npm run build` (UI repo) | Always execute |
-| `./mvnw compile -q` (API repo) | Always execute |
+| `./gradlew compileJava -q` (API repo) | Always execute |
 | TodoWrite for progress | Always execute |
 | EnterPlanMode / ExitPlanMode | Always execute |
 | Pull skills from skills.sh | Always execute (notify user in chat) |
@@ -401,7 +401,7 @@ Before writing ANY code, verify:
 - [ ] Pagination response shape handled correctly
 
 ### Flyway Safety
-- [ ] V1-V34 migrations UNTOUCHED (immutable, pushed to production)
+- [ ] V1-V28 migrations UNTOUCHED (immutable, pushed to production)
 - [ ] New migration version is V{next sequential number}
 - [ ] NOT NULL columns on existing tables have DEFAULT values
 - [ ] No column renames without data migration plan
@@ -415,10 +415,10 @@ After completing implementation, run these automatically:
 ### Step 1: Build Verification
 ```bash
 # UI repo
-cd f:/Ranjith/project/RK/Repos/avarsh-erp-ui && npm run build
+cd e:/avarsh-project/avarsh-erp-ui && npm run build
 
 # API repo (if API changes made)
-cd f:/Ranjith/project/RK/Repos/erp-purchase && ./mvnw compile -q
+cd e:/avarsh-project/erp-purchase && ./gradlew compileJava -q
 ```
 **If build fails → fix the errors before reporting done. Do NOT ask the user to fix.**
 
@@ -936,7 +936,7 @@ When reviewing code (self-review or subagent review), evaluate across ALL 7 dime
 - Double-submit prevention? Proper AbortController usage?
 
 ### 5. Backend Quality (if API changes)
-- Flyway migration immutability respected? (V1-V34 untouched)
+- Flyway migration immutability respected? (V1-V28 untouched)
 - `@Transactional` on write methods? `@EntityGraph` / JOIN FETCH for list queries?
 - MapStruct mappings complete? DTO validation annotations present?
 

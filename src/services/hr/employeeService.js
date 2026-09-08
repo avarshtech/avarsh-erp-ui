@@ -66,9 +66,10 @@ export const updateEmployee = async (id, data) => {
  * Change employee status (ACTIVE, INACTIVE, TERMINATED, etc.).
  * PUT /api/v1/hr/employees/{id}/status?status=X
  */
-export const changeEmployeeStatus = async (id, status) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/status`, null, {
-    params: { status },
-  });
+export const changeEmployeeStatus = async (id, status, dateOfLeaving) => {
+  const params = { status };
+  // Only sent when leaving; the server clears it on a return to ACTIVE.
+  if (dateOfLeaving) params.dateOfLeaving = dateOfLeaving;
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/status`, null, { params });
   return response.data;
 };

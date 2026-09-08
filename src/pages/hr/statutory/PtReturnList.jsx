@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, DatePicker } from 'antd';
-import { PlusOutlined, CheckOutlined, EyeOutlined } from '@ant-design/icons';
+import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getAllPtReturns, generatePtReturn, filePtReturn, getPtReturnRecords } from '../../../services/hr/statutoryService';
+import { getAllPtReturns, generatePtReturn, filePtReturn } from '../../../services/hr/statutoryService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
@@ -15,6 +17,7 @@ const formatCurrency = (val) =>
 
 const PtReturnList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -31,11 +34,11 @@ const PtReturnList = () => {
       const result = await getAllPtReturns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load PT returns');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -62,7 +65,7 @@ const PtReturnList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return; // form validation
-      message.error(err?.response?.data?.message || 'Failed to generate PT return');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setGenerating(false);
     }
@@ -78,8 +81,8 @@ const PtReturnList = () => {
             await filePtReturn(id);
             message.success('PT return marked as filed');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to file PT return');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });
@@ -109,14 +112,14 @@ const PtReturnList = () => {
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',
       },
       {
         title: 'Total PT Amount',
-        dataIndex: 'totalAmount',
+        dataIndex: 'totalPtAmount',
         key: 'totalAmount',
         width: 150,
         align: 'right',
@@ -140,7 +143,7 @@ const PtReturnList = () => {
         render: (_, r) => (
           <Space>
             {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleMarkFiled(r.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleMarkFiled(r.id); }}>
                 Mark Filed
               </Button>
             )}
@@ -180,6 +183,7 @@ const PtReturnList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} returns` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/pt/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -195,7 +199,7 @@ const PtReturnList = () => {
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
             <Select
               placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              options={factoryOptions(factories)}
               showSearch
               optionFilterProp="label"
             />

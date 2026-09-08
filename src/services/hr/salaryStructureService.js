@@ -4,19 +4,23 @@ const BASE_URL = '/hr/salary-structures';
 
 /**
  * Get all salary structures for an employee (history).
- * GET /api/v1/hr/salary-structures/employee/{employeeId}
+ * GET /api/v1/hr/salary-structures/by-employee?employeeId=
  */
 export const getSalaryStructuresByEmployee = async (employeeId) => {
-  const response = await axiosInstance.get(`${BASE_URL}/employee/${employeeId}`);
+  const response = await axiosInstance.get(`${BASE_URL}/by-employee`, {
+    params: { employeeId },
+  });
   return response.data ?? [];
 };
 
 /**
  * Get the current (latest effective) salary structure for an employee.
- * GET /api/v1/hr/salary-structures/employee/{employeeId}/current
+ * GET /api/v1/hr/salary-structures/current?employeeId=
  */
 export const getCurrentSalaryStructure = async (employeeId) => {
-  const response = await axiosInstance.get(`${BASE_URL}/employee/${employeeId}/current`);
+  const response = await axiosInstance.get(`${BASE_URL}/current`, {
+    params: { employeeId },
+  });
   return response.data;
 };
 

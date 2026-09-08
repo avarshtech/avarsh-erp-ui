@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, InputNumber } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
@@ -14,6 +16,7 @@ const formatCurrency = (val) =>
 
 const ElEncashmentList = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -30,11 +33,11 @@ const ElEncashmentList = () => {
       const result = await getAllElEncashmentRuns();
       setData(Array.isArray(result) ? result : result?.content || []);
     } catch {
-      message.error('Failed to load EL encashment runs');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -61,7 +64,7 @@ const ElEncashmentList = () => {
       fetchData();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to process EL encashment');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setProcessing(false);
     }
@@ -77,8 +80,8 @@ const ElEncashmentList = () => {
             await approveElEncashment(id);
             message.success('EL encashment approved');
             fetchData();
-          } catch (err) {
-            message.error(err?.response?.data?.message || 'Failed to approve EL encashment');
+          } catch {
+            // axiosInstance already toasts the server's message; adding another here showed two.
           }
         },
       });
@@ -111,7 +114,7 @@ const ElEncashmentList = () => {
       },
       {
         title: 'Employees',
-        dataIndex: 'employeeCount',
+        dataIndex: 'totalEmployees',
         key: 'employeeCount',
         width: 100,
         align: 'right',
@@ -142,7 +145,7 @@ const ElEncashmentList = () => {
         render: (_, r) => (
           <Space>
             {r.status === 'CALCULATED' && (
-              <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(r.id)}>
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(r.id); }}>
                 Approve
               </Button>
             )}
@@ -182,6 +185,7 @@ const ElEncashmentList = () => {
         loading={loading}
         scroll={{ x: 850 }}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (t) => `Total ${t} runs` }}
+        onRow={(r) => ({ onClick: () => navigate(`/hr/statutory/el/${r.id}`), style: { cursor: 'pointer' } })}
       />
 
       <Modal
@@ -191,13 +195,13 @@ const ElEncashmentList = () => {
         onCancel={() => setProcessOpen(false)}
         confirmLoading={processing}
         afterClose={() => form.resetFields()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
             <Select
               placeholder="Select factory"
-              options={factories.map((f) => ({ value: f.id, label: f.name }))}
+              options={factoryOptions(factories)}
               showSearch
               optionFilterProp="label"
             />

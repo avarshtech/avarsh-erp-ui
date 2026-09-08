@@ -57,7 +57,7 @@ const DesignationMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load designations');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

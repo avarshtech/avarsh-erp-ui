@@ -98,6 +98,8 @@ const EmployeeView = lazy(() => import('./pages/hr/employee/EmployeeView'));
 // Attendance & Leave (lazy-loaded)
 const AttendanceCalendar = lazy(() => import('./pages/hr/attendance/AttendanceCalendar'));
 const AttendanceBulkEntry = lazy(() => import('./pages/hr/attendance/AttendanceBulkEntry'));
+const AttendanceEntry = lazy(() => import('./pages/hr/attendance/AttendanceEntry'));
+const AttendanceImport = lazy(() => import('./pages/hr/attendance/AttendanceImport'));
 const MissPunchList = lazy(() => import('./pages/hr/attendance/MissPunchList'));
 const GatePassList = lazy(() => import('./pages/hr/attendance/GatePassList'));
 const LeaveApplicationList = lazy(() => import('./pages/hr/leave/LeaveApplicationList'));
@@ -108,12 +110,17 @@ const PayrollWizard = lazy(() => import('./pages/hr/payroll/PayrollWizard'));
 const PayrollRunView = lazy(() => import('./pages/hr/payroll/PayrollRunView'));
 const SalarySlipView = lazy(() => import('./pages/hr/payroll/SalarySlipView'));
 const LoanList = lazy(() => import('./pages/hr/loan/LoanList'));
+const AdvanceList = lazy(() => import('./pages/hr/loan/AdvanceList'));
 const LoanView = lazy(() => import('./pages/hr/loan/LoanView'));
 // Bonus, Statutory, F&F (lazy-loaded)
 const BonusList = lazy(() => import('./pages/hr/bonus/BonusList'));
 const BonusWizard = lazy(() => import('./pages/hr/bonus/BonusWizard'));
+const BonusRunView = lazy(() => import('./pages/hr/bonus/BonusRunView'));
 const PtReturnList = lazy(() => import('./pages/hr/statutory/PtReturnList'));
+const PtReturnView = lazy(() => import('./pages/hr/statutory/PtReturnView'));
 const ElEncashmentList = lazy(() => import('./pages/hr/statutory/ElEncashmentList'));
+const ContributionFiling = lazy(() => import('./pages/hr/statutory/ContributionFiling'));
+const ElEncashmentRunView = lazy(() => import('./pages/hr/statutory/ElEncashmentRunView'));
 const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
@@ -382,6 +389,8 @@ const ThemedApp = () => {
             {/* Attendance */}
             <Route path="hr/attendance/calendar" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><AttendanceCalendar /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/bulk" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceBulkEntry /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/entry" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceEntry /></Suspense></PermissionRoute>} />
+            <Route path="hr/attendance/import" element={<PermissionRoute module="hr-attendance" operation="add"><Suspense fallback={<PageSkeleton />}><AttendanceImport /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/miss-punch" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><MissPunchList /></Suspense></PermissionRoute>} />
             <Route path="hr/attendance/gate-pass" element={<PermissionRoute module="hr-attendance"><Suspense fallback={<PageSkeleton />}><GatePassList /></Suspense></PermissionRoute>} />
             {/* Leave */}
@@ -395,15 +404,22 @@ const ThemedApp = () => {
             {/* Loans */}
             <Route path="hr/loans" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanList /></Suspense></PermissionRoute>} />
             <Route path="hr/loans/:id" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><LoanView /></Suspense></PermissionRoute>} />
+            <Route path="hr/advances" element={<PermissionRoute module="hr-loans"><Suspense fallback={<PageSkeleton />}><AdvanceList /></Suspense></PermissionRoute>} />
             {/* Bonus */}
             <Route path="hr/bonus" element={<PermissionRoute module="hr-bonus"><Suspense fallback={<PageSkeleton />}><BonusList /></Suspense></PermissionRoute>} />
             <Route path="hr/bonus/new" element={<PermissionRoute module="hr-bonus" operation="add"><Suspense fallback={<PageSkeleton />}><BonusWizard /></Suspense></PermissionRoute>} />
+            <Route path="hr/bonus/:id" element={<PermissionRoute module="hr-bonus"><Suspense fallback={<PageSkeleton />}><BonusRunView /></Suspense></PermissionRoute>} />
             {/* Statutory */}
             <Route path="hr/statutory/pt" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><PtReturnList /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/pt/:id" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><PtReturnView /></Suspense></PermissionRoute>} />
             <Route path="hr/statutory/el" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ElEncashmentList /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/el/:id" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ElEncashmentRunView /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/pf" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ContributionFiling scheme="PF" /></Suspense></PermissionRoute>} />
+            <Route path="hr/statutory/esi" element={<PermissionRoute module="hr-statutory"><Suspense fallback={<PageSkeleton />}><ContributionFiling scheme="ESI" /></Suspense></PermissionRoute>} />
             {/* F&F Settlement */}
             <Route path="hr/fnf" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfList /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/new" element={<PermissionRoute module="hr-fnf" operation="add"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
+            <Route path="hr/fnf/edit/:id" element={<PermissionRoute module="hr-fnf" operation="update"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/:id" element={<PermissionRoute module="hr-fnf"><Suspense fallback={<PageSkeleton />}><FnfView /></Suspense></PermissionRoute>} />
             {/* Reports (lazy-loaded) */}
             <Route path="reports/list" element={<PermissionRoute module="reports"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />

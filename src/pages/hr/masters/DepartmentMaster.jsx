@@ -50,7 +50,7 @@ const DepartmentMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load departments');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }

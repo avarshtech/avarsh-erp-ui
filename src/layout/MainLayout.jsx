@@ -45,6 +45,7 @@ import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { consumeBuildChange, getDisplayVersion } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
@@ -489,11 +490,22 @@ const MainLayoutInner = () => {
         { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
         { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
         { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
+        // These screens existed with working routes but no navigation entry, so
+        // they were unreachable unless the URL was typed by hand.
+        { key: "/hr/attendance/entry", label: "Mark Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/import", label: "Import Attendance", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/miss-punch", label: "Miss Punch", moduleId: "hr-attendance" },
+        { key: "/hr/attendance/gate-pass", label: "Gate Pass", moduleId: "hr-attendance" },
         { key: "/hr/leaves", label: "Leave Mgmt", moduleId: "hr-leave" },
+        { key: "/hr/leaves/balances", label: "Leave Balances", moduleId: "hr-leave" },
         { key: "/hr/payroll", label: "Payroll", moduleId: "hr-payroll" },
-        { key: "/hr/loans", label: "Loans & Advances", moduleId: "hr-loans" },
+        { key: "/hr/loans", label: "Loans", moduleId: "hr-loans" },
+        { key: "/hr/advances", label: "Salary Advances", moduleId: "hr-loans" },
         { key: "/hr/bonus", label: "Bonus", moduleId: "hr-bonus" },
-        { key: "/hr/statutory/pt", label: "Statutory", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pf", label: "PF / ECR", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/esi", label: "ESI Contribution", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
+        { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
       ],
     },
@@ -613,11 +625,22 @@ const MainLayoutInner = () => {
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
+    // Each attendance screen has its own menu entry, so highlight the specific
+    // one rather than always falling back to the calendar.
+    if (path.startsWith('/hr/attendance/entry') || path.startsWith('/hr/attendance/bulk')) return ['/hr/attendance/entry'];
+    if (path.startsWith('/hr/attendance/import')) return ['/hr/attendance/import'];
+    if (path.startsWith('/hr/attendance/miss-punch')) return ['/hr/attendance/miss-punch'];
+    if (path.startsWith('/hr/attendance/gate-pass')) return ['/hr/attendance/gate-pass'];
     if (path.startsWith('/hr/attendance')) return ['/hr/attendance/calendar'];
+    if (path.startsWith('/hr/leaves/balances')) return ['/hr/leaves/balances'];
     if (path.startsWith('/hr/leaves')) return ['/hr/leaves'];
     if (path.startsWith('/hr/payroll')) return ['/hr/payroll'];
+    if (path.startsWith('/hr/advances')) return ['/hr/advances'];
     if (path.startsWith('/hr/loans')) return ['/hr/loans'];
     if (path.startsWith('/hr/bonus')) return ['/hr/bonus'];
+    if (path.startsWith('/hr/statutory/pf')) return ['/hr/statutory/pf'];
+    if (path.startsWith('/hr/statutory/esi')) return ['/hr/statutory/esi'];
+    if (path.startsWith('/hr/statutory/el')) return ['/hr/statutory/el'];
     if (path.startsWith('/hr/statutory')) return ['/hr/statutory/pt'];
     if (path.startsWith('/hr/fnf')) return ['/hr/fnf'];
     return [path];
@@ -955,7 +978,12 @@ const MainLayoutInner = () => {
               outline: 'none',
             }}
           >
-            <Outlet />
+            {/* A render error used to unmount the whole tree and leave a white
+                page, indistinguishable from a slow load. Wrapping the routed
+                content keeps the shell and shows what went wrong. */}
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </Content>
         </Layout>
         <LiveActivityFeedWindow />

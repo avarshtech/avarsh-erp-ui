@@ -5,12 +5,18 @@ import { createSalaryStructure, updateSalaryStructure } from '../../../services/
 
 const SALARY_FIELDS = ['basic', 'da', 'hra', 'conveyance', 'washingAllowance', 'otherAllowance'];
 
-const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, editData, onSuccess }) => {
+const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, currentStructure, editData, onSuccess }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const isEdit = Boolean(editData?.id);
 
   const watchedValues = Form.useWatch([], form);
+
+  // Start date of the structure this one will supersede, if any.
+  const supersededFrom = useMemo(
+    () => (currentStructure?.effectiveFrom ? dayjs(currentStructure.effectiveFrom) : null),
+    [currentStructure],
+  );
 
   const grossSalary = useMemo(() => {
     if (!watchedValues) return 0;
@@ -49,7 +55,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, editDa
       onSuccess?.();
     } catch (err) {
       if (err?.errorFields) return;
-      message.error(err?.response?.data?.message || 'Failed to save salary structure');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   };
 
@@ -74,8 +80,34 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, editDa
       )}
 
       <Form form={form} layout="vertical" initialValues={{ basic: 0, da: 0, hra: 0, conveyance: 0, washingAllowance: 0, otherAllowance: 0 }}>
-        <Form.Item label="Effective From" name="effectiveFrom" rules={[{ required: true, message: 'Effective date is required' }]}>
-          <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+        <Form.Item
+          label="Effective From"
+          name="effectiveFrom"
+          extra={!isEdit && supersededFrom
+            ? `Supersedes the structure effective ${supersededFrom.format('DD-MMM-YYYY')}`
+            : undefined}
+          rules={[
+            { required: true, message: 'Effective date is required' },
+            {
+              // A new structure closes the current one the day before it starts,
+              // so it must begin after the structure it replaces.
+              validator: (_, value) => {
+                if (isEdit || !value || !supersededFrom) return Promise.resolve();
+                return value.isAfter(supersededFrom, 'day')
+                  ? Promise.resolve()
+                  : Promise.reject(new Error(
+                      `Must be after the current structure's start date (${supersededFrom.format('DD-MMM-YYYY')})`));
+              },
+            },
+          ]}
+        >
+          <DatePicker
+            style={{ width: '100%' }}
+            format="DD-MMM-YYYY"
+            disabledDate={!isEdit && supersededFrom
+              ? (d) => d && !d.isAfter(supersededFrom, 'day')
+              : undefined}
+          />
         </Form.Item>
         <Form.Item label="Basic" name="basic" rules={[{ required: true }]}>
           <InputNumber prefix="₹" min={0} style={{ width: '100%' }} />

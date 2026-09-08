@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space } from 'antd';
-import { PrinterOutlined, CheckCircleOutlined, DollarOutlined } from '@ant-design/icons';
+import { App, Card, Descriptions, Tag, Button, Spin, Row, Col, Divider, Space, Alert } from 'antd';
+import { PrinterOutlined, CheckCircleOutlined, DollarOutlined, EditOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { getFnfById, approveFnf, settleFnf } from '../../../services/hr/fnfService';
+import { getFnfById, approveFnf, settleFnf, cancelFnf } from '../../../services/hr/fnfService';
+import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 
@@ -21,7 +22,7 @@ const AmountRow = ({ label, value, bold }) => (
 );
 
 const FnfView = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -34,15 +35,39 @@ const FnfView = () => {
       const result = await getFnfById(id);
       setData(result);
     } catch {
-      message.error('Failed to load F&F settlement');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [id, message]);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+
+  const handleCancel = useCallback(() => {
+    modal.confirm({
+      title: 'Cancel this settlement?',
+      content: 'The settlement is abandoned. Nothing has been approved or paid, and the employee '
+        + 'stays active, so nothing needs reversing.',
+      okText: 'Cancel Settlement',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep',
+      onOk: async () => {
+        setActionLoading(true);
+        try {
+          await cancelFnf(id);
+          message.success('Settlement cancelled');
+          fetchData();
+        } catch {
+          // axiosInstance already toasts the server's message.
+        } finally {
+          setActionLoading(false);
+        }
+      },
+    });
+  }, [id, message, modal, fetchData]);
 
   const handleApprove = useCallback(async () => {
     setActionLoading(true);
@@ -50,8 +75,8 @@ const FnfView = () => {
       await approveFnf(id);
       message.success('F&F settlement approved');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setActionLoading(false);
     }
@@ -63,8 +88,8 @@ const FnfView = () => {
       await settleFnf(id);
       message.success('F&F settlement finalized');
       fetchData();
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to settle');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setActionLoading(false);
     }
@@ -84,8 +109,17 @@ const FnfView = () => {
   }
 
   const statusInfo = statusMap[data.status];
-  const totalEarnings = (data.pendingSalary || 0) + (data.elEncashment || 0) + (data.bonusProRata || 0) + (data.gratuity || 0) + (data.otherEarnings || 0);
-  const totalDeductions = (data.outstandingLoan || 0) + (data.outstandingAdvance || 0) + (data.noticePeriodRecovery || 0) + (data.otherDeductions || 0);
+  // The server stores all three totals; recomputing is only a fallback for
+  // older rows saved before they were persisted.
+  const totalEarnings = data.totalEarnings != null ? data.totalEarnings
+    : (data.pendingSalary || 0) + (data.elEncashmentAmount || 0) + (data.bonusProrata || 0) + (data.gratuity || 0) + (data.otherEarnings || 0);
+  const totalDeductions = data.totalDeductions != null ? data.totalDeductions
+    : (data.outstandingLoan || 0) + (data.outstandingAdvance || 0) + (data.noticePeriodRecovery || 0) + (data.otherDeductions || 0);
+  // Approve and Settle both authorise a payout, so both sit behind the same
+  // permission. Note this is a UI gate only - the API does not yet enforce
+  // per-operation permissions on any module.
+  const canApprove = hasPermission('hr-fnf', 'approve');
+
   const netSettlement = data.netSettlement != null ? data.netSettlement : totalEarnings - totalDeductions;
 
   return (
@@ -95,12 +129,28 @@ const FnfView = () => {
         onBack={() => navigate('/hr/fnf')}
         extra={
           <Space>
-            {data.status === 'CALCULATED' && (
+            {data.status === 'CALCULATED' && canApprove && (
               <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleApprove} loading={actionLoading}>
                 Approve
               </Button>
             )}
-            {data.status === 'APPROVED' && (
+            {/* The editable form is where anything gets changed - amounts, the
+                last working day, the separation reason - and it was reachable
+                only while creating a settlement, so coming back through the
+                list left no way to alter one. */}
+            {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
+              <Button icon={<EditOutlined />} onClick={() => navigate(`/hr/fnf/edit/${id}`)}>
+                Edit / Recalculate
+              </Button>
+            )}
+            {/* Calculated for the wrong person is a real case, and there was no
+                way back short of leaving it in the list. */}
+            {['DRAFT', 'CALCULATED'].includes(data.status) && canApprove && (
+              <Button danger onClick={handleCancel} loading={actionLoading}>
+                Cancel
+              </Button>
+            )}
+            {data.status === 'APPROVED' && canApprove && (
               <Button type="primary" icon={<DollarOutlined />} onClick={handleSettle} loading={actionLoading}>
                 Settle
               </Button>
@@ -115,7 +165,7 @@ const FnfView = () => {
       <Card style={{ marginBottom: 16 }}>
         <Descriptions column={{ xs: 1, sm: 2, md: 3 }} bordered size="small">
           <Descriptions.Item label="Employee Name">{data.employeeName || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Employee Code">{data.employeeCode || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Employee Code">{data.employeeNo || '-'}</Descriptions.Item>
           <Descriptions.Item label="Department">{data.departmentName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Designation">{data.designationName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Date of Joining">
@@ -135,8 +185,8 @@ const FnfView = () => {
         <Col xs={24} md={12}>
           <Card title="Earnings" styles={{ header: { background: '#f6ffed', borderBottom: '2px solid #b7eb8f' } }}>
             <AmountRow label="Pending Salary" value={data.pendingSalary} />
-            <AmountRow label="EL Encashment" value={data.elEncashment} />
-            <AmountRow label="Bonus Pro-rata" value={data.bonusProRata} />
+            <AmountRow label="EL Encashment" value={data.elEncashmentAmount} />
+            <AmountRow label="Bonus Pro-rata" value={data.bonusProrata} />
             <AmountRow label="Gratuity" value={data.gratuity} />
             <AmountRow label="Other Earnings" value={data.otherEarnings} />
             <Divider style={{ margin: '8px 0' }} />
@@ -156,7 +206,17 @@ const FnfView = () => {
       </Row>
 
       <Card>
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                  {netSettlement < 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <Alert
+                type="warning"
+                showIcon
+                message="This settlement is negative"
+                description="Deductions exceed earnings, so the employee owes the company this amount rather than being paid it. Settling records the figure; recovering it is a separate matter."
+              />
+            </div>
+          )}
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <span style={{ fontSize: 24, fontWeight: 700 }}>
             Net Settlement:{' '}
             <span style={{ color: netSettlement >= 0 ? '#52c41a' : '#ff4d4f' }}>
@@ -165,6 +225,7 @@ const FnfView = () => {
           </span>
         </div>
       </Card>
+
     </>
   );
 };

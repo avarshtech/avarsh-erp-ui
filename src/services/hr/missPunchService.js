@@ -46,7 +46,9 @@ export const approveMissPunch = async (id) => {
  * Reject a miss punch request.
  * PUT /api/v1/hr/miss-punch/{id}/reject
  */
-export const rejectMissPunch = async (id) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`);
+// The API reads the rejection reason from the request body. This previously
+// sent no body at all, so the reason was always lost.
+export const rejectMissPunch = async (id, reason) => {
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, { reason });
   return response.data;
 };

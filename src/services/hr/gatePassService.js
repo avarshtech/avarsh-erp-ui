@@ -46,7 +46,7 @@ export const approveGatePass = async (id) => {
  * Reject a gate pass request.
  * PUT /api/v1/hr/gate-pass/{id}/reject
  */
-export const rejectGatePass = async (id) => {
-  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`);
+export const rejectGatePass = async (id, reason) => {
+  const response = await axiosInstance.put(`${BASE_URL}/${id}/reject`, { reason });
   return response.data;
 };

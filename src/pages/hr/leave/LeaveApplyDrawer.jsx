@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Drawer, Form, Select, DatePicker, Switch, Input, Space, Button, Typography } from 'antd';
+import { App, Drawer, Form, Select, DatePicker, Radio, Input, Space, Button, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { applyLeave, getLeaveBalances } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { HALF_DAY_TYPE } from '../../../utils/hrConstants';
+import { employeeOptions } from '../../../utils/hrLabels';
 
 const { Text } = Typography;
 
@@ -13,11 +14,14 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [balances, setBalances] = useState([]);
-  const isHalfDay = Form.useWatch('isHalfDay', form);
+  const durationType = Form.useWatch('durationType', form) ?? 'SINGLE';
+  const isRange = durationType === 'RANGE';
   const selectedEmployeeId = Form.useWatch('employeeId', form);
   const selectedLeaveTypeId = Form.useWatch('leaveTypeId', form);
   const fromDate = Form.useWatch('fromDate', form);
   const toDate = Form.useWatch('toDate', form);
+  const leaveDate = Form.useWatch('leaveDate', form);
+  const selectedEmployeeCategory = employees.find((e) => e.id === selectedEmployeeId)?.category;
 
   useEffect(() => {
     searchEmployees({ status: 'ACTIVE', size: 500 })
@@ -35,30 +39,48 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
     }
   }, [selectedEmployeeId]);
 
+  // Changing the employee can make an already-picked type inapplicable. Leaving
+  // it selected would submit a type this employee cannot take.
+  useEffect(() => {
+    if (!selectedLeaveTypeId || !selectedEmployeeCategory) return;
+    const picked = leaveTypes.find((lt) => lt.id === selectedLeaveTypeId);
+    if (picked?.applicableCategory && picked.applicableCategory !== selectedEmployeeCategory) {
+      form.setFieldValue('leaveTypeId', undefined);
+    }
+  }, [selectedEmployeeCategory, selectedLeaveTypeId, leaveTypes, form]);
+
   const getSelectedBalance = useCallback(() => {
     if (!selectedLeaveTypeId || !balances.length) return null;
     return balances.find((b) => b.leaveTypeId === selectedLeaveTypeId);
   }, [selectedLeaveTypeId, balances]);
 
   const calculateDays = useCallback(() => {
+    if (durationType === 'HALF') return leaveDate ? 0.5 : 0;
+    if (durationType === 'SINGLE') return leaveDate ? 1 : 0;
     if (!fromDate || !toDate) return 0;
     const diff = toDate.diff(fromDate, 'day') + 1;
-    if (diff <= 0) return 0;
-    if (isHalfDay) return 0.5;
-    return diff;
-  }, [fromDate, toDate, isHalfDay]);
+    return diff > 0 ? diff : 0;
+  }, [durationType, leaveDate, fromDate, toDate]);
 
   const handleSubmit = useCallback(async () => {
     try {
       const values = await form.validateFields();
       setSubmitting(true);
+      // Half and single day collapse to the same date on both ends, so the API
+      // contract stays a from/to range regardless of how it was entered.
+      const isRangeMode = values.durationType === 'RANGE';
+      const single = values.leaveDate?.format('YYYY-MM-DD');
+
       const payload = {
         employeeId: values.employeeId,
         leaveTypeId: values.leaveTypeId,
-        fromDate: values.fromDate.format('YYYY-MM-DD'),
-        toDate: values.toDate.format('YYYY-MM-DD'),
-        isHalfDay: values.isHalfDay || false,
-        halfDayType: values.isHalfDay ? values.halfDayType : null,
+        fromDate: isRangeMode ? values.fromDate.format('YYYY-MM-DD') : single,
+        toDate: isRangeMode ? values.toDate.format('YYYY-MM-DD') : single,
+        isHalfDay: values.durationType === 'HALF',
+        halfDayType: values.durationType === 'HALF' ? values.halfDayType : null,
+        // days is derived by the server from the dates and the half-day flag.
+        // It used to be sent from here and trusted, which put the number that
+        // gates the balance check in the browser's hands.
         reason: values.reason,
       };
       await applyLeave(payload);
@@ -68,7 +90,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
       onClose?.();
     } catch (err) {
       if (err.errorFields) return;
-      message.error('Failed to apply leave');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }
@@ -77,9 +99,21 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
   const balance = getSelectedBalance();
   const days = calculateDays();
 
-  const leaveTypeOptions = leaveTypes.map((lt) => {
+  // A leave type can be limited to one employee category. Every active type was
+  // being offered regardless, so a STAFF employee could pick a WORKER-only type;
+  // the server then refused to provision a balance for it and the application
+  // failed on submit with no hint that the type was never available to them.
+  const applicableLeaveTypes = leaveTypes.filter((lt) => {
+    if (!lt.applicableCategory) return true;
+    if (!selectedEmployeeCategory) return true;
+    return lt.applicableCategory === selectedEmployeeCategory;
+  });
+
+  const leaveTypeOptions = applicableLeaveTypes.map((lt) => {
     const bal = balances.find((b) => b.leaveTypeId === lt.id);
-    const suffix = bal ? ` (Bal: ${bal.balance})` : '';
+    // closingBalance is what LeaveBalanceDTO carries; there is no `balance`,
+    // so this read "(Bal: undefined)" on every option.
+    const suffix = bal?.closingBalance != null ? ` (Bal: ${bal.closingBalance})` : '';
     return { value: lt.id, label: `${lt.name}${suffix}` };
   });
 
@@ -97,13 +131,13 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
         </Space>
       }
     >
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" initialValues={{ durationType: 'SINGLE' }}>
         <Form.Item name="employeeId" label="Employee" rules={[{ required: true, message: 'Please select an employee' }]}>
           <Select
             showSearch
             optionFilterProp="label"
             placeholder="Select Employee"
-            options={employees.map((e) => ({ value: e.id, label: `${e.employeeNo} - ${e.name}` }))}
+            options={employeeOptions(employees)}
           />
         </Form.Item>
         <Form.Item name="leaveTypeId" label="Leave Type" rules={[{ required: true, message: 'Please select leave type' }]}>
@@ -112,28 +146,63 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
         {balance && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">Available Balance: </Text>
-            <Text strong>{balance.balance}</Text>
+            <Text strong>{balance.closingBalance}</Text>
           </div>
         )}
-        <Form.Item name="fromDate" label="From Date" rules={[{ required: true, message: 'Please select from date' }]}>
-          <DatePicker style={{ width: '100%' }} />
+        {/* A half day or single day needs one date, not a range. Asking for
+            From and To in those cases made the user enter the same date twice. */}
+        <Form.Item name="durationType" label="Duration">
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            options={[
+              { value: 'HALF', label: 'Half Day' },
+              { value: 'SINGLE', label: 'One Day' },
+              { value: 'RANGE', label: 'Multiple Days' },
+            ]}
+          />
         </Form.Item>
-        <Form.Item name="toDate" label="To Date" rules={[{ required: true, message: 'Please select to date' }]}>
-          <DatePicker style={{ width: '100%' }} />
-        </Form.Item>
+
+        {isRange ? (
+          <>
+            <Form.Item name="fromDate" label="From Date" rules={[{ required: true, message: 'Please select from date' }]}>
+              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            </Form.Item>
+            <Form.Item
+              name="toDate"
+              label="To Date"
+              dependencies={['fromDate']}
+              rules={[
+                { required: true, message: 'Please select to date' },
+                ({ getFieldValue }) => ({
+                  validator: (_, value) => {
+                    const from = getFieldValue('fromDate');
+                    if (!value || !from || !value.isBefore(from, 'day')) return Promise.resolve();
+                    return Promise.reject(new Error('To date cannot be before from date'));
+                  },
+                }),
+              ]}
+            >
+              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            </Form.Item>
+          </>
+        ) : (
+          <Form.Item name="leaveDate" label="Leave Date" rules={[{ required: true, message: 'Please select the leave date' }]}>
+            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+          </Form.Item>
+        )}
+
+        {durationType === 'HALF' && (
+          <Form.Item name="halfDayType" label="Half Day Type" rules={[{ required: true, message: 'Please select half day type' }]}>
+            <Select options={HALF_DAY_TYPE} placeholder="Select Half Day Type" />
+          </Form.Item>
+        )}
+
         {days > 0 && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">Total Days: </Text>
             <Text strong>{days}</Text>
           </div>
-        )}
-        <Form.Item name="isHalfDay" label="Half Day" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-        {isHalfDay && (
-          <Form.Item name="halfDayType" label="Half Day Type" rules={[{ required: true, message: 'Please select half day type' }]}>
-            <Select options={HALF_DAY_TYPE} placeholder="Select Half Day Type" />
-          </Form.Item>
         )}
         <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please enter a reason' }]}>
           <Input.TextArea rows={3} placeholder="Reason for leave" />

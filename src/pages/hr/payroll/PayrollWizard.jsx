@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Result } from 'antd';
+import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statistic, Space, Spin, Result, Alert, Tag, Collapse } from 'antd';
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords } from '../../../services/hr/payrollService';
+import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords, validatePayrollRun } from '../../../services/hr/payrollService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import SalaryRecordDrawer from './SalaryRecordDrawer';
 
 const MONTH_OPTIONS = [
   { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -21,6 +23,10 @@ const PayrollWizard = () => {
   const navigate = useNavigate();
 
   const [current, setCurrent] = useState(0);
+  // Clicking a row opens the derivation behind its figures.
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [validation, setValidation] = useState(null);
+  const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
@@ -42,8 +48,20 @@ const PayrollWizard = () => {
       setRunData(result);
       setCurrent(1);
       message.success('Payroll run initiated');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to initiate payroll run');
+
+      // Check the inputs straight away. Processing silently skips anyone
+      // without a salary structure, so problems are worth surfacing before
+      // any numbers are calculated.
+      setValidating(true);
+      try {
+        setValidation(await validatePayrollRun(result.id));
+      } catch {
+        setValidation(null);
+      } finally {
+        setValidating(false);
+      }
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -52,6 +70,10 @@ const PayrollWizard = () => {
   // Step 2 — Process
   const handleProcess = useCallback(async () => {
     if (!runData?.id) return;
+    if (validation && validation.blockingCount > 0) {
+      message.error(`${validation.blockingCount} employee(s) cannot be paid. Resolve the blocking issues first.`);
+      return;
+    }
     setLoading(true);
     try {
       const result = await processPayrollRun(runData.id);
@@ -60,12 +82,12 @@ const PayrollWizard = () => {
       setRecords(Array.isArray(recs) ? recs : recs?.content || []);
       setCurrent(2);
       message.success('Salaries processed successfully');
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to process payroll');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [runData, message]);
+  }, [runData, validation, message]);
 
   // Step 4 — Approve
   const handleApprove = useCallback(async () => {
@@ -75,8 +97,8 @@ const PayrollWizard = () => {
       await approvePayrollRun(runData.id);
       message.success('Payroll approved and finalized');
       navigate(`/hr/payroll/${runData.id}`);
-    } catch (err) {
-      message.error(err?.response?.data?.message || 'Failed to approve payroll');
+    } catch {
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -87,7 +109,11 @@ const PayrollWizard = () => {
       { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100 },
       { title: 'Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
       { title: 'Payable Days', dataIndex: 'payableDays', key: 'payableDays', width: 110, align: 'right' },
-      { title: 'Gross', dataIndex: 'grossSalary', key: 'grossSalary', width: 120, align: 'right', render: formatCurrency },
+      // There is no grossSalary on SalaryRecordDTO, so this column was empty on
+      // every row. totalEarnings is the figure that belongs beside Deductions
+      // and Net, because those three are what reconcile: earnings less
+      // deductions is net. earnedGross excludes overtime and would not.
+      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatCurrency },
       { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatCurrency },
       { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatCurrency },
       { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatCurrency },
@@ -99,7 +125,7 @@ const PayrollWizard = () => {
 
   const totals = useMemo(() => {
     const sum = (key) => records.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
-    return { gross: sum('grossSalary'), deductions: sum('totalDeductions'), net: sum('netSalary') };
+    return { earnings: sum('totalEarnings'), deductions: sum('totalDeductions'), net: sum('netSalary') };
   }, [records]);
 
   const steps = [
@@ -120,7 +146,7 @@ const PayrollWizard = () => {
             style={{ width: '100%' }}
             value={factoryId}
             onChange={setFactoryId}
-            options={factories.map((f) => ({ value: f.id, label: f.name }))}
+            options={factoryOptions(factories)}
           />
         </div>
         <Row gutter={16}>
@@ -140,11 +166,78 @@ const PayrollWizard = () => {
     </Card>,
 
     // Step 1 — Process
-    <Card key="process" style={{ maxWidth: 500 }}>
+    <Card key="process" style={{ maxWidth: 720 }}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Statistic title="Factory" value={runData?.factoryName || '-'} />
-        <Statistic title="Employees" value={runData?.totalEmployees || 0} />
-        <Button type="primary" loading={loading} onClick={handleProcess} block icon={loading ? <LoadingOutlined /> : undefined}>
+        <Row gutter={16}>
+          <Col span={8}><Statistic title="Factory" value={runData?.factoryName || '-'} /></Col>
+          <Col span={8}><Statistic title="Employees" value={validation?.totalEmployees ?? 0} /></Col>
+          <Col span={8}>
+            <Statistic
+              title="Would Be Paid"
+              value={validation?.payableEmployees ?? 0}
+              valueStyle={{ color: validation && validation.blockingCount > 0 ? '#ff4d4f' : '#52c41a' }}
+            />
+          </Col>
+        </Row>
+
+        <Spin spinning={validating}>
+          {validation && validation.blockingCount > 0 && (
+            <Alert
+              type="error"
+              showIcon
+              message={`${validation.blockingCount} employee(s) cannot be paid`}
+              description="Processing skips these employees silently, so they would simply not be paid. Fix them before processing."
+            />
+          )}
+          {validation && validation.blockingCount === 0 && validation.warningCount > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message={`${validation.warningCount} thing(s) worth checking`}
+              description="Processing can continue, but review these first."
+            />
+          )}
+          {validation && validation.blockingCount === 0 && validation.warningCount === 0 && (
+            <Alert type="success" showIcon message="All checks passed" />
+          )}
+
+          {validation?.issues?.length > 0 && (
+            <Collapse
+              size="small"
+              style={{ marginTop: 12 }}
+              items={[{
+                key: 'issues',
+                label: `Details (${validation.issues.length})`,
+                children: (
+                  <Table
+                    rowKey={(r, i) => `${r.employeeId ?? 'run'}-${r.code}-${i}`}
+                    dataSource={validation.issues}
+                    size="small"
+                    pagination={{ pageSize: 8, showSizeChanger: false }}
+                    columns={[
+                      {
+                        title: '', dataIndex: 'severity', key: 'severity', width: 96,
+                        render: (v) => <Tag color={v === 'BLOCKING' ? 'error' : 'warning'}>{v}</Tag>,
+                      },
+                      { title: 'Emp No', dataIndex: 'employeeNo', key: 'employeeNo', width: 100, render: (v) => v || '—' },
+                      { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 160, ellipsis: true, render: (v) => v || '—' },
+                      { title: 'Problem', dataIndex: 'message', key: 'message' },
+                    ]}
+                  />
+                ),
+              }]}
+            />
+          )}
+        </Spin>
+
+        <Button
+          type="primary"
+          loading={loading}
+          onClick={handleProcess}
+          block
+          disabled={validating || (validation && validation.blockingCount > 0)}
+          icon={loading ? <LoadingOutlined /> : undefined}
+        >
           Process Salaries
         </Button>
       </Space>
@@ -159,11 +252,15 @@ const PayrollWizard = () => {
         scroll={{ x: 1000 }}
         pagination={false}
         size="small"
+        onRow={(r) => ({
+          onClick: () => setSelectedRecord(r),
+          style: { cursor: 'pointer' },
+        })}
         summary={() => (
           <Table.Summary fixed>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={3}><strong>Totals</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.gross)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.earnings)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={4} colSpan={3} />
               <Table.Summary.Cell index={7} align="right"><strong>{formatCurrency(totals.deductions)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={8} align="right"><strong>{formatCurrency(totals.net)}</strong></Table.Summary.Cell>
@@ -176,9 +273,9 @@ const PayrollWizard = () => {
     // Step 3 — Approve
     <Card key="approve" style={{ maxWidth: 600 }}>
       <Row gutter={[16, 16]}>
-        <Col span={8}><Statistic title="Total Gross" value={totals.gross} precision={2} prefix="\u20B9" /></Col>
-        <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix="\u20B9" /></Col>
-        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix="\u20B9" valueStyle={{ color: '#3f8600' }} /></Col>
+        <Col span={8}><Statistic title="Total Earnings" value={totals.earnings} precision={2} prefix={'\u20B9'} /></Col>
+        <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Col>
+        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Col>
       </Row>
       <div style={{ marginTop: 24, textAlign: 'center' }}>
         <Button type="primary" size="large" loading={loading} icon={<CheckCircleOutlined />} onClick={handleApprove}>
@@ -195,6 +292,13 @@ const PayrollWizard = () => {
       <Spin spinning={loading && current > 0}>
         {stepContent[current]}
       </Spin>
+
+      <SalaryRecordDrawer
+        record={selectedRecord}
+        open={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+      />
+
       {current > 0 && current < 3 && (
         <div style={{ marginTop: 16, display: 'flex', justifyContent: 'space-between' }}>
           <Button icon={<ArrowLeftOutlined />} onClick={() => setCurrent((c) => c - 1)}>

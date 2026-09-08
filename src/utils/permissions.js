@@ -594,13 +594,13 @@ export const PERMISSION_GROUPS = [
     modules: [
       { id: 'hr-masters', name: 'HR Masters', operations: STANDARD_OPERATIONS, path: '/hr/masters' },
       { id: 'hr-employees', name: 'Employees', operations: STANDARD_OPERATIONS, path: '/hr/employees' },
-      { id: 'hr-attendance', name: 'Attendance', operations: STANDARD_OPERATIONS, path: '/hr/attendance' },
-      { id: 'hr-leave', name: 'Leave Management', operations: STANDARD_OPERATIONS, path: '/hr/leaves' },
-      { id: 'hr-payroll', name: 'Payroll', operations: STANDARD_OPERATIONS, path: '/hr/payroll' },
+      { id: 'hr-attendance', name: 'Attendance', operations: [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'], path: '/hr/attendance' },
+      { id: 'hr-leave', name: 'Leave Management', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/leaves' },
+      { id: 'hr-payroll', name: 'Payroll', operations: [...STANDARD_OPERATIONS, 'approve', 'cancel'], path: '/hr/payroll' },
       { id: 'hr-loans', name: 'Loans & Advances', operations: STANDARD_OPERATIONS, path: '/hr/loans' },
-      { id: 'hr-bonus', name: 'Bonus', operations: STANDARD_OPERATIONS, path: '/hr/bonus' },
+      { id: 'hr-bonus', name: 'Bonus', operations: [...STANDARD_OPERATIONS, 'approve', 'cancel'], path: '/hr/bonus' },
       { id: 'hr-statutory', name: 'Statutory', operations: STANDARD_OPERATIONS, path: '/hr/statutory' },
-      { id: 'hr-fnf', name: 'F&F Settlement', operations: STANDARD_OPERATIONS, path: '/hr/fnf' },
+      { id: 'hr-fnf', name: 'F&F Settlement', operations: [...STANDARD_OPERATIONS, 'approve'], path: '/hr/fnf' },
     ],
   },
   {
@@ -638,6 +638,18 @@ export const getOperationsForModule = (moduleId) => {
   if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
   if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
   if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
+  // Attendance (miss punch, gate pass) and leave both have approve/reject
+  // actions. Without declaring the operations here the permission keys are
+  // never generated, so hasPermission(...,'approve') was undefined for every
+  // role including admin, and the buttons could never appear for anyone.
+  if (moduleId === 'hr-attendance')   return [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'];
+  if (moduleId === 'hr-leave')        return [...STANDARD_OPERATIONS, 'approve', 'reject'];
+  // Payroll and bonus move money, so approving and cancelling a run are gated
+  // separately from ordinary editing. Without declaring them the keys are never
+  // generated and hasPermission returns false for every role, admin included.
+  if (moduleId === 'hr-payroll')      return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
+  if (moduleId === 'hr-bonus')        return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
+  if (moduleId === 'hr-fnf')          return [...STANDARD_OPERATIONS, 'approve'];
   if (moduleId === 'inventory-bill-passing') return BILL_PASSING_OPERATIONS;
   if (moduleId === 'export-packing')      return STANDARD_OPERATIONS;
   if (moduleId === 'export-shipments')    return STANDARD_OPERATIONS;

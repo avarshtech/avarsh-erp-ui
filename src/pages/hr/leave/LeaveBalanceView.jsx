@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Select, Row, Col, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { Table, Select, Row, Col, Spin, Button } from 'antd';
 import dayjs from 'dayjs';
-import { getLeaveBalances } from '../../../services/hr/leaveService';
+import { getLeaveBalancesBulk } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveFactories } from '../../../services/master/factoryService';
 import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
+import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
-  const { message } = App.useApp();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [year, setYear] = useState(dayjs().year());
   const [factories, setFactories] = useState([]);
@@ -50,48 +52,45 @@ const LeaveBalanceView = () => {
     }
     setLoading(true);
     try {
-      const allBalances = await Promise.all(
-        employees.map(async (emp) => {
-          try {
-            const balances = await getLeaveBalances(emp.id, year);
-            return { employee: emp, balances: balances || [] };
-          } catch {
-            return { employee: emp, balances: [] };
-          }
-        })
-      );
+      // One request for the whole page. This used to be one per employee, with
+      // each failure swallowed into an empty array - so a server error looked
+      // exactly like an employee who had taken no leave.
+      const balances = await getLeaveBalancesBulk(employees.map((e) => e.id), year);
+      const list = Array.isArray(balances) ? balances : [];
 
-      // Collect unique leave type names
+      const byEmployee = new Map();
       const typeSet = new Map();
-      allBalances.forEach(({ balances }) => {
-        balances.forEach((b) => {
-          if (!typeSet.has(b.leaveTypeId)) {
-            typeSet.set(b.leaveTypeId, b.leaveTypeName || `Type ${b.leaveTypeId}`);
-          }
-        });
+      list.forEach((b) => {
+        if (!typeSet.has(b.leaveTypeId)) {
+          typeSet.set(b.leaveTypeId, b.leaveTypeName || `Type ${b.leaveTypeId}`);
+        }
+        if (!byEmployee.has(b.employeeId)) byEmployee.set(b.employeeId, []);
+        byEmployee.get(b.employeeId).push(b);
       });
-      const types = Array.from(typeSet.entries()).map(([id, name]) => ({ id, name }));
-      setLeaveTypeNames(types);
 
-      // Build table data
-      const rows = allBalances.map(({ employee, balances }) => {
+      setLeaveTypeNames(Array.from(typeSet.entries()).map(([id, name]) => ({ id, name })));
+
+      setBalanceData(employees.map((employee) => {
         const row = {
           key: employee.id,
           employeeNo: employee.employeeNo,
-          employeeName: employee.name,
+          employeeName: employee.fullName,
         };
-        balances.forEach((b) => {
-          row[`lt_${b.leaveTypeId}`] = b.balance;
+        // closingBalance is the field the API returns; the grid read "balance",
+        // which does not exist on the DTO, so every cell rendered empty.
+        (byEmployee.get(employee.id) || []).forEach((b) => {
+          row[`lt_${b.leaveTypeId}`] = b.closingBalance;
         });
         return row;
-      });
-      setBalanceData(rows);
+      }));
     } catch {
-      message.error('Failed to load leave balances');
+      setBalanceData([]);
+      setLeaveTypeNames([]);
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [employees, year, message]);
+  }, [employees, year]);
 
   useEffect(() => {
     fetchBalances();
@@ -123,7 +122,14 @@ const LeaveBalanceView = () => {
 
   return (
     <>
-      <PageHeader title="Leave Balances" />
+      <PageHeader
+        title="Leave Balances"
+        extra={
+          <Button type="link" onClick={() => navigate('/hr/leaves')}>
+            Leave Applications
+          </Button>
+        }
+      />
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={6} md={4}>
           <Select
@@ -140,7 +146,7 @@ const LeaveBalanceView = () => {
             style={{ width: '100%' }}
             value={factoryId}
             onChange={setFactoryId}
-            options={factories.map((f) => ({ value: f.id, label: f.name }))}
+            options={factoryOptions(factories)}
           />
         </Col>
         <Col xs={24} sm={8} md={6}>

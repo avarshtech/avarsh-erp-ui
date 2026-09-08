@@ -68,7 +68,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
       setData(list);
       setFilteredData(list);
     } catch {
-      message.error('Failed to load holidays');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
@@ -323,8 +323,17 @@ const HolidayMaster = ({ onDirtyChange }) => {
                   <Form.Item name="holidayType" label="Holiday Type" rules={[{ required: true, message: 'Please select a type' }]}>
                     <Select placeholder="Select type" options={HOLIDAY_TYPES} allowClear />
                   </Form.Item>
-                  <Form.Item name="factoryId" label="Factory" tooltip="Leave empty if applicable to all factories">
-                    <Select placeholder="All factories" options={factoryOptions} showSearch optionFilterProp="label" allowClear />
+                  {/* factory_id is NOT NULL and the holiday lookup is scoped by
+                      factory, so a holiday cannot yet apply to all of them.
+                      Offering that as a blank option only produced a constraint
+                      error on save. */}
+                  <Form.Item
+                    name="factoryId"
+                    label="Factory"
+                    tooltip="A holiday belongs to one factory. Add it once per factory if it applies to more than one."
+                    rules={[{ required: true, message: 'Select the factory this holiday applies to' }]}
+                  >
+                    <Select placeholder="Select factory" options={factoryOptions} showSearch optionFilterProp="label" />
                   </Form.Item>
                   <Form.Item name="isPaid" label="Paid Holiday" valuePropName="checked">
                     <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />

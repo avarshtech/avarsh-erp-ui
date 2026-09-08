@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createGatePass, getGatePassByStatus, approveGatePass, rejectGatePass } from '../../../services/hr/gatePassService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { hasPermission } from '../../../utils/permissions';
 import { LEAVE_STATUS, GATE_PASS_TYPE } from '../../../utils/hrConstants';
+import { employeeOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(LEAVE_STATUS.map((s) => [s.value, s]));
@@ -20,8 +21,16 @@ const GatePassList = () => {
   const [submitting, setSubmitting] = useState(false);
   const [employees, setEmployees] = useState([]);
 
+  // Detail view for a single pass, opened by clicking its row.
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selected, setSelected] = useState(null);
+
   const canAdd = hasPermission('hr-attendance', 'add');
   const canApprove = hasPermission('hr-attendance', 'approve');
+  const canReject = hasPermission('hr-attendance', 'reject');
+  // Either right is enough to act on a pending request; the buttons
+  // themselves are gated separately below.
+  const canDecide = canApprove || canReject;
 
   useEffect(() => {
     searchEmployees({ status: 'ACTIVE', size: 500 })
@@ -36,11 +45,12 @@ const GatePassList = () => {
       const result = await getGatePassByStatus(status);
       setData(result || []);
     } catch {
-      message.error('Failed to load gate pass requests');
+      setData([]); // don't leave the previous tab's rows looking like a success
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setLoading(false);
     }
-  }, [activeTab, message]);
+  }, [activeTab]);
 
   useEffect(() => {
     fetchData();
@@ -50,25 +60,50 @@ const GatePassList = () => {
     try {
       await approveGatePass(id);
       message.success('Gate pass approved');
+      setDetailOpen(false);
       fetchData();
     } catch {
-      message.error('Failed to approve');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     }
   }, [fetchData, message]);
 
+  const openDetail = useCallback((record) => {
+    setSelected(record);
+    setDetailOpen(true);
+  }, []);
+
   const handleReject = useCallback(async (id) => {
+    // Miss punch has always asked for a reason here. Gate pass rejected without
+    // one, so the requester was told no and never told why.
+    let reason = '';
     modal.confirm({
       title: 'Reject Gate Pass?',
-      content: 'Are you sure you want to reject this gate pass?',
+      content: (
+        <div>
+          <p style={{ marginBottom: 8 }}>The requester will see this reason.</p>
+          <Input.TextArea
+            rows={3}
+            placeholder="Why is this being rejected?"
+            onChange={(e) => { reason = e.target.value; }}
+          />
+        </div>
+      ),
       okText: 'Reject',
       okButtonProps: { danger: true },
       onOk: async () => {
+        // Miss punch refuses to reject without a reason; there is no argument for
+        // gate pass being laxer about it.
+        if (!reason.trim()) {
+          message.error('A reason is required to reject');
+          return Promise.reject(new Error('reason required'));
+        }
         try {
-          await rejectGatePass(id);
+          await rejectGatePass(id, reason.trim());
           message.success('Gate pass rejected');
+          setDetailOpen(false);
           fetchData();
         } catch {
-          message.error('Failed to reject');
+          // axiosInstance already toasts the server's message; adding another here showed two.
         }
       },
     });
@@ -80,8 +115,10 @@ const GatePassList = () => {
       setSubmitting(true);
       const payload = {
         employeeId: values.employeeId,
-        date: values.date.format('YYYY-MM-DD'),
-        type: values.type,
+        // The API fields are entryDate and entryType. Sending date/type left
+        // both null, and entry_date is NOT NULL.
+        entryDate: values.date.format('YYYY-MM-DD'),
+        entryType: values.type,
         fromTime: values.fromTime.format('HH:mm'),
         toTime: values.toTime.format('HH:mm'),
         reason: values.reason,
@@ -94,7 +131,7 @@ const GatePassList = () => {
       fetchData();
     } catch (err) {
       if (err.errorFields) return;
-      message.error('Failed to create gate pass');
+      // axiosInstance already toasts the server's message; adding another here showed two.
     } finally {
       setSubmitting(false);
     }
@@ -105,52 +142,66 @@ const GatePassList = () => {
     { title: 'Employee Name', dataIndex: 'employeeName', key: 'employeeName', width: 180 },
     {
       title: 'Date',
-      dataIndex: 'date',
-      key: 'date',
+      dataIndex: 'entryDate',
+      key: 'entryDate',
       width: 120,
       render: (val) => val ? dayjs(val).format('DD MMM YYYY') : '-',
     },
     {
       title: 'Type',
-      dataIndex: 'type',
-      key: 'type',
+      dataIndex: 'entryType',
+      key: 'entryType',
       width: 110,
       render: (val) => GATE_PASS_TYPE.find((g) => g.value === val)?.label || val,
     },
     { title: 'From', dataIndex: 'fromTime', key: 'fromTime', width: 90 },
     { title: 'To', dataIndex: 'toTime', key: 'toTime', width: 90 },
-    { title: 'Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
+    // Two different reasons exist on this record. Naming the column after the
+    // one it shows keeps it from reading as the rejection reason.
+    { title: 'Request Reason', dataIndex: 'reason', key: 'reason', width: 200, ellipsis: true },
     { title: 'Destination', dataIndex: 'destination', key: 'destination', width: 150, ellipsis: true },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
       width: 110,
-      render: (val) => {
+      // A rejected row said only "Rejected" and gave no way to see why without
+      // opening it. The reason hangs off the tag rather than taking a column.
+      render: (val, record) => {
         const s = statusMap[val];
-        return s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        const tag = s ? <Tag color={s.color}>{s.label}</Tag> : val;
+        if (val !== 'REJECTED') return tag;
+        return (
+          <Tooltip title={record.rejectionReason || 'No reason was recorded.'}>
+            <span style={{ cursor: 'help' }}>{tag}</span>
+          </Tooltip>
+        );
       },
     },
     {
       title: 'Actions',
       key: 'actions',
-      width: 140,
+      width: 180,
       fixed: 'right',
       render: (_, record) => {
-        if (record.status !== 'PENDING' || !canApprove) return null;
+        if (record.status !== 'PENDING' || !canDecide) return null;
         return (
           <Space size="small">
-            <Button type="link" size="small" icon={<CheckOutlined />} onClick={() => handleApprove(record.id)}>
-              Approve
-            </Button>
-            <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={() => handleReject(record.id)}>
-              Reject
-            </Button>
+            {canApprove && (
+              <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(record.id); }}>
+                Approve
+              </Button>
+            )}
+            {canReject && (
+              <Button type="link" size="small" danger icon={<CloseOutlined />} onClick={(e) => { e.stopPropagation(); handleReject(record.id); }}>
+                Reject
+              </Button>
+            )}
           </Space>
         );
       },
     },
-  ], [canApprove, handleApprove, handleReject]);
+  ], [canApprove, canReject, canDecide, handleApprove, handleReject]);
 
   const tabItems = useMemo(() => [
     { key: 'ALL', label: 'All' },
@@ -177,10 +228,86 @@ const GatePassList = () => {
         dataSource={data}
         rowKey="id"
         loading={loading}
-        scroll={{ x: 1200 }}
+        scroll={{ x: 1240 }}
         size="small"
         pagination={{ pageSize: 25, showSizeChanger: true }}
+        onRow={(record) => ({
+          onClick: () => openDetail(record),
+          style: { cursor: 'pointer' },
+        })}
       />
+
+      {/* Full detail for one pass, with its available actions. */}
+      <Drawer
+        title="Gate Pass"
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        width={460}
+        extra={
+          selected?.status === 'PENDING' && canDecide && (
+            <Space>
+              {canReject && (
+                <Button danger icon={<CloseOutlined />} onClick={() => handleReject(selected.id)}>
+                  Reject
+                </Button>
+              )}
+              {canApprove && (
+                <Button type="primary" icon={<CheckOutlined />} onClick={() => handleApprove(selected.id)}>
+                  Approve
+                </Button>
+              )}
+            </Space>
+          )
+        }
+      >
+        {selected && (
+          <>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="Status">
+                {statusMap[selected.status]
+                  ? <Tag color={statusMap[selected.status].color}>{statusMap[selected.status].label}</Tag>
+                  : selected.status}
+              </Descriptions.Item>
+              <Descriptions.Item label="Employee No">{selected.employeeNo || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Employee">{selected.employeeName || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Date">
+                {selected.entryDate ? dayjs(selected.entryDate).format('DD MMM YYYY') : '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Type">
+                {GATE_PASS_TYPE.find((g) => g.value === selected.entryType)?.label || selected.entryType || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="From">{selected.fromTime || '-'}</Descriptions.Item>
+              <Descriptions.Item label="To">{selected.toTime || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Destination">{selected.destination || '-'}</Descriptions.Item>
+              <Descriptions.Item label="Reason for Request">{selected.reason || '-'}</Descriptions.Item>
+              {selected.status === 'REJECTED' && (
+                <Descriptions.Item label="Reason for Rejection">
+                  <span style={{ color: 'var(--error-color, #ff4d4f)', whiteSpace: 'pre-wrap' }}>
+                    {selected.rejectionReason || 'No reason was recorded.'}
+                  </span>
+                </Descriptions.Item>
+              )}
+              <Descriptions.Item label="Raised On">
+                {selected.createdAt ? dayjs(selected.createdAt).format('DD MMM YYYY HH:mm') : '-'}
+              </Descriptions.Item>
+              {selected.status !== 'PENDING' && (
+                <Descriptions.Item label="Actioned On">
+                  {selected.approvedAt ? dayjs(selected.approvedAt).format('DD MMM YYYY HH:mm') : '-'}
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            {selected.status === 'PENDING' && !canDecide && (
+              <Alert
+                type="info"
+                showIcon
+                style={{ marginTop: 16 }}
+                message="You do not have permission to approve or reject requests."
+              />
+            )}
+          </>
+        )}
+      </Drawer>
 
       <Drawer
         title="New Gate Pass"
@@ -201,7 +328,7 @@ const GatePassList = () => {
               showSearch
               optionFilterProp="label"
               placeholder="Select Employee"
-              options={employees.map((e) => ({ value: e.id, label: `${e.employeeNo} - ${e.name}` }))}
+              options={employeeOptions(employees)}
             />
           </Form.Item>
           <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
@@ -219,7 +346,7 @@ const GatePassList = () => {
           <Form.Item name="destination" label="Destination">
             <Input placeholder="Destination (optional)" />
           </Form.Item>
-          <Form.Item name="reason" label="Reason" rules={[{ required: true, message: 'Please enter a reason' }]}>
+          <Form.Item name="reason" label="Reason for Request" rules={[{ required: true, message: 'Please enter a reason' }]}>
             <Input.TextArea rows={3} placeholder="Reason for gate pass" />
           </Form.Item>
         </Form>

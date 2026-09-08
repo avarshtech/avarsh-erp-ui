@@ -41,6 +41,24 @@ export const getElEncashmentRecords = async (runId) => {
 // ── PT Returns ──
 
 /**
+ * One EL encashment run.
+ * GET /api/v1/hr/el-encashment/{id}
+ */
+export const getElEncashmentRunById = async (id) => {
+  const response = await axiosInstance.get(`/hr/el-encashment/${id}`);
+  return response.data;
+};
+
+/**
+ * Records that an approved encashment run has been paid.
+ * POST /api/v1/hr/el-encashment/{id}/mark-paid
+ */
+export const markElEncashmentPaid = async (id) => {
+  const response = await axiosInstance.post(`/hr/el-encashment/${id}/mark-paid`);
+  return response.data;
+};
+
+/**
  * Generate a PT return for a factory/period.
  * POST /api/v1/hr/pt-returns/generate
  */
@@ -71,7 +89,31 @@ export const getAllPtReturns = async () => {
  * Get PT return records for a return.
  * GET /api/v1/hr/pt-returns/{id}/records
  */
+/**
+ * One PT return.
+ * GET /api/v1/hr/pt-returns/{id}
+ *
+ * The endpoint existed; nothing called it, so the return could be filed from
+ * the list without ever seeing the per-employee amounts behind it.
+ */
+export const getPtReturnById = async (id) => {
+  const response = await axiosInstance.get(`/hr/pt-returns/${id}`);
+  return response.data;
+};
+
 export const getPtReturnRecords = async (returnId) => {
   const response = await axiosInstance.get(`/hr/pt-returns/${returnId}/records`);
+  return response.data;
+};
+
+/**
+ * Abandon an EL encashment run calculated in error.
+ * PUT /api/v1/hr/el-encashment/{id}/cancel
+ *
+ * Only while it is CALCULATED. Approving takes the days off leave balances, so
+ * undoing that is a reversal rather than a cancellation.
+ */
+export const cancelElEncashment = async (id, reason) => {
+  const response = await axiosInstance.put(`/hr/el-encashment/${id}/cancel`, { reason });
   return response.data;
 };
