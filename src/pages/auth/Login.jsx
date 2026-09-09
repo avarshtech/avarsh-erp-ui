@@ -205,6 +205,7 @@ const Login = () => {
             ]}
           >
             <Input
+              autoFocus
               prefix={<UserOutlined style={{ color: 'var(--text-muted)', fontSize: 16 }} />}
               placeholder="Username"
               size="large"
