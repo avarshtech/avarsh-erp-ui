@@ -31,7 +31,6 @@ import {
 import {
   navigateWithAuth,
   ensureSessionActive,
-  goToListPage,
   waitForPageReady,
 } from '../../helpers/navigation.js';
 

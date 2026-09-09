@@ -742,8 +742,8 @@ const BOMForm = () => {
     // Direct substring containment
     if (vc.includes(oc) || oc.includes(vc)) return true;
     // Token-based: split variant on " / ", "/", " - " separators → check each token
-    const variantTokens = vc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
-    const orderTokens = oc.split(/\s*[\/]\s*/).map((t) => t.trim()).filter(Boolean);
+    const variantTokens = vc.split(/\s*[/]\s*/).map((t) => t.trim()).filter(Boolean);
+    const orderTokens = oc.split(/\s*[/]\s*/).map((t) => t.trim()).filter(Boolean);
     return variantTokens.some((vt) =>
       orderTokens.some((ot) => vt.includes(ot) || ot.includes(vt)),
     );

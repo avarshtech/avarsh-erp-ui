@@ -12,7 +12,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  findPOByNumber, fabricGrnPayload, submitGrn, draftGrn, qcApproverClient,
+  findPOByNumber, fabricGrnPayload, submitGrn, qcApproverClient,
 } from '../../helpers/grn-qc-data.js';
 
 let api;

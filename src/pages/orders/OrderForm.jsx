@@ -115,7 +115,16 @@ const getFileIcon = (fileType) => {
   return <FileOutlined style={{ fontSize: 28, color: 'var(--primary-color)' }} />;
 };
 
+/**
+ * Row keys for newly added lines. Date.now() repeats when two rows are added
+ * inside the same millisecond — a fast double-click on "Add Color" was enough —
+ * which gives React duplicate keys and lets the rows swap state.
+ */
+let rowKeySeq = 0;
+const nextRowKey = (prefix) => `${prefix}_${++rowKeySeq}`;
+
 const CostingAttachmentCard = ({ attachment }) => {
+  const { message } = App.useApp();
   const [blobUrl, setBlobUrl] = useState(null);
   const isImage = attachment.fileType?.startsWith('image/');
 
@@ -183,6 +192,7 @@ const CostingAttachmentCard = ({ attachment }) => {
 // ==================== COMPONENT DETAILS DIALOG ====================
 
 const ComponentDialog = ({ open, components, onSave, onCancel }) => {
+  const { message } = App.useApp();
   const [rows, setRows] = useState(() =>
     components && components.length > 0
       ? components
@@ -213,7 +223,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
   const handleAdd = () => {
     setRows((prev) => [
       ...prev,
-      { key: `c_${Date.now()}`, name: '', description: '', qtyPerSet: 1 },
+      { key: nextRowKey('c'), name: '', description: '', qtyPerSet: 1 },
     ]);
   };
 
@@ -322,6 +332,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
 // ==================== SIZE BREAKDOWN TABLE ====================
 
 const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePresets = [] }) => {
+  const { message } = App.useApp();
   const {
     sizes = [],
     sizePrices = {},
@@ -427,7 +438,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
 
   // Add color row
   const handleAddColor = () => {
-    const newKey = `c_${Date.now()}`;
+    const newKey = nextRowKey('c');
     const quantities = {};
     sizes.forEach((s) => { quantities[s] = 0; });
     onLineChange({
@@ -679,6 +690,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
 // ==================== QUICK-ADD SIZE PRESET MODAL ====================
 
 const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
+  const { message } = App.useApp();
   const [presetName, setPresetName] = useState('');
   const [category, setCategory] = useState('');
   const [region, setRegion] = useState('');
@@ -810,7 +822,7 @@ const tdStyle = {
 // ==================== EMPTY LINE TEMPLATE ====================
 
 const createEmptyLine = () => ({
-  key: `line_${Date.now()}`,
+  key: nextRowKey('line'),
   lineId: null, // backend ID — null for new lines
   buyerPoNo: '',
   destination: '',
@@ -820,7 +832,7 @@ const createEmptyLine = () => ({
   sizes: [],
   sizePrices: {},
   colorRows: [
-    { key: `c_${Date.now()}`, colorName: '', quantities: {}, total: 0, rowValue: 0 },
+    { key: nextRowKey('c'), colorName: '', quantities: {}, total: 0, rowValue: 0 },
   ],
   lineQty: 0,
   lineTotal: 0,
@@ -984,7 +996,7 @@ const OrderForm = () => {
     });
     if (order.components?.length > 0) setFormComponents(order.components);
     const lines = (order.orderLines || []).map((l) => ({
-      key: `line_${l.id || Date.now() + Math.random()}`,
+      key: l.id ? `line_${l.id}` : nextRowKey('line'),
       lineId: l.id || null,
       buyerPoNo: l.buyerPoNo || '',
       destination: l.destination || '',
@@ -994,7 +1006,7 @@ const OrderForm = () => {
       sizes: Object.keys(l.sizePrices || {}),
       sizePrices: l.sizePrices || {},
       colorRows: (l.colorRows || []).map((c) => ({
-        key: `c_${c.id || Date.now() + Math.random()}`,
+        key: c.id ? `c_${c.id}` : nextRowKey('c'),
         colorName: c.colorName || '',
         quantities: c.quantities || {},
         total: c.total || 0,
@@ -1022,7 +1034,6 @@ const OrderForm = () => {
       setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setStyleImageLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, form]);
 
   // Load existing order for edit — use passed location state first, fall back to API
@@ -1218,7 +1229,7 @@ const OrderForm = () => {
             0
           );
           return {
-            key: `c_${Date.now()}_${idx}`,
+            key: nextRowKey('c'),
             colorName: cr.colorName || '',
             quantities,
             total,

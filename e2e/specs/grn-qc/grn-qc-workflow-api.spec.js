@@ -25,7 +25,7 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload,
   submitGrn, draftGrn, submitQc, draftQc, approveQc, qcApproverClient,
-  getDefectTypes, getPOStatus, getPOReceipts, today,
+  getDefectTypes, getPOStatus, getPOReceipts,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── Shared State ───────────────────────────────────────────────────────────

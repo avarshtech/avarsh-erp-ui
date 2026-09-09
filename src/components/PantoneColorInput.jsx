@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Input, Spin, Empty, Space, Button, Tooltip } from 'antd';
 import { SearchOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import { searchPantoneColors, getPantoneSwatchUrl, isPantoneCode } from '../services/core/pantoneService';

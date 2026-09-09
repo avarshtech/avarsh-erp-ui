@@ -68,6 +68,10 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen, onEdit
             flexShrink: 0,
           }}
         >
+          {/* getModuleIcon is a lookup into a module-level table, so Icon is always
+              one of a fixed set of stable components and never remounts. The rule
+              cannot see through the call and assumes one is built per render. */}
+          {/* eslint-disable-next-line react-hooks/static-components */}
           <Icon />
         </div>
         <span style={{ fontWeight: 600, fontSize: 15 }}>{report.displayName}</span>

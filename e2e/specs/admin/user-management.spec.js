@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antTableWaitForData, antModalConfirm, antPopconfirmYes, antDatePickerToday } from '../../helpers/antd-helpers.js';
-import { navigateWithAuth, ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
+import { antTableWaitForData } from '../../helpers/antd-helpers.js';
+import { ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
 
 let api;
 let createdUserId;

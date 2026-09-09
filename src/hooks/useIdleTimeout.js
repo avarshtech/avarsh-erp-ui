@@ -11,7 +11,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * @returns {{ isIdle: boolean, isWarning: boolean, remainingSeconds: number, resetIdle: () => void }}
  */
 const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
-  const lastActivityRef = useRef(Date.now());
+  // Seeded on mount rather than in the useRef initializer, which would call
+  // Date.now() on every render.
+  const lastActivityRef = useRef(null);
   const throttleRef = useRef(0);
   const [isWarning, setIsWarning] = useState(false);
   const [isIdle, setIsIdle] = useState(false);
@@ -29,6 +31,8 @@ const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
 
   // Throttled activity handler — updates lastActivity at most once per second
   useEffect(() => {
+    lastActivityRef.current = Date.now();
+
     const handleActivity = () => {
       const now = Date.now();
       if (now - throttleRef.current < 1000) return;
@@ -53,7 +57,9 @@ const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
   // Check idle state every second
   useEffect(() => {
     const interval = setInterval(() => {
-      const elapsed = Date.now() - lastActivityRef.current;
+      // Null until the activity effect has run, which is always before the
+      // first tick; treat that window as "just active".
+      const elapsed = Date.now() - (lastActivityRef.current ?? Date.now());
 
       if (elapsed >= idleTimeoutMs) {
         // Fully idle — trigger logout

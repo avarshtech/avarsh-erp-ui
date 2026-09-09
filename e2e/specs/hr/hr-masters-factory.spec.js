@@ -20,7 +20,6 @@ import {
   antTableWaitForData,
   antMessageContains,
   antFormFill,
-  antFormSelect,
   antModalConfirm,
 } from '../../helpers/antd-helpers.js';
 import {

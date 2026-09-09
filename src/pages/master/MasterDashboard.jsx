@@ -377,7 +377,7 @@ const MasterDashboard = () => {
     setData, setLoading, loading, isCacheValid,
   } = useStore();
 
-  const accessibleGroups = useMemo(getAccessibleGroups, []);
+  const accessibleGroups = useMemo(() => getAccessibleGroups(), []);
   const accessibleItems  = useMemo(
     () => accessibleGroups.flatMap(g => g.items.map(item => ({ ...item, groupLabel: g.label }))),
     [accessibleGroups],

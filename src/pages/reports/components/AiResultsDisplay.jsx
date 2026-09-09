@@ -14,7 +14,7 @@ const extractMetrics = (answer, data) => {
   if (!answer) return [];
   const metrics = [];
 
-  const numberPatterns = /(?:total|count|sum|average|avg|max|min|amount)\s*[:\-—]\s*[\$₹]?[\d,]+(?:\.\d+)?/gi;
+  const numberPatterns = /(?:total|count|sum|average|avg|max|min|amount)\s*[:\-—]\s*[$₹]?[\d,]+(?:\.\d+)?/gi;
   const matches = answer.match(numberPatterns);
   if (matches) {
     matches.slice(0, 4).forEach((match) => {

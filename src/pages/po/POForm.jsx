@@ -51,7 +51,6 @@ import { autocompleteItems, getItemsByIds } from '../../services/master/itemServ
 import { useStore } from '../../context/StoreContext';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
-import { generateEwayBill } from '../../services/po/purchaseOrderService';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';

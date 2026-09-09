@@ -15,6 +15,15 @@ export default defineConfig([
     },
   },
   {
+    // Playwright specs and fixtures run in Node, and read process.env for
+    // the base URL and credentials.
+    files: ['e2e/**/*.{js,mjs}'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    },
+  },
+  {
     files: ['**/*.{js,jsx}'],
     extends: [
       js.configs.recommended,

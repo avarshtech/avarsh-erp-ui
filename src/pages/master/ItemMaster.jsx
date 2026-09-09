@@ -1366,7 +1366,9 @@ const ItemMaster = () => {
       // Invalidate cache and refresh items list so the table reflects latest data
       try {
         invalidateCache && invalidateCache('items');
-      } catch (e) {}
+      } catch {
+        // Cache invalidation is best-effort; the refetch below is the real refresh.
+      }
       fetchItems(1, pagination.pageSize, sortConfig.field, sortConfig.order === 'ascend' ? 'asc' : 'desc');
     } catch (error) {
       // Error toast already shown by axiosInstance interceptor
@@ -1412,7 +1414,7 @@ const ItemMaster = () => {
             value={value}
             onChange={(e) => {
               // Allow letters, numbers, spaces, hyphen and percent sign for text attributes
-              const filtered = e.target.value.replace(/[^a-zA-Z0-9\s%\-]/g, '');
+              const filtered = e.target.value.replace(/[^a-zA-Z0-9\s%-]/g, '');
               handleChange(filtered);
             }}
           />

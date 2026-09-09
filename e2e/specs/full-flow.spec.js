@@ -7,9 +7,9 @@
  * Run: npx playwright test --project=full-flow
  */
 
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 import { createAuthenticatedClient } from '../helpers/api-client.js';
-import { antSelect, antFormFill, antFormSelect, antDatePickerToday } from '../helpers/antd-helpers.js';
+import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
 
 const runId = Date.now();
 const today = new Date().toISOString().split('T')[0];

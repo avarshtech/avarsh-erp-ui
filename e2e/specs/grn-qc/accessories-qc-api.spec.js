@@ -15,8 +15,8 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  findPOByNumber, refreshPO, trimsGrnPayload, trimsQcPayload,
-  submitGrn, submitQc, draftQc, getTrimsQCCriteria, today,
+  findPOByNumber, trimsGrnPayload, trimsQcPayload,
+  submitGrn, submitQc, getTrimsQCCriteria, today,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── Shared State ───────────────────────────────────────────────────────────

@@ -110,7 +110,6 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
       setStyleImageUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
       setStyleImageLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Load style image when dialog opens

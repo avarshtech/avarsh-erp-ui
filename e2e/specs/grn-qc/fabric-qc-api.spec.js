@@ -18,8 +18,8 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload,
-  submitGrn, submitQc, draftQc, getDefectTypes, today,
+  findPOByNumber, fabricGrnPayload, fabricQcPayload,
+  submitGrn, submitQc, draftQc, getDefectTypes,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────

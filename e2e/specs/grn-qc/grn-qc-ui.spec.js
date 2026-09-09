@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  antSelect, antFormFill, antTableWaitForData,
+  antSelect, antTableWaitForData,
   antDatePickerToday, antMessageContains,
 } from '../../helpers/antd-helpers.js';
 import { navigateWithAuth, ensureSessionActive, waitForPageReady } from '../../helpers/navigation.js';
 import {
-  findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload, submitGrn, today,
+  findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload, submitGrn,
 } from '../../helpers/grn-qc-data.js';
 
 let api;

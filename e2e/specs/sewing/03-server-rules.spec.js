@@ -4,7 +4,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive } from '../../helpers/navigation.js';
-import { openTab, settle, pickOption, selectAt, tableRows, TABS, watchConsole } from './helpers.js';
+import { openTab, settle, selectAt, tableRows, TABS, watchConsole } from './helpers.js';
 
 test.describe('Sewing — server-derived rules reach the screen', () => {
   test.beforeEach(async ({ page }) => {

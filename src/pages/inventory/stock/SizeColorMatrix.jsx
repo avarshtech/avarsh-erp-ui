@@ -25,9 +25,9 @@ const headerStyle = {
 };
 
 const SizeColorMatrix = memo(function SizeColorMatrix({ sizeColorMatrix }) {
-  if (!sizeColorMatrix) return <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No matrix data</span>;
-
-  const { sizes = [], colors = [], quantities = {} } = sizeColorMatrix;
+  // Destructure before the early return: bailing out first would skip the useMemo
+  // below and change the hook count whenever the matrix goes from absent to present.
+  const { sizes = [], colors = [], quantities = {} } = sizeColorMatrix || {};
 
   const { maxQty, colorTotals, sizeTotals, grandTotal } = useMemo(() => {
     let max = 0;
@@ -48,6 +48,8 @@ const SizeColorMatrix = memo(function SizeColorMatrix({ sizeColorMatrix }) {
 
     return { maxQty: max, colorTotals: cTotals, sizeTotals: sTotals, grandTotal: total };
   }, [sizes, colors, quantities]);
+
+  if (!sizeColorMatrix) return <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>No matrix data</span>;
 
   return (
     <div style={{ overflowX: 'auto', padding: '8px 0' }}>

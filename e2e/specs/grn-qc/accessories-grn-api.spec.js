@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findPOByNumber, refreshPO, trimsGrnPayload,
-  getPOReceipts, today,
+  getPOReceipts,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── PO Line Combinations ────────────────────────────────────────────────────

@@ -45,7 +45,6 @@ const FlowSummaryPreview = ({ roles = [], users = [] }) => {
         {(levels || []).length === 0 && <Text type="secondary" style={{ fontSize: 12 }}>no levels yet</Text>}
         {(levels || []).map((level, index) => (
           // Positional key is correct here: rows are identified by position (level number)
-          // eslint-disable-next-line react/no-array-index-key
           <Space key={index} size={6} align="center">
             {index > 0 && <ArrowRightOutlined style={{ color: '#d9d9d9', fontSize: 10 }} />}
             <Tag style={{ marginInlineEnd: 0 }}>{index + 1}. {levelName(level, index)}</Tag>
