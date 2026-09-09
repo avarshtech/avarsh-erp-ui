@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  App, Card, Table, Space, Input, Tag, Modal, Form, Typography, Row, Col, Switch, Divider,
+  Alert, App, Card, Table, Space, Input, Tag, Modal, Form, Typography, Row, Col, Switch, Divider,
 } from 'antd';
 import { SearchOutlined, ExclamationCircleOutlined, SafetyOutlined } from '@ant-design/icons';
 import { getRoles, createRole, updateRole, deleteRole } from '../../services/admin/roleService';
@@ -181,8 +181,10 @@ const RoleAccess = () => {
   };
 
   // `isSystem` is not a field on RoleDTO, so the old record.isSystem was always
-  // undefined and the guard never fired. The admin roles are the ones that must
-  // not be edited away, and they are identified by name.
+  // undefined and both guards silently did nothing. Making them fire is right
+  // for DELETE - removing Admin or Super Admin would strand every user on them -
+  // but it must not extend to EDIT. Blocking edit locked the screen entirely
+  // while Admin and Super Admin were the only two roles that existed.
   const isProtected = (record) => isAdminRole(record.name);
 
   const columns = useMemo(() => [
@@ -242,7 +244,7 @@ const RoleAccess = () => {
       render: (_, record) => (
         <Space size="small">
           <PermissionGuard module="roles" operation="update">
-            <ActionButton action="edit" size="small" onClick={() => openModal(record)} disabled={isProtected(record)} />
+            <ActionButton action="edit" size="small" onClick={() => openModal(record)} />
           </PermissionGuard>
           <PermissionGuard module="roles" operation="delete">
             <DeleteConfirm
@@ -358,6 +360,19 @@ const RoleAccess = () => {
           </Form.Item>
 
           <Divider style={{ margin: '12px 0' }} />
+
+          {/* An admin role never reads its stored permissions: getCurrentUserPermissions
+              short-circuits on the role NAME and hands back every right. Without saying
+              so, this matrix looks like it configures something it does not. */}
+          {editingRole && isAdminRole(editingRole.name) && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              title="This role bypasses the permission matrix"
+              description={`Anyone signed in as "${editingRole.name}" receives every right, whatever is ticked below. Access is granted on the role name, so changes here have no effect until the role is renamed to something that is not Admin or Super Admin.`}
+            />
+          )}
 
           <PermissionMatrix
             value={permissions}
