@@ -25,7 +25,17 @@ import {
   SafetyOutlined,
   DashboardOutlined,
   ShoppingCartOutlined,
+  FileTextOutlined,
+  DollarOutlined,
+  ShoppingOutlined,
+  ExperimentOutlined,
+  AppstoreOutlined,
+  ScissorOutlined,
+  FieldTimeOutlined,
+  ContainerOutlined,
   DatabaseOutlined,
+  BarChartOutlined,
+  TeamOutlined,
   SettingOutlined,
   LinkOutlined,
   InfoCircleOutlined,
@@ -50,11 +60,23 @@ import { getTablePagination } from '../../utils/paginationConfig';
 import { MODAL_WIDTHS } from '../../utils/uiConstants';
 const { Text } = Typography;
 
-// Icon map for group rendering
+// Icon map for group rendering. Every SECTIONS[].icon in permissions.js must
+// have an entry here — a missing one silently falls back to the settings cog,
+// which is how HR & Payroll wore the wrong icon before the sections were split.
 const GROUP_ICONS = {
   DashboardOutlined: <DashboardOutlined />,
   ShoppingCartOutlined: <ShoppingCartOutlined />,
+  FileTextOutlined: <FileTextOutlined />,
+  DollarOutlined: <DollarOutlined />,
+  ShoppingOutlined: <ShoppingOutlined />,
+  ExperimentOutlined: <ExperimentOutlined />,
+  AppstoreOutlined: <AppstoreOutlined />,
+  ScissorOutlined: <ScissorOutlined />,
+  FieldTimeOutlined: <FieldTimeOutlined />,
+  ContainerOutlined: <ContainerOutlined />,
   DatabaseOutlined: <DatabaseOutlined />,
+  BarChartOutlined: <BarChartOutlined />,
+  TeamOutlined: <TeamOutlined />,
   SettingOutlined: <SettingOutlined />,
 };
 

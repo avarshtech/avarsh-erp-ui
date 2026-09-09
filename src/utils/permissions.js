@@ -42,409 +42,33 @@
  * }
  */
 
-// ─── MODULE DEFINITIONS ─────────────────────────────────────────────────────────
+// ─── SECTIONS ───────────────────────────────────────────────────────────────
+//
+// One section per top-level sidebar group, so the permission matrix and the
+// navigation an admin already knows are the same shape. The previous layout put
+// 38 of the 64 screens into a single "Transactions" bucket, which is what made
+// the matrix unreadable as screens kept arriving.
+//
+// `icon` names an @ant-design/icons export; the matrix resolves it through its
+// own map, and assertRegistryIntegrity checks every name is present there.
 
-export const MODULES = {
-  DASHBOARD: {
-    id: 'dashboard',
-    name: 'Dashboard',
-    path: '/',
-    group: 'main',
-  },
-  ORDERS: {
-    id: 'orders',
-    name: 'Orders',
-    path: '/orders',
-    group: 'transactions',
-  },
-  BOM: {
-    id: 'bom',
-    name: 'Bill of Materials',
-    path: '/bom',
-    group: 'transactions',
-  },
-  SAMPLE_REQUESTS: {
-    id: 'sample-requests',
-    name: 'Sample Requests',
-    path: '/sample-requests/list',
-    group: 'transactions',
-  },
-  SAMPLE_DISPATCHES: {
-    id: 'sample-dispatches',
-    name: 'Sample Dispatches',
-    path: '/sample-requests/dispatches/list',
-    group: 'transactions',
-  },
-  SAMPLE_COMMENTS: {
-    id: 'sample-comments',
-    name: 'Customer Comments',
-    path: '/sample-requests/comments',
-    group: 'transactions',
-  },
-  SAMPLE_INVOICES: {
-    id: 'sample-invoices',
-    name: 'Invoices (Samples)',
-    path: '/sample-requests/invoices/list',
-    group: 'transactions',
-  },
-  PURCHASE_ORDERS: {
-    id: 'purchase-orders',
-    name: 'Supplier PO',
-    path: '/purchase-orders/supplier-po/list',
-    group: 'transactions',
-  },
-  ORDER_ACTIONS: {
-    id: 'order-actions',
-    name: 'Order Actions',
-    path: '/orders', // Integrated within Orders module
-    group: 'transactions',
-    linkedTo: 'orders',
-  },
-  PO_APPROVAL: {
-    id: 'po-approval',
-    name: 'PO Approval',
-    path: '/purchase-orders/supplier-po', // Integrated within Supplier PO module
-    group: 'transactions',
-    linkedTo: 'purchase-orders',
-  },
-  GRN_APPROVAL: {
-    id: 'grn-approval',
-    name: 'GRN Refer-Back Approval',
-    path: '/inventory/grn', // Integrated within GRN module
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  GRN_REVERSAL: {
-    id: 'grn-reversal',
-    name: 'GRN Reversal Approval',
-    path: '/inventory/grn', // Integrated within GRN module
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  CUTTING_PO: {
-    id: 'cutting-po',
-    name: 'Cutting PO',
-    path: '/purchase-orders/cutting-po/list',
-    group: 'transactions',
-  },
-  WORK_ORDER: {
-    id: 'work-order',
-    name: 'Work Orders',
-    path: '/purchase-orders/work-order/list',
-    group: 'transactions',
-  },
-  FINISHING_PO: {
-    id: 'finishing-po',
-    name: 'Finishing PO',
-    path: '/purchase-orders/finishing-po/list',
-    group: 'transactions',
-  },  TNA: {
-    id: 'tna',
-    name: 'Time & Action',
-    path: '/tna/control-tower',
-    group: 'transactions',
-  },
-  TNA_MASTERS: {
-    id: 'tna-masters',
-    name: 'TNA Masters',
-    path: '/tna/masters',
-    group: 'transactions',
-  },
-  TNA_REPLAN_APPROVAL: {
-    id: 'tna-replan-approval',
-    name: 'TNA Re-plan Approvals',
-    path: '/tna/replans',
-    group: 'transactions',
-  },
-  PRODUCTION_CUTTING: {
-    id: 'production-cutting',
-    name: 'Production — Cutting',
-    path: '/production/cutting',
-    group: 'transactions',
-  },
-  PRODUCTION_SEWING: {
-    id: 'production-sewing',
-    name: 'Production — Sewing',
-    path: '/production/sewing',
-    group: 'transactions',
-  },
-  PRODUCTION_FINISHING: {
-    id: 'production-finishing',
-    name: 'Production — Finishing',
-    path: '/production/finishing',
-    group: 'transactions',
-  },
-  EXPORT_PACKING: {
-    id: 'export-packing',
-    name: 'Carton Packing Entry',
-    path: '/export-docs/packing/list',
-    group: 'transactions',
-  },
-  EXPORT_SHIPMENTS: {
-    id: 'export-shipments',
-    name: 'Shipments',
-    path: '/export-docs/shipments/list',
-    group: 'transactions',
-  },
-  EXPORT_PACKING_LIST: {
-    id: 'export-packing-list',
-    name: 'Packing List',
-    path: '/export-docs/packing-lists/list',
-    group: 'transactions',
-  },
-  EXPORT_INVOICE: {
-    id: 'export-invoice',
-    name: 'Export Invoice',
-    path: '/export-docs/invoices/list',
-    group: 'transactions',
-  },
-  EXPORT_STICKERS: {
-    id: 'export-stickers',
-    name: 'Carton Stickers',
-    path: '/export-docs/stickers',
-    group: 'transactions',
-    // Stickers render an existing packing list — without PL access there is nothing to draw.
-    linkedTo: 'export-packing-list',
-  },
-  EXPORT_TEMPLATES: {
-    id: 'export-templates',
-    name: 'Buyer Document Templates',
-    path: '/export-docs/templates/list',
-    group: 'transactions',
-  },
-  PRODUCTION_MASTERS: {
-    id: 'production-masters',
-    name: 'Production Masters',
-    path: '/production/masters',
-    group: 'masters',
-  },
-  INVENTORY: {
-    id: 'inventory',
-    name: 'Inventory Management',
-    path: '/inventory',
-    group: 'transactions',
-  },
-  INVENTORY_QC: {
-    id: 'inventory-qc',
-    name: 'Quality Control',
-    path: '/inventory/qc',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  INVENTORY_ISSUE: {
-    id: 'inventory-issue',
-    name: 'Material Issue',
-    path: '/inventory/issue',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  INVENTORY_ADJUSTMENT: {
-    id: 'inventory-adjustment',
-    name: 'Stock Adjustment',
-    path: '/inventory/adjustment',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  INVENTORY_RETURN_SUPPLIER: {
-    id: 'inventory-return-supplier',
-    name: 'Return to Supplier',
-    path: '/inventory/return-to-supplier',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  INVENTORY_BILL_PASSING: {
-    id: 'inventory-bill-passing',
-    name: 'Bill Passing',
-    path: '/inventory/bill-passing',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  OPENING_STOCK: {
-    id: 'opening-stock',
-    name: 'Opening Stock Balance',
-    path: '/inventory/opening-stock',
-    group: 'transactions',
-    linkedTo: 'inventory',
-  },
-  COSTING: {
-    id: 'costing',
-    name: 'Costing',
-    path: '/costing',
-    group: 'transactions',
-  },
-  COSTING_APPROVAL: {
-    id: 'costing-approval',
-    name: 'Costing Approval Actions',
-    path: '/costing',
-    group: 'transactions',
-    linkedTo: 'costing',
-  },
-  REPORTS: {
-    id: 'reports',
-    name: 'Reports',
-    path: '/reports',
-    group: 'transactions',
-  },
-  BUYERS: {
-    id: 'buyer-info',
-    name: 'Buyers',
-    path: '/master/buyers',
-    group: 'master',
-  },
-  SUPPLIERS: {
-    id: 'supplier-info',
-    name: 'Suppliers',
-    path: '/master/suppliers',
-    group: 'master',
-  },
-  ITEMS: {
-    id: 'items',
-    name: 'Items',
-    path: '/master/items',
-    group: 'master',
-  },
-  MASTER_DATA: {
-    id: 'master-data',
-    name: 'Master Data',
-    description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
-    path: '/master',
-    group: 'master',
-  },
-  STYLE_MASTER: {
-    id: 'style-master',
-    name: 'Style Master',
-    path: '/master → Styles tab',
-    group: 'master',
-  },
-  SIZE_PRESETS: {
-    id: 'size-presets',
-    name: 'Size Presets',
-    path: '/master → Size Presets tab',
-    group: 'master',
-  },
-  PAYMENT_TERMS_MASTER: {
-    id: 'payment-terms',
-    name: 'Payment Terms',
-    path: '/master → Payment Terms tab',
-    group: 'master',
-  },
-  TERMS_CONDITIONS: {
-    id: 'terms-conditions',
-    name: 'Terms & Conditions',
-    path: '/master → Terms & Conditions tab',
-    group: 'master',
-  },
-  PROCESS_MASTER: {
-    id: 'process-master',
-    name: 'Processes',
-    path: '/master → Processes tab',
-    group: 'master',
-  },
-  PARTS_MASTER: {
-    id: 'parts-master',
-    name: 'Parts Master',
-    path: '/master → Parts tab',
-    group: 'master',
-  },
-  OVERHEAD_MASTER: {
-    id: 'overhead-master',
-    name: 'Overheads',
-    path: '/master → Overheads tab',
-    group: 'master',
-  },
-  COURIERS: {
-    id: 'couriers',
-    name: 'Couriers',
-    path: '/master → Couriers tab',
-    group: 'master',
-  },
-  USERS: {
-    id: 'users',
-    name: 'Users',
-    path: '/admin/users',
-    group: 'admin',
-  },
-  ROLES: {
-    id: 'roles',
-    name: 'Role & Access',
-    path: '/admin/roles',
-    group: 'admin',
-  },
-  AI_ASSISTANT: {
-    id: 'ai-assistant',
-    name: 'AI Assistant',
-    path: '/reports/ai-chat',
-    group: 'transactions',
-    linkedTo: 'reports',
-  },
-  APPROVAL_FLOWS: {
-    id: 'approval-flows',
-    name: 'Approval Flows',
-    path: '/admin/approval-flows',
-    group: 'admin',
-  },
-  COMPANY_PROFILE: {
-    id: 'company-profile',
-    name: 'Company Profile',
-    path: '/admin/company-profile',
-    group: 'admin',
-  },
-  // ── HR & Payroll ──
-  HR_MASTERS: {
-    id: 'hr-masters',
-    name: 'HR Masters',
-    path: '/hr/masters',
-    group: 'hr',
-  },
-  HR_EMPLOYEES: {
-    id: 'hr-employees',
-    name: 'Employees',
-    path: '/hr/employees',
-    group: 'hr',
-  },
-  HR_ATTENDANCE: {
-    id: 'hr-attendance',
-    name: 'Attendance',
-    path: '/hr/attendance',
-    group: 'hr',
-  },
-  HR_LEAVE: {
-    id: 'hr-leave',
-    name: 'Leave Management',
-    path: '/hr/leaves',
-    group: 'hr',
-  },
-  HR_PAYROLL: {
-    id: 'hr-payroll',
-    name: 'Payroll',
-    path: '/hr/payroll',
-    group: 'hr',
-  },
-  HR_LOANS: {
-    id: 'hr-loans',
-    name: 'Loans & Advances',
-    path: '/hr/loans',
-    group: 'hr',
-  },
-  HR_BONUS: {
-    id: 'hr-bonus',
-    name: 'Bonus',
-    path: '/hr/bonus',
-    group: 'hr',
-  },
-  HR_STATUTORY: {
-    id: 'hr-statutory',
-    name: 'Statutory',
-    path: '/hr/statutory',
-    group: 'hr',
-  },
-  HR_FNF: {
-    id: 'hr-fnf',
-    name: 'F&F Settlement',
-    path: '/hr/fnf',
-    group: 'hr',
-  },
-};
+export const SECTIONS = [
+  { key: 'dashboard',  label: 'Dashboard',            icon: 'DashboardOutlined' },
+  { key: 'orders',     label: 'Orders',               icon: 'ShoppingCartOutlined' },
+  { key: 'bom',        label: 'Bill of Materials',    icon: 'FileTextOutlined' },
+  { key: 'costing',    label: 'Costing',              icon: 'DollarOutlined' },
+  { key: 'purchase',   label: 'Purchase Orders',      icon: 'ShoppingOutlined' },
+  { key: 'samples',    label: 'Sample Requests',      icon: 'ExperimentOutlined' },
+  { key: 'inventory',  label: 'Inventory',            icon: 'AppstoreOutlined' },
+  { key: 'production', label: 'Production',           icon: 'ScissorOutlined' },
+  { key: 'tna',        label: 'Time & Action',        icon: 'FieldTimeOutlined' },
+  { key: 'expdoc',     label: 'Export Documentation', icon: 'ContainerOutlined' },
+  { key: 'master',     label: 'Master Data',          icon: 'DatabaseOutlined',
+    description: 'Every tab of the Master Data workspace is granted separately.' },
+  { key: 'reports',    label: 'Reports',              icon: 'BarChartOutlined' },
+  { key: 'hr',         label: 'HR & Payroll',         icon: 'TeamOutlined' },
+  { key: 'admin',      label: 'Administration',       icon: 'SettingOutlined' },
+];
 
 // ─── OPERATION DEFINITIONS ─────────────────────────────────────────────────────
 
@@ -492,9 +116,9 @@ export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 // (see canSubmitOrder below, and Bill Passing).
 export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise', 'override'];
 
-// Stickers have no approval of their own — they inherit the packing list's state,
-// so there is nothing to add/update/delete. What varies is who may put ink on
-// paper: `print` from an approved PL, `reprint` a carton/range (an audited
+// Stickers have no lifecycle of their own — they inherit the packing list's
+// state, so there is nothing to add/update/delete. What varies is who may put ink
+// on paper: `print` from a final PL, `reprint` a carton/range (an audited
 // exception), `override` to print from a still-Draft PL.
 export const EXPORT_STICKER_OPERATIONS = ['view', 'print', 'reprint', 'override'];
 
@@ -506,115 +130,375 @@ export const EXPORT_TEMPLATE_OPERATIONS = ['view', 'add', 'update', 'delete', 'p
 // Dashboard only has view
 export const DASHBOARD_OPERATIONS = ['view'];
 
-// ─── PERMISSION MATRIX GROUPED LAYOUT ──────────────────────────────────────────
+// ─── SCREEN REGISTRY ───────────────────────────────────────────────────────────
+//
+// ONE ENTRY PER URL-ADDRESSABLE SCREEN. This array is the single source of
+// truth: MODULES, PERMISSION_GROUPS and getOperationsForModule are all derived
+// from it below. Adding a screen means adding one row here and nothing else.
+//
+// Before this existed the same 64 screens were declared in four parallel lists
+// that had to be hand-synced, and they had drifted: three screens declared one
+// operation set in the matrix layout and a different one in the if-ladder that
+// actually decided which checkboxes rendered.
+//
+//   id        REQUIRED  The key persisted in sys_roles.permissions (jsonb).
+//                       NEVER rename without a Flyway backfill — see
+//                       erp-purchase V29__split_production_rbac.sql.
+//   name      REQUIRED  Label shown in the permission matrix.
+//   section   REQUIRED  A SECTIONS[].key.
+//   kind      REQUIRED  'dashboard' — read-only landing; ops must be ['view'].
+//                       'screen'    — an ordinary routed screen.
+//                       'tab'       — lives inside a shell page (e.g. /master).
+//                       'approval'  — no route of its own; a bundle of rights
+//                                     attached to the screen named by `requires`.
+//   path      REQUIRED unless kind is 'approval'. The canonical landing route,
+//                       and it must match a real <Route> in App.jsx.
+//   routes    optional  Every route this key gates, when it gates more than one.
+//   ops       REQUIRED  The authoritative operation list.
+//   opLabels  optional  Per-screen label override, e.g. { delete: 'Cancel GRN' }.
+//   requires  optional  A hard dependency on another screen, declared ONLY where
+//                       the code actually enforces one.
+//   description optional One line, shown muted under the name.
+//
+// Order matters: buildPermissions walks this array, so it fixes the key order of
+// the persisted jsonb.
 
-export const PERMISSION_GROUPS = [
-  {
-    key: 'main',
-    label: 'General',
-    icon: 'DashboardOutlined',
-    modules: [
-      { id: 'dashboard', name: 'Dashboard', operations: DASHBOARD_OPERATIONS },
-    ],
-  },
-  {
-    key: 'transactions',
-    label: 'Transactions',
-    icon: 'ShoppingCartOutlined',
-    modules: [
-      { id: 'orders', name: 'Orders', operations: STANDARD_OPERATIONS, path: '/orders/list' },
-      { id: 'order-actions', name: 'Order Approval Actions', operations: ORDER_ACTION_OPERATIONS, linkedTo: 'orders', path: '(within Orders)' },
-      { id: 'bom', name: 'Bill of Materials', operations: STANDARD_OPERATIONS, path: '/bom/list' },
-      { id: 'sample-requests', name: 'Sample Requests', operations: STANDARD_OPERATIONS, path: '/sample-requests/list' },
-      { id: 'sample-dispatches', name: 'Sample Dispatches', operations: STANDARD_OPERATIONS, path: '/sample-requests/dispatches/list' },
-      { id: 'sample-comments', name: 'Customer Comments', operations: STANDARD_OPERATIONS, path: '/sample-requests/comments' },
-      { id: 'sample-invoices', name: 'Invoices (Samples)', operations: STANDARD_OPERATIONS, path: '/sample-requests/invoices/list' },
-      { id: 'purchase-orders', name: 'Supplier PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/supplier-po/list' },
-      { id: 'po-approval', name: 'PO Approval Actions', operations: PO_APPROVAL_OPERATIONS, linkedTo: 'purchase-orders', path: '(within Supplier PO)' },
-      { id: 'cutting-po', name: 'Cutting PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/cutting-po/list' },
-      { id: 'work-order', name: 'Work Orders', operations: STANDARD_OPERATIONS, path: '/purchase-orders/work-order/list' },
-      { id: 'finishing-po', name: 'Finishing PO', operations: STANDARD_OPERATIONS, path: '/purchase-orders/finishing-po/list' },      { id: 'tna', name: 'Time & Action (TNA)', operations: STANDARD_OPERATIONS, path: '/tna/control-tower' },
-      { id: 'tna-masters', name: 'TNA Masters', operations: STANDARD_OPERATIONS, path: '/tna/masters' },
-      { id: 'tna-replan-approval', name: 'TNA Re-plan Approvals', operations: ['view', 'approve'], path: '/tna/replans' },
-      { id: 'production-cutting', name: 'Production — Cutting', operations: STANDARD_OPERATIONS, path: '/production/cutting' },
-      { id: 'production-sewing', name: 'Production — Sewing', operations: STANDARD_OPERATIONS, path: '/production/sewing' },
-      { id: 'production-finishing', name: 'Production — Finishing', operations: STANDARD_OPERATIONS, path: '/production/finishing' },
-      { id: 'export-packing', name: 'Carton Packing Entry', operations: STANDARD_OPERATIONS, path: '/export-docs/packing/list' },
-      { id: 'export-shipments', name: 'Shipments', operations: STANDARD_OPERATIONS, path: '/export-docs/shipments/list' },
-      { id: 'export-packing-list', name: 'Packing List', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/packing-lists/list' },
-      { id: 'export-invoice', name: 'Export Invoice', operations: EXPORT_DOC_OPERATIONS, path: '/export-docs/invoices/list' },
-      { id: 'export-stickers', name: 'Carton Stickers', operations: EXPORT_STICKER_OPERATIONS, linkedTo: 'export-packing-list', path: '/export-docs/stickers' },
-      { id: 'export-templates', name: 'Buyer Document Templates', operations: EXPORT_TEMPLATE_OPERATIONS, path: '/export-docs/templates/list' },
-      { id: 'production-masters', name: 'Production Masters', operations: STANDARD_OPERATIONS, path: '/production/masters' },
-      { id: 'inventory', name: 'Inventory Management', operations: STANDARD_OPERATIONS, path: '/inventory/dashboard' },
-      { id: 'grn-approval', name: 'GRN Refer-Back Approval', operations: GRN_APPROVAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
-      { id: 'grn-reversal', name: 'GRN Reversal Approval', operations: GRN_REVERSAL_OPERATIONS, linkedTo: 'inventory', path: '(within GRN)' },
-      { id: 'inventory-qc', name: 'Quality Control', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/qc' },
-      { id: 'inventory-issue', name: 'Material Issue', operations: ['view', 'add', 'update'], linkedTo: 'inventory', path: '/inventory/issue' },
-      { id: 'inventory-adjustment', name: 'Stock Adjustment', operations: ['view', 'add', 'update', 'approve'], linkedTo: 'inventory', path: '/inventory/adjustment' },
-      { id: 'inventory-return-supplier', name: 'Return to Supplier', operations: ['view', 'add'], linkedTo: 'inventory', path: '/inventory/return-to-supplier' },
-      // verify = the Accounts Executive check; approve = the value-band approver.
-      { id: 'inventory-bill-passing', name: 'Bill Passing', operations: BILL_PASSING_OPERATIONS, linkedTo: 'inventory', path: '/inventory/bill-passing' },
-      { id: 'opening-stock', name: 'Opening Stock Balance', operations: ['view', 'add', 'update', 'post', 'finalize'], linkedTo: 'inventory', path: '/inventory/opening-stock' },
-      { id: 'costing', name: 'Costing', operations: STANDARD_OPERATIONS, path: '/costing/list' },
-      { id: 'costing-approval', name: 'Costing Approval Actions', operations: COSTING_APPROVAL_OPERATIONS, linkedTo: 'costing', path: '(within Costing)' },
-      { id: 'reports', name: 'Reports & Analytics', operations: STANDARD_OPERATIONS, path: '/reports/list' },
-      { id: 'ai-assistant', name: 'AI Assistant', operations: ['view'], linkedTo: 'reports', path: '/reports/ai-chat' },
-    ],
-  },
-  {
-    key: 'master',
-    label: 'Master Data',
-    icon: 'DatabaseOutlined',
-    description: 'Individual access for Suppliers & Items; shared access for other master tabs',
-    modules: [
-      { id: 'buyer-info',      name: 'Buyers',                    description: 'Order Entry',          operations: STANDARD_OPERATIONS },
-      { id: 'supplier-info',   name: 'Suppliers',                 description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
-      {
-        id: 'master-data',
-        name: 'Product Catalog',
-        description: 'Item — Categories, Sub-Categories, Item Types, UOM, Attributes',
-        operations: STANDARD_OPERATIONS,
-      },
-      { id: 'items',           name: 'Items',                     description: 'Purchase Order',        operations: ['view', 'add', 'update'] },
-      { id: 'style-master',    name: 'Style Master',              description: 'Order Entry, Costing',  operations: STANDARD_OPERATIONS },
-      { id: 'size-presets',    name: 'Size Presets',              description: 'Order Entry, Costing',  operations: STANDARD_OPERATIONS },
-      { id: 'payment-terms',   name: 'Payment Terms',             description: 'Order Entry',           operations: STANDARD_OPERATIONS },
-      { id: 'terms-conditions',name: 'Terms & Conditions',        description: 'Purchase Order',        operations: STANDARD_OPERATIONS },
-      { id: 'process-master',  name: 'Processes',                  description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
-      { id: 'parts-master',    name: 'Parts Master',               description: 'BOM, Manufacturing',    operations: STANDARD_OPERATIONS },
-      { id: 'overhead-master', name: 'Overheads',                  description: 'Costing, Shipment',     operations: STANDARD_OPERATIONS },
-      { id: 'couriers',        name: 'Couriers',                   description: 'Sample Dispatch',       operations: STANDARD_OPERATIONS },
-    ],
-  },
-  {
-    key: 'hr',
-    label: 'HR & Payroll',
-    icon: 'TeamOutlined',
-    modules: [
-      { id: 'hr-masters', name: 'HR Masters', operations: STANDARD_OPERATIONS, path: '/hr/masters' },
-      { id: 'hr-employees', name: 'Employees', operations: STANDARD_OPERATIONS, path: '/hr/employees' },
-      { id: 'hr-attendance', name: 'Attendance', operations: [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'], path: '/hr/attendance' },
-      { id: 'hr-leave', name: 'Leave Management', operations: [...STANDARD_OPERATIONS, 'approve', 'reject'], path: '/hr/leaves' },
-      { id: 'hr-payroll', name: 'Payroll', operations: [...STANDARD_OPERATIONS, 'approve', 'cancel'], path: '/hr/payroll' },
-      { id: 'hr-loans', name: 'Loans & Advances', operations: STANDARD_OPERATIONS, path: '/hr/loans' },
-      { id: 'hr-bonus', name: 'Bonus', operations: [...STANDARD_OPERATIONS, 'approve', 'cancel'], path: '/hr/bonus' },
-      { id: 'hr-statutory', name: 'Statutory', operations: STANDARD_OPERATIONS, path: '/hr/statutory' },
-      { id: 'hr-fnf', name: 'F&F Settlement', operations: [...STANDARD_OPERATIONS, 'approve'], path: '/hr/fnf' },
-    ],
-  },
-  {
-    key: 'admin',
-    label: 'Administration',
-    icon: 'SettingOutlined',
-    modules: [
-      { id: 'users', name: 'User Management', operations: STANDARD_OPERATIONS, path: '/admin/users' },
-      { id: 'roles', name: 'Role & Access', operations: STANDARD_OPERATIONS, path: '/admin/roles' },
-      { id: 'approval-flows', name: 'Approval Flows', operations: STANDARD_OPERATIONS, path: '/admin/approval-flows' },
-      { id: 'company-profile', name: 'Company Profile', operations: ['view', 'add', 'update'], path: '/admin/company-profile' },
-    ],
-  },
+export const SCREENS = [
+  // ── Dashboard ──
+  { id: 'dashboard', name: 'Dashboard', section: 'dashboard', kind: 'dashboard',
+    path: '/', ops: DASHBOARD_OPERATIONS },
+
+  // ── Orders ──
+  { id: 'orders', name: 'Orders', section: 'orders', kind: 'screen',
+    path: '/orders/list', routes: ['/orders/list', '/orders/new', '/orders/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Bill of Materials ──
+  { id: 'bom', name: 'Bill of Materials', section: 'bom', kind: 'screen',
+    path: '/bom/list', routes: ['/bom/list', '/bom/new', '/bom/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Sample Requests ──
+  { id: 'sample-requests', name: 'Sample Requests', section: 'samples', kind: 'screen',
+    path: '/sample-requests/list',
+    routes: ['/sample-requests/list', '/sample-requests/new', '/sample-requests/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'sample-dispatches', name: 'Sample Dispatches', section: 'samples', kind: 'screen',
+    path: '/sample-requests/dispatches/list',
+    routes: ['/sample-requests/dispatches/list', '/sample-requests/dispatches/new', '/sample-requests/dispatches/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'sample-comments', name: 'Customer Comments', section: 'samples', kind: 'screen',
+    path: '/sample-requests/comments', ops: STANDARD_OPERATIONS },
+  { id: 'sample-invoices', name: 'Invoices (Samples)', section: 'samples', kind: 'screen',
+    path: '/sample-requests/invoices/list',
+    routes: ['/sample-requests/invoices/list', '/sample-requests/invoices/new', '/sample-requests/invoices/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Purchase Orders ──
+  { id: 'purchase-orders', name: 'Supplier PO', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/supplier-po/list',
+    routes: ['/purchase-orders/supplier-po/list', '/purchase-orders/supplier-po/new', '/purchase-orders/supplier-po/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'order-actions', name: 'Order Approval Actions', section: 'orders', kind: 'approval',
+    requires: 'orders', ops: ORDER_ACTION_OPERATIONS,
+    description: 'Act on an order awaiting approval, from inside the Orders screen.' },
+  { id: 'po-approval', name: 'PO Approval Actions', section: 'purchase', kind: 'approval',
+    requires: 'purchase-orders', ops: PO_APPROVAL_OPERATIONS,
+    description: 'Act on a Supplier PO awaiting approval.' },
+  { id: 'grn-approval', name: 'GRN Refer-Back Approval', section: 'inventory', kind: 'approval',
+    requires: 'inventory', ops: GRN_APPROVAL_OPERATIONS },
+  { id: 'grn-reversal', name: 'GRN Reversal Approval', section: 'inventory', kind: 'approval',
+    requires: 'inventory', ops: GRN_REVERSAL_OPERATIONS },
+  { id: 'cutting-po', name: 'Cutting PO', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/cutting-po/list',
+    routes: ['/purchase-orders/cutting-po/list', '/purchase-orders/cutting-po/new', '/purchase-orders/cutting-po/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'work-order', name: 'Work Orders', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/work-order/list',
+    routes: ['/purchase-orders/work-order/list', '/purchase-orders/work-order/new', '/purchase-orders/work-order/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'finishing-po', name: 'Finishing PO', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/finishing-po/list',
+    routes: ['/purchase-orders/finishing-po/list', '/purchase-orders/finishing-po/new', '/purchase-orders/finishing-po/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Time & Action ──
+  { id: 'tna', name: 'Time & Action', section: 'tna', kind: 'screen',
+    path: '/tna/control-tower',
+    routes: ['/tna/control-tower', '/tna/my-activities', '/tna/analytics', '/tna/plan/:planId'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'tna-masters', name: 'TNA Masters', section: 'tna', kind: 'screen',
+    path: '/tna/masters', ops: STANDARD_OPERATIONS },
+  { id: 'tna-replan-approval', name: 'TNA Re-plan Approvals', section: 'tna', kind: 'screen',
+    path: '/tna/replans', ops: STANDARD_OPERATIONS },
+
+  // ── Production ──
+  { id: 'production-cutting', name: 'Production — Cutting', section: 'production', kind: 'screen',
+    path: '/production/cutting',
+    routes: ['/production/cutting', '/production/cutting/marker-plan/new', '/production/cutting/marker-plan/:id',
+             '/production/cutting/lay-audit/new', '/production/cutting/lay-audit/:id',
+             '/production/cutting/tmb/new', '/production/cutting/tmb/:id',
+             '/production/cutting/panel-check/new', '/production/cutting/panel-check/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'production-sewing', name: 'Production — Sewing', section: 'production', kind: 'screen',
+    path: '/production/sewing',
+    routes: ['/production/sewing', '/production/sewing/plan/new', '/production/sewing/plan/:id',
+             '/production/sewing/measurement/new', '/production/sewing/measurement/:id',
+             '/production/sewing/topse/new', '/production/sewing/topse/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'production-finishing', name: 'Production — Finishing', section: 'production', kind: 'screen',
+    path: '/production/finishing',
+    routes: ['/production/finishing', '/production/finishing/checking/new', '/production/finishing/checking/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Export Documentation ──
+  { id: 'export-packing', name: 'Carton Packing Entry', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/packing/list',
+    routes: ['/export-docs/packing/list', '/export-docs/packing/new', '/export-docs/packing/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'export-shipments', name: 'Shipments', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/shipments/list',
+    routes: ['/export-docs/shipments/list', '/export-docs/shipments/new', '/export-docs/shipments/edit/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'export-packing-list', name: 'Packing List', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/packing-lists/list',
+    routes: ['/export-docs/packing-lists/list', '/export-docs/packing-lists/edit/:id',
+             '/export-docs/reports', '/export-docs/audit'],
+    ops: EXPORT_DOC_OPERATIONS,
+    description: 'Also gates the export reports and the audit trail.' },
+  { id: 'export-invoice', name: 'Export Invoice', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/invoices/list',
+    routes: ['/export-docs/invoices/list', '/export-docs/invoices/edit/:id'],
+    ops: EXPORT_DOC_OPERATIONS },
+  { id: 'export-stickers', name: 'Carton Stickers', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/stickers', routes: ['/export-docs/stickers', '/export-docs/stickers/:plId'],
+    requires: 'export-packing-list', ops: EXPORT_STICKER_OPERATIONS },
+  { id: 'export-templates', name: 'Buyer Document Templates', section: 'expdoc', kind: 'screen',
+    path: '/export-docs/templates/list',
+    routes: ['/export-docs/templates/list', '/export-docs/templates/edit/:id'],
+    ops: EXPORT_TEMPLATE_OPERATIONS },
+
+  // ── Production masters (routed under /production, listed in the Production section) ──
+  { id: 'production-masters', name: 'Production Masters', section: 'production', kind: 'screen',
+    path: '/production/masters', ops: STANDARD_OPERATIONS },
+
+  // ── Inventory ──
+  { id: 'inventory', name: 'Inventory Management', section: 'inventory', kind: 'screen',
+    path: '/inventory/dashboard',
+    routes: ['/inventory/dashboard', '/inventory/grn/list', '/inventory/grn/allowance',
+             '/inventory/grn/fabric/new', '/inventory/grn/fabric/edit/:id',
+             '/inventory/grn/accessories/new', '/inventory/grn/accessories/edit/:id',
+             '/inventory/stock'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'inventory-qc', name: 'Quality Control', section: 'inventory', kind: 'screen',
+    path: '/inventory/qc',
+    routes: ['/inventory/qc', '/inventory/qc/fabric/new', '/inventory/qc/fabric/:id',
+             '/inventory/qc/trims/new', '/inventory/qc/trims/:id'],
+    ops: ['view', 'add', 'update', 'approve'] },
+  { id: 'inventory-issue', name: 'Material Issue', section: 'inventory', kind: 'screen',
+    path: '/inventory/issue',
+    routes: ['/inventory/issue', '/inventory/issue/fabric/new', '/inventory/issue/fabric/:id',
+             '/inventory/issue/accessories/new', '/inventory/issue/accessories/:id',
+             '/inventory/issue/sample/fabric/new', '/inventory/issue/sample/trims/new'],
+    ops: ['view', 'add', 'update'] },
+  { id: 'inventory-adjustment', name: 'Stock Adjustment', section: 'inventory', kind: 'screen',
+    path: '/inventory/adjustment',
+    routes: ['/inventory/adjustment', '/inventory/adjustment/new', '/inventory/adjustment/:id'],
+    ops: ['view', 'add', 'update', 'approve'] },
+  { id: 'inventory-return-supplier', name: 'Return to Supplier', section: 'inventory', kind: 'screen',
+    path: '/inventory/return-to-supplier', ops: ['view', 'add'] },
+  // verify = the Accounts Executive check; approve = the value-band approver.
+  { id: 'inventory-bill-passing', name: 'Bill Passing', section: 'inventory', kind: 'screen',
+    path: '/inventory/bill-passing',
+    routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id'],
+    ops: BILL_PASSING_OPERATIONS },
+  { id: 'opening-stock', name: 'Opening Stock Balance', section: 'inventory', kind: 'screen',
+    path: '/inventory/opening-stock',
+    routes: ['/inventory/opening-stock', '/inventory/opening-stock/fabric/new', '/inventory/opening-stock/fabric/:id',
+             '/inventory/opening-stock/accessories/new', '/inventory/opening-stock/accessories/:id'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Costing ──
+  { id: 'costing', name: 'Costing', section: 'costing', kind: 'screen',
+    path: '/costing/list',
+    routes: ['/costing/list', '/costing/new', '/costing/edit/:id', '/costing/compare', '/costing/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'costing-approval', name: 'Costing Approval Actions', section: 'costing', kind: 'approval',
+    requires: 'costing', ops: COSTING_APPROVAL_OPERATIONS },
+
+  // ── Reports ──
+  { id: 'reports', name: 'Reports & Analytics', section: 'reports', kind: 'screen',
+    path: '/reports/list', routes: ['/reports/list', '/reports/builder/:id', '/reports/saved'],
+    ops: STANDARD_OPERATIONS },
+
+  // ── Master Data — every entry is a tab inside the /master workspace ──
+  { id: 'buyer-info', name: 'Buyers', section: 'master', kind: 'tab',
+    path: '/master', description: 'Order Entry', ops: STANDARD_OPERATIONS },
+  { id: 'supplier-info', name: 'Suppliers', section: 'master', kind: 'tab',
+    path: '/master', description: 'Purchase Order', ops: STANDARD_OPERATIONS },
+  { id: 'items', name: 'Items', section: 'master', kind: 'tab',
+    path: '/master', description: 'Purchase Order', ops: ['view', 'add', 'update'] },
+  { id: 'master-data', name: 'Product Catalog', section: 'master', kind: 'tab',
+    path: '/master', description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
+    ops: STANDARD_OPERATIONS },
+  { id: 'style-master', name: 'Style Master', section: 'master', kind: 'tab',
+    path: '/master', description: 'Order Entry, Costing', ops: STANDARD_OPERATIONS },
+  { id: 'size-presets', name: 'Size Presets', section: 'master', kind: 'tab',
+    path: '/master', description: 'Order Entry, Costing', ops: STANDARD_OPERATIONS },
+  { id: 'payment-terms', name: 'Payment Terms', section: 'master', kind: 'tab',
+    path: '/master', description: 'Order Entry', ops: STANDARD_OPERATIONS },
+  { id: 'terms-conditions', name: 'Terms & Conditions', section: 'master', kind: 'tab',
+    path: '/master', description: 'Purchase Order', ops: STANDARD_OPERATIONS },
+  { id: 'process-master', name: 'Processes', section: 'master', kind: 'tab',
+    path: '/master', description: 'BOM, Manufacturing', ops: STANDARD_OPERATIONS },
+  { id: 'parts-master', name: 'Parts Master', section: 'master', kind: 'tab',
+    path: '/master', description: 'BOM, Manufacturing', ops: STANDARD_OPERATIONS },
+  { id: 'overhead-master', name: 'Overheads', section: 'master', kind: 'tab',
+    path: '/master', description: 'Costing, Shipment', ops: STANDARD_OPERATIONS },
+  { id: 'couriers', name: 'Couriers', section: 'master', kind: 'tab',
+    path: '/master', description: 'Sample Dispatch', ops: STANDARD_OPERATIONS },
+
+  // ── Administration ──
+  { id: 'users', name: 'User Management', section: 'admin', kind: 'screen',
+    path: '/admin/users', ops: STANDARD_OPERATIONS },
+  { id: 'roles', name: 'Role & Access', section: 'admin', kind: 'screen',
+    path: '/admin/roles', ops: STANDARD_OPERATIONS },
+  { id: 'ai-assistant', name: 'AI Assistant', section: 'reports', kind: 'screen',
+    path: '/reports/ai-chat', requires: 'reports', ops: ['view'] },
+  { id: 'approval-flows', name: 'Approval Flows', section: 'admin', kind: 'screen',
+    path: '/admin/approval-flows', ops: STANDARD_OPERATIONS },
+  { id: 'company-profile', name: 'Company Profile', section: 'admin', kind: 'screen',
+    path: '/admin/company-profile', ops: STANDARD_OPERATIONS },
+
+  // ── HR & Payroll ──
+  { id: 'hr-masters', name: 'HR Masters', section: 'hr', kind: 'screen',
+    path: '/hr/masters', ops: STANDARD_OPERATIONS },
+  { id: 'hr-employees', name: 'Employees', section: 'hr', kind: 'screen',
+    path: '/hr/employees',
+    routes: ['/hr/employees', '/hr/employees/new', '/hr/employees/edit/:id', '/hr/employees/:id'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'hr-attendance', name: 'Attendance', section: 'hr', kind: 'screen',
+    path: '/hr/attendance/calendar',
+    routes: ['/hr/attendance/calendar', '/hr/attendance/bulk', '/hr/attendance/entry',
+             '/hr/attendance/import', '/hr/attendance/miss-punch', '/hr/attendance/gate-pass'],
+    ops: [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'] },
+  { id: 'hr-leave', name: 'Leave Management', section: 'hr', kind: 'screen',
+    path: '/hr/leaves', routes: ['/hr/leaves', '/hr/leaves/balances'],
+    ops: [...STANDARD_OPERATIONS, 'approve', 'reject'] },
+  { id: 'hr-payroll', name: 'Payroll', section: 'hr', kind: 'screen',
+    path: '/hr/payroll',
+    routes: ['/hr/payroll', '/hr/payroll/new', '/hr/payroll/slip/:id', '/hr/payroll/:id'],
+    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel'] },
+  { id: 'hr-loans', name: 'Loans & Advances', section: 'hr', kind: 'screen',
+    path: '/hr/loans', routes: ['/hr/loans', '/hr/loans/:id', '/hr/advances'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'hr-bonus', name: 'Bonus', section: 'hr', kind: 'screen',
+    path: '/hr/bonus', routes: ['/hr/bonus', '/hr/bonus/new', '/hr/bonus/:id'],
+    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel'] },
+  { id: 'hr-statutory', name: 'Statutory', section: 'hr', kind: 'screen',
+    path: '/hr/statutory/pt',
+    routes: ['/hr/statutory/pt', '/hr/statutory/pt/:id', '/hr/statutory/el', '/hr/statutory/el/:id',
+             '/hr/statutory/pf', '/hr/statutory/esi'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'hr-fnf', name: 'F&F Settlement', section: 'hr', kind: 'screen',
+    path: '/hr/fnf', routes: ['/hr/fnf', '/hr/fnf/new', '/hr/fnf/edit/:id', '/hr/fnf/:id'],
+    ops: [...STANDARD_OPERATIONS, 'approve'] },
 ];
+
+const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
+
+// ─── DERIVED VIEWS ─────────────────────────────────────────────────────────────
+// Everything below is generated from SCREENS. Do not hand-edit — change the
+// registry instead.
+
+/**
+ * Legacy module registry, keyed by module id.
+ *
+ * Was a hand-written object literal keyed by UPPER_SNAKE names. Nothing outside
+ * this file ever imported it by name; the only real uses are the
+ * `Object.values(MODULES)` walks in buildPermissions and
+ * normalizePermissionsForSave, which are unaffected by the key change.
+ */
+export const MODULES = Object.freeze(
+  SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {}),
+);
+
+/** Grouped layout consumed by the permission matrix. */
+export const PERMISSION_GROUPS = SECTIONS.map((section) => ({
+  key: section.key,
+  label: section.label,
+  icon: section.icon,
+  description: section.description,
+  modules: SCREENS.filter((s) => s.section === section.key).map((s) => ({
+    id: s.id,
+    name: s.name,
+    path: s.path,
+    description: s.description,
+    operations: s.ops,
+    kind: s.kind,
+    requires: s.requires,
+    opLabels: s.opLabels,
+  })),
+}));
+
+/** Sections with their screens attached — the matrix data source. */
+export const getPermissionSections = () =>
+  SECTIONS.map((section) => ({
+    ...section,
+    screens: SCREENS.filter((s) => s.section === section.key),
+  }));
+
+/**
+ * Registry self-check, dev builds only.
+ *
+ * Every failure listed here is a drift class that actually happened while the
+ * registry was four hand-synced lists: an operation the matrix offered but no
+ * code read, an operation the code read but the matrix never rendered, a screen
+ * filed under a section that did not exist, a dashboard row offering add/edit/
+ * delete. Failing loudly at boot is cheaper than finding it in production.
+ */
+export const assertRegistryIntegrity = () => {
+  const problems = [];
+  const sectionKeys = new Set(SECTIONS.map((s) => s.key));
+  const seen = new Set();
+
+  SCREENS.forEach((s) => {
+    if (seen.has(s.id)) problems.push(`duplicate screen id "${s.id}"`);
+    seen.add(s.id);
+
+    if (!sectionKeys.has(s.section)) problems.push(`"${s.id}" is in unknown section "${s.section}"`);
+    if (!Array.isArray(s.ops) || s.ops.length === 0) problems.push(`"${s.id}" declares no operations`);
+    if (new Set(s.ops).size !== s.ops.length) problems.push(`"${s.id}" repeats an operation`);
+
+    if (s.kind === 'approval') {
+      if (s.path) problems.push(`"${s.id}" is an approval bundle but declares a path`);
+      if (!s.requires) problems.push(`"${s.id}" is an approval bundle but requires nothing`);
+    } else if (!s.path) {
+      problems.push(`"${s.id}" is a ${s.kind} but declares no path`);
+    }
+
+    // A dashboard is a read-only landing. Offering add/update/delete on one is
+    // the exact complaint that started this work.
+    if (s.kind === 'dashboard' && (s.ops.length !== 1 || s.ops[0] !== 'view')) {
+      problems.push(`dashboard "${s.id}" must declare exactly ['view'], got [${s.ops}]`);
+    }
+
+    if (s.requires) {
+      const parent = SCREEN_BY_ID[s.requires];
+      if (!parent) problems.push(`"${s.id}" requires unknown screen "${s.requires}"`);
+      else if (parent.kind === 'approval') problems.push(`"${s.id}" requires "${s.requires}", which is itself an approval bundle`);
+    }
+  });
+
+  if (problems.length) {
+    console.error(
+      `[permissions] registry integrity: ${problems.length} problem(s)\n  - ${problems.join('\n  - ')}`,
+    );
+  }
+  return problems;
+};
+
+if (import.meta.env?.DEV) assertRegistryIntegrity();
 
 // ─── HELPER FUNCTIONS ──────────────────────────────────────────────────────────
 
@@ -623,44 +507,16 @@ export const getAllOperations = () => Object.values(OPERATIONS);
 export const getSidebarModules = () =>
   getAllModules().filter((m) => !['settings'].includes(m.id));
 
-/** Returns which operations apply to a given module ID */
-export const getOperationsForModule = (moduleId) => {
-  if (moduleId === 'order-actions')   return ORDER_ACTION_OPERATIONS;
-  if (moduleId === 'po-approval')     return PO_APPROVAL_OPERATIONS;
-  if (moduleId === 'grn-approval')    return GRN_APPROVAL_OPERATIONS;
-  if (moduleId === 'grn-reversal')    return GRN_REVERSAL_OPERATIONS;
-  if (moduleId === 'costing-approval') return COSTING_APPROVAL_OPERATIONS;
-  if (moduleId === 'dashboard')            return DASHBOARD_OPERATIONS;
-  // Admins design reports in-app (create/edit/delete definitions); everyone else runs them
-  if (moduleId === 'reports')              return STANDARD_OPERATIONS;
-  if (moduleId === 'ai-assistant')        return ['view'];
-  if (moduleId === 'inventory-qc')        return ['view', 'add', 'update', 'approve'];
-  if (moduleId === 'inventory-issue')     return ['view', 'add', 'update'];
-  if (moduleId === 'inventory-adjustment') return ['view', 'add', 'update', 'approve'];
-  if (moduleId === 'inventory-return-supplier') return ['view', 'add'];
-  // Attendance (miss punch, gate pass) and leave both have approve/reject
-  // actions. Without declaring the operations here the permission keys are
-  // never generated, so hasPermission(...,'approve') was undefined for every
-  // role including admin, and the buttons could never appear for anyone.
-  if (moduleId === 'hr-attendance')   return [...STANDARD_OPERATIONS, 'approve', 'reject', 'lock'];
-  if (moduleId === 'hr-leave')        return [...STANDARD_OPERATIONS, 'approve', 'reject'];
-  // Payroll and bonus move money, so approving and cancelling a run are gated
-  // separately from ordinary editing. Without declaring them the keys are never
-  // generated and hasPermission returns false for every role, admin included.
-  if (moduleId === 'hr-payroll')      return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
-  if (moduleId === 'hr-bonus')        return [...STANDARD_OPERATIONS, 'approve', 'cancel'];
-  if (moduleId === 'hr-fnf')          return [...STANDARD_OPERATIONS, 'approve'];
-  if (moduleId === 'inventory-bill-passing') return BILL_PASSING_OPERATIONS;
-  if (moduleId === 'export-packing')      return STANDARD_OPERATIONS;
-  if (moduleId === 'export-shipments')    return STANDARD_OPERATIONS;
-  if (moduleId === 'export-packing-list') return EXPORT_DOC_OPERATIONS;
-  if (moduleId === 'export-invoice')      return EXPORT_DOC_OPERATIONS;
-  if (moduleId === 'export-stickers')     return EXPORT_STICKER_OPERATIONS;
-  if (moduleId === 'export-templates')    return EXPORT_TEMPLATE_OPERATIONS;
-  // Items do not support delete via UI — remove 'delete' from operations
-  if (moduleId === 'items')           return ['view', 'add', 'update'];
-  return STANDARD_OPERATIONS;
-};
+/**
+ * Returns which operations apply to a given module ID.
+ *
+ * Was a 23-branch if-ladder that had to be kept in step with the matrix layout
+ * by hand, and had drifted from it for three screens. Now a lookup into SCREENS.
+ * The STANDARD_OPERATIONS fallback is deliberate: a legacy key still present in
+ * a stored role must normalize rather than throw.
+ */
+export const getOperationsForModule = (moduleId) =>
+  SCREEN_BY_ID[moduleId]?.ops ?? STANDARD_OPERATIONS;
 
 // ─── EMPTY / ADMIN PERMISSION GENERATORS ───────────────────────────────────────
 
