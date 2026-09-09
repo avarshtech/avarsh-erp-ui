@@ -249,7 +249,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       title: 'Component Name *',
       dataIndex: 'name',
       render: (v, r) => (
-        <Input
+        <Input name="name"
           size="small"
           value={v}
           placeholder="e.g. Top, Bottom, Jacket"
@@ -261,7 +261,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       title: 'Description',
       dataIndex: 'description',
       render: (v, r) => (
-        <Input
+        <Input name="description"
           size="small"
           value={v}
           placeholder="Optional"
@@ -274,7 +274,7 @@ const ComponentDialog = ({ open, components, onSave, onCancel }) => {
       dataIndex: 'qtyPerSet',
       width: 90,
       render: (v, r) => (
-        <InputNumber
+        <InputNumber name="qtyPerSet"
           size="small"
           min={1}
           controls={false}
@@ -508,7 +508,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
               <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
                 Set price for all sizes:
               </Text>
-              <InputNumber
+              <InputNumber name="bulkPrice"
                 min={0}
                 step={0.01}
                 precision={2}
@@ -565,7 +565,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     {readOnly ? (
                       <Text style={{ color: 'var(--primary-color)' }}>{(sizePrices[s] || 0).toFixed(2)}</Text>
                     ) : (
-                      <InputNumber
+                      <InputNumber name="sizePrice"
                         size="small"
                         min={0}
                         step={0.01}
@@ -592,7 +592,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     {readOnly ? (
                       <Text>{row.colorName || '-'}</Text>
                     ) : (
-                      <Input
+                      <Input name="colorPrintName"
                         size="small"
                         placeholder="Color/Print name *"
                         value={row.colorName}
@@ -606,7 +606,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                       {readOnly ? (
                         <Text>{row.quantities?.[s] || 0}</Text>
                       ) : (
-                        <InputNumber
+                        <InputNumber name="sizeQuantity"
                           size="small"
                           min={0}
                           step={1}
@@ -753,7 +753,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
       />
       <Form layout="vertical">
         <Form.Item label="Preset Name" required>
-          <Input
+          <Input name="presetName"
             placeholder='e.g. "US Women XS-3XL"'
             value={presetName}
             onChange={(e) => setPresetName(e.target.value)}
@@ -1900,7 +1900,7 @@ const OrderForm = () => {
             {isEdit && (
               <Col xs={24} sm={12} md={8} lg={4}>
                 <Form.Item label="Order No">
-                  <Input
+                  <Input name="orderNo"
                     value={existingOrder?.orderNo || ''}
                     disabled
                     style={{ backgroundColor: 'var(--bg-tertiary)' }}
@@ -1927,7 +1927,7 @@ const OrderForm = () => {
                 </Form.Item>
               ) : (
                 <Form.Item label="Buyer">
-                  <Input
+                  <Input name="buyer"
                     value={buyers.find((b) => b.id === watchedBuyerId)?.name || ''}
                     placeholder="Populated from costing"
                     disabled
@@ -2242,7 +2242,7 @@ const OrderForm = () => {
                         label={<span>Buyer PO No <span style={{ color: 'var(--error-color)' }}>*</span></span>}
                         style={{ marginBottom: 12 }}
                       >
-                        <Input
+                        <Input name="buyerPoNumber"
                           placeholder="Buyer PO Number"
                           value={line.buyerPoNo}
                           onChange={(e) => handleLineChange(line.key, { buyerPoNo: e.target.value })}
@@ -2280,7 +2280,7 @@ const OrderForm = () => {
                     </Col>
                     <Col xs={24} sm={12}>
                       <Form.Item label="Lead Time" style={{ marginBottom: 12 }}>
-                        <Input
+                        <Input name="leadTime"
                           disabled
                           style={{ backgroundColor: 'var(--bg-tertiary)', cursor: 'not-allowed', pointerEvents: 'auto' }}
                           prefix={<ClockCircleOutlined />}

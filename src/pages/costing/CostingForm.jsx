@@ -1856,7 +1856,7 @@ const CostingForm = () => {
     const consumptionUom = getConsumptionUom(record, rawVariants);
     const factor = record.uomConversionFactor;
     const input = (
-      <InputNumber
+      <InputNumber name="rate"
         value={value}
         min={0}
         step={0.01}
@@ -1980,7 +1980,7 @@ const CostingForm = () => {
       title: 'Description',
       dataIndex: 'description',
       render: (val, record) => (
-        <Input
+        <Input name="description"
           value={val}
           placeholder="Fabric desc"
           onChange={(e) => updateFabricRow(record.key, 'description', e.target.value)}
@@ -1996,7 +1996,7 @@ const CostingForm = () => {
       width: 210,
       render: (val, record) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <InputNumber
+          <InputNumber name="consumption"
             value={val}
             min={0}
             step={0.01}
@@ -2048,7 +2048,7 @@ const CostingForm = () => {
       dataIndex: 'fabricWidthStd',
       width: 100,
       render: (val, record) => (
-        <Input
+        <Input name="fabricWidthStd"
           value={val}
           placeholder='e.g. 58"'
           onChange={(e) => updateFabricRow(record.key, 'fabricWidthStd', e.target.value)}
@@ -2061,7 +2061,7 @@ const CostingForm = () => {
       dataIndex: 'fabricWidthVendor',
       width: 110,
       render: (val, record) => (
-        <Input
+        <Input name="fabricWidthVendor"
           value={val}
           placeholder='e.g. 58"'
           onChange={(e) => updateFabricRow(record.key, 'fabricWidthVendor', e.target.value)}
@@ -2074,7 +2074,7 @@ const CostingForm = () => {
       dataIndex: 'allowancePct',
       width: 100,
       render: (val, record) => (
-        <InputNumber
+        <InputNumber name="allowancePct"
           value={val}
           min={0}
           max={100}
@@ -2092,7 +2092,7 @@ const CostingForm = () => {
       dataIndex: 'wastagePct',
       width: 100,
       render: (val, record) => (
-        <InputNumber
+        <InputNumber name="wastagePct"
           value={val}
           min={0}
           max={100}
@@ -2180,7 +2180,7 @@ const CostingForm = () => {
       dataIndex: 'code',
       width: 130,
       render: (val, record) => (
-        <Input value={val} placeholder="Item code" onChange={(e) => updateLocalTrim(record.key, 'code', e.target.value)} size="small" />
+        <Input name="code" value={val} placeholder="Item code" onChange={(e) => updateLocalTrim(record.key, 'code', e.target.value)} size="small" />
       ),
     },
     {
@@ -2188,7 +2188,7 @@ const CostingForm = () => {
       dataIndex: 'size',
       width: 90,
       render: (val, record) => (
-        <Input value={val} placeholder="Size" onChange={(e) => updateLocalTrim(record.key, 'size', e.target.value)} size="small" />
+        <Input name="size" value={val} placeholder="Size" onChange={(e) => updateLocalTrim(record.key, 'size', e.target.value)} size="small" />
       ),
     },
     {
@@ -2196,7 +2196,7 @@ const CostingForm = () => {
       dataIndex: 'consumption',
       width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, localTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
+        <InputNumber name="consumption" value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, localTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
@@ -2279,7 +2279,7 @@ const CostingForm = () => {
       dataIndex: 'code',
       width: 130,
       render: (val, record) => (
-        <Input value={val} placeholder="Item code" onChange={(e) => updateImportedTrim(record.key, 'code', e.target.value)} size="small" />
+        <Input name="code" value={val} placeholder="Item code" onChange={(e) => updateImportedTrim(record.key, 'code', e.target.value)} size="small" />
       ),
     },
     {
@@ -2287,7 +2287,7 @@ const CostingForm = () => {
       dataIndex: 'size',
       width: 90,
       render: (val, record) => (
-        <Input value={val} placeholder="Size" onChange={(e) => updateImportedTrim(record.key, 'size', e.target.value)} size="small" />
+        <Input name="size" value={val} placeholder="Size" onChange={(e) => updateImportedTrim(record.key, 'size', e.target.value)} size="small" />
       ),
     },
     {
@@ -2295,7 +2295,7 @@ const CostingForm = () => {
       dataIndex: 'consumption',
       width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, importedTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
+        <InputNumber name="consumption" value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, importedTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
@@ -2422,14 +2422,14 @@ const CostingForm = () => {
       dataIndex: 'cost',
       width: 130,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateManufacturingRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
+        <InputNumber name="cost" value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateManufacturingRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
       title: 'Comments',
       dataIndex: 'comments',
       render: (val, record) => (
-        <Input value={val} placeholder="Notes" onChange={(e) => updateManufacturingRow(record.key, 'comments', e.target.value)} size="small" />
+        <Input name="comments" value={val} placeholder="Notes" onChange={(e) => updateManufacturingRow(record.key, 'comments', e.target.value)} size="small" />
       ),
     },
     {
@@ -2501,14 +2501,14 @@ const CostingForm = () => {
       dataIndex: 'cost',
       width: 130,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateOverheadRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
+        <InputNumber name="cost" value={val} min={0} step={0.01} controls={false} placeholder="Cost" onChange={(v) => updateOverheadRow(record.key, 'cost', v)} size="small" style={{ width: '100%' }} {...numericInputProps} />
       ),
     },
     {
       title: 'Comments',
       dataIndex: 'comments',
       render: (val, record) => (
-        <Input value={val} placeholder="Notes" onChange={(e) => updateOverheadRow(record.key, 'comments', e.target.value)} size="small" />
+        <Input name="comments" value={val} placeholder="Notes" onChange={(e) => updateOverheadRow(record.key, 'comments', e.target.value)} size="small" />
       ),
     },
     {
@@ -2543,7 +2543,7 @@ const CostingForm = () => {
               {isEdit && (
                 <Col xs={12} md={8}>
                   <Form.Item label="Costing ID">
-                    <Input value={costingId} disabled />
+                    <Input name="costingId" value={costingId} disabled />
                   </Form.Item>
                 </Col>
               )}
@@ -2600,7 +2600,7 @@ const CostingForm = () => {
               <Form.Item name="seasonYear" hidden noStyle><Input /></Form.Item>
               <Col xs={12} md={6}>
                 <Form.Item label="Season">
-                  <Input
+                  <Input name="season"
                     value={seasonLabelMap[watchedSeasonCode] || ''}
                     placeholder="Auto-filled from style"
                     disabled
@@ -2610,7 +2610,7 @@ const CostingForm = () => {
               </Col>
               <Col xs={12} md={6}>
                 <Form.Item label="Year">
-                  <Input
+                  <Input name="year"
                     value={watchedSeasonYear || ''}
                     placeholder="Auto-filled from style"
                     disabled
@@ -2655,7 +2655,7 @@ const CostingForm = () => {
               </Col>
               <Col xs={12} md={6}>
                 <Form.Item label="Actual Rate" rules={[{ required: true }]}>
-                  <InputNumber
+                  <InputNumber name="actualRate"
                     value={actualRate}
                     min={0}
                     step={0.01}
@@ -2668,7 +2668,7 @@ const CostingForm = () => {
               </Col>
               <Col xs={12} md={6}>
                 <Form.Item label={<Space>Today's Rate <Tooltip title="Auto-fetched exchange rate"><InfoCircleOutlined /></Tooltip></Space>}>
-                  <InputNumber value={todaysRate} disabled style={{ width: '100%', height: 40 }} />
+                  <InputNumber name="actualRate" value={todaysRate} disabled style={{ width: '100%', height: 40 }} />
                 </Form.Item>
               </Col>
               <Col xs={16}>
@@ -2693,7 +2693,7 @@ const CostingForm = () => {
               </Col>
               <Col xs={8}>
                 <Form.Item label="Scenario Name">
-                  <Input
+                  <Input name="scenarioName"
                     value={scenarioName}
                     onChange={(e) => { setScenarioName(e.target.value); setIsDirty(true); }}
                     placeholder="e.g. Option A — Cotton Body"
@@ -2871,7 +2871,7 @@ const CostingForm = () => {
             onClick={addFabricRow}
             style={{ marginTop: 12 }}
           />
-          <Input.TextArea
+          <Input.TextArea name="fabricNotes"
             value={fabricNotes}
             onChange={(e) => { setFabricNotes(e.target.value); setIsDirty(true); }}
             placeholder="Fabric section notes / remarks..."
@@ -2976,7 +2976,7 @@ const CostingForm = () => {
               (Local: {formatCurrency(totalLocalTrimsCost, currency)} + Imported: {formatCurrency(totalImportedTrimsCostUsd, 'USD')} × {usdToCostingRate} rate)
             </Text>
           </Card>
-          <Input.TextArea
+          <Input.TextArea name="trimsNotes"
             value={trimsNotes}
             onChange={(e) => { setTrimsNotes(e.target.value); setIsDirty(true); }}
             placeholder="Trims section notes / remarks..."
@@ -3032,7 +3032,7 @@ const CostingForm = () => {
             onClick={addManufacturingRow}
             style={{ marginTop: 12 }}
           />
-          <Input.TextArea
+          <Input.TextArea name="manufacturingNotes"
             value={manufacturingNotes}
             onChange={(e) => { setManufacturingNotes(e.target.value); setIsDirty(true); }}
             placeholder="Manufacturing section notes / remarks..."
@@ -3088,7 +3088,7 @@ const CostingForm = () => {
             onClick={addOverheadRow}
             style={{ marginTop: 12 }}
           />
-          <Input.TextArea
+          <Input.TextArea name="overheadNotes"
             value={overheadNotes}
             onChange={(e) => { setOverheadNotes(e.target.value); setIsDirty(true); }}
             placeholder="Overhead section notes / remarks..."
@@ -3195,7 +3195,7 @@ const CostingForm = () => {
               <div style={{ marginBottom: 4 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Agent Commission %</Text>
               </div>
-              <InputNumber
+              <InputNumber name="agentCommissionPct"
                 value={agentCommissionPct}
                 min={0}
                 max={100}
@@ -3210,7 +3210,7 @@ const CostingForm = () => {
               <div style={{ marginBottom: 4 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Profit %</Text>
               </div>
-              <InputNumber
+              <InputNumber name="profitPct"
                 value={profitPct}
                 min={0}
                 max={100}
@@ -3225,7 +3225,7 @@ const CostingForm = () => {
               <div style={{ marginBottom: 4 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>Target Price ({getCurrencySymbol(currency)})</Text>
               </div>
-              <InputNumber
+              <InputNumber name="autoCalcProfit"
                 value={targetPrice}
                 min={0}
                 step={0.01}
@@ -3327,7 +3327,7 @@ const CostingForm = () => {
                         <div style={{ marginTop: 8 }}>
                           <div style={{ marginBottom: 4 }}>
                             <Text type="secondary" style={{ fontSize: 11 }}>Agent %</Text>
-                            <InputNumber
+                            <InputNumber name="agentCommissionPct"
                               value={perSizeOverrides[ps.sizeKey]?.agentCommissionPct ?? agentCommissionPct}
                               min={0} max={100} step={0.5} size="small"
                               style={{ width: '100%' }}
@@ -3340,7 +3340,7 @@ const CostingForm = () => {
                           </div>
                           <div style={{ marginBottom: 4 }}>
                             <Text type="secondary" style={{ fontSize: 11 }}>Profit %</Text>
-                            <InputNumber
+                            <InputNumber name="profitPct"
                               value={perSizeOverrides[ps.sizeKey]?.profitPct ?? profitPct}
                               min={0} max={100} step={0.5} size="small"
                               style={{ width: '100%' }}
@@ -3353,7 +3353,7 @@ const CostingForm = () => {
                           </div>
                           <div>
                             <Text type="secondary" style={{ fontSize: 11 }}>Target Price</Text>
-                            <InputNumber
+                            <InputNumber name="target"
                               value={perSizeOverrides[ps.sizeKey]?.targetPrice ?? ''}
                               min={0} step={0.01} size="small"
                               style={{ width: '100%' }}

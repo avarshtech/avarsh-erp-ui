@@ -12,7 +12,10 @@ const { Text } = Typography;
  * in-production orders are offered; each option shows buyer, style and how
  * many POs already feed it so a wrong pick is easy to spot.
  */
-const OrderSelect = ({ value, onChange, disabled, placeholder = 'Select customer order', style }) => {
+// `id` is injected by Form.Item and has to reach the Select: antd renders the
+// item's <label for> from the same value, and without it the label points at
+// nothing.
+const OrderSelect = ({ id, value, onChange, disabled, placeholder = 'Select customer order', style }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -35,6 +38,7 @@ const OrderSelect = ({ value, onChange, disabled, placeholder = 'Select customer
 
   return (
     <Select
+      id={id}
       showSearch
       allowClear
       loading={loading}

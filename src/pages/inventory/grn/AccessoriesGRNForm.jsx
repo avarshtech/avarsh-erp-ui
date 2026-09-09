@@ -376,7 +376,7 @@ const AccessoriesGRNForm = () => {
                 <Row gutter={16}>
                   <Col xs={24} md={12}>
                     <Form.Item label="GRN #">
-                      <Input value={grnRecord?.grnNumber || ''} disabled />
+                      <Input name="grn" value={grnRecord?.grnNumber || ''} disabled />
                     </Form.Item>
                   </Col>
                   <Col xs={24} md={12}>

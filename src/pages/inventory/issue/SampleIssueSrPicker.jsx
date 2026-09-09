@@ -8,7 +8,10 @@ import { Select, Tag } from 'antd';
  * documents, so the second one is always raised against a request that the
  * first already moved into production.
  */
-const SampleIssueSrPicker = ({ srs = [], value, onChange, disabled = false }) => {
+// `id` is injected by Form.Item and has to reach the Select: antd renders the
+// item's <label for> from the same value, and without it the label points at
+// nothing.
+const SampleIssueSrPicker = ({ id, srs = [], value, onChange, disabled = false }) => {
   const options = useMemo(() => srs.map((r) => ({
     value: r.id,
     // Searched against, so the storekeeper can type a style or a buyer too
@@ -27,6 +30,7 @@ const SampleIssueSrPicker = ({ srs = [], value, onChange, disabled = false }) =>
 
   return (
     <Select
+      id={id}
       showSearch
       style={{ width: '100%' }}
       placeholder="Select a sample request"

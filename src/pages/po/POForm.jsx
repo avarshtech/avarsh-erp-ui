@@ -1712,7 +1712,7 @@ const POForm = () => {
       dataIndex: 'description',
       width: 180,
       render: (value, record) => (
-        <Input
+        <Input name="description"
           placeholder="Description"
           value={value}
           onChange={(e) =>
@@ -1769,7 +1769,7 @@ const POForm = () => {
           return <Text strong style={{ color: 'var(--primary-color)' }}>{value}{uomLabel ? ` ${uomLabel}` : ''}</Text>;
         }
         return (
-          <InputNumber
+          <InputNumber name="qty"
             min={0}
             step={1}
             precision={2}
@@ -1792,7 +1792,7 @@ const POForm = () => {
       dataIndex: 'unitPrice',
       width: 120,
       render: (value, record) => (
-        <InputNumber
+        <InputNumber name="unitPrice"
           min={0}
           step={0.01}
           precision={2}

@@ -1918,7 +1918,7 @@ const BOMForm = () => {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: showOverrideInput ? 4 : 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <InputNumber
+                <InputNumber name="consumption"
                   min={0}
                   step={0.001}
                   precision={4}
@@ -2347,7 +2347,7 @@ const BOMForm = () => {
               {!isEdit && <Text strong style={{ color: 'var(--error-color, #ff4d4f)' }}>* </Text>}
               <Text strong>Order No</Text>
             </div>
-            <Input
+            <Input name="orderNo"
               placeholder="SG/25-26/1001"
               inputMode="numeric"
               value={orderNoInput || (isEdit ? '' : 'SG/')}
@@ -2372,31 +2372,31 @@ const BOMForm = () => {
             <div style={{ marginBottom: 4 }}>
               <Text strong>Style No</Text>
             </div>
-            <Input value={styleNo} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="styleNo" value={styleNo} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Garment Name</Text>
             </div>
-            <Input value={garmentName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="garmentName" value={garmentName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Material</Text>
             </div>
-            <Input value={material} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="material" value={material} disabled placeholder="Populated from order" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Buyer</Text>
             </div>
-            <Input value={buyerName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Input name="buyer" value={buyerName} disabled placeholder="Populated from style" style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Col>
           <Col xs={24} md={8} lg={4}>
             <div style={{ marginBottom: 4 }}>
               <Text strong>Order Qty</Text>
             </div>
-            <InputNumber
+            <InputNumber name="orderQty"
               style={{ width: '100%', height: 40 }}
               min={0}
               precision={0}

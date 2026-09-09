@@ -77,7 +77,7 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
       style={{ width: '100%' }}
       popupRender={() => (
         <div style={{ padding: 8 }}>
-          <Input
+          <Input name="searchColors"
             placeholder="Search colors..."
             prefix={<SearchOutlined />}
             value={search}
@@ -1394,7 +1394,7 @@ const ItemMaster = () => {
     switch (type) {
       case 'number':
         return (
-          <Input
+          <Input name={attr.attributeName}
             placeholder={`Enter ${attr.attributeName}`}
             value={value}
             onChange={(e) => {
@@ -1406,7 +1406,7 @@ const ItemMaster = () => {
       case 'text':
       case 'string':
         return (
-          <Input
+          <Input name={attr.attributeName}
             placeholder={`Enter ${attr.attributeName}`}
             value={value}
             onChange={(e) => {
@@ -1418,7 +1418,7 @@ const ItemMaster = () => {
         );
       default:
         return (
-          <Input
+          <Input name={attr.attributeName}
             placeholder={`Enter ${attr.attributeName}`}
             value={value}
             onChange={(e) => {
@@ -1564,7 +1564,7 @@ const ItemMaster = () => {
         <div style={{ marginBottom: 16 }}>
           <Row gutter={[12, 12]} align="middle">
             <Col xs={24} sm={12} md={6} lg={4}>
-              <Input
+              <Input name="searchItems"
                 placeholder="Search items..."
                 prefix={<SearchOutlined />}
                 allowClear
@@ -1809,7 +1809,7 @@ const ItemMaster = () => {
                   label="Item Name"
                   tooltip="Derived from Category / Sub-Category / Item Type. Only one item may exist per combination."
                 >
-                  <Input
+                  <Input name="itemName"
                     value={derivedItemName}
                     readOnly
                     variant="filled"
@@ -2017,7 +2017,7 @@ const ItemMaster = () => {
                           }
                           help="At least 5 characters, unique within this item"
                         >
-                          <Input
+                          <Input name="variantName"
                             value={variants[activeVariantIndex]?.variantName || ''}
                             placeholder="e.g. Single Jersey 180 GSM Navy"
                             maxLength={255}
