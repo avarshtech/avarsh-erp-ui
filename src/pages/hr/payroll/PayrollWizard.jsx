@@ -7,6 +7,7 @@ import { getActiveFactories } from '../../../services/master/factoryService';
 import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 import SalaryRecordDrawer from './SalaryRecordDrawer';
+import { hasPermission } from '../../../utils/permissions';
 
 const MONTH_OPTIONS = [
   { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -21,6 +22,10 @@ const formatCurrency = (val) =>
 const PayrollWizard = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+
+  // Approving finalises the run and releases the payout. PayrollRunView gates
+  // the same act on this right; the wizard did not gate it at all.
+  const canApprove = hasPermission('hr-payroll', 'approve');
 
   const [current, setCurrent] = useState(0);
   // Clicking a row opens the derivation behind its figures.
@@ -277,10 +282,23 @@ const PayrollWizard = () => {
         <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Col>
         <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Col>
       </Row>
+      {/* Approving finalises the run and releases the payout, so it is gated on
+          hr-payroll.approve the same way PayrollRunView gates it. Without this
+          the wizard let anyone who could create a run also approve it, which is
+          the one path in payroll that skipped the check entirely. */}
       <div style={{ marginTop: 24, textAlign: 'center' }}>
-        <Button type="primary" size="large" loading={loading} icon={<CheckCircleOutlined />} onClick={handleApprove}>
-          Approve &amp; Finalize
-        </Button>
+        {canApprove ? (
+          <Button type="primary" size="large" loading={loading} icon={<CheckCircleOutlined />} onClick={handleApprove}>
+            Approve &amp; Finalize
+          </Button>
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            message="This run is ready for approval"
+            description="You do not have permission to approve a payroll run. Someone with the Approve right on Payroll can finalise it."
+          />
+        )}
       </div>
     </Card>,
   ];

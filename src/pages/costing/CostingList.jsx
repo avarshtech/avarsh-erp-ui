@@ -384,11 +384,16 @@ const CostingList = () => {
               onClick={() => navigate(`/costing/edit/${record.id}`)}
             />
           )}
-          <ActionButton
-            action="duplicate"
-            onClick={() => handleDuplicate(record)}
-            loading={duplicatingId === record.id}
-          />
+          {/* Duplicating creates a new cost sheet, so it needs the same right
+              as creating one. It was rendered unconditionally, which let a
+              view-only role add cost sheets. */}
+          {canAdd && (
+            <ActionButton
+              action="duplicate"
+              onClick={() => handleDuplicate(record)}
+              loading={duplicatingId === record.id}
+            />
+          )}
           <ActionButton
             action="print"
             onClick={() => handlePrint(record)}
@@ -413,7 +418,7 @@ const CostingList = () => {
         </Space>
       ),
     },
-  ], [navigate, handleDelete, handleDuplicate, handlePrint, handleViewHistory, deletingId, duplicatingId, printingId, canView, canUpdate, canDelete]);
+  ], [navigate, handleDelete, handleDuplicate, handlePrint, handleViewHistory, deletingId, duplicatingId, printingId, canView, canUpdate, canDelete, canAdd]);
 
   return (
     <div className="animate-fade-in-up">
