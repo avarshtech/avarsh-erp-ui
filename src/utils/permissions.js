@@ -756,9 +756,44 @@ export const validatePermissions = (permissions) => {
 };
 
 /**
+ * Clear any screen whose `requires` parent has no access.
+ *
+ * The single enforcement point for dependencies. The rules used to live in three
+ * places with three different memberships: the matrix UI honoured four pairs,
+ * this normalizer enforced five, and the registry declared thirteen. The pair it
+ * enforced but the UI did not - stickers needing a packing list - meant an admin
+ * could tick Print, save successfully, reopen, and find it silently off.
+ *
+ * Returns a new object; the input is not mutated.
+ */
+export const applyDependencies = (permissions) => {
+  const out = { ...permissions };
+  SCREENS.forEach((screen) => {
+    if (!screen.requires) return;
+    if (out[screen.requires]?.access) return;
+    out[screen.id] = {
+      access: false,
+      operations: screen.ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
+    };
+  });
+  return out;
+};
+
+/**
+ * Why a screen cannot be granted right now, or null if it can.
+ * Used by the matrix to disable a row and say what would unblock it.
+ */
+export const getBlockedReason = (screenId, permissions) => {
+  const screen = SCREEN_BY_ID[screenId];
+  if (!screen?.requires) return null;
+  if (permissions?.[screen.requires]?.access) return null;
+  return { requiresId: screen.requires, requiresName: SCREEN_BY_ID[screen.requires]?.name ?? screen.requires };
+};
+
+/**
  * Normalize permissions before saving to API.
- * Ensures only known modules with their applicable operations are saved.
- * Enforces PO-approval → PO link: if PO has no access, approval is disabled.
+ * Ensures only known modules with their applicable operations are saved, then
+ * applies the registry's dependency rules.
  */
 export const normalizePermissionsForSave = (permissions) => {
   const normalized = {};
@@ -776,49 +811,5 @@ export const normalizePermissionsForSave = (permissions) => {
     normalized[module.id] = { access, operations };
   });
 
-  // Enforce order-actions → orders link
-  if (!normalized['orders']?.access) {
-    normalized['order-actions'] = {
-      access: false,
-      operations: ORDER_ACTION_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-    };
-  }
-
-  // Enforce PO-approval → PO link
-  if (!normalized['purchase-orders']?.access) {
-    normalized['po-approval'] = {
-      access: false,
-      operations: PO_APPROVAL_OPERATIONS.reduce((acc, op) => {
-        acc[op] = false;
-        return acc;
-      }, {}),
-    };
-  }
-
-  // Enforce costing-approval → costing link (mirrors order-actions and po-approval pattern)
-  if (!normalized['costing']?.access) {
-    normalized['costing-approval'] = {
-      access: false,
-      operations: COSTING_APPROVAL_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-    };
-  }
-
-  // Enforce ai-assistant → reports link
-  if (!normalized['reports']?.access) {
-    normalized['ai-assistant'] = {
-      access: false,
-      operations: { view: false },
-    };
-  }
-
-  // Enforce export-stickers → export-packing-list link. Stickers are a projection
-  // of an approved packing list; without PL access there is nothing to render.
-  if (!normalized['export-packing-list']?.access) {
-    normalized['export-stickers'] = {
-      access: false,
-      operations: EXPORT_STICKER_OPERATIONS.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-    };
-  }
-
-  return normalized;
+  return applyDependencies(normalized);
 };
