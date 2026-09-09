@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useMemo } from 'react';
-import { Breadcrumb, Skeleton, Button, Tooltip, App } from 'antd';
+import { Breadcrumb, Skeleton, Button, Tooltip, App, Result } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
@@ -518,8 +518,8 @@ const MasterDashboard = () => {
   // Breadcrumb
   const breadcrumbItems = useMemo(() => [
     { title: 'Master Data' },
-    { title: activeItem.groupLabel },
-    { title: activeItem.label },
+    { title: activeItem?.groupLabel },
+    { title: activeItem?.label },
   ], [activeItem]);
 
   // Content area — render active master component or loading spinner
@@ -562,6 +562,20 @@ const MasterDashboard = () => {
     }
     return collapsedItemBase;
   };
+
+  // The route guard admits any master key, but the nav groups are filtered
+  // again here — a role whose keys all fell out of NAV_GROUPS would otherwise
+  // dereference an undefined activeItem and blank the page instead of 403ing.
+  if (!activeItem) {
+    return (
+      <Result
+        status="403"
+        title="Access Denied"
+        subTitle="You do not have permission to access any master data."
+        extra={<Button type="primary" onClick={() => window.history.back()}>Go Back</Button>}
+      />
+    );
+  }
 
   return (
     <div className="animate-fade-in-up" style={{

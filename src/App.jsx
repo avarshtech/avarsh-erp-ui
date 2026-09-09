@@ -371,13 +371,13 @@ const ThemedApp = () => {
             {/* Admin — the sidebar hides these by module access, but without a route
                 guard any user could still deep-link straight in (found by the RBAC
                 regression suite). Gate them on the same module keys the menu uses. */}
-            <Route path="admin/dashboard" element={<AdminDashboard />} />
+            <Route path="admin/dashboard" element={<PermissionRoute module={['users', 'roles', 'approval-flows', 'company-profile']}><AdminDashboard /></PermissionRoute>} />
             <Route path="admin/users" element={<PermissionRoute module="users"><UserManagement /></PermissionRoute>} />
             <Route path="admin/roles" element={<PermissionRoute module="roles"><RoleAccess /></PermissionRoute>} />
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows"><ApprovalFlowList /></PermissionRoute>} />
             <Route path="admin/company-profile" element={<PermissionRoute module="company-profile"><CompanyProfile /></PermissionRoute>} />
-            {/* Master Data */}
-            <Route path="master" element={<MasterDashboard />} />
+            {/* Master Data — one shell screen shared by every master key; opens if any of them grants access */}
+            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'inventory-qc', 'inventory-bill-passing']}><MasterDashboard /></PermissionRoute>} />
             {/* Profile */}
             <Route path="profile" element={<Profile />} />
             {/* HR & Payroll */}
