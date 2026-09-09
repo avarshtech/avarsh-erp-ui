@@ -100,7 +100,9 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       onUpdated?.(updated);
       closeAction();
     } catch {
-      message.error('Action failed');
+      // No toast here. The axios response interceptor already raises one carrying the server's
+      // own message, so adding a second showed two stacked popups — and the generic one on top,
+      // which told the user nothing while the real reason scrolled away above it.
     } finally { setBusy(false); }
   };
 
