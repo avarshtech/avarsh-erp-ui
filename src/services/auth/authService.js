@@ -284,14 +284,22 @@ export const refreshSession = async () => {
 
     const currentUser = getCurrentUser();
 
-    // Permissions are cached from login and only change on re-login, so reuse them
-    // rather than paying a request on every refresh cycle. Fetch only when the cache
-    // is missing (e.g. bootstrap after storage was cleared). A failure here throws to
-    // the outer catch, which returns false — initializeSession then clears the session.
-    let permissions = currentUser?.permissions;
-    if (!permissions || Object.keys(permissions).length === 0) {
-      ({ permissions } = await getMyPermissions());
-    }
+    // Refetched on every refresh cycle, deliberately.
+    //
+    // These used to be reused from the login cache, on the reasoning that permissions
+    // "only change on re-login". That was true only while the server ignored them. Once
+    // the API enforces, a role edited by an admin has to reach the user: otherwise they
+    // keep seeing screens the server now refuses, and every click 403s. A PWA session
+    // survives up to 30 days (jwt.refresh-token.pwa-expiration-hours defaults to 720, and
+    // SessionContext disables the idle timeout there), so the stale window was that long.
+    //
+    // The cost is nil: this runs on the refresh cycle, not per request, and MeController
+    // reads the permissions straight off the EAGER-loaded principal — no extra query.
+    //
+    // A failure here throws to the outer catch, which returns false; initializeSession
+    // then clears the session. That is the right outcome — a session whose permissions
+    // cannot be established should not continue.
+    const { permissions } = await getMyPermissions();
 
     const updatedUser = buildUserSession(newToken, currentUser, permissions);
 
