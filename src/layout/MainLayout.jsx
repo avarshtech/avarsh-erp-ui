@@ -117,7 +117,7 @@ const SessionTimer = () => {
 };
 
 // Sidebar content extracted so it can be shared between Sider and Drawer
-const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick, isDarkMode }) => (
+const SidebarContent = ({ menuItems, selectedKeys, openKeys, onMenuClick }) => (
   <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
     <Menu
       theme="dark"

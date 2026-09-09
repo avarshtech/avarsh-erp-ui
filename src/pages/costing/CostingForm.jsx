@@ -228,6 +228,8 @@ const CostingForm = () => {
   const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // UNWIRED: only handlePrint touches this, and handlePrint has no caller.
+  // eslint-disable-next-line no-unused-vars
   const [printing, setPrinting] = useState(false);
   const [entityVersion, setEntityVersion] = useState(null);
   const [loadedStatus, setLoadedStatus] = useState(null);
@@ -341,6 +343,9 @@ const CostingForm = () => {
   const [wovenRowKey, setWovenRowKey]                   = useState(null);
   const [bomImportOpen, setBomImportOpen]               = useState(false);
   const [pdfPreviewOpen, setPdfPreviewOpen]             = useState(false);
+  // UNWIRED: setPdfPreviewData is never called, so CostingPdfPreviewModal
+  // is always handed null and can never render a preview.
+  // eslint-disable-next-line no-unused-vars
   const [pdfPreviewData, setPdfPreviewData]             = useState(null);
   const [templateModalOpen, setTemplateModalOpen]       = useState(false);
   const [templateModalMode, setTemplateModalMode]       = useState('load');
@@ -349,7 +354,11 @@ const CostingForm = () => {
   const [scenarioGroupId, setScenarioGroupId]           = useState(null);
 
   // Past PO suggestions
+  // UNWIRED: see suggestionVisible below.
+  // eslint-disable-next-line no-unused-vars
   const [poSuggestions, setPOSuggestions] = useState([]);
+  // UNWIRED: set but never read - the past-PO price suggestion UI was never rendered.
+  // eslint-disable-next-line no-unused-vars
   const [suggestionVisible, setSuggestionVisible] = useState(false);
 
   // Fetch dropdown options from API on mount
@@ -1605,6 +1614,9 @@ const CostingForm = () => {
 
   // ==================== PRINT ====================
 
+  // UNWIRED: no control calls handlePrint, so the cost-sheet print path is
+  // unreachable from the UI. The handler itself is complete.
+  // eslint-disable-next-line no-unused-vars
   const handlePrint = async () => {
     setPrinting(true);
     try {

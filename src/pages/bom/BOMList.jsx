@@ -51,7 +51,6 @@ const BOMList = () => {
 
   // Permissions
   const canView = hasPermission('bom', 'view');
-  const canAdd = hasPermission('bom', 'add');
   const canUpdate = hasPermission('bom', 'update');
   const canDelete = hasPermission('bom', 'delete');
 

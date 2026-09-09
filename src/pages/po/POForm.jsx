@@ -289,7 +289,6 @@ const POForm = () => {
   const prevIdRef = useRef(id);
   const [form] = Form.useForm();
   const { message, modal } = App.useApp();
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [pageLoading, setPageLoading] = useState(!!id);
@@ -306,7 +305,6 @@ const POForm = () => {
   const [isIgstApplicable, setIsIgstApplicable] = useState(false);
 
   // Change detection for resubmit warning
-  const [changeCheckLoading, setChangeCheckLoading] = useState(false);
 
   // Dirty state for unsaved changes warning
   const [isDirty, setIsDirtyState] = useState(false);
@@ -349,7 +347,7 @@ const POForm = () => {
   const [entityVersion, setEntityVersion] = useState(null);
 
   // Store context
-  const { suppliers, uoms, setData, isCacheValid, setLoading: setStoreLoading } = useStore();
+  const { uoms } = useStore();
 
   const isEditMode = !!id;
 
@@ -777,26 +775,6 @@ const POForm = () => {
     });
   };
 
-  // Handle variant modal cancel
-  const handleVariantModalCancel = () => {
-    // If it's a new item selection (not change), clear the line item
-    if (!variantModalState.isChange && variantModalState.pendingLineKey) {
-      setLineItems((prev) =>
-        prev.map((li) =>
-          li.key === variantModalState.pendingLineKey
-            ? { ...createEmptyLineItem(), key: variantModalState.pendingLineKey }
-            : li
-        )
-      );
-    }
-    setVariantModalState({
-      show: false,
-      pendingItem: null,
-      pendingLineKey: null,
-      isChange: false,
-      currentVariantId: null,
-    });
-  };
 
   // Handle "Change Variant" click from variant column
   const handleChangeVariant = (lineKey, itemId) => {
@@ -921,6 +899,9 @@ const POForm = () => {
   }, [poType, bomOrders]);
 
   // Remove BOM order (for Combined PO)
+  // UNWIRED: a Combined PO can add BOM orders but has no control to remove
+  // one, so this never runs.
+  // eslint-disable-next-line no-unused-vars
   const removeOrder = useCallback((orderNo) => {
     setBomOrders(prev => prev.filter(o => o.orderNo !== orderNo));
     // Remove line items that came from this order's BOM
@@ -1450,9 +1431,7 @@ const POForm = () => {
       (originalPO.status === PO_STATUS.REJECTED || originalPO.status === PO_STATUS.REFERRED_BACK);
 
     if (isResubmit) {
-      setChangeCheckLoading(true);
       const changed = await hasChangesFromLastVersion();
-      setChangeCheckLoading(false);
 
       if (!changed) {
         modal.confirm({

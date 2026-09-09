@@ -45,7 +45,15 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        // `(_, index) => ...` and other placeholders that exist only to reach a later argument
+        argsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        // `const { id, createdAt, ...rest } = dto` is how payloads are stripped here;
+        // the named keys are meant to be dropped, not read.
+        ignoreRestSiblings: true,
+      }],
     },
   },
 ])

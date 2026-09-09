@@ -39,7 +39,7 @@ const useIsPwa = () => {
     };
 
     standaloneMql.addEventListener('change', updatePwa);
-    wcoMql.addEventListener('change', (e) => {
+    wcoMql.addEventListener('change', () => {
       updatePwa();
       updateWco();
     });

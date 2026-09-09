@@ -148,7 +148,7 @@ const SwipeableNotificationItem = ({
     isDragging.current = false;
   }, [isMobileOrTablet, notification.id, isUnread, onDelete, onMarkRead, onMarkUnread]);
 
-  const handleClick = useCallback((e) => {
+  const handleClick = useCallback(() => {
     if (isDragging.current) return;
     onClick?.(notification);
   }, [notification, onClick]);

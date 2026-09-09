@@ -86,7 +86,7 @@ const ApprovalFlowList = () => {
     try {
       await toggleFlowActive(id);
       fetchFlows();
-    } catch (err) {
+    } catch {
       message.error('Failed to toggle flow status');
     } finally {
       setTogglingIds(prev => {

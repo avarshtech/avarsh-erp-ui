@@ -106,7 +106,7 @@ const Login = () => {
       } else {
         messageApi.error(result.message || 'Login failed. Please try again.');
       }
-    } catch (error) {
+    } catch {
       messageApi.error('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);

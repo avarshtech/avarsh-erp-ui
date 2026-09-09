@@ -180,7 +180,6 @@ const buildOrderHtml = (order, org) => {
   const companyName  = org?.organisationName || 'Company Name';
   const currency     = order.currency || '';
   const sc           = statusColors(order.status);
-  const currSym      = sym(currency);
 
   // Assortment — grouped by color (case-insensitive, Pantone-aware)
   const getPantoneKey = (s) => {

@@ -384,6 +384,9 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
   };
 
   // Handle custom size tags change
+  // UNWIRED: the only writer of customSizes. Nothing calls it, and the size
+  // preset dropdown never offers the CUSTOM option that would read it.
+  // eslint-disable-next-line no-unused-vars
   const handleCustomSizesChange = (tags) => {
     const newSizePrices = {};
     tags.forEach((s) => {
@@ -853,7 +856,6 @@ const OrderForm = () => {
   // Core state
   const [orderLines, setOrderLines] = useState([createEmptyLine()]);
   const [pageLoading, setPageLoading] = useState(!!id);
-  const [loading, setLoading] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [existingOrder, setExistingOrder] = useState(null);
@@ -1212,7 +1214,7 @@ const OrderForm = () => {
         });
 
         // Build color rows from extraction
-        const colorRows = (data.colorRows || []).map((cr, idx) => {
+        const colorRows = (data.colorRows || []).map((cr) => {
           const quantities = {};
           sizes.forEach((s) => {
             const q = cr.quantities;
@@ -1567,7 +1569,7 @@ const OrderForm = () => {
 
   // ==================== BUILD ORDER DATA ====================
 
-  const buildOrderData = (status) => {
+  const buildOrderData = () => {
     const values = form.getFieldsValue();
     const buyer = buyers.find((b) => b.id === values.buyerId);
     const orderDate = dayjs();
@@ -1919,6 +1921,7 @@ const OrderForm = () => {
                     showSearch
                     optionFilterProp="label"
                     placeholder="Select buyer"
+                    loading={buyersLoading}
                     options={buyers.map((b) => ({ value: b.id, label: b.name }))}
                   />
                 </Form.Item>

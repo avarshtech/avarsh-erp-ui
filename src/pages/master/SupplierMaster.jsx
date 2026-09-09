@@ -97,7 +97,7 @@ const SupplierMaster = () => {
       }
       setSuppliers(data);
       setData('suppliers', data);
-    } catch (error) {
+    } catch {
       message.error('Failed to load suppliers');
       setSuppliers([]);
     } finally {
@@ -261,12 +261,12 @@ const SupplierMaster = () => {
       // Invalidate cache and refresh supplier list to ensure table reflects latest data
       try {
         invalidateCache && invalidateCache('suppliers');
-      } catch (e) {
+      } catch {
         // ignore
       }
       try {
         await fetchSuppliers(true);
-      } catch (e) {
+      } catch {
         // ignore - fetchSuppliers already handles errors
       }
 

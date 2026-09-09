@@ -112,7 +112,7 @@ const BuyerMaster = () => {
       }
       setBuyers(data);
       setData('buyers', data);
-    } catch (error) {
+    } catch {
       message.error('Failed to load buyers');
       setBuyers([]);
     } finally {
@@ -246,8 +246,8 @@ const BuyerMaster = () => {
       }
 
       // Invalidate cache and refresh
-      try { invalidateCache && invalidateCache('buyers'); } catch (e) { /* ignore */ }
-      try { await fetchBuyers(true); } catch (e) { /* ignore */ }
+      try { invalidateCache && invalidateCache('buyers'); } catch { /* ignore */ }
+      try { await fetchBuyers(true); } catch { /* ignore */ }
 
       setModalVisible(false);
       form.resetFields();

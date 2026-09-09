@@ -23,11 +23,6 @@ const formatNum = (val, digits = 2) => {
   return n.toLocaleString('en-IN', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 };
 
-const formatInt = (val) => {
-  const n = parseInt(val, 10);
-  if (!isFinite(n)) return '—';
-  return n.toString();
-};
 
 const formatDate = (d) => {
   if (!d) return '—';

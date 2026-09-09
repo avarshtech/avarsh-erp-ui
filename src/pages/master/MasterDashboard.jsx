@@ -38,7 +38,6 @@ import BpIssueTypeMaster from './BpIssueTypeMaster';
 import BpToleranceSettings from './BpToleranceSettings';
 import CourierMaster from './CourierMaster';
 import { useStore } from '../../context/StoreContext';
-import { useTheme } from '../../context/ThemeContext';
 import { hasModuleAccess } from '../../utils/permissions';
 import {
   getAllCategories,
@@ -371,7 +370,6 @@ const collapsedItemSelected = {
 
 const MasterDashboard = () => {
   const { message, modal } = App.useApp();
-  const { isDarkMode } = useTheme();
   const {
     categories, subCategories, itemTypes, attributes, uoms, styles, paymentTerms, sizePresets,
     setData, setLoading, loading, isCacheValid,
@@ -524,7 +522,7 @@ const MasterDashboard = () => {
 
   // Content area — render active master component or loading spinner
   const renderContent = () => {
-    const { Component, loadingKey, label } = activeItem;
+    const { Component, loadingKey } = activeItem;
     if (loadingKey && loading[loadingKey]) {
       return (
         <div style={{ padding: 24 }}>

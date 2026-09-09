@@ -122,7 +122,7 @@ const BOMView = ({ open, bomData, onClose }) => {
 
   if (!bomData) return null;
   const bom = fullBom || bomData;
-  const { orderNo, status, styleId, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
+  const { orderNo, status, styleName, garmentName, material, buyerName, season, orderQty, remarks, lines = [] } = bom;
 
   const fabricLines = lines.filter(isFabricLine);
   const trimLines = lines.filter((l) => !isFabricLine(l));

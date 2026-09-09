@@ -12,13 +12,6 @@ import { createAuthenticatedClient } from '../helpers/api-client.js';
 import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
 
 const runId = Date.now();
-const today = new Date().toISOString().split('T')[0];
-const futureDate = (days) => {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-};
-
 /** Navigate, re-login if needed, wait for ready */
 async function goTo(page, path) {
   await page.goto(path);
@@ -46,12 +39,6 @@ async function goTo(page, path) {
 async function dismissModals(page) {
   const btn = page.getByRole('button', { name: /Not Now/i });
   if (await btn.isVisible({ timeout: 1500 }).catch(() => false)) await btn.click();
-}
-
-/** Helper to pick a select option within a specific row/context */
-async function selectInContext(page, container, optionText, opts = {}) {
-  const sel = container.locator('.ant-select').first();
-  await antSelect(page, sel, optionText, opts);
 }
 
 test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({ page }) => {

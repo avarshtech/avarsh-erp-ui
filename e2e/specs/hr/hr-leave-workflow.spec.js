@@ -107,7 +107,7 @@ test.describe('HR Leave Workflow — Apply → Approve', () => {
     await antTableWaitForData(page);
 
     // Apply a new leave first so we have a fresh PENDING record to approve
-    const leaveId = await applyLeaveViaDrawer(page, `Approve workflow test ${STAMP()}`);
+    await applyLeaveViaDrawer(page, `Approve workflow test ${STAMP()}`);
 
     // Switch to the Pending tab to locate the freshly submitted leave
     const [pendingResp] = await Promise.all([

@@ -201,7 +201,6 @@ const ItemMaster = () => {
   const [existingLookupLoading, setExistingLookupLoading] = useState(false);
 
   const isEditMode = !!selectedItem;
-  const isReadOnly = isEditMode ? !canUpdate : !canAdd;
 
   // Resolve attribute value from variant/item attributes object
   const resolveAttributeValue = (attributesObj, attr) => {
@@ -1279,10 +1278,8 @@ const ItemMaster = () => {
     setSubmitting(true);
     try {
       // Build variants payload
-      let activePosition = 0;
       const variantsPayload = variants.map((variant) => {
         const isActive = variant.isActive ?? true;
-        if (isActive) activePosition += 1;
         const attributeObject = {};
         formAttributes.forEach((attr) => {
           attributeObject[toCamelCase(attr.attributeName)] = variant[attr.id] || '';

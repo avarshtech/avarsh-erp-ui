@@ -171,7 +171,6 @@ test.describe('AF9 — My Approvals inbox', () => {
 });
 
 test.describe('AF1 — approval flow admin UI', () => {
-  let uiFlowName;
 
   test.beforeAll(async () => {
     api = api || (await createAuthenticatedClient());

@@ -250,6 +250,10 @@ const BOMForm = () => {
 
   // ── Trims Match By Modal ────────────────────────────────────────
   const [matchByModalOpen, setMatchByModalOpen] = useState(false);
+  // UNWIRED: nothing calls setMatchByLineKey, so this stays null and the
+  // buyer-PO match panel below can never open. Kept rather than deleted because
+  // the panel itself is fully built - it just has no entry point.
+  // eslint-disable-next-line no-unused-vars
   const [matchByLineKey, setMatchByLineKey] = useState(null);
   const [matrixDialogLineKey, setMatrixDialogLineKey] = useState(null);
 
@@ -1212,7 +1216,6 @@ const BOMForm = () => {
   }, [allProcessOptions]);
 
   // Backward-compat: flat list used in other places (allowance dialog, payload builder)
-  const processOptions = allProcessOptions;
 
   // ==================== SUMMARY ====================
 
@@ -1251,7 +1254,7 @@ const BOMForm = () => {
     setConsumptionModalOpen(true);
   }, []);
 
-  const handleConsumptionApply = useCallback(({ splitBySizes, consumption, uom, consumptionPerSize, sizes }) => {
+  const handleConsumptionApply = useCallback(({ splitBySizes, consumption, consumptionPerSize }) => {
     if (!consumptionLineKey) return;
     if (!splitBySizes) {
       updateLine(consumptionLineKey, 'consumptionPerGarment', consumption);
@@ -1351,7 +1354,6 @@ const BOMForm = () => {
 
     lines.forEach((l, idx) => {
       const n = idx + 1;
-      const fabric = isFabricCategory(l);
       const cMode = l.consumptionMode || 'SIMPLE';
       const isMatrixMode = cMode === CONSUMPTION_MODE.SIZE_WISE || cMode === CONSUMPTION_MODE.VARIANT_PER_SIZE;
 

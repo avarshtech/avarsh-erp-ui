@@ -1,8 +1,8 @@
 import { Modal, Table, InputNumber, Typography, Space, Tag, Button, Tooltip, Row, Col, Card, Select } from 'antd';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { HolderOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
-import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal, calcVariantBreakdown } from '../../utils/bomConstants';
+import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid } from '../../utils/bomConstants';
 
 const { Text } = Typography;
 
@@ -235,40 +235,6 @@ const ProcessAllowanceModal = ({
     );
   };
 
-  // Per-variant breakdown for preview (VARIANT_PER_SIZE only)
-  const variantBreakdown = useMemo(() => {
-    if (!isMatrix || consumptionMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE || !variantMapping || !consumptionMatrix) return [];
-    const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
-    return calcVariantBreakdown(consumptionMatrix, orderQtyGrid, variantMapping, rows);
-  }, [isMatrix, consumptionMode, variantMapping, consumptionMatrix, orderLineSummary, rows]);
-
-  // Overall purchase qty for matrix modes
-  const matrixPurchaseQty = useMemo(() => {
-    if (!isMatrix || !consumptionMatrix) return 0;
-    const orderQtyGrid = buildOrderQtyGrid(orderLineSummary);
-    const totalReq = calcMatrixTotal(consumptionMatrix, orderQtyGrid);
-    if (consumptionMode === CONSUMPTION_MODE.VARIANT_PER_SIZE) {
-      return variantBreakdown.reduce((s, v) => s + v.purchaseQty, 0);
-    }
-    // SIZE_WISE: aggregate per-size allowances
-    let total = 0;
-    sizes.forEach((size) => {
-      let sizeReq = 0;
-      Object.entries(consumptionMatrix).forEach(([color, szMap]) => {
-        const c = Number(szMap?.[size]) || 0;
-        const o = orderQtyGrid[color]?.[size] || 0;
-        sizeReq += c * o;
-      });
-      let rejTotal = 0, shipTotal = 0;
-      rows.forEach((r) => {
-        const sa = r.sizeAllowances?.[size];
-        rejTotal += Number(sa?.rejectionPercent ?? r.rejectionPercent) || 0;
-        shipTotal += Number(sa?.shipmentAllowancePercent ?? r.shipmentAllowancePercent) || 0;
-      });
-      total += sizeReq + sizeReq * ((rejTotal + shipTotal) / 100);
-    });
-    return total;
-  }, [isMatrix, consumptionMatrix, orderLineSummary, consumptionMode, variantBreakdown, sizes, rows]);
 
   // Variant label helper
   const getVariantLabel = (variantId) => {

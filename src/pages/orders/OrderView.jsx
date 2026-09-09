@@ -159,7 +159,6 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
     costingId,
     buyerName,
     orderDate,
-    styleId,
     styleNo,
     garmentType,
     season,

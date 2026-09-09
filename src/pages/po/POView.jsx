@@ -1657,7 +1657,6 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
           const charCount = actionReason.trim().length;
           const charsRemaining = MIN_CHARS - charCount;
           const isReject = statusAction.key === 'reject';
-          const isCancel = statusAction.key === 'cancel';
           const isReferBack = statusAction.key === 'refer_back';
           const canSubmit = charCount >= MIN_CHARS && (!isReject || rejectionCategory);
 

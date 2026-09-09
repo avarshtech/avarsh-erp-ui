@@ -273,7 +273,6 @@ test.describe.serial('Accessories GRN — PO Line Combinations (API)', () => {
     payload.lineItems.forEach((li) => {
       const item = selected.find((s) => s.id === li.poLineItemId);
       if (item) {
-        const itemQty = item.id === fullItem.id ? fullQty : halfQty;
         li.cartons = cartonConfig[item.id].map((c) => ({
           poLineItemId: item.id,
           itemCode: item.itemCode,
@@ -321,27 +320,6 @@ test.describe('Accessories GRN — Validation (API)', () => {
     }
     await api.dispose();
   });
-
-  /** Build a valid single-item trims payload with explicit carton columns. */
-  function validPayload(qty = 20) {
-    const item = poSingle.items[0];
-    const cartonConfig = {
-      [item.id]: [{ cartonNumber: `CTN-VAL-${Date.now()}`, quantity: qty }],
-    };
-    const payload = trimsGrnPayload(poSingle, [item], cartonConfig);
-    payload.items[0].receivingQty = qty;
-    payload.lineItems[0].cartons = cartonConfig[item.id].map((c) => ({
-      poLineItemId: item.id,
-      itemCode: item.itemCode,
-      itemDescription: item.description,
-      color: item.color,
-      size: item.size,
-      cartonNumber: c.cartonNumber,
-      quantity: c.quantity,
-      uom: item.uom,
-    }));
-    return payload;
-  }
 
   test('submit: cartonNumber missing rejects with error', async () => {
     await refreshPO(api, poSingle);

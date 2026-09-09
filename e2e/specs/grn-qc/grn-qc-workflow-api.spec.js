@@ -31,7 +31,6 @@ import {
 // ─── Shared State ───────────────────────────────────────────────────────────
 
 let api;
-let defectTypes;
 
 // Track all created entities for cleanup
 const createdGrnIds = [];
@@ -202,7 +201,7 @@ test.describe('GRN Workflow (API)', () => {
     expect(qcApproved.status).toBe('Approved');
 
     // Step 6: Close GRN on QC approval
-    const closedGrn = await closeGrn(grnSubmitted.id);
+    await closeGrn(grnSubmitted.id);
 
     // Step 7: Verify final state
     const finalGrn = await fetchGrn(grnSubmitted.id);
@@ -212,7 +211,7 @@ test.describe('GRN Workflow (API)', () => {
   // ── Combo 23 (E2E-WF-2): GRN reversal approve ────────────────────────
 
   test('Combo 23 (E2E-WF-2): GRN reversal approve — Submit → Reverse → Re-submit', async () => {
-    const { grn, poLineItemId, po } = await submitGrnForPO(api, 'E2E-WF-2');
+    const { grn, po } = await submitGrnForPO(api, 'E2E-WF-2');
     expect(grn.status).toBe('QC_Pending');
 
     // Request reversal
@@ -609,7 +608,6 @@ test.describe('PO Status Interlocks (API)', () => {
 
     // Record initial PO status
     const initialPO = await fetchPO(po.id);
-    const initialStatus = initialPO.status;
 
     // Submit partial GRN
     const item = po.items.find((i) => i.pendingQty > 0);

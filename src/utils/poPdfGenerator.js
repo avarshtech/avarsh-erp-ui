@@ -194,17 +194,14 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
   // Build state code from GSTIN
   const orgGstin = org?.gstin || '';
   const supplierGstin = supplier?.gstin || po.supplierGstin || '';
-  const orgStateCode = orgGstin.substring(0, 2);
   const supplierStateCode = supplierGstin.substring(0, 2);
 
   // Calculate total quantity per UOM
   const uomTotals = {};
-  let totalQty = 0;
   items.forEach((item) => {
     const uom = item.uomSymbol || item.uomName || item.uom || 'Units';
     const qty = parseFloat(item.quantity || item.qty || 0);
     uomTotals[uom] = (uomTotals[uom] || 0) + qty;
-    totalQty += qty;
   });
 
   // Build line items table rows with GST in columns
