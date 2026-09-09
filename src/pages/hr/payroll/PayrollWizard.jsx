@@ -190,7 +190,7 @@ const PayrollWizard = () => {
             <Alert
               type="error"
               showIcon
-              message={`${validation.blockingCount} employee(s) cannot be paid`}
+              title={`${validation.blockingCount} employee(s) cannot be paid`}
               description="Processing skips these employees silently, so they would simply not be paid. Fix them before processing."
             />
           )}
@@ -198,12 +198,12 @@ const PayrollWizard = () => {
             <Alert
               type="warning"
               showIcon
-              message={`${validation.warningCount} thing(s) worth checking`}
+              title={`${validation.warningCount} thing(s) worth checking`}
               description="Processing can continue, but review these first."
             />
           )}
           {validation && validation.blockingCount === 0 && validation.warningCount === 0 && (
-            <Alert type="success" showIcon message="All checks passed" />
+            <Alert type="success" showIcon title="All checks passed" />
           )}
 
           {validation?.issues?.length > 0 && (
@@ -295,7 +295,7 @@ const PayrollWizard = () => {
           <Alert
             type="info"
             showIcon
-            message="This run is ready for approval"
+            title="This run is ready for approval"
             description="You do not have permission to approve a payroll run. Someone with the Approve right on Payroll can finalise it."
           />
         )}

@@ -58,7 +58,7 @@ const PermissionSummary = ({ sections, permissions, allScreens }) => {
           type="warning"
           showIcon
           className="perm-summary-none"
-          message="No access at all"
+          title="No access at all"
           description={empty.map((s) => s.label).join(' · ')}
         />
       )}
@@ -68,7 +68,7 @@ const PermissionSummary = ({ sections, permissions, allScreens }) => {
           type="info"
           showIcon
           className="perm-summary-none"
-          message={`${orphans.length} unrecognised permission${orphans.length === 1 ? '' : 's'} preserved`}
+          title={`${orphans.length} unrecognised permission${orphans.length === 1 ? '' : 's'} preserved`}
           description={`This role carries keys this version does not know: ${orphans.join(', ')}. They are kept as they are rather than discarded on save.`}
         />
       )}
