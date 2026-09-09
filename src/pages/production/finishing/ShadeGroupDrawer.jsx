@@ -56,7 +56,7 @@ const ShadeGroupDrawer = ({ open, orders, employees, onClose, onSaved }) => {
   if (!form) return null;
 
   return (
-    <Drawer title="Add Shade Group" open={open} onClose={onClose} width={620} destroyOnHidden
+    <Drawer title="Add Shade Group" open={open} onClose={onClose} size={620} destroyOnHidden
       footer={(
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onClose}>Cancel</Button>

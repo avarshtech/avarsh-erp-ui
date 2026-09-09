@@ -41,7 +41,7 @@ const IncentiveSlabMaster = ({ onDirtyChange }) => {
             <Input placeholder="e.g. 80-90%" maxLength={50} />
           </Form.Item>
           <Form.Item name="fromPct" label="From Efficiency %" rules={[{ required: true, message: 'Enter the band start' }]}>
-            <InputNumber min={0} max={999} step={5} style={{ width: '100%' }} addonAfter="%" />
+            <InputNumber min={0} max={999} step={5} style={{ width: '100%' }} suffix="%" />
           </Form.Item>
           <Form.Item name="toPct" label="To Efficiency %"
             rules={[
@@ -52,10 +52,10 @@ const IncentiveSlabMaster = ({ onDirtyChange }) => {
                   : Promise.reject(new Error('The band must end above where it starts'))),
               }),
             ]}>
-            <InputNumber min={0} max={999} step={5} style={{ width: '100%' }} addonAfter="%" />
+            <InputNumber min={0} max={999} step={5} style={{ width: '100%' }} suffix="%" />
           </Form.Item>
           <Form.Item name="amount" label="Amount per day" rules={[{ required: true, message: 'Enter the payout' }]}>
-            <InputNumber min={0} step={10} style={{ width: '100%' }} addonBefore="₹" />
+            <InputNumber min={0} step={10} style={{ width: '100%' }} prefix="₹" />
           </Form.Item>
           <Form.Item name="sortOrder" label="Sort Order">
             <InputNumber min={0} style={{ width: '100%' }} />

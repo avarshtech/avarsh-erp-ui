@@ -211,7 +211,7 @@ const FnfView = () => {
               <Alert
                 type="warning"
                 showIcon
-                message="This settlement is negative"
+                title="This settlement is negative"
                 description="Deductions exceed earnings, so the employee owes the company this amount rather than being paid it. Settling records the figure; recovering it is a separate matter."
               />
             </div>

@@ -1675,7 +1675,7 @@ const POForm = () => {
                 }
                 trigger="hover"
                 placement="right"
-                overlayInnerStyle={{ padding: 4 }}
+                styles={{ container: { padding: 4 } }}
               >
                 <img
                   src={imgUrl}
@@ -1803,7 +1803,7 @@ const POForm = () => {
             }
             disabled={submitting || savingDraft || !record.itemId}
             placeholder="0"
-            addonAfter={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+            suffix={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
             {...numericInputProps}
           />
         );

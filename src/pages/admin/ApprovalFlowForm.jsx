@@ -128,7 +128,7 @@ const ApprovalFlowForm = ({ open, onClose, onSuccess, editingFlow, onSwitchFlow 
       title={isEditing ? 'Edit Approval Flow' : 'New Approval Flow'}
       open={open}
       onClose={onClose}
-      width={1000}
+      size={1000}
       destroyOnHidden
       extra={
         <Space>

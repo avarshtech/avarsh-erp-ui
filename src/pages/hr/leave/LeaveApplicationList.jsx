@@ -244,7 +244,7 @@ const LeaveApplicationList = () => {
         title="Leave Application"
         open={Boolean(selected)}
         onClose={() => setSelected(null)}
-        width={480}
+        size={480}
       >
         {selected && (
           <Descriptions column={1} bordered size="small">

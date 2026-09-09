@@ -225,7 +225,7 @@ const OpeningStockBatchForm = ({ batchType }) => {
           type={status === OPENING_STOCK_BATCH_STATUS.POSTED ? 'success' : 'warning'}
           showIcon
           style={{ marginBottom: 16 }}
-          message={status === OPENING_STOCK_BATCH_STATUS.POSTED
+          title={status === OPENING_STOCK_BATCH_STATUS.POSTED
             ? `This batch has been posted to stock. ${batch?.totalRows} row(s), total qty ${batch?.totalQuantity}, total value ₹${batch?.totalValue}.`
             : 'This batch was cancelled.'}
         />

@@ -114,7 +114,7 @@ const FabricQCRollInspectionTable = memo(function FabricQCRollInspectionTable({
         showIcon
         icon={<InfoCircleOutlined />}
         style={{ marginBottom: 12, borderRadius: 'var(--radius-md)' }}
-        message={
+        title={
           <Text style={{ fontSize: 12 }}>
             <Text strong>For reference:</Text> width and GSM within −{FABRIC_QC_TOLERANCE_PCT}% to +{FABRIC_QC_TOLERANCE_PCT}% of standard are highlighted green, outside red.
             {' '}The result for each roll is set by the inspector.

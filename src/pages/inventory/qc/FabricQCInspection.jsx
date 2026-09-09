@@ -470,7 +470,7 @@ const FabricQCInspection = () => {
                     showIcon
                     icon={supplyNotice.kind === 'extra' ? <InfoCircleOutlined /> : <WarningOutlined />}
                     style={{ marginTop: 4 }}
-                    message={
+                    title={
                       supplyNotice.kind === 'extra' ? (
                         <span>
                           Supplier sent <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> extra over the requested PO quantity — {formatNumber(supplyNotice.diff)} {supplyNotice.uom} above the ordered {formatNumber(supplyNotice.qtyOrdered)} {supplyNotice.uom}.

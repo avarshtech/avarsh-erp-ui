@@ -338,16 +338,16 @@ const AttendanceCalendar = () => {
               <>
                 <Row gutter={[16, 16]}>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Present" value={summary.present} valueStyle={{ color: '#52c41a' }} />
+                    <Statistic title="Present" value={summary.present} styles={{ content: { color: '#52c41a' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Absent" value={summary.absent} valueStyle={{ color: '#ff4d4f' }} />
+                    <Statistic title="Absent" value={summary.absent} styles={{ content: { color: '#ff4d4f' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
                     <Statistic
                       title="Half Day"
                       value={summary.halfDay}
-                      valueStyle={{ color: '#faad14' }}
+                      styles={{ content: { color: '#faad14' } }}
                       suffix={
                         summary.halfDay > 0
                           ? <span style={{ fontSize: 12, color: 'rgba(0,0,0,0.45)' }}>
@@ -358,31 +358,31 @@ const AttendanceCalendar = () => {
                     />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Leave" value={summary.leave} valueStyle={{ color: '#1677ff' }} />
+                    <Statistic title="Leave" value={summary.leave} styles={{ content: { color: '#1677ff' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="On Duty" value={summary.onDuty} valueStyle={{ color: '#13c2c2' }} />
+                    <Statistic title="On Duty" value={summary.onDuty} styles={{ content: { color: '#13c2c2' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
                     <Statistic title="Week Off" value={summary.weeklyOff} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Holiday" value={summary.holiday} valueStyle={{ color: '#722ed1' }} />
+                    <Statistic title="Holiday" value={summary.holiday} styles={{ content: { color: '#722ed1' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
                     <Statistic title="OT Hours" value={summary.totalOtHours ?? 0} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="Payable Days" value={summary.payableDays ?? 0} valueStyle={{ fontWeight: 600 }} />
+                    <Statistic title="Payable Days" value={summary.payableDays ?? 0} styles={{ content: { fontWeight: 600 } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
-                    <Statistic title="LOP Days" value={summary.lopDays ?? 0} valueStyle={{ color: '#ff4d4f' }} />
+                    <Statistic title="LOP Days" value={summary.lopDays ?? 0} styles={{ content: { color: '#ff4d4f' } }} />
                   </Col>
                   <Col xs={12} sm={8} md={4}>
                     <Statistic
                       title="Not Marked"
                       value={summary.notMarked}
-                      valueStyle={{ color: summary.notMarked > 0 ? '#fa8c16' : undefined }}
+                      styles={{ content: { color: summary.notMarked > 0 ? '#fa8c16' : undefined } }}
                     />
                   </Col>
                 </Row>
@@ -432,7 +432,7 @@ const AttendanceCalendar = () => {
         title="Attendance Details"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={400}
+        size={400}
       >
         {selectedDay && (
           <Descriptions column={1} bordered size="small">

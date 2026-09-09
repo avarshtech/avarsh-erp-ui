@@ -74,7 +74,7 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
       title={record
         ? `${readOnly ? 'Relaxation' : 'Complete Relaxation'} — ${record.relaxationNo}`
         : 'Start Fabric Relaxation'}
-      width={620}
+      size={620}
       open={open}
       onClose={onClose}
       destroyOnHidden

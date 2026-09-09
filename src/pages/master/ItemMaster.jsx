@@ -1900,7 +1900,7 @@ const ItemMaster = () => {
                   <InputNumber
                     placeholder="Enter Allowance"
                     controls={false}
-                    addonAfter="%"
+                    suffix="%"
                     min={0}
                     precision={2}
                     style={{ width: '100%', height: 40 }}

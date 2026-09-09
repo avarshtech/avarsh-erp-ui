@@ -1853,7 +1853,7 @@ const CostingForm = () => {
         onChange={onChange}
         size="small"
         style={{ width: '100%' }}
-        addonAfter={rateUom ? `/${rateUom}` : undefined}
+        suffix={rateUom ? `/${rateUom}` : undefined}
         {...numericInputProps}
       />
     );
@@ -1993,7 +1993,7 @@ const CostingForm = () => {
             onChange={(v) => updateFabricRow(record.key, 'consumption', v)}
             size="small"
             style={{ flex: 1 }}
-            addonAfter={getConsumptionUom(record, fabricItemsRaw)?.toUpperCase() || undefined}
+            suffix={getConsumptionUom(record, fabricItemsRaw)?.toUpperCase() || undefined}
             {...numericInputProps}
           />
           {record.classification === 'Knits' && (
@@ -2184,7 +2184,7 @@ const CostingForm = () => {
       dataIndex: 'consumption',
       width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} addonAfter={getConsumptionUom(record, localTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateLocalTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, localTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
@@ -2283,7 +2283,7 @@ const CostingForm = () => {
       dataIndex: 'consumption',
       width: 140,
       render: (val, record) => (
-        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} addonAfter={getConsumptionUom(record, importedTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
+        <InputNumber value={val} min={0} step={0.01} controls={false} placeholder="Qty" onChange={(v) => updateImportedTrim(record.key, 'consumption', v)} size="small" style={{ width: '100%' }} suffix={getConsumptionUom(record, importedTrimItemsRaw)?.toUpperCase() || undefined} {...numericInputProps} />
       ),
     },
     {
@@ -2375,7 +2375,7 @@ const CostingForm = () => {
             });
           }}
           size="small"
-          dropdownRender={canAddProcess ? (menu) => (
+          popupRender={canAddProcess ? (menu) => (
             <>
               {menu}
               <Divider style={{ margin: '4px 0' }} />
@@ -2472,7 +2472,7 @@ const CostingForm = () => {
             });
           }}
           size="small"
-          dropdownRender={canAddOverhead ? (menu) => (
+          popupRender={canAddOverhead ? (menu) => (
             <>
               {menu}
               <Divider style={{ margin: '4px 0' }} />
@@ -2557,7 +2557,7 @@ const CostingForm = () => {
                     loading={stylesLoading}
                     disabled={!form.getFieldValue('buyerId')}
                     onChange={handleStyleChange}
-                    dropdownRender={canAddStyle && form.getFieldValue('buyerId') ? (menu) => (
+                    popupRender={canAddStyle && form.getFieldValue('buyerId') ? (menu) => (
                       <>
                         {menu}
                         <Divider style={{ margin: '4px 0' }} />
@@ -2825,7 +2825,7 @@ const CostingForm = () => {
       children: (
         <>
           {costingType === 'CMT' && (
-            <Alert type="info" showIcon message="CMT Mode: Fabric cost is excluded from the total price — fabric is supplied by buyer." style={{ marginBottom: 12 }} />
+            <Alert type="info" showIcon title="CMT Mode: Fabric cost is excluded from the total price — fabric is supplied by buyer." style={{ marginBottom: 12 }} />
           )}
           <Table
             dataSource={fabricRows}
@@ -3111,7 +3111,7 @@ const CostingForm = () => {
                 value={totalFabricCost}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: 'var(--info-color)' }}
+                styles={{ content: { fontSize: 16, color: 'var(--info-color)' } }}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -3120,7 +3120,7 @@ const CostingForm = () => {
                 value={totalAccessoriesCost}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: '#8b5cf6' }}
+                styles={{ content: { fontSize: 16, color: '#8b5cf6' } }}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -3129,7 +3129,7 @@ const CostingForm = () => {
                 value={totalManufacturingCost}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: '#f59e0b' }}
+                styles={{ content: { fontSize: 16, color: '#f59e0b' } }}
               />
             </Col>
             <Col xs={12} md={6}>
@@ -3138,7 +3138,7 @@ const CostingForm = () => {
                 value={totalMarkupCost}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: '#ef4444' }}
+                styles={{ content: { fontSize: 16, color: '#ef4444' } }}
               />
             </Col>
           </Row>
@@ -3176,7 +3176,7 @@ const CostingForm = () => {
                 value={totalMakingPrice}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 18, fontWeight: 700 }}
+                styles={{ content: { fontSize: 18, fontWeight: 700 } }}
               />
             </Col>
             <Col xs={12} md={4}>
@@ -3190,7 +3190,7 @@ const CostingForm = () => {
                 step={0.5}
                 onChange={(v) => { setAgentCommissionPct(v); setIsDirty(true); }}
                 style={{ width: '100%' }}
-                addonAfter="%"
+                suffix="%"
                 {...numericInputProps}
               />
             </Col>
@@ -3205,7 +3205,7 @@ const CostingForm = () => {
                 step={0.5}
                 onChange={(v) => { setProfitPct(v); setTargetPrice(''); setIsDirty(true); }}
                 style={{ width: '100%' }}
-                addonAfter="%"
+                suffix="%"
                 {...numericInputProps}
               />
             </Col>
@@ -3229,7 +3229,7 @@ const CostingForm = () => {
                 value={totalOverheadCharges}
                 precision={2}
                 prefix={getCurrencySymbol(currency)}
-                valueStyle={{ fontSize: 16, color: '#64748b' }}
+                styles={{ content: { fontSize: 16, color: '#64748b' } }}
               />
             </Col>
           </Row>
@@ -3484,7 +3484,7 @@ const CostingForm = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Revising a submitted cost sheet"
+          title="Revising a submitted cost sheet"
           description="This cost sheet is pending approval. Saving your changes will revert it to Draft and cancel the current approval request — you will need to submit it again."
         />
       )}

@@ -70,7 +70,7 @@ const BuyerPriceTrendModal = ({ open, onClose, buyerId, buyerName }) => {
       footer={null}
       width={780}
       centered
-      destroyOnClose
+      destroyOnHidden
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
     >
       {loading ? (
@@ -82,16 +82,16 @@ const BuyerPriceTrendModal = ({ open, onClose, buyerId, buyerName }) => {
           {stats && (
             <Row gutter={16} style={{ marginBottom: 16 }}>
               <Col span={6}>
-                <Statistic title="Lowest FOB" value={stats.min} prefix="$" precision={2} valueStyle={{ color: '#10b981', fontSize: 16 }} />
+                <Statistic title="Lowest FOB" value={stats.min} prefix="$" precision={2} styles={{ content: { color: '#10b981', fontSize: 16 } }} />
               </Col>
               <Col span={6}>
-                <Statistic title="Average FOB" value={stats.avg} prefix="$" precision={2} valueStyle={{ color: '#6366f1', fontSize: 16 }} />
+                <Statistic title="Average FOB" value={stats.avg} prefix="$" precision={2} styles={{ content: { color: '#6366f1', fontSize: 16 } }} />
               </Col>
               <Col span={6}>
-                <Statistic title="Highest FOB" value={stats.max} prefix="$" precision={2} valueStyle={{ color: '#f59e0b', fontSize: 16 }} />
+                <Statistic title="Highest FOB" value={stats.max} prefix="$" precision={2} styles={{ content: { color: '#f59e0b', fontSize: 16 } }} />
               </Col>
               <Col span={6}>
-                <Statistic title="Cost Sheets" value={stats.count} valueStyle={{ fontSize: 16 }} />
+                <Statistic title="Cost Sheets" value={stats.count} styles={{ content: { fontSize: 16 } }} />
               </Col>
             </Row>
           )}

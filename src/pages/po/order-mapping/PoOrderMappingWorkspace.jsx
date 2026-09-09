@@ -76,9 +76,9 @@ const PoOrderMappingWorkspace = ({ open, onClose }) => {
     <Drawer
       open={open}
       onClose={onClose}
-      width="94%"
+      size="94%"
       title={(
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <span>Order Mapping</span>
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
             General POs the supplier has accepted. Record which customer orders each one ended up serving.

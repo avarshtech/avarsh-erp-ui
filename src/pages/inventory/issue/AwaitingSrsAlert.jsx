@@ -21,7 +21,7 @@ const AwaitingSrsAlert = ({ awaitingSrs = [], canAdd, onIssue }) => {
   return (
     <Alert
       type="warning" showIcon style={{ marginBottom: 16 }}
-      message={`${awaitingSrs.length} submitted sample request${plural ? 's are' : ' is'} awaiting material issue`}
+      title={`${awaitingSrs.length} submitted sample request${plural ? 's are' : ' is'} awaiting material issue`}
       description={(
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
           {awaitingSrs.slice(0, MAX_CHIPS).map((s) => (

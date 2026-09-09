@@ -157,7 +157,7 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
     <Drawer
       open={open}
       onClose={onClose}
-      width={880}
+      size={880}
       title={`Document set — ${fresh?.shipment?.shipmentNo || ''}`}
       extra={(
         <Space>

@@ -741,7 +741,7 @@ const MainLayoutInner = () => {
             placement="left"
             open={drawerOpen}
             onClose={() => setDrawerOpen(false)}
-            width={280}
+            size={280}
             closable={false}
             styles={{
               body: { padding: 0, background: sidebarGradient },

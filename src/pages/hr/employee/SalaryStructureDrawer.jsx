@@ -64,7 +64,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
       title={isEdit ? 'Edit Salary Structure' : 'New Salary Structure'}
       open={open}
       onClose={onClose}
-      width={480}
+      size={480}
       destroyOnClose
       extra={
         <Space>

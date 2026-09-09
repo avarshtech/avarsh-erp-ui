@@ -87,7 +87,7 @@ const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
       title={null}
       open={open}
       onClose={onClose}
-      width={720}
+      size={720}
       closable
       styles={{
         body: { padding: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' },
@@ -173,7 +173,7 @@ const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
           column={2}
           bordered
           title={<Space><AppstoreOutlined style={{ color: 'var(--primary-color)' }} /><Text strong>Item Details</Text></Space>}
-          labelStyle={{ width: 150, background: 'var(--bg-secondary)' }}
+          styles={{ label: { width: 150, background: 'var(--bg-secondary)' } }}
         >
           <Descriptions.Item label="Category">
             <Tag color={CATEGORY_COLORS[record.category] || 'default'}>{record.category}</Tag>

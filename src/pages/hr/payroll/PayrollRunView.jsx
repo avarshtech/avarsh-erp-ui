@@ -251,7 +251,7 @@ const PayrollRunView = () => {
           type={validation && validation.blockingCount > 0 ? 'error' : 'info'}
           showIcon
           style={{ marginBottom: 16 }}
-          message={
+          title={
             validation && validation.blockingCount > 0
               ? `${validation.blockingCount} employee(s) cannot be paid`
               : 'This run has not been processed yet'
@@ -302,7 +302,7 @@ const PayrollRunView = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Processed but not approved"
+          title="Processed but not approved"
           description="Nothing is committed yet. Loan balances and advances update only on approval, so this run can still be re-processed."
         />
       )}
@@ -317,7 +317,7 @@ const PayrollRunView = () => {
           <Card size="small"><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Card>
         </Col>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Card>
+          <Card size="small"><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} styles={{ content: { color: '#3f8600' } }} /></Card>
         </Col>
       </Row>
       <Table

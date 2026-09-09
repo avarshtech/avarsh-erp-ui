@@ -434,7 +434,7 @@ const UserManagement = () => {
             <div style={{ marginBottom: 16 }}><Text type="secondary">Last Login</Text><div>{selectedUser.lastLoginAt ? formatDate(selectedUser.lastLoginAt, 'DD MMM YYYY HH:mm') : 'Never'}</div></div>
             <div style={{ marginBottom: 16 }}><Text type="secondary">Created</Text><div>{formatDate(selectedUser.createdAt, 'DD MMM YYYY HH:mm')}</div></div>
             <Divider />
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <PermissionGuard module="users" operation="update">
                 <ActionButton action="edit" text="Edit User" block onClick={() => { setDrawerVisible(false); openModal(selectedUser); }} />
               </PermissionGuard>

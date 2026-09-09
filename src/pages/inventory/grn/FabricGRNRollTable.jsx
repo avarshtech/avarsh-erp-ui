@@ -195,7 +195,7 @@ const FabricGRNRollTable = ({ rolls = [], onRollChange, onAddRoll, onRemoveRoll,
               value={val}
               placeholder="Qty"
               controls={false}
-              addonAfter={row.uom || ''}
+              suffix={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
               status={!val ? 'warning' : ''}

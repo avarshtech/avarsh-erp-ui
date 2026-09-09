@@ -56,7 +56,7 @@ const FeedbackAttachments = ({ stored = [], pending = [], setPending, readOnly =
   );
 
   const list = stored.length > 0 && (
-    <Space direction="vertical" size={2} style={{ display: 'flex', marginBottom: readOnly ? 0 : 8 }}>
+    <Space orientation="vertical" size={2} style={{ display: 'flex', marginBottom: readOnly ? 0 : 8 }}>
       {stored.map((file) => (
         <Space key={file.fileId || file.id} size={4}>
           <PaperClipOutlined style={{ color: 'var(--text-secondary)' }} />

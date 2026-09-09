@@ -240,7 +240,7 @@ const ReviseDeliveryDateDialog = ({ open, po, onClose, onSaved }) => {
         <Alert
           type="info"
           showIcon
-          message="This PO has no open processing stages — only the delivery date will change."
+          title="This PO has no open processing stages — only the delivery date will change."
         />
       )}
     </Modal>

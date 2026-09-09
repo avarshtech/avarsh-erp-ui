@@ -84,7 +84,7 @@ const CompanyProfile = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="No company profile configured"
+          title="No company profile configured"
           description="Until this is saved, buyers cannot be told apart as domestic or overseas, and a sample invoice cannot be issued — its number series comes from here."
         />
       )}
@@ -146,7 +146,7 @@ const CompanyProfile = () => {
 
       {!canEdit && (
         <Space style={{ marginTop: 8 }}>
-          <Alert type="info" showIcon message="You have read-only access to the company profile." />
+          <Alert type="info" showIcon title="You have read-only access to the company profile." />
         </Space>
       )}
     </div>

@@ -197,7 +197,7 @@ const AttendanceImport = () => {
             type="info"
             showIcon
             style={{ marginTop: 12 }}
-            message="Choose a factory and period first. The template is generated for that factory's employees."
+            title="Choose a factory and period first. The template is generated for that factory's employees."
           />
         )}
       </Card>
@@ -208,13 +208,13 @@ const AttendanceImport = () => {
             <Row gutter={16}>
               <Col xs={12} sm={6}><Statistic title="Total Rows" value={result.totalRows} /></Col>
               <Col xs={12} sm={6}>
-                <Statistic title="Ready to Import" value={result.validRows} valueStyle={{ color: '#52c41a' }} />
+                <Statistic title="Ready to Import" value={result.validRows} styles={{ content: { color: '#52c41a' } }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="Warnings" value={result.warningRows} valueStyle={{ color: '#faad14' }} />
+                <Statistic title="Warnings" value={result.warningRows} styles={{ content: { color: '#faad14' } }} />
               </Col>
               <Col xs={12} sm={6}>
-                <Statistic title="Errors" value={result.errorRows} valueStyle={{ color: '#ff4d4f' }} />
+                <Statistic title="Errors" value={result.errorRows} styles={{ content: { color: '#ff4d4f' } }} />
               </Col>
             </Row>
           </Card>

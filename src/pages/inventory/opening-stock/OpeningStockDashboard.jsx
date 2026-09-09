@@ -156,7 +156,7 @@ const OpeningStockDashboard = () => {
           showIcon
           icon={<CheckCircleFilled />}
           style={{ marginBottom: 16 }}
-          message={
+          title={
             <span>
               Opening Stock has been finalized{status?.finalizedAt
                 ? ` on ${dayjs(status.finalizedAt).format('DD-MMM-YYYY HH:mm')}`
@@ -171,7 +171,7 @@ const OpeningStockDashboard = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="First-day ERP migration"
+          title="First-day ERP migration"
           description={
             <span>
               Create batches to capture pre-existing fabric rolls and accessory variants.
@@ -191,7 +191,7 @@ const OpeningStockDashboard = () => {
         <Col xs={24} sm={8}>
           <Card size="small" loading={loadingStatus}>
             <Statistic title="Posted Batches" value={status?.postedCount ?? 0}
-                       valueStyle={{ color: 'var(--success-color, #52c41a)' }} />
+                       styles={{ content: { color: 'var(--success-color, #52c41a)' } }} />
           </Card>
         </Col>
         <Col xs={24} sm={8}>

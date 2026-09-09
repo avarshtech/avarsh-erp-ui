@@ -365,8 +365,8 @@ const GRNViewModal = ({ open, onClose, grn: initialGrn }) => {
 
             {(grn.referBackReason || grn.reversalReason) && (
               <div style={{ marginBottom: 20 }}>
-                {grn.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} message="Refer-back reason" description={grn.referBackReason} />}
-                {grn.reversalReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} message="Reversal reason" description={grn.reversalReason} />}
+                {grn.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} title="Refer-back reason" description={grn.referBackReason} />}
+                {grn.reversalReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} title="Reversal reason" description={grn.reversalReason} />}
               </div>
             )}
 

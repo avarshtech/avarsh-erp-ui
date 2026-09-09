@@ -1802,7 +1802,7 @@ const BOMForm = () => {
                         setTimeout(() => { node.focus(); }, 50);
                       }
                     }}
-                    onDropdownVisibleChange={(o) => { if (!o) setVariantEditLineKey(null); }}
+                    onOpenChange={(o) => { if (!o) setVariantEditLineKey(null); }}
                     options={variants.map((v) => {
                       // Prefer the variant's own identity; fall back to its attributes for
                       // legacy variants saved before names existed.
@@ -1927,7 +1927,7 @@ const BOMForm = () => {
                   onChange={(v) => updateLine(record.key, 'consumptionPerGarment', v)}
                   controls={false}
                   disabled={!record.itemId || (!record.variantId && (record.availableVariants || []).length > 1)}
-                  addonAfter={record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+                  suffix={record.itemId ? (record.secondaryUom || record.primaryUom || '').toUpperCase() || undefined : undefined}
                   {...numericInputProps}
                 />
                 {fabric && (
@@ -2719,13 +2719,13 @@ const BOMForm = () => {
         footer={null}
         width={400}
         centered
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
           This color exists in multiple Buyer POs. Select which PO to use for quantity calculation.
         </Text>
-        <Space direction="vertical" style={{ width: '100%' }} size={8}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={8}>
           {buyerPoPickerOptions.map((opt) => (
             <Card
               key={opt.buyerPoNo}
@@ -2752,7 +2752,7 @@ const BOMForm = () => {
         footer={null}
         width={560}
         centered
-        destroyOnClose
+        destroyOnHidden
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
       >
         {(() => {
@@ -2942,7 +2942,7 @@ const BOMForm = () => {
                     <Text strong style={{ fontSize: 12 }}>Match Base Quantity By</Text>
                     <div><Text type="secondary" style={{ fontSize: 11 }}>Click on a card below to select how the base quantity should be calculated</Text></div>
                   </div>
-                  <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                  <Space orientation="vertical" style={{ width: '100%' }} size={6}>
                     {attrOpts.map((opt) => {
                       const qty = previewQty(opt.value);
                       const isSelected = line.baseQtyMatchAttr === opt.value;

@@ -128,7 +128,7 @@ const FabricReceiptDrawer = ({ open, mode = 'create', record, cutPos, onClose, o
   return (
     <Drawer
       title={title}
-      width={820}
+      size={820}
       open={open}
       onClose={onClose}
       destroyOnHidden

@@ -170,7 +170,7 @@ const AdminDashboard = () => {
       title: 'Device / Browser',
       width: 200,
       render: (_, record) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Space size={4}>
             {record.deviceType?.toLowerCase() === 'mobile'
               ? <MobileOutlined style={{ color: 'var(--text-muted)' }} />

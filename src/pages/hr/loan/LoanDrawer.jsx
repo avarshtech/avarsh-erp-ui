@@ -57,7 +57,7 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       title="New Loan"
       open={open}
       onClose={onClose}
-      width={480}
+      size={480}
       destroyOnClose
       extra={
         <Space>

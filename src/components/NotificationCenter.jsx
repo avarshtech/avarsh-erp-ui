@@ -299,7 +299,7 @@ const NotificationCenter = () => {
           open={open}
           onClose={() => setOpen(false)}
           placement="right"
-          width={isMobile ? '100%' : 400}
+          size={isMobile ? '100%' : 400}
           closable
           title={null}
           styles={{ body: { padding: 0 } }}

@@ -131,7 +131,7 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
           {current.status === SAMPLE_INVOICE_STATUS.CANCELLED && (
             <Alert
               type="error" showIcon style={{ marginBottom: 16 }}
-              message="Invoice cancelled"
+              title="Invoice cancelled"
               description={current.cancelReason
                 ? `Reason: ${current.cancelReason}`
                 : 'No reason recorded (cancelled before reasons became mandatory).'}

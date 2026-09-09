@@ -112,8 +112,8 @@ const FinishingPoGenerateWizard = () => {
     { title: 'Review & Confirm', content: (
       <div>
         <Title level={5}>{groups.length} Finishing PO{groups.length !== 1 ? 's' : ''} will be created</Title>
-        {!ppApproved && <Alert type="warning" showIcon style={{ margin: '12px 0' }} message="PP Sample not approved — generation is blocked for this order." />}
-        <Space direction="vertical" style={{ width: '100%' }}>
+        {!ppApproved && <Alert type="warning" showIcon style={{ margin: '12px 0' }} title="PP Sample not approved — generation is blocked for this order." />}
+        <Space orientation="vertical" style={{ width: '100%' }}>
           {groups.map((g, i) => (
             <Card key={i} size="small">
               <Space wrap>
@@ -133,7 +133,7 @@ const FinishingPoGenerateWizard = () => {
     <div className="animate-fade-in-up">
       <PageHeader title="Generate Finishing POs" backPath="/purchase-orders/finishing-po/list" />
       <Card>
-        <Steps current={step} direction={screens.md ? 'horizontal' : 'vertical'} items={steps.map((s) => ({ title: s.title }))} style={{ marginBottom: 24 }} />
+        <Steps current={step} orientation={screens.md ? 'horizontal' : 'vertical'} items={steps.map((s) => ({ title: s.title }))} style={{ marginBottom: 24 }} />
         {steps[step].content}
         <Space style={{ marginTop: 24, justifyContent: 'flex-end', width: '100%' }}>
           {step > 0 && <Button onClick={() => setStep((s) => s - 1)}>Back</Button>}

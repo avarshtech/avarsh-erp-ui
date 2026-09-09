@@ -287,7 +287,7 @@ const SampleRequestForm = () => {
     );
   }
   if (draft.error) {
-    return <Alert type="error" showIcon message="Failed to load" description={draft.error} style={{ margin: 24 }} />;
+    return <Alert type="error" showIcon title="Failed to load" description={draft.error} style={{ margin: 24 }} />;
   }
 
   return (

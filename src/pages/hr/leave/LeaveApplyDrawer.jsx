@@ -122,7 +122,7 @@ const LeaveApplyDrawer = ({ open, onClose, onSuccess, leaveTypes = [] }) => {
       title="Apply Leave"
       open={open}
       onClose={onClose}
-      width={480}
+      size={480}
       afterOpenChange={(isOpen) => { if (!isOpen) form.resetFields(); }}
       extra={
         <Space>

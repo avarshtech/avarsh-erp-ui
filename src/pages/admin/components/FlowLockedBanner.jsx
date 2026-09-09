@@ -31,7 +31,7 @@ const FlowLockedBanner = ({ flow, onCloned }) => {
       showIcon
       icon={<LockOutlined />}
       style={{ marginBottom: 16 }}
-      message="Approval levels are locked"
+      title="Approval levels are locked"
       description={'Documents have already been routed through this flow, so its levels are read-only — '
         + 'editing them would corrupt the audit history of past approvals. You can still change the name, '
         + 'description, priority, conditions and active state. To restructure levels, clone this flow, '

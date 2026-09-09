@@ -473,22 +473,22 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
 
         <Row gutter={[16, 12]}>
           <Col xs={12} md={4}>
-            <Statistic title="Fabric" value={snap.totalFabricCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: 'var(--info-color)' }} />
+            <Statistic title="Fabric" value={snap.totalFabricCost || 0} prefix={getCurrencySymbol(cur)} precision={2} styles={{ content: { fontSize: 14, color: 'var(--info-color)' } }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Trims" value={snap.totalAccessoriesCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#8b5cf6' }} />
+            <Statistic title="Trims" value={snap.totalAccessoriesCost || 0} prefix={getCurrencySymbol(cur)} precision={2} styles={{ content: { fontSize: 14, color: '#8b5cf6' } }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Manufacturing" value={snap.totalManufacturingCost || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#f59e0b' }} />
+            <Statistic title="Manufacturing" value={snap.totalManufacturingCost || 0} prefix={getCurrencySymbol(cur)} precision={2} styles={{ content: { fontSize: 14, color: '#f59e0b' } }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Overhead" value={snap.totalOverheadCharges || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 14, color: '#64748b' }} />
+            <Statistic title="Overhead" value={snap.totalOverheadCharges || 0} prefix={getCurrencySymbol(cur)} precision={2} styles={{ content: { fontSize: 14, color: '#64748b' } }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Total Price" value={snap.totalPrice || 0} prefix={getCurrencySymbol(cur)} precision={2} valueStyle={{ fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' }} />
+            <Statistic title="Total Price" value={snap.totalPrice || 0} prefix={getCurrencySymbol(cur)} precision={2} styles={{ content: { fontSize: 15, fontWeight: 700, color: 'var(--primary-color)' } }} />
           </Col>
           <Col xs={12} md={4}>
-            <Statistic title="Final Price (USD)" value={snap.finalPriceUsd || snap.finalPrice || 0} prefix="$" precision={2} valueStyle={{ fontSize: 15, fontWeight: 700, color: '#3b82f6' }} />
+            <Statistic title="Final Price (USD)" value={snap.finalPriceUsd || snap.finalPrice || 0} prefix="$" precision={2} styles={{ content: { fontSize: 15, fontWeight: 700, color: '#3b82f6' } }} />
           </Col>
         </Row>
       </Card>
@@ -511,7 +511,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
       footer={null}
       width={1400}
       centered
-      destroyOnClose
+      destroyOnHidden
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', padding: '16px 24px' } }}
     >
       {loading ? (

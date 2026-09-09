@@ -171,7 +171,7 @@ const DispatchFields = ({
           style={{ marginBottom: 12 }}
           type="info"
           showIcon
-          message="For hand delivery the signed delivery challan replaces the AWB as proof of dispatch — upload it under Dispatch Documents."
+          title="For hand delivery the signed delivery challan replaces the AWB as proof of dispatch — upload it under Dispatch Documents."
         />
       )}
       <Form.Item name="remarks" label="Dispatch Remarks">
@@ -179,7 +179,7 @@ const DispatchFields = ({
       </Form.Item>
       <Form.Item label="Dispatch Documents" extra="Packing list, AWB copy, or signed delivery challan · PDF or image · max 5 MB per file">
         {(documents || []).length > 0 && (
-          <Space direction="vertical" size={2} style={{ display: 'flex', marginBottom: 8 }}>
+          <Space orientation="vertical" size={2} style={{ display: 'flex', marginBottom: 8 }}>
             {documents.map((doc) => (
               <Space key={doc.fileId || doc.id} size={4}>
                 <PaperClipOutlined style={{ color: 'var(--text-secondary)' }} />

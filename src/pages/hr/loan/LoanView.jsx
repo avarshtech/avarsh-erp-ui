@@ -111,7 +111,7 @@ const LoanView = () => {
         <Alert
           type="error"
           showIcon
-          message="This loan could not be loaded"
+          title="This loan could not be loaded"
           description="It may have been deleted, or the server did not respond. Go back to the list and try again."
         />
       </>
@@ -150,7 +150,7 @@ const LoanView = () => {
             type="info"
             showIcon
             style={{ marginBottom: 12 }}
-            message="No repayments yet"
+            title="No repayments yet"
             description="An instalment is recorded automatically when a payroll run covering this loan's EMI start date is approved. Use Record Repayment for anything paid outside payroll - cash, an early settlement, or a correction."
           />
         )}

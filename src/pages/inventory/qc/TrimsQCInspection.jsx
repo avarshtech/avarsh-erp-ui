@@ -434,7 +434,7 @@ const TrimsQCInspection = () => {
                 showIcon
                 icon={supplyNotice.kind === 'extra' ? <InfoCircleOutlined /> : <WarningOutlined />}
                 style={{ marginTop: 12 }}
-                message={
+                title={
                   supplyNotice.kind === 'extra' ? (
                     <span>
                       Supplier sent <strong>{formatNumber(supplyNotice.pct, 2)}%</strong> extra over the requested PO quantity — {formatNumber(supplyNotice.diff)} {selectedLineItem?.uom || ''} above the ordered {formatNumber(qtyOrdered)} {selectedLineItem?.uom || ''}.

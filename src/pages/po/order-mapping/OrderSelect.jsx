@@ -53,7 +53,7 @@ const OrderSelect = ({ value, onChange, disabled, placeholder = 'Select customer
       optionRender={({ data }) => {
         const o = data.order;
         return (
-          <Space direction="vertical" size={0} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={0} style={{ width: '100%' }}>
             <Space size={8}>
               <Text strong>{o.orderNo}</Text>
               <StatusTag status={o.status} config={ORDER_STATUS_CONFIG} getLabel={getStatusLabel} size="small" />

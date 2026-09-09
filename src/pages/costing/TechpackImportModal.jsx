@@ -87,14 +87,14 @@ function ItemSearchSelect({ value, valueLabel, category, onChange }) {
       value={value ? { value, label: valueLabel } : undefined}
       onChange={(opt) => onChange(opt || null)}
       onSearch={handleSearch}
-      onDropdownVisibleChange={(open) => { if (open && category && options.length === 0) load(''); }}
+      onOpenChange={(open) => { if (open && category && options.length === 0) load(''); }}
       filterOption={false}
       notFoundContent={fetching ? <Spin size="small" /> : 'No results — use Create Item below'}
       placeholder={category ? 'Search variant (code or name)…' : 'Search existing items…'}
       style={{ width: '100%' }}
       options={options}
       optionRender={(opt) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text>{opt.data.label}</Text>
           {opt.data.sub && (
             <Text type="secondary" style={{ fontSize: 11 }}>{opt.data.sub}</Text>
@@ -290,33 +290,33 @@ function QuickCreateItemModal({ open, onClose, onCreated, extractedRow }) {
       onOk={handleSave}
       okText={existingItem ? 'Add Variant' : 'Create Item'}
       okButtonProps={{ loading: saving, disabled: hasDeadEnd }}
-      destroyOnClose
+      destroyOnHidden
       styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
     >
       <Alert
         type="info" showIcon
         style={{ marginBottom: 16 }}
-        message={`Creating a variant for: "${extractedRow?.extractedName}"`}
+        title={`Creating a variant for: "${extractedRow?.extractedName}"`}
         description="Item name is derived from Category / Sub-Category / Item Type. Enter a variant name and its attributes."
       />
       {noSubsForCategory && (
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          message="No Subcategory configured for this Category"
+          title="No Subcategory configured for this Category"
           description="Add a subcategory under this category in the master screen first." />
       )}
       {noTypesForSubcategory && (
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          message="No Item Type configured for this Subcategory"
+          title="No Item Type configured for this Subcategory"
           description="Add an item type under this subcategory in the master screen first." />
       )}
       {noUomsForItemType && (
         <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-          message="No UOM configured for this Item Type"
+          title="No UOM configured for this Item Type"
           description="Assign at least one UOM to this item type first." />
       )}
       {existingItem && (
         <Alert type="success" showIcon style={{ marginBottom: 16 }}
-          message="This item already exists — your variant will be added to it"
+          title="This item already exists — your variant will be added to it"
           description={
             (existingItem.variants || []).length > 0
               ? <>Existing variants: {(existingItem.variants || []).map((vr) => vr.variantName).filter(Boolean).join(', ') || '—'}</>
@@ -407,7 +407,7 @@ function RowsSection({ title, rows, overrides, onOverride, onCreateItem, categor
       title: 'Extracted from Techpack',
       dataIndex: 'extractedName',
       render: (name, row) => (
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Text strong style={{ fontSize: 13 }}>{name}</Text>
           {row.notes    && <Text type="secondary" style={{ fontSize: 11 }}>{row.notes}</Text>}
           {row.quantity && <Text type="secondary" style={{ fontSize: 11 }}>Qty: {row.quantity} {row.uom || ''}</Text>}
@@ -425,7 +425,7 @@ function RowsSection({ title, rows, overrides, onOverride, onCreateItem, categor
           : (ov?.itemId ?? row.matchedItemId);
         const effectiveName = ov?.variantName ?? ov?.itemName ?? row.matchedVariantName ?? row.matchedItemName;
         return (
-          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={4} style={{ width: '100%' }}>
             <Space size={4}>
               <MatchTag matched={!!effectiveId} />
               {effectiveName && <Text style={{ fontSize: 12 }}>{effectiveName}</Text>}
@@ -683,7 +683,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
             </Space>
           ) : null
         }
-        destroyOnClose
+        destroyOnHidden
       >
 
         {/* ── Step 1: Upload ─────────────────────────────────────── */}
@@ -705,7 +705,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
             </Dragger>
             <Alert
               style={{ marginTop: 16 }} type="info" showIcon
-              message="How inline master creation works"
+              title="How inline master creation works"
               description={
                 <>
                   After extraction, unmatched <b>Buyer</b> and <b>Style</b> show an inline
@@ -831,7 +831,7 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
 
             <Alert
               style={{ marginTop: 12 }} type="info" showIcon
-              message={`${totalLinked} of ${totalRows} rows linked to master items. Prices and consumption must be filled manually.`}
+              title={`${totalLinked} of ${totalRows} rows linked to master items. Prices and consumption must be filled manually.`}
             />
           </div>
         )}
@@ -847,13 +847,13 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
         onOk={handleSaveBuyer}
         okText="Create Buyer"
         okButtonProps={{ loading: savingBuyer, icon: <PlusOutlined /> }}
-        destroyOnClose={false}
+        destroyOnHidden={false}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
       >
         <Alert
           type="info" showIcon
           style={{ marginBottom: 16 }}
-          message="Shipping details can be added later in Buyer Master"
+          title="Shipping details can be added later in Buyer Master"
         />
         <Form form={buyerForm} layout="vertical">
           <Row gutter={16}>
@@ -889,13 +889,13 @@ export default function TechpackImportModal({ open, onClose, onApply }) {
         onOk={handleSaveStyle}
         okText="Create Style"
         okButtonProps={{ loading: savingStyle, icon: <PlusOutlined /> }}
-        destroyOnClose={false}
+        destroyOnHidden={false}
         styles={{ body: { maxHeight: '70vh', overflowY: 'auto', overflowX: 'hidden' } }}
       >
         <Alert
           type="info" showIcon
           style={{ marginBottom: 16 }}
-          message="Style will be auto-linked after creation"
+          title="Style will be auto-linked after creation"
         />
         <Form form={styleForm} layout="vertical">
           <Row gutter={16}>

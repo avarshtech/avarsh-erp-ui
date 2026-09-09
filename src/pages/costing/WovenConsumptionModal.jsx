@@ -59,7 +59,7 @@ const WovenConsumptionModal = ({ open, onApply, onCancel }) => {
       okButtonProps={{ disabled: consumption <= 0 }}
       width={520}
       centered
-      destroyOnClose
+      destroyOnHidden
     >
       <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
         Calculate fabric consumption per garment based on panel dimensions, fabric width, and marker efficiency.
@@ -86,13 +86,13 @@ const WovenConsumptionModal = ({ open, onApply, onCancel }) => {
         </Col>
         <Col span={8}>
           <Text strong style={{ fontSize: 12 }}>Marker Eff. %</Text>
-          <InputNumber value={markerEfficiency} min={1} max={100} addonAfter="%" onChange={setMarkerEfficiency} style={{ width: '100%', marginTop: 4 }} {...numericInputProps} />
+          <InputNumber value={markerEfficiency} min={1} max={100} suffix="%" onChange={setMarkerEfficiency} style={{ width: '100%', marginTop: 4 }} {...numericInputProps} />
         </Col>
       </Row>
       <Row gutter={16} style={{ marginTop: 12 }}>
         <Col span={8}>
           <Text strong style={{ fontSize: 12 }}>Wastage %</Text>
-          <InputNumber value={wastage} min={0} max={100} addonAfter="%" onChange={setWastage} style={{ width: '100%', marginTop: 4 }} {...numericInputProps} />
+          <InputNumber value={wastage} min={0} max={100} suffix="%" onChange={setWastage} style={{ width: '100%', marginTop: 4 }} {...numericInputProps} />
         </Col>
       </Row>
 
@@ -108,7 +108,7 @@ const WovenConsumptionModal = ({ open, onApply, onCancel }) => {
           title="Calculated Consumption"
           value={consumption > 0 ? consumption.toFixed(4) : '—'}
           suffix={consumption > 0 ? 'meters' : ''}
-          valueStyle={{ fontSize: 22, color: 'var(--primary-color)', fontWeight: 700 }}
+          styles={{ content: { fontSize: 22, color: 'var(--primary-color)', fontWeight: 700 } }}
         />
       </div>
     </Modal>

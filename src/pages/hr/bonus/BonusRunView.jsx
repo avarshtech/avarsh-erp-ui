@@ -168,7 +168,7 @@ const BonusRunView = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Calculated but not approved"
+          title="Calculated but not approved"
           description="The amounts below are provisional. Approve the run to finalise them."
         />
       )}
@@ -177,7 +177,7 @@ const BonusRunView = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Approved but not yet paid"
+          title="Approved but not yet paid"
           description="Mark the run as paid once the bonus has actually been disbursed."
         />
       )}
@@ -186,7 +186,7 @@ const BonusRunView = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Nothing calculated yet"
+          title="Nothing calculated yet"
           description="This run has no bonus records. Start a new run to calculate it."
         />
       )}

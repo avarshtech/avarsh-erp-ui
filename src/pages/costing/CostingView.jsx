@@ -537,31 +537,31 @@ const CostingView = () => {
         >
           <Row gutter={[24, 16]}>
             <Col xs={12} md={6}>
-              <Statistic title="Fabric Cost" value={data.totalFabricCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: 'var(--info-color)' }} />
+              <Statistic title="Fabric Cost" value={data.totalFabricCost} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 16, color: 'var(--info-color)' } }} />
             </Col>
             <Col xs={12} md={6}>
-              <Statistic title="Trims / Accessories" value={data.totalAccessoriesCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#8b5cf6' }} />
+              <Statistic title="Trims / Accessories" value={data.totalAccessoriesCost} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 16, color: '#8b5cf6' } }} />
             </Col>
             <Col xs={12} md={6}>
-              <Statistic title="Manufacturing Cost" value={data.totalManufacturingCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#f59e0b' }} />
+              <Statistic title="Manufacturing Cost" value={data.totalManufacturingCost} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 16, color: '#f59e0b' } }} />
             </Col>
             <Col xs={12} md={6}>
-              <Statistic title="Markup / Overhead" value={data.totalMarkupCost} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#ef4444' }} />
+              <Statistic title="Markup / Overhead" value={data.totalMarkupCost} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 16, color: '#ef4444' } }} />
             </Col>
           </Row>
           <Divider style={{ margin: '16px 0' }} />
           <Row gutter={[24, 16]}>
             <Col xs={12} md={6}>
-              <Statistic title="Total Making Price" value={data.totalMakingPrice} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 18, fontWeight: 700 }} />
+              <Statistic title="Total Making Price" value={data.totalMakingPrice} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 18, fontWeight: 700 } }} />
             </Col>
             <Col xs={12} md={4}>
-              <Statistic title="Agent Commission" value={data.agentCommissionPct} suffix="%" valueStyle={{ fontSize: 16 }} />
+              <Statistic title="Agent Commission" value={data.agentCommissionPct} suffix="%" styles={{ content: { fontSize: 16 } }} />
             </Col>
             <Col xs={12} md={4}>
-              <Statistic title="Profit" value={data.profitPct} suffix="%" valueStyle={{ fontSize: 16 }} />
+              <Statistic title="Profit" value={data.profitPct} suffix="%" styles={{ content: { fontSize: 16 } }} />
             </Col>
             <Col xs={12} md={5}>
-              <Statistic title="Overhead Charges" value={data.totalOverheadCharges} precision={2} prefix={getCurrencySymbol(data.currency)} valueStyle={{ fontSize: 16, color: '#64748b' }} />
+              <Statistic title="Overhead Charges" value={data.totalOverheadCharges} precision={2} prefix={getCurrencySymbol(data.currency)} styles={{ content: { fontSize: 16, color: '#64748b' } }} />
             </Col>
           </Row>
           <Divider style={{ margin: '16px 0' }} />

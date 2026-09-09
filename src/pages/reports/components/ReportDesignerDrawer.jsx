@@ -104,7 +104,7 @@ const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
       title={isEditing ? 'Edit Report' : 'New Report'}
       open={open}
       onClose={onClose}
-      width={1000}
+      size={1000}
       destroyOnHidden
       extra={
         <Space>
@@ -172,7 +172,7 @@ const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
             <TextArea rows={2} placeholder="What this report shows and when to use it" />
           </Form.Item>
           {source?.description && (
-            <Alert type="info" showIcon message={source.description} style={{ marginTop: 4 }} />
+            <Alert type="info" showIcon title={source.description} style={{ marginTop: 4 }} />
           )}
         </Card>
 

@@ -83,7 +83,7 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
       okButtonProps={{ disabled: !selectedBom }}
       width={720}
       centered
-      destroyOnClose
+      destroyOnHidden
     >
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
@@ -91,7 +91,7 @@ const BomImportModal = ({ open, onClose, onApply, styleId }) => {
         <Empty description="No approved BOMs found for this style" />
       ) : (
         <>
-          <Alert type="info" showIcon message="Select a BOM below. Its fabric and trim lines will be imported into the costing form." style={{ marginBottom: 16 }} />
+          <Alert type="info" showIcon title="Select a BOM below. Its fabric and trim lines will be imported into the costing form." style={{ marginBottom: 16 }} />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
             {boms.map((bom) => (
               <Tag

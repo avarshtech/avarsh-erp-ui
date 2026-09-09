@@ -316,7 +316,7 @@ const FnfForm = () => {
                   type="warning"
                   showIcon
                   style={{ marginBottom: 16 }}
-                  message="Unsaved changes"
+                  title="Unsaved changes"
                   description="These amounts have not been saved yet. Save them before approving, or the settlement will be approved with the previously stored figures."
                 />
               )}

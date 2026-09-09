@@ -716,7 +716,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
       confirmLoading={saving}
       okText="Create & Use"
       centered
-      destroyOnClose
+      destroyOnHidden
       afterClose={() => {
         setPresetName('');
         setCategory('');
@@ -2171,7 +2171,7 @@ const OrderForm = () => {
             <Alert
               type="info"
               showIcon
-              message="Enter a valid Costing ID above to enable order lines"
+              title="Enter a valid Costing ID above to enable order lines"
               style={{ marginBottom: 16 }}
             />
           )}
@@ -2411,7 +2411,7 @@ const OrderForm = () => {
                       >
                         <Alert
                           type={lineExtractionMsg[line.key].type}
-                          message={lineExtractionMsg[line.key].text}
+                          title={lineExtractionMsg[line.key].text}
                           showIcon
                           closable
                           onClose={() => dismissLineMessage(line.key)}

@@ -177,7 +177,7 @@ const AdvanceList = () => {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Advances are recovered by payroll"
+        title="Advances are recovered by payroll"
         description="An advance is deducted automatically when the payroll run for its recovery month is approved. Use the actions here only for an advance repaid in cash or written off."
       />
 
@@ -211,7 +211,7 @@ const AdvanceList = () => {
         title="New Salary Advance"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={420}
+        size={420}
         destroyOnHidden
         extra={
           <Space>

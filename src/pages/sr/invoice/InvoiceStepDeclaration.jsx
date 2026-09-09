@@ -22,7 +22,7 @@ const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => {
       {isSample ? (
         <Alert
           type="info" showIcon style={{ marginBottom: 12 }}
-          message="Chargeable invoice — no NOT-FOR-SALE band"
+          title="Chargeable invoice — no NOT-FOR-SALE band"
           description="The printed invoice shows the entered rates as the actual price with the declaration below. Recovery pricing guidance never prints."
         />
       ) : (
@@ -82,7 +82,7 @@ const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => {
           <Col span={24}>
             <Alert
               type="error" showIcon
-              message="Issue is blocked."
+              title="Issue is blocked."
               description="A line has no rate. Issue assigns the invoice number, locks the document, and links it to its SRs."
             />
           </Col>

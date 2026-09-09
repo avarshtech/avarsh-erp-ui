@@ -154,7 +154,7 @@ const ReturnToSupplierDetailDrawer = ({ returnId, open, onClose }) => {
       title={data ? `Return to Supplier — ${data.returnNumber}` : 'Return to Supplier'}
       open={open}
       onClose={onClose}
-      width={1000}
+      size={1000}
       destroyOnHidden
       extra={
         <Button

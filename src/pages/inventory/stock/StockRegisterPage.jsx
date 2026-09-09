@@ -50,7 +50,7 @@ const StockRegisterPage = () => {
           showIcon
           icon={<InboxOutlined />}
           style={{ marginBottom: 16 }}
-          message="Is this Day 1 of your ERP?"
+          title="Is this Day 1 of your ERP?"
           description="Capture your existing stock balance as a one-time migration. After finalizing, all stock movements go through GRN or Stock Adjustment."
           action={
             <Button

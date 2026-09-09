@@ -30,7 +30,7 @@ const PpSampleGate = ({ status, compact = false, onMarkApproved }) => {
         type="error"
         showIcon
         banner
-        message="PP Sample approval was REVOKED for this order"
+        title="PP Sample approval was REVOKED for this order"
         description="This PO was raised while the Pre-Production sample was approved, but approval has since been revoked. Production Manager & Merchandiser should review — approved POs are not auto-cancelled (PRD §3.2)."
         style={{ marginBottom: 16 }}
       />
@@ -43,7 +43,7 @@ const PpSampleGate = ({ status, compact = false, onMarkApproved }) => {
         type="success"
         showIcon
         banner
-        message="PP Sample approved — this order is cleared for production POs."
+        title="PP Sample approved — this order is cleared for production POs."
         style={{ marginBottom: 16 }}
       />
     );
@@ -54,7 +54,7 @@ const PpSampleGate = ({ status, compact = false, onMarkApproved }) => {
       type="warning"
       showIcon
       banner
-      message="PP Sample not yet approved for this order"
+      title="PP Sample not yet approved for this order"
       description="The PO can be saved as a draft but cannot be submitted for approval until the Pre-Production sample is approved in the T&A calendar."
       action={onMarkApproved ? (
         <Button

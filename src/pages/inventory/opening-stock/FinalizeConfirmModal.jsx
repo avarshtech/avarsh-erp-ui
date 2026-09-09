@@ -45,11 +45,11 @@ const FinalizeConfirmModal = ({ open, onClose, onFinalized, postedCount = 0 }) =
       onOk={handleOk}
       maskClosable={!submitting}
     >
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Alert
           type="warning"
           showIcon
-          message="This is irreversible."
+          title="This is irreversible."
           description={
             <>
               <Paragraph style={{ marginBottom: 8 }}>

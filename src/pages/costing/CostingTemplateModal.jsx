@@ -91,7 +91,7 @@ const CostingTemplateModal = ({ open, onClose, onApply, mode = 'load', currentDa
         confirmLoading={saving}
         centered
         width={480}
-        destroyOnClose
+        destroyOnHidden
         afterClose={() => { setSaveName(''); setSaveDescription(''); setSaveGarmentType(''); }}
       >
         <div style={{ marginBottom: 12 }}>
@@ -118,7 +118,7 @@ const CostingTemplateModal = ({ open, onClose, onApply, mode = 'load', currentDa
       footer={<Button onClick={onClose}>Close</Button>}
       width={680}
       centered
-      destroyOnClose
+      destroyOnHidden
     >
       {loading ? (
         <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>

@@ -34,7 +34,7 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
     title={record ? `${record.employeeNo || ''} ${record.employeeName || ''}`.trim() : 'Salary Record'}
     open={open}
     onClose={onClose}
-    width={520}
+    size={520}
   >
     {record && (
       <>

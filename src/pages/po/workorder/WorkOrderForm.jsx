@@ -208,7 +208,7 @@ const WorkOrderForm = () => {
             type="info"
             showIcon
             style={{ marginBottom: 16 }}
-            message="This garment requires additional process(es)"
+            title="This garment requires additional process(es)"
             description={
               <Space wrap style={{ marginTop: 4 }}>
                 {order.garmentProcesses.map((p) => <Tag key={p} color="purple">{p}</Tag>)}
@@ -219,7 +219,7 @@ const WorkOrderForm = () => {
         )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-            message={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
+            title={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
         )}
         {coverage && (
           <OrderCoveragePanel orderQty={coverage.orderQty} authorizedQty={coverage.authorizedQty}

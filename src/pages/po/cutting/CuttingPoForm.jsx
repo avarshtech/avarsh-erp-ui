@@ -199,13 +199,13 @@ const CuttingPoForm = () => {
             <Text type="secondary">
               Allowance:{' '}
               <InputNumber size="small" min={0} max={50} value={order.allowancePercent}
-                onChange={applyAllowance} style={{ width: 80 }} addonAfter="%" {...numericInputProps} />
+                onChange={applyAllowance} style={{ width: 80 }} suffix="%" {...numericInputProps} />
             </Text>
           </Space>
         )}
         {allowanceWarn && (
           <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-            message={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
+            title={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
         )}
         <FormSection title="Processing Unit">
           <Col span={24}><ProcessingUnitSelector poType={PO_TYPE.CUTTING} /></Col>

@@ -216,10 +216,10 @@ const MyApprovals = () => {
         title={selected ? `${entityLabel(selected.entityType)} · ${selected.entityReference || ''}` : ''}
         open={!!selected}
         onClose={closeDrawer}
-        width={480}
+        size={480}
       >
         {selected && (
-          <Space direction="vertical" size={20} style={{ width: '100%' }}>
+          <Space orientation="vertical" size={20} style={{ width: '100%' }}>
             <ApprovalActionBar
               entityType={selected.entityType}
               entityId={selected.entityId}

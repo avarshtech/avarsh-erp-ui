@@ -97,7 +97,7 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
   };
 
   return (
-    <Drawer title="Log Alterations — Issue to Production" open={open} onClose={onClose} width={980} destroyOnHidden
+    <Drawer title="Log Alterations — Issue to Production" open={open} onClose={onClose} size={980} destroyOnHidden
       footer={(
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onClose}>Cancel</Button>

@@ -37,7 +37,7 @@ const MaterialsTable = ({
         style={{ marginBottom: 12 }}
         type={sr?.colourSubstitutionAllowed ? 'warning' : 'info'}
         showIcon
-        message={substitutionBanner(Boolean(sr?.colourSubstitutionAllowed), typeName || '—')}
+        title={substitutionBanner(Boolean(sr?.colourSubstitutionAllowed), typeName || '—')}
       />
       <Text strong style={{ display: 'block', marginBottom: 8 }}>Fabric</Text>
       <Table

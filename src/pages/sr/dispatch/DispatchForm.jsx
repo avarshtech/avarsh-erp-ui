@@ -297,7 +297,7 @@ const DispatchForm = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Overseas consignee — an issued Commercial invoice must cover every SR before Mark as Dispatched"
+          title="Overseas consignee — an issued Commercial invoice must cover every SR before Mark as Dispatched"
           action={(
             <Button size="small" loading={invoicing} onClick={handleGenerateInvoice}>
               Generate Commercial Invoice
@@ -311,7 +311,7 @@ const DispatchForm = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="No company country configured — every consignee is treated as domestic and the invoice gate stays open. Set it under Admin → Company Profile."
+          title="No company country configured — every consignee is treated as domestic and the invoice gate stays open. Set it under Admin → Company Profile."
         />
       )}
 

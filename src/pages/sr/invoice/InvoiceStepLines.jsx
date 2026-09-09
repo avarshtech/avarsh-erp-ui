@@ -87,7 +87,7 @@ const InvoiceStepLines = ({ inv, patch, locked, onAddFromSr }) => {
     <>
       <Alert
         type={missingRates ? 'warning' : 'info'} showIcon style={{ marginBottom: 12 }}
-        message={isSample
+        title={isSample
           ? 'Chargeable sample invoice — rates are entered by hand, typically 2× the sample cost for non-converted samples. This guidance never prints: the invoice shows only the rates you enter. Issue is blocked until every line carries a rate.'
           : "Values are entered by hand. Nothing is pulled from costing or the order — a sample's declared value is a customs judgement, not the commercial price. The invoice cannot be issued until every line carries a rate."}
       />

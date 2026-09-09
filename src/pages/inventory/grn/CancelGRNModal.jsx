@@ -53,7 +53,7 @@ const CancelGRNModal = ({ open, record, onClose, onCancelled }) => {
         type="warning"
         showIcon
         style={{ marginBottom: 16 }}
-        message="This is permanent — the GRN stays on record but its received quantities are removed from the PO balance."
+        title="This is permanent — the GRN stays on record but its received quantities are removed from the PO balance."
         description="Not possible once a QC inspection exists against this GRN."
       />
       <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>

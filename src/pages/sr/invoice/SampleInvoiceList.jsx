@@ -197,7 +197,7 @@ const SampleInvoiceList = () => {
       {stats?.srsReadyNoInvoice > 0 && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 16 }}
-          message={`${stats.srsReadyNoInvoice} overseas SR${stats.srsReadyNoInvoice > 1 ? 's are' : ' is'} ready to dispatch without an invoice. SRs for the same consignee can go on one invoice.`}
+          title={`${stats.srsReadyNoInvoice} overseas SR${stats.srsReadyNoInvoice > 1 ? 's are' : ' is'} ready to dispatch without an invoice. SRs for the same consignee can go on one invoice.`}
           action={<Button size="small" type="primary" onClick={() => navigate('/sample-requests/invoices/new')}>Create invoice →</Button>}
         />
       )}

@@ -258,7 +258,7 @@ const SampleIssueRegister = ({ issueType = 'FABRIC', onIssueTypeChange }) => {
       {loadError && (
         <Alert
           type="error" showIcon style={{ marginBottom: 16 }}
-          message="Could not load the sample issue register"
+          title="Could not load the sample issue register"
           description={loadError}
           action={<Button size="small" onClick={reload}>Retry</Button>}
         />

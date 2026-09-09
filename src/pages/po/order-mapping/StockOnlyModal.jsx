@@ -42,7 +42,7 @@ const StockOnlyModal = ({ open, po, onClose, onSaved }) => {
         type={marking ? 'warning' : 'info'}
         showIcon
         style={{ marginBottom: 16 }}
-        message={marking
+        title={marking
           ? 'This PO will not be linked to any customer order. Its stock stays as free stock under the PO reference and the PO drops out of the Unmapped queue.'
           : 'The PO returns to the Unmapped queue and can be linked to customer orders.'}
       />

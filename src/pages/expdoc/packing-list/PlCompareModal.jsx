@@ -122,7 +122,7 @@ const PlCompareModal = ({ open, pl, onCancel }) => {
                 title={label(t.field)}
                 value={t.to}
                 precision={/Kg|cbm/i.test(t.field) ? 3 : 0}
-                valueStyle={{ fontSize: 18 }}
+                styles={{ content: { fontSize: 18 } }}
                 suffix={(
                   <Text type={t.delta > 0 ? 'success' : 'danger'} style={{ fontSize: 12 }}>
                     {`${t.delta > 0 ? '+' : ''}${t.delta}`}

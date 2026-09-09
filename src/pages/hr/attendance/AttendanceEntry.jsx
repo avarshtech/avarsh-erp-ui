@@ -109,7 +109,7 @@ const AttendanceEntry = () => {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Saving replaces any existing record for that employee and date."
+        title="Saving replaces any existing record for that employee and date."
         description="For a whole factory use Bulk Grid Entry, or Import Attendance for a spreadsheet."
       />
 

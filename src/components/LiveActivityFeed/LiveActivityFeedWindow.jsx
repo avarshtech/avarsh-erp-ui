@@ -261,7 +261,7 @@ const LiveActivityFeedWindow = () => {
       <Drawer
         open
         placement="bottom"
-        height="100%"
+        size="100%"
         closable={false}
         onClose={() => setWindowState('closed')}
         styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}

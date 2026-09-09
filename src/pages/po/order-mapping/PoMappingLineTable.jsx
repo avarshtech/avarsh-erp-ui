@@ -23,7 +23,7 @@ const PoMappingLineTable = ({ lines, canAdd, canRemove, onAdd, onRemove }) => {
     {
       title: 'Item', key: 'item', width: 260,
       render: (_, l) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Text strong style={{ fontFamily: 'var(--font-mono, monospace)' }}>{l.itemCode}</Text>
           <Text type="secondary" style={{ fontSize: 12 }}>{l.description}</Text>
         </Space>
@@ -65,7 +65,7 @@ const PoMappingLineTable = ({ lines, canAdd, canRemove, onAdd, onRemove }) => {
     {
       title: 'Order', key: 'order', width: 320,
       render: (_, a) => (
-        <Space direction="vertical" size={0}>
+        <Space orientation="vertical" size={0}>
           <Space size={6}>
             <Text strong delete={a.orderClosed} style={{ color: a.orderClosed ? undefined : 'var(--primary-color)' }}>{a.orderNo}</Text>
             {a.orderClosed && <Tag color="volcano" style={{ marginRight: 0 }}>{a.orderStatus}</Tag>}

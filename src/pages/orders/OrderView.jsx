@@ -586,7 +586,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
         {/* ── Refer-back request input ── */}
         {showReferBackInput && (
           <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-refer-back-color)' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Text strong>Reason for Referring Back:</Text>
               <Input.TextArea
                 ref={referBackTextareaRef}
@@ -630,7 +630,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
         {/* ── Cancel request input ── */}
         {showCancelInput && (
           <Card size="small" style={{ marginBottom: 16, borderColor: 'var(--btn-delete-color)' }}>
-            <Space direction="vertical" style={{ width: '100%' }}>
+            <Space orientation="vertical" style={{ width: '100%' }}>
               <Text strong style={{ color: 'var(--btn-delete-color)' }}>Reason for Cancellation:</Text>
               <Input.TextArea
                 ref={cancelTextareaRef}
@@ -677,7 +677,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Refer Back Requested — Pending Approval"
+            title="Refer Back Requested — Pending Approval"
             description={existingReferBackReason}
           />
         )}
@@ -688,7 +688,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             type="error"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Cancellation Requested — Pending Approval"
+            title="Cancellation Requested — Pending Approval"
             description={existingCancelReason}
           />
         )}

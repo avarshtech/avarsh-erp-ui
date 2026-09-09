@@ -326,7 +326,7 @@ const ConsumptionMatrixDialog = ({
       title={<span>Consumption Matrix <Text style={{ fontWeight: 400, fontSize: 13, marginLeft: 8 }}>{itemName}</Text>{itemCode && <Text type="secondary" style={{ marginLeft: 6, fontSize: 12 }}>({itemCode})</Text>}</span>}
       open={open}
       width={Math.max(650, Math.min(1050, 380 + allSizes.length * 110))}
-      destroyOnClose
+      destroyOnHidden
       onCancel={onCancel}
       okText="Apply"
       onOk={handleApply}
@@ -356,7 +356,7 @@ const ConsumptionMatrixDialog = ({
             value={fillValue}
             onChange={setFillValue}
             placeholder="0.0000"
-            addonAfter={uom ? uom.toUpperCase() : undefined}
+            suffix={uom ? uom.toUpperCase() : undefined}
             {...numericInputProps}
           />
           <Select

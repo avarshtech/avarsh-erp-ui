@@ -28,7 +28,7 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
           <InputNumber
             value={val || null}
             onChange={(v) => onItemChange(i, 'issueQty', v)}
-            addonAfter={record.uom || ''}
+            suffix={record.uom || ''}
             placeholder="0"
             controls={false}
             style={{ width: '100%' }}

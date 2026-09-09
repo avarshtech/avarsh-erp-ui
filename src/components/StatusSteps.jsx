@@ -47,7 +47,7 @@ const StatusSteps = memo(function StatusSteps({
     <Steps
       items={items}
       size={size}
-      direction={direction}
+      orientation={direction}
       className={className}
       style={style}
       {...restProps}

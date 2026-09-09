@@ -58,7 +58,7 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
   return (
     <>
       {locked && (
-        <Alert type="info" showIcon style={{ marginBottom: 12 }} message="Issued invoice — style selection is locked. Cancel and duplicate to correct." />
+        <Alert type="info" showIcon style={{ marginBottom: 12 }} title="Issued invoice — style selection is locked. Cancel and duplicate to correct." />
       )}
       <Table
         rowKey="id"

@@ -58,7 +58,7 @@ const CancelIssueModal = ({ open, record, onClose, onCancelled, cancelFn = cance
         type="warning"
         showIcon
         style={{ marginBottom: 16 }}
-        message="Issued quantities will be returned to their source stock rolls / lots."
+        title="Issued quantities will be returned to their source stock rolls / lots."
         description="Cancelling is the correction path — raise a fresh issue afterwards if material is still needed."
       />
       <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>

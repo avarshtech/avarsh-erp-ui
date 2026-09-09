@@ -923,7 +923,7 @@ const POView = ({ open, onClose, poData, pendingAction, onStatusChange, onRefres
               <div style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Spin size="small" /></div>
             )}
             {imgUrl && imgUrl !== 'loading' && (
-              <Popover content={<img src={imgUrl} alt="variant" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }} />} trigger="hover" placement="right" overlayInnerStyle={{ padding: 4 }}>
+              <Popover content={<img src={imgUrl} alt="variant" style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 6 }} />} trigger="hover" placement="right" styles={{ container: { padding: 4 } }}>
                 <img src={imgUrl} alt="variant" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 10, flexShrink: 0, border: '1px solid var(--border-color, #d9d9d9)', cursor: 'pointer' }} />
               </Popover>
             )}

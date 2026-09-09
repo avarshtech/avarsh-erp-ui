@@ -221,7 +221,7 @@ const SampleTrimsIssueForm = () => {
       {deepLinkMissed && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 16 }}
-          message="That sample request cannot be issued to"
+          title="That sample request cannot be issued to"
           description="It is not submitted or in production any more. Pick another request below."
         />
       )}
@@ -267,7 +267,7 @@ const SampleTrimsIssueForm = () => {
                   {totals.shortage > 0 && (
                     <Alert
                       type="warning" showIcon style={{ marginTop: 12 }}
-                      message={`${totals.shortage} trim line(s) have less stock than this sample needs`}
+                      title={`${totals.shortage} trim line(s) have less stock than this sample needs`}
                     />
                   )}
                 </>

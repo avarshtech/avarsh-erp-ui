@@ -208,7 +208,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
         </Row>
       </Card>
 
-      {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} message={error} />}
+      {error && <Alert type="error" showIcon style={{ marginBottom: 16 }} title={error} />}
 
       <Spin spinning={loading}>
         {!summary && !error && (
@@ -242,7 +242,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
                     value={summary.totalContribution ?? 0}
                     prefix="₹"
                     precision={2}
-                    valueStyle={{ fontWeight: 600 }}
+                    styles={{ content: { fontWeight: 600 } }}
                   />
                 </Col>
               </Row>
@@ -265,7 +265,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
                 type="error"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message={`${summary.missingIdentifiers.length} employee(s) have no ${isPf ? 'UAN' : 'ESI number'}`}
+                title={`${summary.missingIdentifiers.length} employee(s) have no ${isPf ? 'UAN' : 'ESI number'}`}
                 description={
                   <>
                     <div style={{ marginBottom: 8 }}>
@@ -287,7 +287,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 16 }}
-                message={`The payroll run for this period is ${summary.payrollStatus}`}
+                title={`The payroll run for this period is ${summary.payrollStatus}`}
                 description="Approve it before filing, or the figures you submit may not match what is paid."
               />
             )}

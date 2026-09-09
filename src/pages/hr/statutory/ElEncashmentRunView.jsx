@@ -159,7 +159,7 @@ const ElEncashmentRunView = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Calculated but not approved"
+          title="Calculated but not approved"
           description="Check the days and amounts below before approving. Encashment is paid from unused earned leave, so the balance is consumed once this is approved."
         />
       )}
@@ -168,7 +168,7 @@ const ElEncashmentRunView = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Approved but not yet paid"
+          title="Approved but not yet paid"
           description="Mark the run as paid once the amount has actually been disbursed."
         />
       )}

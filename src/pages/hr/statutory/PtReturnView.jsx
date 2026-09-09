@@ -105,7 +105,7 @@ const PtReturnView = () => {
         <Alert
           type="error"
           showIcon
-          message="This return could not be loaded"
+          title="This return could not be loaded"
           description="It may have been deleted, or the server did not respond. Go back to the list and try again."
         />
       </>
@@ -134,7 +134,7 @@ const PtReturnView = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Calculated but not filed"
+          title="Calculated but not filed"
           description="Check the employees and amounts below against the current slab rates before marking this as filed."
         />
       )}
@@ -144,7 +144,7 @@ const PtReturnView = () => {
           <Card size="small"><Statistic title="Factory" value={ptReturn?.factoryName || '-'} /></Card>
         </Col>
         <Col xs={24} sm={10}>
-          <Card size="small"><Statistic title="Period" value={period} valueStyle={{ fontSize: 16 }} /></Card>
+          <Card size="small"><Statistic title="Period" value={period} styles={{ content: { fontSize: 16 } }} /></Card>
         </Col>
         <Col xs={12} sm={4}>
           <Card size="small"><Statistic title="Employees" value={records.length} /></Card>

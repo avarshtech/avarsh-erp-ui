@@ -439,7 +439,7 @@ const SampleInvoiceForm = () => {
         {dispatchId && !id && invType === INVOICE_TYPES.COMMERCIAL && (
           <Alert
             type="info" showIcon style={{ marginBottom: 16 }}
-            message={`Styles preselected from ${dispatchNo || 'the dispatch'}`}
+            title={`Styles preselected from ${dispatchNo || 'the dispatch'}`}
             description="Every SR on the dispatch must be covered by an issued commercial invoice before it can be marked dispatched."
           />
         )}

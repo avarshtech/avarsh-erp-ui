@@ -141,7 +141,7 @@ const ReceivingDrawer = ({ open, orders, onClose, onSaved }) => {
   if (!form) return null;
 
   return (
-    <Drawer title="Receive from Sewing" open={open} onClose={onClose} width={900} destroyOnHidden
+    <Drawer title="Receive from Sewing" open={open} onClose={onClose} size={900} destroyOnHidden
       footer={(
         <Space style={{ justifyContent: 'flex-end', width: '100%' }}>
           <Button onClick={onClose}>Cancel</Button>

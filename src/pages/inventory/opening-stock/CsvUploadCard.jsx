@@ -74,7 +74,7 @@ const CsvUploadCard = ({ batchType, onLoad, disabled }) => {
       title={<Space><FileTextOutlined /> CSV Bulk Upload</Space>}
       style={{ marginBottom: 16 }}
     >
-      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Space orientation="vertical" style={{ width: '100%' }} size="middle">
         <Space wrap>
           <Button
             icon={<DownloadOutlined />}
@@ -102,7 +102,7 @@ const CsvUploadCard = ({ batchType, onLoad, disabled }) => {
           <Alert
             type={parseResult.errorRows === 0 ? 'success' : 'warning'}
             showIcon
-            message={
+            title={
               <Space>
                 <Tag color="blue">Total: {parseResult.totalRows}</Tag>
                 <Tag color="green">Valid: {parseResult.validRows}</Tag>

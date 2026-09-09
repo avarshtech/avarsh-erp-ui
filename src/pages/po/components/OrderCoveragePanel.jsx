@@ -17,11 +17,11 @@ const OrderCoveragePanel = ({ orderQty = 0, authorizedQty = 0, thisPoQty = 0, po
     <Card size="small" style={{ marginBottom: 16, borderRadius: 'var(--radius-md)' }}>
       <Row gutter={16} align="middle">
         <Col xs={12} sm={6}><Statistic title="Order Qty" value={orderQty} /></Col>
-        <Col xs={12} sm={6}><Statistic title="Already Authorized" value={authorizedQty} valueStyle={{ color: '#1677ff' }} /></Col>
-        <Col xs={12} sm={6}><Statistic title="This PO" value={thisPoQty} valueStyle={{ color: '#722ed1' }} /></Col>
+        <Col xs={12} sm={6}><Statistic title="Already Authorized" value={authorizedQty} styles={{ content: { color: '#1677ff' } }} /></Col>
+        <Col xs={12} sm={6}><Statistic title="This PO" value={thisPoQty} styles={{ content: { color: '#722ed1' } }} /></Col>
         <Col xs={12} sm={6}>
           <Statistic title={over ? 'Over by' : 'Remaining'} value={Math.abs(remaining)}
-            valueStyle={{ color: over ? '#cf1322' : '#389e0d' }} />
+            styles={{ content: { color: over ? '#cf1322' : '#389e0d' } }} />
         </Col>
       </Row>
       <Progress
@@ -41,7 +41,7 @@ const OrderCoveragePanel = ({ orderQty = 0, authorizedQty = 0, thisPoQty = 0, po
           type="warning"
           showIcon
           style={{ marginTop: 10 }}
-          message={`This PO would authorize ${Math.abs(remaining).toLocaleString()} pcs over the order quantity of ${orderQty.toLocaleString()}.`}
+          title={`This PO would authorize ${Math.abs(remaining).toLocaleString()} pcs over the order quantity of ${orderQty.toLocaleString()}.`}
         />
       )}
     </Card>

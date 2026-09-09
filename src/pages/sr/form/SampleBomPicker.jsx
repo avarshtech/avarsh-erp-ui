@@ -74,7 +74,7 @@ const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null }) => {
             bom: b,
           }))}
           optionRender={(opt) => (
-            <Space direction="vertical" size={0}>
+            <Space orientation="vertical" size={0}>
               <Space size={4}>
                 <Text strong>{opt.data.bom.orderNo || `BOM #${opt.data.bom.id}`}</Text>
                 {isSampleOrder(opt.data.bom.orderNo) && <SampleOrderTag style={{ marginInline: 0 }} />}
@@ -106,7 +106,7 @@ const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null }) => {
           style={{ marginTop: 16 }}
           type="info"
           showIcon
-          message="No BOMs yet"
+          title="No BOMs yet"
           description="Create an order and give it a BOM first (BOM → Create BOM). The Sample Request can then be raised against that BOM, from here or from the BOM screen."
         />
       )}

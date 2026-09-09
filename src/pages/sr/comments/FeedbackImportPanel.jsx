@@ -74,7 +74,7 @@ const FeedbackImportPanel = ({ srId, onApply, onSourceFile }) => {
 
   return (
     <Card size="small" style={{ marginBottom: 16 }} title="Import from buyer comment sheet">
-      {unavailable && <Alert type="warning" showIcon style={{ marginBottom: 12 }} message="Import unavailable" description={unavailable} />}
+      {unavailable && <Alert type="warning" showIcon style={{ marginBottom: 12 }} title="Import unavailable" description={unavailable} />}
       <Steps size="small" current={step} items={[{ title: 'Upload' }, { title: 'Review & apply' }]} style={{ marginBottom: 12 }} />
       {step === 0 && (
         <Spin spinning={parsing} tip="Reading comment sheet…">
@@ -98,7 +98,7 @@ const FeedbackImportPanel = ({ srId, onApply, onSourceFile }) => {
             showIcon
             icon={<FileSearchOutlined />}
             style={{ marginBottom: 8 }}
-            message={`Read ${parsed.fileName} — ${parsed.summary}. Nothing is written to the form until you press Apply.`}
+            title={`Read ${parsed.fileName} — ${parsed.summary}. Nothing is written to the form until you press Apply.`}
           />
           <Table rowKey="key" size="small" columns={feedbackImportColumns(ticked, setTicked)} dataSource={parsed.rows} pagination={false} scroll={{ x: 800 }} />
           <Text type="secondary" style={{ display: 'block', margin: '8px 0' }}>

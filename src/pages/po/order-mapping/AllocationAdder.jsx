@@ -44,7 +44,7 @@ const AllocationAdder = ({ line, onAdd }) => {
         ]}
         style={{ marginBottom: 0 }}
       >
-        <InputNumber min={0} max={line.unmappedQty} step={1} precision={3} disabled={saving} style={{ width: 150 }} addonAfter={line.uom} />
+        <InputNumber min={0} max={line.unmappedQty} step={1} precision={3} disabled={saving} style={{ width: 150 }} suffix={line.uom} />
       </Form.Item>
       <Form.Item name="remarks" style={{ marginBottom: 0 }}>
         {/* 500 matches the column, so an over-long remark is felt here rather than

@@ -141,7 +141,7 @@ const ProcessAllowanceModal = ({
             value={value}
             onChange={(v) => updateRow(record.processId, 'shrinkageInches', v)}
             onBlur={(e) => handleBlur(record.processId, 'shrinkageInches', e)}
-            addonAfter="in"
+            suffix="in"
             {...numericInputProps}
           />
         ),
@@ -161,7 +161,7 @@ const ProcessAllowanceModal = ({
             value={value}
             onChange={(v) => updateRow(record.processId, 'processLossPercent', v)}
             onBlur={(e) => handleBlur(record.processId, 'processLossPercent', e)}
-            addonAfter="%"
+            suffix="%"
             {...numericInputProps}
           />
         ),
@@ -182,7 +182,7 @@ const ProcessAllowanceModal = ({
           value={value}
           onChange={(v) => updateRow(record.processId, 'rejectionPercent', v)}
           onBlur={(e) => handleBlur(record.processId, 'rejectionPercent', e)}
-          addonAfter={isFabric ? '%' : undefined}
+          suffix={isFabric ? '%' : undefined}
           {...numericInputProps}
         />
       ),
@@ -203,7 +203,7 @@ const ProcessAllowanceModal = ({
           onChange={(v) => updateRow(record.processId, 'shipmentAllowancePercent', v)}
           {...numericInputProps}
           onBlur={(e) => handleBlur(record.processId, 'shipmentAllowancePercent', e)}
-          addonAfter={isFabric ? '%' : undefined}
+          suffix={isFabric ? '%' : undefined}
         />
       ),
     },
@@ -307,7 +307,7 @@ const ProcessAllowanceModal = ({
       title="Process Allowances"
       open={open}
       width={isMatrix ? Math.min(950, 300 + sizes.length * 90) : isFabric ? 850 : 700}
-      destroyOnClose
+      destroyOnHidden
       onCancel={onCancel}
       okText="Apply Allowances"
       onOk={handleApply}
@@ -551,7 +551,7 @@ const ProcessAllowanceModal = ({
           border: '1px solid var(--border-color, #e8e8e8)',
         }}
       >
-        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+        <Space orientation="vertical" size={4} style={{ width: '100%' }}>
           {isFabric && (
             <Text>
               <Text strong>Purchase Width</Text> = Finished Width ({finishedWidth}") + Shrinkage ({totalShrinkage}") ={' '}
@@ -578,7 +578,7 @@ const ProcessAllowanceModal = ({
               totalShipment += sizeReq * (shipPct / 100);
             });
             return (
-              <Space direction="vertical" size={2} style={{ width: '100%' }}>
+              <Space orientation="vertical" size={2} style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Text>Total Consumption</Text>
                   <Text>{totalConsumption.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>

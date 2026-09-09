@@ -31,7 +31,7 @@ const SampleDeadlineAlert = ({ alerts = [], style }) => {
         try { sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* noop */ }
       }}
       style={{ marginBottom: 16, ...style }}
-      message={
+      title={
         <span>
           <strong>{alerts.length} sample{alerts.length > 1 ? 's are' : ' is'} overdue or due within 48 hours.</strong>
           <span style={{ marginInlineStart: 12 }}>

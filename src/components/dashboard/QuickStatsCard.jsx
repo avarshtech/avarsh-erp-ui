@@ -24,7 +24,7 @@ const QuickStatsCard = memo(function QuickStatsCard({ quickStats, isDarkMode, lo
       {loading || !quickStats ? (
         <Skeleton active paragraph={{ rows: 4 }} />
       ) : (
-        <Space direction="vertical" style={{ width: '100%' }} size={16}>
+        <Space orientation="vertical" style={{ width: '100%' }} size={16}>
           <QuickStatItem
             icon={<CheckCircleOutlined style={{ fontSize: 24, color: 'var(--success-color)' }} />}
             label="Completed Today"

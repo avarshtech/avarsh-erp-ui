@@ -143,7 +143,7 @@ const PayrollWizard = () => {
   const stepContent = [
     // Step 0 — Select
     <Card key="select" style={{ maxWidth: 500 }}>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <div>
           <div style={{ marginBottom: 4, fontWeight: 500 }}>Factory</div>
           <Select
@@ -172,7 +172,7 @@ const PayrollWizard = () => {
 
     // Step 1 — Process
     <Card key="process" style={{ maxWidth: 720 }}>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Row gutter={16}>
           <Col span={8}><Statistic title="Factory" value={runData?.factoryName || '-'} /></Col>
           <Col span={8}><Statistic title="Employees" value={validation?.totalEmployees ?? 0} /></Col>
@@ -180,7 +180,7 @@ const PayrollWizard = () => {
             <Statistic
               title="Would Be Paid"
               value={validation?.payableEmployees ?? 0}
-              valueStyle={{ color: validation && validation.blockingCount > 0 ? '#ff4d4f' : '#52c41a' }}
+              styles={{ content: { color: validation && validation.blockingCount > 0 ? '#ff4d4f' : '#52c41a' } }}
             />
           </Col>
         </Row>
@@ -280,7 +280,7 @@ const PayrollWizard = () => {
       <Row gutter={[16, 16]}>
         <Col span={8}><Statistic title="Total Earnings" value={totals.earnings} precision={2} prefix={'\u20B9'} /></Col>
         <Col span={8}><Statistic title="Total Deductions" value={totals.deductions} precision={2} prefix={'\u20B9'} /></Col>
-        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} valueStyle={{ color: '#3f8600' }} /></Col>
+        <Col span={8}><Statistic title="Total Net" value={totals.net} precision={2} prefix={'\u20B9'} styles={{ content: { color: '#3f8600' } }} /></Col>
       </Row>
       {/* Approving finalises the run and releases the payout, so it is gated on
           hr-payroll.approve the same way PayrollRunView gates it. Without this

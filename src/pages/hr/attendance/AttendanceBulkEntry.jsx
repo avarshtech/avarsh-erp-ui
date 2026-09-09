@@ -276,7 +276,7 @@ const AttendanceBulkEntry = () => {
           type="warning"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`${selectedDate.format('MMMM YYYY')} is locked`}
+          title={`${selectedDate.format('MMMM YYYY')} is locked`}
           description={
             lock?.lockedAt
               ? `Locked on ${dayjs(lock.lockedAt).format('DD-MMM-YYYY HH:mm')}. Attendance for this month cannot be changed until it is reopened.`
@@ -289,7 +289,7 @@ const AttendanceBulkEntry = () => {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`${selectedDate.format('MMMM YYYY')} is open`}
+          title={`${selectedDate.format('MMMM YYYY')} is open`}
           description="Attendance can still be edited. Lock the month once it is final - payroll expects a locked period before it runs."
         />
       )}

@@ -388,8 +388,8 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
 
             {(qc.referBackReason || qc.rejectionReason) && (
               <div style={{ marginBottom: 20 }}>
-                {qc.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} message="Refer-back reason" description={qc.referBackReason} />}
-                {qc.rejectionReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} message="Rejection reason" description={qc.rejectionReason} />}
+                {qc.referBackReason && <Alert type="warning" showIcon style={{ borderRadius: 10, marginBottom: 8 }} title="Refer-back reason" description={qc.referBackReason} />}
+                {qc.rejectionReason && <Alert type="error" showIcon style={{ borderRadius: 10 }} title="Rejection reason" description={qc.rejectionReason} />}
               </div>
             )}
 

@@ -143,9 +143,9 @@ const SectionDetails = ({
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Some sample types on this order are waiting to be re-made"
+          title="Some sample types on this order are waiting to be re-made"
           description={(
-            <Space direction="vertical" size={2}>
+            <Space orientation="vertical" size={2}>
               {revisable.map((r) => (
                 <Text key={r.id}>
                   {r.sampleTypeName} — {r.srNo} was {getSrStatusLabel(r.status).toLowerCase()}.

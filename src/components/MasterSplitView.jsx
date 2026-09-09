@@ -96,7 +96,7 @@ const MasterSplitView = ({
           open={isEditing}
           onClose={onCloseForm}
           placement="right"
-          width={isMobile ? '100%' : '80%'}
+          size={isMobile ? '100%' : '80%'}
           title={title}
           styles={{
             body: { padding: 0 },

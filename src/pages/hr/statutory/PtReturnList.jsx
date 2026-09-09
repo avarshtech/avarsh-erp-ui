@@ -193,7 +193,7 @@ const PtReturnList = () => {
         onCancel={() => setGenerateOpen(false)}
         confirmLoading={generating}
         afterClose={() => form.resetFields()}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>

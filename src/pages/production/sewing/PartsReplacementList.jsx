@@ -68,7 +68,7 @@ const PartsReplacementList = () => {
   // Cutting works part by part, so the actions sit on an expanded row rather
   // than on the request: half a request can be cut while the rest is not.
   const expandedRowRender = useCallback((record) => (
-    <Space direction="vertical" size={4} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={4} style={{ width: '100%' }}>
       {record.parts.map((p) => (
         <Space key={p.id} size="middle" wrap>
           <Tag color={PART_COLOR[p.status]} style={{ minWidth: 92, textAlign: 'center' }}>{p.status}</Tag>

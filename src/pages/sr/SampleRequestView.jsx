@@ -250,7 +250,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message="Company country not configured"
+                title="Company country not configured"
                 description="Set the country on Admin → Company Profile. Until then every buyer counts as domestic, so no sample dispatch will ask for a commercial invoice."
               />
             )}
@@ -259,7 +259,7 @@ const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
                 type="warning"
                 showIcon
                 style={{ marginBottom: 12 }}
-                message={`No shipping location on record for ${sr.buyerName || 'this buyer'}`}
+                title={`No shipping location on record for ${sr.buyerName || 'this buyer'}`}
                 description="Add an active shipping location to the buyer. Without a country this sample is treated as domestic and will dispatch without a commercial invoice."
               />
             )}

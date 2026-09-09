@@ -273,12 +273,12 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
                       label="Payment Days"
                       rules={[{ required: true, message: 'Please enter payment days' }]}
                     >
-                      <InputNumber min={0} max={365} controls={false} placeholder="e.g. 30" addonAfter="days" style={{ width: 100 }} {...integerInputProps} />
+                      <InputNumber min={0} max={365} controls={false} placeholder="e.g. 30" suffix="days" style={{ width: 100 }} {...integerInputProps} />
                     </Form.Item>
                   </Col>
                   <Col span={8}>
                     <Form.Item name="advancePercentage" label="Advance Percentage">
-                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 50" addonAfter="%" style={{ width: 100 }} {...numericInputProps} />
+                      <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 50" suffix="%" style={{ width: 100 }} {...numericInputProps} />
                     </Form.Item>
                   </Col>
                   <Col span={8}>

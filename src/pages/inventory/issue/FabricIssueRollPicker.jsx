@@ -27,14 +27,14 @@ const SplitPopover = ({ roll, uom, onSplit }) => {
       onOpenChange={setOpen}
       placement="left"
       content={
-        <Space direction="vertical" size={8} style={{ minWidth: 220, maxWidth: '90vw' }}>
+        <Space orientation="vertical" size={8} style={{ minWidth: 220, maxWidth: '90vw' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Split <Text strong>{roll.rollNumber}</Text> ({formatNumber(roll.weight, 1)} {uom})
           </Text>
           <InputNumber
             value={issueQty}
             onChange={setIssueQty}
-            addonAfter={uom}
+            suffix={uom}
             controls={false}
             min={0.1}
             max={Number((roll.weight - 0.1).toFixed(1))}
@@ -152,7 +152,7 @@ const FabricIssueRollPicker = ({
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message={uomMismatchMessage}
+          title={uomMismatchMessage}
         />
       )}
       <Table

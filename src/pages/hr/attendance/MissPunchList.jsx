@@ -244,7 +244,7 @@ const MissPunchList = () => {
         title="Miss Punch Request"
         open={detailOpen}
         onClose={() => setDetailOpen(false)}
-        width={460}
+        size={460}
         extra={
           selected?.status === 'PENDING' && canDecide && (
             <Space>
@@ -310,7 +310,7 @@ const MissPunchList = () => {
                 type="info"
                 showIcon
                 style={{ marginTop: 16 }}
-                message="You do not have permission to approve or reject requests."
+                title="You do not have permission to approve or reject requests."
               />
             )}
           </>
@@ -321,7 +321,7 @@ const MissPunchList = () => {
         title="New Miss Punch Request"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        width={480}
+        size={480}
         afterOpenChange={(open) => { if (!open) form.resetFields(); }}
         extra={
           <Space>

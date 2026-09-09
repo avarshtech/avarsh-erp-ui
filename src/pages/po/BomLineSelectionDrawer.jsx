@@ -391,7 +391,7 @@ const BomLineSelectionDrawer = ({
         </Space>
       }
       placement="right"
-      width={Math.min(720, typeof window !== 'undefined' ? window.innerWidth : 720)}
+      size={Math.min(720, typeof window !== 'undefined' ? window.innerWidth : 720)}
       open={open}
       onClose={onClose}
       styles={{ body: { padding: 0, display: 'flex', flexDirection: 'column' } }}
@@ -498,7 +498,7 @@ const BomLineSelectionDrawer = ({
         {bomOrders.length > 0 && filterMessage && (
           <Alert
             type="info"
-            message={filterMessage}
+            title={filterMessage}
             showIcon
             banner
             style={{ marginTop: 8 }}
@@ -508,7 +508,7 @@ const BomLineSelectionDrawer = ({
         {noMatchingLines && bomOrders.length > 0 && (
           <Alert
             type="warning"
-            message="This supplier does not supply fabric or trims. No BOM lines can be selected."
+            title="This supplier does not supply fabric or trims. No BOM lines can be selected."
             showIcon
             banner
             style={{ marginTop: 8 }}

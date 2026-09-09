@@ -312,7 +312,7 @@ const SampleFabricIssueForm = () => {
       {deepLinkMissed && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 16 }}
-          message="That sample request cannot be issued to"
+          title="That sample request cannot be issued to"
           description="It is not submitted or in production any more. Pick another request below."
         />
       )}
@@ -383,7 +383,7 @@ const SampleFabricIssueForm = () => {
           {borrowedOffered > 0 && (
             <Alert
               type="info" showIcon style={{ marginBottom: 12 }}
-              message={`${borrowedOffered} of the offered rolls are earmarked to another order`}
+              title={`${borrowedOffered} of the offered rolls are earmarked to another order`}
               description="A bulk order's fabric may be borrowed for a sample — those rolls are listed last."
             />
           )}

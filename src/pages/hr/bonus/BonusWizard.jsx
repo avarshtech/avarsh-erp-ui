@@ -148,7 +148,7 @@ const BonusWizard = () => {
                   max={20}
                   step={0.01}
                   precision={2}
-                  addonAfter="%"
+                  suffix="%"
                   status={outOfBand ? 'error' : undefined}
                   style={{ width: '100%' }}
                 />

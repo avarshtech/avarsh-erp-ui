@@ -33,7 +33,7 @@ export const buildColumns = ({ onOpen, onStockOnly, canUpdate }) => [
   {
     title: 'Mapped', key: 'mappedPercent', width: 190,
     render: (_, r) => (
-      <Space direction="vertical" size={0} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={0} style={{ width: '100%' }}>
         <Progress percent={r.mappedPercent} size="small" status={r.mappedPercent === 100 ? 'success' : 'active'} showInfo={false} />
         <Text type="secondary" style={{ fontSize: 11 }}>
           {r.linesFullyMapped} of {r.lineCount} line{r.lineCount === 1 ? '' : 's'} fully mapped{r.linesPartiallyMapped ? ` · ${r.linesPartiallyMapped} partial` : ''}

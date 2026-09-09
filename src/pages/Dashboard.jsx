@@ -109,7 +109,7 @@ const Dashboard = () => {
         <Alert
           type="error"
           showIcon
-          message={error}
+          title={error}
           style={{ marginBottom: 16 }}
           action={<Button size="small" onClick={loadSummary}>Retry</Button>}
         />

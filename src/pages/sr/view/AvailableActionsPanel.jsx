@@ -51,7 +51,7 @@ const AvailableActionsPanel = ({ sr, canAdd, canUpdate, canDelete, canIssue, han
   const terminal = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED].includes(s);
   return (
     <Card size="small" title="Available Actions">
-      <Space direction="vertical" style={{ width: '100%' }} size={8}>
+      <Space orientation="vertical" style={{ width: '100%' }} size={8}>
         <ActionRow
           enabled={s === SR_STATUS.DRAFT && canUpdate}
           reason={!canUpdate ? 'Needs update permission' : 'Available while the SR is a Draft'}

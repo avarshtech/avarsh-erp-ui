@@ -311,28 +311,28 @@ const ProcessMaster = ({ onDirtyChange }) => {
                           type="info"
                           showIcon
                           icon={<InfoCircleOutlined />}
-                          message="Set default allowance values for this process. When selected in a BOM, these values will be auto-applied to calculate purchase quantities."
+                          title="Set default allowance values for this process. When selected in a BOM, these values will be auto-applied to calculate purchase quantities."
                           style={{ marginBottom: 16, fontSize: 12 }}
                         />
                         <Row gutter={16}>
                           <Col span={6}>
                             <Form.Item name="defaultShrinkageInches" label="Shrinkage">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="in" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" suffix="in" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShrinkageInches', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultProcessLossPercent" label="Process Loss">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 5.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultProcessLossPercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultRejectionPercent" label="Rejection">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 2.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultRejectionPercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                           <Col span={6}>
                             <Form.Item name="defaultShipmentAllowancePercent" label="Shipment">
-                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" addonAfter="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} {...numericInputProps} />
+                              <InputNumber min={0} max={100} precision={2} controls={false} placeholder="e.g. 3.0" suffix="%" style={{ width: '100%' }} onBlur={(e) => { if (!e.target.value) form.setFieldValue('defaultShipmentAllowancePercent', 0); }} {...numericInputProps} />
                             </Form.Item>
                           </Col>
                         </Row>

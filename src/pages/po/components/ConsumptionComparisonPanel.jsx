@@ -56,7 +56,7 @@ const ConsumptionComparisonPanel = ({
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Consumption variance exceeds 5%"
+          title="Consumption variance exceeds 5%"
           description="One or more fabric items have CAD consumption more than 5% off BOM. This requires escalation and Production Manager review — Merchandiser will be notified on submission (PRD §4.3 / §7.4)."
         />
       )}

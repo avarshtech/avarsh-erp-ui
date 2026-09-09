@@ -248,7 +248,7 @@ const KnitsConsumptionModal = ({ open, onApply, onCancel, initialParts, targetUo
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message={`This fabric is consumed in ${targetUom.toUpperCase()}, which is not a unit of weight`}
+          title={`This fabric is consumed in ${targetUom.toUpperCase()}, which is not a unit of weight`}
           description={
             <Text style={{ fontSize: 12 }}>
               The knits formula calculates weight, so the total below is in grams and will be

@@ -279,7 +279,7 @@ const AccessoriesIssueForm = () => {
                   <SummaryRow label="Shortage Items" value={stats.shortage} color={stats.shortage > 0 ? 'var(--error-color)' : undefined} />
                 </div>
                 {stats.shortage > 0 && (
-                  <Alert type="warning" showIcon message={`${stats.shortage} item(s) have insufficient stock`} style={{ marginTop: 12 }} />
+                  <Alert type="warning" showIcon title={`${stats.shortage} item(s) have insufficient stock`} style={{ marginTop: 12 }} />
                 )}
               </>) : (
                 <div style={{ textAlign: 'center', padding: '24px 0' }}>

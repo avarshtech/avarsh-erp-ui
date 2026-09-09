@@ -68,7 +68,7 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
     <Drawer
       open={open}
       onClose={onClose}
-      width={1000}
+      size={1000}
       title={head ? <Space>{head.poNumber}<StatusTag status={head.mappingStatus} config={PO_ORDER_MAPPING_STATUS_CONFIG} getLabel={getMappingStatusLabel} /></Space> : 'Order Mapping'}
       extra={po && editable && (
         <Space>
@@ -96,23 +96,23 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
 
           {po.readOnly && (
             <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-              message={`This PO is ${getPoStatusLabel(po.status)} and can no longer be mapped`}
+              title={`This PO is ${getPoStatusLabel(po.status)} and can no longer be mapped`}
               description="Its existing mappings are shown below and can still be removed, so nothing is left stranded." />
           )}
 
           {po.stockOnly ? (
             <Alert type="warning" showIcon icon={<InboxOutlined />} style={{ marginBottom: 16 }}
-              message="Stock Only — deliberately not mapped to any order"
+              title="Stock Only — deliberately not mapped to any order"
               description={po.stockOnlyRemark} />
           ) : (
             <Alert type="info" showIcon style={{ marginBottom: 16 }}
-              message="What mapping records"
+              title="What mapping records"
               description="Which customer orders this PO ended up serving, line by line. Unmapped quantity stays as free stock. Where the PO's delivery date has been re-agreed, that slip carries through to the orders mapped here." />
           )}
 
           {overAllocated.length > 0 && (
             <Alert type="warning" showIcon style={{ marginBottom: 16 }}
-              message="Mapped for more than has been received"
+              title="Mapped for more than has been received"
               description={`${overAllocated.map((l) => l.itemCode).join(', ')}: quantity is mapped against the ordered amount, and goods returned to the supplier do not release it. Check the mapping if the balance looks wrong.`} />
           )}
 
@@ -141,7 +141,7 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
                 key: h.id,
                 color: h.action === 'Unmapped' ? 'red' : h.action.startsWith('Marked') ? 'orange' : 'green',
                 children: (
-                  <Space direction="vertical" size={0}>
+                  <Space orientation="vertical" size={0}>
                     <Text><Text strong>{h.action}</Text> — {h.details}</Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>{h.by} · {formatDate(h.at, 'DD-MMM-YYYY HH:mm')}</Text>
                   </Space>

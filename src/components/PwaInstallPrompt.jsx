@@ -172,7 +172,7 @@ const PwaInstallPrompt = () => {
         )}
 
         {/* Action buttons */}
-        <Space direction="vertical" size={10} style={{ width: '100%', marginTop: 20 }}>
+        <Space orientation="vertical" size={10} style={{ width: '100%', marginTop: 20 }}>
           <Button
             type="primary"
             size="large"

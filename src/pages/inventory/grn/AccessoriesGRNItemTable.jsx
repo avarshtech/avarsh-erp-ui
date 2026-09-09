@@ -159,7 +159,7 @@ const AccessoriesGRNItemTable = ({ items = [], onItemChange, readOnly = false })
               value={val}
               placeholder="Qty"
               controls={false}
-              addonAfter={row.uom || ''}
+              suffix={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
               status={!val ? 'warning' : ''}

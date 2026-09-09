@@ -80,7 +80,7 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
           type="error"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Material shortage detected"
+          title="Material shortage detected"
           description="One or more items have insufficient available balance for this PO. Store Keeper & Merchandiser will be notified on submission."
         />
       )}
@@ -89,7 +89,7 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
           type="warning"
           showIcon
           style={{ marginBottom: 12 }}
-          message="Stock data may be stale"
+          title="Stock data may be stale"
           description={`Last goods receipt for one or more items was over 48 hours ago (${grn.label}). Verify with the latest GRN before approving.`}
         />
       )}

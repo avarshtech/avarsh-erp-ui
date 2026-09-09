@@ -84,7 +84,7 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
       }
       open={open}
       onClose={onClose}
-      width={drawerWidth}
+      size={drawerWidth}
       footer={
         <div style={{ display: 'flex', justifyContent: cancelled ? 'flex-end' : 'space-between', alignItems: 'center' }}>
           {!cancelled && (
@@ -103,7 +103,7 @@ const IssueViewDrawer = ({ open, onClose, record, type }) => {
           type="warning"
           showIcon
           style={{ marginBottom: 20 }}
-          message={`Cancelled${record.cancelledBy ? ` by ${record.cancelledBy}` : ''}${record.cancelledAt ? ` on ${formatDate(record.cancelledAt)}` : ''} — issued quantities were restored to stock.`}
+          title={`Cancelled${record.cancelledBy ? ` by ${record.cancelledBy}` : ''}${record.cancelledAt ? ` on ${formatDate(record.cancelledAt)}` : ''} — issued quantities were restored to stock.`}
           description={record.cancelReason ? `Reason: ${record.cancelReason}` : null}
         />
       )}

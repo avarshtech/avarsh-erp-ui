@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { Dropdown, Button } from 'antd';
+import { Dropdown, Button, Space } from 'antd';
 import { DownloadOutlined, FileExcelOutlined, FilePdfOutlined } from '@ant-design/icons';
 
 const ReportExportBar = memo(function ReportExportBar({ onExport, loading = false }) {
@@ -17,17 +17,19 @@ const ReportExportBar = memo(function ReportExportBar({ onExport, loading = fals
   ], []);
 
   return (
-    <Dropdown.Button
-      icon={<DownloadOutlined />}
-      loading={loading}
-      onClick={() => onExport('EXCEL')}
-      menu={{
-        items: menuItems,
-        onClick: ({ key }) => onExport(key),
-      }}
-    >
-      <FileExcelOutlined /> Excel
-    </Dropdown.Button>
+    <Space.Compact>
+      <Button loading={loading} onClick={() => onExport('EXCEL')}>
+        <FileExcelOutlined /> Excel
+      </Button>
+      <Dropdown
+        menu={{
+          items: menuItems,
+          onClick: ({ key }) => onExport(key),
+        }}
+      >
+        <Button icon={<DownloadOutlined />} aria-label="Other export formats" />
+      </Dropdown>
+    </Space.Compact>
   );
 });
 

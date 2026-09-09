@@ -59,12 +59,12 @@ const TemplateBuilder = ({ open, template, activities, onClose, onSaved }) => {
       <Row gutter={16} style={{ marginBottom: 14 }}>
         <Col>
           <Tooltip title="Critical path length at 100% scale — derived by the engine on every save, governs the percentage conversion">
-            <Statistic title="Baseline critical path" value={criticalPath} suffix="days" valueStyle={{ fontSize: 20, color: 'var(--primary-color)' }} />
+            <Statistic title="Baseline critical path" value={criticalPath} suffix="days" styles={{ content: { fontSize: 20, color: 'var(--primary-color)' } }} />
           </Tooltip>
         </Col>
         <Col>
           <Tooltip title="Critical path with every activity at its floor — any order below this cannot be planned and is flagged infeasible">
-            <Statistic title="Minimum feasible leadtime" value={floor} suffix="days" valueStyle={{ fontSize: 20, color: 'var(--error-color)' }} />
+            <Statistic title="Minimum feasible leadtime" value={floor} suffix="days" styles={{ content: { fontSize: 20, color: 'var(--error-color)' } }} />
           </Tooltip>
         </Col>
       </Row>

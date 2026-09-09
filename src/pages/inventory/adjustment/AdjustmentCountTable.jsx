@@ -66,7 +66,7 @@ const AdjustmentCountTable = memo(function AdjustmentCountTable({ items = [], on
             min={0}
             controls={false}
             style={{ width: '100%' }}
-            addonAfter={record.uom}
+            suffix={record.uom}
             {...numericInputProps}
             onChange={(v) => onItemChange?.(index, { physicalQty: v })}
           />

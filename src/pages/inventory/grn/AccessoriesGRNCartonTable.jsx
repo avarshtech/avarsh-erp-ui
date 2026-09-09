@@ -164,7 +164,7 @@ const AccessoriesGRNCartonTable = ({ cartons = [], items = [], onCartonChange, r
               value={val}
               placeholder="Qty"
               controls={false}
-              addonAfter={row.uom || ''}
+              suffix={row.uom || ''}
               style={{ width: '100%' }}
               disabled={readOnly}
               status={hasOverage ? 'error' : (!val ? 'warning' : '')}

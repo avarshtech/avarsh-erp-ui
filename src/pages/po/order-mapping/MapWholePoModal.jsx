@@ -41,7 +41,7 @@ const MapWholePoModal = ({ open, po, onClose, onMapped }) => {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message={`${openLines} line${openLines === 1 ? '' : 's'} with open quantity will be mapped in full. Lines already fully mapped are untouched.`}
+        title={`${openLines} line${openLines === 1 ? '' : 's'} with open quantity will be mapped in full. Lines already fully mapped are untouched.`}
       />
       <Form form={form} layout="vertical">
         <Form.Item name="orderId" label="Customer order" rules={[{ required: true, message: 'Pick an order' }]}>

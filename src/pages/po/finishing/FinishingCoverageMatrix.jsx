@@ -31,7 +31,7 @@ const FinishingCoverageMatrix = ({ data = [] }) => {
     );
     if (!covering.length) return <Tag color="red" icon={<CloseCircleFilled />}>GAP</Tag>;
     return (
-      <Space direction="vertical" size={2}>
+      <Space orientation="vertical" size={2}>
         {covering.map((f) => (
           <Space key={f.id} size={4}>
             <CheckCircleFilled style={{ color: '#389e0d' }} />
