@@ -383,9 +383,21 @@ Before writing ANY code, verify:
 
 ### Ant Design 6.x Compliance
 - [ ] All component props exist in Ant Design 6.x
-- [ ] No deprecated props: `visible`→`open`, `bordered`→`variant="borderless"`, `onVisibleChange`→`onOpenChange`, `dropdownClassName`→`popupClassName`, `size="default"`→`size="middle"`
+- [ ] **Zero deprecated props — check [`antd6-deprecations.md`](references/antd6-deprecations.md), not memory.** That file is transcribed from the `warning.deprecated(...)` calls in the installed antd and is the only accurate list; the docs lag and the `@deprecated` JSDoc tags include props that never warn. Most-missed: `Alert message`→`title`, `Drawer width/height`→`size`, `Space direction`→`orientation`, `Statistic valueStyle`→`styles.content`, `Modal destroyOnClose`→`destroyOnHidden`. Note `popupClassName` is itself deprecated now (→ `classNames.popup.root`).
+- [ ] Inline style props fold into the semantic `styles` object, never into `style`
+- [ ] `bordered` on Table and Descriptions is still valid — do not "fix" it
 - [ ] Correct imports from `antd` and `@ant-design/icons`
 - [ ] `App.useApp()` for message/notification/modal — never static methods
+- [ ] Every component in a file that calls `message`/`modal` has its **own** `App.useApp()`. A sibling component defined above the one that destructures it does not share the binding, and the call throws a ReferenceError at runtime.
+
+### Accessibility (a11y)
+- [ ] A control rendered outside a `Form.Item` (Table cell editors, filter bars, search boxes) gets an explicit `name` — antd derives an id only from a Form.Item's field path. `name` needs no uniqueness; an id in a repeating row does.
+- [ ] A custom component used inside `<Form.Item name label>` accepts `id` and passes it to the inner antd control. Form.Item renders `<label for>` from that id; drop the prop and the label points at nothing.
+- [ ] Anything clickable that is not a `<button>` carries `role`, `aria-label` and an Enter/Space `onKeyDown`
+- [ ] No CSS `order`, `row-reverse` or `column-reverse` around form fields — it desynchronises tab order from visual order
+
+### React keys
+- [ ] Row keys for newly added rows come from a monotonic counter, never `Date.now()` — two rows added in the same millisecond collide, and React silently swaps their state
 
 ### State Management
 - [ ] No unnecessary state — derived values computed, not stored
@@ -672,18 +684,28 @@ This gate runs **BEFORE implementation** (during planning/research) and **AFTER 
 
 Before editing any file, scan it for existing deprecated patterns and plan to fix them as part of the change:
 
+A bare grep is not enough on its own, because almost every deprecated prop is
+**component-scoped**: `bordered` warns on Card and Select but is correct on Table
+and Descriptions; `direction` warns on Space but not on ConfigProvider; `width`
+warns on Drawer but not on Table. Read
+[`antd6-deprecations.md`](references/antd6-deprecations.md) for the scoping, then
+grep the props it lists:
+
 ```bash
-# Run this scan on every file you're about to modify
-grep -n "visible=" <file>         # → should be open=
-grep -n "onVisibleChange" <file>  # → should be onOpenChange
-grep -n "bordered=" <file>        # → should be variant="borderless" (for Input/Select/DatePicker)
-grep -n "bordered={false}" <file> # → should be variant="borderless"
-grep -n "dropdownClassName" <file>        # → should be popupClassName
-grep -n "dropdownMatchSelectWidth" <file> # → should be popupMatchSelectWidth
-grep -n "filterDropdownVisible" <file>    # → should be filterDropdownOpen
-grep -n 'size="default"' <file>           # → should be size="middle"
-grep -n "getPopupContainer" <file>        # → verify still valid in AntD 6.x
-grep -n "dropdownRender" <file>           # → verify still valid in AntD 6.x
+# The highest-frequency offenders, from the 2026-09-09 repo sweep
+grep -n "message=" <file>          # → Alert: title=
+grep -n "valueStyle" <file>        # → Statistic: styles={{ content: ... }}
+grep -n "direction=" <file>        # → Space/Steps: orientation=   (NOT ConfigProvider)
+grep -n "width=\|height=" <file>   # → Drawer: size=              (NOT Table/Col)
+grep -n "destroyOnClose" <file>    # → Modal/Drawer: destroyOnHidden
+grep -n "labelStyle\|contentStyle" <file>   # → Descriptions: styles={{ label, content }}
+grep -n "overlayStyle\|overlayInnerStyle\|overlayClassName" <file>  # → styles.*/classNames.*
+grep -n "bodyStyle\|headStyle\|headerStyle\|footerStyle\|maskStyle" <file>  # → styles.*
+grep -n "dropdownRender\|onDropdownVisibleChange" <file>  # → popupRender / onOpenChange
+grep -n "dropdownClassName\|popupClassName" <file>        # → classNames.popup.root (BOTH are deprecated)
+grep -n "addonAfter\|addonBefore" <file>   # → InputNumber only: suffix= / prefix=
+grep -n "iconPosition" <file>      # → Button: iconPlacement=
+grep -n "tabPosition" <file>       # → Tabs: tabPlacement=
 ```
 
 ### Pre-Implementation: CSS Deprecated Patterns
@@ -727,16 +749,19 @@ git diff --name-only HEAD
 
 ### Deprecated Pattern Fix Reference
 
+**The full, verified antd table lives in [antd6-deprecations.md](references/antd6-deprecations.md).**
+Read it instead of working from memory: it is transcribed from the
+`warning.deprecated(...)` calls in the installed antd, and it also records which
+props are still valid so they do not get "fixed" by mistake. Most-missed entries:
+`Alert message`->`title`, `Drawer width/height`->`size`, `Space direction`->`orientation`,
+`Statistic valueStyle`->`styles.content`, `Modal destroyOnClose`->`destroyOnHidden`.
+Note `popupClassName` is now deprecated too (-> `classNames.popup.root`), so older
+guidance pointing at it is wrong.
+
+React-level patterns, unchanged:
+
 | Deprecated Pattern | Replacement | Components Affected |
 |---|---|---|
-| `visible={x}` | `open={x}` | Modal, Drawer, Dropdown, Tooltip, Popover, Popconfirm |
-| `onVisibleChange={fn}` | `onOpenChange={fn}` | Modal, Drawer, Dropdown, Tooltip, Popover, Popconfirm |
-| `bordered={false}` | `variant="borderless"` | Input, Select, DatePicker, TimePicker, TreeSelect, Cascader |
-| `bordered` (boolean prop) | `variant="outlined"` or `variant="borderless"` | Input, Select, DatePicker |
-| `dropdownClassName={x}` | `popupClassName={x}` | Select, TreeSelect, Cascader, DatePicker, TimePicker |
-| `dropdownMatchSelectWidth` | `popupMatchSelectWidth` | Select, TreeSelect, Cascader |
-| `filterDropdownVisible` | `filterDropdownOpen` | Table column config |
-| `size="default"` | `size="middle"` | Table, Button, Input, Select |
 | `defaultProps = {}` | Default parameter values in function signature | All React components (React 19) |
 | `ReactDOM.render()` | `createRoot().render()` | App entry point |
 | `.ant-modal-visible` | `.ant-modal-open` | CSS targeting modal state |
