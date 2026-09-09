@@ -258,52 +258,6 @@ textarea.ant-input:active {
 }
 
 /* ============================================================
-   PERMISSIONS MATRIX TABLE STYLES
-   ============================================================ */
-
-/* Compact spacing and visible overflow to avoid badge cutoff */
-.permissions-matrix-table .ant-table-cell {
-  padding: 6px 8px;
-  white-space: nowrap;
-  overflow: visible !important;
-}
-
-.permissions-matrix-table .ant-table-tbody > tr > td {
-  vertical-align: middle;
-}
-
-.permissions-matrix-table .ant-checkbox-wrapper {
-  margin: 0;
-}
-
-/* Slightly smaller checkboxes inside permission table */
-.permissions-matrix-table .ant-checkbox-inner {
-  width: 14px;
-  height: 14px;
-}
-
-/* Media tweak: allow tighter table on small screens */
-@media (max-width: 768px) {
-  .permissions-matrix-table .ant-table-cell {
-    padding: 4px 6px;
-  }
-}
-
-/* Ensure tags/badges inside permissions table are visible and not clipped */
-.permissions-matrix-table .ant-tag,
-.permissions-matrix-table .ant-badge {
-  z-index: 50;
-  position: relative;
-}
-
-/* If any inner wrapper hides overflow, make sure table row allows visible overflow */
-.permissions-matrix-table .ant-table-row,
-.permissions-matrix-table .ant-table-tbody > tr > td,
-.permissions-matrix-table .ant-table-thead > tr > th {
-  overflow: visible !important;
-}
-
-/* ============================================================
    SIDEBAR / SIDER MENU OVERRIDES
    ============================================================ */
 

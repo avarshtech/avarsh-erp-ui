@@ -1,54 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  App,
-  Card,
-  Table,
-  Space,
-  Input,
-  Tag,
-  Modal,
-  Form,
-  Typography,
-  Row,
-  Col,
-  Tooltip,
-  Checkbox,
-  Divider,
-  Badge,
-  Switch,
-  Alert,
-  Collapse,
+  App, Card, Table, Space, Input, Tag, Modal, Form, Typography, Row, Col, Switch, Divider,
 } from 'antd';
-import {
-  SearchOutlined,
-  ExclamationCircleOutlined,
-  SafetyOutlined,
-  DashboardOutlined,
-  ShoppingCartOutlined,
-  FileTextOutlined,
-  DollarOutlined,
-  ShoppingOutlined,
-  ExperimentOutlined,
-  AppstoreOutlined,
-  ScissorOutlined,
-  FieldTimeOutlined,
-  ContainerOutlined,
-  DatabaseOutlined,
-  BarChartOutlined,
-  TeamOutlined,
-  SettingOutlined,
-  LinkOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons';
+import { SearchOutlined, ExclamationCircleOutlined, SafetyOutlined } from '@ant-design/icons';
 import { getRoles, createRole, updateRole, deleteRole } from '../../services/admin/roleService';
 import {
   getEmptyPermissions,
-  getOperationsForModule,
+  applyDependencies,
   validatePermissions,
   normalizePermissionsForSave,
-  PERMISSION_GROUPS,
   getCurrentUser,
   setCurrentUser,
+  isAdminRole,
 } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
@@ -58,70 +21,13 @@ import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { MODAL_WIDTHS } from '../../utils/uiConstants';
+import PermissionMatrix from './components/roles/PermissionMatrix';
+
 const { Text } = Typography;
 
-// Icon map for group rendering. Every SECTIONS[].icon in permissions.js must
-// have an entry here — a missing one silently falls back to the settings cog,
-// which is how HR & Payroll wore the wrong icon before the sections were split.
-const GROUP_ICONS = {
-  DashboardOutlined: <DashboardOutlined />,
-  ShoppingCartOutlined: <ShoppingCartOutlined />,
-  FileTextOutlined: <FileTextOutlined />,
-  DollarOutlined: <DollarOutlined />,
-  ShoppingOutlined: <ShoppingOutlined />,
-  ExperimentOutlined: <ExperimentOutlined />,
-  AppstoreOutlined: <AppstoreOutlined />,
-  ScissorOutlined: <ScissorOutlined />,
-  FieldTimeOutlined: <FieldTimeOutlined />,
-  ContainerOutlined: <ContainerOutlined />,
-  DatabaseOutlined: <DatabaseOutlined />,
-  BarChartOutlined: <BarChartOutlined />,
-  TeamOutlined: <TeamOutlined />,
-  SettingOutlined: <SettingOutlined />,
-};
-
-// Operation label helpers
-// Every operation id any module can return from getOperationsForModule() must
-// appear in BOTH maps. The label falls back to the raw id, but OP_COLORS is used
-// in string concatenation (`OP_COLORS[op] + '40'`), so a missing entry yields
-// "undefined40" — invalid CSS the browser drops, leaving the chip unstyled.
-const OP_LABELS = {
-  view: 'View',
-  add: 'Add',
-  update: 'Update',
-  delete: 'Delete',
-  approve: 'Approve',
-  reject: 'Reject',
-  cancel: 'Cancel',
-  refer_back: 'Refer Back',
-  verify: 'Verify',
-  post: 'Post',
-  finalize: 'Finalize',
-  revise: 'Revise',
-  override: 'Override',
-  print: 'Print',
-  reprint: 'Reprint',
-  publish: 'Publish',
-};
-
-const OP_COLORS = {
-  view: '#6366f1',
-  add: '#22c55e',
-  update: '#f59e0b',
-  delete: '#ef4444',
-  approve: '#10b981',
-  reject: '#f43f5e',
-  cancel: '#64748b',
-  refer_back: '#8b5cf6',
-  verify: '#14b8a6',
-  post: '#eab308',
-  finalize: '#16a34a',
-  revise: '#0ea5e9',
-  override: '#a855f7',
-  print: '#0891b2',
-  reprint: '#7c3aed',
-  publish: '#059669',
-};
+const countPermissions = (role) =>
+  Object.values(role?.permissions ?? {})
+    .reduce((n, mod) => n + Object.values(mod?.operations ?? {}).filter(Boolean).length, 0);
 
 const RoleAccess = () => {
   const { message, modal } = App.useApp();
@@ -131,79 +37,70 @@ const RoleAccess = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [form] = Form.useForm();
-  const [permissions, setPermissions] = useState(getEmptyPermissions());
-  const [formDirty, setFormDirty] = useState(false);
-  const [initialPermissions, setInitialPermissions] = useState(null);
+  const [permissions, setPermissions] = useState(getEmptyPermissions);
+  const [initialPermissions, setInitialPermissions] = useState('');
   const [deletingId, setDeletingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const initialFormValuesRef = useRef(null);
 
-  // Fetch roles
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getRoles();
-      const roleData = Array.isArray(response) ? response : (response.content || response.data || []);
-      setRoles(roleData);
+      setRoles(Array.isArray(response) ? response : (response.content || response.data || []));
     } catch (error) {
       console.error('Error fetching roles:', error);
       message.error('Failed to load roles');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [message]);
 
-  useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-  // Filter roles based on search
   const filteredRoles = roles.filter((role) =>
     !searchText ||
     role.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-    role.description?.toLowerCase().includes(searchText.toLowerCase())
-  );
+    role.description?.toLowerCase().includes(searchText.toLowerCase()));
 
-  // Check if form or permissions have changed from initial values
-  const checkIfDirty = (currentFormValues, currentPermissions) => {
-    if (!initialFormValuesRef.current) return false;
+  // Dirty state is derived, not stored. It used to be set from inside a
+  // setPermissions updater — impure, and run twice under StrictMode.
+  const formValues = Form.useWatch([], form);
+  const permsJson = useMemo(() => JSON.stringify(permissions), [permissions]);
+  const formDirty = useMemo(() => {
     const initial = initialFormValuesRef.current;
-    const formChanged =
-      currentFormValues.name !== initial.name ||
-      (currentFormValues.description || '') !== (initial.description || '') ||
-      currentFormValues.active !== initial.active;
-    const permsChanged = JSON.stringify(currentPermissions) !== initialPermissions;
-    return formChanged || permsChanged;
-  };
+    if (!initial) return false;
+    return (formValues?.name ?? '') !== (initial.name ?? '')
+      || (formValues?.description || '') !== (initial.description || '')
+      || (formValues?.active ?? true) !== initial.active
+      || permsJson !== initialPermissions;
+  }, [formValues, permsJson, initialPermissions]);
 
-  // Open modal for add/edit
   const openModal = (role = null) => {
     setEditingRole(role);
     if (role) {
-      const formVals = {
-        name: role.name,
-        description: role.description,
-        active: role.status !== 'INACTIVE',
-      };
+      const formVals = { name: role.name, description: role.description, active: role.status !== 'INACTIVE' };
       form.setFieldsValue(formVals);
       initialFormValuesRef.current = { ...formVals };
-      // Merge role permissions with empty template so every key exists
+
+      // Merge onto a fresh template so a newly added screen has a key, then
+      // derive access from the operations rather than trusting the stored flag,
+      // which is free-form jsonb and can disagree with them. Unknown keys are
+      // carried through untouched instead of being dropped on the floor.
       const empty = getEmptyPermissions();
-      const rolePerms = role.permissions || {};
+      const stored = role.permissions || {};
       const merged = { ...empty };
-      Object.keys(rolePerms).forEach((moduleId) => {
-        if (merged[moduleId]) {
-          merged[moduleId] = {
-            access: !!rolePerms[moduleId]?.access,
-            operations: {
-              ...merged[moduleId].operations,
-              ...(rolePerms[moduleId]?.operations || {}),
-            },
-          };
-        }
+      Object.keys(stored).forEach((moduleId) => {
+        if (!merged[moduleId]) { merged[moduleId] = stored[moduleId]; return; }
+        const operations = { ...merged[moduleId].operations };
+        Object.keys(operations).forEach((op) => {
+          operations[op] = stored[moduleId]?.operations?.[op] === true;
+        });
+        merged[moduleId] = { access: Object.values(operations).some(Boolean), operations };
       });
-      setPermissions(merged);
-      setInitialPermissions(JSON.stringify(merged));
+      const resolved = applyDependencies(merged);
+      setPermissions(resolved);
+      setInitialPermissions(JSON.stringify(resolved));
     } else {
       form.resetFields();
       form.setFieldsValue({ active: true });
@@ -212,229 +109,16 @@ const RoleAccess = () => {
       setInitialPermissions(JSON.stringify(empty));
       initialFormValuesRef.current = { name: '', description: '', active: true };
     }
-    setFormDirty(false);
     setModalVisible(true);
   };
 
-  // Handle permission change
-  const handlePermissionChange = (moduleId, operationId, checked) => {
-    setPermissions((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      if (!updated[moduleId]) {
-        const ops = getOperationsForModule(moduleId);
-        updated[moduleId] = {
-          access: false,
-          operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-        };
-      }
-
-      // Approval/action modules have no 'view' — skip the view-cascade logic for them
-      const isApprovalModule = ['po-approval', 'order-actions', 'costing-approval'].includes(moduleId);
-
-      // If disabling 'view' for standard modules, disable all operations
-      if (operationId === 'view' && !checked && !isApprovalModule) {
-        const ops = getOperationsForModule(moduleId);
-        ops.forEach((op) => { updated[moduleId].operations[op] = false; });
-        updated[moduleId].access = false;
-      } else {
-        updated[moduleId].operations[operationId] = checked;
-        // If enabling any operation other than view, also enable view
-        if (checked && operationId !== 'view' && !isApprovalModule) {
-          updated[moduleId].operations.view = true;
-        }
-        updated[moduleId].access = Object.values(updated[moduleId].operations).some(Boolean);
-      }
-
-      // Enforce PO-approval → PO link
-      if (moduleId === 'purchase-orders' && !updated['purchase-orders'].access) {
-        const approvalOps = getOperationsForModule('po-approval');
-        if (updated['po-approval']) {
-          approvalOps.forEach((op) => { updated['po-approval'].operations[op] = false; });
-          updated['po-approval'].access = false;
-        }
-      }
-
-      // Enforce order-actions → orders link
-      if (moduleId === 'orders' && !updated['orders'].access) {
-        const actionOps = getOperationsForModule('order-actions');
-        if (updated['order-actions']) {
-          actionOps.forEach((op) => { updated['order-actions'].operations[op] = false; });
-          updated['order-actions'].access = false;
-        }
-      }
-
-      // Enforce costing-approval → costing link
-      if (moduleId === 'costing' && !updated['costing'].access) {
-        const approvalOps = getOperationsForModule('costing-approval');
-        if (updated['costing-approval']) {
-          approvalOps.forEach((op) => { updated['costing-approval'].operations[op] = false; });
-          updated['costing-approval'].access = false;
-        }
-      }
-
-      // Enforce ai-assistant → reports link
-      if (moduleId === 'reports' && !updated['reports'].access) {
-        if (updated['ai-assistant']) {
-          updated['ai-assistant'] = { access: false, operations: { view: false } };
-        }
-      }
-
-      return updated;
-    });
-    // Recalculate dirty after permission change
-    setPermissions((latest) => {
-      const vals = form.getFieldsValue();
-      setFormDirty(checkIfDirty(vals, latest));
-      return latest;
-    });
-  };
-
-  // Handle select all for a module
-  const handleSelectAllModule = (moduleId, checked) => {
-    const operations = getOperationsForModule(moduleId);
-    setPermissions((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      updated[moduleId] = {
-        access: checked,
-        operations: operations.reduce((acc, op) => {
-          acc[op] = checked;
-          return acc;
-        }, {}),
-      };
-
-      // Enforce PO-approval → PO link on uncheck
-      if (moduleId === 'purchase-orders' && !checked) {
-        const approvalOps = getOperationsForModule('po-approval');
-        updated['po-approval'] = {
-          access: false,
-          operations: approvalOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-        };
-      }
-
-      // Enforce order-actions → orders link on uncheck
-      if (moduleId === 'orders' && !checked) {
-        const actionOps = getOperationsForModule('order-actions');
-        updated['order-actions'] = {
-          access: false,
-          operations: actionOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-        };
-      }
-
-      // Enforce costing-approval → costing link on uncheck
-      if (moduleId === 'costing' && !checked) {
-        const approvalOps = getOperationsForModule('costing-approval');
-        updated['costing-approval'] = {
-          access: false,
-          operations: approvalOps.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-        };
-      }
-
-      // Enforce ai-assistant → reports link on uncheck
-      if (moduleId === 'reports' && !checked) {
-        updated['ai-assistant'] = { access: false, operations: { view: false } };
-      }
-
-      return updated;
-    });
-    setPermissions((latest) => {
-      const vals = form.getFieldsValue();
-      setFormDirty(checkIfDirty(vals, latest));
-      return latest;
-    });
-  };
-
-  // Handle select all for entire group
-  const handleSelectAllGroup = (group, checked) => {
-    setPermissions((prev) => {
-      const updated = JSON.parse(JSON.stringify(prev));
-      group.modules.forEach((mod) => {
-        // For linked approval modules, enforce parent access when unchecking the group
-        const linkedParent = { 'po-approval': 'purchase-orders', 'order-actions': 'orders', 'costing-approval': 'costing', 'ai-assistant': 'reports' };
-        if (!checked && linkedParent[mod.id] && !updated[linkedParent[mod.id]]?.access) {
-          const ops = getOperationsForModule(mod.id);
-          updated[mod.id] = {
-            access: false,
-            operations: ops.reduce((acc, op) => { acc[op] = false; return acc; }, {}),
-          };
-          return;
-        }
-        const ops = getOperationsForModule(mod.id);
-        updated[mod.id] = {
-          access: checked,
-          operations: ops.reduce((acc, op) => { acc[op] = checked; return acc; }, {}),
-        };
-      });
-      return updated;
-    });
-    setPermissions((latest) => {
-      const vals = form.getFieldsValue();
-      setFormDirty(checkIfDirty(vals, latest));
-      return latest;
-    });
-  };
-
-  // Check states
-  const isAllSelectedForModule = (moduleId) => {
-    const ops = getOperationsForModule(moduleId);
-    const modulePerms = permissions[moduleId]?.operations || {};
-    return ops.length > 0 && ops.every((op) => modulePerms[op] === true);
-  };
-
-  const isSomeSelectedForModule = (moduleId) => {
-    const ops = getOperationsForModule(moduleId);
-    const modulePerms = permissions[moduleId]?.operations || {};
-    const selected = ops.filter((op) => modulePerms[op] === true);
-    return selected.length > 0 && selected.length < ops.length;
-  };
-
-  const isAllSelectedForGroup = (group) => {
-    return group.modules.every((mod) => isAllSelectedForModule(mod.id));
-  };
-
-  const isSomeSelectedForGroup = (group) => {
-    const allSelected = group.modules.every((mod) => isAllSelectedForModule(mod.id));
-    const someSelected = group.modules.some((mod) =>
-      permissions[mod.id]?.access === true
-    );
-    return someSelected && !allSelected;
-  };
-
-  // Count permissions
-  const countPermissions = (role) => {
-    if (!role.permissions) return 0;
-    let count = 0;
-    Object.values(role.permissions).forEach((mod) => {
-      if (mod.operations) {
-        count += Object.values(mod.operations).filter(Boolean).length;
-      }
-    });
-    return count;
-  };
-
-  const countTotalSelectedPermissions = () => {
-    let count = 0;
-    Object.values(permissions).forEach((mod) => {
-      if (mod.operations) {
-        count += Object.values(mod.operations).filter(Boolean).length;
-      }
-    });
-    return count;
-  };
-
-  // Handle form submit
   const handleSubmit = async (values) => {
-    // Validate: at least one permission
     const validation = validatePermissions(permissions);
-    if (!validation.valid) {
-      message.warning(validation.message);
-      return;
-    }
+    if (!validation.valid) { message.warning(validation.message); return; }
 
     setSaving(true);
     try {
-      // Normalize permissions before save
       const normalizedPermissions = normalizePermissionsForSave(permissions);
-
       const roleData = {
         name: values.name,
         description: values.description,
@@ -445,8 +129,8 @@ const RoleAccess = () => {
       if (editingRole) {
         await updateRole(editingRole.id, { ...roleData, version: editingRole.version });
         message.success('Role updated successfully');
-        // Refresh the current user's session permissions immediately
-        // so UI guards reflect the change without requiring a re-login.
+        // Refresh the current user's session permissions immediately so UI
+        // guards reflect the change without requiring a re-login.
         const currentUser = getCurrentUser();
         if (currentUser && currentUser.role?.toLowerCase() === editingRole.name?.toLowerCase()) {
           setCurrentUser({ ...currentUser, permissions: normalizedPermissions });
@@ -464,30 +148,25 @@ const RoleAccess = () => {
     }
   };
 
-  // Close modal with unsaved changes check
   const handleModalClose = () => {
-    if (formDirty) {
-      modal.confirm({
-        title: 'Unsaved Changes',
-        icon: <ExclamationCircleOutlined />,
-        content: 'You have unsaved changes. Are you sure you want to discard them?',
-        okText: 'Discard',
-        okType: 'danger',
-        cancelText: 'Keep Editing',
-        onOk: () => setModalVisible(false),
-      });
-    } else {
-      setModalVisible(false);
-    }
+    if (!formDirty) { setModalVisible(false); return; }
+    modal.confirm({
+      title: 'Unsaved Changes',
+      icon: <ExclamationCircleOutlined />,
+      content: 'You have unsaved changes. Are you sure you want to discard them?',
+      okText: 'Discard',
+      okType: 'danger',
+      cancelText: 'Keep Editing',
+      onOk: () => setModalVisible(false),
+    });
   };
 
   const handleModalAfterClose = () => {
     form.resetFields();
     setPermissions(getEmptyPermissions());
-    setFormDirty(false);
+    initialFormValuesRef.current = null;
   };
 
-  // Handle delete
   const handleDelete = async (roleId) => {
     setDeletingId(roleId);
     try {
@@ -501,8 +180,12 @@ const RoleAccess = () => {
     }
   };
 
-  // Table columns
-  const columns = [
+  // `isSystem` is not a field on RoleDTO, so the old record.isSystem was always
+  // undefined and the guard never fired. The admin roles are the ones that must
+  // not be edited away, and they are identified by name.
+  const isProtected = (record) => isAdminRole(record.name);
+
+  const columns = useMemo(() => [
     {
       title: 'Role Name',
       dataIndex: 'name',
@@ -512,12 +195,8 @@ const RoleAccess = () => {
       render: (name, record) => (
         <Space>
           <SafetyOutlined style={{ color: 'var(--primary-color)' }} />
-          <div>
-            <Text strong style={{ whiteSpace: 'nowrap' }}>{name}</Text>
-            {record.isSystem && (
-              <Tag color="orange" style={{ marginLeft: 8 }}>System</Tag>
-            )}
-          </div>
+          <Text strong style={{ whiteSpace: 'nowrap' }}>{name}</Text>
+          {isProtected(record) && <Tag color="orange">System</Tag>}
         </Space>
       ),
     },
@@ -525,23 +204,9 @@ const RoleAccess = () => {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
-      width: 200,
+      width: 220,
       ellipsis: true,
       render: (desc) => <Text type="secondary">{desc || '-'}</Text>,
-    },
-    {
-      title: 'Users',
-      dataIndex: 'userCount',
-      key: 'userCount',
-      align: 'center',
-      width: 80,
-      render: (count) => (
-        <Badge
-          count={count || 0}
-          showZero
-          style={{ backgroundColor: 'var(--primary-color)' }}
-        />
-      ),
     },
     {
       title: 'Permissions',
@@ -550,11 +215,7 @@ const RoleAccess = () => {
       width: 140,
       render: (_, record) => {
         const count = countPermissions(record);
-        return (
-          <Tag color={count > 20 ? 'green' : count > 10 ? 'blue' : 'default'}>
-            {count} permissions
-          </Tag>
-        );
+        return <Tag color={count > 20 ? 'green' : count > 10 ? 'blue' : 'default'}>{count} rights</Tag>;
       },
     },
     {
@@ -581,12 +242,7 @@ const RoleAccess = () => {
       render: (_, record) => (
         <Space size="small">
           <PermissionGuard module="roles" operation="update">
-            <ActionButton
-              action="edit"
-              size="small"
-              onClick={() => openModal(record)}
-              disabled={record.isSystem}
-            />
+            <ActionButton action="edit" size="small" onClick={() => openModal(record)} disabled={isProtected(record)} />
           </PermissionGuard>
           <PermissionGuard module="roles" operation="delete">
             <DeleteConfirm
@@ -594,240 +250,25 @@ const RoleAccess = () => {
               recordLabel={record.name}
               onConfirm={() => handleDelete(record.id)}
               loading={deletingId === record.id}
-              disabled={record.isSystem}
+              disabled={isProtected(record)}
             >
               <ActionButton
                 action="delete"
                 size="small"
-                tooltip={record.isSystem ? 'System roles cannot be deleted' : 'Delete'}
-                disabled={record.isSystem}
+                tooltip={isProtected(record) ? 'System roles cannot be deleted' : 'Delete'}
+                disabled={isProtected(record)}
               />
             </DeleteConfirm>
           </PermissionGuard>
         </Space>
       ),
     },
-  ];
+    // openModal and handleDelete are stable enough for this table; deletingId is
+    // what actually changes between renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [deletingId]);
 
-  /* Render Permission Group */
-
-  const renderModuleRow = (mod) => {
-    const ops = getOperationsForModule(mod.id);
-    const isPOApproval      = mod.id === 'po-approval';
-    const isOrderActions    = mod.id === 'order-actions';
-    const isCostingApproval = mod.id === 'costing-approval';
-    const isAiAssistant     = mod.id === 'ai-assistant';
-    const poHasAccess      = permissions['purchase-orders']?.access;
-    const ordersHasAccess  = permissions['orders']?.access;
-    const costingHasAccess = permissions['costing']?.access;
-    const reportsHasAccess = permissions['reports']?.access;
-    const isLinkedDisabled =
-      (isPOApproval      && !poHasAccess)      ||
-      (isOrderActions    && !ordersHasAccess)  ||
-      (isCostingApproval && !costingHasAccess) ||
-      (isAiAssistant     && !reportsHasAccess);
-
-    return (
-      <div
-        key={mod.id}
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          padding: '10px 12px',
-          gap: '6px 12px',
-          borderBottom: '1px solid var(--border-color, #f0f0f0)',
-          background: isLinkedDisabled ? 'var(--bg-tertiary, #fafafa)' : 'transparent',
-          opacity: isLinkedDisabled ? 0.5 : 1,
-          transition: 'all 0.2s',
-        }}
-      >
-        {/* Module name + select all checkbox */}
-        <div style={{ flex: '0 1 220px', minWidth: 140, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Checkbox
-            checked={isAllSelectedForModule(mod.id)}
-            indeterminate={isSomeSelectedForModule(mod.id)}
-            onChange={(e) => handleSelectAllModule(mod.id, e.target.checked)}
-            disabled={isLinkedDisabled}
-          />
-          <div>
-            <Text strong style={{ fontSize: 13 }}>{mod.name}</Text>
-            {mod.path && (
-              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
-                {mod.path}
-              </Text>
-            )}
-            {mod.description && (
-              <Text type="secondary" style={{ fontSize: 11, display: 'block', fontStyle: 'italic' }}>
-                {mod.description}
-              </Text>
-            )}
-          </div>
-          {isPOApproval && (
-            <Tooltip title="Requires Supplier PO access to be enabled">
-              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
-            </Tooltip>
-          )}
-          {isOrderActions && (
-            <Tooltip title="Requires Orders access to be enabled">
-              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
-            </Tooltip>
-          )}
-          {isCostingApproval && (
-            <Tooltip title="Requires Costing access to be enabled">
-              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
-            </Tooltip>
-          )}
-          {isAiAssistant && (
-            <Tooltip title="Requires Reports & Analytics access to be enabled">
-              <LinkOutlined style={{ color: 'var(--primary-hover)', fontSize: 12 }} />
-            </Tooltip>
-          )}
-        </div>
-
-        {/* Operation checkboxes */}
-        <div style={{ flex: '1 1 200px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {ops.map((op) => (
-            <div
-              key={op}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                padding: '3px 8px',
-                borderRadius: 6,
-                border: `1px solid ${permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '40' : 'var(--border-color, #e2e8f0)'}`,
-                background: permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] + '10' : 'transparent',
-                transition: 'all 0.2s',
-                minWidth: 80,
-              }}
-            >
-              <Checkbox
-                checked={permissions[mod.id]?.operations?.[op] || false}
-                onChange={(e) => handlePermissionChange(mod.id, op, e.target.checked)}
-                disabled={isLinkedDisabled}
-              />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: permissions[mod.id]?.operations?.[op] ? OP_COLORS[op] : 'var(--text-secondary, #64748b)',
-                  fontWeight: permissions[mod.id]?.operations?.[op] ? 600 : 400,
-                }}
-              >
-                {OP_LABELS[op] || op}
-              </Text>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderPermissionsMatrix = () => {
-    const totalSelected = countTotalSelectedPermissions();
-
-    const collapseItems = PERMISSION_GROUPS.map((group) => ({
-      key: group.key,
-      label: (
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', width: '100%' }}>
-          <Checkbox
-            checked={isAllSelectedForGroup(group)}
-            indeterminate={isSomeSelectedForGroup(group)}
-            onChange={(e) => {
-              e.stopPropagation();
-              handleSelectAllGroup(group, e.target.checked);
-            }}
-            onClick={(e) => e.stopPropagation()}
-          />
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 auto', minWidth: 0 }}>
-            {GROUP_ICONS[group.icon] || <SettingOutlined />}
-            <Text strong style={{ fontSize: 14 }}>{group.label}</Text>
-            {group.description && (
-              <Tooltip title={group.description}>
-                <InfoCircleOutlined style={{ color: 'var(--text-muted, #94a3b8)', fontSize: 12 }} />
-              </Tooltip>
-            )}
-          </span>
-          <Tag
-            style={{ marginLeft: 'auto', marginRight: 0, flexShrink: 0 }}
-            color={group.modules.every((m) => isAllSelectedForModule(m.id)) ? 'green' : 'default'}
-          >
-            {group.modules.filter((m) => permissions[m.id]?.access).length}/{group.modules.length} active
-          </Tag>
-        </div>
-      ),
-      children: (
-        <div style={{ margin: -12 }}>
-          {group.modules.map((mod) => renderModuleRow(mod))}
-        </div>
-      ),
-    }));
-
-    return (
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <div>
-            <h4 style={{ margin: 0 }}>Permission Matrix</h4>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Configure page access and operations for this role
-            </Text>
-          </div>
-          <Tag color={totalSelected > 0 ? 'blue' : 'default'} style={{ fontSize: 13, padding: '2px 12px' }}>
-            {totalSelected} permission{totalSelected !== 1 ? 's' : ''} selected
-          </Tag>
-        </div>
-
-        {/* PO Approval dependency notice */}
-        {permissions['purchase-orders']?.access && (
-          <Alert
-            message="PO Approval Actions are linked to Supplier PO access"
-            description="Approve, Reject, Cancel, and Refer Back operations require the Supplier PO module to be enabled."
-            type="info"
-            showIcon
-            icon={<LinkOutlined />}
-            style={{ marginBottom: 12 }}
-            closable
-          />
-        )}
-
-        {/* Order Approval Actions dependency notice */}
-        {permissions['orders']?.access && (
-          <Alert
-            message="Order Approval Actions are linked to Orders access"
-            description="Refer Back, Cancel, Approve, and Reject operations require the Orders module to be enabled."
-            type="info"
-            showIcon
-            icon={<LinkOutlined />}
-            style={{ marginBottom: 12 }}
-            closable
-          />
-        )}
-
-        {/* Costing Approval Actions dependency notice */}
-        {permissions['costing']?.access && (
-          <Alert
-            message="Costing Approval Actions are linked to Costing access"
-            description="Approve operation requires the Costing module to be enabled."
-            type="info"
-            showIcon
-            icon={<LinkOutlined />}
-            style={{ marginBottom: 12 }}
-            closable
-          />
-        )}
-
-        <Collapse
-          defaultActiveKey={PERMISSION_GROUPS.map((g) => g.key)}
-          items={collapseItems}
-          size="small"
-          style={{
-            background: 'var(--card-bg, #fff)',
-            borderRadius: 8,
-          }}
-        />
-      </div>
-    );
-  };
+  const noRightsYet = !validatePermissions(permissions).valid;
 
   return (
     <div>
@@ -838,7 +279,6 @@ const RoleAccess = () => {
           </PermissionGuard>
         </PageHeader>
 
-        {/* Filters */}
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }} align="middle">
           <Col xs={20} sm={12} md={8}>
             <Input
@@ -854,87 +294,56 @@ const RoleAccess = () => {
           </Col>
         </Row>
 
-        {/* Table */}
         <Table
           columns={columns}
           dataSource={filteredRoles}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 950 }}
+          scroll={{ x: 900 }}
           pagination={getTablePagination(undefined, 'roles')}
-          locale={{
-            emptyText: <EmptyState description="No roles found" />,
-          }}
+          locale={{ emptyText: <EmptyState description="No roles found" /> }}
         />
       </Card>
 
-      {/* Add/Edit Modal */}
       <Modal
-        title={editingRole ? "Edit Role" : "Add New Role"}
+        title={editingRole ? `Edit Role — ${editingRole.name}` : 'Add New Role'}
         open={modalVisible}
         onCancel={handleModalClose}
         afterClose={handleModalAfterClose}
-        width={MODAL_WIDTHS.LARGE}
+        width={MODAL_WIDTHS.XLARGE}
         centered
-        styles={{
-          body: { maxHeight: "70vh", overflowY: "auto", paddingBottom: 0 },
-        }}
+        style={{ maxWidth: 'calc(100vw - 32px)' }}
+        styles={{ body: { maxHeight: '76vh', overflowY: 'auto', paddingBottom: 0 } }}
         footer={
-          <div style={{ textAlign: "right" }}>
+          <div style={{ textAlign: 'right' }}>
             <Space>
               <ActionButton action="cancel" text="Cancel" onClick={handleModalClose} />
               <ActionButton
                 action="save"
-                text={editingRole ? "Update Role" : "Create Role"}
+                text={editingRole ? 'Update Role' : 'Create Role'}
                 onClick={() => form.submit()}
-                disabled={editingRole && !formDirty}
+                disabled={(editingRole && !formDirty) || noRightsYet}
+                tooltip={noRightsYet ? 'A role needs at least one right' : undefined}
                 loading={saving}
               />
             </Space>
           </div>
         }
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          onValuesChange={() => {
-            const vals = form.getFieldsValue();
-            setFormDirty(checkIfDirty(vals, permissions));
-          }}
-          style={{ width: "99%" }}
-        >
+        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ width: '99%' }}>
           <Row gutter={16}>
             <Col xs={24} sm={12}>
               <Form.Item
                 name="name"
                 label="Role Name"
                 rules={[
-                  { required: true, message: "Please enter role name" },
-                  {
-                    pattern: /^[a-zA-Z\s]+$/,
-                    message: "Role name can only contain letters and spaces",
-                  },
-                  {
-                    min: 2,
-                    message: "Role name must be at least 2 characters",
-                  },
-                  { max: 50, message: "Role name cannot exceed 50 characters" },
+                  { required: true, message: 'Please enter role name' },
+                  { pattern: /^[a-zA-Z\s]+$/, message: 'Role name can only contain letters and spaces' },
+                  { min: 2, message: 'Role name must be at least 2 characters' },
+                  { max: 50, message: 'Role name cannot exceed 50 characters' },
                 ]}
               >
-                <Input
-                  placeholder="Enter role name (e.g., Manager, Approver)"
-                  onKeyDown={(e) => {
-                    if (
-                      /[0-9!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?`~\-]/.test(
-                        e.key,
-                      ) &&
-                      e.key.length === 1
-                    ) {
-                      e.preventDefault();
-                    }
-                  }}
-                />
+                <Input placeholder="Enter role name (e.g., Manager, Approver)" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
@@ -948,9 +357,14 @@ const RoleAccess = () => {
             <Input.TextArea placeholder="Enter role description" rows={2} />
           </Form.Item>
 
-          <Divider style={{ margin: "12px 0" }} />
+          <Divider style={{ margin: '12px 0' }} />
 
-          {renderPermissionsMatrix()}
+          <PermissionMatrix
+            value={permissions}
+            onChange={setPermissions}
+            roles={roles}
+            currentRoleId={editingRole?.id}
+          />
         </Form>
       </Modal>
     </div>
