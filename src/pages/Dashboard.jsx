@@ -91,12 +91,14 @@ const Dashboard = () => {
 
   useEffect(() => { loadSummary(); }, [loadSummary]);
 
-  // If user doesn't have dashboard access, redirect to first accessible menu
+  // If user doesn't have dashboard access, redirect to first accessible menu.
+  // The redirect is unconditional: getFirstAccessibleRoute is derived from the
+  // screen registry and falls back to /profile, so it can no longer return '/'
+  // for a user without dashboard access. It used to, for any role whose keys
+  // were missing from the hand-written table (all HR, all inventory, all TNA),
+  // and the old `!== '/'` guard then fell through and rendered the dashboard.
   if (!hasModuleAccess('dashboard')) {
-    const firstRoute = getFirstAccessibleRoute();
-    if (firstRoute !== '/') {
-      return <Navigate to={firstRoute} replace />;
-    }
+    return <Navigate to={getFirstAccessibleRoute()} replace />;
   }
 
   return (

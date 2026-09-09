@@ -145,7 +145,8 @@ const ItemMaster = () => {
   // RBAC Permissions
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
-  const canDelete = hasPermission(MODULE_ID, 'delete');
+  // No canDelete: items are never deleted through the UI, so the registry does
+  // not offer the operation. The flag was computed here and never read.
   const canView = hasPermission(MODULE_ID, 'view');
 
   // List State

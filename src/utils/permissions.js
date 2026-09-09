@@ -312,11 +312,17 @@ export const SCREENS = [
     path: '/inventory/bill-passing',
     routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id'],
     ops: BILL_PASSING_OPERATIONS },
+  // `post` commits a batch to stock, `finalize` locks the cut-over for good.
+  // Both are checked by the screens (OpeningStockBatchForm:54, Dashboard:83) but
+  // the old if-ladder never returned them, so the buttons they gate were hidden
+  // from every role including Super Admin, whose map is built from the same list.
+  // `delete` goes the other way: it was offered and nothing ever read it.
   { id: 'opening-stock', name: 'Opening Stock Balance', section: 'inventory', kind: 'screen',
     path: '/inventory/opening-stock',
     routes: ['/inventory/opening-stock', '/inventory/opening-stock/fabric/new', '/inventory/opening-stock/fabric/:id',
              '/inventory/opening-stock/accessories/new', '/inventory/opening-stock/accessories/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: ['view', 'add', 'update', 'post', 'finalize'],
+    description: 'Post commits a batch to stock; Finalize locks the cut-over.' },
 
   // ── Costing ──
   { id: 'costing', name: 'Costing', section: 'costing', kind: 'screen',
@@ -708,42 +714,22 @@ export const canReviseCostSheet = () =>
  * Order matches the sidebar menu priority.
  */
 export const getFirstAccessibleRoute = () => {
-  const routeModuleMap = [
-    { route: '/', moduleId: 'dashboard' },
-    { route: '/orders/list', moduleId: 'orders' },
-    { route: '/bom/list', moduleId: 'bom' },
-    { route: '/sample-requests/list', moduleId: 'sample-requests' },
-    { route: '/sample-requests/dispatches/list', moduleId: 'sample-dispatches' },
-    { route: '/sample-requests/comments', moduleId: 'sample-comments' },
-    { route: '/sample-requests/invoices/list', moduleId: 'sample-invoices' },
-    { route: '/purchase-orders/supplier-po/list', moduleId: 'purchase-orders' },
-    { route: '/purchase-orders/cutting-po/list', moduleId: 'cutting-po' },
-    { route: '/purchase-orders/work-order/list', moduleId: 'work-order' },
-    { route: '/purchase-orders/finishing-po/list', moduleId: 'finishing-po' },    { route: '/production/cutting', moduleId: 'production-cutting' },
-    { route: '/production/sewing', moduleId: 'production-sewing' },
-    { route: '/production/finishing', moduleId: 'production-finishing' },
-    { route: '/export-docs/packing/list', moduleId: 'export-packing' },
-    { route: '/export-docs/shipments/list', moduleId: 'export-shipments' },
-    { route: '/export-docs/packing-lists/list', moduleId: 'export-packing-list' },
-    { route: '/export-docs/invoices/list', moduleId: 'export-invoice' },
-    { route: '/export-docs/stickers', moduleId: 'export-stickers' },
-    { route: '/export-docs/templates/list', moduleId: 'export-templates' },
-    { route: '/grn/list', moduleId: 'grn' },
-    { route: '/costing/list', moduleId: 'costing' },
-    { route: '/reports/list', moduleId: 'reports' },
-    { route: '/master', moduleId: ['master-data', 'buyer-info', 'supplier-info', 'items', 'terms-conditions', 'overhead-master', 'couriers'] },
-    { route: '/admin/dashboard', moduleId: ['users', 'roles', 'company-profile'] },
-  ];
-
-  for (const entry of routeModuleMap) {
-    if (Array.isArray(entry.moduleId)) {
-      if (entry.moduleId.some((id) => hasModuleAccess(id))) return entry.route;
-    } else {
-      if (hasModuleAccess(entry.moduleId)) return entry.route;
+  // Derived from the registry, in section order. The hand-written table this
+  // replaces listed 25 of the 64 screens, so a role holding only HR, inventory,
+  // TNA, production-masters or approval-flows keys matched nothing and fell
+  // through to '/' — the company dashboard it had no permission for. It also
+  // carried a dead '/grn/list' entry for a module id that does not exist.
+  for (const section of SECTIONS) {
+    for (const screen of SCREENS) {
+      if (screen.section !== section.key) continue;
+      if (screen.kind === 'approval') continue; // no route of its own
+      if (screen.path && hasModuleAccess(screen.id)) return screen.path;
     }
   }
 
-  return '/'; // fallback
+  // Nothing at all is accessible. Profile is self-scoped and always reachable,
+  // so it beats returning '/' and rendering a dashboard the user cannot hold.
+  return '/profile';
 };
 
 // ─── PERMISSION VALIDATION ────────────────────────────────────────────────────
