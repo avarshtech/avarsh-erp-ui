@@ -59,7 +59,7 @@ const QualityControlPage = () => {
         sticky
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-qc" operation="add">
           <ActionButton
             action="create"
             text={isFabric ? 'New Fabric Inspection' : 'New Accessories Inspection'}

@@ -110,7 +110,10 @@ const GRNList = () => {
       onEdit: handleEdit,
       onDelete: handleDelete,
       onCancel: handleCancel,
-      canCancel: hasPermission('inventory', 'delete'),
+      // Cancelling a posted GRN and deleting a draft are different acts. Cancel
+      // used to run on the delete right while Delete itself was ungated.
+      canCancel: hasPermission('inventory', 'cancel'),
+      canDelete: hasPermission('inventory', 'delete'),
     }),
     [handleView, handleEdit, handleDelete, handleCancel],
   );

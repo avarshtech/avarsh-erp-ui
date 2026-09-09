@@ -397,18 +397,25 @@ const MainLayoutInner = () => {
       key: "/inventory",
       icon: <AppstoreOutlined />,
       label: "Inventory",
-      moduleId: ["inventory", "inventory-qc", "inventory-issue", "inventory-adjustment", "inventory-return-supplier", "inventory-bill-passing"],
+      // Every child carries its own key. None of them did, and the child filter
+      // passes anything without one, so holding a single inventory right showed
+      // links to all ten screens and nine of them answered with Access Denied.
+      moduleId: [
+        "inventory", "inventory-dashboard", "inventory-stock", "inventory-qc",
+        "inventory-issue", "inventory-adjustment", "inventory-return-supplier",
+        "inventory-bill-passing", "opening-stock",
+      ],
       children: [
-        { key: "/inventory/dashboard", label: "Dashboard" },
-        { key: "/inventory/grn/list", label: "GRN List" },
-        { key: "/inventory/grn/allowance", label: "GRN Allowance" },
-        { key: "/inventory/qc", label: "Quality Control" },
-        { key: "/inventory/stock", label: "Stock" },
-        { key: "/inventory/opening-stock", label: "Opening Stock" },
-        { key: "/inventory/issue", label: "Material Issue" },
-        { key: "/inventory/adjustment", label: "Stock Adjustment" },
-        { key: "/inventory/return-to-supplier", label: "Return to Supplier" },
-        { key: "/inventory/bill-passing", label: "Bill Passing" },
+        { key: "/inventory/dashboard", label: "Dashboard", moduleId: "inventory-dashboard" },
+        { key: "/inventory/grn/list", label: "GRN List", moduleId: "inventory" },
+        { key: "/inventory/grn/allowance", label: "GRN Allowance", moduleId: "inventory" },
+        { key: "/inventory/qc", label: "Quality Control", moduleId: "inventory-qc" },
+        { key: "/inventory/stock", label: "Stock", moduleId: "inventory-stock" },
+        { key: "/inventory/opening-stock", label: "Opening Stock", moduleId: "opening-stock" },
+        { key: "/inventory/issue", label: "Material Issue", moduleId: "inventory-issue" },
+        { key: "/inventory/adjustment", label: "Stock Adjustment", moduleId: "inventory-adjustment" },
+        { key: "/inventory/return-to-supplier", label: "Return to Supplier", moduleId: "inventory-return-supplier" },
+        { key: "/inventory/bill-passing", label: "Bill Passing", moduleId: "inventory-bill-passing" },
       ],
     },
     {
@@ -467,8 +474,14 @@ const MainLayoutInner = () => {
       key: "/master",
       icon: <DatabaseOutlined />,
       label: "Master Data",
-      // Master Data is visible if user has access to any master module
-      moduleId: ["master-data", "buyer-info", "supplier-info", "items", "terms-conditions", "overhead-master"],
+      // Visible if any master tab is accessible. The list omitted six of the
+      // twelve, so a role granted only Couriers, Styles, Size Presets, Payment
+      // Terms, Processes or Parts never saw the menu at all.
+      moduleId: [
+        "master-data", "buyer-info", "supplier-info", "items", "style-master",
+        "size-presets", "payment-terms", "terms-conditions", "process-master",
+        "parts-master", "overhead-master", "couriers",
+      ],
     },
     {
       key: "/reports",

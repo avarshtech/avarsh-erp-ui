@@ -283,13 +283,31 @@ export const SCREENS = [
     path: '/production/masters', ops: STANDARD_OPERATIONS },
 
   // ── Inventory ──
-  { id: 'inventory', name: 'Inventory Management', section: 'inventory', kind: 'screen',
-    path: '/inventory/dashboard',
-    routes: ['/inventory/dashboard', '/inventory/grn/list', '/inventory/grn/allowance',
+  //
+  // One key used to gate four unrelated screens: a read-only KPI dashboard, the
+  // GRN register with full CRUD, and the read-only stock register. So the
+  // dashboard row offered Add, Update and Delete, none of which it can do, and
+  // there was no way to let someone read stock without also letting them raise
+  // a GRN. Split per the one-key-per-screen rule; `inventory` keeps its id so
+  // no stored role loses its GRN rights.
+  { id: 'inventory-dashboard', name: 'Inventory Dashboard', section: 'inventory', kind: 'dashboard',
+    path: '/inventory/dashboard', ops: ['view'],
+    description: 'Read-only stock and GRN indicators.' },
+  // `cancel` reverses a posted GRN and `delete` removes a draft. Cancel used to
+  // ride on the delete operation while the Delete button itself was gated by
+  // nothing at all, so the checkbox named Delete authorised Cancel and actual
+  // deletion was free. They are separate rights now.
+  { id: 'inventory', name: 'GRN Register', section: 'inventory', kind: 'screen',
+    path: '/inventory/grn/list',
+    routes: ['/inventory/grn/list', '/inventory/grn/allowance',
              '/inventory/grn/fabric/new', '/inventory/grn/fabric/edit/:id',
-             '/inventory/grn/accessories/new', '/inventory/grn/accessories/edit/:id',
-             '/inventory/stock'],
-    ops: STANDARD_OPERATIONS },
+             '/inventory/grn/accessories/new', '/inventory/grn/accessories/edit/:id'],
+    ops: ['view', 'add', 'update', 'delete', 'cancel'],
+    opLabels: { delete: 'Delete draft', cancel: 'Cancel GRN' },
+    description: 'Goods receipt notes and the GRN allowance report.' },
+  { id: 'inventory-stock', name: 'Stock Register', section: 'inventory', kind: 'screen',
+    path: '/inventory/stock', ops: ['view'],
+    description: 'Read-only stock balances.' },
   { id: 'inventory-qc', name: 'Quality Control', section: 'inventory', kind: 'screen',
     path: '/inventory/qc',
     routes: ['/inventory/qc', '/inventory/qc/fabric/new', '/inventory/qc/fabric/:id',

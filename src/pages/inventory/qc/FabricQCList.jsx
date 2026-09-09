@@ -219,7 +219,7 @@ const FabricQCList = ({ embedded = false }) => {
   return (
     <div className="animate-fade-in-up inv-page">
       <PageHeader title="Fabric Quality Control">
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-qc" operation="add">
           <ActionButton action="create" text="New Inspection" onClick={() => navigate('/inventory/qc/fabric/new')} />
         </PermissionGuard>
       </PageHeader>

@@ -330,7 +330,7 @@ const ThemedApp = () => {
             <Route path="export-docs/audit" element={<PermissionRoute module="export-packing-list" operation="view"><Suspense fallback={<PageSkeleton />}><ExportDocAudit /></Suspense></PermissionRoute>} />
 
             {/* Inventory */}
-            <Route path="inventory/dashboard" element={<PermissionRoute module="inventory" operation="view"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
+            <Route path="inventory/dashboard" element={<PermissionRoute module="inventory-dashboard" operation="view"><Suspense fallback={<PageSkeleton />}><InventoryDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/list" element={<PermissionRoute module="inventory" operation="view"><Suspense fallback={<PageSkeleton />}><GRNList /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/allowance" element={<PermissionRoute module="inventory" operation="view"><Suspense fallback={<PageSkeleton />}><AllowancePage /></Suspense></PermissionRoute>} />
             <Route path="inventory/grn/fabric/new" element={<PermissionRoute module="inventory" operation="add"><Suspense fallback={<PageSkeleton />}><FabricGRNForm /></Suspense></PermissionRoute>} />
@@ -342,7 +342,7 @@ const ThemedApp = () => {
             <Route path="inventory/qc/fabric/:id" element={<PermissionRoute module="inventory-qc" operation="view"><Suspense fallback={<PageSkeleton />}><FabricQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/qc/trims/new" element={<PermissionRoute module="inventory-qc" operation="add"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
             <Route path="inventory/qc/trims/:id" element={<PermissionRoute module="inventory-qc" operation="view"><Suspense fallback={<PageSkeleton />}><TrimsQCInspection /></Suspense></PermissionRoute>} />
-            <Route path="inventory/stock" element={<PermissionRoute module="inventory" operation="view"><Suspense fallback={<PageSkeleton />}><StockRegisterPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/stock" element={<PermissionRoute module="inventory-stock" operation="view"><Suspense fallback={<PageSkeleton />}><StockRegisterPage /></Suspense></PermissionRoute>} />
             <Route path="inventory/opening-stock" element={<PermissionRoute module="opening-stock" operation="view"><Suspense fallback={<PageSkeleton />}><OpeningStockDashboard /></Suspense></PermissionRoute>} />
             <Route path="inventory/opening-stock/fabric/new" element={<PermissionRoute module="opening-stock" operation="add"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="FABRIC" /></Suspense></PermissionRoute>} />
             <Route path="inventory/opening-stock/fabric/:id" element={<PermissionRoute module="opening-stock" operation="view"><Suspense fallback={<PageSkeleton />}><OpeningStockBatchForm batchType="FABRIC" /></Suspense></PermissionRoute>} />

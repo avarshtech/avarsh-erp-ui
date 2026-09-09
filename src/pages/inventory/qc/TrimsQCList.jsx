@@ -225,7 +225,7 @@ const TrimsQCList = ({ embedded = false }) => {
   return (
     <div className="animate-fade-in-up inv-page">
       <PageHeader title="Accessories Quality Control">
-        <PermissionGuard module="inventory" operation="add">
+        <PermissionGuard module="inventory-qc" operation="add">
           <ActionButton action="create" text="New Accessories Inspection" onClick={() => navigate('/inventory/qc/trims/new')} />
         </PermissionGuard>
       </PageHeader>
