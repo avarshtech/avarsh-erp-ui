@@ -30,38 +30,38 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
     setLoading(true);
     try {
       setPo(await getPoMapping(poId));
-    } catch (e) {
-      message.error(e.message || 'Could not load purchase order');
+    } catch {
+      // axiosInstance already raised the server's message as a toast.
     } finally {
       setLoading(false);
     }
-  }, [poId, message]);
+  }, [poId]);
 
   useEffect(() => { if (open) load(); else setPo(null); }, [open, load]);
 
   const applyUpdate = useCallback((updated) => { setPo(updated); onChanged?.(); }, [onChanged]);
 
+  // The interceptor already toasts the server's message on failure, so these only
+  // report success. handleAdd still rethrows, so AllocationAdder keeps the values the
+  // user typed instead of clearing a form the server rejected.
   const handleAdd = useCallback(async (values) => {
-    try {
-      applyUpdate(await addAllocation({ poId, ...values }));
-      message.success('Mapped to order');
-    } catch (e) {
-      message.error(e.message || 'Could not map quantity');
-      throw e;
-    }
+    applyUpdate(await addAllocation({ poId, ...values }));
+    message.success('Mapped to order');
   }, [poId, applyUpdate, message]);
 
   const handleRemove = useCallback(async (allocationId) => {
     try {
       applyUpdate(await removeAllocation({ poId, allocationId }));
       message.success('Mapping removed');
-    } catch (e) {
-      message.error(e.message || 'Could not remove mapping');
+    } catch {
+      // Already reported by the interceptor.
     }
   }, [poId, applyUpdate, message]);
 
   const hasOpenQty = (po?.lineItems || []).some((l) => l.unmappedQty > 0);
   const hasAllocations = (po?.lineItems || []).some((l) => l.allocations.length > 0);
+  const overAllocated = (po?.lineItems || []).filter((l) => l.overAllocatedQty > 0);
+  const editable = canEdit && !po?.readOnly;
   const head = po || summary;
 
   return (
@@ -70,7 +70,7 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
       onClose={onClose}
       width={1000}
       title={head ? <Space>{head.poNumber}<StatusTag status={head.mappingStatus} config={PO_ORDER_MAPPING_STATUS_CONFIG} getLabel={getMappingStatusLabel} /></Space> : 'Order Mapping'}
-      extra={po && canEdit && (
+      extra={po && editable && (
         <Space>
           <Button icon={po.stockOnly ? <UndoOutlined /> : <InboxOutlined />} disabled={!po.stockOnly && hasAllocations} onClick={() => setStockOnlyOpen(true)}>
             {po.stockOnly ? 'Reopen for mapping' : 'Mark Stock Only'}
@@ -94,17 +94,40 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
             ]}
           />
 
+          {po.readOnly && (
+            <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+              message={`This PO is ${getPoStatusLabel(po.status)} and can no longer be mapped`}
+              description="Its existing mappings are shown below and can still be removed, so nothing is left stranded." />
+          )}
+
           {po.stockOnly ? (
             <Alert type="warning" showIcon icon={<InboxOutlined />} style={{ marginBottom: 16 }}
               message="Stock Only — deliberately not mapped to any order"
               description={po.stockOnlyRemark} />
           ) : (
             <Alert type="info" showIcon style={{ marginBottom: 16 }}
-              message="What mapping does"
-              description="Mapped quantity is tagged to the order and its style, so Material Issue for that order can pick this stock and the order's material cost includes it. Unmapped quantity stays as free stock under the PO reference." />
+              message="What mapping records"
+              description="Which customer orders this PO ended up serving, line by line. Unmapped quantity stays as free stock. Where the PO's delivery date has been re-agreed, that slip carries through to the orders mapped here." />
           )}
 
-          <PoMappingLineTable lines={po.lineItems} canEdit={canEdit && !po.stockOnly} onAdd={handleAdd} onRemove={handleRemove} />
+          {overAllocated.length > 0 && (
+            <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+              message="Mapped for more than has been received"
+              description={`${overAllocated.map((l) => l.itemCode).join(', ')}: quantity is mapped against the ordered amount, and goods returned to the supplier do not release it. Check the mapping if the balance looks wrong.`} />
+          )}
+
+          {/*
+            Removal stays available even on a read-only PO: a referred-back or cancelled PO
+            still holds its allocations, and if they could not be cleared here the next edit
+            of that line would be refused by the database with nowhere to go.
+          */}
+          <PoMappingLineTable
+            lines={po.lineItems}
+            canAdd={editable && !po.stockOnly}
+            canRemove={canEdit}
+            onAdd={handleAdd}
+            onRemove={handleRemove}
+          />
           {po.hiddenLineCount > 0 && (
             <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
               {po.hiddenLineCount} other line{po.hiddenLineCount === 1 ? '' : 's'} on this PO (packing, consumables) {po.hiddenLineCount === 1 ? 'is' : 'are'} not mapped to orders and {po.hiddenLineCount === 1 ? 'is' : 'are'} hidden here.
@@ -120,7 +143,7 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
                 children: (
                   <Space direction="vertical" size={0}>
                     <Text><Text strong>{h.action}</Text> — {h.details}</Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>{h.by} · {h.at}</Text>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{h.by} · {formatDate(h.at, 'DD-MMM-YYYY HH:mm')}</Text>
                   </Space>
                 ),
               }))}

@@ -20,8 +20,9 @@ const StockOnlyModal = ({ open, po, onClose, onSaved }) => {
       message.success(marking ? `${po.poNumber} marked as Stock Only` : `${po.poNumber} is open for mapping again`);
       form.resetFields();
       onSaved();
-    } catch (e) {
-      message.error(e.message || 'Could not update the purchase order');
+    } catch {
+      // axiosInstance already raised the server's message as a toast. The catch stays so
+      // the rejection does not escape Modal onOk and so saving is always cleared.
     } finally {
       setSaving(false);
     }

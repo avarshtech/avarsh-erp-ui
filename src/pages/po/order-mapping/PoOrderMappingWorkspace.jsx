@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Drawer, Table, App, Button, Tag, Space, Typography } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Drawer, Table, Space, Typography } from 'antd';
 import { searchMappablePos, listMappingSuppliers } from '../../../services/po/poOrderMappingService';
-import { USE_MOCK_PO_ORDER_MAPPING_DATA } from '../../../services/po/poOrderMappingEnv';
-import { resetPoOrderMappingMockStore } from '../../../services/po/poOrderMappingMockStore';
 import { hasPermission } from '../../../utils/permissions';
-import { MAPPING_STATUS_OPTIONS, MAPPABLE_ITEM_CATEGORIES } from '../../../utils/poOrderMappingConstants';
+import { MAPPING_STATUS_OPTIONS } from '../../../utils/poOrderMappingConstants';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import SearchFilterBar from '../../../components/SearchFilterBar';
@@ -17,12 +14,12 @@ import { buildColumns } from './PoOrderMappingColumns';
 const { Text } = Typography;
 
 /**
- * Opened from the Supplier PO list. Lists General POs that have Fabric or Trims
- * lines (the only lines that get mapped) and how much of each is linked to
- * customer orders. Mapping itself happens in the nested per-PO drawer.
+ * Opened from the Supplier PO list. Lists the General POs a supplier has accepted and
+ * how much of each is linked to customer orders. Which item categories count as order
+ * material is a server setting, so this screen names none of them. Mapping itself
+ * happens in the nested per-PO drawer.
  */
 const PoOrderMappingWorkspace = ({ open, onClose }) => {
-  const { message } = App.useApp();
   const canUpdate = hasPermission('purchase-orders', 'update');
 
   const [loading, setLoading] = useState(false);
@@ -52,12 +49,12 @@ const PoOrderMappingWorkspace = ({ open, onClose }) => {
       });
       setData(res.content);
       setPagination({ current: res.number + 1, pageSize: res.size, total: res.totalElements });
-    } catch (e) {
-      message.error(e.message || 'Failed to load purchase orders');
+    } catch {
+      // axiosInstance already raised the server's message as a toast.
     } finally {
       setLoading(false);
     }
-  }, [pagination.pageSize, sort, debouncedSearch, statusFilter, supplierFilter, dateRange, message]);
+  }, [pagination.pageSize, sort, debouncedSearch, statusFilter, supplierFilter, dateRange]);
 
   useEffect(() => { if (open) fetchData(1); }, [open, fetchData]);
 
@@ -68,12 +65,6 @@ const PoOrderMappingWorkspace = ({ open, onClose }) => {
   };
 
   const refresh = useCallback(() => fetchData(pagination.current), [fetchData, pagination]);
-
-  const handleResetDemo = () => {
-    resetPoOrderMappingMockStore();
-    message.info('Demo data reset to the seed');
-    fetchData(1);
-  };
 
   const columns = useMemo(() => buildColumns({
     onOpen: (r) => setDrawerPo(r),
@@ -90,14 +81,8 @@ const PoOrderMappingWorkspace = ({ open, onClose }) => {
         <Space direction="vertical" size={0}>
           <span>Order Mapping</span>
           <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-            General POs with {MAPPABLE_ITEM_CATEGORIES.slice(0, -1).join(', ')} or {MAPPABLE_ITEM_CATEGORIES.at(-1)} lines. Link them, and the stock received against them, to the customer orders they serve.
+            General POs the supplier has accepted. Record which customer orders each one ended up serving.
           </Text>
-        </Space>
-      )}
-      extra={USE_MOCK_PO_ORDER_MAPPING_DATA && (
-        <Space>
-          <Tag color="gold" style={{ marginRight: 0 }}>Mock data</Tag>
-          <Button size="small" icon={<ReloadOutlined />} onClick={handleResetDemo}>Reset demo data</Button>
         </Space>
       )}
     >
@@ -122,7 +107,7 @@ const PoOrderMappingWorkspace = ({ open, onClose }) => {
         scroll={{ x: 1400 }}
         onChange={handleTableChange}
         pagination={getTablePagination(pagination, 'general PO')}
-        locale={{ emptyText: <EmptyState title="No General PO to map" description="Only General POs accepted by the supplier with Fabric, Trims or Accessories lines appear here." /> }}
+        locale={{ emptyText: <EmptyState title="No General PO to map" description="Only General POs the supplier has accepted, carrying at least one line of order material, appear here." /> }}
       />
 
       <PoOrderMappingDrawer open={Boolean(drawerPo)} poId={drawerPo?.id} summary={drawerPo} canEdit={canUpdate} onClose={() => setDrawerPo(null)} onChanged={refresh} />

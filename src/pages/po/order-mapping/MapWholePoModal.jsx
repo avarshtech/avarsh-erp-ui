@@ -19,8 +19,9 @@ const MapWholePoModal = ({ open, po, onClose, onMapped }) => {
       message.success(`${po.poNumber} mapped to the selected order`);
       form.resetFields();
       onMapped(updated);
-    } catch (e) {
-      message.error(e.message || 'Could not map the purchase order');
+    } catch {
+      // axiosInstance already raised the server's message as a toast. The catch stays so
+      // the rejection does not escape Modal onOk and so saving is always cleared.
     } finally {
       setSaving(false);
     }

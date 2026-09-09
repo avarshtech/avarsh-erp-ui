@@ -55,7 +55,7 @@ const POList = () => {
 
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
-  // General PO → customer order mapping workspace (mock phase)
+  // General PO → customer order mapping workspace
   const [mappingOpen, setMappingOpen] = useState(false);
   const [viewingPO, setViewingPO] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);

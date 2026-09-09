@@ -20,6 +20,9 @@ const OrderSelect = ({ value, onChange, disabled, placeholder = 'Select customer
     let alive = true;
     listMappableOrders()
       .then((rows) => { if (alive) setOrders(rows); })
+      // Without this the rejection escapes unhandled: the interceptor toasts the failure
+      // but nothing here was ever catching it, because under the mock it could not reject.
+      .catch(() => { if (alive) setOrders([]); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);

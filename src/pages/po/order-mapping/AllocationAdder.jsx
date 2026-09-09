@@ -47,7 +47,9 @@ const AllocationAdder = ({ line, onAdd }) => {
         <InputNumber min={0} max={line.unmappedQty} step={1} precision={3} disabled={saving} style={{ width: 150 }} addonAfter={line.uom} />
       </Form.Item>
       <Form.Item name="remarks" style={{ marginBottom: 0 }}>
-        <Input placeholder="Remarks (optional)" disabled={saving} style={{ width: 220 }} allowClear />
+        {/* 500 matches the column, so an over-long remark is felt here rather than
+            coming back as a database constraint violation. */}
+        <Input placeholder="Remarks (optional)" disabled={saving} style={{ width: 220 }} maxLength={500} allowClear />
       </Form.Item>
       <Form.Item style={{ marginBottom: 0 }}>
         <Space>

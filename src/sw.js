@@ -102,6 +102,16 @@ registerRoute(
   'GET'
 );
 
+// Same reasoning for order mapping: the screen shows how much of a PO line is still
+// unmapped, and every allocation is checked against that balance server-side. A
+// half-hour-old balance would offer quantities that are already spoken for and then be
+// refused on submit, with nothing on screen explaining why.
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/api/v1/purchase-orders/order-mapping'),
+  new NetworkOnly(),
+  'GET'
+);
+
 // ─── Runtime Caching: Other API GET requests ───
 registerRoute(
   ({ url, request }) =>
