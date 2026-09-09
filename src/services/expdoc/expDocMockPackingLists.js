@@ -33,7 +33,7 @@ import { resolveTemplate } from '../../utils/expDocTemplateSchema';
 const find = (db, id) => db.packingLists.find((p) => p.id === Number(id));
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
 
-const LIVE_STATUSES = [PL_STATUS.DRAFT, PL_STATUS.SUBMITTED, PL_STATUS.APPROVED, PL_STATUS.EXPORTED];
+const LIVE_STATUSES = [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 
 // ─── Scaffolding ────────────────────────────────────────────────────────────────
 
@@ -264,42 +264,17 @@ export const decoratePl = (pl, db, options = {}) => {
     canProceed: out.submitCheck.canProceed,
   };
 
-  const user = currentUserName();
-  const fourEyes = db.masters?.tenantConfig?.fourEyesEnabled !== false;
-
   // Permission-shaped flags the screen reads instead of re-deriving the rules.
   out.editable = out.status === PL_STATUS.DRAFT;
-  out.canSubmit = out.status === PL_STATUS.DRAFT && out.submitCheck.canProceed && rows.length > 0;
-  out.submitBlockers = out.submitCheck.blocking.map((b) => b.message);
-  out.isOwnDocument = fourEyes && (out.submittedBy || out.createdBy) === user;
   /*
-   * Approval is gated on the SAME check submission was, not only on four-eyes.
-   *
-   * An acknowledgement stops applying when the value that justified it changes, so a
-   * document can arrive at approval with a warning open again. Enabling Approve then
-   * offered an action the service would refuse — and the warning could no longer be
-   * acknowledged, because that needs a draft.
+   * Finalising is the one gate left, and it runs the full check: the same
+   * validation that used to be split across submit and approve now has to pass in
+   * a single step, because there is no second pair of eyes behind it.
    */
-  out.canApprove = out.status === PL_STATUS.SUBMITTED
-    && !out.isOwnDocument
-    && out.submitCheck.canProceed;
-  out.approveBlockedReason = out.status !== PL_STATUS.SUBMITTED
-    ? null
-    : (out.isOwnDocument
-      ? 'You submitted this packing list. Four-eyes review requires a different approver.'
-      : (out.submitCheck.blocking.length
-        ? `${out.submitCheck.blocking.length} issue(s) reopened since submission. Send it back to draft to resolve them.`
-        : null));
-  /*
-   * A maker may take back their own submission while it is still untouched (§16).
-   *
-   * This is NOT the reviewer's send-back: nobody has rejected anything, and the
-   * maker should not have to find an approver to undo a misclick. Distinguishing
-   * them keeps the audit trail honest about who changed their mind.
-   */
-  out.canRecall = out.status === PL_STATUS.SUBMITTED && (out.submittedBy || out.createdBy) === user;
+  out.canFinalise = out.status === PL_STATUS.DRAFT && out.submitCheck.canProceed && rows.length > 0;
+  out.finaliseBlockers = out.submitCheck.blocking.map((b) => b.message);
 
-  out.canRevise = out.status === PL_STATUS.APPROVED || out.status === PL_STATUS.EXPORTED;
+  out.canRevise = out.status === PL_STATUS.FINAL || out.status === PL_STATUS.EXPORTED;
   out.canRefresh = out.status === PL_STATUS.DRAFT && out.isStale;
   return out;
 };
@@ -414,9 +389,8 @@ export const createPackingList = async (payload) => {
     orderBreakdown: buildOrderBreakdown(payload, entries),
     tolerancePercent: payload.tolerancePercent ?? null,
     acknowledgements: [],
-    approvalSnapshot: null,
-    submittedBy: null,
-    approvedBy: null,
+    finalSnapshot: null,
+    finalisedBy: null,
     reviseReason: null,
     cancelReason: null,
     version: 0,
@@ -463,7 +437,7 @@ export const updatePackingList = async (id, payload) => {
     failConflict(pl.plNo, payload.version, pl.version);
   }
   // A whitelist, not a blacklist. Carton rows, the number, the status and the
-  // approval snapshot are not editable through this door at any severity, and an
+  // final snapshot are not editable through this door at any severity, and an
   // unlisted key is dropped rather than written.
   const before = clone(pl);
   PL_EDITABLE_FIELDS.forEach((f) => {
@@ -488,7 +462,7 @@ export const updatePackingList = async (id, payload) => {
 /**
  * Re-pull carton rows from the bound packing entries (PRD §7.1 "Refresh from
  * Packing"). Carton corrections are made in the entry screen; this is how they
- * reach an unapproved document.
+ * reach a document that is still a draft.
  */
 export const refreshFromPacking = async (id) => {
   await delay();
@@ -528,7 +502,7 @@ export const acknowledgeWarning = async (id, findingRef, reason) => {
   const pl = find(db, id);
   if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
   if (!reason || reason.trim().length < 10) {
-    fail('VALIDATION', 'Give a reason of at least 10 characters — it is shown to the approver and kept in the audit trail.');
+    fail('VALIDATION', 'Give a reason of at least 10 characters — it is kept in the audit trail.');
   }
   /*
    * Accepts either the finding object or just its targetKey. The key form is the
@@ -557,10 +531,10 @@ export const acknowledgeWarning = async (id, findingRef, reason) => {
 // ─── Lifecycle ──────────────────────────────────────────────────────────────────
 
 /**
- * Release the document's files (§16 Approved -> Exported, §20 "export" event).
+ * Release the document's files (§16 Final -> Released, §20 "export" event).
  *
  * Printing alone was never recorded, so the register could not report an export date
- * and the Exported status — defined, allowed and treated as approved everywhere —
+ * and the Released status — defined, allowed and treated as issued everywhere —
  * was unreachable. This is the act that sets it.
  */
 export const markPackingListExported = async (id, options = {}) => {
@@ -679,20 +653,19 @@ export const changeStatus = async (id, target, reason) => {
   const decorated = decoratePl(pl, db, { phase: PHASE.SUBMIT });
   const user = currentUserName();
 
-  if (target === PL_STATUS.SUBMITTED) {
+  if (target === PL_STATUS.FINAL) {
     if (!allRows(pl).length) fail('CONFLICT', 'There are no cartons on this packing list.');
+    /*
+     * Both phases run here.
+     *
+     * They used to be two gates with a reviewer between them. With one step there
+     * is no later checkpoint to catch what the save-phase check let through, so the
+     * stricter phase's rules have to hold before the document freezes.
+     */
     if (!decorated.submitCheck.canProceed) {
-      fail('CONFLICT', `Cannot submit — ${decorated.submitCheck.blocking.length} issue(s) still open: ${decorated.submitCheck.blocking.map((b) => b.message).join(' ')}`);
+      fail('CONFLICT', `Cannot finalise — ${decorated.submitCheck.blocking.length} issue(s) still open: ${decorated.submitCheck.blocking.map((b) => b.message).join(' ')}`);
     }
-    pl.submittedBy = user;
-  }
-
-  if (target === PL_STATUS.APPROVED) {
-    // BR-11 four-eyes. Advisory client-side; the API must re-enforce it.
-    if (db.masters?.tenantConfig?.fourEyesEnabled !== false && (pl.submittedBy || pl.createdBy) === user) {
-      fail('CONFLICT', 'The creator of a document cannot be its sole approver. Four-eyes review is enabled for this tenant.');
-    }
-    const approveCheck = validate(
+    const finalCheck = validate(
       {
         pl: decorated,
         template: decorated.template,
@@ -705,13 +678,13 @@ export const changeStatus = async (id, target, reason) => {
       },
       { phase: PHASE.APPROVE, acknowledgements: pl.acknowledgements || [] },
     );
-    if (!approveCheck.canProceed) {
-      fail('CONFLICT', `Cannot approve — ${approveCheck.blocking.length} issue(s) still open.`);
+    if (!finalCheck.canProceed) {
+      fail('CONFLICT', `Cannot finalise — ${finalCheck.blocking.length} issue(s) still open.`);
     }
-    pl.approvedBy = user;
-    // BR-08: approval snapshots data + template version. Every export renders from
-    // this, so a re-print a year later reproduces the original document.
-    pl.approvalSnapshot = {
+    pl.finalisedBy = user;
+    // BR-08: finalising snapshots data + template version. Every export renders
+    // from this, so a re-print a year later reproduces the original document.
+    pl.finalSnapshot = {
       at: nowStamp(),
       by: user,
       templateId: pl.templateId,
@@ -724,7 +697,7 @@ export const changeStatus = async (id, target, reason) => {
         totals: decorated.totals,
         // BR-08: the header is snapshotted too. `resolved` in particular, because
         // it resolves a consignee profile that master data can change afterwards —
-        // reprinting an approved document must not silently pick up the new address.
+        // reprinting a final document must not silently pick up the new address.
         plDate: pl.plDate,
         descriptionOfGoods: pl.descriptionOfGoods,
         marksAndNos: pl.marksAndNos,
@@ -738,7 +711,6 @@ export const changeStatus = async (id, target, reason) => {
     fail('VALIDATION', 'Cancelling a packing list needs a reason.');
   }
   if (target === PL_STATUS.CANCELLED) pl.cancelReason = reason.trim();
-  if (target === PL_STATUS.DRAFT) pl.submittedBy = null;
 
   pl.status = target;
   pl.version = (pl.version || 0) + 1;
@@ -753,23 +725,13 @@ export const changeStatus = async (id, target, reason) => {
   // §23. Raised inside the same mutation as the change it describes, so a
   // notification can never outlive a transition that failed.
   const NOTE = {
-    [PL_STATUS.SUBMITTED]: {
-      type: NOTIF.PL_SUBMITTED,
-      title: `${pl.plNo} is waiting for approval`,
-      body: `${user} submitted ${decorated.totals.cartons} carton(s) for ${pl.buyerName || 'this buyer'}${
+    [PL_STATUS.FINAL]: {
+      type: NOTIF.PL_FINALISED,
+      title: `${pl.plNo} is final`,
+      body: `${user} finalised ${decorated.totals.cartons} carton(s) for ${pl.buyerName || 'this buyer'}${
         decorated.panelFindings.warnings.filter((w) => w.acknowledged).length
           ? ` with ${decorated.panelFindings.warnings.filter((w) => w.acknowledged).length} acknowledged warning(s)`
-          : ''}.`,
-    },
-    [PL_STATUS.APPROVED]: {
-      type: NOTIF.PL_APPROVED,
-      title: `${pl.plNo} approved`,
-      body: `Approved by ${user}. Stickers and the export invoice can now be raised from it.`,
-    },
-    [PL_STATUS.DRAFT]: {
-      type: NOTIF.PL_SENT_BACK,
-      title: `${pl.plNo} was sent back`,
-      body: reason ? reason.trim() : 'Returned to draft for changes.',
+          : ''}. Stickers and the export invoice can now be raised from it.`,
     },
     [PL_STATUS.CANCELLED]: {
       type: NOTIF.PL_CANCELLED,
@@ -790,7 +752,7 @@ export const changeStatus = async (id, target, reason) => {
 };
 
 /**
- * Post-approval correction (PRD §17). Never edits in place: creates a NEW draft row
+ * Post-finalise correction (PRD §17). Never edits in place: creates a NEW draft row
  * carrying the same plNo with revision + 1, and supersedes the old one, so the buyer
  * keeps referencing one number across revisions.
  */
@@ -799,8 +761,8 @@ export const revisePackingList = async (id, reason) => {
   const db = loadDb();
   const pl = find(db, id);
   if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
-  if (![PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(pl.status)) {
-    fail('CONFLICT', 'Only an approved or exported packing list can be revised.');
+  if (![PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(pl.status)) {
+    fail('CONFLICT', 'Only a final or released packing list can be revised.');
   }
   if (!reason || reason.trim().length < 10) {
     fail('VALIDATION', 'A revision needs a reason of at least 10 characters.');
@@ -814,9 +776,8 @@ export const revisePackingList = async (id, reason) => {
     status: PL_STATUS.DRAFT,
     supersedesPlId: pl.id,
     supersededByPlId: null,
-    approvalSnapshot: null,
-    submittedBy: null,
-    approvedBy: null,
+    finalSnapshot: null,
+    finalisedBy: null,
     reviseReason: reason.trim(),
     // A revision starts with a clean slate: the previous reasons were given against
     // the previous version's numbers.
@@ -945,7 +906,7 @@ export const revisionChain = (db, pl) => (db.packingLists || [])
     version: p.version,
     contentHash: p.contentHash,
     createdAt: p.createdAt,
-    approvedAt: p.approvalSnapshot?.at || null,
+    finalisedAt: p.finalSnapshot?.at || null,
     reviseReason: p.reviseReason || null,
     isCurrent: p.id === pl.id,
   }));
@@ -998,7 +959,7 @@ export const comparePackingLists = async (idA, idB) => {
   const side = (p, d) => ({
     id: p.id, plNo: p.plNo, revision: p.revision || 0, status: p.status,
     version: p.version, cartons: d.totals?.cartons ?? 0, pieces: d.totals?.pieces ?? 0,
-    approvedAt: p.approvalSnapshot?.at || null,
+    finalisedAt: p.finalSnapshot?.at || null,
   });
 
   return {
@@ -1012,36 +973,4 @@ export const comparePackingLists = async (idA, idB) => {
     // saying out loud — it is a comparison, not a revision history.
     sameDocument: a.plNo === b.plNo,
   };
-};
-
-/**
- * The submitter takes their own document back (§16).
- *
- * Deliberately separate from the reviewer's send-back: the audit entry says who
- * changed their mind, and it needs no approver.
- */
-export const recallPackingList = async (id, reason) => {
-  await delay();
-  const db = loadDb();
-  const pl = find(db, id);
-  if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
-  if (pl.status !== PL_STATUS.SUBMITTED) {
-    fail('CONFLICT', 'Only a document awaiting approval can be recalled.');
-  }
-  const user = currentUserName();
-  if ((pl.submittedBy || pl.createdBy) !== user) {
-    fail('CONFLICT', `Only ${pl.submittedBy || pl.createdBy} can recall this submission. An approver can send it back instead.`);
-  }
-  pl.status = PL_STATUS.DRAFT;
-  pl.submittedBy = null;
-  pl.version = (pl.version || 0) + 1;
-  pl.updatedAt = nowStamp();
-  pl.updatedBy = user;
-  pushAudit(db, {
-    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
-    action: 'Submission recalled by its author',
-    reason: reason ? String(reason).trim() : null,
-  });
-  saveDb(db);
-  return decoratePl(pl, db);
 };

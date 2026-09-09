@@ -481,16 +481,16 @@ export const GRN_REVERSAL_OPERATIONS = ['approve'];
 // Costing Approval operations
 export const COSTING_APPROVAL_OPERATIONS = ['approve', 'revise'];
 
-// Export documents (Packing List / Export Invoice) carry an approval lifecycle:
-// maker (add/update), approver (approve), and the two post-approval powers the
-// PRD separates — `revise` opens a new draft version of an approved document,
-// `override` forces a non-default template version onto one document. Both are
-// logged; neither is ordinary editing. Acknowledging a validation WARNing maps to
-// `update`, not `override`: every role that may acknowledge already holds an edit
-// right, whereas template override is approver-only.
-// No `submit` op — repo-wide, Draft→Submitted is gated on `update`
+// Export documents (Packing List / Export Invoice) have NO approver: whoever
+// builds a document finalises it, so there is no `approve` op. What remains are
+// the maker rights (add/update) and the two post-finalise powers the PRD
+// separates — `revise` opens a new draft version of a final document, `override`
+// forces a non-default template version onto one document. Both are logged;
+// neither is ordinary editing. Acknowledging a validation WARNing maps to
+// `update`: every role that may acknowledge already holds an edit right.
+// No `finalise` op — repo-wide, leaving Draft is gated on `update`
 // (see canSubmitOrder below, and Bill Passing).
-export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'approve', 'revise', 'override'];
+export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise', 'override'];
 
 // Stickers have no approval of their own — they inherit the packing list's state,
 // so there is nothing to add/update/delete. What varies is who may put ink on

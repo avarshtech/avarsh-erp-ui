@@ -25,8 +25,8 @@ const etdColour = (days, atRisk) => {
  * documents finished, soonest sailing first.
  *
  * Readiness is four steps rather than a percentage of cartons: cartons entered, a
- * packing list raised, every packing list approved, every invoice approved. A
- * shipment 95% packed but with nothing approved is not 95% documented.
+ * packing list raised, every packing list final, every invoice final. A shipment
+ * 95% packed but with nothing finalised is not 95% documented.
  */
 const ShipmentReadinessCard = memo(function ShipmentReadinessCard({ rows, total, loading }) {
   const navigate = useNavigate();
@@ -66,7 +66,7 @@ const ShipmentReadinessCard = memo(function ShipmentReadinessCard({ rows, total,
       key: 'pls',
       width: 120,
       render: (_, r) => (r.packingLists
-        ? <Text>{`${r.packingListsApproved} of ${r.packingLists} approved`}</Text>
+        ? <Text>{`${r.packingListsFinal} of ${r.packingLists} final`}</Text>
         : <Text type="secondary">None raised</Text>),
     },
     {
@@ -74,7 +74,7 @@ const ShipmentReadinessCard = memo(function ShipmentReadinessCard({ rows, total,
       key: 'invoices',
       width: 120,
       render: (_, r) => (r.invoices
-        ? <Text>{`${r.invoicesApproved} of ${r.invoices} approved`}</Text>
+        ? <Text>{`${r.invoicesFinal} of ${r.invoices} final`}</Text>
         : <Text type="secondary">None raised</Text>),
     },
     {

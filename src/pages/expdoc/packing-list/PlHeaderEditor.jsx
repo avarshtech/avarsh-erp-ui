@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Button, Form, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { FormSection, FormInput, FormSelect, FormDatePicker } from '../../../components/form';
@@ -15,7 +15,7 @@ const { Text } = Typography;
  * field returns to it, and once overridden the field is tagged so a reader can see
  * at a glance that this document no longer follows its shipment.
  */
-const PlHeaderEditor = ({ pl, saving, onSave }) => {
+const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
   const [form] = Form.useForm();
   const [dirty, setDirty] = useState(false);
 
@@ -32,6 +32,10 @@ const PlHeaderEditor = ({ pl, saving, onSave }) => {
 
   // No reset effect: the parent keys this on the document's version, so any save —
   // here, a refresh, a revision — remounts it with the stored values.
+
+  // Lifted so the workspace's Exit can warn before discarding an edit. Reported on
+  // mount too, which is what clears the flag after a save remounts this.
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
   const consigneeOptions = (pl.consigneeOptions || []).map((c) => ({ value: c.id, label: c.name }));
 

@@ -27,7 +27,7 @@ const KIND_COLOUR = { PACKING_LIST: 'green', EXPORT_INVOICE: 'gold', STICKER_RUN
  *
  * Two jobs, deliberately separated. The list answers "what exists for this
  * consignment and is it finished" — the question asked before anything is sent to a
- * buyer or a broker. The print action then produces the approved documents as one
+ * buyer or a broker. The print action then produces the final documents as one
  * job per paper geometry.
  *
  * Why not one file: a packing list is landscape A4 and an invoice is portrait, and
@@ -65,7 +65,7 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
     : []), [fresh]);
 
   /**
-   * Print every approved document, grouped by paper geometry — one job per group,
+   * Print every final document, grouped by paper geometry — one job per group,
    * so each save produces a correctly-sized PDF.
    */
   const printSet = useCallback(async () => {
@@ -164,7 +164,7 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
           <ActionButton action="refresh" text="Refresh" size="small" onClick={load} />
           <ActionButton
             action="print"
-            text="Print approved set"
+            text="Print final set"
             loading={printing}
             disabled={!fresh?.readyToSend}
             onClick={printSet}
@@ -179,7 +179,7 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
           style={{ marginBottom: 16 }}
           title="The set is not complete"
           description={`${fresh.notReady.map((d) => `${d.docNo} (${String(d.status).toLowerCase()})`).join(', ')} ${
-            fresh.notReady.length === 1 ? 'is' : 'are'} not approved, so ${
+            fresh.notReady.length === 1 ? 'is' : 'are'} not final, so ${
             fresh.notReady.length === 1 ? 'it' : 'they'} will not be printed with the set.`}
         />
       )}
@@ -189,7 +189,7 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
           type="success"
           showIcon
           style={{ marginBottom: 16 }}
-          title="Every document on this shipment is approved"
+          title="Every document on this shipment is final"
           description={`${fresh.counts.packingLists} packing list(s), ${fresh.counts.invoices} invoice(s) and ${fresh.counts.stickerRuns} sticker run(s).`}
         />
       )}

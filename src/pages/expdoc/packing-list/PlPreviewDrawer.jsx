@@ -58,8 +58,8 @@ const PlPreviewDrawer = ({ open, pl, exporter, shipment, onClose }) => {
           <Text type="secondary" style={{ fontSize: 12 }}>
             {pl?.template ? `${pl.template.name} v${pl.template.version}` : 'No template'}
           </Text>
-          {!pl?.approvalSnapshot && (
-            <Tooltip title="Anything generated before approval carries a DRAFT watermark (PRD §18).">
+          {!pl?.finalSnapshot && (
+            <Tooltip title="Anything generated before the list is final carries a DRAFT watermark (PRD §18).">
               <Text type="warning" style={{ fontSize: 12 }}>DRAFT</Text>
             </Tooltip>
           )}

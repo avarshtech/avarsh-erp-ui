@@ -113,7 +113,7 @@ const TemplateCompareModal = ({ open, template, onCancel }) => {
         />
         {result && !result.identical && (
           <Text type="secondary" style={{ fontSize: 12 }}>
-            {`${result.changes.length} value(s) differ. Documents approved against v${result.a.version} still render v${result.a.version}.`}
+            {`${result.changes.length} value(s) differ. Documents finalised against v${result.a.version} still render v${result.a.version}.`}
           </Text>
         )}
       </Space>

@@ -83,10 +83,12 @@ export const isPackingEntryEditable = (status) => status === PACKING_ENTRY_STATU
 // ─── Packing list lifecycle (PRD §16) ───────────────────────────────────────────
 // Revise does NOT transition in place: it creates a new DRAFT row and moves the old
 // one to SUPERSEDED, so buyers keep referencing one plNo across revisions (PRD §17).
+// There is no approval step: the person who builds the document finalises it.
+// FINAL is the freeze — it snapshots data and template version, which is what
+// stickers, invoices and reports bind to (BR-08). It is a state, not a verdict.
 export const PL_STATUS = {
   DRAFT: 'DRAFT',
-  SUBMITTED: 'SUBMITTED',
-  APPROVED: 'APPROVED',
+  FINAL: 'FINAL',
   EXPORTED: 'EXPORTED',
   CANCELLED: 'CANCELLED',
   SUPERSEDED: 'SUPERSEDED',
@@ -94,17 +96,15 @@ export const PL_STATUS = {
 
 export const PL_STATUS_LABELS = {
   DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
-  APPROVED: 'Approved',
-  EXPORTED: 'Exported',
+  FINAL: 'Final',
+  EXPORTED: 'Released',
   CANCELLED: 'Cancelled',
   SUPERSEDED: 'Superseded',
 };
 
 export const PL_TRANSITIONS = {
-  DRAFT: ['SUBMITTED'],
-  SUBMITTED: ['APPROVED', 'DRAFT'], // approve, or send back for edits
-  APPROVED: ['EXPORTED', 'CANCELLED', 'SUPERSEDED'],
+  DRAFT: ['FINAL'],
+  FINAL: ['EXPORTED', 'CANCELLED', 'SUPERSEDED'], // to change it, Revise creates a new draft
   EXPORTED: ['CANCELLED', 'SUPERSEDED'],
   CANCELLED: [],
   SUPERSEDED: [],
@@ -112,14 +112,15 @@ export const PL_TRANSITIONS = {
 
 export const isPlEditable = (status) => status === PL_STATUS.DRAFT;
 export const isPlDeletable = (status) => status === PL_STATUS.DRAFT;
-export const isPlApproved = (status) =>
-  status === PL_STATUS.APPROVED || status === PL_STATUS.EXPORTED;
+export const isPlFinal = (status) =>
+  status === PL_STATUS.FINAL || status === PL_STATUS.EXPORTED;
 
 // ─── Export invoice lifecycle ───────────────────────────────────────────────────
+// Same shape as the packing list, and for the same reason: no approver, one
+// finalise by the author. The invoice number is allocated at FINAL.
 export const INVOICE_STATUS = {
   DRAFT: 'DRAFT',
-  SUBMITTED: 'SUBMITTED',
-  APPROVED: 'APPROVED',
+  FINAL: 'FINAL',
   EXPORTED: 'EXPORTED',
   CANCELLED: 'CANCELLED',
   SUPERSEDED: 'SUPERSEDED',
@@ -127,17 +128,15 @@ export const INVOICE_STATUS = {
 
 export const INVOICE_STATUS_LABELS = {
   DRAFT: 'Draft',
-  SUBMITTED: 'Submitted',
-  APPROVED: 'Approved',
-  EXPORTED: 'Exported',
+  FINAL: 'Final',
+  EXPORTED: 'Released',
   CANCELLED: 'Cancelled',
   SUPERSEDED: 'Superseded',
 };
 
 export const INVOICE_TRANSITIONS = {
-  DRAFT: ['SUBMITTED'],
-  SUBMITTED: ['APPROVED', 'DRAFT'],
-  APPROVED: ['EXPORTED', 'CANCELLED', 'SUPERSEDED'],
+  DRAFT: ['FINAL'],
+  FINAL: ['EXPORTED', 'CANCELLED', 'SUPERSEDED'],
   EXPORTED: ['CANCELLED', 'SUPERSEDED'],
   CANCELLED: [],
   SUPERSEDED: [],
@@ -196,9 +195,12 @@ export const labelsPerSheet = (paper) => {
   return spec.cols * spec.rows;
 };
 
-// Sticker face render modes. These three cover every layout in PRD §9.2:
-// STACK (JOMO AMG/SCA, Prénatal), TABLE (Vingino), TEXT_BLOCK (Van Gennip).
-export const FACE_RENDER = { STACK: 'STACK', TABLE: 'TABLE', TEXT_BLOCK: 'TEXT_BLOCK' };
+// Sticker face render modes. These four cover every layout in PRD §9.2: STACK
+// (JOMO AMG, Prénatal), COLON_LIST (JOMO SCA's aligned LABEL : value block),
+// TABLE (Vingino), TEXT_BLOCK (Van Gennip).
+export const FACE_RENDER = {
+  STACK: 'STACK', COLON_LIST: 'COLON_LIST', TABLE: 'TABLE', TEXT_BLOCK: 'TEXT_BLOCK',
+};
 
 // ─── Validation vocabulary (PRD §14) ────────────────────────────────────────────
 export const SEVERITY = { ERROR: 'ERROR', WARN: 'WARN', INFO: 'INFO' };

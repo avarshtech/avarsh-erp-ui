@@ -7,11 +7,11 @@ const { TextArea } = Input;
 
 /**
  * One reason-capture modal for every action in the module that needs a
- * justification — acknowledging a warning, revising an approved document,
+ * justification — acknowledging a warning, revising a final document,
  * cancelling one. Lifted from the Bill Passing workspace, where a single
  * `openReason(cfg)` funnel serves eight actions.
  *
- * The reason is not decoration: PRD §14 puts it in front of the approver and in the
+ * The reason is not decoration: PRD §14 puts it on the document and in the
  * audit trail, so a minimum length is enforced rather than suggested.
  */
 const AckReasonModal = ({
@@ -83,7 +83,7 @@ const AckReasonModal = ({
         value={text}
         autoFocus
         placeholder={placeholder || (minLength > 0
-          ? `At least ${minLength} characters — the approver will read this.`
+          ? `At least ${minLength} characters — it is kept in the audit trail.`
           : 'Optional — recorded against the document either way.')}
         status={touched && tooShort ? 'error' : undefined}
         onChange={(e) => setText(e.target.value)}

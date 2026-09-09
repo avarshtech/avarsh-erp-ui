@@ -3,7 +3,7 @@
  *
  * A template row is IMMUTABLE ONCE PUBLISHED. A new version is a new row sharing the
  * template code, so a document that stored `templateId` keeps rendering exactly the
- * layout it was approved against, however many times the buyer's format later
+ * layout it was finalised against, however many times the buyer's format later
  * changes (§10 opening paragraph, BR-08).
  *
  * The one invariant worth stating out loud: exactly one ACTIVE template per
@@ -295,7 +295,7 @@ export const updateTemplate = async (id, payload = {}) => {
   const t = find(db, id);
   if (!t) fail('NOT_FOUND', `Template ${id} not found`);
   // Published rows are frozen: a document that stored this id must keep rendering
-  // the layout it was approved against.
+  // the layout it was finalised against.
   if (t.status !== TEMPLATE_STATUS.DRAFT) {
     fail('CONFLICT', `v${t.version} is ${t.status.toLowerCase()} and cannot be edited. Start a new version instead.`);
   }
@@ -573,7 +573,7 @@ export const getTemplateSample = async (id) => {
     orderNos: [entry.orderNo].filter(Boolean),
     orderBreakdown: clone(entry.orderBreakdown || []),
     sections: [{ key: 'MAIN', title: 'Main cartons', order: 0, rows }],
-    approvalSnapshot: null,
+    finalSnapshot: null,
     // The template under edit, not the one the document would resolve to — that is
     // what makes this a preview of THIS draft.
     template: clone(t),

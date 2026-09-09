@@ -59,6 +59,7 @@ export const FIELD_CATALOGUE = [
   // the document has not overridden them, so a template binds one path either way.
   { path: 'pl.descriptionOfGoods', label: 'Description of goods', category: 'PL', type: 'string', sample: "MEN'S KNITTED GARMENTS" },
   { path: 'pl.marksAndNos', label: 'Marks & numbers', category: 'PL', type: 'string', sample: '1-48' },
+  { path: 'pl.orderNos', label: 'Order number(s)', category: 'PL', type: 'list', sample: 'SG/26-27/1042' },
   { path: 'pl.remarks', label: 'Document remarks', category: 'PL', type: 'string', sample: 'Loose cartons stowed aft' },
   { path: 'pl.resolved.consignee.block', label: 'Consignee (document)', category: 'PL', type: 'block', sample: 'JOMO BV, Valkenswaard' },
   { path: 'pl.resolved.deliveryCentre', label: 'Delivery centre (document)', category: 'PL', type: 'string', sample: 'DM Karlsruhe' },
@@ -99,6 +100,9 @@ export const FIELD_CATALOGUE = [
   { path: 'carton.netWeightKg', label: 'Carton net weight', category: 'CARTON', type: 'number', decimals: 3, sample: 12.48 },
   { path: 'carton.grossWeightKg', label: 'Carton gross weight', category: 'CARTON', type: 'number', decimals: 3, sample: 13.5 },
   { path: 'carton.dimensions', label: 'Carton measurement', category: 'CARTON', type: 'string', sample: '60 × 40 × 35' },
+  { path: 'carton.sizeText', label: 'Sizes in the carton', category: 'CARTON', type: 'string', sample: 'M / L / XL' },
+  { path: 'carton.articleNo', label: "Buyer's article number", category: 'CARTON', type: 'string', sample: 'ART-99120' },
+  { path: 'carton.destination', label: 'Port of destination', category: 'CARTON', type: 'string', sample: 'Rotterdam' },
   { path: 'carton.cbm', label: 'Carton CBM', category: 'CARTON', type: 'number', decimals: 3, sample: 0.084 },
   { path: 'carton.eanBySize', label: 'EAN by size', category: 'CARTON', type: 'map', sample: '{ M: 8712345678901 }' },
 

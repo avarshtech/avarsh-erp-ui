@@ -271,12 +271,12 @@ const bandFor = (status, hasSnapshot, override) => {
 };
 
 export const buildPackingListHtml = (pl, options = {}) => {
-  const snapshot = pl.approvalSnapshot?.payload;
+  const snapshot = pl.finalSnapshot?.payload;
   const source = snapshot ? { ...pl, ...snapshot } : pl;
   const template = pl.template || {};
   const sizes = source.sizes || [];
   const spec = expandColumns(template, sizes);
-  const band = bandFor(pl.status, Boolean(pl.approvalSnapshot), options.draft);
+  const band = bandFor(pl.status, Boolean(pl.finalSnapshot), options.draft);
   const draft = band === 'DRAFT';
 
   const ctx = {
@@ -311,10 +311,10 @@ export const buildPackingListHtml = (pl, options = {}) => {
     ${wantsSummary ? summaryBlock(source, template) : ''}
     <div class="note">${esc(
     band === 'DRAFT'
-      ? 'DRAFT — not yet approved.'
+      ? 'DRAFT — not yet finalised.'
       : (band
         ? `${band} — this version is no longer valid.`
-        : `Approved ${pl.approvalSnapshot?.at || ''} by ${pl.approvalSnapshot?.by || ''}.`),
+        : `Finalised ${pl.finalSnapshot?.at || ''} by ${pl.finalSnapshot?.by || ''}.`),
   )}</div>`;
 
   return documentShell({
@@ -348,6 +348,15 @@ const STICKER_CSS = `
   .grid td, .grid th { border: 0.8pt solid #000; padding: 0.8mm; font-size: 8pt; text-align: center; }
   .bc { margin-top: 2mm; text-align: center; }
   .face-tag { position: absolute; top: 1mm; right: 2mm; font-size: 6pt; color: #999; letter-spacing: 1pt; }
+  .face-caption { text-align: center; font-weight: 700; letter-spacing: 1pt; margin-bottom: 2mm; }
+  .tsu { display: flex; gap: 2mm; margin-bottom: 2mm; }
+  .tsu svg { width: 7mm; height: 9mm; }
+  /* The colon list: label, colon and value in three columns so every colon lines
+     up down the label however long the labels are. */
+  .clist { display: grid; grid-template-columns: max-content max-content 1fr; column-gap: 2mm; row-gap: 1.2mm; align-items: baseline; }
+  .clist .lbl { font-weight: 700; }
+  .clist .val { font-weight: 400; }
+  .clist .span3 { grid-column: 1 / -1; }
 `;
 
 /** Resolve one configured line against a carton, honouring prefix/suffix/decimals. */
@@ -389,10 +398,24 @@ const barcodeHtml = (face, ctx) => {
 };
 
 /**
+ * The ISO 780 "this way up" mark. Inline SVG rather than an arrow character,
+ * because the glyph a print driver substitutes for one is not predictable.
+ */
+const THIS_SIDE_UP_SVG = `<svg viewBox="0 0 24 32" aria-hidden="true">
+  <path d="M12 2 L21 13 H16 V30 H8 V13 H3 Z" fill="#000" />
+</svg>`;
+
+const faceChrome = (face) => [
+  face.caption ? `<div class="face-caption">${esc(face.caption)}</div>` : '',
+  face.symbol === 'THIS_SIDE_UP' ? `<div class="tsu">${THIS_SIDE_UP_SVG}${THIS_SIDE_UP_SVG}</div>` : '',
+].join('');
+
+/**
  * Render one sticker face.
  *
- * Three modes cover every layout in PRD §9.2:
- *   STACK       label/value rows      (JOMO AMG + SCA, Prénatal)
+ * Four modes cover every layout in PRD §9.2:
+ *   STACK       label/value rows      (JOMO AMG, Prénatal)
+ *   COLON_LIST  LABEL : value, colons aligned in a column (JOMO SCA)
  *   TABLE       bordered key/value    (Vingino)
  *   TEXT_BLOCK  monospace lines       (Van Gennip's nine-line block)
  * A seventh buyer is a template row, not new code.
@@ -402,7 +425,16 @@ export const renderStickerFace = (face, carton, ctx = {}) => {
   const lines = face.lines || [];
 
   let inner;
-  if (face.render === 'TABLE') {
+  if (face.render === 'COLON_LIST') {
+    /*
+     * A labelled row occupies all three columns; an unlabelled one (a shipping-mark
+     * heading, say) spans them, so it starts at the left margin instead of being
+     * pushed into the value column by an empty label.
+     */
+    inner = `<div class="clist">${lines.map((l) => (l.label
+      ? `<span class="lbl" style="${lineStyle(l)}">${esc(l.label)}</span><span class="lbl" style="${lineStyle(l)}">:</span><span class="val" style="${lineStyle(l)}">${esc(lineValue(l, full))}</span>`
+      : `<span class="span3 lbl" style="${lineStyle(l)}">${esc(lineValue(l, full))}</span>`)).join('')}</div>`;
+  } else if (face.render === 'TABLE') {
     inner = `<table class="tbl">${lines.map((l) => `<tr><td class="k">${esc(l.label || '')}</td><td style="${lineStyle(l)}">${esc(lineValue(l, full))}</td></tr>`).join('')}</table>`;
   } else if (face.render === 'TEXT_BLOCK') {
     inner = `<div class="txtblk">${lines
@@ -423,6 +455,7 @@ export const renderStickerFace = (face, carton, ctx = {}) => {
   return `<div class="label${border}" style="position:relative">
     ${face.title ? `<span class="face-tag">${esc(face.title)}</span>` : ''}
     ${logo}
+    ${faceChrome(face)}
     ${inner}
     ${sizeGridHtml(face, carton)}
     ${barcodeHtml(face, full)}
@@ -606,12 +639,12 @@ const ediBlock = (template, exporter) => {
 };
 
 export const buildExportInvoiceHtml = (inv, options = {}) => {
-  const snapshot = inv.approvalSnapshot?.payload;
+  const snapshot = inv.finalSnapshot?.payload;
   const source = snapshot ? { ...inv, ...snapshot } : inv;
   const template = inv.template || {};
   const exporter = options.exporter || {};
   const shipment = options.shipment || {};
-  const band = bandFor(inv.status, Boolean(inv.approvalSnapshot), options.draft);
+  const band = bandFor(inv.status, Boolean(inv.finalSnapshot), options.draft);
   const draft = band === 'DRAFT';
 
   const currency = source.currency || 'USD';
@@ -789,10 +822,10 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
   </table>
   ${annexeHtml}
   <div class="muted" style="margin-top:6px;">${esc(band === 'DRAFT'
-    ? 'DRAFT — not yet approved. This document has no allocated invoice number.'
+    ? 'DRAFT — not yet finalised. This document has no allocated invoice number.'
     : (band
       ? `${band} — this version is no longer valid.`
-      : `Approved ${inv.approvalSnapshot?.at || ''} by ${inv.approvalSnapshot?.by || ''}.`))}</div>`;
+      : `Finalised ${inv.finalSnapshot?.at || ''} by ${inv.finalSnapshot?.by || ''}.`))}</div>`;
 
   return documentShell({
     title: options.fileName || `${source.invoiceNo || source.provisionalNo || 'DRAFT'} — Commercial Invoice`,

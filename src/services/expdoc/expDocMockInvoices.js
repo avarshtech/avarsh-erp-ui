@@ -1,7 +1,7 @@
 /**
  * Export invoice — mock service (PRD §8, §16, §17).
  *
- * The invoice is a projection of one or more APPROVED packing lists. It stores its
+ * The invoice is a projection of one or more FINAL packing lists. It stores its
  * own header, lines, charges and tax block, but never its own quantities of record:
  * `plTotals` is always recomputed from the bound packing lists, so BR-01's promise
  * — that the three documents can never disagree — holds by construction rather than
@@ -22,7 +22,6 @@ import { getBuyerCommercial, getHsDefault, getFxRate, getExporterProfileExtra } 
 import { decoratePl } from './expDocMockPackingLists';
 import { decorate as decorateShipment, syncShipmentStatus } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
-import { getCurrentUser } from '../../utils/permissions';
 import {
   INVOICE_STATUS, INVOICE_TRANSITIONS, PL_STATUS, PHASE, DOC_TYPE,
   DEFAULT_TENANT_CONFIG, LINE_GRAIN,
@@ -35,12 +34,11 @@ import { validate, buildAcknowledgement, acknowledgementApplies } from '../../ut
 import { resolveTemplate } from '../../utils/expDocTemplateSchema';
 
 const LIVE_INVOICE_STATUSES = [
-  INVOICE_STATUS.DRAFT, INVOICE_STATUS.SUBMITTED,
-  INVOICE_STATUS.APPROVED, INVOICE_STATUS.EXPORTED,
+  INVOICE_STATUS.DRAFT, INVOICE_STATUS.FINAL, INVOICE_STATUS.EXPORTED,
 ];
 
-/** Packing lists an invoice may be raised from (§8.1: approved, or already shipped). */
-const INVOICEABLE_PL_STATUSES = [PL_STATUS.APPROVED, PL_STATUS.EXPORTED];
+/** Packing lists an invoice may be raised from (§8.1: final, or already shipped). */
+const INVOICEABLE_PL_STATUSES = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 
@@ -159,31 +157,6 @@ const boundPls = (db, inv) => (inv.packingListRefs || [])
  * the action gates. Recomputing beats persisting because the packing list underneath
  * can change at any time and a stored total would quietly go stale.
  */
-/**
- * The figures a Finance signature covers (§16).
- *
- * Everything the money depends on and nothing that does not: a corrected buyer
- * address must not invalidate a signature, and a changed rate must.
- */
-const financeFigures = (out) => ({
-  currency: out.currency || null,
-  fxRate: Number(out.fxRate) || null,
-  linesTotal: Number(out.totals?.linesTotal) || 0,
-  netTotal: Number(out.totals?.netTotal) || 0,
-  igstValue: Number(out.igst?.igstValue) || 0,
-  charges: (out.lines || []).length,
-  rates: (out.lines || []).map((l) => `${l.seq}:${Number(l.rate) || 0}:${Number(l.quantity) || 0}`).join('|'),
-});
-
-const sameFigures = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-/** Whether the signed-in user holds one of the tenant's Finance roles. */
-const isFinanceUser = (cfg) => {
-  const role = getCurrentUser()?.role;
-  if (!role) return false;
-  return (cfg.financeRoles || []).some((r) => String(r).toLowerCase() === String(role).toLowerCase());
-};
-
 export const decorateInvoice = (inv, db, options = {}) => {
   const out = clone(inv);
   const pls = boundPls(db, inv);
@@ -262,7 +235,7 @@ export const decorateInvoice = (inv, db, options = {}) => {
 
   /*
    * The panel shows the union of the live findings and anything that would block
-   * approval — showing only one lets the panel read "clear" while the button sits
+   * finalising — showing only one lets the panel read "clear" while the button sits
    * disabled with nothing on screen explaining why.
    *
    * Shaped exactly like the packing list's `panelFindings` so one validation panel
@@ -281,61 +254,17 @@ export const decorateInvoice = (inv, db, options = {}) => {
     canProceed: out.submitCheck.canProceed,
   };
 
-  const user = currentUserName();
   out.editable = inv.status === INVOICE_STATUS.DRAFT;
-  out.isOwnDocument = inv.createdBy === user;
-
-  out.canSubmit = out.editable && out.submitCheck.errors.length === 0;
-  out.submitBlockers = out.submitCheck.errors.map((e) => e.message);
 
   /*
-   * §16 / BR-11: the optional Finance sign-off on the financial block.
-   *
-   * The signature records the FIGURES it was given, and stops applying when they
-   * move — the same rule an acknowledgement follows (§14). Without that, re-rating
-   * a line after Finance signed would carry their signature onto numbers they never
-   * saw, which is worse than having no second approval at all.
+   * One gate: the author finalises their own invoice. The APPROVE-phase check is
+   * what runs, because there is no reviewer behind this step to catch anything a
+   * laxer save-phase check would let through.
    */
-  out.financeRequired = cfg.financeApprovalRequired === true;
-  out.financeFigures = financeFigures(out);
-  out.financeSignOffValid = Boolean(inv.financeSignOff)
-    && sameFigures(inv.financeSignOff.figures, out.financeFigures);
-  out.financeSignOffStale = Boolean(inv.financeSignOff) && !out.financeSignOffValid;
-  out.isFinanceUser = isFinanceUser(cfg);
-  out.canSignOffFinancials = out.financeRequired
-    && inv.status === INVOICE_STATUS.SUBMITTED
-    && !out.financeSignOffValid
-    && out.isFinanceUser
-    // The person who raised the figures cannot be the second pair of eyes on them.
-    && !(cfg.fourEyesEnabled && out.isOwnDocument);
+  out.canFinalise = out.editable && out.submitCheck.canProceed;
+  out.finaliseBlockers = out.submitCheck.blocking.map((b) => b.message);
 
-  // BR-11 four-eyes: advisory here, and the API must re-enforce it.
-  const fourEyesBlocks = cfg.fourEyesEnabled && out.isOwnDocument;
-  const financeBlocks = out.financeRequired && !out.financeSignOffValid;
-  out.canApprove = inv.status === INVOICE_STATUS.SUBMITTED
-    && out.submitCheck.canProceed && !fourEyesBlocks && !financeBlocks;
-  out.approveBlockedReason = inv.status !== INVOICE_STATUS.SUBMITTED
-    ? null
-    : (fourEyesBlocks
-      ? 'You created this invoice. A second person must approve it.'
-      : (financeBlocks
-        ? (out.financeSignOffStale
-          ? 'The financial block changed after Finance signed it off. It needs signing again.'
-          : 'Finance has not signed off the financial block yet.')
-        : (out.submitCheck.blocking.length
-          ? `${out.submitCheck.blocking.length} issue(s) must be resolved or acknowledged first.`
-          : null)));
-
-  /*
-   * The submitter takes their own submission back (§16) — not the reviewer's
-   * send-back. Closed once Finance has signed, because by then somebody has acted
-   * on it and withdrawing that signature is its own recorded decision.
-   */
-  out.canRecall = inv.status === INVOICE_STATUS.SUBMITTED
-    && (inv.submittedBy || inv.createdBy) === user
-    && !out.financeSignOffValid;
-
-  out.canRevise = [INVOICE_STATUS.APPROVED, INVOICE_STATUS.EXPORTED].includes(inv.status)
+  out.canRevise = [INVOICE_STATUS.FINAL, INVOICE_STATUS.EXPORTED].includes(inv.status)
     && !inv.supersededByInvoiceId;
   out.canRegenerate = out.editable && pls.length > 0;
   return out;
@@ -394,7 +323,7 @@ export const listInvoiceablePls = async (params = {}) => {
       const decorated = decoratePl(pl, db);
       let reason = null;
       if (!INVOICEABLE_PL_STATUSES.includes(pl.status)) {
-        reason = `Only an approved packing list can be invoiced (this one is ${pl.status.toLowerCase()}).`;
+        reason = `Only a final packing list can be invoiced (this one is ${pl.status.toLowerCase()}).`;
       } else if (existing.length && !commercial.allowMultiInvoicePerPl) {
         reason = `Already on ${existing.map((e) => e.invoiceNo || 'a draft invoice').join(', ')}.`;
       }
@@ -430,7 +359,7 @@ export const createInvoice = async (payload = {}) => {
     const pl = (db.packingLists || []).find((p) => p.id === id);
     if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
     if (!INVOICEABLE_PL_STATUSES.includes(pl.status)) {
-      fail('CONFLICT', `${pl.plNo} is ${pl.status.toLowerCase()} — only an approved packing list can be invoiced.`);
+      fail('CONFLICT', `${pl.plNo} is ${pl.status.toLowerCase()} — only a final packing list can be invoiced.`);
     }
     return decoratePl(pl, db);
   });
@@ -460,7 +389,7 @@ export const createInvoice = async (payload = {}) => {
   const id = Math.max(0, ...(db.invoices || []).map((i) => i.id)) + 1;
   const record = {
     id,
-    // BR-02: no number until approval, so the approved series stays gapless.
+    // BR-02: no number until it is finalised, so the issued series stays gapless.
     invoiceNo: null,
     provisionalNo: `DRAFT-${String(id).padStart(4, '0')}`,
     revision: 0,
@@ -525,7 +454,7 @@ export const createInvoice = async (payload = {}) => {
     lines: generateLines(db, pls, template),
     annexes: generateAnnexes(db, pls, template),
     acknowledgements: [],
-    approvalSnapshot: null,
+    finalSnapshot: null,
 
     version: 0,
     createdAt: nowStamp(),
@@ -710,7 +639,7 @@ export const acknowledgeInvoiceWarning = async (id, targetKey, reason) => {
   return decorateInvoice(row, db);
 };
 
-/** Release the invoice's files (§16 Approved -> Exported, §20 "export" event). */
+/** Release the invoice's files (§16 Final -> Released, §20 "export" event). */
 export const markInvoiceExported = async (id, options = {}) => {
   await delay();
   const db = loadDb();
@@ -750,30 +679,12 @@ export const changeInvoiceStatus = async (id, next, options = {}) => {
   }
 
   const decorated = decorateInvoice(row, db, { phase: PHASE.INVOICE_APPROVE });
-  const cfg = { ...DEFAULT_TENANT_CONFIG, ...(db.masters?.tenantConfig || {}) };
 
-  if (next === INVOICE_STATUS.SUBMITTED && decorated.submitCheck.errors.length) {
-    fail('CONFLICT', decorated.submitCheck.errors[0].message);
-  }
-
-  if (next === INVOICE_STATUS.APPROVED) {
+  if (next === INVOICE_STATUS.FINAL) {
     if (decorated.submitCheck.blocking.length) fail('CONFLICT', decorated.submitCheck.blocking[0].message);
-    // BR-11. Deliberately NOT bypassable through an option: a flag the caller can
-    // set is not a control. The API phase must re-enforce this server-side, since
-    // everything here runs in the browser.
-    if (cfg.fourEyesEnabled && row.createdBy === currentUserName()) {
-      fail('CONFLICT', 'You created this invoice. A second person must approve it.');
-    }
-    // §16: the optional second approval. Enforced here rather than only surfaced,
-    // because a gate the service does not hold is a label, not a control.
-    if (cfg.financeApprovalRequired === true && !decorated.financeSignOffValid) {
-      fail('CONFLICT', decorated.financeSignOffStale
-        ? 'The financial block changed after Finance signed it off. It must be signed again before approval.'
-        : 'Finance has not signed off the financial block. It cannot be approved yet.');
-    }
     /*
-     * BR-02 / §24: the series of the APPROVAL date applies, which is why the number
-     * is allocated here and not at create — a March draft approved in April belongs
+     * BR-02 / §24: the series of the FINALISE date applies, which is why the number
+     * is allocated here and not at create — a March draft finalised in April belongs
      * to the new financial year.
      *
      * A REVISION already carries its number with an -R suffix (§17), and allocating
@@ -781,11 +692,11 @@ export const changeInvoiceStatus = async (id, next, options = {}) => {
      * gapless. So a number is taken only when there is not one already.
      */
     if (!row.invoiceNo) row.invoiceNo = nextInvoiceNo(db);
-    // §8.1 makes the date editable before approval, so a date the user set is kept;
-    // approval only fills one in when nobody did.
+    // §8.1 makes the date editable while the invoice is a draft, so a date the user
+    // set is kept; finalising only fills one in when nobody did.
     row.invoiceDate = options.invoiceDate || row.invoiceDate || todayStr();
     // BR-08: the document is frozen, and every later print renders from this.
-    row.approvalSnapshot = {
+    row.finalSnapshot = {
       at: nowStamp(),
       by: currentUserName(),
       templateId: row.templateId,
@@ -812,11 +723,6 @@ export const changeInvoiceStatus = async (id, next, options = {}) => {
     // §8.1: a cancelled invoice keeps its number. Nothing reuses it.
   }
 
-  if (next === INVOICE_STATUS.SUBMITTED) {
-    row.submittedBy = currentUserName();
-    row.submittedAt = nowStamp();
-  }
-
   const from = row.status;
   row.status = next;
   row.version += 1;
@@ -827,27 +733,16 @@ export const changeInvoiceStatus = async (id, next, options = {}) => {
     entityId: row.id,
     entityNo: row.invoiceNo || row.provisionalNo,
     action: `Status ${from} to ${next}`,
-    details: next === INVOICE_STATUS.APPROVED ? `Number allocated: ${row.invoiceNo}` : null,
+    details: next === INVOICE_STATUS.FINAL ? `Number allocated: ${row.invoiceNo}` : null,
     reason: options.reason || null,
   });
 
-  // §23: the invoice's own events. Submission goes to Finance, because the
-  // financial block is what they are being asked to look at.
+  // §23: the invoice's own events.
   const NOTE = {
-    [INVOICE_STATUS.SUBMITTED]: {
-      type: NOTIF.INVOICE_SUBMITTED,
-      title: `${row.provisionalNo || row.invoiceNo} is waiting for approval`,
-      body: `${currentUserName()} submitted ${decorated.currency} ${Number(decorated.totals?.netTotal || 0).toFixed(2)} for ${row.buyerName || 'this buyer'}.`,
-    },
-    [INVOICE_STATUS.APPROVED]: {
-      type: NOTIF.INVOICE_APPROVED,
-      title: `${row.invoiceNo} approved`,
-      body: `Number allocated on approval. ${row.buyerName || ''}`.trim(),
-    },
-    [INVOICE_STATUS.DRAFT]: {
-      type: NOTIF.INVOICE_SENT_BACK,
-      title: `${row.provisionalNo || row.invoiceNo} was sent back`,
-      body: options.reason || 'Returned to draft for changes.',
+    [INVOICE_STATUS.FINAL]: {
+      type: NOTIF.INVOICE_FINALISED,
+      title: `${row.invoiceNo} is final`,
+      body: `${currentUserName()} finalised ${decorated.currency} ${Number(decorated.totals?.netTotal || 0).toFixed(2)} for ${row.buyerName || 'this buyer'}. Number allocated on finalising.`,
     },
   }[next];
   if (NOTE) {
@@ -863,9 +758,9 @@ export const changeInvoiceStatus = async (id, next, options = {}) => {
 };
 
 /**
- * §17: revise an approved invoice.
+ * §17: revise a final invoice.
  *
- * The default keeps the number and adds an R-suffix, so the approved series stays
+ * The default keeps the number and adds an R-suffix, so the issued series stays
  * gapless (BR-02) and the buyer keeps referencing the number they already have. The
  * old row becomes SUPERSEDED and stays viewable.
  */
@@ -874,8 +769,8 @@ export const reviseInvoice = async (id, reason) => {
   const db = loadDb();
   const row = (db.invoices || []).find((i) => i.id === Number(id));
   if (!row) fail('NOT_FOUND', `Invoice ${id} not found`);
-  if (![INVOICE_STATUS.APPROVED, INVOICE_STATUS.EXPORTED].includes(row.status)) {
-    fail('CONFLICT', 'Only an approved invoice can be revised.');
+  if (![INVOICE_STATUS.FINAL, INVOICE_STATUS.EXPORTED].includes(row.status)) {
+    fail('CONFLICT', 'Only a final or released invoice can be revised.');
   }
   if (!reason || String(reason).trim().length < 10) fail('VALIDATION', 'A revision reason of at least 10 characters is required.');
 
@@ -896,7 +791,7 @@ export const reviseInvoice = async (id, reason) => {
     status: INVOICE_STATUS.DRAFT,
     supersedesInvoiceId: row.id,
     supersededByInvoiceId: null,
-    approvalSnapshot: null,
+    finalSnapshot: null,
     reviseReason: String(reason).trim(),
     version: 0,
     createdAt: nowStamp(),
@@ -938,107 +833,4 @@ export const deleteInvoice = async (id) => {
   return { id: row.id };
 };
 
-/**
- * Finance signs off the financial block (§16 / BR-11).
- *
- * Not a status of its own: a second signature ON the figures, stored with the
- * figures it saw. Re-rating a line afterwards leaves the signature stale rather
- * than silently valid, and approval is refused until it is signed again.
- */
-export const signOffInvoiceFinancials = async (id, options = {}) => {
-  await delay();
-  const db = loadDb();
-  const row = (db.invoices || []).find((i) => i.id === Number(id));
-  if (!row) fail('NOT_FOUND', `Invoice ${id} not found`);
-  const cfg = { ...DEFAULT_TENANT_CONFIG, ...(db.masters?.tenantConfig || {}) };
-  if (cfg.financeApprovalRequired !== true) {
-    fail('CONFLICT', 'Finance sign-off is not enabled for this tenant.');
-  }
-  if (row.status !== INVOICE_STATUS.SUBMITTED) {
-    fail('CONFLICT', 'Only a submitted invoice can have its financial block signed off.');
-  }
-  if (options.version != null && Number(options.version) !== Number(row.version)) {
-    failConflict(row.invoiceNo || row.provisionalNo, options.version, row.version);
-  }
-  if (!isFinanceUser(cfg)) {
-    fail('CONFLICT', `Signing off the financial block needs one of these roles: ${(cfg.financeRoles || []).join(', ')}.`);
-  }
-  const user = currentUserName();
-  if (cfg.fourEyesEnabled && row.createdBy === user) {
-    fail('CONFLICT', 'You raised these figures. A second person must sign them off.');
-  }
 
-  const decorated = decorateInvoice(row, db);
-  row.financeSignOff = {
-    by: user,
-    at: nowStamp(),
-    note: options.note ? String(options.note).trim() : null,
-    figures: decorated.financeFigures,
-  };
-  row.version += 1;
-  pushAudit(db, {
-    entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo || row.provisionalNo,
-    action: 'Financial block signed off by Finance',
-    details: `${decorated.currency} ${Number(decorated.totals?.netTotal || 0).toFixed(2)} at FX ${decorated.fxRate}`,
-    reason: row.financeSignOff.note,
-  });
-  saveDb(db);
-  return decorateInvoice(row, db);
-};
-
-/** Withdraw a sign-off — the signer changed their mind before approval. */
-export const withdrawFinanceSignOff = async (id, reason) => {
-  await delay();
-  const db = loadDb();
-  const row = (db.invoices || []).find((i) => i.id === Number(id));
-  if (!row) fail('NOT_FOUND', `Invoice ${id} not found`);
-  if (!row.financeSignOff) fail('CONFLICT', 'This invoice has no Finance sign-off.');
-  if (row.status !== INVOICE_STATUS.SUBMITTED) {
-    fail('CONFLICT', 'A sign-off can only be withdrawn while the invoice is awaiting approval.');
-  }
-  if (!reason || String(reason).trim().length < 10) {
-    fail('VALIDATION', 'Withdrawing a sign-off needs a reason of at least 10 characters.');
-  }
-  const was = row.financeSignOff;
-  row.financeSignOff = null;
-  row.version += 1;
-  pushAudit(db, {
-    entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo || row.provisionalNo,
-    action: 'Finance sign-off withdrawn',
-    details: `Signed by ${was.by} on ${was.at}`,
-    reason: String(reason).trim(),
-  });
-  saveDb(db);
-  return decorateInvoice(row, db);
-};
-
-/** The submitter takes their own invoice back before anyone has acted on it (§16). */
-export const recallInvoice = async (id, reason) => {
-  await delay();
-  const db = loadDb();
-  const row = (db.invoices || []).find((i) => i.id === Number(id));
-  if (!row) fail('NOT_FOUND', `Invoice ${id} not found`);
-  if (row.status !== INVOICE_STATUS.SUBMITTED) {
-    fail('CONFLICT', 'Only an invoice awaiting approval can be recalled.');
-  }
-  const user = currentUserName();
-  if ((row.submittedBy || row.createdBy) !== user) {
-    fail('CONFLICT', `Only ${row.submittedBy || row.createdBy} can recall this submission. An approver can send it back instead.`);
-  }
-  if (decorateInvoice(row, db).financeSignOffValid) {
-    fail('CONFLICT', 'Finance has already signed off these figures. Ask them to withdraw the sign-off first.');
-  }
-  row.status = INVOICE_STATUS.DRAFT;
-  row.submittedBy = null;
-  row.submittedAt = null;
-  row.version += 1;
-  row.updatedAt = nowStamp();
-  row.updatedBy = user;
-  pushAudit(db, {
-    entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo || row.provisionalNo,
-    action: 'Submission recalled by its author',
-    reason: reason ? String(reason).trim() : null,
-  });
-  saveDb(db);
-  return decorateInvoice(row, db);
-};

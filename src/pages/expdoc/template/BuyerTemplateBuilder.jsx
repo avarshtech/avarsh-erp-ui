@@ -159,7 +159,7 @@ const BuyerTemplateBuilder = () => {
               disabled={dirty}
               onClick={() => modal.confirm({
                 title: `Publish ${working.templateCode} v${working.version}?`,
-                content: 'Every new document for this buyer will use it. The previous active version is retired in the same step, and documents already approved keep the version they were built on.',
+                content: 'Every new document for this buyer will use it. The previous active version is retired in the same step, and documents already finalised keep the version they were built on.',
                 okText: 'Publish',
                 onOk: () => run(() => publishTemplate(working.id), 'Published'),
               })}

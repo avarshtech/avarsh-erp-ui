@@ -86,7 +86,7 @@ const OrderPackingSummaryCard = ({ orderNo }) => {
           <Tooltip title="Packed on any live packing list, including drafts.">
             <Text type="secondary">{`Packed ${int(summary.packed)}`}</Text>
           </Tooltip>
-          <Tooltip title="Packed on an APPROVED packing list — a draft can still change.">
+          <Tooltip title="Packed on a FINAL packing list — a draft can still change.">
             <Text strong>{`Shipped ${int(summary.shipped)}`}</Text>
           </Tooltip>
         </Space>

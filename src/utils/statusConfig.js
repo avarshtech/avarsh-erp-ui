@@ -160,8 +160,7 @@ export const PACKING_ENTRY_STATUS_CONFIG = {
 
 export const PL_STATUS_CONFIG = {
   [PL_STATUS.DRAFT]:      { color: 'default',    icon: FileTextOutlined },
-  [PL_STATUS.SUBMITTED]:  { color: 'processing', icon: SendOutlined },
-  [PL_STATUS.APPROVED]:   { color: 'green',      icon: CheckCircleOutlined },
+  [PL_STATUS.FINAL]:      { color: 'green',      icon: CheckCircleOutlined },
   [PL_STATUS.EXPORTED]:   { color: 'cyan',       icon: SafetyCertificateOutlined },
   [PL_STATUS.CANCELLED]:  { color: 'volcano',    icon: StopOutlined },
   [PL_STATUS.SUPERSEDED]: { color: 'default',    icon: SwapOutlined },
@@ -169,8 +168,7 @@ export const PL_STATUS_CONFIG = {
 
 export const EXPORT_INVOICE_STATUS_CONFIG = {
   [INVOICE_STATUS.DRAFT]:      { color: 'default',    icon: FileTextOutlined },
-  [INVOICE_STATUS.SUBMITTED]:  { color: 'processing', icon: SendOutlined },
-  [INVOICE_STATUS.APPROVED]:   { color: 'green',      icon: CheckCircleOutlined },
+  [INVOICE_STATUS.FINAL]:      { color: 'green',      icon: CheckCircleOutlined },
   [INVOICE_STATUS.EXPORTED]:   { color: 'cyan',       icon: SafetyCertificateOutlined },
   [INVOICE_STATUS.CANCELLED]:  { color: 'volcano',    icon: StopOutlined },
   [INVOICE_STATUS.SUPERSEDED]: { color: 'default',    icon: SwapOutlined },
@@ -195,8 +193,8 @@ export const PRODUCTION_PO_STATUS_FLOW = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED
 export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISPATCHED', 'FEEDBACK_RECEIVED'];
 // Export documents share one happy path. CANCELLED and SUPERSEDED are outcomes, not
 // steps, so they stay off the flow and show as a status tag instead.
-export const PL_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'APPROVED', 'EXPORTED'];
-export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'APPROVED', 'EXPORTED'];
+export const PL_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
+export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

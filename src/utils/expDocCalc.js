@@ -459,6 +459,29 @@ export const formatRanges = (ranges) =>
 // ─── Carton expansion ───────────────────────────────────────────────────────────
 // The ONLY place individual cartons are materialised, and only for one scope.
 
+/**
+ * The sizes actually inside one carton, for the layouts that print a SIZE line.
+ *
+ * Derived from `sizeQtyPerCarton`, so a ratio pack and a mixed carton report the
+ * sizes they really hold rather than the sizes the order happened to mention.
+ */
+const sizeTextOf = (row) => {
+  const sizes = Object.entries(sizeQtyPerCarton(row))
+    .filter(([, q]) => num(q) > 0)
+    .map(([size]) => size);
+  return sizes.length ? sizes.join(' / ') : null;
+};
+
+/**
+ * The buyer's article number(s) in one carton. `articleNos` is keyed by size, so an
+ * assorted carton can legitimately carry several and a solid one carries a single.
+ */
+const articleNoOf = (row) => {
+  const map = row?.articleNos || {};
+  const nos = [...new Set(Object.keys(sizeQtyPerCarton(row)).map((s) => map[s]).filter(Boolean))];
+  return nos.length ? nos.join(', ') : null;
+};
+
 const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   cartonNo,
   ordinal,
@@ -476,6 +499,7 @@ const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   colorName: row.colorName ?? null,
   mixedRows: row.mixedRows ?? null,
   sizeQty: sizeQtyPerCarton(row),
+  sizeText: sizeTextOf(row),
   ratio: row.ratio ?? null,
   assortmentsPerCarton: row.assortmentsPerCarton ?? null,
   // The master-polybag structure a Prenatal layout prints, alongside the ratio one.
@@ -491,6 +515,7 @@ const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   dimensions: dimensionsLabel(row),
   cbm: cbmPerCarton(row, cfg),
   articleNos: row.articleNos ?? null,
+  articleNo: articleNoOf(row),
   eanBySize: row.eanBySize ?? null,
 });
 

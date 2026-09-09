@@ -18,15 +18,11 @@ import { EXPDOC_PREFIX, SERIES_WARN_AT, seriesHeadroom, LAST_DOC_NUMBER } from '
 
 /** The §23 event catalogue. Types are namespaced so they cannot collide with the API's. */
 export const EXPDOC_NOTIFICATION = {
-  PL_SUBMITTED: 'EXPDOC_PL_SUBMITTED',
-  PL_APPROVED: 'EXPDOC_PL_APPROVED',
-  PL_SENT_BACK: 'EXPDOC_PL_SENT_BACK',
+  PL_FINALISED: 'EXPDOC_PL_FINALISED',
   PL_CANCELLED: 'EXPDOC_PL_CANCELLED',
   PL_REVISED: 'EXPDOC_PL_REVISED',
   DOC_RELEASED: 'EXPDOC_DOC_RELEASED',
-  INVOICE_SUBMITTED: 'EXPDOC_INVOICE_SUBMITTED',
-  INVOICE_APPROVED: 'EXPDOC_INVOICE_APPROVED',
-  INVOICE_SENT_BACK: 'EXPDOC_INVOICE_SENT_BACK',
+  INVOICE_FINALISED: 'EXPDOC_INVOICE_FINALISED',
   SOURCE_STALE: 'EXPDOC_SOURCE_STALE',
   SERIES_EXHAUSTED: 'EXPDOC_SERIES_EXHAUSTED',
   ETD_APPROACHING: 'EXPDOC_ETD_APPROACHING',
@@ -34,15 +30,11 @@ export const EXPDOC_NOTIFICATION = {
 
 /** Who each event is addressed to (§23), recorded on the row for the API phase. */
 const AUDIENCE = {
-  [EXPDOC_NOTIFICATION.PL_SUBMITTED]: 'Documentation Manager',
-  [EXPDOC_NOTIFICATION.PL_APPROVED]: 'Documentation Executive',
-  [EXPDOC_NOTIFICATION.PL_SENT_BACK]: 'Documentation Executive',
+  [EXPDOC_NOTIFICATION.PL_FINALISED]: 'Documentation Executive',
   [EXPDOC_NOTIFICATION.PL_CANCELLED]: 'Documentation Executive',
   [EXPDOC_NOTIFICATION.PL_REVISED]: 'Documentation Manager',
   [EXPDOC_NOTIFICATION.DOC_RELEASED]: 'Documentation Executive',
-  [EXPDOC_NOTIFICATION.INVOICE_SUBMITTED]: 'Finance',
-  [EXPDOC_NOTIFICATION.INVOICE_APPROVED]: 'Documentation Executive',
-  [EXPDOC_NOTIFICATION.INVOICE_SENT_BACK]: 'Documentation Executive',
+  [EXPDOC_NOTIFICATION.INVOICE_FINALISED]: 'Documentation Executive',
   [EXPDOC_NOTIFICATION.SOURCE_STALE]: 'Documentation Executive',
   [EXPDOC_NOTIFICATION.SERIES_EXHAUSTED]: 'Template Admin',
   [EXPDOC_NOTIFICATION.ETD_APPROACHING]: 'Documentation Manager',
@@ -116,13 +108,13 @@ const evaluateConditions = (db) => {
       const days = daysTo(s.etd);
       if (days < 0 || days > 7) return;
       const docs = (db.packingLists || []).filter((p) => p.shipmentId === s.id);
-      const unapproved = docs.filter((p) => ['DRAFT', 'SUBMITTED'].includes(p.status));
+      const unfinished = docs.filter((p) => p.status === 'DRAFT');
       if (!docs.length && days > 3) return;
       note({
         type: EXPDOC_NOTIFICATION.ETD_APPROACHING,
         title: `${s.shipmentNo} sails in ${days} day${days === 1 ? '' : 's'}`,
         body: docs.length
-          ? `${unapproved.length} of ${docs.length} document(s) are still unapproved.`
+          ? `${unfinished.length} of ${docs.length} document(s) are still in draft.`
           : 'No packing list has been raised for this shipment yet.',
         actionUrl: `/export-docs/shipments/edit/${s.id}`,
         entityType: 'SHIPMENT', entityId: s.id, entityNo: s.shipmentNo,
@@ -131,7 +123,7 @@ const evaluateConditions = (db) => {
     });
 
   // §15: a series that is about to run out is an administrator's problem, and they
-  // need to hear about it before the approval that would hit the wall.
+  // need to hear about it before the document that would hit the wall.
   Object.values(EXPDOC_PREFIX).forEach((prefix) => {
     const h = seriesHeadroom(db, prefix);
     if (h.next <= SERIES_WARN_AT) return;

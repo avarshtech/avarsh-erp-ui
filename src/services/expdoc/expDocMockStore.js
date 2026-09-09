@@ -71,7 +71,7 @@ export const nextShipmentNo = (db) => nextDocNo(db, EXPDOC_PREFIX.SHIPMENT);
 export const nextPackingListNo = (db) => nextDocNo(db, EXPDOC_PREFIX.PACKING_LIST);
 
 /**
- * Export invoice, e.g. EXP/26-27/1001. Assigned ON APPROVAL ONLY so the
+ * Export invoice, e.g. EXP/26-27/1001. Assigned ON FINALISE ONLY so the
  * buyer-facing series never gains gaps from abandoned drafts (PRD BR-02); a
  * cancelled invoice keeps its number. `series` comes from the buyer template.
  */

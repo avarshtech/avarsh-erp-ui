@@ -31,7 +31,7 @@ const label = (field) => {
 /**
  * Compare two revisions of a packing list (§17).
  *
- * Any two, not only consecutive ones — the question an approver asks is "what
+ * Any two, not only consecutive ones — the question a reader asks is "what
  * changed since the revision the buyer signed off", which may be several back.
  *
  * The diff is over ROWS, never cartons. A revised 40,000-carton shipment is still a
@@ -65,7 +65,7 @@ const PlCompareModal = ({ open, pl, onCancel }) => {
 
   const options = revisions.map((r) => ({
     value: r.id,
-    label: `R${r.revision} — ${String(r.status).toLowerCase()}${r.approvedAt ? ` · approved ${r.approvedAt}` : ''}`,
+    label: `R${r.revision} — ${String(r.status).toLowerCase()}${r.finalisedAt ? ` · final ${r.finalisedAt}` : ''}`,
   }));
 
   // One flat table: header fields, then row changes, then added and removed rows.
@@ -112,7 +112,7 @@ const PlCompareModal = ({ open, pl, onCancel }) => {
           <Alert type="success" showIcon title="These two revisions are identical" description="No header field, carton row or total differs." />
         )}
 
-        {/* Totals first: an approver checks whether the shipment itself moved before
+        {/* Totals first: a reader checks whether the shipment itself moved before
             reading which row moved it. */}
         {result?.totals?.length > 0 && (
           <Space size={24} wrap>

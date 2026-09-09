@@ -125,7 +125,7 @@ const ExportDocReports = () => {
           type="error"
           showIcon
           style={{ marginBottom: 16 }}
-          title="The approved invoice series has gaps"
+          title="The issued invoice series has gaps"
           description={meta.gaps
             .map((g) => `${g.fy}: ${g.missing} number(s) missing between ${g.after} and ${g.before}`)
             .join(' · ')}
@@ -136,7 +136,7 @@ const ExportDocReports = () => {
           type="success"
           showIcon
           style={{ marginBottom: 16 }}
-          title="The approved series is gapless"
+          title="The issued series is gapless"
           description="Every allocated number is present and in sequence."
         />
       )}

@@ -69,7 +69,7 @@ const StickerConsole = () => {
             <Tag color="gold">Draft — override needed</Tag>
           </Tooltip>
         )
-        : <Tag color={[PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(s) ? 'green' : 'default'}>{s}</Tag>),
+        : <Tag color={[PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(s) ? 'green' : 'default'}>{s}</Tag>),
     },
     {
       title: '', key: 'go', width: 130, fixed: 'right',

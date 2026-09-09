@@ -54,8 +54,8 @@ const InvPreviewDrawer = ({ open, inv, exporter, shipment, onClose }) => {
           <Text type="secondary" style={{ fontSize: 12 }}>
             {inv?.template ? `${inv.template.name} v${inv.template.version}` : 'No template'}
           </Text>
-          {!inv?.approvalSnapshot && (
-            <Tooltip title="Anything generated before approval carries a DRAFT watermark and no allocated number (§18).">
+          {!inv?.finalSnapshot && (
+            <Tooltip title="Anything generated before the invoice is final carries a DRAFT watermark and no allocated number (§18).">
               <Tag color="gold">DRAFT</Tag>
             </Tooltip>
           )}

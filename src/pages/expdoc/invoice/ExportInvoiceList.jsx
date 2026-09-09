@@ -81,8 +81,8 @@ const ExportInvoiceList = () => {
   // worse than no figure at all.
   const kpis = useMemo(() => ({
     drafts: rows.filter((r) => r.status === INVOICE_STATUS.DRAFT).length,
-    submitted: rows.filter((r) => r.status === INVOICE_STATUS.SUBMITTED).length,
-    approved: rows.filter((r) => [INVOICE_STATUS.APPROVED, INVOICE_STATUS.EXPORTED].includes(r.status)).length,
+    final: rows.filter((r) => r.status === INVOICE_STATUS.FINAL).length,
+    released: rows.filter((r) => r.status === INVOICE_STATUS.EXPORTED).length,
     stale: rows.filter((r) => r.isStale).length,
   }), [rows]);
 
@@ -99,15 +99,15 @@ const ExportInvoiceList = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Export Invoices"
-        subtitle="Commercial invoices raised from approved packing lists — quantities, weights and marks flow across untouched"
+        subtitle="Commercial invoices raised from final packing lists — quantities, weights and marks flow across untouched"
         onAdd={canAdd ? () => setCreateOpen(true) : undefined}
         addLabel="New Invoice"
       />
 
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><StatCard title="Drafts (this page)" value={kpis.drafts} icon={<FileTextOutlined />} color="var(--info-color)" /></Col>
-        <Col xs={12} md={6}><StatCard title="Awaiting approval (this page)" value={kpis.submitted} icon={<SendOutlined />} color="var(--accent-color)" /></Col>
-        <Col xs={12} md={6}><StatCard title="Approved (this page)" value={kpis.approved} icon={<CheckCircleOutlined />} color="var(--success-color)" /></Col>
+        <Col xs={12} md={6}><StatCard title="Final (this page)" value={kpis.final} icon={<CheckCircleOutlined />} color="var(--success-color)" /></Col>
+        <Col xs={12} md={6}><StatCard title="Released (this page)" value={kpis.released} icon={<SendOutlined />} color="var(--accent-color)" /></Col>
         <Col xs={12} md={6}><StatCard title="Built on a changed PL (this page)" value={kpis.stale} icon={<WarningOutlined />} color="var(--warning-color)" /></Col>
       </Row>
 
@@ -133,7 +133,7 @@ const ExportInvoiceList = () => {
             emptyText: (
               <EmptyState
                 title="No export invoices yet"
-                description="Approve a packing list, then raise its invoice — lines, totals and marks come across without retyping."
+                description="Finalise a packing list, then raise its invoice — lines, totals and marks come across without retyping."
                 actionLabel={canAdd ? 'New Invoice' : undefined}
                 onAction={canAdd ? () => setCreateOpen(true) : undefined}
                 showAction={canAdd}

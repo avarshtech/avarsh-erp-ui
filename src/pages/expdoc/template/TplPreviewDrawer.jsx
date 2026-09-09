@@ -38,7 +38,15 @@ const TplPreviewDrawer = ({ open, sample, exporter, onClose }) => {
         layout: tpl.stickerLayout,
         paper: tpl.stickerLayout.paperDefault,
         draft: true,
-        ctx: { exporter: ctxExporter, shipment, showLogo: tpl.identity?.showLogo === true },
+        // `pl` is in the context because a sticker layout may bind document-level
+        // fields (the order number, say) alongside carton ones.
+        ctx: {
+          exporter: ctxExporter,
+          shipment,
+          pl: sample.pl,
+          buyer: { name: sample.pl.buyerName, subClient: sample.pl.subClientCode },
+          showLogo: tpl.identity?.showLogo === true,
+        },
       });
     }
 
@@ -91,7 +99,7 @@ const TplPreviewDrawer = ({ open, sample, exporter, onClose }) => {
         igstValue: 41234.38, totalTaxableInr: 865921.88,
       },
       plTotals: { cartons: 61, pieces: 1000, netWeightKg: 700.5, grossWeightKg: 760.25, cbm: 5.124 },
-      approvalSnapshot: null,
+      finalSnapshot: null,
       template: tpl,
     }, { exporter: ctxExporter, shipment, draft: true });
   }, [sample, exporter]);

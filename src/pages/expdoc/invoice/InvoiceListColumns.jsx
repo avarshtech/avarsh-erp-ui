@@ -24,7 +24,7 @@ export const buildInvoiceColumns = ({ onView, onDelete, canDelete }) => [
       <Space size={4} wrap={false}>
         <RecordLink text={text || record.provisionalNo} onClick={() => onView(record)} />
         {/* A draft has no number yet (BR-02) and must not look as though it does. */}
-        {!text && <Tooltip title="A number is allocated at approval, so the approved series stays gapless."><Tag>provisional</Tag></Tooltip>}
+        {!text && <Tooltip title="A number is allocated when the invoice is finalised, so the issued series stays gapless."><Tag>provisional</Tag></Tooltip>}
         {record.revision > 0 && (
           <Tooltip title={`Revision ${record.revision}`}><Tag color="orange">R{record.revision}</Tag></Tooltip>
         )}
@@ -85,7 +85,7 @@ export const buildInvoiceColumns = ({ onView, onDelete, canDelete }) => [
       <Space size={4} wrap>
         <StatusTag status={status} config={EXPORT_INVOICE_STATUS_CONFIG} labels={INVOICE_STATUS_LABELS} />
         {record.isStale && (
-          <Tooltip title="A packing list under this invoice has changed since the lines were generated. Regenerate before approving.">
+          <Tooltip title="A packing list under this invoice has changed since the lines were generated. Regenerate before finalising.">
             <Tag color="gold">stale</Tag>
           </Tooltip>
         )}

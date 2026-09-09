@@ -17,7 +17,7 @@ const TONE = {
  * The validation panel — the single place a user sees what is wrong with a document.
  *
  * Errors block. Warnings block only until someone with edit rights records a reason,
- * and that reason travels to the approval screen and the audit trail, which is why
+ * and that reason travels onto the document and the audit trail, which is why
  * acknowledged findings stay visible rather than disappearing (PRD §14).
  */
 const PlValidationPanel = ({ validation, canAcknowledge, onAcknowledge, onNavigateTarget }) => {

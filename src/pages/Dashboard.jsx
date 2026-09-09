@@ -66,7 +66,7 @@ const Dashboard = () => {
   const expDocQuickStats = useMemo(() => (expdoc.enabled && expdoc.data ? [
     {
       icon: <ContainerOutlined style={{ fontSize: 24, color: '#0369a1' }} />,
-      label: 'Export Docs Awaiting Approval', value: expdoc.data.quickStats.awaitingApproval, unit: 'docs',
+      label: 'Export Docs In Draft', value: expdoc.data.quickStats.inDraft, unit: 'docs',
       background: isDarkMode ? '#082f49' : '#f0f9ff',
     },
     {

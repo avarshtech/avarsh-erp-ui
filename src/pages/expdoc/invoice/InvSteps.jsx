@@ -102,9 +102,9 @@ export const InvStepHeader = ({ inv, patch, locked, incoterms, exporter }) => (
               {inv.invoiceNo
                 ? <Text strong>{inv.invoiceNo}</Text>
                 : (
-                  <Tooltip title="A number is allocated at approval so the approved series stays gapless (BR-02).">
+                  <Tooltip title="A number is allocated when the invoice is finalised so the issued series stays gapless (BR-02).">
                     <Text type="secondary" style={{ fontStyle: 'italic' }}>
-                      {`${inv.provisionalNo} — allocated at approval`}
+                      {`${inv.provisionalNo} — allocated on finalising`}
                     </Text>
                   </Tooltip>
                 )}
@@ -336,7 +336,7 @@ export const InvStepLines = ({ inv, patch, locked, onRegenerate, onChangeGrain, 
           type="error"
           showIcon
           title={`${unpriced.length} line(s) have no rate`}
-          description="The order carried no price for these sizes. Enter a rate, or the invoice cannot be submitted."
+          description="The order carried no price for these sizes. Enter a rate, or the invoice cannot be finalised."
         />
       )}
       {partiallyPriced.length > 0 && (
@@ -552,7 +552,7 @@ export const InvStepFinancials = ({ inv, patch, locked, onOverrideFx }) => {
             <Descriptions.Item label="CBM">{money(inv.plTotals?.cbm, 3)}</Descriptions.Item>
           </Descriptions>
           <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
-            These come from the packing list. Overriding one raises a warning that the approver must see (V-10).
+            These come from the packing list. Overriding one raises a warning that is recorded on the document (V-10).
           </Text>
         </Card>
       </Col>

@@ -28,7 +28,7 @@ import {
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
 
-export const SEED_VERSION = 8;
+export const SEED_VERSION = 10;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -441,31 +441,50 @@ const buildTemplates = () => [
       paperDefault: PAPER.A4_2UP,
       faces: [
         {
-          key: 'LONG', title: 'LONG SIDE', render: FACE_RENDER.STACK,
+          // The buyer's own carton-marking sheet: a THIS SIDE UP head, the shipping
+          // mark, then ten fields whose colons line up in a column. COLON_LIST is
+          // what holds that alignment however long a label runs.
+          key: 'LONG', title: 'LONG SIDE', render: FACE_RENDER.COLON_LIST,
           border: { style: 'solid', widthPt: 1.5 },
+          caption: 'THIS SIDE UP',
+          symbol: 'THIS_SIDE_UP',
           lines: [
-            { key: 'clientOrder', label: 'CLIENT ORDER NO', binding: 'carton.buyerPoNo', fontPt: 14, bold: true },
-            { key: 'article', label: 'CLIENT ARTICLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'division', label: 'DIVISION', binding: 'carton.endCustomer', fontPt: 12 },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
+            // The shipping mark head. Fixed text: the ERP has no field for it, and
+            // §10 says a template carries what the data model does not.
+            { key: 'mark', label: null, binding: 'fixed:BJJI:', fontPt: 13, bold: true },
+            { key: 'clientOrder', label: 'CLIENT ORDER No', binding: 'carton.buyerPoNo', fontPt: 12 },
+            { key: 'po', label: 'PO No', binding: 'pl.orderNos', fontPt: 12 },
+            { key: 'article', label: 'CLIENT ARTICLE No', binding: 'carton.articleNo', fontPt: 12 },
+            { key: 'style', label: 'STYLE No', binding: 'carton.styleNo', fontPt: 12 },
+            { key: 'division', label: 'ASSORTMENT DIVISION, CUSTOMER', binding: 'carton.endCustomer', fontPt: 12 },
+            { key: 'ctn', label: 'CARTON No', binding: 'carton.nOfN', fontPt: 12 },
+            { key: 'port', label: 'PORT OF DESTINATION', binding: 'carton.destination', fontPt: 12 },
+            { key: 'colour', label: 'COLOR', binding: 'carton.colorName', fontPt: 12 },
+            { key: 'size', label: 'SIZE', binding: 'carton.sizeText', fontPt: 12 },
             { key: 'qty', label: 'QUANTITY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 15, bold: true },
           ],
           sizeGrid: null, barcode: null,
         },
         {
-          key: 'SHORT', title: 'SHORT SIDE', render: FACE_RENDER.STACK,
+          // Three weights-and-measures lines only. The carton number and the port
+          // are NOT repeated here: the buyer's sheet puts both on the long side.
+          // Colons align the same way, so the two faces read as one document.
+          key: 'SHORT', title: 'SHORT SIDE', render: FACE_RENDER.COLON_LIST,
           border: { style: 'solid', widthPt: 1.5 },
           lines: [
-            { key: 'port', label: 'PORT', binding: 'shipment.portOfDischarge', fontPt: 13 },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 15, bold: true },
-            { key: 'gw', label: 'G.W.', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3, fontPt: 12 },
-            { key: 'dims', label: 'MEAS.', binding: 'carton.dimensions', suffix: ' CM', fontPt: 11 },
+            { key: 'nw', label: 'NET WEIGHT', binding: 'carton.netWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
+            { key: 'gw', label: 'GROSS WEIGHT', binding: 'carton.grossWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
+            { key: 'dims', label: 'CARTON MEASUREMENT', binding: 'carton.dimensions', suffix: ' CM', fontPt: 12 },
           ],
           sizeGrid: null, barcode: null,
         },
       ],
-      mandatoryFields: ['carton.grossWeightKg'],
+      // Every field the buyer's sheet prints has to be there before the run goes out,
+      // or a carton ships with a blank line where the customer looks for its article.
+      mandatoryFields: [
+        'carton.netWeightKg', 'carton.grossWeightKg', 'carton.buyerPoNo',
+        'carton.articleNo', 'carton.endCustomer', 'carton.destination',
+      ],
     },
     formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
     mandatoryForSubmit: [], mandatoryForDocGen: [],
@@ -1112,6 +1131,9 @@ const buildPackingEntries = () => [
         packingType: PACKING_TYPE.SOLID, cartonFrom: 1, cartonTo: 47,
         danNo: 'DAN-4471', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
+        // The buyer's own article number, one per size — what JOMO's SCA carton
+        // marking prints as CLIENT ARTICLE No.
+        articleNos: { M: 'ART-99120', L: 'ART-99121', XL: 'ART-99122' },
         sizeQty: { M: 10, L: 20, XL: 30 },
         netWeightKg: 12.48, grossWeightKg: 13.5, lengthCm: 60, breadthCm: 40, heightCm: 35,
       }),
@@ -1119,6 +1141,7 @@ const buildPackingEntries = () => [
         packingType: PACKING_TYPE.RATIO, cartonFrom: 48, cartonTo: 57,
         danNo: 'DAN-4472', endCustomer: 'Jensen', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Flame Scarlet 18-1662 TCX',
+        articleNos: { M: 'ART-99130', L: 'ART-99131', XL: 'ART-99132', XXL: 'ART-99133' },
         ratio: { M: 1, L: 2, XL: 2, XXL: 1 }, assortmentsPerCarton: 4,
         netWeightKg: 9.2, grossWeightKg: 10.0, lengthCm: 60, breadthCm: 40, heightCm: 30,
       }),
@@ -1126,6 +1149,7 @@ const buildPackingEntries = () => [
         packingType: PACKING_TYPE.MIXED, cartonFrom: 58, cartonTo: 60,
         danNo: 'DAN-4473', endCustomer: 'Marja', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: null,
+        articleNos: { M: 'ART-99120', L: 'ART-99121' },
         mixedRows: [
           { colorName: 'Navy', sizeQty: { M: 5, L: 5 } },
           { colorName: 'Flame Scarlet 18-1662 TCX', sizeQty: { M: 3, L: 2 } },
@@ -1138,6 +1162,7 @@ const buildPackingEntries = () => [
         cartonFrom: 61, cartonTo: 61,
         danNo: 'DAN-4474', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
+        articleNos: { M: 'ART-99120', L: 'ART-99121' },
         sizeQty: { M: 3, L: 4 },
         netWeightKg: 2.005, grossWeightKg: 2.5, lengthCm: 40, breadthCm: 30, heightCm: 20,
       }),

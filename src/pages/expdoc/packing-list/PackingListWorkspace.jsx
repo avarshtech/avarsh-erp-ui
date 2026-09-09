@@ -18,7 +18,6 @@ import { hasPermission } from '../../../utils/permissions';
 import {
   getPackingList, refreshFromPacking, acknowledgeWarning, changePlStatus, revisePackingList,
   getShipment, markPackingListExported, overridePlTemplate, clearPlTemplateOverride,
-  recallPackingList,
   updatePackingList,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
@@ -33,6 +32,7 @@ import PlHeaderEditor from './PlHeaderEditor';
 import PlCompareModal from './PlCompareModal';
 
 const { Text } = Typography;
+const LIST_PATH = '/export-docs/packing-lists/list';
 const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 const SECTION_KEYS = ['header', 'details', 'cartons', 'totals', 'orderVsPacked', 'validation', 'versions'];
 
@@ -77,10 +77,11 @@ const PackingListWorkspace = () => {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [shipment, setShipment] = useState(null);
+  // Reported up by PlHeaderEditor, so Exit can warn instead of silently discarding.
+  const [headerDirty, setHeaderDirty] = useState(false);
   const exporter = useExporterBlock();
 
   const canUpdate = hasPermission(EXPDOC_MODULE.PACKING_LIST, 'update');
-  const canApprovePerm = hasPermission(EXPDOC_MODULE.PACKING_LIST, 'approve');
   const canRevisePerm = hasPermission(EXPDOC_MODULE.PACKING_LIST, 'revise');
   const canOverridePerm = hasPermission(EXPDOC_MODULE.PACKING_LIST, 'override');
 
@@ -146,22 +147,18 @@ const PackingListWorkspace = () => {
     onSubmit: (reason) => run(
       'ack',
       () => acknowledgeWarning(pl.id, item, reason),
-      'Reason recorded — it will be shown to the approver',
+      'Reason recorded against this document',
     ),
   });
 
-  const handleSubmit = () => modal.confirm({
-    title: 'Submit for approval?',
-    content: `${pl.plNo} will be locked for editing and sent to an approver. Every acknowledged warning is shown to them with your reason.`,
-    okText: 'Submit',
-    onOk: () => run('submit', () => changePlStatus(pl.id, PL_STATUS.SUBMITTED), `${pl.plNo} submitted`),
-  });
-
-  const handleApprove = () => modal.confirm({
-    title: 'Approve this packing list?',
+  const handleFinalise = () => modal.confirm({
+    title: 'Finalise this packing list?',
     content: (
       <Space orientation="vertical" size={4}>
-        <Text>Approval snapshots the document and its template version. Later carton changes will flag it stale rather than alter it.</Text>
+        <Text>
+          {`${pl.plNo} is locked for editing and snapshotted with its template version. Stickers and the export invoice can be raised from it, and later carton changes flag it stale rather than alter it.`}
+        </Text>
+        <Text type="secondary">To change it afterwards, Revise creates a new draft under the same number.</Text>
         {(pl.panelFindings?.warnings || []).filter((w) => w.acknowledged).length > 0 && (
           <Text type="secondary">
             {`${pl.panelFindings.warnings.filter((w) => w.acknowledged).length} acknowledged warning(s) are recorded against this document.`}
@@ -169,17 +166,8 @@ const PackingListWorkspace = () => {
         )}
       </Space>
     ),
-    okText: 'Approve',
-    onOk: () => run('approve', () => changePlStatus(pl.id, PL_STATUS.APPROVED), `${pl.plNo} approved`),
-  });
-
-  const handleSendBack = () => setReasonCfg({
-    key: 'sendback',
-    title: 'Send back to draft',
-    label: 'What needs changing?',
-    okText: 'Send back',
-    danger: true,
-    onSubmit: (reason) => run('sendback', () => changePlStatus(pl.id, PL_STATUS.DRAFT, reason), `${pl.plNo} returned to draft`),
+    okText: 'Finalise',
+    onOk: () => run('finalise', () => changePlStatus(pl.id, PL_STATUS.FINAL), `${pl.plNo} finalised`),
   });
 
   const handleRevise = () => setReasonCfg({
@@ -196,6 +184,18 @@ const PackingListWorkspace = () => {
       if (next?.id) navigate(`/export-docs/packing-lists/edit/${next.id}`, { replace: true });
     },
   });
+
+  const handleExit = useCallback(() => {
+    if (!headerDirty) { navigate(LIST_PATH); return; }
+    modal.confirm({
+      title: 'Leave without saving?',
+      content: 'The document details you changed have not been saved. Leaving discards them.',
+      okText: 'Discard and exit',
+      okButtonProps: { danger: true },
+      cancelText: 'Stay',
+      onOk: () => navigate(LIST_PATH),
+    });
+  }, [headerDirty, modal, navigate]);
 
   const handleCancel = () => setReasonCfg({
     key: 'cancel',
@@ -216,71 +216,31 @@ const PackingListWorkspace = () => {
             onClick={() => run('refresh', () => refreshFromPacking(pl.id), 'Carton data refreshed')} />,
         );
       }
+      // The single gate. There is no approver behind it, so the tooltip has to name
+      // what is blocking rather than leave the user waiting on somebody else.
       if (canUpdate) {
         actions.push(
-          <Tooltip key="submit" title={pl.canSubmit ? undefined : `Blocked — ${pl.submitBlockers[0] || 'open issues'}`}>
+          <Tooltip key="finalise" title={pl.canFinalise ? undefined : `Blocked — ${pl.finaliseBlockers[0] || 'open issues'}`}>
             <span>
-              <ActionButton action="send" text="Submit" {...busyProps('submit', !pl.canSubmit)} onClick={handleSubmit} />
+              <ActionButton action="approve" text="Finalise" {...busyProps('finalise', !pl.canFinalise)} onClick={handleFinalise} />
             </span>
           </Tooltip>,
         );
       }
     }
 
-    if (pl.status === PL_STATUS.SUBMITTED) {
-      // The author's own recall — no approver needed, and recorded as their decision.
-      if (pl.canRecall && canUpdate) {
-        actions.push(
-          <ActionButton
-            key="recall"
-            action="undo"
-            text="Recall submission"
-            {...busyProps('recall')}
-            onClick={() => setReasonCfg({
-              key: 'recall',
-              title: 'Recall this submission?',
-              label: 'Why are you taking it back? (optional)',
-              minLength: 0,
-              context: {
-                title: 'It returns to draft',
-                message: 'Nobody has approved it yet, so it comes straight back to you for editing.',
-              },
-              okText: 'Recall',
-              onSubmit: (reason) => run('recall', () => recallPackingList(pl.id, reason), `${pl.plNo} recalled`),
-            })}
-          />,
-        );
-      }
-
-      // Sending a document back is the reviewer’s alternative to approving it, so it
-      // is gated on `approve` — matching the invoice. On `update` it let any editor
-      // bounce a document out of somebody else’s review queue.
-      if (canApprovePerm) {
-        actions.push(<ActionButton key="back" action="refer-back" text="Send back" {...busyProps('sendback')} onClick={handleSendBack} />);
-      }
-      if (canApprovePerm) {
-        actions.push(
-          <Tooltip key="approve" title={pl.approveBlockedReason || undefined}>
-            <span>
-              <ActionButton action="approve" text="Approve" {...busyProps('approve', !pl.canApprove)} onClick={handleApprove} />
-            </span>
-          </Tooltip>,
-        );
-      }
-    }
-
-    if ([PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(pl.status)) {
+    if ([PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(pl.status)) {
       if (canRevisePerm) {
         actions.push(<ActionButton key="revise" action="history" text="Revise" {...busyProps('revise')} onClick={handleRevise} />);
       }
-      if (canApprovePerm) {
+      if (canUpdate) {
         actions.push(<ActionButton key="cancel" action="cancel" text="Cancel" {...busyProps('cancel')} onClick={handleCancel} />);
       }
     }
 
-    // §16: Approved -> Exported is the release. Printing alone recorded nothing, so
+    // §16: Final -> Released is the release. Printing alone recorded nothing, so
     // the register had no export date and the status was unreachable.
-    if (pl.status === PL_STATUS.APPROVED && canUpdate) {
+    if (pl.status === PL_STATUS.FINAL && canUpdate) {
       actions.push(
         <Tooltip key="release" title="Mark the documents released to the buyer or forwarder. Recorded in the audit trail and the shipment register.">
           <span>
@@ -298,9 +258,14 @@ const PackingListWorkspace = () => {
     actions.push(
       <ActionButton key="preview" action="print" text="Preview & print" onClick={() => setPreviewOpen(true)} />,
     );
+    // The way out of a long document. The back arrow is easy to lose once the page
+    // is scrolled, and the header is sticky — so Exit is always reachable.
+    actions.push(
+      <ActionButton key="exit" action="close" text="Exit" onClick={handleExit} />,
+    );
     return actions;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pl, busyProps, canUpdate, canApprovePerm, canRevisePerm, run, message]);
+  }, [pl, busyProps, canUpdate, canRevisePerm, run, message]);
 
   if (loadError) {
     return (
@@ -308,7 +273,7 @@ const PackingListWorkspace = () => {
         status="warning"
         title="Packing list could not be opened"
         subTitle={loadError}
-        extra={<ActionButton action="back" text="Back to packing lists" onClick={() => navigate('/export-docs/packing-lists/list')} />}
+        extra={<ActionButton action="back" text="Back to packing lists" onClick={() => navigate(LIST_PATH)} />}
       />
     );
   }
@@ -385,6 +350,7 @@ const PackingListWorkspace = () => {
             key={pl.version}
             pl={pl}
             saving={busy === 'header'}
+            onDirtyChange={setHeaderDirty}
             onSave={(values) => run(
               'header',
               () => updatePackingList(pl.id, { ...values, version: pl.version }),
@@ -509,8 +475,7 @@ const PackingListWorkspace = () => {
         <Timeline
           items={[
             { content: `Created by ${pl.createdBy} on ${pl.createdAt}` },
-            ...(pl.submittedBy ? [{ content: `Submitted by ${pl.submittedBy}`, color: 'blue' }] : []),
-            ...(pl.approvedBy ? [{ content: `Approved by ${pl.approvedBy} on ${pl.approvalSnapshot?.at}`, color: 'green' }] : []),
+            ...(pl.finalisedBy ? [{ content: `Finalised by ${pl.finalisedBy} on ${pl.finalSnapshot?.at}`, color: 'green' }] : []),
             ...(pl.reviseReason ? [{ content: `Revision ${pl.revision}: ${pl.reviseReason}`, color: 'orange' }] : []),
             ...(pl.supersededByPlId ? [{ content: 'Superseded by a later revision', color: 'gray' }] : []),
             ...(pl.cancelReason ? [{ content: `Cancelled: ${pl.cancelReason}`, color: 'red' }] : []),
@@ -526,7 +491,7 @@ const PackingListWorkspace = () => {
       <PageHeader
         title={pl.plNo}
         subtitle={`${pl.buyerName || '—'} · ${pl.shipmentNo || '—'} · ${num(pl.totals.cartons)} cartons`}
-        onBack={() => navigate('/export-docs/packing-lists/list')}
+        onBack={handleExit}
         status={(
           <Space size={6}>
             <StatusTag status={pl.status} config={PL_STATUS_CONFIG} getLabel={(s) => PL_STATUS_LABELS[s] || s} />
@@ -588,7 +553,7 @@ const PackingListWorkspace = () => {
       )}
 
       <div style={{ marginTop: 16 }}>
-        <DraftWatermark status={pl.status} draftStatuses={[PL_STATUS.DRAFT, PL_STATUS.SUBMITTED]}>
+        <DraftWatermark status={pl.status} draftStatuses={[PL_STATUS.DRAFT]}>
           <Collapse defaultActiveKey={SECTION_KEYS} items={items} />
         </DraftWatermark>
       </div>

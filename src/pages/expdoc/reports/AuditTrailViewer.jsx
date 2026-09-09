@@ -150,7 +150,7 @@ const AuditTrailViewer = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Audit Trail"
-        subtitle="Every create, edit, submit, approve, print and override in Export Documentation — read-only for every role"
+        subtitle="Every create, edit, finalise, print and override in Export Documentation — read-only for every role"
       />
       <Card>
         <Space wrap size={12} style={{ marginBottom: 12 }}>
@@ -184,7 +184,7 @@ const AuditTrailViewer = () => {
             emptyText: (
               <EmptyState
                 title="Nothing recorded yet"
-                description="Events appear here as documents are created, submitted, approved and printed."
+                description="Events appear here as documents are created, finalised and printed."
                 showAction={false}
               />
             ),

@@ -41,7 +41,7 @@ export const stickerLayoutFor = (db, pl) => {
 const shipmentCartonTotal = (db, pl) => {
   const ranges = (db.packingLists || [])
     .filter((p) => p.shipmentId === pl.shipmentId
-      && [PL_STATUS.DRAFT, PL_STATUS.SUBMITTED, PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(p.status))
+      && [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(p.status))
     .flatMap((p) => toRanges(allRows(p)));
   return countCartons(ranges) || countCartons(toRanges(allRows(pl)));
 };

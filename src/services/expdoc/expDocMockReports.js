@@ -20,8 +20,8 @@ import { decoratePl } from './expDocMockPackingLists';
 import { decorateInvoice } from './expDocMockInvoices';
 import { resolveTemplate } from '../../utils/expDocTemplateSchema';
 
-const LIVE_PL = [PL_STATUS.DRAFT, PL_STATUS.SUBMITTED, PL_STATUS.APPROVED, PL_STATUS.EXPORTED];
-const SHIPPED_PL = [PL_STATUS.APPROVED, PL_STATUS.EXPORTED];
+const LIVE_PL = [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED];
+const SHIPPED_PL = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 
 const num = (v) => Number(v) || 0;
@@ -31,7 +31,7 @@ const num = (v) => Number(v) || 0;
 /**
  * Ordered vs packed vs shipped per style / colour / size, across every packing list.
  *
- * "Packed" counts every live document; "shipped" only those approved or beyond —
+ * "Packed" counts every live document; "shipped" only those final or beyond —
  * the distinction matters because a draft can still change, and reporting a draft as
  * shipped is how a short-ship goes unnoticed until the buyer counts the cartons.
  */
@@ -120,8 +120,8 @@ export const shipmentRegisterReport = async (params = {}) => {
     templateVersion: pl.templateVersion,
     createdBy: pl.createdBy,
     updatedAt: pl.updatedAt,
-    approvedAt: pl.approvalSnapshot?.at || null,
-    approvedBy: pl.approvalSnapshot?.by || null,
+    finalisedAt: pl.finalSnapshot?.at || null,
+    finalisedBy: pl.finalSnapshot?.by || null,
     exportedAt: pl.exportedAt || null,
     exportedBy: pl.exportedBy || null,
   }));
@@ -138,8 +138,8 @@ export const shipmentRegisterReport = async (params = {}) => {
     templateVersion: inv.templateVersion,
     createdBy: inv.createdBy,
     updatedAt: inv.updatedAt,
-    approvedAt: inv.approvalSnapshot?.at || null,
-    approvedBy: inv.approvalSnapshot?.by || null,
+    finalisedAt: inv.finalSnapshot?.at || null,
+    finalisedBy: inv.finalSnapshot?.by || null,
     exportedAt: inv.exportedAt || null,
     exportedBy: inv.exportedBy || null,
   }));
@@ -159,8 +159,8 @@ export const shipmentRegisterReport = async (params = {}) => {
       templateVersion: run.templateVersion,
       createdBy: run.generatedBy,
       updatedAt: run.generatedAt,
-      approvedAt: null,
-      approvedBy: null,
+      finalisedAt: null,
+      finalisedBy: null,
       // A sticker run IS its own release: generating it is the export event.
       exportedAt: run.generatedAt,
       exportedBy: run.generatedBy,
@@ -185,7 +185,7 @@ export const shipmentRegisterReport = async (params = {}) => {
 // ─── 3. Invoice register, FY (§22) ──────────────────────────────────────────────
 
 /**
- * The approved series, in number order, with any gap called out.
+ * The issued series, in number order, with any gap called out.
  *
  * A gap is what a GST reconciliation actually looks for, so it is computed here
  * rather than left for a human to spot in a list of four hundred numbers.
@@ -468,7 +468,7 @@ export const productivityReport = async (params = {}) => {
     if (!byUser.has(u)) {
       byUser.set(u, {
         id: u, user: u, packingLists: 0, invoices: 0, stickerRuns: 0,
-        approvals: 0, acknowledgements: 0, __hours: [],
+        finalisations: 0, acknowledgements: 0, __hours: [],
       });
     }
     return byUser.get(u);
@@ -478,17 +478,17 @@ export const productivityReport = async (params = {}) => {
     const r = touch(pl.createdBy);
     r.packingLists += 1;
     r.acknowledgements += (pl.acknowledgements || []).length;
-    const h = hoursBetween(pl.createdAt, pl.approvalSnapshot?.at);
+    const h = hoursBetween(pl.createdAt, pl.finalSnapshot?.at);
     if (h !== null) r.__hours.push(h);
-    if (pl.approvalSnapshot?.by) touch(pl.approvalSnapshot.by).approvals += 1;
+    if (pl.finalSnapshot?.by) touch(pl.finalSnapshot.by).finalisations += 1;
   });
   (db.invoices || []).forEach((inv) => {
     const r = touch(inv.createdBy);
     r.invoices += 1;
     r.acknowledgements += (inv.acknowledgements || []).length;
-    const h = hoursBetween(inv.createdAt, inv.approvalSnapshot?.at);
+    const h = hoursBetween(inv.createdAt, inv.finalSnapshot?.at);
     if (h !== null) r.__hours.push(h);
-    if (inv.approvalSnapshot?.by) touch(inv.approvalSnapshot.by).approvals += 1;
+    if (inv.finalSnapshot?.by) touch(inv.finalSnapshot.by).finalisations += 1;
   });
   (db.stickerRuns || []).forEach((run) => { touch(run.generatedBy).stickerRuns += 1; });
 
@@ -498,8 +498,8 @@ export const productivityReport = async (params = {}) => {
       return {
         ...r,
         documents: docs,
-        // Null rather than 0: "no approved document yet" is not "approved instantly".
-        avgHoursToApproval: r.__hours.length
+        // Null rather than 0: "no final document yet" is not "finalised instantly".
+        avgHoursToFinal: r.__hours.length
           ? round(r.__hours.reduce((s, h) => s + h, 0) / r.__hours.length, 2)
           : null,
         overrideRate: docs ? round(r.acknowledgements / docs, 2) : null,

@@ -13,8 +13,8 @@ import { integerInputProps } from '../../../utils/inputHelpers';
 import { hasPermission } from '../../../utils/permissions';
 import { EXPDOC_MODULE, PAPER_LIST, PAPER_SPECS, PL_STATUS } from '../../../utils/expDocConstants';
 
-/** A sticker prints clean only from a packing list that is actually approved. */
-const APPROVED_PL_STATUSES = [PL_STATUS.APPROVED, PL_STATUS.EXPORTED];
+/** A sticker prints clean only from a packing list that is actually final. */
+const FINAL_PL_STATUSES = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 import { buildStickerSheetHtml, stickerCounts } from '../../../utils/expDocHtml';
 import { intersectRanges, formatRanges } from '../../../utils/expDocCalc';
 import { openPrintWindow, documentFileName } from '../../../utils/printDoc';
@@ -202,8 +202,8 @@ const StickerWorkspace = () => {
       paper,
       faceKeys,
       // §16: a sticker inherits the packing list's state. Anything short of
-      // approved is provisional, not just a DRAFT — a SUBMITTED list printed clean.
-      draft: !APPROVED_PL_STATUSES.includes(plStatus),
+      // final is provisional and prints watermarked.
+      draft: !FINAL_PL_STATUSES.includes(plStatus),
       ctx: stickerCtx,
     });
   }, [layoutWithBarcode, pageCartons, paper, faceKeys, stickerCtx, plStatus]);
@@ -287,9 +287,9 @@ const StickerWorkspace = () => {
       setReasonCfg({
         key: 'override',
         title: 'Print from a draft packing list?',
-        label: 'Why is printing before approval necessary?',
+        label: 'Why is printing before the list is final necessary?',
         context: {
-          title: 'This packing list is not approved',
+          title: 'This packing list is not final',
           message: 'The labels will carry a DRAFT watermark, and the run is recorded as printed from a draft.',
         },
         okText: 'Print draft labels',

@@ -10,7 +10,7 @@ const num = (v, dp = 0) => (Number(v) || 0).toLocaleString('en-IN', {
 });
 
 /**
- * Create an export invoice from approved packing lists (§8.1).
+ * Create an export invoice from final packing lists (§8.1).
  *
  * Ineligible lists are shown greyed WITH the reason rather than hidden — the same
  * idiom the packing-list create modal uses, because "where is my packing list?" is a
@@ -121,7 +121,7 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
             getCheckboxProps: (r) => ({ disabled: !r.eligible }),
           }}
           rowClassName={(r) => (r.eligible ? '' : 'expdoc-row-muted')}
-          locale={{ emptyText: 'No approved packing lists are waiting to be invoiced.' }}
+          locale={{ emptyText: 'No final packing lists are waiting to be invoiced.' }}
         />
         {chosen.length > 0 && (
           <Text type="secondary">

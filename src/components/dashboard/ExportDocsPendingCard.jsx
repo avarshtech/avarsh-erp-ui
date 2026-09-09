@@ -13,9 +13,8 @@ const KIND_COLOUR = { PACKING_LIST: 'green', EXPORT_INVOICE: 'gold' };
 /**
  * Export documents still in flight (PRD §11.1), oldest first.
  *
- * "Waiting on" is the column that makes this useful: a submitted document is an
- * approver's problem and a draft is its author's, and a reader should not have to
- * infer which from a status name.
+ * "Waiting on" is the column that makes this useful: a draft belongs to whoever
+ * raised it, and a reader should not have to infer that from a status name.
  */
 const ExportDocsPendingCard = memo(function ExportDocsPendingCard({ rows, total, loading }) {
   const navigate = useNavigate();
@@ -73,7 +72,7 @@ const ExportDocsPendingCard = memo(function ExportDocsPendingCard({ rows, total,
       size="small"
       pagination={false}
       scroll={{ x: 820 }}
-      locale={{ emptyText: <Text type="secondary">Nothing is waiting — every export document is approved.</Text> }}
+      locale={{ emptyText: <Text type="secondary">Nothing is waiting — every export document is final.</Text> }}
       footer={total > (rows || []).length
         ? () => (
           <Text type="secondary" style={{ fontSize: 12 }}>

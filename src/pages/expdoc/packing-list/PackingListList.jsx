@@ -87,8 +87,8 @@ const PackingListList = () => {
   // worse than no figure at all.
   const kpis = useMemo(() => ({
     drafts: rows.filter((r) => r.status === PL_STATUS.DRAFT).length,
-    submitted: rows.filter((r) => r.status === PL_STATUS.SUBMITTED).length,
-    approved: rows.filter((r) => [PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(r.status)).length,
+    final: rows.filter((r) => r.status === PL_STATUS.FINAL).length,
+    released: rows.filter((r) => r.status === PL_STATUS.EXPORTED).length,
     openIssues: rows.filter((r) => (r.panelFindings?.blocking?.length || 0) > 0).length,
   }), [rows]);
 
@@ -105,15 +105,15 @@ const PackingListList = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Packing Lists"
-        subtitle="Buyer-format packing lists built from carton data, with validation and approval"
+        subtitle="Buyer-format packing lists built from carton data, with validation before they are finalised"
         onAdd={canAdd ? () => setCreateOpen(true) : undefined}
         addLabel="New Packing List"
       />
 
       <Row gutter={[16, 16]} align="stretch" style={{ marginBottom: 16 }}>
         <Col xs={12} md={6}><StatCard title="Drafts (this page)" value={kpis.drafts} icon={<FileTextOutlined />} color="var(--info-color)" /></Col>
-        <Col xs={12} md={6}><StatCard title="Awaiting approval (this page)" value={kpis.submitted} icon={<SendOutlined />} color="var(--accent-color)" /></Col>
-        <Col xs={12} md={6}><StatCard title="Approved (this page)" value={kpis.approved} icon={<CheckCircleOutlined />} color="var(--success-color)" /></Col>
+        <Col xs={12} md={6}><StatCard title="Final (this page)" value={kpis.final} icon={<CheckCircleOutlined />} color="var(--success-color)" /></Col>
+        <Col xs={12} md={6}><StatCard title="Released (this page)" value={kpis.released} icon={<SendOutlined />} color="var(--accent-color)" /></Col>
         <Col xs={12} md={6}><StatCard title="With open issues (this page)" value={kpis.openIssues} icon={<WarningOutlined />} color="var(--error-color)" /></Col>
       </Row>
 

@@ -13,7 +13,6 @@ import { EXPORT_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   getInvoice, updateInvoice, regenerateInvoiceLines, acknowledgeInvoiceWarning,
   changeInvoiceStatus, reviseInvoice, getShipment, listIncoterms, markInvoiceExported,
-  signOffInvoiceFinancials, withdrawFinanceSignOff, recallInvoice,
 } from '../../../services/expdoc/expDocService';
 import PlValidationPanel from '../packing-list/PlValidationPanel';
 import AckReasonModal from '../shared/AckReasonModal';
@@ -38,7 +37,7 @@ const STEPS = [
 /**
  * Export invoice — a five-step wizard on the SampleInvoiceForm model: one state
  * object, one `patch()`, no per-step gate. Navigation is free because the document
- * is validated as a whole (§14): what blocks is Submit, and the panel says why.
+ * is validated as a whole (§14): what blocks is Finalise, and the panel says why.
  *
  * Every mutation goes through `run()` and re-reads the decorated invoice, so totals,
  * tax and validation on screen are always the service's answer rather than a local
@@ -63,7 +62,6 @@ const ExportInvoiceForm = () => {
   const exporter = useExporterBlock();
 
   const canUpdate = hasPermission(EXPDOC_MODULE.INVOICE, 'update');
-  const canApprovePerm = hasPermission(EXPDOC_MODULE.INVOICE, 'approve');
   const canRevisePerm = hasPermission(EXPDOC_MODULE.INVOICE, 'revise');
   const canOverride = hasPermission(EXPDOC_MODULE.INVOICE, 'override');
 
@@ -186,7 +184,7 @@ const ExportInvoiceForm = () => {
 
   const move = useCallback((next, opts = {}) => run(
     () => changeInvoiceStatus(inv.id, next, opts),
-    next === INVOICE_STATUS.APPROVED ? 'Approved — invoice number allocated' : `Moved to ${INVOICE_STATUS_LABELS[next]}`,
+    next === INVOICE_STATUS.FINAL ? 'Final — invoice number allocated' : `Moved to ${INVOICE_STATUS_LABELS[next]}`,
   ), [inv, run]);
 
   const actions = useMemo(() => {
@@ -198,126 +196,24 @@ const ExportInvoiceForm = () => {
       list.push(
         <ActionButton key="save" action="save" text="Save" loading={saving} disabled={!dirty} onClick={save} />,
       );
+      // The single gate. Nobody reviews this afterwards, so the tooltip has to name
+      // what is blocking rather than leave the user waiting on somebody else.
       list.push(
-        <Tooltip key="submit" title={working.canSubmit ? undefined : (working.submitBlockers[0] || 'Resolve the open issues first.')}>
-          <span>
-            <ActionButton
-              action="send"
-              text="Submit"
-              disabled={!working.canSubmit || dirty}
-              onClick={() => move(INVOICE_STATUS.SUBMITTED)}
-            />
-          </span>
-        </Tooltip>,
-      );
-    }
-
-    // The author's own recall, distinct from the reviewer's send-back.
-    if (working.canRecall && canUpdate) {
-      list.push(
-        <ActionButton
-          key="recall"
-          action="undo"
-          text="Recall submission"
-          onClick={() => setReasonCfg({
-            key: 'recall',
-            title: 'Recall this submission?',
-            label: 'Why are you taking it back? (optional)',
-            minLength: 0,
-            context: {
-              title: 'It returns to draft',
-              message: 'Nobody has approved it yet, so it comes straight back to you for editing.',
-            },
-            okText: 'Recall',
-            onSubmit: (reason) => run(() => recallInvoice(working.id, reason), 'Submission recalled'),
-          })}
-        />,
-      );
-    }
-
-    // §16: the optional Finance sign-off on the money, offered to the roles the
-    // tenant nominates. It is a separate act from approval, and approval is refused
-    // until it exists — so it goes in front of the Approve button, not beside it.
-    if (working.canSignOffFinancials) {
-      list.push(
-        <ActionButton
-          key="finance"
-          action="approve"
-          text="Sign off financials"
-          onClick={() => setReasonCfg({
-            key: 'finance',
-            title: 'Sign off the financial block?',
-            label: 'Note (optional context for the approver)',
-            minLength: 0,
-            context: {
-              title: `${working.currency} ${Number(working.totals?.netTotal || 0).toFixed(2)} at FX ${working.fxRate}`,
-              message: 'Your signature covers these figures. If a rate, quantity or charge changes afterwards it lapses and must be signed again.',
-            },
-            okText: 'Sign off',
-            onSubmit: (note) => run(
-              () => signOffInvoiceFinancials(working.id, { version: working.version, note }),
-              'Financial block signed off',
-            ),
-          })}
-        />,
-      );
-    }
-
-    // The signer can take it back while the invoice is still awaiting approval.
-    if (working.financeSignOffValid && working.isFinanceUser
-      && working.status === INVOICE_STATUS.SUBMITTED) {
-      list.push(
-        <ActionButton
-          key="unfinance"
-          action="cancel"
-          text="Withdraw sign-off"
-          onClick={() => setReasonCfg({
-            key: 'unfinance',
-            title: 'Withdraw the Finance sign-off?',
-            label: 'Why is the sign-off being withdrawn?',
-            okText: 'Withdraw',
-            danger: true,
-            onSubmit: (reason) => run(
-              () => withdrawFinanceSignOff(working.id, reason),
-              'Sign-off withdrawn',
-            ),
-          })}
-        />,
-      );
-    }
-
-    if (working.status === INVOICE_STATUS.SUBMITTED && canApprovePerm) {
-      list.push(
-        <Tooltip key="approve" title={working.approveBlockedReason || undefined}>
+        <Tooltip key="finalise" title={working.canFinalise ? undefined : (working.finaliseBlockers[0] || 'Resolve the open issues first.')}>
           <span>
             <ActionButton
               action="approve"
-              text="Approve"
-              disabled={!working.canApprove}
+              text="Finalise"
+              disabled={!working.canFinalise || dirty}
               onClick={() => modal.confirm({
-                title: 'Approve this invoice?',
-                content: 'A number is allocated now and the document is frozen. Later prints render from this version.',
-                okText: 'Approve',
-                onOk: () => move(INVOICE_STATUS.APPROVED),
+                title: 'Finalise this invoice?',
+                content: 'A number is allocated now and the document is frozen. Later prints render from this version. To change it afterwards, Revise creates a new version.',
+                okText: 'Finalise',
+                onOk: () => move(INVOICE_STATUS.FINAL),
               })}
             />
           </span>
         </Tooltip>,
-      );
-      list.push(
-        <ActionButton
-          key="reject"
-          action="reject"
-          text="Send back"
-          onClick={() => setReasonCfg({
-            key: 'reject',
-            title: 'Send this invoice back to draft?',
-            label: 'What needs changing?',
-            okText: 'Send back',
-            danger: true,
-            onSubmit: (reason) => move(INVOICE_STATUS.DRAFT, { reason }),
-          })}
-        />,
       );
     }
 
@@ -329,11 +225,11 @@ const ExportInvoiceForm = () => {
           text="Revise"
           onClick={() => setReasonCfg({
             key: 'revise',
-            title: 'Revise this approved invoice?',
+            title: 'Revise this invoice?',
             label: 'Reason for the revision',
             context: {
               title: 'A new version is created',
-              message: 'The number is kept with an -R suffix so the approved series stays gapless. This version becomes superseded and stays viewable.',
+              message: 'The number is kept with an -R suffix so the issued series stays gapless. This version becomes superseded and stays viewable.',
             },
             okText: 'Create revision',
             onSubmit: async (reason) => {
@@ -345,7 +241,7 @@ const ExportInvoiceForm = () => {
       );
     }
 
-    if ([INVOICE_STATUS.APPROVED, INVOICE_STATUS.EXPORTED].includes(working.status) && canApprovePerm) {
+    if ([INVOICE_STATUS.FINAL, INVOICE_STATUS.EXPORTED].includes(working.status) && canUpdate) {
       list.push(
         <ActionButton
           key="cancel"
@@ -357,7 +253,7 @@ const ExportInvoiceForm = () => {
             label: 'Reason for cancelling',
             context: {
               title: 'The number is kept',
-              message: 'A cancelled invoice retains its number and is never reused, so the approved series stays intact.',
+              message: 'A cancelled invoice retains its number and is never reused, so the issued series stays intact.',
             },
             okText: 'Cancel invoice',
             danger: true,
@@ -367,7 +263,7 @@ const ExportInvoiceForm = () => {
       );
     }
 
-    if (working.status === INVOICE_STATUS.APPROVED && canUpdate) {
+    if (working.status === INVOICE_STATUS.FINAL && canUpdate) {
       list.push(
         <Tooltip key="release" title="Mark the invoice released to the buyer or customs broker. Recorded in the audit trail and the shipment register.">
           <span>
@@ -385,7 +281,7 @@ const ExportInvoiceForm = () => {
       <ActionButton key="preview" action="print" text="Preview &amp; print" onClick={() => setPreviewOpen(true)} />,
     );
     return list;
-  }, [working, dirty, saving, canUpdate, canApprovePerm, canRevisePerm, save, move, modal, run, inv, navigate]);
+  }, [working, dirty, saving, canUpdate, canRevisePerm, save, move, modal, run, inv, navigate]);
 
   if (loadError) {
     return (
@@ -433,33 +329,12 @@ const ExportInvoiceForm = () => {
           showIcon
           style={{ marginBottom: 16 }}
           title="A packing list under this invoice has changed"
-          description={`${working.staleRefs.map((r) => r.plNo).join(', ')} has been edited since these lines were generated. Regenerate before approving.`}
+          description={`${working.staleRefs.map((r) => r.plNo).join(', ')} has been edited since these lines were generated. Regenerate before finalising.`}
           action={!locked && (
             <ActionButton action="refresh" text="Regenerate" size="small" onClick={handleRegenerate} />
           )}
         />
       )}
-
-      {/* §16: whether the money has had a second pair of eyes, and whether that
-          signature still covers the figures on screen. */}
-      {working.financeRequired && working.status === INVOICE_STATUS.SUBMITTED && (
-        <Alert
-          type={working.financeSignOffValid ? 'success' : (working.financeSignOffStale ? 'warning' : 'info')}
-          showIcon
-          style={{ marginBottom: 16 }}
-          title={working.financeSignOffValid
-            ? `Financial block signed off by ${working.financeSignOff.by}`
-            : (working.financeSignOffStale
-              ? 'The Finance sign-off has lapsed'
-              : 'Waiting for Finance to sign off the financial block')}
-          description={working.financeSignOffValid
-            ? `Signed ${working.financeSignOff.at}. ${working.financeSignOff.note || 'The invoice can now be approved.'}`
-            : (working.financeSignOffStale
-              ? `${working.financeSignOff.by} signed different figures on ${working.financeSignOff.at}. The rates or totals have changed since, so it must be signed again before approval.`
-              : 'This tenant requires a second approval of rate, FX, charges and tax before an invoice can be approved.')}
-        />
-      )}
-
 
       {dirty && (
         <Alert

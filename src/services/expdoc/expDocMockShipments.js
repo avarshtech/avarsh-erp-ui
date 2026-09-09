@@ -154,7 +154,7 @@ export const updateShipment = async (id, payload) => {
 export const syncShipmentStatus = (db, shipmentId) => {
   const s = find(db, shipmentId);
   if (!s) return null;
-  const live = ['DRAFT', 'SUBMITTED', 'APPROVED', 'EXPORTED'];
+  const live = ['DRAFT', 'FINAL', 'EXPORTED'];
   const pls = (db.packingLists || []).filter((p) => p.shipmentId === s.id && live.includes(p.status));
   const invoices = (db.invoices || []).filter((i) => i.shipmentId === s.id && live.includes(i.status));
   const docs = [...pls, ...invoices];
@@ -210,7 +210,7 @@ export const getShipmentDocumentSet = async (shipmentId) => {
   if (!shipment) fail('NOT_FOUND', `Shipment ${shipmentId} not found`);
 
   const live = (status) => !['CANCELLED', 'SUPERSEDED'].includes(status);
-  const ready = (status) => ['APPROVED', 'EXPORTED'].includes(status);
+  const ready = (status) => ['FINAL', 'EXPORTED'].includes(status);
 
   const packingLists = (db.packingLists || [])
     .filter((p) => p.shipmentId === id)
@@ -254,12 +254,12 @@ export const getShipmentDocumentSet = async (shipmentId) => {
       id: r.id,
       docNo: r.runNo,
       revision: 0,
-      status: r.fromDraft ? 'DRAFT' : 'APPROVED',
+      status: r.fromDraft ? 'DRAFT' : 'FINAL',
       date: r.generatedAt,
       cartonCount: r.cartonCount,
       plId: r.plId,
       isLive: true,
-      // Stickers are printed, not approved (§16) — they have no readiness of their own.
+      // Stickers are printed, not finalised (§16) — they have no readiness of their own.
       isReady: !r.fromDraft,
       route: `/export-docs/stickers/${r.plId}`,
     }));

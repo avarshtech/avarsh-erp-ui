@@ -47,7 +47,7 @@ export const buildReports = () => [
         width: 110,
         align: 'right',
         render: (v, r) => (
-          <Tooltip title={v === r.packedQty ? undefined : 'Packed on a list that is not approved yet.'}>
+          <Tooltip title={v === r.packedQty ? undefined : 'Packed on a list that is not final yet.'}>
             <Text strong={v > 0}>{int(v)}</Text>
           </Tooltip>
         ),
@@ -87,8 +87,8 @@ export const buildReports = () => [
       { title: 'Status', dataIndex: 'status', width: 120, render: (s) => <Tag>{s}</Tag> },
       { title: 'Tpl v', dataIndex: 'templateVersion', width: 75, align: 'center', render: (v) => (v ? `v${v}` : '—') },
       { title: 'Created by', dataIndex: 'createdBy', width: 130, ellipsis: true },
-      { title: 'Approved', dataIndex: 'approvedAt', width: 150, render: nowrap },
-      { title: 'By', dataIndex: 'approvedBy', width: 130, ellipsis: true },
+      { title: 'Finalised', dataIndex: 'finalisedAt', width: 150, render: nowrap },
+      { title: 'By', dataIndex: 'finalisedBy', width: 130, ellipsis: true },
       { title: 'Exported', dataIndex: 'exportedAt', width: 150, render: nowrap },
       { title: 'Detail', dataIndex: 'detail', width: 220, ellipsis: true, render: (v) => v || '—' },
     ],
@@ -96,7 +96,7 @@ export const buildReports = () => [
   {
     key: 'INVOICE_REGISTER',
     label: 'Invoice register (FY)',
-    blurb: 'The approved series in number order with FX and INR values — what a GST reconciliation reads.',
+    blurb: 'The issued series in number order with FX and INR values — what a GST reconciliation reads.',
     fetch: invoiceRegisterReport,
     scroll: 1520,
     filters: ['search'],
@@ -128,7 +128,7 @@ export const buildReports = () => [
   {
     key: 'VARIANCE',
     label: 'Excess / shortage',
-    blurb: 'Every quantity variance across shipments, with the reason its approver accepted.',
+    blurb: 'Every quantity variance across shipments, with the reason recorded against it.',
     fetch: varianceReport,
     scroll: 1480,
     filters: ['search', 'outsideToleranceOnly'],
@@ -226,7 +226,7 @@ export const buildReports = () => [
   {
     key: 'PRODUCTIVITY',
     label: 'Productivity',
-    blurb: 'Documents produced per user, how long they take to approve, and how often a warning is overridden.',
+    blurb: 'Documents produced per user, how long they take to finalise, and how often a warning is overridden.',
     fetch: productivityReport,
     scroll: 1080,
     filters: ['search'],
@@ -236,14 +236,14 @@ export const buildReports = () => [
       { title: 'Packing lists', dataIndex: 'packingLists', width: 130, align: 'right', render: int },
       { title: 'Invoices', dataIndex: 'invoices', width: 110, align: 'right', render: int },
       { title: 'Sticker runs', dataIndex: 'stickerRuns', width: 130, align: 'right', render: int },
-      { title: 'Approvals', dataIndex: 'approvals', width: 115, align: 'right', render: int },
+      { title: 'Finalisations', dataIndex: 'finalisations', width: 115, align: 'right', render: int },
       {
-        title: 'Draft → approval',
-        dataIndex: 'avgHoursToApproval',
+        title: 'Draft → final',
+        dataIndex: 'avgHoursToFinal',
         width: 160,
         align: 'right',
         render: (v) => (v === null
-          ? <Tooltip title="Nothing approved yet — not an instant approval."><Text type="secondary">—</Text></Tooltip>
+          ? <Tooltip title="Nothing finalised yet — not an instant turnaround."><Text type="secondary">—</Text></Tooltip>
           : `${dec(v, 1)} h`),
       },
       {

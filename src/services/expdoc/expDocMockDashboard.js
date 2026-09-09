@@ -16,10 +16,10 @@ const daysBetween = (from, to) => Math.round(
   (new Date(`${to}T00:00:00`) - new Date(`${from}T00:00:00`)) / 86400000,
 );
 
-/** Documents waiting on somebody, and who. */
+/** Documents still open, and whose desk they are on. */
 const pendingRows = (db) => {
   const pls = (db.packingLists || [])
-    .filter((p) => [PL_STATUS.DRAFT, PL_STATUS.SUBMITTED].includes(p.status))
+    .filter((p) => p.status === PL_STATUS.DRAFT)
     .map((p) => ({
       id: p.id,
       kind: 'PACKING_LIST',
@@ -27,12 +27,12 @@ const pendingRows = (db) => {
       buyerName: p.buyerName,
       shipmentNo: p.shipmentNo,
       status: p.status,
-      waitingOn: p.status === PL_STATUS.SUBMITTED ? 'Approver' : (p.createdBy || 'Documentation'),
+      waitingOn: p.createdBy || 'Documentation',
       updatedAt: p.updatedAt,
       route: `/export-docs/packing-lists/edit/${p.id}`,
     }));
   const invoices = (db.invoices || [])
-    .filter((i) => [INVOICE_STATUS.DRAFT, INVOICE_STATUS.SUBMITTED].includes(i.status))
+    .filter((i) => i.status === INVOICE_STATUS.DRAFT)
     .map((i) => ({
       id: i.id,
       kind: 'EXPORT_INVOICE',
@@ -40,9 +40,7 @@ const pendingRows = (db) => {
       buyerName: i.buyerName,
       shipmentNo: i.shipmentNo,
       status: i.status,
-      waitingOn: i.status === INVOICE_STATUS.SUBMITTED
-        ? (i.financeSignOff ? 'Approver' : 'Finance')
-        : (i.createdBy || 'Documentation'),
+      waitingOn: i.createdBy || 'Documentation',
       updatedAt: i.updatedAt,
       route: `/export-docs/invoices/edit/${i.id}`,
     }));
@@ -66,7 +64,7 @@ const readinessRows = (db) => {
       const invoices = (db.invoices || []).filter(
         (i) => i.shipmentId === s.id && ![INVOICE_STATUS.CANCELLED, INVOICE_STATUS.SUPERSEDED].includes(i.status),
       );
-      const done = (rows) => rows.filter((r) => [PL_STATUS.APPROVED, PL_STATUS.EXPORTED].includes(r.status)).length;
+      const done = (rows) => rows.filter((r) => [PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(r.status)).length;
 
       // Four things have to be true for a shipment to be documented, so readiness is
       // four quarters rather than a ratio of one of them.
@@ -85,12 +83,12 @@ const readinessRows = (db) => {
         daysToEtd: days,
         packingEntries: entries.length,
         packingLists: pls.length,
-        packingListsApproved: done(pls),
+        packingListsFinal: done(pls),
         invoices: invoices.length,
-        invoicesApproved: done(invoices),
+        invoicesFinal: done(invoices),
         readinessPercent: Math.round((steps.filter(Boolean).length / steps.length) * 100),
         // Late is not the same as merely close: a shipment that sails in two days
-        // with unapproved documents is the one worth a colour.
+        // with documents still in draft is the one worth a colour.
         atRisk: days != null && days <= 3 && steps.filter(Boolean).length < steps.length,
         route: `/export-docs/shipments/edit/${s.id}`,
       };
@@ -111,9 +109,7 @@ export const getExpDocDashboard = async () => {
 
   return {
     quickStats: {
-      // Waiting on an approver — the number a manager acts on.
-      awaitingApproval: pending.filter((p) => p.status === 'SUBMITTED').length,
-      // Drafts nobody has submitted, which is the other half of "what is pending".
+      // Documents nobody has finalised — the number a manager acts on.
       inDraft: pending.filter((p) => p.status === 'DRAFT').length,
       shipmentsAtRisk: readiness.filter((r) => r.atRisk).length,
       releasedToday: [
