@@ -680,9 +680,19 @@ const POForm = () => {
         return;
       }
 
+      // An item with no active variant cannot be bought: a PO line is raised against the
+      // variant. This used to fall through and save a line with no variant at all, so
+      // refuse the selection and name the item rather than accept an unusable line.
+      if (variants.length === 0) {
+        message.error(
+          `${selectedItem.itemCode || selectedItem.itemName || 'This item'} has no active variant, `
+          + 'so it cannot be purchased. Activate a variant in Item Master first.'
+        );
+        return;
+      }
+
       // If item has exactly one variant, auto-select it
-      const selectedVariant = variants.length === 1 ? variants[0] : null;
-      populateLineItemWithVariant(lineKey, selectedItem, selectedVariant);
+      populateLineItemWithVariant(lineKey, selectedItem, variants[0]);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -1138,6 +1148,15 @@ const POForm = () => {
     if (remarks.length > 500) {
       errors.push('Remarks cannot exceed 500 characters');
     }
+
+    // Every line must name the variant it is buying — the variant is the purchasable
+    // identity, and both the API and the column now refuse a line without one. Catching
+    // it here means the buyer sees which line is at fault instead of a bare 400.
+    lineItems.forEach((item, index) => {
+      if (item.itemId && !item.variantId) {
+        errors.push(`Line ${index + 1}: pick a variant for ${item.itemCode || item.itemName || 'this item'}`);
+      }
+    });
 
     // BOM-PO type validations
     if (poType === PO_TYPE.REGULAR && bomOrders.length === 0) {
