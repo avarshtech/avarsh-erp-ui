@@ -236,6 +236,43 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    // ── RBAC AUDIT soak (non-admin roles) ──────────────────
+    // Its OWN setup, not the shared `setup` project: these three users exist only in the
+    // e2e seed, so folding them into the shared setup would fail every other project on
+    // any database that lacks that seed. Not part of a default run — invoke explicitly
+    // with `--project=rbac-soak-*`.
+    {
+      name: 'rbac-soak-setup',
+      testMatch: /rbac-soak-setup\.js/,
+    },
+    {
+      name: 'rbac-soak-merch',
+      testDir: './e2e/specs/rbac-soak',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/e2e-merch.json',
+      },
+      dependencies: ['rbac-soak-setup'],
+    },
+    {
+      name: 'rbac-soak-store',
+      testDir: './e2e/specs/rbac-soak',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/e2e-store.json',
+      },
+      dependencies: ['rbac-soak-setup'],
+    },
+    {
+      name: 'rbac-soak-costing',
+      testDir: './e2e/specs/rbac-soak',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/e2e-costing.json',
+      },
+      dependencies: ['rbac-soak-setup'],
+    },
+
     // ── Full Business Flow (Costing → Order → BOM → PO) ─────
     // Single browser window, handles its own login, no setup dependency
     {
