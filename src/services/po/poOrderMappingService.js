@@ -45,7 +45,15 @@ export const searchMappablePos = async (params = {}) =>
 
 export const getPoMapping = async (poId) => (await axiosInstance.get(`${BASE}/${poId}`)).data;
 
-export const listMappableOrders = async () => (await axiosInstance.get(`${BASE}/orders`)).data;
+/**
+ * The orders whose BOM actually consumes the variant this PO line is buying.
+ *
+ * The unfiltered list offers every confirmed bulk order, which for a fabric line is most
+ * of the factory. An empty array is a real answer — a General PO is often raised before
+ * the order's BOM exists — so the caller must explain it rather than render a blank.
+ */
+export const listMappableOrdersForLine = async (poLineItemId) =>
+  (await axiosInstance.get(`${BASE}/lines/${poLineItemId}/orders`)).data;
 
 export const listMappingSuppliers = async () => (await axiosInstance.get(`${BASE}/suppliers`)).data;
 
@@ -57,9 +65,6 @@ export const addAllocation = async ({ poId, ...body }) =>
 
 export const removeAllocation = async ({ poId, allocationId }) =>
   (await axiosInstance.delete(`${BASE}/${poId}/allocations/${allocationId}`)).data;
-
-export const mapWholePo = async ({ poId, ...body }) =>
-  (await axiosInstance.post(`${BASE}/${poId}/map-all`, body)).data;
 
 export const setStockOnly = async ({ poId, ...body }) =>
   (await axiosInstance.put(`${BASE}/${poId}/stock-only`, body)).data;

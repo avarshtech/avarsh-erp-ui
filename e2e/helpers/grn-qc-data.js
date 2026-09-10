@@ -15,6 +15,18 @@ const ts = () => Date.now();
 
 export const today = () => new Date().toISOString().split('T')[0];
 
+/**
+ * Variant attributes are free text in the item master — a fabric's width is typically
+ * entered as "72 inch" — but GRNRollDTO.width and .gsm are BigDecimal, so passing the
+ * raw attribute through makes every fabric GRN submit fail deserialization with a 500.
+ * The real form already coerces this way before sending (inventoryService.js:439); the
+ * fixture has to match it or it tests a payload the UI never produces.
+ */
+const toNumberOrNull = (value) => {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 // ─── PO Lookup ───────────────────────────────────────────────────────────────
 
 /**
@@ -111,8 +123,8 @@ async function enrichPOForTest(api, po, matchingLines) {
       uom: li.uomName || 'Mtr',
       color: li.variantAttributes?.color || '',
       size: li.variantAttributes?.size || '',
-      width: li.variantAttributes?.width || null,
-      gsm: li.variantAttributes?.gsm || null,
+      width: toNumberOrNull(li.variantAttributes?.width),
+      gsm: toNumberOrNull(li.variantAttributes?.gsm),
     };
   });
 

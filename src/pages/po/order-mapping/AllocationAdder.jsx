@@ -34,7 +34,11 @@ const AllocationAdder = ({ line, onAdd }) => {
       style={{ padding: '8px 0 4px', rowGap: 8 }}
     >
       <Form.Item name="orderId" rules={[{ required: true, message: 'Pick an order' }]} style={{ marginBottom: 0 }}>
-        <OrderSelect disabled={saving} />
+        <OrderSelect
+          disabled={saving}
+          poLineItemId={line.id}
+          lineLabel={[line.itemCode, line.variantCode].filter(Boolean).join(' ')}
+        />
       </Form.Item>
       <Form.Item
         name="qty"

@@ -8,7 +8,6 @@ import { getMappingStatusLabel } from '../../../utils/poOrderMappingConstants';
 import { formatDate } from '../../../utils/formatters';
 import StatusTag from '../../../components/StatusTag';
 import PoMappingLineTable from './PoMappingLineTable';
-import MapWholePoModal from './MapWholePoModal';
 import StockOnlyModal from './StockOnlyModal';
 
 const { Text } = Typography;
@@ -22,7 +21,6 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
   const { message } = App.useApp();
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [mapAllOpen, setMapAllOpen] = useState(false);
   const [stockOnlyOpen, setStockOnlyOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -58,7 +56,6 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
     }
   }, [poId, applyUpdate, message]);
 
-  const hasOpenQty = (po?.lineItems || []).some((l) => l.unmappedQty > 0);
   const hasAllocations = (po?.lineItems || []).some((l) => l.allocations.length > 0);
   const overAllocated = (po?.lineItems || []).filter((l) => l.overAllocatedQty > 0);
   const editable = canEdit && !po?.readOnly;
@@ -74,9 +71,6 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
         <Space>
           <Button icon={po.stockOnly ? <UndoOutlined /> : <InboxOutlined />} disabled={!po.stockOnly && hasAllocations} onClick={() => setStockOnlyOpen(true)}>
             {po.stockOnly ? 'Reopen for mapping' : 'Mark Stock Only'}
-          </Button>
-          <Button type="primary" icon={<LinkOutlined />} disabled={po.stockOnly || !hasOpenQty} onClick={() => setMapAllOpen(true)}>
-            Map entire PO to one order
           </Button>
         </Space>
       )}
@@ -152,7 +146,6 @@ const PoOrderMappingDrawer = ({ open, poId, summary, canEdit, onClose, onChanged
         </>
       )}
 
-      <MapWholePoModal open={mapAllOpen} po={po} onClose={() => setMapAllOpen(false)} onMapped={(u) => { setMapAllOpen(false); applyUpdate(u); }} />
       <StockOnlyModal open={stockOnlyOpen} po={po} onClose={() => setStockOnlyOpen(false)} onSaved={() => { setStockOnlyOpen(false); load(); onChanged?.(); }} />
     </Drawer>
   );
