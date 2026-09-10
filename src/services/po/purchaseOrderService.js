@@ -92,14 +92,15 @@ export const createPurchaseOrder = async (poData) => {
 
 /**
  * Update an existing purchase order
- * Backend expects POST with id in body
+ * PUT /{id} is the edit route; the id still rides in the body so the payload shape is
+ * identical to create. The old POST upsert still works server-side, so a stale tab is safe.
  * @param {number} id - Purchase order ID
  * @param {Object} poData - Updated purchase order data
  * @returns {Promise<Object>} Updated purchase order
  */
 export const updatePurchaseOrder = async (id, poData) => {
   const payload = { id, ...poData };
-  const response = await axiosInstance.post(ENDPOINTS.PURCHASE_ORDERS, payload);
+  const response = await axiosInstance.put(`${ENDPOINTS.PURCHASE_ORDERS}/${id}`, payload);
   return response.data;
 };
 
