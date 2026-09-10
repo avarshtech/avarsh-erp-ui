@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined, TeamOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined, LineChartOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
+import CostPerHead from './CostPerHead';
 import HeadcountMovement from './HeadcountMovement';
 
 const { Text } = Typography;
@@ -27,6 +28,14 @@ const SECTIONS = [
         title: 'Payroll cost movement',
         subtitle: 'Why the payroll total changed between two periods, broken down by cause',
         render: () => <PayrollBridge />,
+      },
+      {
+        key: 'cost-per-head',
+        label: 'Cost per Head',
+        icon: <LineChartOutlined />,
+        title: 'Cost per head',
+        subtitle: 'Whether cost moved because of more people or more pay each',
+        render: () => <CostPerHead />,
       },
     ],
   },

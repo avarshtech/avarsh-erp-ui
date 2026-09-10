@@ -37,3 +37,12 @@ export const getHeadcountEmployees = async (params) => {
   const response = await axiosInstance.get(`${BASE_URL}/headcount-movement/employees`, { params });
   return response.data;
 };
+
+/**
+ * Cost per head across a run of periods, split into people and pay.
+ * GET /api/v1/hr/analytics/cost-per-head
+ */
+export const getCostPerHead = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/cost-per-head`, { params });
+  return response.data;
+};
