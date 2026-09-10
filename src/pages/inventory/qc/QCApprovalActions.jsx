@@ -54,7 +54,11 @@ const VOLCANO = '#d4380d'; // Rejected_With_Backup accent
 const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const { message } = App.useApp();
   const [busy, setBusy] = useState(false);
-  const [activeAction, setActiveAction] = useState(null);
+  // Only the key is held in state; the live config is looked up from
+  // ACTION_CONFIGS on every render. Storing the config object froze it at the
+  // moment the dialog opened, so ticking "Conditional Pass" left the dialog
+  // still titled "Approve" and promising "Pending Approval → Approved".
+  const [activeKey, setActiveKey] = useState(null);
   const [reason, setReason] = useState('');
   const [conditionalPass, setConditionalPass] = useState(false);
   const [keepBackup, setKeepBackup] = useState(false);
@@ -69,42 +73,13 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
   const referBackApproveFn  = isFabric ? approveFabricQCReferBack : approveTrimsQCReferBack;
   const referBackRejectFn   = isFabric ? rejectFabricQCReferBack  : rejectTrimsQCReferBack;
 
-  const openAction = (action) => {
+  const openAction = (key) => {
     setReason('');
     setConditionalPass(false);
     setKeepBackup(false);
-    setActiveAction(action);
+    setActiveKey(key);
   };
-  const closeAction = () => setActiveAction(null);
-
-  const performAction = async (enteredReason) => {
-    if (!activeAction) return;
-    setBusy(true);
-    try {
-      let updated;
-      switch (activeAction.key) {
-        case 'approve':
-          // Backend owns the GRN-close interlock inside QCService on every path
-          updated = await approveFn(qc.id, enteredReason, { conditionalPass });
-          break;
-        case 'reject':     updated = await rejectFn(qc.id, enteredReason, { keepBackup }); break;
-        case 'request-rb': updated = await referBackRequestFn?.(qc.id, enteredReason); break;
-        case 'approve-rb': updated = await referBackApproveFn?.(qc.id); break;
-        case 'reject-rb':  updated = await referBackRejectFn?.(qc.id); break;
-        default: break;
-      }
-      let successMsg = activeAction.successMsg || 'Action completed';
-      if (activeAction.key === 'approve' && conditionalPass) successMsg = 'QC approved with Conditional Pass';
-      if (activeAction.key === 'reject' && keepBackup) successMsg = 'QC rejected and kept in stock as Back-up';
-      message.success(successMsg);
-      onUpdated?.(updated);
-      closeAction();
-    } catch {
-      // No toast here. The axios response interceptor already raises one carrying the server's
-      // own message, so adding a second showed two stacked popups — and the generic one on top,
-      // which told the user nothing while the real reason scrolled away above it.
-    } finally { setBusy(false); }
-  };
+  const closeAction = () => setActiveKey(null);
 
   const docLabel = isFabric ? 'Fabric QC Inspection' : 'Accessories QC Inspection';
 
@@ -197,6 +172,39 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
       requiresReason: false,
       successMsg: 'Refer-back rejected',
     },
+  };
+
+  // Live config for the open dialog — re-read every render so the Conditional
+  // Pass / Keep Back-up toggles restyle and re-title it as they are ticked.
+  const activeAction = activeKey ? ACTION_CONFIGS[activeKey] : null;
+
+  const performAction = async (enteredReason) => {
+    if (!activeAction) return;
+    setBusy(true);
+    try {
+      let updated;
+      switch (activeAction.key) {
+        case 'approve':
+          // Backend owns the GRN-close interlock inside QCService on every path
+          updated = await approveFn(qc.id, enteredReason, { conditionalPass });
+          break;
+        case 'reject':     updated = await rejectFn(qc.id, enteredReason, { keepBackup }); break;
+        case 'request-rb': updated = await referBackRequestFn?.(qc.id, enteredReason); break;
+        case 'approve-rb': updated = await referBackApproveFn?.(qc.id); break;
+        case 'reject-rb':  updated = await referBackRejectFn?.(qc.id); break;
+        default: break;
+      }
+      let successMsg = activeAction.successMsg || 'Action completed';
+      if (activeAction.key === 'approve' && conditionalPass) successMsg = 'QC approved with Conditional Pass';
+      if (activeAction.key === 'reject' && keepBackup) successMsg = 'QC rejected and kept in stock as Back-up';
+      message.success(successMsg);
+      onUpdated?.(updated);
+      closeAction();
+    } catch {
+      // No toast here. The axios response interceptor already raises one carrying the server's
+      // own message, so adding a second showed two stacked popups — and the generic one on top,
+      // which told the user nothing while the real reason scrolled away above it.
+    } finally { setBusy(false); }
   };
 
   // ─── Extra dialog panels (Conditional Pass / Keep Back-up) ───────────
@@ -296,17 +304,19 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
             key={cfg.key}
             action={cfg.action}
             text={cfg.label}
-            onClick={() => openAction(cfg)}
-            loading={busy && activeAction?.key === cfg.key}
+            onClick={() => openAction(cfg.key)}
+            loading={busy && activeKey === cfg.key}
           />
         );
       })}
     </Space>
   ) : null;
 
-  // After an engine decision the QC status changed server-side — refetch it
+  // After an engine decision the QC status changed server-side — refetch it.
+  // A failed refetch still reports the change upward (with no record) so the
+  // list behind the modal reloads instead of sitting on the old status.
   const refreshQc = async () => {
-    try { onUpdated?.(await getFabricQCById(qc.id)); } catch { /* parent keeps stale copy */ }
+    try { onUpdated?.(await getFabricQCById(qc.id)); } catch { onUpdated?.(null); }
   };
 
   if (!isDecisionStage && !showRequestRb) return null;
@@ -336,8 +346,8 @@ const QCApprovalActions = ({ qc, type = 'fabric', onUpdated }) => {
           <ActionButton
             action={ACTION_CONFIGS['request-rb'].action}
             text={ACTION_CONFIGS['request-rb'].label}
-            onClick={() => openAction(ACTION_CONFIGS['request-rb'])}
-            loading={busy && activeAction?.key === 'request-rb'}
+            onClick={() => openAction('request-rb')}
+            loading={busy && activeKey === 'request-rb'}
           />
         </Space>
       )}

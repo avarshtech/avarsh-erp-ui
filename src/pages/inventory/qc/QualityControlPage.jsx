@@ -26,6 +26,9 @@ const QualityControlPage = () => {
   const navigate = useNavigate();
   const [activeSegment, setActiveSegment] = useState('Fabric');
   const [deepLinkQc, setDeepLinkQc] = useState(null);
+  // Bumped when the deep-linked modal approves/rejects a QC, so the embedded
+  // list refetches instead of keeping the row's pre-approval status.
+  const [listVersion, setListVersion] = useState(0);
 
   const isFabric = activeSegment === 'Fabric';
 
@@ -85,13 +88,19 @@ const QualityControlPage = () => {
         }}
       />
 
-      {isFabric ? <FabricQCList embedded /> : <TrimsQCList embedded />}
+      {isFabric
+        ? <FabricQCList embedded refreshToken={listVersion} />
+        : <TrimsQCList embedded refreshToken={listVersion} />}
 
       <QCViewModal
         open={!!deepLinkQc}
         onClose={() => setDeepLinkQc(null)}
         record={deepLinkQc}
         type={deepLinkQc?.type === 'Accessories' ? 'trims' : 'fabric'}
+        onUpdated={(updated) => {
+          if (updated) setDeepLinkQc(updated);
+          setListVersion((v) => v + 1);
+        }}
       />
     </div>
   );

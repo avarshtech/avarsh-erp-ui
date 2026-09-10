@@ -43,7 +43,7 @@ const STATUS_OPTIONS = [
   { label: 'Referred Back', value: QC_STATUS.REFERRED_BACK },
 ];
 
-const FabricQCList = ({ embedded = false }) => {
+const FabricQCList = ({ embedded = false, refreshToken = 0 }) => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
 
@@ -97,9 +97,11 @@ const FabricQCList = ({ embedded = false }) => {
     });
   }, [modal, message, loadData]);
 
+  // `refreshToken` lets the page above force a refetch (e.g. after the
+  // deep-linked view modal approves a QC) without remounting the list.
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [loadData, refreshToken]);
 
   const filteredData = useMemo(() => {
     let result = data;
@@ -205,11 +207,14 @@ const FabricQCList = ({ embedded = false }) => {
           locale={{ emptyText: <EmptyState title="No fabric QC inspections found" description="Create a new inspection to get started" /> }}
         />
       </Card>
+      {/* onUpdated: an approval inside the modal changes the QC server-side —
+          reload so the row behind it shows the new status without a page refresh. */}
       <QCViewModal
         open={viewDrawer.open}
         onClose={() => setViewDrawer({ open: false, record: null })}
         record={viewDrawer.record}
         type="fabric"
+        onUpdated={() => loadData()}
       />
     </>
   );

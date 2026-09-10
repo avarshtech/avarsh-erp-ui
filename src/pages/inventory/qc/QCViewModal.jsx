@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Modal, Row, Col, Card, Table, Tag, Typography, Avatar, Divider, Alert, Space, Skeleton } from 'antd';
 import useResponsive from '../../../hooks/useResponsive';
 import {
@@ -92,12 +92,24 @@ const trimsCriteriaColumns = [
   { title: 'Remarks', dataIndex: 'remarks', align: 'center', ellipsis: true },
 ];
 
-const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) => {
+/**
+ * `onUpdated` fires whenever an approval action changes the QC server-side.
+ * The modal adopts the returned record itself; the parent needs the signal to
+ * reload its list, otherwise the row behind the modal keeps the old status
+ * until the page is reloaded. It is called with `null` when the action
+ * succeeded but the follow-up refetch did not — the list must still reload.
+ */
+const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric', onUpdated }) => {
   const [qc, setQc] = useState(initialRecord);
   const { isMobile, isTablet } = useResponsive();
   const modalWidth = isMobile ? '100vw' : isTablet ? '94vw' : 1200;
 
   useEffect(() => { setQc(initialRecord); }, [initialRecord]);
+
+  const handleQcUpdated = useCallback((updated) => {
+    if (updated) setQc(updated);
+    onUpdated?.(updated);
+  }, [onUpdated]);
 
   const isFabric = type === 'fabric';
   const accent = HERO_ACCENT[qc?.status] || 'var(--primary-color)';
@@ -147,7 +159,7 @@ const QCViewModal = ({ open, onClose, record: initialRecord, type = 'fabric' }) 
                 onClick={() => (isFabric ? generateFabricQCPdf(qc) : generateTrimsQCPdf(qc))}
               />
             )}
-            <QCApprovalActions qc={qc} type={type} onUpdated={(updated) => setQc(updated)} />
+            <QCApprovalActions qc={qc} type={type} onUpdated={handleQcUpdated} />
           </Space>
           <ActionButton action="close" text="Close" onClick={onClose} />
         </div>
