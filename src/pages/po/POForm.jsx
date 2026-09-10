@@ -23,6 +23,7 @@ import {
   AutoComplete,
   Segmented,
   Popover,
+  Tooltip,
 } from 'antd';
 import { numericInputProps } from '../../utils/inputHelpers';
 import {
@@ -53,6 +54,8 @@ import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
 import { CONSUMPTION_MODE } from '../../utils/bomConstants';
+import { formatNumber } from '../../utils/formatters';
+import { getVariantStockAvailability } from '../../services/inventory/inventoryService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -301,6 +304,10 @@ const POForm = () => {
 
   // Line items
   const [lineItems, setLineItems] = useState([createEmptyLineItem()]);
+  // What is already on the rack for the variants on this PO, keyed by variant id. A
+  // variant with nothing In_Stock is simply absent, so its line renders no stock cell at
+  // all rather than a zero. Purely informational — nothing here is reserved or held.
+  const [stockByVariant, setStockByVariant] = useState({});
 
   // IGST applicability (determined by supplier)
   const [isIgstApplicable, setIsIgstApplicable] = useState(false);
@@ -956,6 +963,10 @@ const POForm = () => {
       // The PO is raised in the BOM line's purchase UOM. When the item defines a UOM
       // conversion the BOM snapshots the converted quantity; otherwise both are the same.
       qty: String(bomPurchaseQty(bomLine)),
+      // The BOM's own figure, kept so the Qty cell can show it once the buyer edits away
+      // from it — the quantity is editable now, and a silent deviation would be worse
+      // than no BOM link at all.
+      _bomQty: String(bomPurchaseQty(bomLine)),
       uom: bomPurchaseUom(bomLine),
       uomId: bomPurchaseUomId(bomLine),
       primaryUom: '',
@@ -1025,6 +1036,8 @@ const POForm = () => {
         if (mergeMap.has(key)) {
           const existing = mergeMap.get(key);
           existing.qty = String(parseFloat(existing.qty || 0) + parseFloat(bomPurchaseQty(bomLine)));
+          // The merged total is what the BOMs asked for, so it is the figure to deviate from.
+          existing._bomQty = existing.qty;
           existing.bomLineSources.push({ bomId, lineId: bomLine.id });
         } else {
           mergeMap.set(key, createPoLineFromBom(bomLine, bomId));
@@ -1045,6 +1058,35 @@ const POForm = () => {
     setLineItems(newLines.length > 0 ? newLines : [createEmptyLineItem()]);
     setIsDirty(true);
   }, [poType, uoms, message]);
+
+  // Asked once for every line on the form rather than once per line: on a twenty-line
+  // combined PO that is the difference between one round trip and twenty. Keyed on the
+  // sorted id list so re-rendering for an unrelated edit (a price, a remark) does not
+  // refetch.
+  const variantIdsKey = useMemo(() => (
+    [...new Set(lineItems.map((l) => l.variantId).filter(Boolean))].sort((a, b) => a - b).join(',')
+  ), [lineItems]);
+
+  useEffect(() => {
+    let alive = true;
+    const ids = variantIdsKey ? variantIdsKey.split(',').map(Number) : [];
+    getVariantStockAvailability(ids)
+      .then((rows) => {
+        if (!alive) return;
+        // A variant can hold stock in more than one unit, so keep every row and let the
+        // cell pick the one that matches the line.
+        const byVariant = {};
+        rows.forEach((row) => {
+          if (!byVariant[row.variantId]) byVariant[row.variantId] = [];
+          byVariant[row.variantId].push(row);
+        });
+        setStockByVariant(byVariant);
+      })
+      // Fails closed: the stock cell disappears and the form behaves exactly as it did
+      // before this feature existed. Availability is never worth blocking a PO over.
+      .catch(() => { if (alive) setStockByVariant({}); });
+    return () => { alive = false; };
+  }, [variantIdsKey]);
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -1824,26 +1866,89 @@ const POForm = () => {
       width: 100,
       align: 'center',
       render: (value, record) => {
-        if (record._fromBom) {
-          const uomLabel = (record.uom || record.primaryUom || '').toUpperCase();
-          return <Text strong style={{ color: 'var(--primary-color)' }}>{value}{uomLabel ? ` ${uomLabel}` : ''}</Text>;
-        }
+        // A BOM-sourced quantity used to be read-only text, on the reasoning that the BOM
+        // owns the number. It is editable now because the buyer has to be able to buy less
+        // when the material is already on the rack — which is the whole point of the stock
+        // cell beside it. The BOM figure is kept and shown once the two diverge, so a
+        // deviation is visible rather than silent.
+        const deviated = record._fromBom && record._bomQty != null
+          && String(record._bomQty) !== String(value ?? '');
         return (
-          <InputNumber name="qty"
-            min={0}
-            step={1}
-            precision={2}
-            controls={false}
-            style={{ width: '100%', height: 40 }}
-            value={value === '' ? null : Number(value)}
-            onChange={(v) =>
-              handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
-            }
-            disabled={submitting || savingDraft || !record.itemId}
-            placeholder="0"
-            suffix={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
-            {...numericInputProps}
-          />
+          <Space orientation="vertical" size={0} style={{ width: '100%' }}>
+            <InputNumber name="qty"
+              min={0}
+              step={1}
+              precision={2}
+              controls={false}
+              style={{ width: '100%', height: 40 }}
+              value={value === '' ? null : Number(value)}
+              onChange={(v) =>
+                handleLineItemChange(record.key, 'qty', v !== null ? String(v) : '')
+              }
+              disabled={submitting || savingDraft || !record.itemId}
+              placeholder="0"
+              suffix={record.itemId ? (record.uom || record.primaryUom || '').toUpperCase() || undefined : undefined}
+              {...numericInputProps}
+            />
+            {deviated && (
+              <Text type="secondary" style={{ fontSize: 11 }}>
+                BOM: {formatNumber(Number(record._bomQty), 3)}
+              </Text>
+            )}
+          </Space>
+        );
+      },
+    },
+    {
+      // Requirement: before committing to a purchase quantity, the buyer sees what is
+      // already on the rack for this exact variant — no siblings, no item-level rollup.
+      // Nothing renders when there is no stock, so the column is quiet on most lines.
+      title: 'In Stock',
+      key: 'inStock',
+      width: 150,
+      align: 'center',
+      render: (_, record) => {
+        const rows = stockByVariant[record.variantId] || [];
+        if (rows.length === 0) return null;
+
+        const lineUom = (record.uom || record.primaryUom || '').trim().toLowerCase();
+        // Stock carries its own unit. Prefer the row that matches the line so the figure
+        // and the purchase quantity are comparable; otherwise show the first and say why
+        // the action is unavailable.
+        const match = rows.find((r) => (r.uom || '').trim().toLowerCase() === lineUom);
+        const row = match || rows[0];
+        if (!(row.availableQty > 0)) return null;
+
+        const currentQty = parseFloat(record.qty || 0) || 0;
+        const reduced = Math.max(0, currentQty - row.availableQty);
+        const canReduce = Boolean(match) && currentQty > 0
+          && !submitting && !savingDraft && record.itemId;
+
+        return (
+          <Space orientation="vertical" size={2} style={{ width: '100%' }}>
+            <Text strong style={{ color: 'var(--success-color, #389e0d)' }}>
+              {formatNumber(row.availableQty, 3)} {row.uom}
+            </Text>
+            {match ? (
+              <Button
+                size="small"
+                type="link"
+                disabled={!canReduce}
+                style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                onClick={() => handleLineItemChange(record.key, 'qty', String(reduced))}
+              >
+                Reduce by stock
+              </Button>
+            ) : (
+              <Tooltip
+                title={`Stock is held in ${row.uom} but this line is bought in ${record.uom || record.primaryUom || 'another unit'}. Convert it yourself before adjusting the quantity.`}
+              >
+                <Text type="secondary" style={{ fontSize: 11, cursor: 'help' }}>
+                  Different unit
+                </Text>
+              </Tooltip>
+            )}
+          </Space>
         );
       },
     },

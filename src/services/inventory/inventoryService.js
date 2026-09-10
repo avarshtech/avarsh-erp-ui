@@ -732,6 +732,26 @@ export const getActiveTrimsQCCriteria = () => fetchActiveTrimsQCCriteria();
 // pre-aggregated at the (itemCode × grnNumber) level with rolls / variants nested.
 const STOCK_FABRIC_ENDPOINT      = '/inventory/stock/fabric';
 const STOCK_ACCESSORIES_ENDPOINT = '/inventory/stock/accessories';
+const STOCK_AVAILABILITY_ENDPOINT = '/inventory/stock/availability';
+
+/**
+ * What is already on the rack for these exact variants, across fabric and accessories.
+ *
+ * Batched deliberately: the PO form asks once for every line it is showing, not once per
+ * line. Rows come back grouped by UOM because stock carries its own unit while a PO line
+ * is raised in the purchase UOM, and a variant with nothing In_Stock is simply absent —
+ * so the caller renders nothing at all for it rather than a zero.
+ *
+ * Purely informational. It reserves nothing and holds nothing.
+ */
+export const getVariantStockAvailability = async (variantIds = []) => {
+  const ids = [...new Set(variantIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const { data } = await axiosInstance.get(STOCK_AVAILABILITY_ENDPOINT, {
+    params: { variantIds: ids.join(',') },
+  });
+  return data || [];
+};
 
 // Current financial year window (April 1 → March 31) used by mock stat scoping.
 const currentFYWindow = () => {
