@@ -41,6 +41,9 @@ async function confirmRemove(page) {
 
 const PO_NUMBER = 'PO/0003';
 const BULK_ORDER = 'ORD/0002';
+// Also confirmed and bulk, and its BOM uses the SAME item in a different colour — which
+// is what makes it the right negative for the variant-exact rule.
+const OTHER_BULK_ORDER = 'ORD/0003';
 const SAMPLE_ORDER = 'SMP/0001';
 const MAPPING = '/purchase-orders/order-mapping';
 
@@ -187,13 +190,15 @@ test.describe('PO — Order Mapping', () => {
     await expectToast(page, 'Mapped to order');
     await expect(drawer.getByText(/Partially Mapped/i).first()).toBeVisible({ timeout: 10000 });
     // The trail accumulates across runs, so assert the entry exists rather than that it is unique.
-    await expect(drawer.getByText(/200 kg of FAB-SJ-001 to ORD\/0002/).first()).toBeVisible();
+    // The line is labelled by item AND variant code — the seeded line now names a variant,
+    // and the variant is the purchasable identity, so the trail has to say which colour.
+    await expect(drawer.getByText(/200 kg of FAB-SJ-001 FAB-SJ-001-NVY to ORD\/0002/).first()).toBeVisible();
 
     await drawer.locator('.ant-btn-dangerous').first().click();
     await confirmRemove(page);
 
     await expectToast(page, 'Mapping removed');
-    await expect(drawer.getByText(/200 kg of FAB-SJ-001 from ORD\/0002/).first()).toBeVisible();
+    await expect(drawer.getByText(/200 kg of FAB-SJ-001 FAB-SJ-001-NVY from ORD\/0002/).first()).toBeVisible();
   });
 
   test('over-mapping is refused with the server message', async ({ page }) => {
@@ -235,18 +240,75 @@ test.describe('PO — Order Mapping', () => {
     }
   });
 
-  test('mapping the whole PO marks every line fully mapped', async ({ page }) => {
+  test('mapping every open line in full marks the PO fully mapped', async ({ page }) => {
+    // Replaces the old "map entire PO to one order" button, which was removed: under a
+    // variant-exact rule sibling lines of one PO legitimately belong to different orders,
+    // so the whole-PO shortcut cannot be defended. Each line is mapped to the order that
+    // actually uses its variant instead.
+    const api = await createAuthenticatedClient();
+    try {
+      const row = await findPo(api);
+      const { data: detail } = await api.get(`${MAPPING}/${row.id}`);
+
+      for (const line of detail.lineItems) {
+        if (!(line.unmappedQty > 0)) continue;
+        const { data: orders } = await api.get(`${MAPPING}/lines/${line.id}/orders`);
+        if (orders.length === 0) continue; // no order uses this variant — covered below
+        await api.post(`${MAPPING}/${row.id}/allocations`, {
+          poLineItemId: line.id, orderId: orders[0].id, qty: line.unmappedQty,
+        });
+      }
+    } finally {
+      await api.dispose();
+    }
+
     const drawer = await openPoDrawer(page);
-
-    await drawer.getByRole('button', { name: /map entire po to one order/i }).click();
-    const modal = page.locator('.ant-modal').filter({ hasText: /map entire po/i }).last();
-    await expect(modal).toBeVisible();
-
-    await pickOrder(page, modal);
-    await modal.getByRole('button', { name: /map all open quantity/i }).click();
-
-    await expectToast(page, 'mapped to the selected order');
     await expect(drawer.getByText(/Fully Mapped/i).first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('an order whose BOM does not use the line variant is refused', async () => {
+    // The whole point of the variant filter. PO/0003 buys navy single jersey, which only
+    // ORD/0002 consumes; ORD/0003 uses the black variant of the same item, so matching on
+    // the item alone would have accepted this.
+    const api = await createAuthenticatedClient();
+    try {
+      const row = await findPo(api);
+      const { line } = await fabricLineAndOrder(api, row.id);
+      const { data: wrong } = await api.get('/orders/by-order-no', { orderNo: OTHER_BULK_ORDER });
+
+      const refused = await api.post(`${MAPPING}/${row.id}/allocations`, {
+        poLineItemId: line.id, orderId: wrong.id, qty: 10,
+      });
+
+      expect(refused.status).toBe(409);
+      expect(refused.data.message).toContain('cannot be mapped to it');
+    } finally {
+      await api.dispose();
+    }
+  });
+
+  test('the picker offers only the orders that use the line variant', async () => {
+    const api = await createAuthenticatedClient();
+    try {
+      const row = await findPo(api);
+      const { data: detail } = await api.get(`${MAPPING}/${row.id}`);
+
+      const fabric = detail.lineItems.find((l) => l.itemCode === 'FAB-SJ-001');
+      const { data: forFabric } = await api.get(`${MAPPING}/lines/${fabric.id}/orders`);
+      expect(forFabric.map((o) => o.orderNo)).toEqual([BULK_ORDER]);
+
+      // The unfiltered list is what the picker used to show, and it offers more than one
+      // order for the same line — so this assertion cannot pass vacuously.
+      const { data: unfiltered } = await api.get(`${MAPPING}/orders`);
+      expect(unfiltered.length).toBeGreaterThan(forFabric.length);
+
+      // The trims line buys a colour no BOM uses, so its picker is legitimately empty.
+      const trims = detail.lineItems.find((l) => l.itemCode === 'TRM-BTN-001');
+      const { data: forTrims } = await api.get(`${MAPPING}/lines/${trims.id}/orders`);
+      expect(forTrims).toEqual([]);
+    } finally {
+      await api.dispose();
+    }
   });
 
   test('Stock Only is refused while mappings exist, and accepted once they are gone', async ({ page }) => {
