@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
+import HeadcountMovement from './HeadcountMovement';
 
 const { Text } = Typography;
 
@@ -26,6 +27,20 @@ const SECTIONS = [
         title: 'Payroll cost movement',
         subtitle: 'Why the payroll total changed between two periods, broken down by cause',
         render: () => <PayrollBridge />,
+      },
+    ],
+  },
+  {
+    key: 'people',
+    label: 'Workforce',
+    children: [
+      {
+        key: 'headcount-movement',
+        label: 'Headcount Movement',
+        icon: <TeamOutlined />,
+        title: 'Headcount movement',
+        subtitle: 'How the workforce changed over a date range, and where',
+        render: () => <HeadcountMovement />,
       },
     ],
   },
