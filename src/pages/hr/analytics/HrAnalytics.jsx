@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined, WalletOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
 import CostPerHead from './CostPerHead';
 import HeadcountMovement from './HeadcountMovement';
 import AttendanceSummary from './AttendanceSummary';
+import LeaveLiability from './LeaveLiability';
 
 const { Text } = Typography;
 
@@ -59,6 +60,14 @@ const SECTIONS = [
         title: 'Attendance and loss of pay',
         subtitle: 'Which groups lost days, and whether anyone was absent or the register went unfilled',
         render: () => <AttendanceSummary />,
+      },
+      {
+        key: 'leave-liability',
+        label: 'Leave Liability',
+        icon: <WalletOutlined />,
+        title: 'Leave balance and liability',
+        subtitle: 'What unused leave is worth, and who is holding the most',
+        render: () => <LeaveLiability />,
       },
     ],
   },

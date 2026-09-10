@@ -55,3 +55,21 @@ export const getAttendanceSummary = async (params) => {
   const response = await axiosInstance.get(`${BASE_URL}/attendance-summary`, { params });
   return response.data;
 };
+
+/**
+ * What unused leave is worth, by group and leave type.
+ * GET /api/v1/hr/analytics/leave-liability
+ */
+export const getLeaveLiability = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/leave-liability`, { params });
+  return response.data;
+};
+
+/**
+ * Who is holding it, heaviest first.
+ * GET /api/v1/hr/analytics/leave-liability/holders
+ */
+export const getLeaveHolders = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/leave-liability/holders`, { params });
+  return response.data;
+};
