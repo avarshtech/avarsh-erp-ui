@@ -501,6 +501,7 @@ const MainLayoutInner = () => {
       moduleId: ["hr-masters", "hr-employees", "hr-attendance", "hr-leave", "hr-payroll", "hr-loans", "hr-bonus", "hr-statutory", "hr-fnf"],
       children: [
         { key: "/hr/masters", label: "HR Masters", moduleId: "hr-masters" },
+        { key: "/hr/analytics", label: "Analytics", moduleId: "hr-analytics" },
         { key: "/hr/employees", label: "Employees", moduleId: "hr-employees" },
         { key: "/hr/attendance/calendar", label: "Attendance", moduleId: "hr-attendance" },
         // These screens existed with working routes but no navigation entry, so

@@ -427,6 +427,11 @@ export const SCREENS = [
   { id: 'hr-fnf', name: 'F&F Settlement', section: 'hr', kind: 'screen',
     path: '/hr/fnf', routes: ['/hr/fnf', '/hr/fnf/new', '/hr/fnf/edit/:id', '/hr/fnf/:id'],
     ops: [...STANDARD_OPERATIONS, 'approve'] },
+  // Read-only, but a separate module from hr-payroll on purpose: seeing what a
+  // factory's wage bill did is a wider grant than running its payroll, and some
+  // people need one without the other.
+  { id: 'hr-analytics', name: 'HR Analytics', section: 'hr', kind: 'screen',
+    path: '/hr/analytics', ops: ['view'] },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

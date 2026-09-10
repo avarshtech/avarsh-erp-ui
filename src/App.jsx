@@ -92,6 +92,7 @@ const SavedReportsPage = lazy(() => import('./pages/reports/SavedReportsPage'));
 const AiChatPage = lazy(() => import('./pages/reports/AiChatPage'));
 // HR & Payroll (lazy-loaded)
 const HrDashboard = lazy(() => import('./pages/hr/HrDashboard'));
+const HrAnalytics = lazy(() => import('./pages/hr/analytics/HrAnalytics'));
 const EmployeeList = lazy(() => import('./pages/hr/employee/EmployeeList'));
 const EmployeeForm = lazy(() => import('./pages/hr/employee/EmployeeForm'));
 const EmployeeView = lazy(() => import('./pages/hr/employee/EmployeeView'));
@@ -382,6 +383,7 @@ const ThemedApp = () => {
             <Route path="profile" element={<Profile />} />
             {/* HR & Payroll */}
             <Route path="hr/masters" element={<PermissionRoute module="hr-masters" operation="view"><Suspense fallback={<PageSkeleton />}><HrDashboard /></Suspense></PermissionRoute>} />
+            <Route path="hr/analytics" element={<PermissionRoute module="hr-analytics" operation="view"><Suspense fallback={<PageSkeleton />}><HrAnalytics /></Suspense></PermissionRoute>} />
             <Route path="hr/employees" element={<PermissionRoute module="hr-employees" operation="view"><Suspense fallback={<PageSkeleton />}><EmployeeList /></Suspense></PermissionRoute>} />
             <Route path="hr/employees/new" element={<PermissionRoute module="hr-employees" operation="add"><Suspense fallback={<PageSkeleton />}><EmployeeForm /></Suspense></PermissionRoute>} />
             <Route path="hr/employees/edit/:id" element={<PermissionRoute module="hr-employees" operation="update"><Suspense fallback={<PageSkeleton />}><EmployeeForm /></Suspense></PermissionRoute>} />
