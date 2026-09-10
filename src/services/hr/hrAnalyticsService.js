@@ -46,3 +46,12 @@ export const getCostPerHead = async (params) => {
   const response = await axiosInstance.get(`${BASE_URL}/cost-per-head`, { params });
   return response.data;
 };
+
+/**
+ * Attendance over a date range, grouped.
+ * GET /api/v1/hr/analytics/attendance-summary
+ */
+export const getAttendanceSummary = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/attendance-summary`, { params });
+  return response.data;
+};

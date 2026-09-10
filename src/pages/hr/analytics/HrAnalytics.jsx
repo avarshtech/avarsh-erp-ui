@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined, TeamOutlined, LineChartOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
 import CostPerHead from './CostPerHead';
 import HeadcountMovement from './HeadcountMovement';
+import AttendanceSummary from './AttendanceSummary';
 
 const { Text } = Typography;
 
@@ -50,6 +51,14 @@ const SECTIONS = [
         title: 'Headcount movement',
         subtitle: 'How the workforce changed over a date range, and where',
         render: () => <HeadcountMovement />,
+      },
+      {
+        key: 'attendance-summary',
+        label: 'Attendance & LOP',
+        icon: <CalendarOutlined />,
+        title: 'Attendance and loss of pay',
+        subtitle: 'Which groups lost days, and whether anyone was absent or the register went unfilled',
+        render: () => <AttendanceSummary />,
       },
     ],
   },
