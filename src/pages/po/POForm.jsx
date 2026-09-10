@@ -52,6 +52,7 @@ import { useStore } from '../../context/StoreContext';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
+import { CONSUMPTION_MODE } from '../../utils/bomConstants';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';
 import PantoneColorSwatch from '../../components/PantoneColorSwatch';
@@ -966,11 +967,49 @@ const POForm = () => {
       status: LINE_ITEM_STATUS.DRAFT,
     });
 
+    // A VARIANT_PER_SIZE BOM line spans several size-variants at once, but a PO line is
+    // raised against exactly one variant. The server sends the split (variantBreakdown)
+    // already apportioned to the line's purchase quantity — it is computed there because
+    // the order's size grid is not loaded on this screen, and a Combined PO draws lines
+    // from several BOMs across several orders, so there is no single grid to read here.
+    const splitByVariant = (bomLine) => {
+      if (bomLine.consumptionMode !== CONSUMPTION_MODE.VARIANT_PER_SIZE) return [bomLine];
+      return (bomLine.variantBreakdown || []).map((share) => ({
+        ...bomLine,
+        variantId: share.variantId,
+        variantCode: share.variantCode || '',
+        variantName: share.variantName || '',
+        // The share is already in the purchase UOM, so it stands in for both figures.
+        purchaseQtyPrimary: share.purchaseQty,
+        purchaseQty: share.purchaseQty,
+      }));
+    };
+
+    // Each part keeps its parent's id, so several PO lines can legitimately cite one
+    // BOM line as their source.
+    const expanded = [];
+    const unsplittable = [];
+    selectedLines.forEach(({ bomLine, bomId }) => {
+      const parts = splitByVariant(bomLine);
+      if (parts.length === 0) {
+        unsplittable.push(bomLine.itemCode || bomLine.itemName || `BOM line ${bomLine.id}`);
+        return;
+      }
+      parts.forEach((part) => expanded.push({ bomLine: part, bomId }));
+    });
+
+    if (unsplittable.length > 0) {
+      message.error(
+        `Cannot add ${unsplittable.join(', ')}: the BOM line covers several sizes, but its `
+        + 'variants or the order quantities behind them are incomplete. Complete the BOM first.'
+      );
+    }
+
     let newLines;
     if (poType === PO_TYPE.COMBINED) {
       // Merge duplicate item+variant+uom lines
       const mergeMap = new Map();
-      selectedLines.forEach(({ bomLine, bomId }) => {
+      expanded.forEach(({ bomLine, bomId }) => {
         // Group by the unit actually being purchased, so quantities only merge when comparable
         const key = `${bomLine.itemId}|${bomLine.variantId || 'null'}|${bomPurchaseUom(bomLine)}`;
         if (mergeMap.has(key)) {
@@ -984,16 +1023,18 @@ const POForm = () => {
       newLines = Array.from(mergeMap.values());
 
       // Check if any merging happened
-      if (newLines.length < selectedLines.length) {
+      if (newLines.length < expanded.length) {
         message.info('Lines with same item+variant+UOM merged: quantities combined from multiple orders');
       }
     } else {
-      newLines = selectedLines.map(({ bomLine, bomId }) => createPoLineFromBom(bomLine, bomId));
+      newLines = expanded.map(({ bomLine, bomId }) => createPoLineFromBom(bomLine, bomId));
     }
 
-    setLineItems(newLines);
+    // Every selected line can be unsplittable, which would otherwise leave the table with
+    // no rows at all and no way to type one.
+    setLineItems(newLines.length > 0 ? newLines : [createEmptyLineItem()]);
     setIsDirty(true);
-  }, [poType, uoms]);
+  }, [poType, uoms, message]);
 
   // Calculate totals
   const totals = useMemo(() => {
