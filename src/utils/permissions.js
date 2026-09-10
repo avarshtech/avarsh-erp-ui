@@ -308,11 +308,16 @@ export const SCREENS = [
   { id: 'inventory-stock', name: 'Stock Register', section: 'inventory', kind: 'screen',
     path: '/inventory/stock', ops: ['view'],
     description: 'Read-only stock balances.' },
+  // `delete` removes a QC draft, and also governs the two QC masters — defect types
+  // and trims QC criteria — which have no key of their own. It used to ride on
+  // `update`, so anyone who could edit a draft could delete one and there was no way
+  // to separate the two rights.
   { id: 'inventory-qc', name: 'Quality Control', section: 'inventory', kind: 'screen',
     path: '/inventory/qc',
     routes: ['/inventory/qc', '/inventory/qc/fabric/new', '/inventory/qc/fabric/:id',
              '/inventory/qc/trims/new', '/inventory/qc/trims/:id'],
-    ops: ['view', 'add', 'update', 'approve'] },
+    ops: ['view', 'add', 'update', 'delete', 'approve'],
+    opLabels: { delete: 'Delete draft' } },
   { id: 'inventory-issue', name: 'Material Issue', section: 'inventory', kind: 'screen',
     path: '/inventory/issue',
     routes: ['/inventory/issue', '/inventory/issue/fabric/new', '/inventory/issue/fabric/:id',
@@ -360,8 +365,14 @@ export const SCREENS = [
     path: '/master', description: 'Order Entry', ops: STANDARD_OPERATIONS },
   { id: 'supplier-info', name: 'Suppliers', section: 'master', kind: 'tab',
     path: '/master', description: 'Purchase Order', ops: STANDARD_OPERATIONS },
+  // `delete` has no control on Item Master — the API endpoint is a maintenance back door for
+  // a Super Admin correcting a bad entry, and their superuser flag bypasses this matrix
+  // anyway. It is declared so the endpoint stops riding on `update`, which silently gave
+  // item deletion to every role holding edit rights. Leave the checkbox unticked.
   { id: 'items', name: 'Items', section: 'master', kind: 'tab',
-    path: '/master', description: 'Purchase Order', ops: ['view', 'add', 'update'] },
+    path: '/master', description: 'Purchase Order',
+    ops: ['view', 'add', 'update', 'delete'],
+    opLabels: { delete: 'Delete item (API only)' } },
   { id: 'master-data', name: 'Product Catalog', section: 'master', kind: 'tab',
     path: '/master', description: 'Categories, Sub-Categories, Item Types, UOM, Attributes',
     ops: STANDARD_OPERATIONS },
