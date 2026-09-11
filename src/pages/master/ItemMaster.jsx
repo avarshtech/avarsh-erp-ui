@@ -1321,7 +1321,8 @@ const ItemMaster = () => {
         hsnCode: values.hsnCode,
         description: values.description || null,
         defaultAllowance: values.defaultAllowance,
-        isActive: values.isActive,
+        // Add mode does not render the Active checkbox, so values.isActive is absent there.
+        isActive: isEditMode ? values.isActive : true,
         // No attributes → no variants section → nothing to send. Without this gate the
         // default empty variant leaked into the payload and the server 400ed on its name.
         variants: formAttributes.length > 0 ? variantsPayload : [],
@@ -1912,9 +1913,17 @@ const ItemMaster = () => {
               <Input.TextArea rows={2} maxLength={500} placeholder="Optional description / composition (auto-fills costing fabric description)" />
             </Form.Item>
 
-            <Form.Item name="isActive" label="Active" valuePropName="checked">
-              <Checkbox>Is Active</Checkbox>
-            </Form.Item>
+            {/* Edit only. A new item is always active and always has at least one variant, so
+                offering the choice at creation is a way to create something unusable. Note this
+                field being unmounted DOES drop it from onFinish's values — preserve keeps a value
+                in the store, but validateFields() builds its name-path list from MOUNTED entities
+                only (@rc-component/form useForm.js:774-782, then :855) — which is why the payload
+                below sets isActive explicitly rather than relying on handleAdd's setFieldsValue. */}
+            {isEditMode && (
+              <Form.Item name="isActive" label="Active" valuePropName="checked">
+                <Checkbox>Is Active</Checkbox>
+              </Form.Item>
+            )}
 
             {/* Variants Section */}
             {formAttributes.length > 0 && (

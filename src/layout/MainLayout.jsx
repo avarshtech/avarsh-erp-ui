@@ -427,6 +427,10 @@ const MainLayoutInner = () => {
         { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
         { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
+        // Moved here from the Export Documentation children, where it sat while this group
+        // already claimed its permission key above — so the menu and the RBAC matrix disagreed
+        // about which module it belonged to.
+        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
         // Carton packing lives under Export Documentation for now — see the note there.
       ],
     },
@@ -466,7 +470,6 @@ const MainLayoutInner = () => {
         // a viewer of the documents may read what was done to them.
         { key: "/export-docs/reports", label: "Reports", moduleId: "export-packing-list" },
         { key: "/export-docs/audit", label: "Audit Trail", moduleId: "export-packing-list" },
-        { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
         // Packing arrives in the next design session.
       ],
     },
