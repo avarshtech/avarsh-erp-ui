@@ -5,7 +5,6 @@ import {
   BarChartOutlined,
   StarOutlined,
   AppstoreOutlined,
-  ClockCircleOutlined,
   PlusOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -24,7 +23,7 @@ import {
 import {
   getFilteredReportNavOptions, getModuleColor, getModuleLabel,
 } from '../../utils/reportConstants';
-import { hasModuleAccess, hasPermission } from '../../utils/permissions';
+import { hasModuleAccess, hasPermission, isSuperuser } from '../../utils/permissions';
 
 const ReportListPage = () => {
   const navigate = useNavigate();
@@ -41,6 +40,9 @@ const ReportListPage = () => {
   const [editingReport, setEditingReport] = useState(null);
   const navOptions = useMemo(() => getFilteredReportNavOptions(hasModuleAccess), []);
   const canAddReports = hasPermission('reports', 'add');
+  // Reports belong to a role, and a role only ever sees its own — so the owning role is
+  // noise on every card except a superuser's, who is looking at several roles at once.
+  const showOwner = useMemo(() => isSuperuser(), []);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -89,7 +91,7 @@ const ReportListPage = () => {
   const moduleCounts = useMemo(() => {
     const counts = {};
     definitions.forEach((d) => {
-      const mod = d.module || 'OTHER';
+      const mod = d.moduleName || 'OTHER';
       counts[mod] = (counts[mod] || 0) + 1;
     });
     return counts;
@@ -104,7 +106,7 @@ const ReportListPage = () => {
   const filteredDefs = useMemo(() => {
     let result = definitions;
     if (selectedModule) {
-      result = result.filter((d) => d.module === selectedModule);
+      result = result.filter((d) => d.moduleName === selectedModule);
     }
     if (search.trim()) {
       const lower = search.toLowerCase();
@@ -121,7 +123,7 @@ const ReportListPage = () => {
   const grouped = useMemo(() => {
     const map = {};
     filteredDefs.forEach((d) => {
-      const mod = d.module || 'OTHER';
+      const mod = d.moduleName || 'OTHER';
       if (!map[mod]) map[mod] = [];
       map[mod].push(d);
     });
@@ -160,8 +162,8 @@ const ReportListPage = () => {
 
         {/* Skeleton stat cards */}
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          {[1, 2, 3, 4].map((i) => (
-            <Col xs={12} sm={12} md={6} key={i}>
+          {[1, 2, 3].map((i) => (
+            <Col xs={12} sm={12} md={8} key={i}>
               <StatCard loading />
             </Col>
           ))}
@@ -204,9 +206,10 @@ const ReportListPage = () => {
           />
         </PageHeader>
 
-        {/* Stat cards */}
+        {/* Stat cards — three, not four: "Saved Configs" and "Saved Reports" counted the
+            same array, so the row showed the same number twice under two names. */}
         <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={8}>
             <StatCard
               title="Total Reports"
               value={definitions.length}
@@ -214,7 +217,7 @@ const ReportListPage = () => {
               color="var(--primary-color)"
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={12} sm={12} md={8}>
             <StatCard
               title="Saved Configs"
               value={savedReports.length}
@@ -222,20 +225,12 @@ const ReportListPage = () => {
               color="var(--warning-color)"
             />
           </Col>
-          <Col xs={12} sm={12} md={6}>
+          <Col xs={24} sm={24} md={8}>
             <StatCard
               title="Modules"
               value={uniqueModuleCount}
               icon={<AppstoreOutlined />}
               color="var(--success-color)"
-            />
-          </Col>
-          <Col xs={12} sm={12} md={6}>
-            <StatCard
-              title="Saved Reports"
-              value={savedReports.length > 0 ? savedReports.length : '—'}
-              icon={<ClockCircleOutlined />}
-              color="var(--info-color)"
             />
           </Col>
         </Row>
@@ -362,6 +357,7 @@ const ReportListPage = () => {
                       <Col xs={24} sm={12} lg={8} key={report.id}>
                         <ModuleReportCard
                           report={report}
+                          showOwner={showOwner}
                           onOpen={handleOpen}
                           onEdit={handleEdit}
                           onDelete={handleDelete}

@@ -1,10 +1,14 @@
 /**
- * Reports module (scenarios R1–R6).
+ * Reports module.
  *
- * The module is definition-driven and NOTHING is seeded — `rpt_definitions` is empty on
- * a fresh e2e boot. So the suite first authors one definition over `ord_orders` via
- * `POST /reports/definitions` (the controller binds the entity directly), then walks
- * the user-facing surfaces: list, builder, execution, export, saved reports, log.
+ * R1–R6 — the definition-driven pipeline. The module is definition-driven and NOTHING is
+ * seeded: `rpt_definitions` is empty on a fresh e2e boot. So the suite first authors one
+ * definition over `ord_orders` via `POST /reports/definitions` (the controller binds the
+ * entity directly), then walks the user-facing surfaces: list, builder, execution, export,
+ * saved reports, log.
+ *
+ * O1–O7 — role ownership, and the delete that used to destroy other people's saved work.
+ * These run as three identities; see the block's own comment for why one is not enough.
  *
  * AI chat (R7) is exercised only in the Neon smoke — Gemini is disabled on H2.
  */
@@ -184,5 +188,172 @@ test.describe('Reports — definition-driven pipeline', () => {
     } finally {
       await api.delete(`/reports/definitions/${badId}`).catch(() => {});
     }
+  });
+});
+
+/**
+ * Scenarios O1–O7: a report belongs to the role that authored it, and deleting one no longer
+ * destroys other people's saved configurations.
+ *
+ * Three identities, because one cannot prove either claim:
+ *   • e2e-reports  — 'E2E Report Author', reports view/add/update/delete, NOT superuser
+ *   • e2e-viewer   — 'Viewer' (V114), reports.view only
+ *   • superadmin   — 'Super Admin', the superuser that sees every role's
+ *
+ * The author is deliberately not a superuser: with only superadmin available, the author and
+ * the see-everything principal would be the same account and the scoping assertions would
+ * pass whether or not scoping existed.
+ */
+test.describe('Reports — role ownership', () => {
+  let author;
+  let viewer;
+  let superadmin;
+  let ownedDefId;
+  let deletedDefId;
+  let savedConfigId;
+  const OWNED_CODE = `E2E_OWNED_${Date.now()}`;
+
+  test.beforeAll(async () => {
+    superadmin = await createAuthenticatedClient();
+    author = await createAuthenticatedClient('e2e-reports', 'admin123');
+    viewer = await createAuthenticatedClient('e2e-viewer', 'admin123');
+  });
+
+  test.afterAll(async () => {
+    // Soft delete, so this leaves the row behind on purpose — the saved configuration
+    // pointing at it has to keep resolving.
+    if (ownedDefId) await author.delete(`/reports/definitions/${ownedDefId}`).catch(() => {});
+    await Promise.all([author?.dispose(), viewer?.dispose(), superadmin?.dispose()]);
+  });
+
+  test('O1 — a non-superuser role authors a report from the designer, with no SQL', async () => {
+    const catalog = await author.get('/reports/catalog');
+    expect(catalog.status, 'a role that may add reports must be able to load the catalog')
+      .toBeLessThan(300);
+    const source = catalog.data?.[0];
+    expect(source, 'the catalog must offer at least one data source').toBeTruthy();
+
+    const res = await author.post('/reports/definitions/from-blueprint', {
+      dataSourceKey: source.key,
+      reportCode: OWNED_CODE,
+      displayName: 'E2E Owned Report',
+      description: 'Authored by a non-superuser role',
+      active: true,
+      columns: source.columns.slice(0, 3).map((c) => ({ key: c.key, isDefault: true })),
+    });
+    expect(res.status, `blueprint create failed: ${JSON.stringify(res.data)}`).toBeLessThan(300);
+    ownedDefId = res.data.id;
+    expect(res.data.ownerRoleName, 'the author’s role owns it, without being asked')
+      .toBe('E2E Report Author');
+  });
+
+  test('O2 — the owning role sees it, another role does not, a superuser does', async () => {
+    const mine = await author.get('/reports/definitions');
+    expect(mine.data.some((d) => d.id === ownedDefId), 'the author must see their own').toBeTruthy();
+
+    const theirs = await viewer.get('/reports/definitions');
+    expect(theirs.status).toBeLessThan(300);
+    expect(
+      theirs.data.some((d) => d.id === ownedDefId),
+      'another role must NOT see it — this is the whole point of ownership',
+    ).toBeFalsy();
+
+    const all = await superadmin.get('/reports/definitions');
+    expect(all.data.some((d) => d.id === ownedDefId), 'a superuser sees every role’s')
+      .toBeTruthy();
+  });
+
+  test('O3 — another role cannot open or run it by id', async () => {
+    const byId = await viewer.get(`/reports/definitions/${ownedDefId}`);
+    expect(byId.status, 'a deep link from another role must be refused').toBe(403);
+
+    const run = await viewer.post('/reports/execute', {
+      reportDefId: ownedDefId,
+      selectedFieldCodes: [],
+      filters: {},
+      page: 0,
+      size: 5,
+    });
+    expect(run.status, 'and so must executing it').toBe(403);
+  });
+
+  test('O4 — authoring is gated by permission, raw SQL by superuser', async () => {
+    const viewerAttempt = await viewer.post('/reports/definitions/from-blueprint', {
+      dataSourceKey: 'anything',
+      reportCode: `E2E_DENIED_${Date.now()}`,
+      displayName: 'Should not exist',
+      columns: [{ key: 'x' }],
+    });
+    expect(viewerAttempt.status, 'reports.view alone must not author a report').toBe(403);
+
+    // The blueprint path carries no SQL; this one does, so it stays superuser-only even for
+    // a role that may design reports.
+    const rawAttempt = await author.post('/reports/definitions', {
+      moduleName: 'ORDER',
+      reportCode: `E2E_RAW_${Date.now()}`,
+      displayName: 'Raw SQL attempt',
+      baseQuery: 'ord_orders o',
+      isActive: true,
+      fields: [{ fieldCode: 'order_no', displayName: 'Order No', fieldType: 'STRING', sqlExpression: 'o.order_no', isDefault: true, displayOrder: 1 }],
+      filters: [],
+    });
+    expect(rawAttempt.status, 'supplying executable SQL is a superuser action').toBe(403);
+  });
+
+  test('O5 — a saved configuration is visible to the whole role, deletable only by its author', async () => {
+    const saved = await author.post('/reports/saved', {
+      reportDefId: ownedDefId,
+      savedName: `E2E Shared ${Date.now()}`,
+      selectedFields: [],
+      appliedFilters: {},
+      sortConfig: {},
+    });
+    expect(saved.status, `save failed: ${JSON.stringify(saved.data)}`).toBeLessThan(300);
+    savedConfigId = saved.data.id;
+    expect(saved.data.canEdit, 'its author may edit it').toBeTruthy();
+
+    const outsider = await viewer.get('/reports/saved');
+    expect(
+      outsider.data.some((s) => s.id === savedConfigId),
+      'a different role must not see it',
+    ).toBeFalsy();
+
+    const outsiderDelete = await viewer.delete(`/reports/saved/${savedConfigId}`);
+    expect(outsiderDelete.status, 'and certainly must not delete it').toBe(403);
+  });
+
+  test('O6 — deleting the report keeps every saved configuration built on it', async () => {
+    // The bug this proves gone: fk_rpt_saved_reports_definition carried ON DELETE CASCADE
+    // and delete() was a hard deleteById, so this call used to destroy the row asserted
+    // below — for every user, silently.
+    const removed = await author.delete(`/reports/definitions/${ownedDefId}`);
+    expect(removed.status, `delete failed: ${JSON.stringify(removed.data)}`).toBeLessThan(300);
+
+    const gone = await author.get('/reports/definitions');
+    expect(gone.data.some((d) => d.id === ownedDefId), 'it leaves the list').toBeFalsy();
+
+    const stillThere = await author.get('/reports/saved');
+    const config = stillThere.data.find((s) => s.id === savedConfigId);
+    expect(config, 'the saved configuration MUST survive the report being deleted').toBeTruthy();
+    expect(config.reportAvailable, 'but it can no longer be run, and says so').toBe(false);
+
+    deletedDefId = ownedDefId;
+    ownedDefId = null; // afterAll must not delete it twice
+  });
+
+  test('O7 — a deleted report can no longer be opened or run', async () => {
+    expect(deletedDefId, 'O6 must have run first').toBeTruthy();
+
+    const reopen = await author.get(`/reports/definitions/${deletedDefId}`);
+    expect(reopen.status, 'a deleted definition is not found, not served').toBe(404);
+
+    const run = await author.post('/reports/execute', {
+      reportDefId: deletedDefId,
+      selectedFieldCodes: [],
+      filters: {},
+      page: 0,
+      size: 5,
+    });
+    expect(run.status, 'and it cannot be executed either').toBe(404);
   });
 });

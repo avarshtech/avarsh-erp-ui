@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Card, Tag, Button, Typography, Space, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, TeamOutlined } from '@ant-design/icons';
 import { getModuleColor, getModuleIcon, getModuleLabel } from '../../../utils/reportConstants';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { DeleteConfirm } from '../../../components/buttons';
@@ -10,9 +10,14 @@ const { Paragraph } = Typography;
 // Re-export for backward compatibility
 export { getModuleColor };
 
-const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen, onEdit, onDelete }) {
-  const Icon = getModuleIcon(report.module);
-  const color = getModuleColor(report.module);
+const ModuleReportCard = memo(function ModuleReportCard({
+  report, showOwner, onOpen, onEdit, onDelete,
+}) {
+  // moduleName, not module: that is the field the API sends (ReportDefinitionResponse).
+  // Reading `report.module` made every card fall through to the default icon and colour,
+  // hid the module tag entirely, and left the left-hand nav filtering on undefined.
+  const Icon = getModuleIcon(report.moduleName);
+  const color = getModuleColor(report.moduleName);
 
   // Map Ant Design tag color names to CSS color values for the accent bar
   const accentColorMap = {
@@ -77,11 +82,16 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen, onEdit
         <span style={{ fontWeight: 600, fontSize: 15 }}>{report.displayName}</span>
       </div>
 
-      {report.module && (
-        <Tag color={color} style={{ alignSelf: 'flex-start', marginBottom: 8 }}>
-          {getModuleLabel(report.module)}
-        </Tag>
-      )}
+      <Space size={4} wrap style={{ marginBottom: 8 }}>
+        {report.moduleName && (
+          <Tag color={color}>{getModuleLabel(report.moduleName)}</Tag>
+        )}
+        {showOwner && (
+          <Tag icon={<TeamOutlined />} color={report.ownerRoleName ? 'default' : 'warning'}>
+            {report.ownerRoleName || 'No role'}
+          </Tag>
+        )}
+      </Space>
 
       <Paragraph
         type="secondary"
@@ -109,6 +119,11 @@ const ModuleReportCard = memo(function ModuleReportCard({ report, onOpen, onEdit
             <DeleteConfirm
               title="Delete Report"
               recordLabel={report.displayName}
+              // Spelled out because it used to be untrue: deleting a report cascaded onto
+              // rpt_saved_reports and destroyed every user's saved configurations built on
+              // it, while the dialog said only "are you sure?".
+              description={`Remove "${report.displayName}" from the reports list? `
+                + 'Saved configurations built on it are kept.'}
               onConfirm={() => onDelete(report)}
             >
               {/* Native title rather than <Tooltip>: nesting Tooltip inside Popconfirm

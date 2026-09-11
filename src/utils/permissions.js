@@ -597,6 +597,20 @@ export const getCurrentUser = () => getCachedUserDisplay();
 export const setCurrentUser = (user) => cacheUserDisplay(user);
 
 /**
+ * Is the signed-in user a superuser?
+ *
+ * Reads `sys_roles.is_superuser` as the server reported it on /me/permissions — NOT
+ * `isAdminRole()`, which matches the role NAME. The name match is what the menu and the
+ * route guards still use, and it is kept for those, but it is not the server's boundary: a
+ * role renamed away from "Admin" keeps the column and loses the string. Use this wherever
+ * the client must agree with the server about who sees everything.
+ */
+export const isSuperuser = () => getCurrentUser()?.isSuperuser === true;
+
+/** The signed-in user's role id, or null on a session cached before ids were surfaced. */
+export const getCurrentRoleId = () => getCurrentUser()?.roleId ?? null;
+
+/**
  * Get current user permissions.
  * Normalizes the token's permission object against known modules
  * so any module added later has a safe fallback.

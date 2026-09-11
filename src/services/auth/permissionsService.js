@@ -15,7 +15,12 @@ import axiosInstance from '../core/axiosInstance';
 
 /**
  * Fetch the authenticated user's role and permissions.
- * @returns {Promise<{role: string, permissions: object}>}
+ *
+ * `isSuperuser` is the server's own `sys_roles.is_superuser` column, not a guess from the
+ * role name — the client's `isAdminRole()` string match and the server's bypass disagree
+ * the moment a role is renamed, and only one of them is the real boundary.
+ *
+ * @returns {Promise<{role: string, roleId: number, isSuperuser: boolean, permissions: object}>}
  */
 export const getMyPermissions = async () => {
   const response = await axiosInstance.get('/me/permissions');

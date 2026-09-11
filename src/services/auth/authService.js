@@ -67,15 +67,20 @@ const normalizeTokenPermissions = (raw) => {
  * Permissions no longer travel in the JWT (they pushed the Authorization header past
  * Tomcat's 8 KB limit); they are fetched from GET /me/permissions and passed in here.
  *
+ * The same call carries the role's id and its superuser flag. Both are kept: the client
+ * used to infer "is this an admin" by string-matching the role NAME, which disagrees with
+ * the server the moment a role is renamed, and screens that show who owns a record need the
+ * id rather than the label.
+ *
  * @param {string} token - JWT access token
  * @param {object|null} fallbackUser - Existing user data to merge with
- * @param {object|null} permissions - Permissions map from /me/permissions.
- *   Falls back to the cached user's permissions when omitted.
+ * @param {object|null} identity - The /me/permissions payload
+ *   ({ role, roleId, isSuperuser, permissions }). Falls back to the cached user when omitted.
  * @returns {object} User session object
  */
-const buildUserSession = (token, fallbackUser = null, permissions = null) => {
+const buildUserSession = (token, fallbackUser = null, identity = null) => {
   const payload = decodeToken(token);
-  const rawPermissions = permissions ?? fallbackUser?.permissions ?? {};
+  const rawPermissions = identity?.permissions ?? fallbackUser?.permissions ?? {};
   const normalizedPermissions = normalizeTokenPermissions(rawPermissions);
 
   return {
@@ -84,6 +89,8 @@ const buildUserSession = (token, fallbackUser = null, permissions = null) => {
     name: payload.name || fallbackUser?.name || '',
     email: payload.email || fallbackUser?.email || '',
     role: payload.role || fallbackUser?.role || '',
+    roleId: identity?.roleId ?? fallbackUser?.roleId ?? null,
+    isSuperuser: identity?.isSuperuser ?? fallbackUser?.isSuperuser ?? false,
     permissions: normalizedPermissions,
     idleTimeoutMinutes: payload.idleTimeoutMinutes || 30,
     idleWarningSeconds: payload.idleWarningSeconds || 120,
@@ -120,9 +127,9 @@ export const authenticateUser = async (username, password) => {
     setAccessToken(token);
 
     // Permissions are no longer a JWT claim; the session is not usable without them.
-    let permissions;
+    let identity;
     try {
-      ({ permissions } = await getMyPermissions());
+      identity = await getMyPermissions();
     } catch {
       // Fail the login rather than proceed with an empty permission set — that would
       // render an app with no menu and no reachable routes, which reads as a broken
@@ -137,7 +144,7 @@ export const authenticateUser = async (username, password) => {
     const userSession = buildUserSession(
       token,
       { username, email: `${username}@avarsh.com` },
-      permissions
+      identity
     );
 
     // Cache user display info in localStorage (token field is stripped automatically)
@@ -299,9 +306,9 @@ export const refreshSession = async () => {
     // A failure here throws to the outer catch, which returns false; initializeSession
     // then clears the session. That is the right outcome — a session whose permissions
     // cannot be established should not continue.
-    const { permissions } = await getMyPermissions();
+    const identity = await getMyPermissions();
 
-    const updatedUser = buildUserSession(newToken, currentUser, permissions);
+    const updatedUser = buildUserSession(newToken, currentUser, identity);
 
     // Update cached user display info
     cacheUserDisplay(updatedUser);

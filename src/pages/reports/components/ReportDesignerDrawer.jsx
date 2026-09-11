@@ -5,22 +5,34 @@ import {
 import {
   getReportCatalog, createReportFromBlueprint, updateReportFromBlueprint, getReportDefinition,
 } from '../../../services/core/reportService';
+import { getRoles } from '../../../services/admin/roleService';
 import { getModuleLabel } from '../../../utils/reportConstants';
+import { isSuperuser } from '../../../utils/permissions';
 import ReportColumnPicker from './ReportColumnPicker';
 
 const { TextArea } = Input;
 
 const toCode = (name) => name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '');
 
-/** Admin-only designer: compose a report from a curated data source. Sends no SQL. */
+/**
+ * Compose a report from a curated data source. Sends no SQL — only a data-source key and
+ * column keys, which the server resolves against its registry. That is what lets any role
+ * holding reports.add build one, rather than only a superuser.
+ *
+ * A report belongs to the role that authors it. Only a superuser is offered a choice, and
+ * only because someone has to be able to hand a report to another team and to adopt the
+ * definitions that predate ownership.
+ */
 const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [catalog, setCatalog] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [selection, setSelection] = useState({});
   const dataSourceKey = Form.useWatch('dataSourceKey', form);
+  const canChooseOwner = useMemo(() => isSuperuser(), []);
 
   const isEditing = !!editingReport;
   const source = useMemo(
@@ -38,6 +50,13 @@ const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
   }, [open, message]);
 
   useEffect(() => {
+    if (!open || !canChooseOwner) return;
+    // Silent on failure: the owner picker is an extra for one account, and a roles endpoint
+    // that is unreachable must not stop anyone designing a report.
+    getRoles().then((data) => setRoles(data || [])).catch(() => setRoles([]));
+  }, [open, canChooseOwner]);
+
+  useEffect(() => {
     if (!open) return;
     if (!editingReport) {
       form.resetFields();
@@ -53,6 +72,7 @@ const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
           reportCode: def.reportCode,
           description: def.description,
           active: def.isActive !== false,
+          ownerRoleId: def.ownerRoleId ?? undefined,
         });
         setSelection(Object.fromEntries((def.fields || []).map((f) => [f.fieldCode, {
           isDefault: f.isDefault !== false,
@@ -162,6 +182,23 @@ const ReportDesignerDrawer = ({ open, onClose, onSaved, editingReport }) => {
                 <Input placeholder="PENDING_ORDERS_BY_BUYER" disabled={isEditing} />
               </Form.Item>
             </Col>
+            {canChooseOwner && (
+              <Col xs={24} md={12}>
+                <Form.Item
+                  name="ownerRoleId"
+                  label="Owned by"
+                  tooltip="Everyone in this role sees the report. Leave empty to keep it to superusers."
+                >
+                  <Select
+                    placeholder="Your own role"
+                    allowClear
+                    showSearch
+                    optionFilterProp="label"
+                    options={roles.map((r) => ({ value: r.id, label: r.name }))}
+                  />
+                </Form.Item>
+              </Col>
+            )}
             <Col xs={12} md={6}>
               <Form.Item name="active" label="Active" valuePropName="checked">
                 <Switch />
