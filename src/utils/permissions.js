@@ -432,6 +432,12 @@ export const SCREENS = [
   // people need one without the other.
   { id: 'hr-analytics', name: 'HR Analytics', section: 'hr', kind: 'screen',
     path: '/hr/analytics', ops: ['view'] },
+  // Self-service: only ever the signed-in employee's own records, which is
+  // enforced on the server. Separate from every other hr-* module because it
+  // grants nothing about anybody else, and is the one module a shop-floor
+  // worker should hold.
+  { id: 'hr-ess', name: 'My HR', section: 'hr', kind: 'screen',
+    path: '/ess', ops: ['view'] },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
