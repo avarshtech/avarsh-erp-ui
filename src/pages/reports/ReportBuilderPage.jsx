@@ -153,8 +153,9 @@ const ReportBuilderPage = () => {
   // Breadcrumb
   const breadcrumbItems = useMemo(() => {
     const items = [];
-    if (definition?.module) {
-      items.push(definition.module.replace(/_/g, ' '));
+    // moduleName, not module: the API's field name. See ModuleReportCard.
+    if (definition?.moduleName) {
+      items.push(definition.moduleName.replace(/_/g, ' '));
     }
     items.push(definition?.displayName || 'Report');
     return items;
@@ -191,8 +192,8 @@ const ReportBuilderPage = () => {
         title={definition?.displayName || 'Report'}
         subtitle={definition?.description}
         backPath="/reports/list"
-        status={definition?.module
-          ? <Tag color={getModuleColor(definition.module)} style={{ fontSize: 13 }}>{definition.module.replace(/_/g, ' ')}</Tag>
+        status={definition?.moduleName
+          ? <Tag color={getModuleColor(definition.moduleName)} style={{ fontSize: 13 }}>{definition.moduleName.replace(/_/g, ' ')}</Tag>
           : undefined
         }
       />
