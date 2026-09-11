@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined, WalletOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined, WalletOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
 import CostPerHead from './CostPerHead';
 import HeadcountMovement from './HeadcountMovement';
 import AttendanceSummary from './AttendanceSummary';
 import LeaveLiability from './LeaveLiability';
+import Overtime from './Overtime';
 
 const { Text } = Typography;
 
@@ -68,6 +69,14 @@ const SECTIONS = [
         title: 'Leave balance and liability',
         subtitle: 'What unused leave is worth, and who is holding the most',
         render: () => <LeaveLiability />,
+      },
+      {
+        key: 'overtime',
+        label: 'Overtime',
+        icon: <ClockCircleOutlined />,
+        title: 'Overtime register and limits',
+        subtitle: 'Whether overtime is a cost problem or a compliance one',
+        render: () => <Overtime />,
       },
     ],
   },

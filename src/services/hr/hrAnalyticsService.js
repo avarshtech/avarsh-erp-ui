@@ -73,3 +73,21 @@ export const getLeaveHolders = async (params) => {
   const response = await axiosInstance.get(`${BASE_URL}/leave-liability/holders`, { params });
   return response.data;
 };
+
+/**
+ * Overtime as cost and as compliance.
+ * GET /api/v1/hr/analytics/overtime
+ */
+export const getOvertimeAnalysis = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/overtime`, { params });
+  return response.data;
+};
+
+/**
+ * The overtime register - who worked it, worst quarter first.
+ * GET /api/v1/hr/analytics/overtime/employees
+ */
+export const getOvertimeRegister = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/overtime/employees`, { params });
+  return response.data;
+};
