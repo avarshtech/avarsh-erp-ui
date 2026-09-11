@@ -190,15 +190,16 @@ test.describe('PO — Order Mapping', () => {
     await expectToast(page, 'Mapped to order');
     await expect(drawer.getByText(/Partially Mapped/i).first()).toBeVisible({ timeout: 10000 });
     // The trail accumulates across runs, so assert the entry exists rather than that it is unique.
-    // The line is labelled by item AND variant code — the seeded line now names a variant,
-    // and the variant is the purchasable identity, so the trail has to say which colour.
-    await expect(drawer.getByText(/200 kg of FAB-SJ-001 FAB-SJ-001-NVY to ORD\/0002/).first()).toBeVisible();
+    // The line is labelled by variant code alone — it already opens with the item code, so
+    // naming both repeated it — and the variant is the purchasable identity, so the trail
+    // still says which colour.
+    await expect(drawer.getByText(/200 kg of FAB-SJ-001-NVY to ORD\/0002/).first()).toBeVisible();
 
     await drawer.locator('.ant-btn-dangerous').first().click();
     await confirmRemove(page);
 
     await expectToast(page, 'Mapping removed');
-    await expect(drawer.getByText(/200 kg of FAB-SJ-001 FAB-SJ-001-NVY from ORD\/0002/).first()).toBeVisible();
+    await expect(drawer.getByText(/200 kg of FAB-SJ-001-NVY from ORD\/0002/).first()).toBeVisible();
   });
 
   test('over-mapping is refused with the server message', async ({ page }) => {
