@@ -1,16 +1,18 @@
-import { useMemo } from 'react';
-import { Drawer, Descriptions, Table, Divider, Space, Tag, Typography, Row, Col } from 'antd';
+import { useId, useMemo } from 'react';
+import { Drawer, Table, Space, Tag, Typography, Row, Col } from 'antd';
 import {
   AppstoreOutlined,
   CalendarOutlined,
   BgColorsOutlined,
   ColumnWidthOutlined,
-  BarcodeOutlined,
 } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
+import DetailCard from '../../../components/DetailCard';
 import { formatNumber, formatDate } from '../../../utils/formatters';
+import { StockDrawerHero, Stat } from './StockDrawerLayout';
+import { FIELD_SPAN, SECTION_HEADING } from './stockDrawerStyles';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 const CATEGORY_COLORS = {
   Buttons: 'blue',
@@ -73,6 +75,7 @@ const buildVariantsFromMatrix = (matrix) => {
 };
 
 const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
+  const titleId = useId();
   const variants = useMemo(() => {
     if (Array.isArray(record?.variants) && record.variants.length > 0) {
       return record.variants.map((v, idx) => ({ id: v.variantId ?? idx, ...v }));
@@ -82,13 +85,22 @@ const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
 
   if (!record) return null;
 
+  // Opening balance rows carry their batch number in `grnNumber` — the register's column is
+  // headed "GRN # / Batch" for the same reason. Here the row's source is known, so name it.
+  const fromOpening = record.sourceType === 'OPENING_BALANCE';
+  // `description` is the item's derived "Category - Sub-Category", identical for every
+  // variant of one item. The variant is what is actually on the rack.
+  const heading = record.variantName || record.description || 'Accessory';
+
   return (
     <Drawer
       title={null}
       open={open}
       onClose={onClose}
       size={720}
-      closable
+      // No header: Close sits in the footer, and a second X above it was one button too many.
+      closable={false}
+      aria-labelledby={titleId}
       styles={{
         body: { padding: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' },
       }}
@@ -98,145 +110,61 @@ const AccessoriesStockViewDrawer = ({ open, onClose, record }) => {
         </div>
       }
     >
-      {/* ── HERO HEADER ─────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: '24px 28px 20px',
-          borderBottom: '2px solid var(--border-color, #f0f0f0)',
-          borderLeft: `4px solid var(--primary-color)`,
-        }}
+      <StockDrawerHero
+        code={record.variantCode}
+        title={heading}
+        titleId={titleId}
+        tag={record.category && (
+          <Tag color={CATEGORY_COLORS[record.category] || 'default'} style={{ margin: 0 }}>
+            {record.category}
+          </Tag>
+        )}
       >
-        <Space align="center" size={10} style={{ marginBottom: 8 }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 12px',
-              borderRadius: 6,
-              background: 'var(--bg-secondary, rgba(99, 102, 241, 0.08))',
-              border: '1px solid var(--border-color, rgba(99, 102, 241, 0.25))',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-              fontSize: 13.5,
-              fontWeight: 600,
-              letterSpacing: '0.02em',
-              color: 'var(--text-primary)',
-              lineHeight: 1.3,
-            }}
-          >
-            <BarcodeOutlined style={{ color: 'var(--text-secondary)', fontSize: 14 }} />
-            {record.variantCode}
-          </span>
-          {record.category && (
-            <Tag color={CATEGORY_COLORS[record.category] || 'default'} style={{ margin: 0 }}>
-              {record.category}
-            </Tag>
-          )}
-        </Space>
-        <Title level={4} style={{ margin: 0, letterSpacing: '-0.01em' }}>
-          {record.description}
-        </Title>
-
-        <Row gutter={24} style={{ marginTop: 16 }}>
+        <Row gutter={[24, 16]} style={{ marginTop: 16 }}>
           <Col xs={12} sm={8}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Qty
-            </Text>
-            <Text strong style={{ fontSize: 22, letterSpacing: '-0.02em' }}>
-              {formatNumber(record.totalQty, 2)}{' '}
-              <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>{record.uom || ''}</Text>
-            </Text>
+            <Stat label="Total Qty" value={formatNumber(record.totalQty, 2)} suffix={record.uom || ''} />
           </Col>
           <Col xs={12} sm={8}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Unit Cost
-            </Text>
-            <Text strong style={{ fontSize: 22, letterSpacing: '-0.02em' }}>
-              ₹ {formatNumber(record.unitCost, 2)}
-            </Text>
+            <Stat label="Unit Cost" value={`₹ ${formatNumber(record.unitCost, 2)}`} />
           </Col>
-          <Col xs={24} sm={8}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Value (Excl. GST)
-            </Text>
-            <Text strong style={{ fontSize: 22, color: 'var(--warning-color)', letterSpacing: '-0.02em' }}>
-              ₹ {formatNumber(record.poLineValue || 0, 2)}
-            </Text>
+          <Col xs={12} sm={8}>
+            <Stat
+              label="Value (Excl. GST)"
+              value={record.poLineValue != null ? `₹ ${formatNumber(record.poLineValue, 2)}` : '—'}
+            />
           </Col>
         </Row>
-      </div>
+      </StockDrawerHero>
 
-      {/* ── BODY ────────────────────────────────────────────────────── */}
       <div style={{ padding: '20px 28px 28px', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        <Descriptions
-          size="small"
-          column={2}
-          bordered
-          title={<Space><AppstoreOutlined style={{ color: 'var(--primary-color)' }} /><Text strong>Item Details</Text></Space>}
-          styles={{ label: { width: 150, background: 'var(--bg-secondary)' } }}
-        >
-          <Descriptions.Item label="Category">
-            <Tag color={CATEGORY_COLORS[record.category] || 'default'}>{record.category}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Style">{record.style || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Order No">{record.orderRef || '-'}</Descriptions.Item>
-          <Descriptions.Item label="GRN #">{record.grnNumber || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Supplier">{record.supplier || '-'}</Descriptions.Item>
-          <Descriptions.Item label="UOM">{record.uom || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Last Received" span={2}>
-            <Space size={6}>
-              <CalendarOutlined style={{ color: 'var(--text-secondary)' }} />
-              {formatDate(record.lastReceived)}
-            </Space>
-          </Descriptions.Item>
-        </Descriptions>
-
-        <Divider style={{ margin: '24px 0 16px' }} />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 12,
-          }}
-        >
-          <Space size={8}>
-            <AppstoreOutlined style={{ color: 'var(--primary-color)' }} />
-            <Text strong>Variants (Size × Colour)</Text>
-          </Space>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'baseline',
-              gap: 4,
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: 'var(--bg-secondary, #f5f5f7)',
-              border: '1px solid var(--border-color, #e5e7eb)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            <span style={{ fontSize: 14 }}>{variants.length}</span>
-            <Text type="secondary" style={{ fontSize: 11.5, fontWeight: 500 }}>
-              {variants.length === 1 ? 'variant' : 'variants'}
-            </Text>
-          </span>
-        </div>
-
-        {variants.length > 0 ? (
-          <Table
-            rowKey="id"
-            columns={variantColumns(record.uom)}
-            dataSource={variants}
-            pagination={false}
-            size="small"
+        <DetailCard title="Item Details" icon={<AppstoreOutlined />}>
+          <DetailCard.Field {...FIELD_SPAN} label="Style" value={record.style} />
+          <DetailCard.Field {...FIELD_SPAN} label="Order No" value={record.orderRef} />
+          <DetailCard.Field {...FIELD_SPAN} label="Supplier" value={record.supplier} />
+          <DetailCard.Field
+            {...FIELD_SPAN}
+            label={fromOpening ? 'Opening Batch' : 'GRN #'}
+            value={record.grnNumber}
           />
-        ) : (
-          <Text type="secondary">No variant breakdown available.</Text>
-        )}
+          <DetailCard.Field {...FIELD_SPAN} label="UOM" value={record.uom} />
+          <DetailCard.Field
+            {...FIELD_SPAN}
+            label="Last Received"
+            icon={<CalendarOutlined style={{ color: 'var(--text-secondary)' }} />}
+            value={record.lastReceived ? formatDate(record.lastReceived) : null}
+          />
+        </DetailCard>
+
+        {/* The columns already name size and colour, so the heading does not repeat them. */}
+        <div style={SECTION_HEADING}>{`Variants (${variants.length})`}</div>
+        <Table
+          rowKey="id"
+          columns={variantColumns(record.uom)}
+          dataSource={variants}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: <Text type="secondary">No variant breakdown available.</Text> }}
+        />
       </div>
     </Drawer>
   );

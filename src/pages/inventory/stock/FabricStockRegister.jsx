@@ -94,7 +94,7 @@ const FabricStockRegister = ({ embedded = false }) => {
           columns={columns}
           dataSource={items}
           loading={loading}
-          scroll={{ x: 1400 }}
+          scroll={{ x: 1620 }}
           pagination={getTablePagination({ pageSize: 25 }, 'items')}
           onRow={(record) => ({
             onClick: () => setDrawer({ open: true, record }),

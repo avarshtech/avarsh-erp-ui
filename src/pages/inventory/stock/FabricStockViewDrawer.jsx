@@ -1,18 +1,19 @@
-import { useMemo } from 'react';
-import { Drawer, Descriptions, Table, Divider, Space, Tag, Typography, Row, Col } from 'antd';
+import { useId, useMemo } from 'react';
+import { Drawer, Table, Space, Tag, Typography, Row, Col } from 'antd';
 import {
-  NumberOutlined,
   CalendarOutlined,
   AppstoreOutlined,
   CheckCircleOutlined,
   WarningOutlined,
-  BarcodeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
+import DetailCard from '../../../components/DetailCard';
 import { formatNumber, formatDate } from '../../../utils/formatters';
+import { StockDrawerHero, Stat } from './StockDrawerLayout';
+import { FIELD_SPAN, SECTION_HEADING } from './stockDrawerStyles';
 
-const { Text, Title } = Typography;
+const { Text } = Typography;
 
 const QC_TAG = {
   Pass:              { color: 'green',   label: 'Pass' },
@@ -71,6 +72,7 @@ const rollColumns = [
 ];
 
 const FabricStockViewDrawer = ({ open, onClose, record }) => {
+  const titleId = useId();
   const summary = useMemo(() => {
     if (!record?.rolls) return { pass: 0, cond: 0, backup: 0 };
     return record.rolls.reduce(
@@ -88,6 +90,13 @@ const FabricStockViewDrawer = ({ open, onClose, record }) => {
 
   const ageDays = record.grnDate ? dayjs().diff(dayjs(record.grnDate), 'day') : null;
   const accent = summary.backup > 0 ? 'var(--warning-color)' : 'var(--primary-color)';
+  const rolls = record.rolls || [];
+  // Opening balance rows carry their batch number in `grnNumber` — the register's column is
+  // headed "GRN # / Batch" for the same reason. Here the row's source is known, so name it.
+  const fromOpening = record.sourceType === 'OPENING_BALANCE';
+  // `fabricDescription` is the item's derived "Category - Sub-Category", which reads the same
+  // for every colour of one fabric. The variant is what is actually on the rack.
+  const heading = record.variantName || record.fabricDescription || 'Fabric';
 
   return (
     <Drawer
@@ -95,7 +104,9 @@ const FabricStockViewDrawer = ({ open, onClose, record }) => {
       open={open}
       onClose={onClose}
       size={720}
-      closable
+      // No header: Close sits in the footer, and a second X above it was one button too many.
+      closable={false}
+      aria-labelledby={titleId}
       styles={{
         body: { padding: 0, display: 'flex', flexDirection: 'column', overflowX: 'hidden' },
       }}
@@ -105,68 +116,36 @@ const FabricStockViewDrawer = ({ open, onClose, record }) => {
         </div>
       }
     >
-      {/* ── HERO HEADER ─────────────────────────────────────────────── */}
-      <div
-        style={{
-          padding: '24px 28px 20px',
-          borderBottom: '2px solid var(--border-color, #f0f0f0)',
-          borderLeft: `4px solid ${accent}`,
-        }}
+      <StockDrawerHero
+        code={record.variantCode}
+        title={heading}
+        titleId={titleId}
+        accent={accent}
+        tag={record.subCategory && (
+          <Tag color={SUB_CATEGORY_COLORS[record.subCategory] || 'default'} style={{ margin: 0 }}>
+            {record.subCategory}
+          </Tag>
+        )}
       >
-        <Space align="center" size={10} style={{ marginBottom: 8 }}>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 12px',
-              borderRadius: 6,
-              background: 'var(--bg-secondary, rgba(99, 102, 241, 0.08))',
-              border: '1px solid var(--border-color, rgba(99, 102, 241, 0.25))',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-              fontSize: 13.5,
-              fontWeight: 600,
-              letterSpacing: '0.02em',
-              color: 'var(--text-primary)',
-              lineHeight: 1.3,
-            }}
-          >
-            <BarcodeOutlined style={{ color: 'var(--text-secondary)', fontSize: 14 }} />
-            {record.variantCode}
-          </span>
-          {record.subCategory && (
-            <Tag color={SUB_CATEGORY_COLORS[record.subCategory] || 'default'} style={{ margin: 0 }}>
-              {record.subCategory}
-            </Tag>
-          )}
-        </Space>
-        <Title level={4} style={{ margin: 0, letterSpacing: '-0.01em' }}>
-          {record.fabricDescription}
-        </Title>
-
-        <Row gutter={24} style={{ marginTop: 16 }}>
-          <Col xs={12} sm={12}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Total Qty
-            </Text>
-            <Text strong style={{ fontSize: 22, letterSpacing: '-0.02em' }}>
-              {formatNumber(record.totalQty, 2)}{' '}
-              <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>{record.uom || 'kg'}</Text>
-            </Text>
+        <Row gutter={[24, 16]} style={{ marginTop: 16 }}>
+          <Col xs={12} sm={8}>
+            <Stat label="Total Qty" value={formatNumber(record.totalQty, 2)} suffix={record.uom || 'kg'} />
           </Col>
-          <Col xs={12} sm={12}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Age
-            </Text>
-            <Text strong style={{ fontSize: 22, color: getAgeColor(ageDays), letterSpacing: '-0.02em' }}>
-              {ageDays != null ? `${ageDays}` : '-'}
-              <Text type="secondary" style={{ fontSize: 13, marginLeft: 4 }}>days</Text>
-            </Text>
+          <Col xs={12} sm={8}>
+            <Stat
+              label="Value (Excl. GST)"
+              value={record.poLineValue != null ? `₹ ${formatNumber(record.poLineValue, 2)}` : '—'}
+            />
           </Col>
-          <Col xs={24} style={{ marginTop: 14 }}>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-              QC Summary
-            </Text>
+          <Col xs={12} sm={8}>
+            <Stat
+              label="Age"
+              value={ageDays != null ? ageDays : '—'}
+              suffix={ageDays != null ? 'days' : null}
+              color={getAgeColor(ageDays)}
+            />
+          </Col>
+          <Col xs={24}>
             <Space size={8} wrap>
               <Tag icon={<CheckCircleOutlined />} color="green">{summary.pass} Pass</Tag>
               {summary.cond > 0 && <Tag color="cyan">{summary.cond} Conditional Pass</Tag>}
@@ -176,82 +155,42 @@ const FabricStockViewDrawer = ({ open, onClose, record }) => {
             </Space>
           </Col>
         </Row>
-      </div>
+      </StockDrawerHero>
 
-      {/* ── BODY ────────────────────────────────────────────────────── */}
       <div style={{ padding: '20px 28px 28px', flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-        <Descriptions
-          size="small"
-          column={2}
-          bordered
-          title={<Space><AppstoreOutlined style={{ color: 'var(--primary-color)' }} /><Text strong>Item Details</Text></Space>}
-          styles={{ label: { width: 140, background: 'var(--bg-secondary)' } }}
-        >
-          <Descriptions.Item label="Style">{record.style || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Order No">{record.orderRef || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Supplier">{record.supplier || '-'}</Descriptions.Item>
-          <Descriptions.Item label="GRN #">{record.grnNumber || '-'}</Descriptions.Item>
-          <Descriptions.Item label="GRN Date">
-            <Space size={6}>
-              <CalendarOutlined style={{ color: 'var(--text-secondary)' }} />
-              {formatDate(record.grnDate)}
-            </Space>
-          </Descriptions.Item>
-          <Descriptions.Item label="Sub Category">
-            {record.subCategory
-              ? <Tag color={SUB_CATEGORY_COLORS[record.subCategory] || 'default'}>{record.subCategory}</Tag>
-              : '-'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Composition">{record.composition || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Colour">{record.color || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Std Width">{record.width ? `${record.width} in` : '-'}</Descriptions.Item>
-          <Descriptions.Item label="Std GSM">{record.gsm || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Total Value (Excl. GST)" span={2}>
-            <Text strong>{record.poLineValue != null ? `₹ ${formatNumber(record.poLineValue, 2)}` : '-'}</Text>
-          </Descriptions.Item>
-        </Descriptions>
+        <DetailCard title="Item Details" icon={<AppstoreOutlined />}>
+          <DetailCard.Field {...FIELD_SPAN} label="Style" value={record.style} />
+          <DetailCard.Field {...FIELD_SPAN} label="Order No" value={record.orderRef} />
+          <DetailCard.Field {...FIELD_SPAN} label="Supplier" value={record.supplier} />
+          <DetailCard.Field
+            {...FIELD_SPAN}
+            label={fromOpening ? 'Opening Batch' : 'GRN #'}
+            value={record.grnNumber}
+          />
+          <DetailCard.Field
+            {...FIELD_SPAN}
+            label={fromOpening ? 'Opening Date' : 'GRN Date'}
+            icon={<CalendarOutlined style={{ color: 'var(--text-secondary)' }} />}
+            value={record.grnDate ? formatDate(record.grnDate) : null}
+          />
+          <DetailCard.Field {...FIELD_SPAN} label="Composition" value={record.composition} />
+          <DetailCard.Field {...FIELD_SPAN} label="Colour" value={record.color} />
+          <DetailCard.Field
+            {...FIELD_SPAN}
+            label="Std Width"
+            value={record.width ? `${formatNumber(record.width, 0)} in` : null}
+          />
+          <DetailCard.Field {...FIELD_SPAN} label="Std GSM" value={record.gsm} />
+        </DetailCard>
 
-        <Divider style={{ margin: '24px 0 16px' }} />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginBottom: 12,
-          }}
-        >
-          <Space size={8}>
-            <NumberOutlined style={{ color: 'var(--primary-color)' }} />
-            <Text strong>Rolls</Text>
-          </Space>
-          <span
-            style={{
-              display: 'inline-flex',
-              alignItems: 'baseline',
-              gap: 4,
-              padding: '3px 10px',
-              borderRadius: 999,
-              background: 'var(--bg-secondary, #f5f5f7)',
-              border: '1px solid var(--border-color, #e5e7eb)',
-              fontSize: 12,
-              fontWeight: 600,
-              color: 'var(--text-primary)',
-            }}
-          >
-            <span style={{ fontSize: 14 }}>{record.rolls?.length || 0}</span>
-            <Text type="secondary" style={{ fontSize: 11.5, fontWeight: 500 }}>
-              {record.rolls?.length === 1 ? 'roll' : 'rolls'}
-            </Text>
-          </span>
-        </div>
-
+        <div style={SECTION_HEADING}>{`Rolls (${rolls.length})`}</div>
         <Table
           rowKey={(r) => r.id || r.rollId || r.rollNumber}
           columns={rollColumns}
-          dataSource={record.rolls || []}
+          dataSource={rolls}
           pagination={false}
           size="small"
+          locale={{ emptyText: <Text type="secondary">No rolls recorded against this receipt.</Text> }}
         />
       </div>
     </Drawer>

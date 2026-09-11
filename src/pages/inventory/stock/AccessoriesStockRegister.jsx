@@ -85,7 +85,7 @@ const AccessoriesStockRegister = ({ embedded = false }) => {
           columns={columns}
           dataSource={data}
           loading={loading}
-          scroll={{ x: 1240 }}
+          scroll={{ x: 1370 }}
           pagination={getTablePagination({ pageSize: 25 }, 'items')}
           onRow={(record) => ({
             onClick: () => setDrawer({ open: true, record }),

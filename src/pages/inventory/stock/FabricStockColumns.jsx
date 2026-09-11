@@ -23,12 +23,16 @@ const ageDays = (grnDate) => (grnDate ? dayjs().diff(dayjs(grnDate), 'day') : nu
 
 const getFabricStockColumns = () => [
   {
+    // Wide enough for a full variant code on one line — "KNI-SIN-002-1109-100C-180"
+    // is 25 characters, and a wrapped code is unreadable at a glance in a register.
+    // ellipsis rather than wrap for the rare code that still overruns.
     title: 'Item Code',
     dataIndex: 'itemCode',
     key: 'itemCode',
     fixed: 'left',
-    width: 180,
+    width: 260,
     align: 'center',
+    ellipsis: true,
     render: (code, r) => r.variantCode || '—',
   },
   {
