@@ -91,3 +91,47 @@ export const getOvertimeRegister = async (params) => {
   const response = await axiosInstance.get(`${BASE_URL}/overtime/employees`, { params });
   return response.data;
 };
+
+/**
+ * Why PF, ESI, PT and LWF moved between two periods.
+ * GET /api/v1/hr/analytics/statutory-variance
+ */
+export const getStatutoryVariance = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/statutory-variance`, { params });
+  return response.data;
+};
+
+/** The employees behind one driver of one statute. */
+export const getStatutoryDriver = async (statute, code, params) => {
+  const response = await axiosInstance.get(
+    `${BASE_URL}/statutory-variance/${statute}/drivers/${code}`, { params },
+  );
+  return response.data;
+};
+
+/**
+ * What a revision round costs for a full year.
+ * GET /api/v1/hr/analytics/salary-revisions
+ */
+export const getSalaryRevisions = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/salary-revisions`, { params });
+  return response.data;
+};
+
+/**
+ * Every unit on the same metrics, with the outliers named.
+ * GET /api/v1/hr/analytics/unit-comparison
+ */
+export const getUnitComparison = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/unit-comparison`, { params });
+  return response.data;
+};
+
+/**
+ * What will break the next payroll run.
+ * GET /api/v1/hr/analytics/payroll-readiness
+ */
+export const getPayrollReadiness = async (params) => {
+  const response = await axiosInstance.get(`${BASE_URL}/payroll-readiness`, { params });
+  return response.data;
+};

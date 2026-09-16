@@ -1,12 +1,17 @@
 import { useState, useMemo } from 'react';
 import { Menu, Typography } from 'antd';
-import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined, WalletOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { FundOutlined, TeamOutlined, LineChartOutlined, CalendarOutlined, WalletOutlined, ClockCircleOutlined, SafetyCertificateOutlined,
+  RiseOutlined, BlockOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import PayrollBridge from './PayrollBridge';
 import CostPerHead from './CostPerHead';
 import HeadcountMovement from './HeadcountMovement';
 import AttendanceSummary from './AttendanceSummary';
 import LeaveLiability from './LeaveLiability';
 import Overtime from './Overtime';
+import StatutoryVariance from './StatutoryVariance';
+import SalaryRevisions from './SalaryRevisions';
+import UnitComparison from './UnitComparison';
+import PayrollReadiness from './PayrollReadiness';
 
 const { Text } = Typography;
 
@@ -39,6 +44,22 @@ const SECTIONS = [
         title: 'Cost per head',
         subtitle: 'Whether cost moved because of more people or more pay each',
         render: () => <CostPerHead />,
+      },
+      {
+        key: 'salary-revisions',
+        label: 'Revision Impact',
+        icon: <RiseOutlined />,
+        title: 'Salary revision impact',
+        subtitle: 'What a revision round costs for a full year, employer contributions included',
+        render: () => <SalaryRevisions />,
+      },
+      {
+        key: 'unit-comparison',
+        label: 'Unit Comparison',
+        icon: <BlockOutlined />,
+        title: 'Factory and department comparison',
+        subtitle: 'Every unit on the same metrics, with the outliers named',
+        render: () => <UnitComparison />,
       },
     ],
   },
@@ -77,6 +98,28 @@ const SECTIONS = [
         title: 'Overtime register and limits',
         subtitle: 'Whether overtime is a cost problem or a compliance one',
         render: () => <Overtime />,
+      },
+    ],
+  },
+  {
+    key: 'compliance',
+    label: 'Statutory & Readiness',
+    children: [
+      {
+        key: 'statutory-variance',
+        label: 'PF & ESI Variance',
+        icon: <SafetyCertificateOutlined />,
+        title: 'Statutory contribution variance',
+        subtitle: 'Why PF and ESI moved — joiners, wage changes, ceiling crossings',
+        render: () => <StatutoryVariance />,
+      },
+      {
+        key: 'payroll-readiness',
+        label: 'Payroll Readiness',
+        icon: <CheckCircleOutlined />,
+        title: 'Payroll readiness',
+        subtitle: 'What will break the next payroll run, grouped by what needs doing',
+        render: () => <PayrollReadiness />,
       },
     ],
   },
