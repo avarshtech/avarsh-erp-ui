@@ -273,6 +273,23 @@ export default defineConfig({
       dependencies: ['rbac-soak-setup'],
     },
 
+    // ── Branch / Unit hierarchy ─────────────────────────────
+    // Declared last on purpose: the specs make the company multi-branch to
+    // exercise the switcher, branch fields and columns, and 99-restore closes
+    // those branches again. Every other suite is written against the
+    // single-branch company the seed ships, so nothing may run after this
+    // until the restore has happened.
+    {
+      name: 'branch',
+      testDir: './e2e/specs/branch',
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
     // ── Full Business Flow (Costing → Order → BOM → PO) ─────
     // Single browser window, handles its own login, no setup dependency
     {

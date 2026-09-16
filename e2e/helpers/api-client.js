@@ -41,9 +41,13 @@ export class ApiClient {
     return data;
   }
 
-  headers() {
+  /**
+   * `extra` merges per-request headers onto the auth header — the branch suites
+   * send `X-Branch-Id` this way, which is how the server picks a working branch.
+   */
+  headers(extra) {
     if (!this.token) throw new Error('Not authenticated. Call login() first.');
-    return { Authorization: `Bearer ${this.token}` };
+    return { Authorization: `Bearer ${this.token}`, ...(extra || {}) };
   }
 
   /**
@@ -58,41 +62,41 @@ export class ApiClient {
     return { response, data, status: response.status() };
   }
 
-  async get(path, params) {
+  async get(path, params, extraHeaders) {
     const url = params
       ? `${API_BASE}${path}?${new URLSearchParams(params)}`
       : `${API_BASE}${path}`;
-    const response = await this.request.get(url, { headers: this.headers() });
+    const response = await this.request.get(url, { headers: this.headers(extraHeaders) });
     return this.#result(response);
   }
 
-  async post(path, data) {
+  async post(path, data, extraHeaders) {
     const response = await this.request.post(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
     return this.#result(response);
   }
 
-  async put(path, data) {
+  async put(path, data, extraHeaders) {
     const response = await this.request.put(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
     return this.#result(response);
   }
 
-  async patch(path, data) {
+  async patch(path, data, extraHeaders) {
     const response = await this.request.patch(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
       data,
     });
     return this.#result(response);
   }
 
-  async delete(path) {
+  async delete(path, extraHeaders) {
     const response = await this.request.delete(`${API_BASE}${path}`, {
-      headers: this.headers(),
+      headers: this.headers(extraHeaders),
     });
     return this.#result(response);
   }

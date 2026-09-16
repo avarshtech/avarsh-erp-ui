@@ -29,7 +29,8 @@
     "test:e2e:approvals": "playwright test --project=approvals",
     "test:e2e:inventory": "playwright test --project=inventory",
     "test:e2e:sample-requests": "playwright test --project=sample-requests",
-    "test:e2e:reports": "playwright test --project=reports"
+    "test:e2e:reports": "playwright test --project=reports",
+    "test:e2e:branch": "playwright test --project=branch"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
