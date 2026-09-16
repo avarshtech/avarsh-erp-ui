@@ -13,6 +13,7 @@ export const searchOrders = async (params = {}) => {
   if (params.orderType)      query.append('orderType',      params.orderType);
   if (params.orderDateStart) query.append('orderDateStart', params.orderDateStart);
   if (params.orderDateEnd)   query.append('orderDateEnd',   params.orderDateEnd);
+  if (params.branchId)       query.append('branchId',       params.branchId);
   if (params.page  !== undefined) query.append('page',  params.page);
   if (params.size  !== undefined) query.append('size',  params.size);
   if (params.sort)           query.append('sort',      params.sort);

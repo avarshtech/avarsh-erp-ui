@@ -27,12 +27,15 @@ import { ORDER_STATUS_CONFIG } from '../../utils/statusConfig';
 import { getTablePagination } from '../../utils/paginationConfig';
 import useDebouncedSearch from '../../hooks/useDebouncedSearch';
 import OrderView from './OrderView';
+import { useBranch } from '../../context/BranchContext';
 
 const { Text } = Typography;
 
 const OrderList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher is the branch filter: the list follows it, "all" lifts it
+  const { activeBranchId, isMultiBranch, branchName } = useBranch();
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [data, setData] = useState([]);
@@ -93,6 +96,7 @@ const OrderList = () => {
         if (debouncedSearch) params.search = debouncedSearch;
         if (statusFilter) params.status = statusFilter;
         if (orderTypeFilter) params.orderType = orderTypeFilter;
+        if (activeBranchId) params.branchId = activeBranchId;
         if (orderDateRange && orderDateRange.length === 2) {
           params.orderDateStart = orderDateRange[0].format('YYYY-MM-DD');
           params.orderDateEnd = orderDateRange[1].format('YYYY-MM-DD');
@@ -113,14 +117,14 @@ const OrderList = () => {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, activeBranchId]
   );
 
   // Re-fetch on filter change
   useEffect(() => {
     fetchData(1, pagination.pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, statusFilter, orderTypeFilter, orderDateRange]);
+  }, [debouncedSearch, statusFilter, orderTypeFilter, orderDateRange, activeBranchId]);
 
   // Table change (pagination, sorting)
   const handleTableChange = (pag, _filters, sorter) => {
@@ -188,6 +192,18 @@ const OrderList = () => {
       ellipsis: true,
       render: (text) => <Text strong>{text || '-'}</Text>,
     },
+    ...(isMultiBranch ? [{
+      title: 'Branch',
+      key: 'branches',
+      width: 150,
+      ellipsis: true,
+      render: (_, record) => {
+        const rows = (record.allocations || []).filter((a) => a.qty > 0);
+        return rows.length
+          ? rows.map((a) => a.branchName || branchName(a.branchId)).join(', ')
+          : <Text type="secondary">Unallocated</Text>;
+      },
+    }] : []),
     {
       title: 'Lines',
       key: 'lineCount',
@@ -289,7 +305,7 @@ const OrderList = () => {
         </Space>
       ),
     },
-  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, handleDelete, navigate, deletingId, canView, canUpdate, canDelete, isMultiBranch, branchName]);
 
   // Status filter options
   const statusOptions = useMemo(() =>
