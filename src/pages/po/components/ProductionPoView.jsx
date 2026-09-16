@@ -16,6 +16,7 @@ import {
 } from '../../../utils/productionConstants';
 import { getStockByBom, getPpApprovalStatus } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 const KIND = { CUTTING: 'fabric', WORK_ORDER: 'trim', FINISHING: 'packing' };
@@ -28,6 +29,7 @@ const money = (n) => (Number(n) || 0).toLocaleString('en-IN', { minimumFractionD
 const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
   const [stockRows, setStockRows] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
+  const { isMultiBranch, branchName } = useBranch();
   const meta = PO_TYPE_META[poType];
 
   useEffect(() => {
@@ -57,6 +59,7 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
         <Descriptions.Item label="Style">{record.styleNo}</Descriptions.Item>
         <Descriptions.Item label="Buyer">{record.buyer}</Descriptions.Item>
         <Descriptions.Item label="BOM">{record.bomNo}</Descriptions.Item>
+        {isMultiBranch && <Descriptions.Item label="Branch">{branchName(record.branchId)}</Descriptions.Item>}
         {poType === PO_TYPE.FINISHING ? (
           <>
             <Descriptions.Item label="Work Order">{record.workOrderNo}</Descriptions.Item>

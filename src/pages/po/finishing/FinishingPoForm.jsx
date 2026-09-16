@@ -34,12 +34,12 @@ const FinishingPoForm = () => {
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
 
-  useEffect(() => { getProcessingUnits('UNIT').then(setUnits); }, []);
-
   useEffect(() => {
     getFinishingPo(id).then(async (record) => {
       if (!record) { message.error('Finishing PO not found'); return navigate('/purchase-orders/finishing-po/list'); }
       setPo(record);
+      // Only the units of the branch this PO is made at (it follows its work order)
+      getProcessingUnits('UNIT', record.branchId).then(setUnits);
       setItems(record.items || []);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {

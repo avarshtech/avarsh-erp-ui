@@ -17,6 +17,8 @@ import { PROD_PO_STATUS, getStatusLabel, getProcessLabel, EDITABLE_STATUSES, PO_
 import { listFinishingPos, getFinishingPo } from '../../../services/po/production/finishingPoService';
 import { getVendors } from '../../../services/po/production/productionLookupService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
 const PROCESS_OPTIONS = FINISHING_PROCESSES.map((p) => ({ value: p.key, label: p.label }));
@@ -25,6 +27,9 @@ const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) 
 const FinishingPoList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters this list server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [status, setStatus] = useState();
   const [process, setProcess] = useState();
@@ -52,7 +57,7 @@ const FinishingPoList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message]);
+  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message, activeBranchId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -82,6 +87,7 @@ const FinishingPoList = () => {
           {(r.processes || []).map((p) => <Tag key={p.processName} color="blue">{getProcessLabel(p.processName)}</Tag>)}
         </Space>
       ) },
+    ...branchColumn,
     { title: 'Vendor', key: 'vendor', width: 160, render: (_, r) => (r.isOutsourced ? r.vendorName : <Tag>In-house</Tag>) },
     { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
     { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString() },
@@ -100,7 +106,7 @@ const FinishingPoList = () => {
           )}
         </Space>
       ) },
-  ], [navigate]);
+  ], [navigate, branchColumn]);
 
   return (
     <div className="animate-fade-in-up">

@@ -64,10 +64,11 @@ export const getConsumptionComparison = async (order, cadPerPc, plannedQty) => {
   }));
 };
 
-export const getProcessingUnits = async (type) => {
+/** In-house units; narrowed to one branch when the PO already knows where it is made. */
+export const getProcessingUnits = async (type, branchId) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.getProcessingUnits(type);
-  const { data } = await axiosInstance.get('/factories/active');
-  return (data || []).map((f) => ({ id: f.id, name: f.factoryName || f.name }));
+  const { data } = await axiosInstance.get('/factories/active', { params: branchId ? { branchId } : undefined });
+  return (data || []).map((f) => ({ id: f.id, name: f.factoryName || f.name, branchId: f.branchId }));
 };
 
 export const getVendors = async (service) => {

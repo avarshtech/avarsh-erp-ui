@@ -86,7 +86,7 @@ const WorkOrderForm = () => {
       setConsumption(await getConsumptionComparison(o, wo.cadConsumptionPerPc, wo.totalPlannedQty));
       setItems(wo.items || []);
       form.setFieldsValue({
-        orderId: wo.orderId, cuttingPoId: wo.cuttingPoId,
+        orderId: wo.orderId, cuttingPoId: wo.cuttingPoId, branchId: wo.branchId,
         plannedStartDate: wo.plannedStartDate ? dayjs(wo.plannedStartDate) : null,
         plannedEndDate: wo.plannedEndDate ? dayjs(wo.plannedEndDate) : null,
         plannedDeliveryDate: wo.plannedDeliveryDate ? dayjs(wo.plannedDeliveryDate) : null,
@@ -106,6 +106,8 @@ const WorkOrderForm = () => {
   const handleCuttingPoSelect = async (cpId) => {
     const cp = cuttingPos.find((c) => c.id === cpId);
     if (cp && order) await applyCuttingPo(cp, order);
+    // Made where the cutting was: the unit picker narrows to that branch's units
+    form.setFieldsValue({ branchId: cp?.branchId, processingUnitId: undefined, processingUnitName: '' });
   };
 
   const applyBulkRate = () => {
@@ -143,7 +145,7 @@ const WorkOrderForm = () => {
   const buildPayload = (values) => ({
     orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
     buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
-    cuttingPoId: cuttingPo?.id, cuttingPoNo: cuttingPo?.cuttingPoNo,
+    cuttingPoId: cuttingPo?.id, cuttingPoNo: cuttingPo?.cuttingPoNo, branchId: cuttingPo?.branchId ?? values.branchId ?? null,
     processingUnitType: values.processingUnitType, processingUnitId: values.processingUnitId, processingUnitName: values.processingUnitName,
     sewingLineId: values.sewingLineId, samMinutes: values.samMinutes, targetDailyOutput: values.targetDailyOutput,
     plannedStartDate: values.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: values.plannedEndDate?.format('YYYY-MM-DD'),
@@ -202,6 +204,8 @@ const WorkOrderForm = () => {
             <FormSelect placeholder="Select approved cutting PO" disabled={isEdit || !order} onChange={handleCuttingPoSelect}
               options={cuttingPos.map((c) => ({ value: c.id, label: c.cuttingPoNo }))} />
           </Form.Item>
+          {/* The cutting PO's branch; the unit picker narrows to it. Never chosen here. */}
+          <Form.Item name="branchId" hidden><Input /></Form.Item>
         </FormSection>
         {order?.garmentProcesses?.length > 0 && (
           <Alert

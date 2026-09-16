@@ -13,19 +13,22 @@ import { getProcessingUnits, getVendors } from '../../../services/po/production/
 const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) => {
   const form = Form.useFormInstance();
   const unitType = Form.useWatch('processingUnitType', form) || PROCESSING_UNIT_TYPE.UNIT;
+  // The branch the PO is made at (set by the form once it is known) narrows the
+  // in-house unit list to that branch's units; vendors are company-wide.
+  const branchId = Form.useWatch('branchId', form);
   const [options, setOptions] = useState([]);
 
   useEffect(() => {
     let active = true;
     const fetcher = unitType === PROCESSING_UNIT_TYPE.VENDOR
       ? getVendors(poType)
-      : getProcessingUnits('UNIT');
+      : getProcessingUnits('UNIT', branchId);
     fetcher.then((list) => {
       if (!active) return;
       setOptions((list || []).map((u) => ({ value: u.id, label: u.name })));
     });
     return () => { active = false; };
-  }, [unitType, poType]);
+  }, [unitType, poType, branchId]);
 
   const handleUnitChange = (value, option) => {
     form.setFieldValue('processingUnitName', option?.label || '');

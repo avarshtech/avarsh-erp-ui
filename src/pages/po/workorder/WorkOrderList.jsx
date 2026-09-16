@@ -16,6 +16,8 @@ import {
 } from '../../../utils/productionConstants';
 import { listWorkOrders, getWorkOrder } from '../../../services/po/production/workOrderService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
@@ -24,6 +26,9 @@ const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) 
 const WorkOrderList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters this list server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [status, setStatus] = useState();
   const [unitType, setUnitType] = useState();
@@ -46,7 +51,7 @@ const WorkOrderList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, unitType, buyer, dateRange, message]);
+  }, [debouncedSearch, status, unitType, buyer, dateRange, message, activeBranchId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -70,6 +75,7 @@ const WorkOrderList = () => {
     { title: 'Style', dataIndex: 'styleNo', width: 130 },
     { title: 'Buyer', dataIndex: 'buyer', width: 150, ellipsis: true },
     { title: 'Cutting PO', dataIndex: 'cuttingPoNo', width: 150 },
+    ...branchColumn,
     { title: 'Processing Unit', dataIndex: 'processingUnitName', width: 180, ellipsis: true },
     { title: 'Start Date', dataIndex: 'plannedStartDate', width: 110, render: fmtDate },
     { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
@@ -89,7 +95,7 @@ const WorkOrderList = () => {
           )}
         </Space>
       ) },
-  ], [navigate]);
+  ], [navigate, branchColumn]);
 
   return (
     <div className="animate-fade-in-up">
