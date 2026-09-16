@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Drawer, Table, Select, InputNumber, Input, Button, Space, Tag, Typography, App } from 'antd';
+import { Drawer, Table, Select, InputNumber, Input, Button, Space, Tag, Typography, App, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useBranch } from '../../context/BranchContext';
 import { getActiveFactories } from '../../services/master/factoryService';
@@ -70,9 +70,15 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
       const saved = await saveOrderAllocations(orderId, rows.map(({ branchId, unitId, qty, remarks }) => ({
         branchId, unitId: unitId ?? null, qty: Number(qty), remarks: remarks || null,
       })));
-      message.success('Branch allocation saved');
       onSaved?.(saved);
-      onClose?.();
+      if (saved?.warnings?.length) {
+        // Saved, but a unit is off the buyer's approved list: keep the drawer open so the warning is read
+        setView(saved);
+        message.warning('Saved. Check the buyer-approval warning.');
+      } else {
+        message.success('Branch allocation saved');
+        onClose?.();
+      }
     } catch (e) {
       toastUnlessHandled(message, e, 'Failed to save branch allocation');
     } finally {
@@ -173,6 +179,15 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
         </Tag>
         {duplicateBranch && <Tag color="error">A branch appears twice</Tag>}
       </Space>
+      {view?.warnings?.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Buyer approval"
+          description={<ul style={{ margin: 0, paddingLeft: 18 }}>{view.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
+        />
+      )}
       <Table
         size="small"
         rowKey="key"

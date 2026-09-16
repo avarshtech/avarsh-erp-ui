@@ -35,7 +35,7 @@ const CuttingPoForm = () => {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { message, modal } = App.useApp();
+  const { message, modal, notification } = App.useApp();
   const [form] = Form.useForm();
 
   const { isMultiBranch, effectiveBranchId } = useBranch();
@@ -179,6 +179,10 @@ const CuttingPoForm = () => {
       const saved = isEdit ? await updateCuttingPo(id, payload) : await createCuttingPo(payload);
       if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
       message.success(`${saved.cuttingPoNo} ${submit ? 'submitted' : 'saved'}`);
+      if (saved.warnings?.length) {
+        // The buyer has an approved-unit list and this unit is not on it: warn, never block
+        notification.warning({ title: 'Buyer approval', description: saved.warnings.join(' '), duration: 10 });
+      }
       navigate('/purchase-orders/cutting-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
