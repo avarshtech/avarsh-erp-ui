@@ -11,6 +11,7 @@ import {
   getActiveDepartmentsByFactory, getActiveDesignationsByDepartment, getActiveShifts,
 } from '../../../services/master/hrMasterService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import {
   EMPLOYEE_STATUS, EMPLOYEE_TYPE, GENDER_OPTIONS, MARITAL_STATUS,
@@ -165,6 +166,8 @@ const DocumentCell = ({ row, uploading, onUpload, onClear }) => {
 
 
 const EmployeeForm = () => {
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const { message } = App.useApp();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -193,9 +196,9 @@ const EmployeeForm = () => {
   const watchedDepartmentId = Form.useWatch('departmentId', form);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
     getActiveShifts().then(setShifts).catch(() => {});
-  }, []);
+  }, [activeBranchId]);
 
   useEffect(() => {
     if (!watchedFactoryId) {

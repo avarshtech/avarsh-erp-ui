@@ -8,6 +8,7 @@ import {
   getPfSummary, getEsiSummary, downloadEcrFile, downloadEsiFile,
 } from '../../../services/hr/statutoryFilingService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { downloadContributionStatement } from '../../../services/hr/statutoryFilingService';
 import { triggerBrowserDownload } from '../../../services/hr/attendanceService';
 import { factoryOptions } from '../../../utils/hrLabels';
@@ -39,6 +40,8 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
   const isPf = scheme === 'PF';
   const canView = hasPermission('hr-statutory', 'view');
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -51,8 +54,8 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   const load = useCallback(async () => {
     if (!factoryId) { message.warning('Select a factory first'); return; }

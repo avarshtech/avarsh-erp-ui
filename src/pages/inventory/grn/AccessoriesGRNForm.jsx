@@ -138,11 +138,13 @@ const AccessoriesGRNForm = () => {
     const po = purchaseOrders.find((p) => p.id === poId);
     const enriched = po ? await enrichPOWithReceipts(po, grnRecord?.id) : null;
     setSelectedPO(enriched);
+    // A new GRN receives where its PO is delivered (the field stays editable)
+    if (!grnRecord?.id && po?.deliveryBranchId != null) form.setFieldsValue({ branchId: po.deliveryBranchId });
     setSelectedLineItemIds([]);
     setItems([]);
     setCartons([]);
     setIsDirty(true);
-  }, [purchaseOrders, grnRecord?.id]);
+  }, [purchaseOrders, grnRecord?.id, form]);
 
   // Merge items + cartons when selection changes — preserving user-entered Receiving Qty,
   // Carton #, and Quantity for line items that remain selected.

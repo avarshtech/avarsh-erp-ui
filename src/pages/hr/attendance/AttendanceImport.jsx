@@ -10,6 +10,7 @@ import {
   triggerBrowserDownload,
 } from '../../../services/hr/attendanceService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
 import { factoryOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
@@ -24,6 +25,8 @@ const AttendanceImport = () => {
   const { message } = App.useApp();
   const canAdd = hasPermission('hr-attendance', 'add');
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [factories, setFactories] = useState([]);
   const [factoryId, setFactoryId] = useState(undefined);
   const [period, setPeriod] = useState([dayjs().startOf('month'), dayjs().endOf('month')]);
@@ -35,8 +38,8 @@ const AttendanceImport = () => {
   const [duplicateStrategy, setDuplicateStrategy] = useState('SKIP');
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   const contextReady = Boolean(factoryId && period?.[0] && period?.[1]);
 

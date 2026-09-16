@@ -148,10 +148,12 @@ const FabricGRNForm = () => {
     // and disables fully-received line items.
     const enriched = po ? await enrichPOWithReceipts(po, grnRecord?.id) : null;
     setSelectedPO(enriched);
+    // A new GRN receives where its PO is delivered (the field stays editable)
+    if (!grnRecord?.id && po?.deliveryBranchId != null) form.setFieldsValue({ branchId: po.deliveryBranchId });
     setSelectedLineItemIds([]);
     setRolls([]);
     setIsDirty(true);
-  }, [purchaseOrders, grnRecord?.id]);
+  }, [purchaseOrders, grnRecord?.id, form]);
 
   // When line item selection changes within the same PO, merge — preserving any
   // user-entered Roll #, Receiving Qty, Shade Lot for line items that remain selected.

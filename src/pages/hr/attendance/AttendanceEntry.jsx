@@ -9,6 +9,7 @@ import dayjs from 'dayjs';
 import { markAttendance } from '../../../services/hr/attendanceService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { getActiveLeaveTypes } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS, HALF_DAY_TYPE } from '../../../utils/hrConstants';
 import { employeeOptions, factoryOptions } from '../../../utils/hrLabels';
@@ -24,6 +25,8 @@ const AttendanceEntry = () => {
   const [form] = Form.useForm();
   const canAdd = hasPermission('hr-attendance', 'add');
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [factories, setFactories] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
@@ -33,9 +36,9 @@ const AttendanceEntry = () => {
   const status = Form.useWatch('status', form);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
     getActiveLeaveTypes().then(setLeaveTypes).catch(() => {});
-  }, []);
+  }, [activeBranchId]);
 
   // Employees are scoped to the chosen factory, matching how the rest of the
   // HR screens cascade.

@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { getAttendanceCalendar, getAttendanceSummary } from '../../../services/hr/attendanceService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
 import { employeeOptions, factoryOptions } from '../../../utils/hrLabels';
@@ -42,6 +43,8 @@ const textColourFor = (status) => (LIGHT_BACKGROUNDS.has(status) ? 'rgba(0,0,0,0
 
 const AttendanceCalendar = () => {
   const { message } = App.useApp();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [factories, setFactories] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -75,8 +78,8 @@ const AttendanceCalendar = () => {
   );
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   useEffect(() => {
     if (factoryId) {

@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveDepartments } from '../../../services/master/hrMasterService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import { EMPLOYEE_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
@@ -18,6 +19,8 @@ import { factoryOptions } from '../../../utils/hrLabels';
 const EmployeeList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
@@ -35,8 +38,8 @@ const EmployeeList = () => {
   // Load filter options on mount
   useEffect(() => {
     getActiveDepartments().then(setDepartments).catch(() => {});
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);

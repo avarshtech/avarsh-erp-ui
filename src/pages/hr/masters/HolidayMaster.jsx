@@ -5,6 +5,7 @@ import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined 
 import dayjs from 'dayjs';
 import { getHolidaysByYear, createHoliday, updateHoliday, deleteHoliday } from '../../../services/master/hrMasterService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { HOLIDAY_TYPES } from '../../../utils/hrConstants';
@@ -16,6 +17,8 @@ const MODULE_ID = 'hr-masters';
 const HolidayMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -76,13 +79,13 @@ const HolidayMaster = ({ onDirtyChange }) => {
 
   const fetchFactories = useCallback(async () => {
     try {
-      const result = await getActiveFactories();
+      const result = await getActiveFactories(activeBranchId || undefined);
       const list = Array.isArray(result) ? result : (result?.data || []);
       setFactories(list);
     } catch {
       // Silent
     }
-  }, []);
+  }, [activeBranchId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { fetchFactories(); }, [fetchFactories]);

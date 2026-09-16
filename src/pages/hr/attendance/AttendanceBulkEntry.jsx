@@ -7,6 +7,7 @@ import {
   getAttendanceLock, lockAttendanceMonth, unlockAttendanceMonth,
 } from '../../../services/hr/attendanceService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
 import { factoryOptions } from '../../../utils/hrLabels';
@@ -16,6 +17,8 @@ const statusOptions = ATTENDANCE_STATUS.map((s) => ({ value: s.value, label: s.l
 
 const AttendanceBulkEntry = () => {
   const { message, modal } = App.useApp();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [factories, setFactories] = useState([]);
@@ -30,8 +33,8 @@ const AttendanceBulkEntry = () => {
   const canLock = hasPermission('hr-attendance', 'lock');
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   const fetchData = useCallback(async () => {
     if (!selectedDate || !factoryId) return;

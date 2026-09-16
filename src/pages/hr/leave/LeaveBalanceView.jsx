@@ -5,12 +5,15 @@ import dayjs from 'dayjs';
 import { getLeaveBalancesBulk } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
 import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
   const navigate = useNavigate();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [year, setYear] = useState(dayjs().year());
   const [factories, setFactories] = useState([]);
@@ -22,8 +25,8 @@ const LeaveBalanceView = () => {
   const [leaveTypeNames, setLeaveTypeNames] = useState([]);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [activeBranchId]);
 
   useEffect(() => {
     if (factoryId) {

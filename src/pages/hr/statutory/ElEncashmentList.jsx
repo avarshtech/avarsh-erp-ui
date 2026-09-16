@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import { factoryOptions } from '../../../utils/hrLabels';
@@ -17,6 +18,8 @@ const formatCurrency = (val) =>
 const ElEncashmentList = () => {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [statusFilter, setStatusFilter] = useState(undefined);
@@ -41,8 +44,8 @@ const ElEncashmentList = () => {
 
   useEffect(() => {
     fetchData();
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, [fetchData]);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+  }, [fetchData, activeBranchId]);
 
   const filteredData = useMemo(() => {
     if (!statusFilter) return data;

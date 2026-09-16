@@ -7,8 +7,9 @@ export const getAllFactories = async () => {
   return response.data;
 };
 
-export const getActiveFactories = async () => {
-  const response = await axiosInstance.get(`${BASE_URL}/active`);
+/** Active units; with a branchId only that branch's (a unit with no branch reads as the head office's). */
+export const getActiveFactories = async (branchId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/active`, { params: branchId ? { branchId } : undefined });
   return response.data;
 };
 

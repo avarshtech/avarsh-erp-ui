@@ -16,7 +16,7 @@ import {
 } from '../../../utils/sampleRequestConstants';
 import { printSampleInvoice } from '../../../utils/sampleInvoicePdfGenerator';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import useCompanyProfile from './useCompanyProfile';
+import useCompanyProfile, { withExportingBranch } from './useCompanyProfile';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useBusyAction from '../../../hooks/useBusyAction';
 import InvoiceStepStyles from './InvoiceStepStyles';
@@ -55,6 +55,7 @@ const makeBlankInvoice = (type, keep = {}) => ({
   portOfLoading: '', portOfDischarge: '', finalDestination: '',
   termsOfDelivery: '', paymentTerms: '', containerNo: '', marksAndNos: '', packages: '',
   currency: 'USD',
+  branchId: null,
   lines: [], srIds: [],
   ...keep,
 });
@@ -229,6 +230,7 @@ const SampleInvoiceForm = () => {
       // A saved draft keeps its identity; the type change persists on next save
       ...(prev.id ? { id: prev.id, version: prev.version, activity: prev.activity } : {}),
       invoiceDate: prev.invoiceDate,
+      branchId: prev.branchId,
       countryOfOrigin: prev.countryOfOrigin,
     }));
     setStep(0);
@@ -333,7 +335,7 @@ const SampleInvoiceForm = () => {
   };
 
   const handlePrint = () => {
-    if (!printSampleInvoice(inv, profile)) message.error('Pop-up blocked — allow pop-ups to print');
+    if (!printSampleInvoice(inv, withExportingBranch(profile, inv))) message.error('Pop-up blocked — allow pop-ups to print');
   };
 
   if (loading || !inv || profile.loading) {

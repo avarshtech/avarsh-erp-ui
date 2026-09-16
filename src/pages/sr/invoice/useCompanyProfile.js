@@ -68,3 +68,21 @@ const useCompanyProfile = () => {
 };
 
 export default useCompanyProfile;
+
+/**
+ * The exporter block for one invoice. With an exporting branch chosen, its
+ * address and GSTIN print under the company name (GST registration is
+ * state-wise, so the invoice must carry the branch's); with none, the company
+ * profile prints exactly as before. The branch details ride on the invoice DTO,
+ * so the print needs no extra permission to read branches.
+ */
+export const withExportingBranch = (profile, inv) => {
+  if (!inv?.branchId || !(inv.branchAddress || inv.branchGstin)) return profile;
+  const exporterBlock = [
+    profile.companyName,
+    inv.branchName ? `${inv.branchName} Branch` : null,
+    inv.branchAddress,
+    inv.branchGstin ? `GST NO: ${inv.branchGstin}` : null,
+  ].filter(Boolean).join('\n');
+  return { ...profile, exporterBlock };
+};

@@ -4,6 +4,7 @@ import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutl
 import { useNavigate } from 'react-router-dom';
 import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords, validatePayrollRun } from '../../../services/hr/payrollService';
 import { getActiveFactories } from '../../../services/master/factoryService';
+import { useBranch } from '../../../context/BranchContext';
 import { factoryOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 import SalaryRecordDrawer from './SalaryRecordDrawer';
@@ -27,6 +28,8 @@ const PayrollWizard = () => {
   // the same act on this right; the wizard did not gate it at all.
   const canApprove = hasPermission('hr-payroll', 'approve');
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [current, setCurrent] = useState(0);
   // Clicking a row opens the derivation behind its figures.
   const [selectedRecord, setSelectedRecord] = useState(null);
@@ -41,8 +44,8 @@ const PayrollWizard = () => {
   const [records, setRecords] = useState([]);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => message.error('Failed to load factories'));
-  }, [message]);
+    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => message.error('Failed to load factories'));
+  }, [message, activeBranchId]);
 
   // Step 1 — Initialize
   const handleInitiate = useCallback(async () => {
