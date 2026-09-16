@@ -6,6 +6,7 @@ import {
   CONDITION_OPERATORS,
   getConditionField,
 } from '../../../utils/approvalFlowConstants';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 
@@ -17,13 +18,19 @@ const FlowSummaryPreview = ({ roles = [], users = [] }) => {
   const entityType = Form.useWatch('entityType', form);
   const conditions = Form.useWatch('conditions', form);
   const levels = Form.useWatch('levels', form);
+  const { branchName } = useBranch();
 
   if (!entityType) return null;
 
   const entityLabel = ENTITY_TYPES.find((e) => e.value === entityType)?.label || entityType;
   const conditionText = (conditions || [])
     .filter((c) => c?.field && c?.operator && c?.value !== undefined && c?.value !== null)
-    .map((c) => `${getConditionField(entityType, c.field)?.label || c.field} ${opLabel(c.operator)} ${c.value}`)
+    .map((c) => {
+      const def = getConditionField(entityType, c.field);
+      // A branch condition stores the id; the summary reads better with the name
+      const value = def?.type === 'branch' ? branchName(Number(c.value)) : c.value;
+      return `${def?.label || c.field} ${opLabel(c.operator)} ${value}`;
+    })
     .join(' AND ');
 
   const levelName = (level, index) => {

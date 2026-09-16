@@ -5,6 +5,7 @@ import {
   CONDITION_OPERATORS,
   getConditionField,
 } from '../../../utils/approvalFlowConstants';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 
@@ -14,7 +15,13 @@ const EQUALITY_OPS = CONDITION_OPERATORS.filter((o) => o.value === 'EQ' || o.val
 /** Condition rows for one entity type — the value input follows the field's type. */
 const FlowConditionEditor = ({ entityType, disabled = false }) => {
   const form = Form.useFormInstance();
-  const fieldsForEntity = entityType ? (CONDITION_FIELDS[entityType] || []) : [];
+  // A branch condition only means something with more than one branch; a
+  // single-branch company never sees the field.
+  const { isMultiBranch, branches } = useBranch();
+  const fieldsForEntity = entityType
+    ? (CONDITION_FIELDS[entityType] || []).filter((f) => f.type !== 'branch' || isMultiBranch)
+    : [];
+  const branchOptions = branches.map((b) => ({ value: b.id, label: b.branchName }));
 
   if (!entityType) {
     return <Text type="secondary">Select an entity type first to configure conditions.</Text>;
@@ -52,6 +59,7 @@ const FlowConditionEditor = ({ entityType, disabled = false }) => {
                 {({ getFieldValue }) => {
                   const def = getConditionField(entityType, getFieldValue(['conditions', name, 'field']));
                   const isSelect = def?.type === 'select';
+                  const isBranch = def?.type === 'branch';
                   return (
                     <>
                       <Col span={5}>
@@ -60,13 +68,20 @@ const FlowConditionEditor = ({ entityType, disabled = false }) => {
                             placeholder="Op"
                             disabled={disabled}
                             style={{ width: '100%' }}
-                            options={isSelect ? EQUALITY_OPS : CONDITION_OPERATORS}
+                            options={isSelect || isBranch ? EQUALITY_OPS : CONDITION_OPERATORS}
                           />
                         </Form.Item>
                       </Col>
                       <Col span={9}>
                         <Form.Item {...restField} name={[name, 'value']} noStyle>
-                          {isSelect ? (
+                          {isBranch ? (
+                            <Select
+                              placeholder="Branch"
+                              disabled={disabled}
+                              style={{ width: '100%' }}
+                              options={branchOptions}
+                            />
+                          ) : isSelect ? (
                             <Select
                               placeholder="Value"
                               disabled={disabled}
