@@ -19,6 +19,7 @@ export const sewingOperationApi = crud('/sewing-operations');
 export const sewingDefectTypeApi = crud('/sewing-defect-types');
 export const sewingLookupApi = crud('/sewing-lookups');
 export const incentiveSlabApi = crud('/incentive-slabs');
+export const cuttingTableApi = crud('/cutting-tables');
 
 /**
  * The measurement chart is uploaded and replaces the style's chart outright, so
