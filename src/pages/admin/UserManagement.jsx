@@ -161,8 +161,10 @@ const UserManagement = () => {
         phone: values.phone,
         roleId: values.roleId,
         isActive: values.isActive ?? true,
-        defaultBranchId: values.defaultBranchId ?? null,
-        branchIds: values.branchIds ?? [],
+        // Only when the fields were on the form: absent keys leave the user's
+        // branch scope untouched server-side, so a single-branch screen (or a
+        // failed branch fetch) can never wipe it.
+        ...(isMultiBranch ? { defaultBranchId: values.defaultBranchId ?? null, branchIds: values.branchIds ?? [] } : {}),
       };
       if (!editingUser && values.password) {
         payload.password = values.password;

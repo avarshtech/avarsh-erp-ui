@@ -11,11 +11,16 @@ import { useBranch } from '../../context/BranchContext';
  * a null to the head office anyway; the hidden field just keeps payloads uniform.)
  */
 const BranchField = ({ name = 'branchId', label = 'Branch', required = true, disabled = false, ...itemProps }) => {
-  const { isMultiBranch, allowedBranches, effectiveBranchId } = useBranch();
+  const { isMultiBranch, allowedBranches, effectiveBranchId, loaded } = useBranch();
   const options = useMemo(
     () => allowedBranches.map((b) => ({ value: b.id, label: b.branchName })),
     [allowedBranches],
   );
+
+  // Until the list is known, register nothing: the server defaults a missing
+  // branch, and a picker that appears after the form was filled would fail
+  // validation on a field the user never saw.
+  if (!loaded) return null;
 
   if (!isMultiBranch) {
     return (

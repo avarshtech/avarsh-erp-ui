@@ -13,8 +13,9 @@ const BranchSwitcher = ({ compact = false }) => {
   const { isMultiBranch, allowedBranches, activeBranchId, setActiveBranch } = useBranch();
   if (!isMultiBranch) return null;
 
+  // A user allowed exactly one branch is shown it, not a way out of it.
   const options = [
-    { value: ALL, label: 'All Branches' },
+    ...(allowedBranches.length > 1 ? [{ value: ALL, label: 'All Branches' }] : []),
     ...allowedBranches.map((b) => ({ value: b.id, label: b.branchName })),
   ];
 

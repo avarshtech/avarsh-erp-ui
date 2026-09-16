@@ -57,7 +57,7 @@ const FinishingPoList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message, activeBranchId]);
+  }, [debouncedSearch, status, process, vendor, buyer, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { load(); }, [load]);
 

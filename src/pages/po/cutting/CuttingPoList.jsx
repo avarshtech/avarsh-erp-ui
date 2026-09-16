@@ -51,7 +51,7 @@ const CuttingPoList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, unitType, buyer, dateRange, message, activeBranchId]);
+  }, [debouncedSearch, status, unitType, buyer, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { load(); }, [load]);
 

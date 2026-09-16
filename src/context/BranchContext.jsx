@@ -41,18 +41,6 @@ export const BranchProvider = ({ children }) => {
   const [loaded, setLoaded] = useState(false);
   const [stored, setStored] = useState(readStored);
 
-  const refresh = useCallback(async () => {
-    try {
-      const { data } = await getActiveBranches();
-      setBranches(Array.isArray(data) ? data : []);
-      setLoaded(true);
-    } catch {
-      // axiosInstance already toasted; keep whatever list we had.
-    }
-  }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
   // axiosInstance reads the same key to send X-Branch-Id, so this is the one place it is written.
   const setActiveBranch = useCallback((id) => {
     const next = id == null ? ALL : String(id);
@@ -63,6 +51,33 @@ export const BranchProvider = ({ children }) => {
       // storage unavailable — the choice just does not survive a reload
     }
   }, []);
+
+  // Runs each time the list is (re)fetched. A fresh browser starts at the
+  // user's home branch and that choice is written down, so X-Branch-Id is sent
+  // from the first request; a remembered branch that has since been
+  // deactivated falls back to "all".
+  const reconcileStored = useCallback((list) => {
+    const current = readStored();
+    if (current == null) {
+      const home = getCurrentUser()?.defaultBranchId;
+      setActiveBranch(list.some((b) => b.id === home) ? home : null);
+    } else if (current !== ALL && !list.some((b) => b.id === Number(current))) {
+      setActiveBranch(null);
+    }
+  }, [setActiveBranch]);
+
+  const refresh = useCallback(() => getActiveBranches()
+    .then(({ data }) => {
+      const list = Array.isArray(data) ? data : [];
+      setBranches(list);
+      setLoaded(true);
+      reconcileStored(list);
+    })
+    .catch(() => {
+      // axiosInstance already toasted; keep whatever list we had.
+    }), [reconcileStored]);
+
+  useEffect(() => { refresh(); }, [refresh]);
 
   const value = useMemo(() => {
     const user = getCurrentUser();
@@ -93,14 +108,6 @@ export const BranchProvider = ({ children }) => {
       refresh,
     };
   }, [branches, loaded, stored, setActiveBranch, refresh]);
-
-  // A remembered branch that has since been deactivated falls back to "all",
-  // and the stored key is rewritten so the request header stops carrying it.
-  useEffect(() => {
-    if (loaded && stored != null && stored !== ALL && !branches.some((b) => b.id === Number(stored))) {
-      setActiveBranch(null);
-    }
-  }, [loaded, branches, stored, setActiveBranch]);
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;
 };

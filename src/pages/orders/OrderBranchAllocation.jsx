@@ -28,7 +28,9 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [data, activeUnits] = await Promise.all([getOrderAllocations(orderId), getActiveFactories()]);
+      // Units are optional and their endpoint is HR-gated: a merchandiser without
+      // hr-masters still gets the split, just without a unit picker.
+      const [data, activeUnits] = await Promise.all([getOrderAllocations(orderId), getActiveFactories().catch(() => [])]);
       setView(data);
       setRows((data.rows || []).map((r) => ({
         key: ++nextKey.current, branchId: r.branchId, unitId: r.unitId, qty: r.qty, remarks: r.remarks || '',
