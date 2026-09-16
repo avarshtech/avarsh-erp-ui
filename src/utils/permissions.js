@@ -330,6 +330,12 @@ export const SCREENS = [
     ops: ['view', 'add', 'update', 'approve'] },
   { id: 'inventory-return-supplier', name: 'Return to Supplier', section: 'inventory', kind: 'screen',
     path: '/inventory/return-to-supplier', ops: ['view', 'add'] },
+  // Multi-branch companies only: the menu entry and the screen key off isMultiBranch.
+  // dispatch = goods leave the source store; receive = they land at the destination.
+  { id: 'inventory-transfer', name: 'Stock Transfer', section: 'inventory', kind: 'screen',
+    path: '/inventory/transfer',
+    routes: ['/inventory/transfer', '/inventory/transfer/new', '/inventory/transfer/:id'],
+    ops: ['view', 'add', 'update', 'dispatch', 'receive', 'cancel'] },
   // verify = the Accounts Executive check; approve = the value-band approver.
   { id: 'inventory-bill-passing', name: 'Bill Passing', section: 'inventory', kind: 'screen',
     path: '/inventory/bill-passing',

@@ -52,6 +52,7 @@ import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
 import BranchSwitcher from "../components/branch/BranchSwitcher";
+import { useBranch } from "../context/BranchContext";
 import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
@@ -191,6 +192,8 @@ const MainLayoutInner = () => {
   const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
   const { isWco } = useIsPwa();
   const { isOffline } = useNetworkStatus();
+  // Inter-branch transfers only make sense with more than one branch
+  const { isMultiBranch } = useBranch();
 
   // Auto-focus first input on route change + global keyboard shortcuts
   useFocusManagement();
@@ -416,6 +419,7 @@ const MainLayoutInner = () => {
         { key: "/inventory/issue", label: "Material Issue", moduleId: "inventory-issue" },
         { key: "/inventory/adjustment", label: "Stock Adjustment", moduleId: "inventory-adjustment" },
         { key: "/inventory/return-to-supplier", label: "Return to Supplier", moduleId: "inventory-return-supplier" },
+        ...(isMultiBranch ? [{ key: "/inventory/transfer", label: "Stock Transfer", moduleId: "inventory-transfer" }] : []),
         { key: "/inventory/bill-passing", label: "Bill Passing", moduleId: "inventory-bill-passing" },
       ],
     },

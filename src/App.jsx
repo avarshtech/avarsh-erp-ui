@@ -43,6 +43,8 @@ const SampleTrimsIssueForm = lazy(() => import('./pages/inventory/issue/SampleTr
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
+const StockTransferList = lazy(() => import('./pages/inventory/transfer/StockTransferList'));
+const StockTransferForm = lazy(() => import('./pages/inventory/transfer/StockTransferForm'));
 const BillPassingList = lazy(() => import('./pages/inventory/bill-passing/BillPassingList'));
 const BillPassingForm = lazy(() => import('./pages/inventory/bill-passing/BillPassingForm'));
 // Production PO screens (now grouped under the Purchase Orders module)
@@ -364,6 +366,9 @@ const ThemedApp = () => {
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment" operation="view"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/return-to-supplier" element={<PermissionRoute module="inventory-return-supplier" operation="view"><Suspense fallback={<PageSkeleton />}><ReturnToSupplierPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer" element={<PermissionRoute module="inventory-transfer" operation="view"><Suspense fallback={<PageSkeleton />}><StockTransferList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer/new" element={<PermissionRoute module="inventory-transfer" operation="add"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer/:id" element={<PermissionRoute module="inventory-transfer" operation="view"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingList /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
