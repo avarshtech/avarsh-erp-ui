@@ -6,11 +6,14 @@ import { searchReturns } from '../../../services/inventory/returnToSupplierServi
 import ReturnToSupplierDetailDrawer from './ReturnToSupplierDetailDrawer';
 import { formatCurrency } from '../../../utils/formatters';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
+import { useBranch } from '../../../context/BranchContext';
 
 const { RangePicker } = DatePicker;
 
 const ReturnToSupplierList = ({ returnType, refreshKey }) => {
   const { message } = App.useApp();
+  // Returns go back from a branch's store; the list follows the header switcher (X-Branch-Id)
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ content: [], totalElements: 0, number: 0, size: 20 });
   const [page, setPage] = useState(0);
@@ -37,7 +40,7 @@ const ReturnToSupplierList = ({ returnType, refreshKey }) => {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, returnType, debouncedSearch, dateRange, message]);
+  }, [page, pageSize, returnType, debouncedSearch, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 

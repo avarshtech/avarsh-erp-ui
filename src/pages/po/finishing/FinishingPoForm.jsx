@@ -43,7 +43,7 @@ const FinishingPoForm = () => {
       setItems(record.items || []);
       setPpStatus(await getPpApprovalStatus(record.orderId));
       if ((record.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-        setStock(await getStockByBom(record, 'packing', { plannedQty: record.totalPlannedQty }));
+        setStock(await getStockByBom(record, 'packing', { plannedQty: record.totalPlannedQty, branchId: record.branchId }));
       }
       form.setFieldsValue({
         plannedStartDate: record.plannedStartDate ? dayjs(record.plannedStartDate) : null,
@@ -60,7 +60,7 @@ const FinishingPoForm = () => {
     setItems(newItems);
     const total = newItems.reduce((s, i) => s + (i.plannedQty || 0), 0);
     if (po && (po.processes || []).some((p) => p.processName === FINISHING_PROCESS.PACKING)) {
-      getStockByBom(po, 'packing', { plannedQty: total }).then(setStock);
+      getStockByBom(po, 'packing', { plannedQty: total, branchId: po.branchId }).then(setStock);
     }
   };
 

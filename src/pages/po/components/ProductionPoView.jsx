@@ -35,7 +35,7 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
   useEffect(() => {
     if (!open || !record?.orderId) return;
     let active = true;
-    getStockByBom(record, KIND[poType], { cadPerPc: record.cadConsumptionPerPc, plannedQty: record.totalPlannedQty })
+    getStockByBom(record, KIND[poType], { cadPerPc: record.cadConsumptionPerPc, plannedQty: record.totalPlannedQty, branchId: record.branchId })
       .then((rows) => active && setStockRows(rows));
     getPpApprovalStatus(record.orderId).then((s) => active && setPpStatus(s));
     return () => { active = false; };

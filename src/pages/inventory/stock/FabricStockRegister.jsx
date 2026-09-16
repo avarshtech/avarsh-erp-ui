@@ -14,9 +14,14 @@ import { getFabricStock } from '../../../services/inventory/inventoryService';
 import { formatNumber } from '../../../utils/formatters';
 import getFabricStockColumns from './FabricStockColumns';
 import FabricStockViewDrawer from './FabricStockViewDrawer';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const FabricStockRegister = ({ embedded = false }) => {
   const { message } = App.useApp();
+  // Stock is per branch: the register follows the header switcher (X-Branch-Id)
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState([]);
@@ -39,13 +44,13 @@ const FabricStockRegister = ({ embedded = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, subCategoryFilter, message]);
+  }, [searchText, subCategoryFilter, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const columns = useMemo(() => getFabricStockColumns(), []);
+  const columns = useMemo(() => [...branchColumn, ...getFabricStockColumns()], [branchColumn]);
 
   const subCategoryOptions = useMemo(() => {
     const set = new Set(items.map((r) => r.subCategory).filter(Boolean));

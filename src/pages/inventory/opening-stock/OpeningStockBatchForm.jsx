@@ -19,6 +19,8 @@ import CsvUploadCard from './CsvUploadCard';
 import OpeningStockFabricRollTable from './OpeningStockFabricRollTable';
 import OpeningStockAccessoriesItemTable from './OpeningStockAccessoriesItemTable';
 import { BatchFormSkeleton } from './OpeningStockSkeletons';
+import BranchField from '../../../components/branch/BranchField';
+import { useBranch } from '../../../context/BranchContext';
 
 const { TextArea } = Input;
 
@@ -35,6 +37,7 @@ const OpeningStockBatchForm = ({ batchType }) => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [form] = Form.useForm();
+  const { isMultiBranch } = useBranch();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -68,6 +71,7 @@ const OpeningStockBatchForm = ({ batchType }) => {
         setBatch(b);
         form.setFieldsValue({
           referenceDate: b.referenceDate ? dayjs(b.referenceDate) : null,
+          branchId: b.branchId,
           notes: b.notes,
         });
         setRows(batchType === 'FABRIC' ? (b.fabricLines || []) : (b.accessoriesLines || []));
@@ -124,6 +128,8 @@ const OpeningStockBatchForm = ({ batchType }) => {
       batchType,
       referenceDate: values.referenceDate ? values.referenceDate.format('YYYY-MM-DD') : null,
       notes: values.notes,
+      // The store these balances belong to; every posted lot inherits it
+      branchId: values.branchId ?? batch?.branchId ?? null,
       fabricLines: batchType === 'FABRIC' ? rows : [],
       accessoriesLines: batchType === 'ACCESSORIES' ? rows : [],
     };
@@ -235,6 +241,9 @@ const OpeningStockBatchForm = ({ batchType }) => {
         <Form form={form} layout="vertical" disabled={readOnly}>
           <Row gutter={16}>
             <Col xs={24} md={8}>
+              {isMultiBranch ? (
+                <BranchField label="Branch (store)" disabled={readOnly} />
+              ) : <BranchField />}
               <Form.Item
                 name="referenceDate"
                 label="As-of Date"

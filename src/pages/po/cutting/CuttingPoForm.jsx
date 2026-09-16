@@ -65,9 +65,9 @@ const CuttingPoForm = () => {
     const cons = await getConsumptionComparison(o, cadPerPc);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
     setAllocations(alloc?.rows || []);
-    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc })));
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, branchId: form.getFieldValue('branchId') })));
     return o;
-  }, []);
+  }, [form]);
 
   // Edit: load existing PO
   useEffect(() => {
@@ -136,7 +136,7 @@ const CuttingPoForm = () => {
 
   const refreshStock = (rows) => {
     setConsumption(rows);
-    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty'), branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
   };
 
   // Editing Planned Qty re-derives the BOM-based requirement (per-garment from BOM × planned qty)
@@ -145,7 +145,7 @@ const CuttingPoForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
   };
 
   const applyBulkRate = () => {
@@ -237,6 +237,8 @@ const CuttingPoForm = () => {
             </Col>
           )}
           <Form.Item name="branchId" hidden><Input /></Form.Item>
+          {/* Always registered: an edit must send the allocation back, or the link would be lost */}
+          {!isMultiBranch && <Form.Item name="orderAllocationId" hidden><Input /></Form.Item>}
           <Col span={24}><ProcessingUnitSelector poType={PO_TYPE.CUTTING} /></Col>
         </FormSection>
         <FormSection title="Other" columns={1}>

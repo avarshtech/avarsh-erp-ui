@@ -48,6 +48,8 @@ export const getStockByBom = async (order, kind = 'fabric', opts = {}) => {
       orderNo: order?.orderNo,
       excludeType: opts.excludeType,
       excludePoId: opts.excludePoId,
+      // stock at the branch the PO is made at; absent = the working branch, else everywhere
+      branchId: opts.branchId || undefined,
     },
   });
   return data || [];

@@ -62,9 +62,9 @@ const WorkOrderForm = () => {
   const hydrateOrder = useCallback(async (orderId) => {
     const [o, pp, cps] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId), getApprovedCuttingPos(orderId)]);
     setOrder(o); setPpStatus(pp); setCuttingPos(cps);
-    setStock(normTrimStock(await getStockByBom(o, 'trim')));
+    setStock(normTrimStock(await getStockByBom(o, 'trim', { branchId: form.getFieldValue('branchId') })));
     return o;
-  }, []);
+  }, [form]);
 
   const applyCuttingPo = useCallback(async (cp, o) => {
     setCuttingPo(cp);
@@ -121,7 +121,7 @@ const WorkOrderForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order, 'trim', { plannedQty: total }).then((s) => setStock(normTrimStock(s)));
+    if (order) getStockByBom(order, 'trim', { plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normTrimStock(s)));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
