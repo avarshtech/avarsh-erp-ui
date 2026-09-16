@@ -51,6 +51,7 @@ import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
 import NotificationCenter from "../components/NotificationCenter";
+import BranchSwitcher from "../components/branch/BranchSwitcher";
 import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
@@ -913,6 +914,8 @@ const MainLayoutInner = () => {
               )}
             </Space>
             <Space size={isMobile ? 6 : 12} align="center">
+              {/* Working branch; renders nothing for a single-branch company */}
+              <BranchSwitcher compact={isMobile} />
               {!isMobile && <SessionTimer />}
               {!isMobile && <div className="toolbar-divider" />}
 

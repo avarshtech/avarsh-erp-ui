@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getActiveBranches } from '../services/master/branchService';
+import { getCurrentUser } from '../services/auth/authService';
 
 /**
  * The company's branches and which one the user is currently working in.
@@ -8,19 +9,26 @@ import { getActiveBranches } from '../services/master/branchService';
  * configuration flag: `isMultiBranch` is simply "more than one active branch",
  * and every screen that shows a branch switcher, field or column keys off it.
  *
- * `activeBranchId` is the header switcher's choice — null means "all branches"
- * and is the only value a single-branch company ever holds. `effectiveBranchId`
- * is what a NEW document should default to: the active branch, else the head
- * office. The two differ on purpose: a list filtered to "all" still creates its
- * documents somewhere.
+ * `activeBranchId` is the header switcher's choice — null means "all branches".
+ * It starts at the user's home branch (sys_users.default_branch_id) and is then
+ * remembered per browser; the stored value 'all' records that the user lifted
+ * the filter on purpose, so a reload does not silently put it back.
+ *
+ * `effectiveBranchId` is what a NEW document should default to: the active
+ * branch, else the user's home branch, else the head office. The two differ on
+ * purpose — a list filtered to "all" still creates its documents somewhere.
+ *
+ * `allowedBranches` is what the switcher offers: the user's allow-list when one
+ * is set (sys_user_branches), otherwise every active branch. Not a security
+ * boundary; the server does not enforce it in this phase.
  */
 const STORAGE_KEY = 'activeBranchId';
+const ALL = 'all';
 const BranchContext = createContext(null);
 
 const readStored = () => {
   try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return v ? Number(v) : null;
+    return localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
@@ -28,56 +36,71 @@ const readStored = () => {
 
 export const BranchProvider = ({ children }) => {
   const [branches, setBranches] = useState([]);
+  // True only after a fetch that succeeded: a transient failure must not read as
+  // "the company has no branches" and wipe the user's remembered choice.
   const [loaded, setLoaded] = useState(false);
-  const [activeBranchId, setActiveBranchIdState] = useState(readStored);
+  const [stored, setStored] = useState(readStored);
 
   const refresh = useCallback(async () => {
     try {
       const { data } = await getActiveBranches();
       setBranches(Array.isArray(data) ? data : []);
-    } catch {
-      // axiosInstance already toasted. An empty list behaves as single-branch.
-      setBranches([]);
-    } finally {
       setLoaded(true);
+    } catch {
+      // axiosInstance already toasted; keep whatever list we had.
     }
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // axiosInstance reads the same key to send X-Branch-Id, so this is the one place it is written.
   const setActiveBranch = useCallback((id) => {
-    setActiveBranchIdState(id ?? null);
+    const next = id == null ? ALL : String(id);
+    setStored(next);
     try {
-      if (id == null) localStorage.removeItem(STORAGE_KEY);
-      else localStorage.setItem(STORAGE_KEY, String(id));
+      localStorage.setItem(STORAGE_KEY, next);
     } catch {
       // storage unavailable — the choice just does not survive a reload
     }
   }, []);
 
-  // A remembered branch that has since been deactivated falls back to "all".
-  useEffect(() => {
-    if (loaded && activeBranchId != null && !branches.some((b) => b.id === activeBranchId)) {
-      setActiveBranch(null);
-    }
-  }, [loaded, branches, activeBranchId, setActiveBranch]);
-
   const value = useMemo(() => {
-    const defaultBranch = branches.find((b) => b.isHeadOffice) || branches[0] || null;
+    const user = getCurrentUser();
+    const userBranchIds = Array.isArray(user?.branchIds) ? user.branchIds : [];
+    const allowedBranches = userBranchIds.length
+      ? branches.filter((b) => userBranchIds.includes(b.id))
+      : branches;
+    const headOffice = branches.find((b) => b.isHeadOffice) || branches[0] || null;
+    const userDefault = branches.find((b) => b.id === user?.defaultBranchId) || null;
+    const defaultBranch = userDefault || (userBranchIds.length ? allowedBranches[0] : null) || headOffice;
+
+    let activeBranchId = null;
+    if (stored == null) activeBranchId = userDefault?.id ?? null;
+    else if (stored !== ALL) activeBranchId = Number(stored);
     const activeBranch = branches.find((b) => b.id === activeBranchId) || null;
+
     return {
       branches,
+      allowedBranches,
       loaded,
       isMultiBranch: branches.length > 1,
       defaultBranch,
-      activeBranchId,
+      activeBranchId: activeBranch ? activeBranchId : null,
       activeBranch,
-      effectiveBranchId: activeBranchId ?? defaultBranch?.id ?? null,
+      effectiveBranchId: activeBranch?.id ?? defaultBranch?.id ?? null,
       branchName: (id) => branches.find((b) => b.id === id)?.branchName || '—',
       setActiveBranch,
       refresh,
     };
-  }, [branches, loaded, activeBranchId, setActiveBranch, refresh]);
+  }, [branches, loaded, stored, setActiveBranch, refresh]);
+
+  // A remembered branch that has since been deactivated falls back to "all",
+  // and the stored key is rewritten so the request header stops carrying it.
+  useEffect(() => {
+    if (loaded && stored != null && stored !== ALL && !branches.some((b) => b.id === Number(stored))) {
+      setActiveBranch(null);
+    }
+  }, [loaded, branches, stored, setActiveBranch]);
 
   return <BranchContext.Provider value={value}>{children}</BranchContext.Provider>;
 };

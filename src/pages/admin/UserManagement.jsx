@@ -20,6 +20,7 @@ import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { MODAL_WIDTHS } from '../../utils/uiConstants';
+import { useBranch } from '../../context/BranchContext';
 const { Text } = Typography;
 
 const UserManagement = () => {
@@ -49,6 +50,7 @@ const UserManagement = () => {
 
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.role ? isAdminRole(currentUser.role) : false;
+  const { isMultiBranch, branches } = useBranch();
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -102,6 +104,8 @@ const UserManagement = () => {
         phone: user.phone || '',
         roleId: user.roleId || user.role?.id,
         isActive: user.isActive ?? true,
+        defaultBranchId: user.defaultBranchId ?? null,
+        branchIds: user.branchIds || [],
       };
       form.setFieldsValue(editValues);
       initialFormValuesRef.current = { ...editValues };
@@ -157,6 +161,8 @@ const UserManagement = () => {
         phone: values.phone,
         roleId: values.roleId,
         isActive: values.isActive ?? true,
+        defaultBranchId: values.defaultBranchId ?? null,
+        branchIds: values.branchIds ?? [],
       };
       if (!editingUser && values.password) {
         payload.password = values.password;
@@ -386,6 +392,21 @@ const UserManagement = () => {
             <Col xs={24} sm={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
           </Row>
+          {/* Branch scoping is only a thing once the company has more than one branch */}
+          {isMultiBranch && (
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="defaultBranchId" label="Home Branch" extra="where the branch switcher starts for this user">
+                  <Select allowClear placeholder="Head office" options={branches.map((b) => ({ value: b.id, label: b.branchName }))} />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="branchIds" label="Allowed Branches" extra="leave empty to allow every branch">
+                  <Select mode="multiple" allowClear placeholder="All branches" options={branches.map((b) => ({ value: b.id, label: b.branchName }))} />
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
         </Form>
       </Modal>
 

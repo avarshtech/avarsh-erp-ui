@@ -90,6 +90,8 @@ const buildUserSession = (token, fallbackUser = null, identity = null) => {
     email: payload.email || fallbackUser?.email || '',
     role: payload.role || fallbackUser?.role || '',
     roleId: identity?.roleId ?? fallbackUser?.roleId ?? null,
+    defaultBranchId: identity?.defaultBranchId ?? fallbackUser?.defaultBranchId ?? null,
+    branchIds: identity?.branchIds ?? fallbackUser?.branchIds ?? [],
     isSuperuser: identity?.isSuperuser ?? fallbackUser?.isSuperuser ?? false,
     permissions: normalizedPermissions,
     idleTimeoutMinutes: payload.idleTimeoutMinutes || 30,
