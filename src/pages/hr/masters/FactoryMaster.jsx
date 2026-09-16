@@ -22,7 +22,7 @@ const MODULE_ID = 'hr-masters';
  */
 const FactoryMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
-  const { branches, isMultiBranch, effectiveBranchId, branchName } = useBranch();
+  const { branches, isMultiBranch, effectiveBranchId, defaultBranch, branchName } = useBranch();
 
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -76,7 +76,8 @@ const FactoryMaster = ({ onDirtyChange }) => {
       title: 'Branch',
       dataIndex: 'branchId',
       width: 140,
-      render: (val) => branchName(val),
+      // A unit with no branch (an old seed) is the head office's, as the server treats it
+      render: (val) => branchName(val ?? defaultBranch?.id),
     }] : []),
     {
       title: 'Type',
@@ -106,7 +107,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
         ? <Tag color="default">Inactive</Tag>
         : <Tag color="green">Active</Tag>,
     },
-  ], [isMultiBranch, branchName]);
+  ], [isMultiBranch, branchName, defaultBranch]);
 
   const handleAdd = () => {
     if (!canAdd) { message.warning('You do not have permission to add units'); return; }
