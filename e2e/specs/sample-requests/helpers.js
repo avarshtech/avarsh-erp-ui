@@ -29,8 +29,10 @@ export const SEED_ORDER_POOL = Array.from(
 );
 export const SEED_BUYER = 'Next PLC';
 
-/** Sample type ids are a fixed list of eight, seeded by the M1 migration. */
-export const SAMPLE_TYPE = { PROTO: 1, FIT: 2, SIZE_SET: 3 };
+/** Sample type ids are a fixed code list, seeded by the M1 migration. */
+export const SAMPLE_TYPE = {
+  PROTO: 1, FIT: 2, SIZE_SET: 3, LAB_DIP: 9, STRIKE_OFF: 10,
+};
 
 // ── UI plumbing ─────────────────────────────────────────────────────────────
 

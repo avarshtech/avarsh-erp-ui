@@ -1,9 +1,16 @@
 // Sample Request (SR) module constants — PRD v3.0 + process-flow revision R2.
 
 /**
- * FIXED sample-type list (R2): exactly these eight, fixed ids — no user-created
- * types ("Others" covers ad-hoc cases). The mock master seeds verbatim from
- * this constant; substitution default: Proto/Fit allowed, everything else not.
+ * FIXED sample-type list (R2): exactly these ten, fixed ids — no user-created
+ * types ("Others" covers ad-hoc cases). Substitution default: Proto/Fit
+ * allowed, everything else not.
+ *
+ * This mirrors the smp_sample_types code list the API serves; the SR screens
+ * read the master through useSampleMasters and only the Sample Issue register
+ * and forms use this copy, to lay out their fixed tabs without waiting on a
+ * fetch. Order here is the master's sort_order, NOT id order — Lab Dip and
+ * Strike Off were added after "Others", which stays last as the catch-all.
+ * Keep both in step with db/migration when the list changes.
  */
 export const SAMPLE_TYPE_LIST = [
   { id: 1, name: 'Proto', colourSubstitutionDefault: true },
@@ -13,6 +20,8 @@ export const SAMPLE_TYPE_LIST = [
   { id: 5, name: 'PP Sample', colourSubstitutionDefault: false },
   { id: 6, name: 'Shipment Sample', colourSubstitutionDefault: false },
   { id: 7, name: 'SMS', colourSubstitutionDefault: false },
+  { id: 9, name: 'Lab Dip', colourSubstitutionDefault: false },
+  { id: 10, name: 'Strike Off', colourSubstitutionDefault: false },
   { id: 8, name: 'Others', colourSubstitutionDefault: false },
 ];
 

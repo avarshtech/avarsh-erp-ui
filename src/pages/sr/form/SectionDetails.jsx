@@ -12,8 +12,9 @@ const { TextArea } = Input;
 
 /**
  * Section B — Sample Details.
- * Sample Type is a FIXED list of eight (Proto, Fit, Size Set, Photoshoot
- * Sample, PP Sample, Shipment Sample, SMS, Others) — no user-created types.
+ * Sample Type is a FIXED list of ten (Proto, Fit, Size Set, Photoshoot Sample,
+ * PP Sample, Shipment Sample, SMS, Lab Dip, Strike Off, Others) — no
+ * user-created types.
  * The Colour/Design Substitution toggle pre-fills from the selected type's
  * default and is overridable per SR — it drives the Section D lock state.
  *

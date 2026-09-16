@@ -23,7 +23,11 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const ALL = 'ALL';
-const OTHERS_TYPE_ID = SAMPLE_TYPE_LIST[SAMPLE_TYPE_LIST.length - 1].id;
+// The catch-all tab, found by name rather than by position: the list grows at
+// the end (Lab Dip, Strike Off), and a new type landing here silently would
+// send every unknown row to the wrong tab.
+const OTHERS_TYPE_ID = (SAMPLE_TYPE_LIST.find((t) => t.name === 'Others')
+  || SAMPLE_TYPE_LIST[SAMPLE_TYPE_LIST.length - 1]).id;
 
 // Sample volumes are small (a handful of documents per style), so one window
 // covers the register and lets both toggle badges and every tab badge be
@@ -53,7 +57,7 @@ const SIDE = {
  * The Sample Request Issue register.
  *
  * Fabric and trims are separate documents against one sample request, so the
- * register is two registers: the eight fixed sample-type tabs stay, and inside
+ * register is two registers: the fixed sample-type tabs stay, and inside
  * every tab a toggle switches which document type is listed. The toggle choice
  * is owned by the Material Issue page, so it survives the round-trip to a form
  * and the page header's button follows it.
