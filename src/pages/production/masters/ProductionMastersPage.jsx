@@ -48,10 +48,13 @@ const ProductionMastersPage = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Production Masters"
-        subtitle="The lists the production floor screens read from — lines, machines, operations, defects, thresholds and incentive slabs"
+        subtitle="The lists the production floor screens read from — lines, cutting tables, machines, operations, defects, thresholds and incentive slabs"
       />
       <Card styles={{ body: { paddingTop: 8 } }}>
-        <Tabs items={items} activeKey={activeKey} onChange={setActiveKey} size="small" />
+        {/* Eight masters overflow a 1280px screen at the default 32px gutter,
+            which hides the last tab behind the "more" chevron. Tightening the
+            gutter fits them all again. */}
+        <Tabs items={items} activeKey={activeKey} onChange={setActiveKey} size="small" tabBarGutter={14} />
         {ActiveMaster && <ActiveMaster />}
       </Card>
     </div>
