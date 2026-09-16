@@ -482,7 +482,7 @@ const MainLayoutInner = () => {
       // Terms, Processes or Parts never saw the menu at all.
       moduleId: [
         "master-data", "buyer-info", "supplier-info", "items", "style-master",
-        "size-presets", "payment-terms", "terms-conditions", "process-master",
+        "size-presets", "payment-terms", "terms-conditions", "process-master", "branches",
         "parts-master", "overhead-master", "couriers",
       ],
     },

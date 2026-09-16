@@ -392,6 +392,8 @@ export const SCREENS = [
     path: '/master', description: 'Costing, Shipment', ops: STANDARD_OPERATIONS },
   { id: 'couriers', name: 'Couriers', section: 'master', kind: 'tab',
     path: '/master', description: 'Sample Dispatch', ops: STANDARD_OPERATIONS },
+  { id: 'branches', name: 'Branches', section: 'master', kind: 'tab',
+    path: '/master', description: 'Organisation — sites, GSTIN, units', ops: STANDARD_OPERATIONS },
 
   // ── Administration ──
   { id: 'users', name: 'User Management', section: 'admin', kind: 'screen',

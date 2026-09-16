@@ -31,11 +31,11 @@ const NAV_GROUPS = [
     items: [
       {
         key: 'factory',
-        label: 'Factories',
+        label: 'Units',
         icon: <BankOutlined />,
         moduleId: 'hr-masters',
         Component: FactoryMaster,
-        description: 'Factory locations and addresses',
+        description: 'Production units (cutting, sewing, finishing) under each branch',
       },
       {
         key: 'department',
