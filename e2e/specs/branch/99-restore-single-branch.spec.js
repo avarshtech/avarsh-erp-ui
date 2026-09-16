@@ -39,7 +39,7 @@ test.describe('Back to a single branch', () => {
 
   test('documents raised at a closed branch are still readable', async () => {
     // Deactivating a branch hides it from pickers; it never hides history.
-    const { data } = await api.get('/orders', { size: '100' });
+    const { data } = await api.get('/orders/search', { size: '100' });
     expect((data.content || []).length).toBeGreaterThan(0);
   });
 });

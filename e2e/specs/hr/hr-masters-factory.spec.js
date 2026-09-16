@@ -2,9 +2,9 @@
  * HR Masters — Factory CRUD E2E Tests
  *
  * What this tests:
- *   - Factory list page loads at /hr/masters with Factories selected in left nav
- *   - Create a new factory (required fields: Factory Code, Factory Name)
- *   - Edit an existing factory (modify Factory Name, verify update succeeds)
+ *   - Factory list page loads at /hr/masters with Units selected in left nav
+ *   - Create a new factory (required fields: Unit Code, Unit Name)
+ *   - Edit an existing factory (modify Unit Name, verify update succeeds)
  *   - Toggle active/inactive status via the Switch in the form
  *   - Form validation — required field errors shown when saved empty
  *   - Delete a factory via the Delete button + modal confirm
@@ -31,19 +31,19 @@ import {
 const STAMP = () => Date.now().toString().slice(-6);
 
 /** Navigate to /hr/masters and click "Factories" in the left nav. */
-async function goToFactories(page) {
+async function goToUnits(page) {
   await navigateWithAuth(page, '/hr/masters');
   // Wait for the HR dashboard two-panel layout to render
   await page.getByRole('heading', { name: 'HR Management' }).waitFor({ state: 'visible', timeout: 15000 });
   await waitForPageReady(page);
 
-  // Click "Factories" in the left navigation panel
-  // The nav item text is "Factories" — scope to the left nav panel to avoid hitting breadcrumb
-  const factoriesNav = page.getByText('Factories', { exact: true }).first();
-  await factoriesNav.waitFor({ state: 'visible', timeout: 10000 });
-  await factoriesNav.click();
+  // Click "Units" in the left navigation panel
+  // The nav item text is "Units" — scope to the left nav panel to avoid hitting breadcrumb
+  const unitsNav = page.getByText('Units', { exact: true }).first();
+  await unitsNav.waitFor({ state: 'visible', timeout: 10000 });
+  await unitsNav.click();
 
-  // Wait for the Factories table to load
+  // Wait for the Units table to load
   await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 15000 });
   await antTableWaitForData(page);
 }
@@ -62,15 +62,15 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test.describe('HR Masters — Factories', () => {
+test.describe('HR Masters — Units', () => {
 
   test('list page loads and table is visible', async ({ page }) => {
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Table should be visible
     await expect(page.locator('.ant-table')).toBeVisible();
 
-    // Page breadcrumb should show HR Management > Organization > Factories
+    // Page breadcrumb should show HR Management > Organization > Units
     await expect(page.getByRole('heading', { name: 'HR Management' })).toBeVisible();
   });
 
@@ -79,17 +79,17 @@ test.describe('HR Masters — Factories', () => {
     const factoryCode = `FC-${stamp}`;
     const factoryName = `E2E Factory ${stamp}`;
 
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Click "Add Factory" button
-    await page.getByRole('button', { name: /Add Factory/i }).click();
+    await page.getByRole('button', { name: /Add Unit/i }).click();
 
     // Form panel should appear — wait for "New Factory" heading
-    await page.getByRole('heading', { name: 'New Factory' }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Fill required fields
-    await antFormFill(page, 'Factory Code', factoryCode);
-    await antFormFill(page, 'Factory Name', factoryName);
+    await antFormFill(page, 'Unit Code', factoryCode);
+    await antFormFill(page, 'Unit Name', factoryName);
 
     // Fill optional fields
     await antFormFill(page, 'City', 'Tirupur');
@@ -115,11 +115,11 @@ test.describe('HR Masters — Factories', () => {
   });
 
   test('create factory validates required fields', async ({ page }) => {
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Open new factory form
-    await page.getByRole('button', { name: /Add Factory/i }).click();
-    await page.getByRole('heading', { name: 'New Factory' }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('button', { name: /Add Unit/i }).click();
+    await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Click Save without filling anything
     await page.getByRole('button', { name: /^Save$/i }).click();
@@ -132,7 +132,7 @@ test.describe('HR Masters — Factories', () => {
   test('edit existing factory — modify name and save', async ({ page }) => {
     const stamp = STAMP();
 
-    await goToFactories(page);
+    await goToUnits(page);
 
     const rows = page.locator('.ant-table-row');
     const rowCount = await rows.count();
@@ -142,7 +142,7 @@ test.describe('HR Masters — Factories', () => {
     await rows.first().click();
 
     // Wait for edit form panel to appear
-    await page.getByRole('heading', { name: /Edit Factory|View Factory/i }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('heading', { name: /Edit Unit|View Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Check if edit is possible (not read-only)
     const saveBtn = page.getByRole('button', { name: /^Save$/i });
@@ -150,7 +150,7 @@ test.describe('HR Masters — Factories', () => {
     test.skip(isReadOnly, 'Factory form is read-only for this user');
 
     // Modify the Factory Name
-    const nameInput = page.locator('.ant-form-item').filter({ hasText: 'Factory Name' }).first().locator('input').first();
+    const nameInput = page.locator('.ant-form-item').filter({ hasText: 'Unit Name' }).first().locator('input').first();
     await nameInput.clear();
     await nameInput.fill(`E2E Updated Factory ${stamp}`);
 
@@ -173,14 +173,14 @@ test.describe('HR Masters — Factories', () => {
   test('toggle factory status — active to inactive', async ({ page }) => {
     const stamp = STAMP();
 
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Create a fresh factory to toggle its status
-    await page.getByRole('button', { name: /Add Factory/i }).click();
-    await page.getByRole('heading', { name: 'New Factory' }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('button', { name: /Add Unit/i }).click();
+    await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
-    await antFormFill(page, 'Factory Code', `FC-ST-${stamp}`);
-    await antFormFill(page, 'Factory Name', `E2E Status Factory ${stamp}`);
+    await antFormFill(page, 'Unit Code', `FC-ST-${stamp}`);
+    await antFormFill(page, 'Unit Name', `E2E Status Factory ${stamp}`);
 
     const [createResp] = await Promise.all([
       page.waitForResponse(
@@ -199,7 +199,7 @@ test.describe('HR Masters — Factories', () => {
     await newRow.click();
 
     // Wait for edit form
-    await page.getByRole('heading', { name: /Edit Factory/i }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('heading', { name: /Edit Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Toggle the Active switch to inactive
     const activeSwitch = page.locator('.ant-form-item').filter({ hasText: 'Active' }).first().locator('.ant-switch');
@@ -227,14 +227,14 @@ test.describe('HR Masters — Factories', () => {
   test('delete factory via modal confirm', async ({ page }) => {
     const stamp = STAMP();
 
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Create a factory specifically for deletion
-    await page.getByRole('button', { name: /Add Factory/i }).click();
-    await page.getByRole('heading', { name: 'New Factory' }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('button', { name: /Add Unit/i }).click();
+    await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
-    await antFormFill(page, 'Factory Code', `FC-DEL-${stamp}`);
-    await antFormFill(page, 'Factory Name', `E2E Delete Factory ${stamp}`);
+    await antFormFill(page, 'Unit Code', `FC-DEL-${stamp}`);
+    await antFormFill(page, 'Unit Name', `E2E Delete Factory ${stamp}`);
 
     const [createResp] = await Promise.all([
       page.waitForResponse(
@@ -252,7 +252,7 @@ test.describe('HR Masters — Factories', () => {
     await newRow.waitFor({ state: 'visible', timeout: 10000 });
     await newRow.click();
 
-    await page.getByRole('heading', { name: /Edit Factory/i }).waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('heading', { name: /Edit Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Click Delete button
     await page.getByRole('button', { name: /Delete/i }).click();
@@ -275,14 +275,14 @@ test.describe('HR Masters — Factories', () => {
   });
 
   test('search filters factory list', async ({ page }) => {
-    await goToFactories(page);
+    await goToUnits(page);
 
     // Get initial row count
     const initialCount = await page.locator('.ant-table-row').count();
     test.skip(initialCount === 0, 'No factory data to test search against');
 
     // Type a search term that is unlikely to match all rows
-    const searchInput = page.getByPlaceholder(/Search factories/i);
+    const searchInput = page.getByPlaceholder(/Search units/i);
     await searchInput.fill('ZZZNOMATCH999');
 
     // Table should filter — either empty or fewer rows

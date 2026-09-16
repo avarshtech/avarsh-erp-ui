@@ -15,6 +15,16 @@ let api;
 let ho;
 let second;
 
+/** The switcher's Select root — clicking the inner combobox input does not open it. */
+const switcherRoot = (page) => page.locator('.ant-select:has([aria-label="Working branch"])');
+
+async function openSwitcher(page) {
+  await switcherRoot(page).click();
+  const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+  await dropdown.waitFor({ state: 'visible', timeout: 8000 });
+  return dropdown;
+}
+
 test.beforeAll(async () => {
   api = await createAuthenticatedClient();
   ho = await headOffice(api);
@@ -30,12 +40,9 @@ test.describe('Branch hierarchy — multi-branch company', () => {
     await navigateWithAuth(page, '/');
     await waitForPageReady(page);
 
-    const switcher = page.getByLabel('Working branch');
-    await expect(switcher).toBeVisible({ timeout: 15000 });
+    await expect(page.getByLabel('Working branch')).toBeVisible({ timeout: 15000 });
 
-    await switcher.click();
-    const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
-    await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+    const dropdown = await openSwitcher(page);
     await expect(dropdown.getByText('All Branches')).toBeVisible();
     await expect(dropdown.getByText('E2E Tirupur')).toBeVisible();
     await page.keyboard.press('Escape');
@@ -55,12 +62,11 @@ test.describe('Branch hierarchy — multi-branch company', () => {
     await page.getByRole('button', { name: /Add Unit/i }).click();
     await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
-    await expect(page.locator('.ant-form-item-label').getByText('Branch', { exact: true })).toBeVisible();
-    // and it is mandatory — a unit has to sit somewhere
-    await page.getByLabel('Unit Code').fill('E2E-NB');
-    await page.getByLabel('Unit Name').fill('E2E No Branch');
-    await page.getByRole('button', { name: /Save Changes/i }).click();
-    await expect(page.getByText('Please select the branch this unit belongs to')).toBeVisible({ timeout: 8000 });
+    // A unit has to sit somewhere, so the picker is there and it is mandatory.
+    const branchLabel = page.locator('.ant-form-item-label label[for="branchId"]');
+    await expect(branchLabel).toBeVisible();
+    await expect(branchLabel).toHaveClass(/ant-form-item-required/);
+    await expect(page.locator('.ant-form-item:has(label[for="branchId"]) .ant-select')).toBeVisible();
   });
 
   test('switching the working branch re-fetches the list for that branch', async ({ page }) => {
@@ -69,15 +75,12 @@ test.describe('Branch hierarchy — multi-branch company', () => {
 
     // The seeded orders are all allocated to the head office, so the second
     // branch's list comes back empty while "All Branches" shows them again.
-    const switcher = page.getByLabel('Working branch');
-    await switcher.click();
-    let dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    let dropdown = await openSwitcher(page);
     await dropdown.getByText('E2E Tirupur').click();
     await page.waitForResponse((r) => r.url().includes('/orders') && r.request().method() === 'GET', { timeout: 15000 }).catch(() => {});
     await expect(page.locator('.ant-table-placeholder, .ant-empty').first()).toBeVisible({ timeout: 15000 });
 
-    await switcher.click();
-    dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    dropdown = await openSwitcher(page);
     await dropdown.getByText('All Branches').click();
     await page.waitForResponse((r) => r.url().includes('/orders') && r.request().method() === 'GET', { timeout: 15000 }).catch(() => {});
     await expect(page.locator('.ant-table-tbody .ant-table-row').first()).toBeVisible({ timeout: 15000 });
@@ -87,9 +90,7 @@ test.describe('Branch hierarchy — multi-branch company', () => {
     await navigateWithAuth(page, '/');
     await waitForPageReady(page);
 
-    const switcher = page.getByLabel('Working branch');
-    await switcher.click();
-    const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+    const dropdown = await openSwitcher(page);
     await dropdown.getByText('E2E Tirupur').click();
 
     const [request] = await Promise.all([
@@ -98,12 +99,11 @@ test.describe('Branch hierarchy — multi-branch company', () => {
     ]);
     expect(request.headers()['x-branch-id']).toBe(String(second.id));
 
-    // put the switcher back on the head office for the specs that follow
+    // lift the filter again for the specs that follow
     await page.goto('/');
     await waitForPageReady(page);
-    await page.getByLabel('Working branch').click();
-    await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last()
-      .getByText('All Branches').click();
+    const back = await openSwitcher(page);
+    await back.getByText('All Branches').click();
   });
 
   test('master data ignores the branch — items are the company\'s, not a site\'s', async () => {

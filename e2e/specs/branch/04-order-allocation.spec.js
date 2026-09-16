@@ -100,11 +100,11 @@ test.describe('Order allocation across branches', () => {
       rows: [{ branchId: ho.id, qty: total - share }, { branchId: second.id, qty: share }],
     });
 
-    const { data: atSecond } = await api.get('/orders', { size: '100' }, branchHeader(second.id));
+    const { data: atSecond } = await api.get('/orders/search', { size: '100' }, branchHeader(second.id));
     expect((atSecond.content || []).some((o) => o.id === order.id)).toBe(true);
 
     const third = await ensureBranch(api, { branchCode: 'E2E-ERD', branchName: 'E2E Erode' });
-    const { data: atThird } = await api.get('/orders', { size: '100' }, branchHeader(third.id));
+    const { data: atThird } = await api.get('/orders/search', { size: '100' }, branchHeader(third.id));
     expect((atThird.content || []).some((o) => o.id === order.id)).toBe(false);
   });
 
@@ -141,7 +141,8 @@ test.describe('Order allocation across branches', () => {
       rows: [{ branchId: ho.id, qty: view.totalOrderQty }],
     });
     expect(dropStatus).toBe(409);
-    expect(JSON.stringify(dropBody)).toMatch(/cutting|production|branch/i);
+    // The per-constraint wording is PostgreSQL-only (see 02); the code is the contract.
+    expect(dropBody.error).toBe('REFERENCE_CONSTRAINT');
   });
 
   test('a production PO with no allocation falls back to the working branch', async () => {

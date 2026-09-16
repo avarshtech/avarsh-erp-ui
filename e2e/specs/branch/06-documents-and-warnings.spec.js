@@ -16,7 +16,8 @@ let api;
 let ho;
 let second;
 
-const rowsOf = (data) => (Array.isArray(data) ? data : data?.content || []);
+// Paged lists answer with `content`; a report run answers with `rows`.
+const rowsOf = (data) => (Array.isArray(data) ? data : data?.content || data?.rows || []);
 const today = () => new Date().toISOString().slice(0, 10);
 
 test.beforeAll(async () => {
@@ -171,34 +172,36 @@ test.describe('Buyer-approved units warn, never block', () => {
     expect(status).toBe(200);
     expect(withList.approvedUnits).toHaveLength(1);
 
-    const total = Math.max(orderRow.totalOrderQty || 1, 1);
-    const { data: off, status: offStatus } = await api.put(`/orders/${order.id}/allocations`, {
-      rows: [{ branchId: ho.id, unitId: notApproved.id, qty: total }],
+    // Keep the split exactly as it is and only name the unit on the head-office
+    // row: a share that already carries a production PO cannot be dropped, and
+    // this spec is about the warning, not about re-splitting.
+    const { data: current } = await api.get(`/orders/${order.id}/allocations`);
+    const withUnit = (unitId) => ({
+      rows: current.rows.map((r) => ({
+        branchId: r.branchId, qty: r.qty,
+        unitId: r.branchId === ho.id ? unitId : r.unitId ?? null,
+      })),
     });
+
+    const { data: off, status: offStatus } = await api.put(`/orders/${order.id}/allocations`, withUnit(notApproved.id));
     expect(offStatus).toBe(200);               // saved
     expect(off.warnings).toHaveLength(1);      // and warned
     expect(off.warnings[0]).toMatch(/E2E Unapproved Unit/);
 
-    const { data: on } = await api.put(`/orders/${order.id}/allocations`, {
-      rows: [{ branchId: ho.id, unitId: approved.id, qty: total }],
-    });
+    const { data: on } = await api.put(`/orders/${order.id}/allocations`, withUnit(approved.id));
     expect(on.warnings || []).toHaveLength(0);
 
     // an expired approval warns too
     await api.put(`/buyers/${orderRow.buyerId}`, {
       ...withList, approvedUnits: [{ factoryId: approved.id, validTill: '2020-01-01' }],
     });
-    const { data: stale } = await api.put(`/orders/${order.id}/allocations`, {
-      rows: [{ branchId: ho.id, unitId: approved.id, qty: total }],
-    });
+    const { data: stale } = await api.put(`/orders/${order.id}/allocations`, withUnit(approved.id));
     expect(stale.warnings?.[0]).toMatch(/expired/i);
 
     // and a buyer who keeps no list never warns
     const { data: cleared } = await api.get(`/buyers/${orderRow.buyerId}`);
     await api.put(`/buyers/${orderRow.buyerId}`, { ...cleared, approvedUnits: [] });
-    const { data: quiet } = await api.put(`/orders/${order.id}/allocations`, {
-      rows: [{ branchId: ho.id, unitId: notApproved.id, qty: total }],
-    });
+    const { data: quiet } = await api.put(`/orders/${order.id}/allocations`, withUnit(notApproved.id));
     expect(quiet.warnings || []).toHaveLength(0);
   });
 });

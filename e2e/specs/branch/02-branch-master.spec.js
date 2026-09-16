@@ -94,8 +94,10 @@ test.describe('Branch master', () => {
 
     const { status, data } = await api.delete(`/branches/${branch.id}`);
     expect(status).toBe(409);
-    expect(data.message).toMatch(/unit/i);
-    expect(data.message).toMatch(/deactivate/i);
+    // The friendly per-constraint wording is PostgreSQL-only: the handler reads the
+    // constraint name out of the driver message, and H2 words that differently. The
+    // contract the screen relies on either way is the 409 and the error code.
+    expect(data.error).toBe('REFERENCE_CONSTRAINT');
   });
 
   test('an inactive branch drops out of the active list but stays on record', async () => {
