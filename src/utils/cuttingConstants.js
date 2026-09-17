@@ -66,8 +66,8 @@ export const SEWING_LINES = ['Line-A', 'Line-B', 'B-1', 'B-2'];
 
 export const CUTTING_TABLES = ['Table-1', 'Table-2', 'Table-3'];
 
-/** CR-CUT-2026-001 — Marker Plan header factory selector. */
-export const FACTORIES = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
+/** CR-CUT-2026-001 — Marker Plan header unit selector. */
+export const UNITS = ['Unit-1 Tirupur', 'Unit-2 Avinashi'];
 
 /** CR-CUT-2026-001 — marker efficiency target (auto-calc from CAD; >= 85%). */
 export const MARKER_EFFICIENCY_TARGET = 85;

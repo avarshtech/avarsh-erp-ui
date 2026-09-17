@@ -3,7 +3,7 @@ import axiosInstance from '../core/axiosInstance';
 const BASE_URL = '/hr/bonus';
 
 /**
- * Process bonus calculation for a factory/period.
+ * Process bonus calculation for a unit/period.
  * POST /api/v1/hr/bonus/process
  */
 export const processBonus = async (data) => {
@@ -61,7 +61,7 @@ export const markBonusPaid = async (runId) => {
  * PUT /api/v1/hr/bonus/{id}/cancel
  *
  * Only while it is CALCULATED. There was no way back at all before, so a run at
- * the wrong rate blocked that factory and year permanently.
+ * the wrong rate blocked that unit and year permanently.
  */
 export const cancelBonus = async (id, reason) => {
   const response = await axiosInstance.put(`${BASE_URL}/${id}/cancel`, { reason });

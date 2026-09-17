@@ -67,7 +67,7 @@ const SalarySlipView = () => {
       <Card style={{ maxWidth: 800, margin: '0 auto' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 16 }}>
-          <Title level={4} style={{ margin: 0 }}>{slip.factoryName || 'Avarsh Apparels'}</Title>
+          <Title level={4} style={{ margin: 0 }}>{slip.unitName || 'Avarsh Apparels'}</Title>
           <Text type="secondary">Salary Slip for {monthYear}</Text>
         </div>
 

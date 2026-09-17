@@ -10,7 +10,7 @@ export const searchEmployees = async (params = {}) => {
   const queryParams = new URLSearchParams();
   if (params.search) queryParams.append('search', params.search);
   if (params.departmentId) queryParams.append('departmentId', params.departmentId);
-  if (params.factoryId) queryParams.append('factoryId', params.factoryId);
+  if (params.unitId) queryParams.append('unitId', params.unitId);
   if (params.status) queryParams.append('status', params.status);
   if (params.category) queryParams.append('category', params.category);
   if (params.employeeType) queryParams.append('employeeType', params.employeeType);

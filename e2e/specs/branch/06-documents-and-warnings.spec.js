@@ -100,19 +100,19 @@ test.describe('Sample invoices export from a branch', () => {
 test.describe('Cutting tables sit on a unit\'s floor', () => {
 
   test('a unit is offered its own tables and the shared ones', async () => {
-    const unitA = await ensureUnit(api, ho.id, { factoryCode: 'E2E-TBLA', factoryName: 'E2E Table Unit A' });
-    const unitB = await ensureUnit(api, ho.id, { factoryCode: 'E2E-TBLB', factoryName: 'E2E Table Unit B' });
+    const unitA = await ensureUnit(api, ho.id, { unitCode: 'E2E-TBLA', unitName: 'E2E Table Unit A' });
+    const unitB = await ensureUnit(api, ho.id, { unitCode: 'E2E-TBLB', unitName: 'E2E Table Unit B' });
     const stamp = Date.now().toString().slice(-5);
 
-    const { data: own } = await api.post('/cutting-tables', { name: `E2E A ${stamp}`, factoryId: unitA.id });
+    const { data: own } = await api.post('/cutting-tables', { name: `E2E A ${stamp}`, unitId: unitA.id });
     const { data: shared } = await api.post('/cutting-tables', { name: `E2E Shared ${stamp}` });
-    const { data: other } = await api.post('/cutting-tables', { name: `E2E B ${stamp}`, factoryId: unitB.id });
-    expect(own.factoryId).toBe(unitA.id);
-    expect(own.factoryName).toBe('E2E Table Unit A');
-    expect(shared.factoryId).toBeFalsy();
+    const { data: other } = await api.post('/cutting-tables', { name: `E2E B ${stamp}`, unitId: unitB.id });
+    expect(own.unitId).toBe(unitA.id);
+    expect(own.unitName).toBe('E2E Table Unit A');
+    expect(shared.unitId).toBeFalsy();
 
     const names = (list) => rowsOf(list).map((t) => t.name);
-    const { data: forA } = await api.get('/cutting-tables/active', { factoryId: String(unitA.id) });
+    const { data: forA } = await api.get('/cutting-tables/active', { unitId: String(unitA.id) });
     expect(names(forA)).toContain(own.name);
     expect(names(forA)).toContain(shared.name);
     expect(names(forA)).not.toContain(other.name);
@@ -122,7 +122,7 @@ test.describe('Cutting tables sit on a unit\'s floor', () => {
   });
 
   test('an unknown unit is refused', async () => {
-    const { status } = await api.post('/cutting-tables', { name: `E2E Bad ${Date.now()}`, factoryId: 999999 });
+    const { status } = await api.post('/cutting-tables', { name: `E2E Bad ${Date.now()}`, unitId: 999999 });
     expect(status).toBe(400);
   });
 });
@@ -162,12 +162,12 @@ test.describe('Buyer-approved units warn, never block', () => {
     const { data: orderRow } = await api.get(`/orders/${order.id}`);
     test.skip(!orderRow?.buyerId, 'the order has no buyer');
 
-    const approved = await ensureUnit(api, ho.id, { factoryCode: 'E2E-APPR', factoryName: 'E2E Approved Unit' });
-    const notApproved = await ensureUnit(api, ho.id, { factoryCode: 'E2E-NOTAPPR', factoryName: 'E2E Unapproved Unit' });
+    const approved = await ensureUnit(api, ho.id, { unitCode: 'E2E-APPR', unitName: 'E2E Approved Unit' });
+    const notApproved = await ensureUnit(api, ho.id, { unitCode: 'E2E-NOTAPPR', unitName: 'E2E Unapproved Unit' });
 
     const { data: buyer } = await api.get(`/buyers/${orderRow.buyerId}`);
     const { data: withList, status } = await api.put(`/buyers/${orderRow.buyerId}`, {
-      ...buyer, approvedUnits: [{ factoryId: approved.id, auditRef: 'SEDEX-E2E' }],
+      ...buyer, approvedUnits: [{ unitId: approved.id, auditRef: 'SEDEX-E2E' }],
     });
     expect(status).toBe(200);
     expect(withList.approvedUnits).toHaveLength(1);
@@ -193,7 +193,7 @@ test.describe('Buyer-approved units warn, never block', () => {
 
     // an expired approval warns too
     await api.put(`/buyers/${orderRow.buyerId}`, {
-      ...withList, approvedUnits: [{ factoryId: approved.id, validTill: '2020-01-01' }],
+      ...withList, approvedUnits: [{ unitId: approved.id, validTill: '2020-01-01' }],
     });
     const { data: stale } = await api.put(`/orders/${order.id}/allocations`, withUnit(approved.id));
     expect(stale.warnings?.[0]).toMatch(/expired/i);

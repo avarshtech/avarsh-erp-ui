@@ -7,11 +7,11 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getAttendanceCalendar, getAttendanceSummary } from '../../../services/hr/attendanceService';
 import { searchEmployees } from '../../../services/hr/employeeService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
-import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
+import { getActiveDepartmentsByUnit } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
-import { employeeOptions, factoryOptions } from '../../../utils/hrLabels';
+import { employeeOptions, unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const { Text } = Typography;
@@ -46,10 +46,10 @@ const AttendanceCalendar = () => {
   // Units of the working branch only; "All branches" lists every unit
   const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  const [unitId, setUnitId] = useState(undefined);
   const [departmentId, setDepartmentId] = useState(undefined);
   const [employeeId, setEmployeeId] = useState(undefined);
   const [currentMonth, setCurrentMonth] = useState(dayjs());
@@ -78,29 +78,29 @@ const AttendanceCalendar = () => {
   );
 
   useEffect(() => {
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
   }, [activeBranchId]);
 
   useEffect(() => {
-    if (factoryId) {
-      getActiveDepartmentsByFactory(factoryId).then(setDepartments).catch(() => {});
+    if (unitId) {
+      getActiveDepartmentsByUnit(unitId).then(setDepartments).catch(() => {});
     } else {
       setDepartments([]);
     }
     setDepartmentId(undefined);
     setEmployeeId(undefined);
-  }, [factoryId]);
+  }, [unitId]);
 
   useEffect(() => {
-    if (factoryId) {
-      searchEmployees({ factoryId, departmentId, status: 'ACTIVE', size: 500 })
+    if (unitId) {
+      searchEmployees({ unitId, departmentId, status: 'ACTIVE', size: 500 })
         .then((res) => setEmployees(res.content || []))
         .catch(() => {});
     } else {
       setEmployees([]);
     }
     setEmployeeId(undefined);
-  }, [factoryId, departmentId]);
+  }, [unitId, departmentId]);
 
   const fetchCalendar = useCallback(async () => {
     if (!employeeId) {
@@ -257,12 +257,12 @@ const AttendanceCalendar = () => {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={8} md={6}>
           <Select
-            placeholder="Select Factory"
+            placeholder="Select Unit"
             allowClear
             style={{ width: '100%' }}
-            value={factoryId}
-            onChange={setFactoryId}
-            options={factoryOptions(factories)}
+            value={unitId}
+            onChange={setUnitId}
+            options={unitOptions(units)}
           />
         </Col>
         <Col xs={24} sm={8} md={6}>
@@ -273,7 +273,7 @@ const AttendanceCalendar = () => {
             value={departmentId}
             onChange={setDepartmentId}
             options={departments.map((d) => ({ value: d.id, label: d.name }))}
-            disabled={!factoryId}
+            disabled={!unitId}
           />
         </Col>
         <Col xs={24} sm={8} md={6}>
@@ -286,7 +286,7 @@ const AttendanceCalendar = () => {
             value={employeeId}
             onChange={setEmployeeId}
             options={employeeOptions(employees)}
-            disabled={!factoryId}
+            disabled={!unitId}
           />
         </Col>
       </Row>

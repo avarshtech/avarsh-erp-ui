@@ -26,18 +26,18 @@ export const recordEmployeeLabel = (r) =>
   r ? [r.employeeNo, r.employeeName].filter(Boolean).join(' - ') : '';
 
 /**
- * Factory record (FactoryDTO) — the fields are `factoryCode` and
- * `factoryName`, not `code` and `name`.
+ * Unit record (UnitDTO) — the fields are `unitCode` and
+ * `unitName`, not `code` and `name`.
  *
  * Renders as "FAC-A - Avarsh Apparels, Unit 1".
  *
- * Name alone is ambiguous once two factories are named similarly, and the code
+ * Name alone is ambiguous once two units are named similarly, and the code
  * is what appears on the PF and ESI registrations, so it is the half people
  * recognise. Matches employeeLabel, which has always led with the code.
  */
-export const factoryLabel = (f) =>
-  (f ? [f.factoryCode, f.factoryName].filter(Boolean).join(' - ') : '');
+export const unitLabel = (f) =>
+  (f ? [f.unitCode, f.unitName].filter(Boolean).join(' - ') : '');
 
-/** Options for a factory Select. */
-export const factoryOptions = (list = []) =>
-  list.map((f) => ({ value: f.id, label: factoryLabel(f) }));
+/** Options for a unit Select. */
+export const unitOptions = (list = []) =>
+  list.map((f) => ({ value: f.id, label: unitLabel(f) }));

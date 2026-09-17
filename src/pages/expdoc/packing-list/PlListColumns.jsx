@@ -11,7 +11,7 @@ const nowrap = (text) => <Text style={{ whiteSpace: 'nowrap' }}>{text || '—'}<
 const numeric = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
-/** Column factory for the packing-list register. */
+/** Column unit for the packing-list register. */
 export const buildPlColumns = ({ onView, onOpen, onDelete, canUpdate, canDelete }) => [
   {
     title: 'PL No',

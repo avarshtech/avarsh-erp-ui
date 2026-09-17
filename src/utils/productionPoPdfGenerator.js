@@ -33,7 +33,7 @@ const processingBlock = (record, poType) => {
       ? `Vendor: <b>${esc(record.vendorName)}</b>${record.vendorRate ? ` &nbsp;|&nbsp; Rate/Pc: ${money(record.vendorRate)}` : ''}`
       : 'Processing: <b>In-house</b>';
   }
-  return `${record.processingUnitType === 'VENDOR' ? 'Vendor' : 'Factory Unit'}: <b>${esc(record.processingUnitName)}</b>`;
+  return `${record.processingUnitType === 'VENDOR' ? 'Vendor' : 'Unit Unit'}: <b>${esc(record.processingUnitName)}</b>`;
 };
 
 const datesBlock = (record, poType) => {

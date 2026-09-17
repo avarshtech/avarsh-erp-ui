@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { getAllFactories, createFactory, updateFactory, deleteFactory } from '../../../services/master/factoryService';
+import { getAllUnits, createUnit, updateUnit, deleteUnit } from '../../../services/master/unitService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { INDIAN_STATES } from '../../../utils/hrConstants';
@@ -14,13 +14,13 @@ const { Text } = Typography;
 const MODULE_ID = 'hr-masters';
 
 /**
- * Unit master. The entity, table and API are still called Factory — a unit IS a
- * factory (mst_factories), and employees, production lines and production POs all
+ * Unit master. The entity, table and API are still called Unit — a unit IS a
+ * unit (mst_units), and employees, production lines and production POs all
  * point at it — so only the labels changed when branches arrived above it. A
  * single-branch company never sees the Branch field: the unit lands in the head
  * office and the server fills the branch in.
  */
-const FactoryMaster = ({ onDirtyChange }) => {
+const UnitMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
   const { branches, isMultiBranch, effectiveBranchId, defaultBranch, branchName } = useBranch();
 
@@ -43,7 +43,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getAllFactories();
+      const result = await getAllUnits();
       const list = Array.isArray(result) ? result : (result?.data || []);
       setData(list);
       setFilteredData(list);
@@ -64,13 +64,13 @@ const FactoryMaster = ({ onDirtyChange }) => {
   const columns = useMemo(() => [
     {
       title: 'Unit Code',
-      dataIndex: 'factoryCode',
-      sorter: (a, b) => (a.factoryCode || '').localeCompare(b.factoryCode || ''),
+      dataIndex: 'unitCode',
+      sorter: (a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''),
     },
     {
       title: 'Unit Name',
-      dataIndex: 'factoryName',
-      sorter: (a, b) => (a.factoryName || '').localeCompare(b.factoryName || ''),
+      dataIndex: 'unitName',
+      sorter: (a, b) => (a.unitName || '').localeCompare(b.unitName || ''),
     },
     ...(isMultiBranch ? [{
       title: 'Branch',
@@ -144,10 +144,10 @@ const FactoryMaster = ({ onDirtyChange }) => {
       // `values`; keep the unit where it was rather than letting the server re-default it.
       const payload = { ...values, branchId: values.branchId ?? selectedRecord?.branchId ?? effectiveBranchId };
       if (selectedId) {
-        await updateFactory(selectedId, { ...payload, version: selectedRecord?.version });
+        await updateUnit(selectedId, { ...payload, version: selectedRecord?.version });
         message.success('Unit updated successfully');
       } else {
-        await createFactory(payload);
+        await createUnit(payload);
         message.success('Unit created successfully');
       }
       markDirty(false);
@@ -172,7 +172,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          await deleteFactory(selectedId);
+          await deleteUnit(selectedId);
           message.success('Unit deleted successfully');
           handleCancel();
           fetchData();
@@ -194,8 +194,8 @@ const FactoryMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.factoryCode?.toLowerCase().includes(lower) ||
-        item.factoryName?.toLowerCase().includes(lower) ||
+        item.unitCode?.toLowerCase().includes(lower) ||
+        item.unitName?.toLowerCase().includes(lower) ||
         item.city?.toLowerCase().includes(lower)
       )
     );
@@ -280,10 +280,10 @@ const FactoryMaster = ({ onDirtyChange }) => {
                   <Select placeholder="Select branch" options={branchOptions} showSearch optionFilterProp="label" />
                 </Form.Item>
               )}
-              <Form.Item name="factoryCode" label="Unit Code" rules={[{ required: true, message: 'Please enter a unit code' }]}>
+              <Form.Item name="unitCode" label="Unit Code" rules={[{ required: true, message: 'Please enter a unit code' }]}>
                 <Input placeholder="e.g. UNIT-1" maxLength={20} />
               </Form.Item>
-              <Form.Item name="factoryName" label="Unit Name" rules={[{ required: true, message: 'Please enter a unit name' }]}>
+              <Form.Item name="unitName" label="Unit Name" rules={[{ required: true, message: 'Please enter a unit name' }]}>
                 <Input placeholder="e.g. Sewing Unit 1" maxLength={200} />
               </Form.Item>
               <Form.Item name="unitType" label="Unit Type" extra="what the unit does — a production PO offers only units that can do the work">
@@ -312,4 +312,4 @@ const FactoryMaster = ({ onDirtyChange }) => {
   );
 };
 
-export default FactoryMaster;
+export default UnitMaster;

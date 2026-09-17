@@ -25,7 +25,7 @@ test.beforeAll(async () => {
   ho = await headOffice(api);
   second = await ensureBranch(api, { branchCode: 'E2E-TIR', branchName: 'E2E Tirupur' });
   order = await eligibleOrder(api);
-  const { data: units } = await api.get('/factories/active', { branchId: String(ho.id) });
+  const { data: units } = await api.get('/units/active', { branchId: String(ho.id) });
   hoUnit = units[0];
 });
 
@@ -114,7 +114,7 @@ test.describe('Order allocation across branches', () => {
     const row = view.rows.find((r) => r.branchId === second.id);
     test.skip(!row, 'the order is not split to the second branch');
 
-    const { data: units } = await api.get('/factories/active');
+    const { data: units } = await api.get('/units/active');
     const items = (order.items || []).map((i) => ({
       color: i.color, size: i.size, orderQty: i.orderQty,
       allowancePercent: i.allowancePercent ?? 0, plannedQty: i.plannedQty ?? i.orderQty, ratePerPiece: 1,
@@ -125,7 +125,7 @@ test.describe('Order allocation across branches', () => {
     const { data: po, status } = await api.post('/cutting-po', {
       orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
       buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
-      processingUnitType: 'UNIT', processingUnitId: units[0].id, processingUnitName: units[0].factoryName,
+      processingUnitType: 'UNIT', processingUnitId: units[0].id, processingUnitName: units[0].unitName,
       plannedCutDate: iso(today), plannedDeliveryDate: iso(new Date(today.getTime() + 10 * 864e5)),
       totalOrderQty: sum('orderQty'), allowancePercent: 0, totalPlannedQty: sum('plannedQty'),
       items, remarks: 'e2e branch allocation', orderAllocationId: row.id,
@@ -147,7 +147,7 @@ test.describe('Order allocation across branches', () => {
 
   test('a production PO with no allocation falls back to the working branch', async () => {
     test.skip(!order, 'no CONFIRMED order with a BOM in the seed');
-    const { data: units } = await api.get('/factories/active');
+    const { data: units } = await api.get('/units/active');
     const items = (order.items || []).map((i) => ({
       color: i.color, size: i.size, orderQty: i.orderQty,
       allowancePercent: i.allowancePercent ?? 0, plannedQty: i.plannedQty ?? i.orderQty, ratePerPiece: 1,
@@ -157,7 +157,7 @@ test.describe('Order allocation across branches', () => {
     const payload = {
       orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
       buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
-      processingUnitType: 'UNIT', processingUnitId: units[0].id, processingUnitName: units[0].factoryName,
+      processingUnitType: 'UNIT', processingUnitId: units[0].id, processingUnitName: units[0].unitName,
       plannedCutDate: iso(today), plannedDeliveryDate: iso(new Date(today.getTime() + 10 * 864e5)),
       totalOrderQty: sum('orderQty'), allowancePercent: 0, totalPlannedQty: sum('plannedQty'),
       items, remarks: 'e2e working branch',

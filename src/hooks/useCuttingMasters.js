@@ -61,7 +61,7 @@ const useCuttingMasters = () => {
   );
   // A table sits on one unit's floor; a table with no unit is shared by every unit.
   const tableOptionsFor = useCallback((unitId) => masters.cuttingTables
-    .filter((t) => unitId == null || t.factoryId == null || t.factoryId === unitId)
+    .filter((t) => unitId == null || t.unitId == null || t.unitId === unitId)
     .map((t) => ({ value: t.id, label: t.name })), [masters.cuttingTables]);
 
   return {

@@ -63,7 +63,7 @@ test.describe('Production Masters', () => {
     await page.getByRole('button', { name: /Add Line/i }).click();
     await page.getByLabel(/Line Name/i).fill(name);
 
-    await page.getByRole('combobox', { name: /Unit \(Factory\)/ }).click();
+    await page.getByRole('combobox', { name: /Unit \(Unit\)/ }).click();
     await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
       .first().click();
 

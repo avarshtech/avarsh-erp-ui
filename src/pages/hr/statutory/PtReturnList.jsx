@@ -4,11 +4,11 @@ import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, DatePick
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getAllPtReturns, generatePtReturn, filePtReturn } from '../../../services/hr/statutoryService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
 import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
@@ -26,7 +26,7 @@ const PtReturnList = () => {
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [generateOpen, setGenerateOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission('hr-statutory', 'add');
@@ -45,7 +45,7 @@ const PtReturnList = () => {
 
   useEffect(() => {
     fetchData();
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
   }, [fetchData, activeBranchId]);
 
   const filteredData = useMemo(() => {
@@ -58,7 +58,7 @@ const PtReturnList = () => {
       const values = await form.validateFields();
       setGenerating(true);
       await generatePtReturn({
-        factoryId: values.factoryId,
+        unitId: values.unitId,
         periodFrom: values.periodFrom.format('YYYY-MM-DD'),
         periodTo: values.periodTo.format('YYYY-MM-DD'),
       });
@@ -107,9 +107,9 @@ const PtReturnList = () => {
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },
@@ -199,10 +199,10 @@ const PtReturnList = () => {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
+          <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
             <Select
-              placeholder="Select factory"
-              options={factoryOptions(factories)}
+              placeholder="Select unit"
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />

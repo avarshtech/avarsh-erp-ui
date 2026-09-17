@@ -30,7 +30,7 @@ import { ActionButton, DeleteConfirm } from '../../components/buttons';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import dayjs from 'dayjs';
-import { getActiveFactories } from '../../services/master/factoryService';
+import { getActiveUnits } from '../../services/master/unitService';
 import {
   getBuyers,
   createBuyer,
@@ -88,13 +88,13 @@ const BuyerMaster = () => {
   const [editingLocation, setEditingLocation] = useState(null);
   // Units the buyer has audited and approved (warn-only list); units come from HR
   const [approvedUnits, setApprovedUnits] = useState([]);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const approvedKey = useRef(0);
   useEffect(() => {
-    getActiveFactories().then((r) => setFactories(Array.isArray(r) ? r : [])).catch(() => {});
+    getActiveUnits().then((r) => setUnits(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
-  const unitOptions = useMemo(() => factories.map((f) => ({ value: f.id, label: f.factoryName })), [factories]);
-  const unitName = useCallback((id) => factories.find((f) => f.id === id)?.factoryName || `#${id}`, [factories]);
+  const unitOptions = useMemo(() => units.map((f) => ({ value: f.id, label: f.unitName })), [units]);
+  const unitName = useCallback((id) => units.find((f) => f.id === id)?.unitName || `#${id}`, [units]);
   const [locationForm] = Form.useForm();
 
   // Permissions
@@ -222,7 +222,7 @@ const BuyerMaster = () => {
         ...values,
         active: true,
         swiftCode: values.swiftCode?.toUpperCase() || null,
-        approvedUnits: approvedUnits.filter((u) => u.factoryId).map(({ key, ...u }) => u),
+        approvedUnits: approvedUnits.filter((u) => u.unitId).map(({ key, ...u }) => u),
         shippingLocations: shippingLocations.map(({ key, ...loc }) => ({
           ...loc,
           active: loc.active !== false,
@@ -452,8 +452,8 @@ const BuyerMaster = () => {
   const patchUnit = (key, changes) => setApprovedUnits((prev) => prev.map((u) => (u.key === key ? { ...u, ...changes } : u)));
   const approvedUnitColumns = [
     {
-      title: 'Unit', dataIndex: 'factoryId', width: 220,
-      render: (v, r) => <Select aria-label="Unit" value={v} options={unitOptions} showSearch optionFilterProp="label" placeholder="Select unit" style={{ width: '100%' }} onChange={(val) => patchUnit(r.key, { factoryId: val })} />,
+      title: 'Unit', dataIndex: 'unitId', width: 220,
+      render: (v, r) => <Select aria-label="Unit" value={v} options={unitOptions} showSearch optionFilterProp="label" placeholder="Select unit" style={{ width: '100%' }} onChange={(val) => patchUnit(r.key, { unitId: val })} />,
     },
     {
       title: 'Valid Till', dataIndex: 'validTill', width: 160,
@@ -654,8 +654,8 @@ const BuyerMaster = () => {
                   {viewingBuyer.approvedUnits.map((u) => {
                     const expired = u.validTill && dayjs(u.validTill).isBefore(dayjs(), 'day');
                     return (
-                      <Tag key={u.id || u.factoryId} color={expired ? 'red' : 'green'}>
-                        {unitName(u.factoryId)}{u.validTill ? ` · till ${dayjs(u.validTill).format('DD-MMM-YYYY')}` : ''}{u.auditRef ? ` · ${u.auditRef}` : ''}
+                      <Tag key={u.id || u.unitId} color={expired ? 'red' : 'green'}>
+                        {unitName(u.unitId)}{u.validTill ? ` · till ${dayjs(u.validTill).format('DD-MMM-YYYY')}` : ''}{u.auditRef ? ` · ${u.auditRef}` : ''}
                       </Tag>
                     );
                   })}
@@ -846,7 +846,7 @@ const BuyerMaster = () => {
             <Button
               type="dashed"
               icon={<PlusOutlined />}
-              onClick={() => setApprovedUnits((prev) => [...prev, { key: `new_${++approvedKey.current}`, factoryId: null, validTill: null, auditRef: '', remarks: '' }])}
+              onClick={() => setApprovedUnits((prev) => [...prev, { key: `new_${++approvedKey.current}`, unitId: null, validTill: null, auditRef: '', remarks: '' }])}
               block
             >
               Add Approved Unit

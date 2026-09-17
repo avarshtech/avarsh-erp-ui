@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 /**
  * Breakpoints aligned with Ant Design's grid system:
  * - Mobile:  < 576px   (phones)
- * - Tablet:  576–992px (tablets, factory floor devices)
+ * - Tablet:  576–992px (tablets, unit floor devices)
  * - Desktop: > 992px   (office workstations)
  */
 const BREAKPOINTS = {

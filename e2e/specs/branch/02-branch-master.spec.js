@@ -90,7 +90,7 @@ test.describe('Branch master', () => {
 
   test('a branch with units under it refuses deletion with a message', async () => {
     const branch = await ensureBranch(api, { branchCode: 'E2E-DEL', branchName: 'E2E Deletable' });
-    await ensureUnit(api, branch.id, { factoryCode: 'E2E-DELU', factoryName: 'E2E Unit On Deletable' });
+    await ensureUnit(api, branch.id, { unitCode: 'E2E-DELU', unitName: 'E2E Unit On Deletable' });
 
     const { status, data } = await api.delete(`/branches/${branch.id}`);
     expect(status).toBe(409);

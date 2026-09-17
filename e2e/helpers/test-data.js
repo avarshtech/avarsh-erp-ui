@@ -1,5 +1,5 @@
 /**
- * Test Data Factories for E2E Tests
+ * Test Data Units for E2E Tests
  *
  * Generates test payloads with timestamp-based unique names
  * to avoid conflicts between test runs.

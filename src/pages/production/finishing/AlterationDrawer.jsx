@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Drawer, Space, InputNumber, Table, Button, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined, SendOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../components/form';
-import { FACTORIES } from '../../../utils/cuttingConstants';
+import { UNITS } from '../../../utils/cuttingConstants';
 import { DEFECT_LIBRARY, DEFECT_SOURCES, DEFECT_SEVERITIES } from '../../../utils/finishingConstants';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { saveAlterationBatch } from '../../../services/production/finishingService';
@@ -24,14 +24,14 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
   const { message } = App.useApp();
   const { selectOrder, defaultOrderId } = useModuleSelection('finishing');
   const [orderId, setOrderId] = useState(null);
-  const [productionUnit, setProductionUnit] = useState(FACTORIES[0]);
+  const [productionUnit, setProductionUnit] = useState(UNITS[0]);
   const [rows, setRows] = useState([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setOrderId(defaultOrderId(orders));
-    setProductionUnit(FACTORIES[0]);
+    setProductionUnit(UNITS[0]);
     setRows([blankRow()]);
   }, [open, orders, defaultOrderId]);
 
@@ -119,7 +119,7 @@ const AlterationDrawer = ({ open, orders, onClose, onSaved }) => {
         <div>
           <FieldLabel>Issue to Unit</FieldLabel>
           <FormSelect value={productionUnit} style={{ width: 200 }}
-            options={FACTORIES.map((f) => ({ value: f, label: f }))} onChange={setProductionUnit} />
+            options={UNITS.map((f) => ({ value: f, label: f }))} onChange={setProductionUnit} />
         </div>
         {order && <Tag style={{ alignSelf: 'end' }}>{order.buyer} · {order.color}</Tag>}
       </Space>

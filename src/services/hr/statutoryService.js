@@ -3,7 +3,7 @@ import axiosInstance from '../core/axiosInstance';
 // ── EL Encashment ──
 
 /**
- * Process EL encashment for a factory/year.
+ * Process EL encashment for a unit/year.
  * POST /api/v1/hr/el-encashment/process
  */
 export const processElEncashment = async (data) => {
@@ -59,7 +59,7 @@ export const markElEncashmentPaid = async (id) => {
 };
 
 /**
- * Generate a PT return for a factory/period.
+ * Generate a PT return for a unit/period.
  * POST /api/v1/hr/pt-returns/generate
  */
 export const generatePtReturn = async (data) => {

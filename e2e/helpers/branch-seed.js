@@ -51,14 +51,14 @@ export async function restoreSingleBranch(api) {
 }
 
 /** A unit at this branch, created if the branch has none yet. */
-export async function ensureUnit(api, branchId, { factoryCode, factoryName }) {
-  const { data: all } = await api.get('/factories');
-  const existing = (all || []).find((f) => f.factoryCode === factoryCode);
+export async function ensureUnit(api, branchId, { unitCode, unitName }) {
+  const { data: all } = await api.get('/units');
+  const existing = (all || []).find((f) => f.unitCode === unitCode);
   if (existing) return existing;
-  const { data, status } = await api.post('/factories', {
-    factoryCode, factoryName, branchId, isActive: true,
+  const { data, status } = await api.post('/units', {
+    unitCode, unitName, branchId, isActive: true,
   });
-  if (status >= 300) throw new Error(`Could not create unit ${factoryCode}: ${status} ${JSON.stringify(data)}`);
+  if (status >= 300) throw new Error(`Could not create unit ${unitCode}: ${status} ${JSON.stringify(data)}`);
   return data;
 }
 

@@ -7,7 +7,7 @@ import { getProcessingUnits, getVendors } from '../../../services/po/production/
 
 /**
  * Header Unit/Vendor selector (PRD §4.6 / §5.4) — a radio toggle that loads the
- * matching list (in-house factory units vs. outsource vendors) plus a planned
+ * matching list (in-house unit units vs. outsource vendors) plus a planned
  * delivery date. Bound to the parent Form via field names; must sit inside a Form.
  */
 const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) => {
@@ -52,7 +52,7 @@ const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) 
       <Col xs={24} md={12}>
         <Form.Item
           name="processingUnitId"
-          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Factory Unit'}
+          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Unit Unit'}
           rules={[{ required: true, message: 'Select a processing unit' }]}
         >
           <FormSelect

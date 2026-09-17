@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Drawer, Table, Select, InputNumber, Input, Button, Space, Tag, Typography, App, Alert } from 'antd';
 import { PlusOutlined, DeleteOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons';
 import { useBranch } from '../../context/BranchContext';
-import { getActiveFactories } from '../../services/master/factoryService';
+import { getActiveUnits } from '../../services/master/unitService';
 import { getOrderAllocations, saveOrderAllocations } from '../../services/orders/orderAllocationService';
 import { toastUnlessHandled } from '../../utils/apiError';
 
@@ -30,7 +30,7 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
     try {
       // Units are optional and their endpoint is HR-gated: a merchandiser without
       // hr-masters still gets the split, just without a unit picker.
-      const [data, activeUnits] = await Promise.all([getOrderAllocations(orderId), getActiveFactories().catch(() => [])]);
+      const [data, activeUnits] = await Promise.all([getOrderAllocations(orderId), getActiveUnits().catch(() => [])]);
       setView(data);
       setRows((data.rows || []).map((r) => ({
         key: ++nextKey.current, branchId: r.branchId, unitId: r.unitId, qty: r.qty, remarks: r.remarks || '',
@@ -116,7 +116,7 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
           placeholder="Any unit"
           allowClear
           disabled={!r.branchId}
-          options={units.filter((u) => u.branchId === r.branchId).map((u) => ({ value: u.id, label: u.factoryName }))}
+          options={units.filter((u) => u.branchId === r.branchId).map((u) => ({ value: u.id, label: u.unitName }))}
           style={{ width: '100%' }}
           onChange={(val) => patch(r.key, { unitId: val ?? null })}
         />

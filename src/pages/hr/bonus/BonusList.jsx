@@ -56,9 +56,9 @@ const BonusList = () => {
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },

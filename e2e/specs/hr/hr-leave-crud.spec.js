@@ -267,21 +267,21 @@ test.describe('HR Leave — Leave Balances Page', () => {
     // Year select should be visible
     await page.locator('.ant-select').first().waitFor({ state: 'visible', timeout: 5000 });
 
-    // Factory select placeholder
-    await expect(page.getByText('Select Factory')).toBeVisible();
+    // Unit select placeholder
+    await expect(page.getByText('Select Unit')).toBeVisible();
   });
 
-  test('Leave Balances — table renders after factory selection', async ({ page }) => {
+  test('Leave Balances — table renders after unit selection', async ({ page }) => {
     await navigateWithAuth(page, '/hr/leaves/balances');
     await waitForPageReady(page);
 
     // Table should be present (even if empty)
     await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 15000 });
 
-    // Select first factory to trigger employee + balance load
-    const factorySelect = page.getByText('Select Factory').locator('xpath=ancestor::div[contains(@class,"ant-select")]').first();
-    if (await factorySelect.isVisible().catch(() => false)) {
-      await antSelect(page, factorySelect, null, { first: true });
+    // Select first unit to trigger employee + balance load
+    const unitSelect = page.getByText('Select Unit').locator('xpath=ancestor::div[contains(@class,"ant-select")]').first();
+    if (await unitSelect.isVisible().catch(() => false)) {
+      await antSelect(page, unitSelect, null, { first: true });
       await waitForPageReady(page);
       // Table should still be visible after selection
       await page.locator('.ant-table').waitFor({ state: 'visible', timeout: 10000 });

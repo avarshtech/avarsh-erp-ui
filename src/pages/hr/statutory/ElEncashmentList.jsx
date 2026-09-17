@@ -3,11 +3,11 @@ import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, InputNum
 import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import { getAllElEncashmentRuns, processElEncashment, approveElEncashment } from '../../../services/hr/statutoryService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
@@ -25,7 +25,7 @@ const ElEncashmentList = () => {
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [processOpen, setProcessOpen] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [form] = Form.useForm();
 
   const canAdd = hasPermission('hr-statutory', 'add');
@@ -44,7 +44,7 @@ const ElEncashmentList = () => {
 
   useEffect(() => {
     fetchData();
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
   }, [fetchData, activeBranchId]);
 
   const filteredData = useMemo(() => {
@@ -57,7 +57,7 @@ const ElEncashmentList = () => {
       const values = await form.validateFields();
       setProcessing(true);
       await processElEncashment({
-        factoryId: values.factoryId,
+        unitId: values.unitId,
         year: values.year,
         category: values.category,
       });
@@ -103,9 +103,9 @@ const ElEncashmentList = () => {
         defaultSortOrder: 'descend',
       },
       {
-        title: 'Factory',
-        dataIndex: 'factoryName',
-        key: 'factoryName',
+        title: 'Unit',
+        dataIndex: 'unitName',
+        key: 'unitName',
         width: 160,
         ellipsis: true,
       },
@@ -201,10 +201,10 @@ const ElEncashmentList = () => {
         destroyOnHidden
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
+          <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
             <Select
-              placeholder="Select factory"
-              options={factoryOptions(factories)}
+              placeholder="Select unit"
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />

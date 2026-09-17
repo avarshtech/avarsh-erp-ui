@@ -2,7 +2,7 @@
  * HR Employee — Bulk Creation + CRUD E2E Tests (Headed + Slow)
  *
  * What this tests:
- *   - Seeds master data if missing (Factory, Department, Designation, Shift)
+ *   - Seeds master data if missing (Unit, Department, Designation, Shift)
  *   - Employee list page loads with table and filters
  *   - Create 12 employees with ALL fields filled (Personal + Employment tabs)
  *   - View employee detail page after creation
@@ -32,7 +32,7 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 const STAMP = () => Date.now().toString().slice(-6);
 
 // ── Master data IDs (seeded in beforeAll) ──
-let factoryId, departmentId, designationId, shiftId;
+let unitId, departmentId, designationId, shiftId;
 let api;
 
 // ── 12 varied employee profiles ──
@@ -139,8 +139,8 @@ async function createEmployeeViaForm(page, profile, stamp) {
   await pickSelectById(page, '#designationId');
   await page.waitForTimeout(300);
 
-  // Factory — select first available
-  await pickSelectById(page, '#factoryId');
+  // Unit — select first available
+  await pickSelectById(page, '#unitId');
   await page.waitForTimeout(300);
 
   // Shift — required NOT NULL in DB
@@ -196,19 +196,19 @@ test.beforeAll(async () => {
   api = await createAuthenticatedClient();
   const stamp = STAMP();
 
-  // 1. Create Factory (or use existing)
-  const factoriesResp = await api.get('/factories/active');
-  if (factoriesResp.data && factoriesResp.data.length > 0) {
-    factoryId = factoriesResp.data[0].id;
+  // 1. Create Unit (or use existing)
+  const unitsResp = await api.get('/units/active');
+  if (unitsResp.data && unitsResp.data.length > 0) {
+    unitId = unitsResp.data[0].id;
   } else {
-    const createFactory = await api.post('/factories', {
-      factoryCode: `E2E-FAC-${stamp}`,
-      factoryName: `E2E Test Factory ${stamp}`,
+    const createUnit = await api.post('/units', {
+      unitCode: `E2E-FAC-${stamp}`,
+      unitName: `E2E Test Unit ${stamp}`,
       city: 'Tirupur',
       state: 'TN',
       isActive: true,
     });
-    factoryId = createFactory.data?.id;
+    unitId = createUnit.data?.id;
   }
 
   // 2. Create Department (or use existing)
@@ -219,7 +219,7 @@ test.beforeAll(async () => {
     const createDept = await api.post('/hr/departments', {
       code: `E2E-DEP-${stamp}`,
       name: `E2E Department ${stamp}`,
-      factoryId,
+      unitId,
       isActive: true,
     });
     departmentId = createDept.data?.id;
@@ -257,7 +257,7 @@ test.beforeAll(async () => {
     shiftId = createShift.data?.id;
   }
 
-  console.log(`[E2E Setup] Factory=${factoryId}, Dept=${departmentId}, Desig=${designationId}, Shift=${shiftId}`);
+  console.log(`[E2E Setup] Unit=${unitId}, Dept=${departmentId}, Desig=${designationId}, Shift=${shiftId}`);
 });
 
 test.afterAll(async () => {

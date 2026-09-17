@@ -3,7 +3,7 @@ import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { getAllDepartments, createDepartment, updateDepartment, deleteDepartment } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
@@ -28,22 +28,22 @@ const DepartmentMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
 
-  const factoryOptions = useMemo(() =>
-    factories.map(f => ({ value: f.id, label: `${f.factoryCode} - ${f.factoryName}` })),
-  [factories]);
+  const unitOptions = useMemo(() =>
+    units.map(f => ({ value: f.id, label: `${f.unitCode} - ${f.unitName}` })),
+  [units]);
 
-  const factoryMap = useMemo(() => {
+  const unitMap = useMemo(() => {
     const map = {};
-    factories.forEach(f => { map[f.id] = f.factoryName; });
+    units.forEach(f => { map[f.id] = f.unitName; });
     return map;
-  }, [factories]);
+  }, [units]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -59,17 +59,17 @@ const DepartmentMaster = ({ onDirtyChange }) => {
     }
   }, []);
 
-  const fetchFactories = useCallback(async () => {
+  const fetchUnits = useCallback(async () => {
     try {
-      const result = await getActiveFactories(activeBranchId || undefined);
+      const result = await getActiveUnits(activeBranchId || undefined);
       const list = Array.isArray(result) ? result : (result?.data || []);
-      setFactories(list);
+      setUnits(list);
     } catch {
-      // Silent — factory dropdown will just be empty
+      // Silent — unit dropdown will just be empty
     }
   }, [activeBranchId]);
 
-  useEffect(() => { fetchData(); fetchFactories(); }, [fetchData, fetchFactories]);
+  useEffect(() => { fetchData(); fetchUnits(); }, [fetchData, fetchUnits]);
 
   const columns = [
     {
@@ -84,10 +84,10 @@ const DepartmentMaster = ({ onDirtyChange }) => {
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
     },
     {
-      title: 'Factory',
-      dataIndex: 'factoryId',
+      title: 'Unit',
+      dataIndex: 'unitId',
       width: 140,
-      render: (val) => factoryMap[val] || '—',
+      render: (val) => unitMap[val] || '—',
     },
     {
       title: 'Status',
@@ -224,7 +224,7 @@ const DepartmentMaster = ({ onDirtyChange }) => {
                 {selectedId ? (isReadOnly ? 'View Department' : 'Edit Department') : 'New Department'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the department details below' : 'Create a new department under a factory'}
+                {selectedId ? 'Modify the department details below' : 'Create a new department under a unit'}
               </Text>
             </div>
             <Space>
@@ -267,8 +267,8 @@ const DepartmentMaster = ({ onDirtyChange }) => {
               <Form.Item name="name" label="Department Name" rules={[{ required: true, message: 'Please enter a department name' }]}>
                 <Input placeholder="e.g. Production" maxLength={200} />
               </Form.Item>
-              <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Please select a factory' }]}>
-                <Select placeholder="Select factory" options={factoryOptions} showSearch optionFilterProp="label" allowClear />
+              <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
+                <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" allowClear />
               </Form.Item>
               <Form.Item name="isActive" label="Active" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />

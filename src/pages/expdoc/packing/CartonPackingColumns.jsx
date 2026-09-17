@@ -11,7 +11,7 @@ const nowrap = (text) => <Text style={{ whiteSpace: 'nowrap' }}>{text || '—'}<
 const numeric = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
-/** Column factory for the carton packing register. */
+/** Column unit for the carton packing register. */
 export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate, canDelete }) => [
   {
     title: 'Packing No',

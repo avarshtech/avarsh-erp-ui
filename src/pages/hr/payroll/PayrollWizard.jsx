@@ -3,9 +3,9 @@ import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statist
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { initiatePayrollRun, processPayrollRun, approvePayrollRun, getPayrollRecords, validatePayrollRun } from '../../../services/hr/payrollService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 import SalaryRecordDrawer from './SalaryRecordDrawer';
 import { hasPermission } from '../../../utils/permissions';
@@ -36,23 +36,23 @@ const PayrollWizard = () => {
   const [validation, setValidation] = useState(null);
   const [validating, setValidating] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [factories, setFactories] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  const [units, setUnits] = useState([]);
+  const [unitId, setUnitId] = useState(undefined);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [runData, setRunData] = useState(null);
   const [records, setRecords] = useState([]);
 
   useEffect(() => {
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => message.error('Failed to load factories'));
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => message.error('Failed to load units'));
   }, [message, activeBranchId]);
 
   // Step 1 — Initialize
   const handleInitiate = useCallback(async () => {
-    if (!factoryId) { message.warning('Please select a factory'); return; }
+    if (!unitId) { message.warning('Please select a unit'); return; }
     setLoading(true);
     try {
-      const result = await initiatePayrollRun({ factoryId, month, year });
+      const result = await initiatePayrollRun({ unitId, month, year });
       setRunData(result);
       setCurrent(1);
       message.success('Payroll run initiated');
@@ -73,7 +73,7 @@ const PayrollWizard = () => {
     } finally {
       setLoading(false);
     }
-  }, [factoryId, month, year, message]);
+  }, [unitId, month, year, message]);
 
   // Step 2 — Process
   const handleProcess = useCallback(async () => {
@@ -148,13 +148,13 @@ const PayrollWizard = () => {
     <Card key="select" style={{ maxWidth: 500 }}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <div>
-          <div style={{ marginBottom: 4, fontWeight: 500 }}>Factory</div>
+          <div style={{ marginBottom: 4, fontWeight: 500 }}>Unit</div>
           <Select
-            placeholder="Select factory"
+            placeholder="Select unit"
             style={{ width: '100%' }}
-            value={factoryId}
-            onChange={setFactoryId}
-            options={factoryOptions(factories)}
+            value={unitId}
+            onChange={setUnitId}
+            options={unitOptions(units)}
           />
         </div>
         <Row gutter={16}>
@@ -177,7 +177,7 @@ const PayrollWizard = () => {
     <Card key="process" style={{ maxWidth: 720 }}>
       <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
         <Row gutter={16}>
-          <Col span={8}><Statistic title="Factory" value={runData?.factoryName || '-'} /></Col>
+          <Col span={8}><Statistic title="Unit" value={runData?.unitName || '-'} /></Col>
           <Col span={8}><Statistic title="Employees" value={validation?.totalEmployees ?? 0} /></Col>
           <Col span={8}>
             <Statistic

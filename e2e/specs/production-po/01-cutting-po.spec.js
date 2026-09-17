@@ -32,7 +32,7 @@ test.describe('Cutting PO', () => {
     await selectOptionByText(page, 'Confirmed Order', ORDER_NO);
     await expect(page.locator('.ant-alert', { hasText: /PP Sample approved/i })).toBeVisible({ timeout: 10000 });
     await pickToday(page, 'Planned Cut Date');
-    await selectOptionByText(page, 'Factory Unit', 'Unit 1');
+    await selectOptionByText(page, 'Unit Unit', 'Unit 1');
     await pickToday(page, 'Planned Delivery Date');
 
     // Guard: saving without any rate must be blocked

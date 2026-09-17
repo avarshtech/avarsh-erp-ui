@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { searchEmployees } from '../../../services/hr/employeeService';
 import { getActiveDepartments } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import { EMPLOYEE_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
@@ -14,7 +14,7 @@ import SearchFilterBar from '../../../components/SearchFilterBar';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 
 const EmployeeList = () => {
   const { message } = App.useApp();
@@ -26,11 +26,11 @@ const EmployeeList = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [departmentFilter, setDepartmentFilter] = useState(undefined);
-  const [factoryFilter, setFactoryFilter] = useState(undefined);
+  const [unitFilter, setUnitFilter] = useState(undefined);
   const [statusFilter, setStatusFilter] = useState(undefined);
   const [categoryFilter, setCategoryFilter] = useState(undefined);
   const [departments, setDepartments] = useState([]);
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
 
   const canAdd = hasPermission('hr-employees', 'add');
   const canUpdate = hasPermission('hr-employees', 'update');
@@ -38,7 +38,7 @@ const EmployeeList = () => {
   // Load filter options on mount
   useEffect(() => {
     getActiveDepartments().then(setDepartments).catch(() => {});
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
   }, [activeBranchId]);
 
   const fetchData = useCallback(async (page, pageSize) => {
@@ -47,7 +47,7 @@ const EmployeeList = () => {
       const result = await searchEmployees({
         search: debouncedSearch || undefined,
         departmentId: departmentFilter,
-        factoryId: factoryFilter,
+        unitId: unitFilter,
         status: statusFilter,
         category: categoryFilter,
         page: (page || pagination.current) - 1,
@@ -67,11 +67,11 @@ const EmployeeList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, departmentFilter, factoryFilter, statusFilter, categoryFilter, pagination.current, pagination.pageSize, message]);
+  }, [debouncedSearch, departmentFilter, unitFilter, statusFilter, categoryFilter, pagination.current, pagination.pageSize, message]);
 
   useEffect(() => {
     fetchData(1, pagination.pageSize);
-  }, [debouncedSearch, departmentFilter, factoryFilter, statusFilter, categoryFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, departmentFilter, unitFilter, statusFilter, categoryFilter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTableChange = (pag) => {
     fetchData(pag.current, pag.pageSize);
@@ -80,7 +80,7 @@ const EmployeeList = () => {
   const handleClearFilters = () => {
     setSearchText('');
     setDepartmentFilter(undefined);
-    setFactoryFilter(undefined);
+    setUnitFilter(undefined);
     setStatusFilter(undefined);
     setCategoryFilter(undefined);
   };
@@ -92,7 +92,7 @@ const EmployeeList = () => {
       title: 'Department', dataIndex: 'departmentName', key: 'departmentName', width: 150,
     },
     { title: 'Designation', dataIndex: 'designationName', key: 'designationName', width: 150 },
-    { title: 'Factory', dataIndex: 'factoryName', key: 'factoryName', width: 140 },
+    { title: 'Unit', dataIndex: 'unitName', key: 'unitName', width: 140 },
     {
       title: 'Category', dataIndex: 'category', key: 'category', width: 100,
       render: (val) => {
@@ -137,13 +137,13 @@ const EmployeeList = () => {
       },
     },
     {
-      key: 'factory', type: 'select',
+      key: 'unit', type: 'select',
       span: { xs: 24, sm: 12, md: 6, lg: 4 },
       props: {
-        placeholder: 'Factory',
-        value: factoryFilter,
-        onChange: setFactoryFilter,
-        options: factoryOptions(factories),
+        placeholder: 'Unit',
+        value: unitFilter,
+        onChange: setUnitFilter,
+        options: unitOptions(units),
       },
     },
     {
@@ -166,7 +166,7 @@ const EmployeeList = () => {
         options: EMPLOYEE_CATEGORY,
       },
     },
-  ], [departmentFilter, factoryFilter, statusFilter, categoryFilter, departments, factories]);
+  ], [departmentFilter, unitFilter, statusFilter, categoryFilter, departments, units]);
 
   return (
     <>

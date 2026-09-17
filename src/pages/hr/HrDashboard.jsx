@@ -6,7 +6,7 @@ import {
   ClockCircleOutlined, CalendarOutlined, FileProtectOutlined, PercentageOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
-import FactoryMaster from './masters/FactoryMaster';
+import UnitMaster from './masters/UnitMaster';
 import DepartmentMaster from './masters/DepartmentMaster';
 import DesignationMaster from './masters/DesignationMaster';
 import ShiftMaster from './masters/ShiftMaster';
@@ -30,11 +30,11 @@ const NAV_GROUPS = [
     label: 'Organization',
     items: [
       {
-        key: 'factory',
+        key: 'unit',
         label: 'Units',
         icon: <BankOutlined />,
         moduleId: 'hr-masters',
-        Component: FactoryMaster,
+        Component: UnitMaster,
         description: 'Production units (cutting, sewing, finishing) under each branch',
       },
       {
@@ -43,7 +43,7 @@ const NAV_GROUPS = [
         icon: <ApartmentOutlined />,
         moduleId: 'hr-masters',
         Component: DepartmentMaster,
-        description: 'Departments within each factory',
+        description: 'Departments within each unit',
       },
       {
         key: 'designation',
@@ -73,7 +73,7 @@ const NAV_GROUPS = [
         icon: <CalendarOutlined />,
         moduleId: 'hr-masters',
         Component: HolidayMaster,
-        description: 'Annual holiday calendar by factory',
+        description: 'Annual holiday calendar by unit',
       },
     ],
   },
@@ -177,7 +177,7 @@ const HrDashboard = () => {
     [accessibleGroups],
   );
 
-  const [selectedKey, setSelectedKey] = useState(() => accessibleItems[0]?.key ?? 'factory');
+  const [selectedKey, setSelectedKey] = useState(() => accessibleItems[0]?.key ?? 'unit');
   const [navCollapsed, setNavCollapsed] = useState(false);
   const [childIsDirty, setChildIsDirty] = useState(false);
   const [hoveredKey, setHoveredKey] = useState(null);

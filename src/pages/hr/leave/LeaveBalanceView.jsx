@@ -4,10 +4,10 @@ import { Table, Select, Row, Col, Spin, Button } from 'antd';
 import dayjs from 'dayjs';
 import { getLeaveBalancesBulk } from '../../../services/hr/leaveService';
 import { searchEmployees } from '../../../services/hr/employeeService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
-import { getActiveDepartmentsByFactory } from '../../../services/master/hrMasterService';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { getActiveDepartmentsByUnit } from '../../../services/master/hrMasterService';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const LeaveBalanceView = () => {
@@ -16,36 +16,36 @@ const LeaveBalanceView = () => {
   const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [year, setYear] = useState(dayjs().year());
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  const [unitId, setUnitId] = useState(undefined);
   const [departmentId, setDepartmentId] = useState(undefined);
   const [employees, setEmployees] = useState([]);
   const [balanceData, setBalanceData] = useState([]);
   const [leaveTypeNames, setLeaveTypeNames] = useState([]);
 
   useEffect(() => {
-    getActiveFactories(activeBranchId || undefined).then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
   }, [activeBranchId]);
 
   useEffect(() => {
-    if (factoryId) {
-      getActiveDepartmentsByFactory(factoryId).then(setDepartments).catch(() => {});
+    if (unitId) {
+      getActiveDepartmentsByUnit(unitId).then(setDepartments).catch(() => {});
     } else {
       setDepartments([]);
     }
     setDepartmentId(undefined);
-  }, [factoryId]);
+  }, [unitId]);
 
   useEffect(() => {
-    if (factoryId) {
-      searchEmployees({ factoryId, departmentId, status: 'ACTIVE', size: 500 })
+    if (unitId) {
+      searchEmployees({ unitId, departmentId, status: 'ACTIVE', size: 500 })
         .then((res) => setEmployees(res.content || []))
         .catch(() => setEmployees([]));
     } else {
       setEmployees([]);
     }
-  }, [factoryId, departmentId]);
+  }, [unitId, departmentId]);
 
   const fetchBalances = useCallback(async () => {
     if (!employees.length) {
@@ -144,12 +144,12 @@ const LeaveBalanceView = () => {
         </Col>
         <Col xs={24} sm={8} md={6}>
           <Select
-            placeholder="Select Factory"
+            placeholder="Select Unit"
             allowClear
             style={{ width: '100%' }}
-            value={factoryId}
-            onChange={setFactoryId}
-            options={factoryOptions(factories)}
+            value={unitId}
+            onChange={setUnitId}
+            options={unitOptions(units)}
           />
         </Col>
         <Col xs={24} sm={8} md={6}>
@@ -160,7 +160,7 @@ const LeaveBalanceView = () => {
             value={departmentId}
             onChange={setDepartmentId}
             options={departments.map((d) => ({ value: d.id, label: d.name }))}
-            disabled={!factoryId}
+            disabled={!unitId}
           />
         </Col>
       </Row>

@@ -59,7 +59,7 @@ const TnaGantt = memo(function TnaGantt({ plan, showBaseline, onToggleBaseline }
           ))}
         </div>
         {todayPct > 0 && todayPct < 100 && <Marker leftPct={todayPct} color="var(--info-color)" label="Today" />}
-        <Tooltip title={`ETD ${dayjs(plan.etd).format(DATE_FORMAT)} — goods must leave the factory`}>
+        <Tooltip title={`ETD ${dayjs(plan.etd).format(DATE_FORMAT)} — goods must leave the unit`}>
           <div><Marker leftPct={pos(plan.etd)} color="var(--error-color)" label="ETD" dashed /></div>
         </Tooltip>
 
