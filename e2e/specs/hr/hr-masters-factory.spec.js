@@ -30,7 +30,7 @@ import {
 
 const STAMP = () => Date.now().toString().slice(-6);
 
-/** Navigate to /hr/masters and click "Factories" in the left nav. */
+/** Navigate to /hr/masters and click "Units" in the left nav. */
 async function goToUnits(page) {
   await navigateWithAuth(page, '/hr/masters');
   // Wait for the HR dashboard two-panel layout to render
@@ -117,7 +117,7 @@ test.describe('HR Masters — Units', () => {
   test('create factory validates required fields', async ({ page }) => {
     await goToUnits(page);
 
-    // Open new factory form
+    // Open the new unit form
     await page.getByRole('button', { name: /Add Unit/i }).click();
     await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
@@ -125,8 +125,8 @@ test.describe('HR Masters — Units', () => {
     await page.getByRole('button', { name: /^Save$/i }).click();
 
     // Ant Design inline validation errors should appear
-    await expect(page.getByText(/Please enter a factory code/i)).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText(/Please enter a factory name/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Please enter a unit code/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/Please enter a unit name/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('edit existing factory — modify name and save', async ({ page }) => {
@@ -147,9 +147,9 @@ test.describe('HR Masters — Units', () => {
     // Check if edit is possible (not read-only)
     const saveBtn = page.getByRole('button', { name: /^Save$/i });
     const isReadOnly = await saveBtn.isHidden().catch(() => true);
-    test.skip(isReadOnly, 'Factory form is read-only for this user');
+    test.skip(isReadOnly, 'Unit form is read-only for this user');
 
-    // Modify the Factory Name
+    // Modify the Unit Name
     const nameInput = page.locator('.ant-form-item').filter({ hasText: 'Unit Name' }).first().locator('input').first();
     await nameInput.clear();
     await nameInput.fill(`E2E Updated Factory ${stamp}`);
