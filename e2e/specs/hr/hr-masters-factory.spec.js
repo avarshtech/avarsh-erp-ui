@@ -81,10 +81,10 @@ test.describe('HR Masters — Units', () => {
 
     await goToUnits(page);
 
-    // Click "Add Factory" button
+    // Click "Add Unit" button
     await page.getByRole('button', { name: /Add Unit/i }).click();
 
-    // Form panel should appear — wait for "New Factory" heading
+    // Form panel should appear — wait for "New Unit" heading
     await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Fill required fields
