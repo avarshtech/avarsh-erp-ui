@@ -9,7 +9,7 @@
 
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { ensureBranch, headOffice, branchHeader } from '../../helpers/branch-seed.js';
+import { ensureBranch, headOffice, branchHeader, openingStockFinalized } from '../../helpers/branch-seed.js';
 
 let api;
 let ho;
@@ -58,6 +58,9 @@ test.describe('Inventory per branch', () => {
   });
 
   test('opening stock lands at the branch on the batch and the lot inherits it', async () => {
+    // The cut-over is a one-time affair: once an earlier suite finalises it,
+    // every opening-stock endpoint refuses, which is the correct behaviour.
+    test.skip(await openingStockFinalized(api), 'opening stock is finalised for this database');
     const { data: items } = await api.get('/items/autocomplete', { q: 'FAB-SJ-001' });
     const item = rowsOf(items)[0];
     test.skip(!item?.id, 'no fabric item in the seed');

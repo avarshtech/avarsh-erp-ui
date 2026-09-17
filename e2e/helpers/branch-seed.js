@@ -62,11 +62,26 @@ export async function ensureUnit(api, branchId, { unitCode, unitName }) {
   return data;
 }
 
-/** The first CONFIRMED order with a BOM — what production and allocation specs need. */
+/**
+ * A CONFIRMED order with a BOM and a real quantity — what the production and
+ * allocation specs need. The quantity check matters: by the time these specs
+ * run in a full suite, earlier suites have created orders of their own, and an
+ * order of zero pieces cannot be split (the rows are @Min(1)).
+ */
 export async function eligibleOrder(api) {
   const { data } = await api.get('/production/eligible-orders');
   const list = Array.isArray(data) ? data : [];
-  if (!list.length) return null;
-  const { data: detail } = await api.get(`/production/eligible-orders/${list[0].id}`);
-  return detail;
+  for (const candidate of list) {
+    const { data: row } = await api.get(`/orders/${candidate.id}`);
+    if (!row || !(row.totalOrderQty > 0)) continue;
+    const { data: detail } = await api.get(`/production/eligible-orders/${candidate.id}`);
+    if (detail) return detail;
+  }
+  return null;
+}
+
+/** True once the one-time opening-stock cut-over is locked; the endpoints then refuse everything. */
+export async function openingStockFinalized(api) {
+  const { data } = await api.get('/opening-stock/status');
+  return Boolean(data?.finalized);
 }
