@@ -7,10 +7,11 @@ import { DownloadOutlined, ReloadOutlined, FileExcelOutlined } from '@ant-design
 import {
   getPfSummary, getEsiSummary, downloadEcrFile, downloadEsiFile,
 } from '../../../services/hr/statutoryFilingService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { downloadContributionStatement } from '../../../services/hr/statutoryFilingService';
 import { triggerBrowserDownload } from '../../../services/hr/attendanceService';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 
@@ -39,8 +40,10 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
   const isPf = scheme === 'PF';
   const canView = hasPermission('hr-statutory', 'view');
 
-  const [factories, setFactories] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
+  const [units, setUnits] = useState([]);
+  const [unitId, setUnitId] = useState(undefined);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
 
@@ -51,35 +54,35 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+  }, [activeBranchId]);
 
   const load = useCallback(async () => {
-    if (!factoryId) { message.warning('Select a factory first'); return; }
+    if (!unitId) { message.warning('Select a unit first'); return; }
     setLoading(true);
     setError(null);
     setSummary(null);
     try {
       const data = isPf
-        ? await getPfSummary(factoryId, month, year)
-        : await getEsiSummary(factoryId, month, year);
+        ? await getPfSummary(unitId, month, year)
+        : await getEsiSummary(unitId, month, year);
       setSummary(data);
     } catch (err) {
       setError(err?.response?.data?.message || `Could not load the ${scheme} summary`);
     } finally {
       setLoading(false);
     }
-  }, [factoryId, month, year, isPf, scheme, message]);
+  }, [unitId, month, year, isPf, scheme, message]);
 
   const handleStatement = useCallback(async () => {
     setStatementLoading(true);
     try {
       const blob = await downloadContributionStatement(
-        isPf ? 'pf' : 'esi', factoryId, month, year,
+        isPf ? 'pf' : 'esi', unitId, month, year,
       );
       triggerBrowserDownload(
         blob,
-        `${isPf ? 'PF' : 'ESI'}_statement_${factoryId}_${String(month).padStart(2, '0')}_${year}.xlsx`,
+        `${isPf ? 'PF' : 'ESI'}_statement_${unitId}_${String(month).padStart(2, '0')}_${year}.xlsx`,
       );
       message.success('Statement downloaded');
     } catch {
@@ -87,17 +90,17 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
     } finally {
       setStatementLoading(false);
     }
-  }, [factoryId, month, year, isPf, message]);
+  }, [unitId, month, year, isPf, message]);
 
   const handleDownload = useCallback(async () => {
     setDownloading(true);
     try {
       const blob = isPf
-        ? await downloadEcrFile(factoryId, month, year)
-        : await downloadEsiFile(factoryId, month, year);
+        ? await downloadEcrFile(unitId, month, year)
+        : await downloadEsiFile(unitId, month, year);
       const name = isPf
-        ? `ECR_${factoryId}_${String(month).padStart(2, '0')}_${year}.txt`
-        : `ESI_${factoryId}_${String(month).padStart(2, '0')}_${year}.csv`;
+        ? `ECR_${unitId}_${String(month).padStart(2, '0')}_${year}.txt`
+        : `ESI_${unitId}_${String(month).padStart(2, '0')}_${year}.csv`;
       triggerBrowserDownload(blob, name);
       message.success(`${isPf ? 'ECR' : 'ESI contribution'} file downloaded`);
     } catch (err) {
@@ -114,7 +117,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
     } finally {
       setDownloading(false);
     }
-  }, [factoryId, month, year, isPf, scheme, message]);
+  }, [unitId, month, year, isPf, scheme, message]);
 
   const columns = useMemo(() => {
     const base = [
@@ -156,13 +159,13 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
       <Card size="small" style={{ marginBottom: 16 }}>
         <Row gutter={[16, 16]} align="bottom">
           <Col xs={24} sm={8} md={6}>
-            <div style={{ marginBottom: 4 }}><Text type="secondary">Factory</Text></div>
+            <div style={{ marginBottom: 4 }}><Text type="secondary">Unit</Text></div>
             <Select
-              placeholder="Select factory"
+              placeholder="Select unit"
               style={{ width: '100%' }}
-              value={factoryId}
-              onChange={setFactoryId}
-              options={factoryOptions(factories)}
+              value={unitId}
+              onChange={setUnitId}
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />
@@ -177,7 +180,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
           </Col>
           <Col xs={24} sm={12} md={10}>
             <Space wrap>
-              <Button icon={<ReloadOutlined />} onClick={load} loading={loading} disabled={!factoryId || !canView}>
+              <Button icon={<ReloadOutlined />} onClick={load} loading={loading} disabled={!unitId || !canView}>
                 Load Summary
               </Button>
               {/*
@@ -215,7 +218,7 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
           <Card size="small">
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="Choose a factory and period, then load the summary."
+              description="Choose a unit and period, then load the summary."
             />
           </Card>
         )}

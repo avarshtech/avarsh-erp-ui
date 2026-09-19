@@ -15,12 +15,17 @@ import { formatNumber } from '../../../utils/formatters';
 import { generateAccessoriesIssueSlipPdf } from '../../../utils/issueSlipPdfGenerator';
 import IssueViewDrawer from './IssueViewDrawer';
 import CancelIssueModal from './CancelIssueModal';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const { RangePicker } = DatePicker;
 
 const AccessoriesIssueList = ({ embedded = false }) => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters the register server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -42,7 +47,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, message]);
+  }, [searchText, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -74,6 +79,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
   const columns = useMemo(() => [
     { title: 'Issue #', dataIndex: 'issueNumber', key: 'issueNumber', width: 160, align: 'center', render: (val, record) => <RecordLink text={val} onClick={() => setViewDrawer({ open: true, record })} /> },
     { title: 'Date', dataIndex: 'issueDate', key: 'issueDate', width: 120, align: 'center', render: (v) => dayjs(v).format('DD-MMM-YYYY') },
+    ...branchColumn,
     { title: 'Work Order', dataIndex: 'workOrder', key: 'workOrder', width: 160, align: 'center' },
     { title: 'Style', dataIndex: 'style', key: 'style', width: 130, align: 'center' },
     { title: 'Items', dataIndex: 'itemsCount', key: 'itemsCount', width: 80, align: 'center' },
@@ -112,7 +118,7 @@ const AccessoriesIssueList = ({ embedded = false }) => {
         </Space>
       ),
     },
-  ], []);
+  ], [branchColumn]);
 
   const drawer = (
     <>

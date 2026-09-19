@@ -6,7 +6,7 @@ import sristiLogo from '../assets/images/sristi_logo.jpeg';
 /**
  * Trims / Accessories QC PDF Generator — "Trims Checking Record"
  *
- * Matches the factory's manual TCR form layout: metadata + criteria
+ * Matches the unit's manual TCR form layout: metadata + criteria
  * checklist + size-wise inspection table. Opens in a new window ready
  * to print.
  */

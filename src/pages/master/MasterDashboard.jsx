@@ -14,6 +14,7 @@ import {
   IssuesCloseOutlined,
   SlidersOutlined,
   CarOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -37,6 +38,7 @@ import BpChargeTypeMaster from './BpChargeTypeMaster';
 import BpIssueTypeMaster from './BpIssueTypeMaster';
 import BpToleranceSettings from './BpToleranceSettings';
 import CourierMaster from './CourierMaster';
+import BranchMaster from './BranchMaster';
 import { useStore } from '../../context/StoreContext';
 import { hasModuleAccess } from '../../utils/permissions';
 import {
@@ -52,6 +54,7 @@ import { getAllSizePresets } from '../../services/master/sizePresetService';
 
 // Group accent colors for left border on group headers
 const GROUP_ACCENT = {
+  organisation: 'var(--primary-color)',
   business: 'var(--info-color)',
   catalog: 'var(--btn-duplicate-color)',
   style: 'var(--success-color)',
@@ -63,6 +66,21 @@ const GROUP_ACCENT = {
 
 // Static navigation config — add new master data entries here
 const NAV_GROUPS = [
+  {
+    groupKey: 'organisation',
+    label: 'Organisation',
+    items: [
+      {
+        key: 'branch',
+        label: 'Branches',
+        icon: <BankOutlined />,
+        moduleId: 'branches',
+        Component: BranchMaster,
+        loadingKey: null,
+        description: 'Sites the company operates from — units hang under a branch',
+      },
+    ],
+  },
   {
     groupKey: 'business',
     label: 'Business Partners',

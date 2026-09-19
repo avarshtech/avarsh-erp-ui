@@ -4,8 +4,8 @@
  */
 import axiosInstance from '../core/axiosInstance';
 
-export const getProductionLines = async (factoryId) => {
-  const { data } = await axiosInstance.get('/production-lines', { params: { factoryId } });
+export const getProductionLines = async (unitId) => {
+  const { data } = await axiosInstance.get('/production-lines', { params: { unitId } });
   return data;
 };
 

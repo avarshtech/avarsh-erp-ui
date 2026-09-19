@@ -79,7 +79,7 @@ export const getLeaveBalances = async (employeeId, year) => {
  * GET /api/v1/hr/leaves/balances/bulk?employeeIds=1,2,3&year=
  *
  * The balance screen used to call getLeaveBalances once per employee, so a
- * factory of 500 issued 500 concurrent requests.
+ * unit of 500 issued 500 concurrent requests.
  */
 export const getLeaveBalancesBulk = async (employeeIds, year) => {
   const response = await axiosInstance.get(`${BASE_URL}/balances/bulk`, {

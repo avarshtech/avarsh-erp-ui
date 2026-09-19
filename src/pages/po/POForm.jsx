@@ -50,6 +50,8 @@ import { getAllTermsConditions } from '../../services/master/termsConditionsServ
 import { getSuppliers } from '../../services/master/supplierService';
 import { autocompleteItems, getItemsByIds } from '../../services/master/itemService';
 import { useStore } from '../../context/StoreContext';
+import { useBranch } from '../../context/BranchContext';
+import BranchField from '../../components/branch/BranchField';
 import { getCurrentUser, hasPermission } from '../../utils/permissions';
 import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATUSES, EWAY_BILL_THRESHOLD } from '../../utils/poStatusConstants';
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
@@ -292,6 +294,7 @@ const POForm = () => {
   const { id } = useParams();
   const prevIdRef = useRef(id);
   const [form] = Form.useForm();
+  const { isMultiBranch } = useBranch();
   const { message, modal } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
@@ -500,6 +503,7 @@ const POForm = () => {
         deliveryDate: data.deliveryDate ? dayjs(data.deliveryDate) : null,
         termsConditionId: data.termsConditionsId || data.termsConditionId,
         remarks: data.remarks || '',
+        branchId: data.deliveryBranchId,
       });
 
       // If suppliers list is already loaded, set selected supplier immediately
@@ -1347,6 +1351,7 @@ const POForm = () => {
       termsConditionsId: values.termsConditionId || null,
       termsConditionsTitle: terms?.name || '',
       remarks: values.remarks || '',
+      deliveryBranchId: values.branchId ?? null,
       status,
       subtotal: totals.subtotal,
       tax: isIgst ? totals.igst : totals.sgst + totals.cgst,
@@ -2224,6 +2229,7 @@ const POForm = () => {
                     />
                   </Form.Item>
                 </Col>
+                {isMultiBranch ? <Col xs={24} md={12}><BranchField label="Deliver To (Branch)" /></Col> : <BranchField />}
               </Row>
               <Row gutter={24}>
                 <Col xs={24}>

@@ -141,7 +141,7 @@ const PtReturnView = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="Factory" value={ptReturn?.factoryName || '-'} /></Card>
+          <Card size="small"><Statistic title="Unit" value={ptReturn?.unitName || '-'} /></Card>
         </Col>
         <Col xs={24} sm={10}>
           <Card size="small"><Statistic title="Period" value={period} styles={{ content: { fontSize: 16 } }} /></Card>

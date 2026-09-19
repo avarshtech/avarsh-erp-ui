@@ -16,6 +16,8 @@ import {
 } from '../../../utils/productionConstants';
 import { listCuttingPos, getCuttingPo } from '../../../services/po/production/cuttingPoService';
 import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
@@ -24,6 +26,9 @@ const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) 
 const CuttingPoList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // The header switcher filters this list server-side (X-Branch-Id); reload when it changes
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [status, setStatus] = useState();
   const [unitType, setUnitType] = useState();
@@ -46,7 +51,7 @@ const CuttingPoList = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, status, unitType, buyer, dateRange, message]);
+  }, [debouncedSearch, status, unitType, buyer, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { load(); }, [load]);
 
@@ -73,6 +78,7 @@ const CuttingPoList = () => {
     { title: 'Order Qty', dataIndex: 'totalOrderQty', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
     { title: 'Planned Qty', dataIndex: 'totalPlannedQty', width: 110, align: 'right', render: (v) => (v || 0).toLocaleString() },
     { title: 'PO Value', key: 'poValue', width: 120, align: 'right', render: (_, r) => `₹ ${poValue(r).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+    ...branchColumn,
     { title: 'Processing Unit', dataIndex: 'processingUnitName', width: 180, ellipsis: true },
     { title: 'Status', dataIndex: 'status', width: 150, align: 'center',
       render: (s) => <StatusTag status={s} config={PRODUCTION_PO_STATUS_CONFIG} getLabel={getStatusLabel} /> },
@@ -88,7 +94,7 @@ const CuttingPoList = () => {
           )}
         </Space>
       ) },
-  ], [navigate]);
+  ], [navigate, branchColumn]);
 
   return (
     <div className="animate-fade-in-up">

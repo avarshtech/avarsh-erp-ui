@@ -49,7 +49,7 @@ export const getPoMapping = async (poId) => (await axiosInstance.get(`${BASE}/${
  * The orders whose BOM actually consumes the variant this PO line is buying.
  *
  * The unfiltered list offers every confirmed bulk order, which for a fabric line is most
- * of the factory. An empty array is a real answer — a General PO is often raised before
+ * of the unit. An empty array is a real answer — a General PO is often raised before
  * the order's BOM exists — so the caller must explain it rather than render a blank.
  */
 export const listMappableOrdersForLine = async (poLineItemId) =>

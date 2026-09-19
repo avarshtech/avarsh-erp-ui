@@ -1,33 +1,34 @@
 import axiosInstance from '../core/axiosInstance';
 
-const BASE_URL = '/factories';
+const BASE_URL = '/units';
 
-export const getAllFactories = async () => {
+export const getAllUnits = async () => {
   const response = await axiosInstance.get(BASE_URL);
   return response.data;
 };
 
-export const getActiveFactories = async () => {
-  const response = await axiosInstance.get(`${BASE_URL}/active`);
+/** Active units; with a branchId only that branch's (a unit with no branch reads as the head office's). */
+export const getActiveUnits = async (branchId) => {
+  const response = await axiosInstance.get(`${BASE_URL}/active`, { params: branchId ? { branchId } : undefined });
   return response.data;
 };
 
-export const getFactoryById = async (id) => {
+export const getUnitById = async (id) => {
   const response = await axiosInstance.get(`${BASE_URL}/${id}`);
   return response.data;
 };
 
-export const createFactory = async (data) => {
+export const createUnit = async (data) => {
   const response = await axiosInstance.post(BASE_URL, data);
   return response.data;
 };
 
-export const updateFactory = async (id, data) => {
+export const updateUnit = async (id, data) => {
   const response = await axiosInstance.put(`${BASE_URL}/${id}`, { id, ...data });
   return response.data;
 };
 
-export const deleteFactory = async (id) => {
+export const deleteUnit = async (id) => {
   const response = await axiosInstance.delete(`${BASE_URL}/${id}`);
   return response.data;
 };

@@ -29,12 +29,15 @@ import EmptyState from '../../components/EmptyState';
 import POView from './POView';
 import POVersionHistory from './POVersionHistory';
 import PoOrderMappingWorkspace from './order-mapping/PoOrderMappingWorkspace';
+import { useBranch } from '../../context/BranchContext';
 
 const { Text } = Typography;
 
 const POList = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  // Deliver-to branch: a column on multi-branch, and the list follows the header switcher (X-Branch-Id)
+  const { isMultiBranch, activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
   const [pagination, setPagination] = useState({
@@ -131,7 +134,7 @@ const POList = () => {
         setLoading(false);
       }
     },
-    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange]
+    [pagination.current, pagination.pageSize, sortField, sortDirection, debouncedSearch, statusFilter, poTypeFilter, poDateRange, deliveryDateRange, activeBranchId] // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
   );
 
   // Re-fetch when any filter (including debounced search) changes
@@ -195,6 +198,7 @@ const POList = () => {
       ellipsis: true,
       render: (text) => <Text strong>{text || '-'}</Text>,
     },
+    ...(isMultiBranch ? [{ title: 'Deliver To', dataIndex: 'deliveryBranchName', key: 'deliveryBranchName', width: 150, ellipsis: true, render: (v) => v || '—' }] : []),
     {
       title: 'PO Type',
       dataIndex: 'poType',
@@ -298,7 +302,7 @@ const POList = () => {
         </Space>
       ),
     },
-  ], [handleView, navigate, fetchData, pagination.current, pagination.pageSize, deletingId, canView, canUpdate, canDelete]);
+  ], [handleView, navigate, fetchData, pagination.current, pagination.pageSize, deletingId, canView, canUpdate, canDelete, isMultiBranch]);
 
   return (
     <div className="animate-fade-in-up">

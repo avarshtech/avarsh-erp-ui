@@ -22,7 +22,8 @@ import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import { formatDate } from '../../../utils/formatters';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
-import useCompanyProfile from './useCompanyProfile';
+import useCompanyProfile, { withExportingBranch } from './useCompanyProfile';
+import { useBranch } from '../../../context/BranchContext';
 import SampleInvoiceView from './SampleInvoiceView';
 
 const { Text } = Typography;
@@ -50,6 +51,8 @@ const SampleInvoiceList = () => {
 
   const canAdd = hasPermission('sample-invoices', 'add');
   const canUpdate = hasPermission('sample-invoices', 'update');
+  // Exporting branch: a column on multi-branch, and the list follows the header switcher (X-Branch-Id)
+  const { activeBranchId, isMultiBranch, branchName } = useBranch();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,7 +69,7 @@ const SampleInvoiceList = () => {
       setRows(res.content);
       setStats(res.stats);
     } catch (e) { toastUnlessHandled(message, e, 'Failed to load invoices'); } finally { setLoading(false); }
-  }, [debouncedSearch, statusFilter, typeFilter, dateRange, message]);
+  }, [debouncedSearch, statusFilter, typeFilter, dateRange, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -74,7 +77,7 @@ const SampleInvoiceList = () => {
     const hide = message.loading('Preparing print…', 0);
     try {
       const full = await getInvoice(record.id);
-      if (!printSampleInvoice(full, profile)) message.error('Pop-up blocked — allow pop-ups to print');
+      if (!printSampleInvoice(full, withExportingBranch(profile, full))) message.error('Pop-up blocked — allow pop-ups to print');
     } catch (e) {
       toastUnlessHandled(message, e, 'Failed to load invoice');
     } finally { hide(); }
@@ -132,6 +135,7 @@ const SampleInvoiceList = () => {
       render: (d) => <span style={{ whiteSpace: 'nowrap' }}>{formatDate(d)}</span>,
     },
     { title: 'Consignee', dataIndex: 'consigneeName', key: 'consigneeName', width: 200, ellipsis: true, render: (v) => <Text strong>{v}</Text> },
+    ...(isMultiBranch ? [{ title: 'Branch', dataIndex: 'branchId', key: 'branchId', width: 130, render: (v) => (v ? branchName(v) : 'Company') }] : []),
     { title: 'Destination', dataIndex: 'destinationCountry', key: 'destinationCountry', width: 130 },
     { title: 'SRs / Styles', dataIndex: 'srCount', key: 'srCount', width: 110, align: 'center' },
     {
@@ -171,7 +175,7 @@ const SampleInvoiceList = () => {
         );
       },
     },
-  ], [navigate, canUpdate, handlePrint, handleDuplicate, handleCancel]);
+  ], [navigate, canUpdate, handlePrint, handleDuplicate, handleCancel, isMultiBranch, branchName]);
 
   return (
     <div className="animate-fade-in-up">

@@ -3,8 +3,9 @@ import { App, Steps, Button, Card, Select, InputNumber, Table, Row, Col, Statist
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { processBonus, approveBonus, getBonusRecords } from '../../../services/hr/bonusService';
-import { getActiveFactories } from '../../../services/master/factoryService';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const formatCurrency = (val) =>
@@ -14,10 +15,12 @@ const BonusWizard = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [current, setCurrent] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [factories, setFactories] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  const [units, setUnits] = useState([]);
+  const [unitId, setUnitId] = useState(undefined);
   // The API takes the accounting year as two integers: April of yearFrom to
   // March of yearTo. yearTo is therefore always yearFrom + 1, so only the start
   // year is asked for and the pair is derived.
@@ -32,17 +35,17 @@ const BonusWizard = () => {
   const [records, setRecords] = useState([]);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => message.error('Failed to load factories'));
-  }, [message]);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => message.error('Failed to load units'));
+  }, [message, activeBranchId]);
 
   // Step 1 - Calculate Bonus
   const handleCalculate = useCallback(async () => {
-    if (!factoryId) { message.warning('Please select a factory'); return; }
+    if (!unitId) { message.warning('Please select a unit'); return; }
     if (!yearFrom) { message.warning('Please select the accounting year'); return; }
     setLoading(true);
     try {
       const result = await processBonus({
-        factoryId,
+        unitId,
         // Integers, not dates. Sending "2026-08-01" produced
         // "Cannot deserialize value of type Integer from String".
         yearFrom,
@@ -61,7 +64,7 @@ const BonusWizard = () => {
     } finally {
       setLoading(false);
     }
-  }, [factoryId, yearFrom, bonusPercentage, message]);
+  }, [unitId, yearFrom, bonusPercentage, message]);
 
   // Step 2 - Approve
   const handleApprove = useCallback(async () => {
@@ -110,12 +113,12 @@ const BonusWizard = () => {
           <Spin spinning={loading}>
             <Row gutter={[24, 16]}>
               <Col xs={24} sm={12} md={8}>
-                <div style={{ marginBottom: 8, fontWeight: 500 }}>Factory</div>
+                <div style={{ marginBottom: 8, fontWeight: 500 }}>Unit</div>
                 <Select
-                  placeholder="Select factory"
-                  value={factoryId}
-                  onChange={setFactoryId}
-                  options={factoryOptions(factories)}
+                  placeholder="Select unit"
+                  value={unitId}
+                  onChange={setUnitId}
+                  options={unitOptions(units)}
                   style={{ width: '100%' }}
                   showSearch
                   optionFilterProp="label"

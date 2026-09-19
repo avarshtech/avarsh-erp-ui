@@ -7,25 +7,28 @@ import { getProcessingUnits, getVendors } from '../../../services/po/production/
 
 /**
  * Header Unit/Vendor selector (PRD §4.6 / §5.4) — a radio toggle that loads the
- * matching list (in-house factory units vs. outsource vendors) plus a planned
+ * matching list (in-house unit units vs. outsource vendors) plus a planned
  * delivery date. Bound to the parent Form via field names; must sit inside a Form.
  */
 const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) => {
   const form = Form.useFormInstance();
   const unitType = Form.useWatch('processingUnitType', form) || PROCESSING_UNIT_TYPE.UNIT;
+  // The branch the PO is made at (set by the form once it is known) narrows the
+  // in-house unit list to that branch's units; vendors are company-wide.
+  const branchId = Form.useWatch('branchId', form);
   const [options, setOptions] = useState([]);
 
   useEffect(() => {
     let active = true;
     const fetcher = unitType === PROCESSING_UNIT_TYPE.VENDOR
       ? getVendors(poType)
-      : getProcessingUnits('UNIT');
+      : getProcessingUnits('UNIT', branchId);
     fetcher.then((list) => {
       if (!active) return;
       setOptions((list || []).map((u) => ({ value: u.id, label: u.name })));
     });
     return () => { active = false; };
-  }, [unitType, poType]);
+  }, [unitType, poType, branchId]);
 
   const handleUnitChange = (value, option) => {
     form.setFieldValue('processingUnitName', option?.label || '');
@@ -49,7 +52,7 @@ const ProcessingUnitSelector = ({ poType = PO_TYPE.CUTTING, disabled = false }) 
       <Col xs={24} md={12}>
         <Form.Item
           name="processingUnitId"
-          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Factory Unit'}
+          label={unitType === PROCESSING_UNIT_TYPE.VENDOR ? 'Vendor' : 'Unit Unit'}
           rules={[{ required: true, message: 'Select a processing unit' }]}
         >
           <FormSelect

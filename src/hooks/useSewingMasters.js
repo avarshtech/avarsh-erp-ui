@@ -55,9 +55,9 @@ const useSewingMasters = () => {
     return entry?.numericValue != null ? Number(entry.numericValue) : fallback;
   }, [masters.lookups]);
 
-  /** Lines of one factory — how the Unit select filters the Line select. */
-  const linesByFactory = useCallback((factoryId) => masters.lines
-    .filter((l) => !factoryId || l.factoryId === factoryId), [masters.lines]);
+  /** Lines of one unit — how the Unit select filters the Line select. */
+  const linesByUnit = useCallback((unitId) => masters.lines
+    .filter((l) => !unitId || l.unitId === unitId), [masters.lines]);
 
   const lineOptions = useMemo(
     () => masters.lines.map((l) => ({ value: l.id, label: l.name })),
@@ -92,7 +92,7 @@ const useSewingMasters = () => {
     lineOptions,
     machineOptions,
     operationOptions,
-    linesByFactory,
+    linesByUnit,
     defectCategories,
     defectTypesOf,
     options,

@@ -59,11 +59,16 @@ const useCuttingMasters = () => {
     () => masters.cuttingTables.map((t) => ({ value: t.id, label: t.name })),
     [masters.cuttingTables],
   );
+  // A table sits on one unit's floor; a table with no unit is shared by every unit.
+  const tableOptionsFor = useCallback((unitId) => masters.cuttingTables
+    .filter((t) => unitId == null || t.unitId == null || t.unitId === unitId)
+    .map((t) => ({ value: t.id, label: t.name })), [masters.cuttingTables]);
 
   return {
     fabricTypes: masters.fabricTypes,
     cuttingTables: masters.cuttingTables,
     tableOptions,
+    tableOptionsFor,
     options,
     numericOptions,
     labelOf,

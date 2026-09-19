@@ -9,9 +9,10 @@ import {
   downloadAttendanceTemplate, parseAttendanceFile, commitAttendanceImport,
   triggerBrowserDownload,
 } from '../../../services/hr/attendanceService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 
@@ -24,8 +25,10 @@ const AttendanceImport = () => {
   const { message } = App.useApp();
   const canAdd = hasPermission('hr-attendance', 'add');
 
-  const [factories, setFactories] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
+  const [units, setUnits] = useState([]);
+  const [unitId, setUnitId] = useState(undefined);
   const [period, setPeriod] = useState([dayjs().startOf('month'), dayjs().endOf('month')]);
 
   const [file, setFile] = useState(null);
@@ -35,16 +38,16 @@ const AttendanceImport = () => {
   const [duplicateStrategy, setDuplicateStrategy] = useState('SKIP');
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+  }, [activeBranchId]);
 
-  const contextReady = Boolean(factoryId && period?.[0] && period?.[1]);
+  const contextReady = Boolean(unitId && period?.[0] && period?.[1]);
 
   const params = useMemo(() => ({
-    factoryId,
+    unitId,
     periodFrom: period?.[0]?.format('YYYY-MM-DD'),
     periodTo: period?.[1]?.format('YYYY-MM-DD'),
-  }), [factoryId, period]);
+  }), [unitId, period]);
 
   const handleDownloadTemplate = useCallback(async () => {
     try {
@@ -141,13 +144,13 @@ const AttendanceImport = () => {
       <Card size="small" style={{ marginBottom: 16 }}>
         <Row gutter={[16, 16]} align="bottom">
           <Col xs={24} sm={8} md={6}>
-            <div style={{ marginBottom: 4 }}><Text type="secondary">Factory</Text></div>
+            <div style={{ marginBottom: 4 }}><Text type="secondary">Unit</Text></div>
             <Select
-              placeholder="Select factory"
+              placeholder="Select unit"
               style={{ width: '100%' }}
-              value={factoryId}
-              onChange={setFactoryId}
-              options={factoryOptions(factories)}
+              value={unitId}
+              onChange={setUnitId}
+              options={unitOptions(units)}
               showSearch
               optionFilterProp="label"
             />
@@ -197,7 +200,7 @@ const AttendanceImport = () => {
             type="info"
             showIcon
             style={{ marginTop: 12 }}
-            title="Choose a factory and period first. The template is generated for that factory's employees."
+            title="Choose a unit and period first. The template is generated for that unit's employees."
           />
         )}
       </Card>

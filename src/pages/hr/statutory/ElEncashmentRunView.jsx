@@ -175,7 +175,7 @@ const ElEncashmentRunView = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="Factory" value={run?.factoryName || '-'} /></Card>
+          <Card size="small"><Statistic title="Unit" value={run?.unitName || '-'} /></Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small"><Statistic title="Year" value={run?.year ?? '-'} /></Card>

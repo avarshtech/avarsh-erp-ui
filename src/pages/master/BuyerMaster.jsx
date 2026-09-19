@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Card,
   Table,
@@ -16,6 +16,7 @@ import {
   Descriptions,
   Divider,
   Select,
+  DatePicker,
 } from 'antd';
 import {
   PlusOutlined,
@@ -23,11 +24,13 @@ import {
   EyeOutlined,
   BankOutlined,
   EnvironmentOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { ActionButton, DeleteConfirm } from '../../components/buttons';
 import StatusBadge from '../../components/StatusBadge';
 import EmptyState from '../../components/EmptyState';
 import dayjs from 'dayjs';
+import { getActiveUnits } from '../../services/master/unitService';
 import {
   getBuyers,
   createBuyer,
@@ -83,6 +86,15 @@ const BuyerMaster = () => {
   const [shippingLocations, setShippingLocations] = useState([]);
   const [locationModalVisible, setLocationModalVisible] = useState(false);
   const [editingLocation, setEditingLocation] = useState(null);
+  // Units the buyer has audited and approved (warn-only list); units come from HR
+  const [approvedUnits, setApprovedUnits] = useState([]);
+  const [units, setUnits] = useState([]);
+  const approvedKey = useRef(0);
+  useEffect(() => {
+    getActiveUnits().then((r) => setUnits(Array.isArray(r) ? r : [])).catch(() => {});
+  }, []);
+  const unitOptions = useMemo(() => units.map((f) => ({ value: f.id, label: f.unitName })), [units]);
+  const unitName = useCallback((id) => units.find((f) => f.id === id)?.unitName || `#${id}`, [units]);
   const [locationForm] = Form.useForm();
 
   // Permissions
@@ -158,6 +170,7 @@ const BuyerMaster = () => {
     form.resetFields();
     form.setFieldsValue({ active: true });
     setShippingLocations([]);
+    setApprovedUnits([]);
     setModalVisible(true);
     setUnsavedChanges(false);
   };
@@ -165,6 +178,7 @@ const BuyerMaster = () => {
   // Handle Edit
   const handleEdit = (record) => {
     setEditingBuyer(record);
+    setApprovedUnits((record.approvedUnits || []).map((u, idx) => ({ ...u, key: u.id || `unit_${idx}` })));
     form.setFieldsValue({ ...record });
     setShippingLocations(
       (record.shippingLocations || []).map((loc, idx) => ({
@@ -208,6 +222,7 @@ const BuyerMaster = () => {
         ...values,
         active: true,
         swiftCode: values.swiftCode?.toUpperCase() || null,
+        approvedUnits: approvedUnits.filter((u) => u.unitId).map(({ key, ...u }) => u),
         shippingLocations: shippingLocations.map(({ key, ...loc }) => ({
           ...loc,
           active: loc.active !== false,
@@ -253,6 +268,7 @@ const BuyerMaster = () => {
       form.resetFields();
       setEditingBuyer(null);
       setShippingLocations([]);
+    setApprovedUnits([]);
     } catch (error) {
       if (error?.errorFields) return;
       // Error toast already shown by axiosInstance interceptor
@@ -270,6 +286,7 @@ const BuyerMaster = () => {
     setEditingBuyer(null);
     form.resetFields();
     setShippingLocations([]);
+    setApprovedUnits([]);
     setUnsavedChanges(false);
   };
 
@@ -432,6 +449,30 @@ const BuyerMaster = () => {
   ];
 
   // Shipping locations table columns (inside buyer modal)
+  const patchUnit = (key, changes) => setApprovedUnits((prev) => prev.map((u) => (u.key === key ? { ...u, ...changes } : u)));
+  const approvedUnitColumns = [
+    {
+      title: 'Unit', dataIndex: 'unitId', width: 220,
+      render: (v, r) => <Select aria-label="Unit" value={v} options={unitOptions} showSearch optionFilterProp="label" placeholder="Select unit" style={{ width: '100%' }} onChange={(val) => patchUnit(r.key, { unitId: val })} />,
+    },
+    {
+      title: 'Valid Till', dataIndex: 'validTill', width: 160,
+      render: (v, r) => <DatePicker aria-label="Valid till" value={v ? dayjs(v) : null} format="DD-MMM-YYYY" style={{ width: '100%' }} placeholder="No expiry" onChange={(d) => patchUnit(r.key, { validTill: d ? d.format('YYYY-MM-DD') : null })} />,
+    },
+    {
+      title: 'Audit Ref', dataIndex: 'auditRef', width: 170,
+      render: (v, r) => <Input name="auditRef" value={v || ''} maxLength={100} placeholder="e.g. SEDEX 2026" onChange={(e) => patchUnit(r.key, { auditRef: e.target.value })} />,
+    },
+    {
+      title: 'Remarks', dataIndex: 'remarks',
+      render: (v, r) => <Input name="unitRemarks" value={v || ''} maxLength={300} onChange={(e) => patchUnit(r.key, { remarks: e.target.value })} />,
+    },
+    {
+      title: '', width: 60, align: 'center',
+      render: (_, r) => <ActionButton action="delete" size="small" onClick={() => setApprovedUnits((prev) => prev.filter((u) => u.key !== r.key))} />,
+    },
+  ];
+
   const locationColumns = [
     {
       title: 'Label',
@@ -607,6 +648,22 @@ const BuyerMaster = () => {
                 <Text type="secondary" style={{ fontSize: 13 }}>No shipping locations configured</Text>
               )}
 
+              <Divider titlePlacement="start"><SafetyCertificateOutlined style={{ marginRight: 6 }} />Approved Units</Divider>
+              {viewingBuyer.approvedUnits?.length > 0 ? (
+                <Space wrap>
+                  {viewingBuyer.approvedUnits.map((u) => {
+                    const expired = u.validTill && dayjs(u.validTill).isBefore(dayjs(), 'day');
+                    return (
+                      <Tag key={u.id || u.unitId} color={expired ? 'red' : 'green'}>
+                        {unitName(u.unitId)}{u.validTill ? ` · till ${dayjs(u.validTill).format('DD-MMM-YYYY')}` : ''}{u.auditRef ? ` · ${u.auditRef}` : ''}
+                      </Tag>
+                    );
+                  })}
+                </Space>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 13 }}>No approved-unit list on record (nothing warns)</Text>
+              )}
+
               <Divider titlePlacement="start">Metadata</Divider>
               <Descriptions column={1} size="small" styles={{ label: { width: 140 } }} items={[
                 {
@@ -777,6 +834,32 @@ const BuyerMaster = () => {
               size="small"
               pagination={false}
               scroll={{ x: 650 }}
+              style={{ marginBottom: 8 }}
+            />
+          )}
+
+          <Divider titlePlacement="start"><SafetyCertificateOutlined style={{ marginRight: 6 }} />Approved Units</Divider>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>
+            Units this buyer has audited. Leave empty when the buyer keeps no list; with a list, an order or cutting PO at another unit warns (never blocks).
+          </Text>
+          <div style={{ marginBottom: 12 }}>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              onClick={() => setApprovedUnits((prev) => [...prev, { key: `new_${++approvedKey.current}`, unitId: null, validTill: null, auditRef: '', remarks: '' }])}
+              block
+            >
+              Add Approved Unit
+            </Button>
+          </div>
+          {approvedUnits.length > 0 && (
+            <Table
+              columns={approvedUnitColumns}
+              dataSource={approvedUnits}
+              rowKey="key"
+              size="small"
+              pagination={false}
+              scroll={{ x: 700 }}
               style={{ marginBottom: 8 }}
             />
           )}

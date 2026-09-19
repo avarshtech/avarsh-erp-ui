@@ -1,18 +1,28 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
 import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { getAllFactories, createFactory, updateFactory, deleteFactory } from '../../../services/master/factoryService';
+import { getAllUnits, createUnit, updateUnit, deleteUnit } from '../../../services/master/unitService';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { INDIAN_STATES } from '../../../utils/hrConstants';
+import { UNIT_TYPES, unitTypeLabel } from '../../../utils/branchConstants';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 
 const MODULE_ID = 'hr-masters';
 
-const FactoryMaster = ({ onDirtyChange }) => {
+/**
+ * Unit master. The entity, table and API are still called Unit — a unit IS a
+ * unit (mst_units), and employees, production lines and production POs all
+ * point at it — so only the labels changed when branches arrived above it. A
+ * single-branch company never sees the Branch field: the unit lands in the head
+ * office and the server fills the branch in.
+ */
+const UnitMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
+  const { branches, isMultiBranch, effectiveBranchId, defaultBranch, branchName } = useBranch();
 
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -33,7 +43,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getAllFactories();
+      const result = await getAllUnits();
       const list = Array.isArray(result) ? result : (result?.data || []);
       setData(list);
       setFilteredData(list);
@@ -46,16 +56,34 @@ const FactoryMaster = ({ onDirtyChange }) => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const columns = [
+  const branchOptions = useMemo(
+    () => branches.map((b) => ({ value: b.id, label: b.branchName })),
+    [branches],
+  );
+
+  const columns = useMemo(() => [
     {
-      title: 'Factory Code',
-      dataIndex: 'factoryCode',
-      sorter: (a, b) => (a.factoryCode || '').localeCompare(b.factoryCode || ''),
+      title: 'Unit Code',
+      dataIndex: 'unitCode',
+      sorter: (a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''),
     },
     {
-      title: 'Factory Name',
-      dataIndex: 'factoryName',
-      sorter: (a, b) => (a.factoryName || '').localeCompare(b.factoryName || ''),
+      title: 'Unit Name',
+      dataIndex: 'unitName',
+      sorter: (a, b) => (a.unitName || '').localeCompare(b.unitName || ''),
+    },
+    ...(isMultiBranch ? [{
+      title: 'Branch',
+      dataIndex: 'branchId',
+      width: 140,
+      // A unit with no branch (an old seed) is the head office's, as the server treats it
+      render: (val) => branchName(val ?? defaultBranch?.id),
+    }] : []),
+    {
+      title: 'Type',
+      dataIndex: 'unitType',
+      width: 150,
+      render: (val) => unitTypeLabel(val),
     },
     {
       title: 'City',
@@ -79,21 +107,21 @@ const FactoryMaster = ({ onDirtyChange }) => {
         ? <Tag color="default">Inactive</Tag>
         : <Tag color="green">Active</Tag>,
     },
-  ];
+  ], [isMultiBranch, branchName, defaultBranch]);
 
   const handleAdd = () => {
-    if (!canAdd) { message.warning('You do not have permission to add factories'); return; }
+    if (!canAdd) { message.warning('You do not have permission to add units'); return; }
     skipDirty.current = true;
     setSelectedId(null);
     setIsEditing(true);
     form.resetFields();
-    form.setFieldsValue({ isActive: true });
+    form.setFieldsValue({ isActive: true, branchId: effectiveBranchId });
     markDirty(false);
     setTimeout(() => { skipDirty.current = false; }, 300);
   };
 
   const handleSelect = (record) => {
-    if (!canView && !canUpdate) { message.warning('You do not have permission to view factories'); return; }
+    if (!canView && !canUpdate) { message.warning('You do not have permission to view units'); return; }
     skipDirty.current = true;
     setSelectedId(record.id);
     setIsEditing(true);
@@ -106,18 +134,21 @@ const FactoryMaster = ({ onDirtyChange }) => {
   };
 
   const handleSave = async (values) => {
-    if (selectedId && !canUpdate) { message.warning('You do not have permission to update factories'); return; }
-    if (!selectedId && !canAdd) { message.warning('You do not have permission to add factories'); return; }
+    if (selectedId && !canUpdate) { message.warning('You do not have permission to update units'); return; }
+    if (!selectedId && !canAdd) { message.warning('You do not have permission to add units'); return; }
 
     setSubmitting(true);
     try {
+      const selectedRecord = selectedId ? data.find(r => r.id === selectedId) : null;
+      // The Branch field is not rendered for a single-branch company, so it is not in
+      // `values`; keep the unit where it was rather than letting the server re-default it.
+      const payload = { ...values, branchId: values.branchId ?? selectedRecord?.branchId ?? effectiveBranchId };
       if (selectedId) {
-        const selectedRecord = data.find(r => r.id === selectedId);
-        await updateFactory(selectedId, { ...values, version: selectedRecord?.version });
-        message.success('Factory updated successfully');
+        await updateUnit(selectedId, { ...payload, version: selectedRecord?.version });
+        message.success('Unit updated successfully');
       } else {
-        await createFactory(values);
-        message.success('Factory created successfully');
+        await createUnit(payload);
+        message.success('Unit created successfully');
       }
       markDirty(false);
       setIsEditing(false);
@@ -131,18 +162,18 @@ const FactoryMaster = ({ onDirtyChange }) => {
   };
 
   const handleDelete = () => {
-    if (!canDelete) { message.warning('You do not have permission to delete factories'); return; }
+    if (!canDelete) { message.warning('You do not have permission to delete units'); return; }
     modal.confirm({
-      title: 'Delete Factory',
+      title: 'Delete Unit',
       icon: <ExclamationCircleOutlined />,
-      content: 'Are you sure you want to delete this factory? This action cannot be undone.',
+      content: 'Are you sure you want to delete this unit? Employees and production lines under it will block the delete — mark it Inactive instead.',
       okText: 'Delete',
       okType: 'danger',
       cancelText: 'Cancel',
       onOk: async () => {
         try {
-          await deleteFactory(selectedId);
-          message.success('Factory deleted successfully');
+          await deleteUnit(selectedId);
+          message.success('Unit deleted successfully');
           handleCancel();
           fetchData();
         } catch {
@@ -163,8 +194,8 @@ const FactoryMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.factoryCode?.toLowerCase().includes(lower) ||
-        item.factoryName?.toLowerCase().includes(lower) ||
+        item.unitCode?.toLowerCase().includes(lower) ||
+        item.unitName?.toLowerCase().includes(lower) ||
         item.city?.toLowerCase().includes(lower)
       )
     );
@@ -174,9 +205,9 @@ const FactoryMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
-      title="Factories"
-      subtitle="Organization"
-      addLabel="Add Factory"
+      title="Units"
+      subtitle="Organisation"
+      addLabel="Add Unit"
       data={filteredData}
       columns={columns}
       selectedId={selectedId}
@@ -186,7 +217,7 @@ const FactoryMaster = ({ onDirtyChange }) => {
       onSelectRow={handleSelect}
       onSearch={handleSearch}
       onCloseForm={handleCancel}
-      searchPlaceholder="Search factories..."
+      searchPlaceholder="Search units..."
       renderForm={() => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
           {/* Sticky header */}
@@ -204,10 +235,10 @@ const FactoryMaster = ({ onDirtyChange }) => {
           }}>
             <div>
               <h2 style={{ margin: 0 }}>
-                {selectedId ? (isReadOnly ? 'View Factory' : 'Edit Factory') : 'New Factory'}
+                {selectedId ? (isReadOnly ? 'View Unit' : 'Edit Unit') : 'New Unit'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the factory details below' : 'Add a new factory location'}
+                {selectedId ? 'Modify the unit details below' : 'Add a production unit'}
               </Text>
             </div>
             <Space>
@@ -244,11 +275,19 @@ const FactoryMaster = ({ onDirtyChange }) => {
               disabled={isReadOnly}
               onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
-              <Form.Item name="factoryCode" label="Factory Code" rules={[{ required: true, message: 'Please enter a factory code' }]}>
-                <Input placeholder="e.g. FAC-001" maxLength={20} />
+              {isMultiBranch && (
+                <Form.Item name="branchId" label="Branch" rules={[{ required: true, message: 'Please select the branch this unit belongs to' }]}>
+                  <Select placeholder="Select branch" options={branchOptions} showSearch optionFilterProp="label" />
+                </Form.Item>
+              )}
+              <Form.Item name="unitCode" label="Unit Code" rules={[{ required: true, message: 'Please enter a unit code' }]}>
+                <Input placeholder="e.g. UNIT-1" maxLength={20} />
               </Form.Item>
-              <Form.Item name="factoryName" label="Factory Name" rules={[{ required: true, message: 'Please enter a factory name' }]}>
-                <Input placeholder="e.g. Tirupur Unit 1" maxLength={200} />
+              <Form.Item name="unitName" label="Unit Name" rules={[{ required: true, message: 'Please enter a unit name' }]}>
+                <Input placeholder="e.g. Sewing Unit 1" maxLength={200} />
+              </Form.Item>
+              <Form.Item name="unitType" label="Unit Type" extra="what the unit does — a production PO offers only units that can do the work">
+                <Select placeholder="Select type" options={UNIT_TYPES} allowClear />
               </Form.Item>
               <Form.Item name="address" label="Address">
                 <Input.TextArea rows={2} placeholder="Street address" maxLength={500} />
@@ -273,4 +312,4 @@ const FactoryMaster = ({ onDirtyChange }) => {
   );
 };
 
-export default FactoryMaster;
+export default UnitMaster;

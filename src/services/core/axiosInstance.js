@@ -42,6 +42,14 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // The working branch chosen in the header switcher (persisted by BranchContext).
+    // Sent only while one is selected; absent means "all branches".
+    try {
+      const branchId = localStorage.getItem('activeBranchId');
+      if (branchId && branchId !== 'all') config.headers['X-Branch-Id'] = branchId;
+    } catch {
+      // storage unavailable — no branch header
+    }
     return config;
   },
   (error) => Promise.reject(error)

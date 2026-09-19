@@ -43,7 +43,7 @@ test.describe('Work Order', () => {
 
     await pickToday(page, 'Planned Start');
     await pickToday(page, 'Planned End');
-    await selectOptionByText(page, 'Factory Unit', 'Unit 1');
+    await selectOptionByText(page, 'Unit Unit', 'Unit 1');
     await pickToday(page, 'Planned Delivery Date');
 
     await applyBulkRate(page, 30);

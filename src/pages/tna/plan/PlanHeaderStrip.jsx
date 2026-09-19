@@ -44,7 +44,7 @@ const PlanHeaderStrip = memo(function PlanHeaderStrip({ plan }) {
             <Col xs={12} md={6}><Field label="Product" value={plan.productType} /></Col>
             <Col xs={12} md={6}><Field label="Qty" value={`${plan.qty.toLocaleString()} ${plan.uom}`} mono /></Col>
             <Col xs={12} md={6}><Field label="Received" value={fmt(plan.orderReceived)} tip="Forward-pass anchor — buyer PO confirmation date" /></Col>
-            <Col xs={12} md={6}><Field label="ETD" value={fmt(plan.etd)} tip="Backward-pass anchor — goods must leave the factory" /></Col>
+            <Col xs={12} md={6}><Field label="ETD" value={fmt(plan.etd)} tip="Backward-pass anchor — goods must leave the unit" /></Col>
             <Col xs={12} md={6}><Field label="Template" value={`${plan.templateCode} v${plan.templateVersion}`} mono tip="Resolved by buyer + product type precedence (§7.4)" /></Col>
             <Col xs={12} md={6}><Field label="Merchandiser" value={plan.merchandiser} /></Col>
           </Row>

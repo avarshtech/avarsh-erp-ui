@@ -107,6 +107,8 @@ export const hasSessionActiveFlag = () => {
 
 export const clearSessionActiveFlag = () => {
   localStorage.removeItem('sessionActive');
+  // The working branch is a per-user choice; the next user on this browser starts at their own home branch
+  localStorage.removeItem('activeBranchId');
 };
 
 // ── User Display Cache (localStorage — survives PWA restart) ─────────────────

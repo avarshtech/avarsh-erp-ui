@@ -1,5 +1,7 @@
 import { Row, Col, Input, DatePicker, Select, Typography } from 'antd';
 import dayjs from 'dayjs';
+import { useBranch } from '../../../context/BranchContext';
+import { withExportingBranch } from './useCompanyProfile';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -15,16 +17,34 @@ const Field = ({ label, required, children, hint }) => (
 );
 
 /**
- * Step 2 — header fields following the existing Avarsh export invoice layout
- * (PRD §10.4). Exporter block + IEC are read-only from the Company Master
+ * Step 2 â header fields following the existing Avarsh export invoice layout
+ * (PRD Â§10.4). Exporter block + IEC are read-only from the Company Master
  * (real organisation-info + profile extras); consignee prefills from the
  * buyer and stays editable per shipment.
  */
-const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
+const InvoiceStepHeader = ({ inv, patch, profile, locked }) => {
+  // Multi-branch only: which branch exports (its address + GSTIN print as the exporter)
+  const { isMultiBranch, allowedBranches } = useBranch();
+  const exporterBlock = withExportingBranch(profile, inv).exporterBlock;
+  return (
   <Row gutter={24}>
     <Col xs={24} md={12}>
+      {isMultiBranch && (
+        <Field label="Exporting Branch" hint="Its address and GSTIN print as the exporter; blank = company profile">
+          <Select
+            aria-label="Exporting Branch"
+            value={inv.branchId ?? undefined}
+            disabled={locked}
+            allowClear
+            placeholder="Company profile"
+            style={{ width: '100%' }}
+            options={allowedBranches.map((b) => ({ value: b.id, label: b.branchName }))}
+            onChange={(v) => patch({ branchId: v ?? null })}
+          />
+        </Field>
+      )}
       <Field label="Exporter (Company Master — read-only)">
-        <TextArea value={profile.exporterBlock} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+        <TextArea value={exporterBlock} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)' }} />
       </Field>
       <Field label="Consignee" required>
         <Input
@@ -34,13 +54,13 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
         />
         <TextArea
           value={inv.consigneeAddress} disabled={locked} rows={3}
-          placeholder="Delivery address — prefilled from the buyer's shipping address, editable per shipment"
+          placeholder="Delivery address â prefilled from the buyer's shipping address, editable per shipment"
           style={{ marginBottom: 4 }}
           onChange={(e) => patch({ consigneeAddress: e.target.value })}
         />
         <Input
           value={inv.consigneeContact} disabled={locked}
-          placeholder="Attn: contact person · phone (prints under the consignee address)"
+          placeholder="Attn: contact person Â· phone (prints under the consignee address)"
           onChange={(e) => patch({ consigneeContact: e.target.value })}
         />
       </Field>
@@ -60,7 +80,7 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
     <Col xs={24} md={12}>
       <Row gutter={12}>
         <Col span={12}>
-          <Field label="Invoice No." hint={`Assigned on Issue · series ${inv.series || 'EXSG'}`}>
+          <Field label="Invoice No." hint={`Assigned on Issue Â· series ${inv.series || 'EXSG'}`}>
             <Input value={inv.invoiceNo || 'Assigned on Issue'} disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
           </Field>
         </Col>
@@ -85,7 +105,7 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
           <Field label="Invoice Series" hint="Set per invoice type in Company Profile">
             <Select
               style={{ width: '100%' }} disabled value={inv.series || 'EXSG'}
-              options={(profile.extra?.invoiceSeries || [{ code: 'EXSG', label: 'Full export' }]).map((s) => ({ value: s.code, label: `${s.code} — ${s.label}` }))}
+              options={(profile.extra?.invoiceSeries || [{ code: 'EXSG', label: 'Full export' }]).map((s) => ({ value: s.code, label: `${s.code} â ${s.label}` }))}
             />
           </Field>
         </Col>
@@ -96,7 +116,7 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
         </Col>
         <Col span={24}>
           <Field label="Other References">
-            <Input value={inv.otherReferences} disabled={locked} placeholder="e.g. Sample submission — SS27 development" onChange={(e) => patch({ otherReferences: e.target.value })} />
+            <Input value={inv.otherReferences} disabled={locked} placeholder="e.g. Sample submission â SS27 development" onChange={(e) => patch({ otherReferences: e.target.value })} />
           </Field>
         </Col>
         <Col span={12}>
@@ -145,7 +165,7 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
           </Field>
         </Col>
         <Col span={12}>
-          <Field label="Payment Terms" hint="e.g. SAMPLES ONLY (commercial) · TT 30 DAYS (chargeable)">
+          <Field label="Payment Terms" hint="e.g. SAMPLES ONLY (commercial) Â· TT 30 DAYS (chargeable)">
             <Input value={inv.paymentTerms} disabled={locked} onChange={(e) => patch({ paymentTerms: e.target.value })} />
           </Field>
         </Col>
@@ -167,6 +187,7 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked }) => (
       </Row>
     </Col>
   </Row>
-);
+  );
+};
 
 export default InvoiceStepHeader;

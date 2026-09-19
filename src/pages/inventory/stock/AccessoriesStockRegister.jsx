@@ -14,6 +14,8 @@ import { getAccessoriesStock } from '../../../services/inventory/inventoryServic
 import { formatNumber } from '../../../utils/formatters';
 import getAccessoriesStockColumns from './AccessoriesStockColumns';
 import AccessoriesStockViewDrawer from './AccessoriesStockViewDrawer';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const CATEGORY_OPTIONS = [
   { label: 'Buttons', value: 'Buttons' },
@@ -27,6 +29,9 @@ const CATEGORY_OPTIONS = [
 
 const AccessoriesStockRegister = ({ embedded = false }) => {
   const { message } = App.useApp();
+  // Stock is per branch: the register follows the header switcher (X-Branch-Id)
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState([]);
@@ -49,13 +54,13 @@ const AccessoriesStockRegister = ({ embedded = false }) => {
     } finally {
       setLoading(false);
     }
-  }, [searchText, categoryFilter, message]);
+  }, [searchText, categoryFilter, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const columns = useMemo(() => getAccessoriesStockColumns(), []);
+  const columns = useMemo(() => [...branchColumn, ...getAccessoriesStockColumns()], [branchColumn]);
 
   // Stats sourced from the paginated response. See
   // AccessoriesStockService.search() for the server-side computation.

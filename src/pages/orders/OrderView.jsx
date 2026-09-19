@@ -12,11 +12,15 @@ import {
   Image,
   Skeleton,
   Tooltip,
+  Button,
 } from 'antd';
 import {
   CalendarOutlined,
   ShoppingOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
+import { useBranch } from '../../context/BranchContext';
+import OrderBranchAllocation from './OrderBranchAllocation';
 import { generateOrderPdf } from '../../utils/orderPdfGenerator';
 import { useNavigate } from 'react-router-dom';
 import { changeOrderStatus } from '../../services/orders/orderService';
@@ -87,6 +91,13 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
 
   const referBackTextareaRef = useRef(null);
   const cancelTextareaRef = useRef(null);
+
+  // Branch split: the drawer returns the saved view, so the card updates without a
+  // round trip through the parent. Reset when a different order is shown.
+  const { isMultiBranch, branchName } = useBranch();
+  const [allocOpen, setAllocOpen] = useState(false);
+  const [savedAllocations, setSavedAllocations] = useState(null);
+  useEffect(() => { setSavedAllocations(null); }, [orderData?.id]);
 
   useEffect(() => {
     if (showReferBackInput) {
@@ -406,6 +417,11 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           loading={printLoading}
           onClick={handlePrint}
         />
+        {isMultiBranch && hasPermission('orders', 'update') && ![ORDER_STATUS.CANCELLED, ORDER_STATUS.COMPLETED].includes(status) && (
+          <Button icon={<BankOutlined />} onClick={() => setAllocOpen(true)}>
+            Branch Allocation
+          </Button>
+        )}
 
         {/* Request decisions route through the centralized approval engine when a flow
             is configured; legacy Popconfirm buttons are the no-flow fallback. */}
@@ -753,6 +769,30 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           )}
         </DetailCard>
 
+        {/* ── Branch Allocation (multi-branch companies only) ── */}
+        {isMultiBranch && (() => {
+          const rows = savedAllocations ?? orderData.allocations ?? [];
+          const allocated = rows.reduce((s, a) => s + (a.qty || 0), 0);
+          const unallocated = (totalOrderQty || 0) - allocated;
+          return (
+            <Card
+              size="small"
+              title={<Space><BankOutlined /><span>Branch Allocation</span></Space>}
+              extra={unallocated > 0 ? <Tag color="warning">{unallocated.toLocaleString()} pcs unallocated</Tag> : <Tag color="success">Fully allocated</Tag>}
+              style={{ marginBottom: 16 }}
+            >
+              <Space wrap>
+                {rows.map((a) => (
+                  <Tag key={a.branchId} color="geekblue">
+                    {a.branchName || branchName(a.branchId)}{a.unitName ? ` / ${a.unitName}` : ''}: <Text strong>{(a.qty || 0).toLocaleString()}</Text> pcs
+                  </Tag>
+                ))}
+                {rows.length === 0 && <Text type="secondary">Not allocated to any branch yet</Text>}
+              </Space>
+            </Card>
+          );
+        })()}
+
         {/* ── Assortment Summary ── */}
         {assortmentSummary.length > 0 && (
           <Card size="small" title="Assortment Summary" style={{ marginBottom: 16 }}>
@@ -872,6 +912,14 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           );
         })}
       </DraftWatermark>
+      {isMultiBranch && (
+        <OrderBranchAllocation
+          open={allocOpen}
+          orderId={orderData.id}
+          onClose={() => setAllocOpen(false)}
+          onSaved={(view) => setSavedAllocations(view?.rows || [])}
+        />
+      )}
     </ViewDialog>
   );
 };

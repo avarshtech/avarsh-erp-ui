@@ -16,7 +16,9 @@ const FieldLabel = ({ children }) => (
  * TOTAL row at the bottom. Marker details sit in the row expansion.
  */
 const MarkerMatrix = ({ po, plan, onPatchMarker, onAddMarker, onRemoveMarker, onImportExcel }) => {
-  const { tableOptions, threshold } = useCuttingMasters();
+  const { tableOptionsFor, threshold } = useCuttingMasters();
+  // Only the tables on the floor of the unit this PO is cut at (a vendor-cut PO sees the shared ones)
+  const tableOptions = useMemo(() => tableOptionsFor(po?.processingUnitType === 'UNIT' ? po?.processingUnitId : null), [tableOptionsFor, po?.processingUnitType, po?.processingUnitId]);
   const efficiencyTarget = threshold('MARKER_EFFICIENCY_TARGET', 85);
   const pcsOf = useCallback((m) => (po?.sizes || []).reduce((s, sz) => s + (m.ratio?.[sz] || 0), 0), [po]);
 

@@ -6,7 +6,7 @@ import sristiLogo from '../assets/images/sristi_logo.jpeg';
 /**
  * Fabric QC PDF Generator — "Fabric Inspection Report"
  *
- * Opens a new window with a clean, modern HTML version of the factory's
+ * Opens a new window with a clean, modern HTML version of the unit's
  * manual fabric inspection ledger. Defects are pivoted into a matrix
  * (rolls as rows, defect types as columns) for parity with the paper form.
  *

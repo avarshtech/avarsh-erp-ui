@@ -28,6 +28,7 @@ import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import PageHeader from '../../../components/PageHeader';
 import PermissionGuard from '../../../components/PermissionGuard';
 import StatCard from '../../../components/StatCard';
+import { useBranch } from '../../../context/BranchContext';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import { getBillPassingListColumns } from './BillPassingListColumns';
@@ -86,6 +87,8 @@ const BillPassingList = () => {
 
   const canUpdate = hasPermission(BP_MODULE_ID, 'update');
   const canDelete = hasPermission(BP_MODULE_ID, 'delete');
+  // Bills follow the working branch (input credit is per GSTIN); reload when the switcher changes
+  const { activeBranchId } = useBranch();
 
   const fetchData = useCallback(async () => {
     const seq = ++reqRef.current;
@@ -128,7 +131,7 @@ const BillPassingList = () => {
     } finally {
       if (seq === reqRef.current) setLoading(false);
     }
-  }, [view, quickFilter, debouncedSearch, supplierId, poId, statusFilter, invoiceRange, pagination, message]);
+  }, [view, quickFilter, debouncedSearch, supplierId, poId, statusFilter, invoiceRange, pagination, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
