@@ -43,6 +43,12 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
       title: 'Sample Type', dataIndex: 'sampleTypeName', key: 'sampleTypeName', width: 170,
       render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>,
     },
+    {
+      // Which colour is being invoiced: a style sampled in several of them puts
+      // rows here that are otherwise identical.
+      title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 140,
+      render: (v) => (v ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag> : '—'),
+    },
     { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70, align: 'right' },
     {
       title: 'Status', key: 'status', width: 235,
@@ -67,7 +73,7 @@ const InvoiceStepStyles = ({ eligible, selectedIds, onToggle, locked }) => {
         dataSource={eligible}
         pagination={false}
         rowClassName={(r) => (!r.eligible && !selectedIds.includes(r.id) ? 'ant-table-row-disabled' : '')}
-        scroll={{ x: 1110 }}
+        scroll={{ x: 1250 }}
         footer={() => (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <Text>

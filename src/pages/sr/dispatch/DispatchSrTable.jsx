@@ -31,6 +31,12 @@ const DispatchSrTable = ({
       title: 'Sample Type', dataIndex: 'sampleTypeName', key: 'sampleTypeName', width: 160,
       render: (n) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{n}</Tag>,
     },
+    {
+      // A style sampled in several colours otherwise puts rows on the parcel
+      // that differ only by SR number, which reads as duplicated data.
+      title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 130,
+      render: (v) => (v ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag> : '—'),
+    },
     { title: 'Qty', dataIndex: 'quantity', key: 'quantity', width: 70, align: 'right' },
     {
       title: 'Dispatch Deadline', dataIndex: 'dispatchDeadline', key: 'dispatchDeadline', width: 210,
@@ -78,7 +84,7 @@ const DispatchSrTable = ({
         dataSource={rows}
         loading={rowsLoading}
         pagination={false}
-        scroll={{ x: 860 }}
+        scroll={{ x: 990 }}
         rowSelection={{ selectedRowKeys: selectedIds, onChange: onSelectionChange }}
         locale={{
           emptyText: buyerId != null

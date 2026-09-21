@@ -36,6 +36,12 @@ const SampleDeadlinesCard = memo(function SampleDeadlinesCard({ deadlines, loadi
       render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>,
     },
     {
+      // Several colours of one style can be due on the same day; without this
+      // they read as the same sample listed twice.
+      title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 140,
+      render: (v) => (v ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag> : '—'),
+    },
+    {
       title: 'Status', dataIndex: 'status', key: 'status', width: 175,
       render: (s) => (
         <span style={{ whiteSpace: 'nowrap' }}>
@@ -72,7 +78,7 @@ const SampleDeadlinesCard = memo(function SampleDeadlinesCard({ deadlines, loadi
       columns={columns}
       dataSource={deadlines || []}
       pagination={false}
-      scroll={{ x: 1020 }}
+      scroll={{ x: 1160 }}
       locale={{ emptyText: 'No active sample deadlines' }}
     />
   );

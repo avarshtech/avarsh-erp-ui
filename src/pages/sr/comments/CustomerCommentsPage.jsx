@@ -137,6 +137,12 @@ const CustomerCommentsPage = () => {
       render: (name) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{name}</Tag>,
     },
     {
+      // The buyer rules on each colour separately, so this is what says which
+      // sample a decision is being recorded against.
+      title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 140,
+      render: (v) => (v ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag> : '—'),
+    },
+    {
       title: 'Status', dataIndex: 'status', key: 'status', width: 175,
       render: (status) => (
         <span style={{ whiteSpace: 'nowrap' }}>
@@ -209,7 +215,7 @@ const CustomerCommentsPage = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1180 }}
+          scroll={{ x: 1320 }}
           onRow={(record) => ({
             onClick: () => openDialog(record),
             style: { cursor: 'pointer' },

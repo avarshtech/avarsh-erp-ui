@@ -67,6 +67,12 @@ const identityColumns = ({ showType, onView, onOpenSr }) => [
     render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v || '—'}</Tag>,
   }] : []),
   {
+    // Never redundant, unlike the type: the tab cannot say which colour, and
+    // issuing against the wrong one puts the wrong fabric on the wrong sample.
+    title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 140,
+    render: (v) => (v ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag> : '—'),
+  },
+  {
     title: 'Style / Garment', key: 'style', width: 220,
     render: (_, r) => (
       <>

@@ -21,7 +21,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  goTo, seedFreeSampleOrder, seedPreview, raiseSr, raiseSrBatch, tryRaiseSrBatch,
+  goTo, selectFor, seedFreeSampleOrder, seedPreview, raiseSr, raiseSrBatch, tryRaiseSrBatch,
   SAMPLE_TYPE,
 } from './helpers.js';
 
@@ -158,26 +158,38 @@ test.describe('Sample Requests · colour scopes', () => {
     await goTo(page, `/sample-requests/new?bomId=${fresh.bomId}&orderNo=${encodeURIComponent(fresh.orderNo)}`);
     await expect(page.getByText('B · Sample Details')).toBeVisible({ timeout: 25000 });
 
-    const typeSelect = page.locator('.ant-select').first();
+    const typeSelect = selectFor(page, 'Sample Type');
     const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)');
 
+    /**
+     * Pick a sample type through the field's own search.
+     *
+     * The list is virtualised, so only the options around the current selection
+     * are in the DOM - reopening it with PP Sample chosen renders 4, 5 and 6 and
+     * nothing else, and clicking blindly for Lab Dip waits for an element that
+     * was never rendered. Typing is what a user does anyway, and
+     * optionFilterProp="name" is there for exactly this.
+     */
+    const pickType = async (name) => {
+      await typeSelect.click();
+      await page.keyboard.type(name);
+      const option = dropdown.locator('.ant-select-item-option').filter({ hasText: name }).first();
+      await option.waitFor({ state: 'visible', timeout: 15000 });
+      await option.click();
+      await page.waitForTimeout(500);
+    };
+
     // Proto divides by nothing: no colour field, and the size run still asked for.
-    await typeSelect.click();
-    await dropdown.locator('.ant-select-item-option', { hasText: 'Proto' }).first().click();
-    await page.waitForTimeout(500);
+    await pickType('Proto');
     await expect(page.locator('label', { hasText: 'Colourways' })).toHaveCount(0);
     await expect(page.locator('label', { hasText: 'Sizes' }).first()).toBeVisible();
 
     // PP Sample divides by colour: the colourway picker appears.
-    await typeSelect.click();
-    await dropdown.locator('.ant-select-item-option', { hasText: 'PP Sample' }).first().click();
-    await page.waitForTimeout(500);
+    await pickType('PP Sample');
     await expect(page.locator('label', { hasText: 'Colourways' }).first()).toBeVisible();
 
     // A lab dip divides by material, and has no size run at all.
-    await typeSelect.click();
-    await dropdown.locator('.ant-select-item-option', { hasText: 'Lab Dip' }).first().click();
-    await page.waitForTimeout(500);
+    await pickType('Lab Dip');
     await expect(page.locator('label', { hasText: 'Materials' }).first()).toBeVisible();
     await expect(page.locator('label', { hasText: 'Sizes' })).toHaveCount(0);
     await expect(page.locator('label', { hasText: 'Swatches' }).first()).toBeVisible();
