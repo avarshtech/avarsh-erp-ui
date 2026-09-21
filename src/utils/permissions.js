@@ -335,17 +335,18 @@ export const SCREENS = [
     path: '/inventory/bill-passing',
     routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id'],
     ops: BILL_PASSING_OPERATIONS },
-  // `post` commits a batch to stock, `finalize` locks the cut-over for good.
-  // Both are checked by the screens (OpeningStockBatchForm:54, Dashboard:83) but
-  // the old if-ladder never returned them, so the buttons they gate were hidden
-  // from every role including Super Admin, whose map is built from the same list.
-  // `delete` goes the other way: it was offered and nothing ever read it.
+  // `post` commits a batch to stock. It is checked by the screens
+  // (OpeningStockBatchForm:54) but the old if-ladder never returned it, so the
+  // button it gates was hidden from every role including Super Admin, whose map
+  // is built from this same list. `delete` goes the other way: it was offered
+  // and nothing ever read it. `finalize` sealed the feature after go-live and
+  // is gone — the screen no longer locks, on either side.
   { id: 'opening-stock', name: 'Opening Stock Balance', section: 'inventory', kind: 'screen',
     path: '/inventory/opening-stock',
     routes: ['/inventory/opening-stock', '/inventory/opening-stock/fabric/new', '/inventory/opening-stock/fabric/:id',
              '/inventory/opening-stock/accessories/new', '/inventory/opening-stock/accessories/:id'],
-    ops: ['view', 'add', 'update', 'post', 'finalize'],
-    description: 'Post commits a batch to stock; Finalize locks the cut-over.' },
+    ops: ['view', 'add', 'update', 'post'],
+    description: 'Post commits a batch to stock.' },
 
   // ── Costing ──
   { id: 'costing', name: 'Costing', section: 'costing', kind: 'screen',

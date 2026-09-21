@@ -1,10 +1,12 @@
 /**
- * Opening stock (scenario I6) — batches, CSV, guards, post and finalize.
+ * Opening stock (scenario I6) — batches, CSV, guards and post.
  *
- * Order matters (serial): finalize is a one-way system state, so it is the LAST test —
- * after it no further batches can be authored in this H2 session. The suite runs on a
- * fresh boot in the full-estate gate, so nothing downstream depends on the pre-finalize
- * state.
+ * The suite is serial because the tests share seeded roll numbers and a batch's
+ * status moves under them. It used to end with a finalize test, which was the
+ * real reason for the ordering: finalize was a one-way system state that barred
+ * every later write in the session. That lock is gone — the screen stays open
+ * indefinitely — so the last test now asserts the opposite, that authoring
+ * still works once batches have been posted.
  */
 
 import { test, expect } from '@playwright/test';
@@ -138,22 +140,26 @@ test.describe('Opening stock', () => {
     expect(String(after.status)).toMatch(/CANCEL/i);
   });
 
-  test('finalize refuses while a draft exists, succeeds once drafts are cleared', async () => {
-    // Leave one draft behind deliberately.
-    const draft = await api.post('/opening-stock/batches', batchPayload([
+  test('the feature stays open after stock has been posted', async () => {
+    // The regression this guards: opening stock was once sealed by a finalize
+    // call once anything had been posted, which is exactly the state reached by
+    // the time this test runs. Authoring must still work.
+    const { data: before } = await api.get('/opening-stock/status');
+    expect(before.postedCount, 'earlier tests should have posted a batch').toBeGreaterThan(0);
+
+    const created = await api.post('/opening-stock/batches', batchPayload([
       fabricLine({ rollNumber: `OS-ROLL-C-${Date.now()}` }),
     ]));
-    expect(draft.status).toBeLessThan(300);
+    expect(created.status, `authoring after a post must still be allowed: ${JSON.stringify(created.data).slice(0, 300)}`)
+      .toBeLessThan(300);
 
-    const refused = await api.post('/opening-stock/finalize', {});
-    expect(refused.status, 'finalize with drafts outstanding must be refused').toBeGreaterThanOrEqual(400);
+    const posted = await api.post(`/opening-stock/batches/${created.data.id}/post`, {});
+    expect(posted.status, `posting after a post must still be allowed: ${JSON.stringify(posted.data).slice(0, 300)}`)
+      .toBeLessThan(300);
 
-    await api.post(`/opening-stock/batches/${draft.data.id}/cancel`, {});
-
-    const ok = await api.post('/opening-stock/finalize', {});
-    expect(ok.status, `finalize failed: ${JSON.stringify(ok.data).slice(0, 300)}`).toBeLessThan(300);
-
-    const { data: status } = await api.get('/opening-stock/status');
-    expect(JSON.stringify(status)).toMatch(/final/i);
+    // No lock is reported any more — the status is batch counts and nothing else.
+    const { data: after } = await api.get('/opening-stock/status');
+    expect(after.postedCount).toBeGreaterThan(before.postedCount);
+    expect(JSON.stringify(after)).not.toMatch(/final/i);
   });
 });

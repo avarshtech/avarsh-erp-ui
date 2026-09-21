@@ -1,16 +1,15 @@
 /**
  * Opening Stock Balance API client.
  *
- * One-time go-live migration feature — admin captures pre-existing inventory
- * before normal GRN flow begins. Endpoints mirror OpeningStockController on
- * the erp-purchase backend. Once the system is finalized, create/post/update
- * endpoints return 409; this module surfaces that via the status response.
+ * Captures inventory that predates the ERP. Endpoints mirror
+ * OpeningStockController on the erp-purchase backend. The feature is available
+ * indefinitely — it was once a one-time migration sealed by a `finalize` call,
+ * and that lock is gone from both ends.
  *
  * Mock mode: governed by USE_MOCK_OPENING_STOCK_DATA defined locally in this
  * file so opening-stock can be toggled independently of the main inventory
  * mock flag. Mock state lives in openingStockMockData and mutates in-session
- * to simulate real API behaviour (create → list, post → lock, finalize →
- * reject writes, etc.).
+ * to simulate real API behaviour (create → list, post → committed to stock).
  */
 import axiosInstance from '../core/axiosInstance';
 import {
@@ -21,7 +20,6 @@ import {
   mockUpdateBatch,
   mockPostBatch,
   mockCancelBatch,
-  mockFinalize,
   mockDownloadCsvTemplate,
   mockParseCsv,
 } from './openingStockMockData';
@@ -101,15 +99,6 @@ export const cancelBatch = async (id) => {
     return mockCancelBatch(id);
   }
   const { data } = await axiosInstance.post(`${BASE}/batches/${id}/cancel`);
-  return data;
-};
-
-export const finalizeOpeningStock = async () => {
-  if (USE_MOCK_OPENING_STOCK_DATA) {
-    await delay();
-    return mockFinalize();
-  }
-  const { data } = await axiosInstance.post(`${BASE}/finalize`);
   return data;
 };
 

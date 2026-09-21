@@ -4,7 +4,7 @@
  * erp-purchase backend.
  *
  * State lives at module scope so in-session mutations persist across calls
- * (create/update/post/cancel/finalize) and the UI behaves the way it would
+ * (create/update/post/cancel) and the UI behaves the way it would
  * against a live API. Reload the page to reset.
  */
 
@@ -125,10 +125,6 @@ let batches = [
 let nextId = 100;
 let fabricSeq = 2;   // last-used fabric serial (OSB-FAB-0002)
 let accSeq = 2;      // last-used accessories serial (OSB-ACC-0002)
-let finalized = false;
-let finalizedAt = null;
-let finalizedBy = null;
-let finalizedByName = null;
 
 // ─── Accessors ────────────────────────────────────────────────────────────────
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -138,14 +134,9 @@ export const mockGetStatus = () => {
   const posted = batches.filter((b) => b.status === 'POSTED').length;
   const cancelled = batches.filter((b) => b.status === 'CANCELLED').length;
   return {
-    finalized,
-    finalizedAt,
-    finalizedBy,
-    finalizedByName,
     draftCount: drafts,
     postedCount: posted,
     cancelledCount: cancelled,
-    canFinalize: !finalized && drafts === 0 && posted > 0,
   };
 };
 
@@ -197,16 +188,7 @@ const nextBatchNumber = (type) => {
   return `OSB-ACC-${String(accSeq).padStart(4, '0')}`;
 };
 
-const guardUnlocked = () => {
-  if (finalized) {
-    const err = new Error('Opening Stock has been finalized. No further batches can be created or posted.');
-    err.response = { data: { message: err.message }, status: 409 };
-    throw err;
-  }
-};
-
 export const mockCreateBatch = (payload) => {
-  guardUnlocked();
   const id = ++nextId;
   const now = new Date().toISOString().replace('Z', '');
   const lines = payload.batchType === 'FABRIC'
@@ -230,7 +212,6 @@ export const mockCreateBatch = (payload) => {
 };
 
 export const mockUpdateBatch = (id, payload) => {
-  guardUnlocked();
   const idx = batches.findIndex((x) => String(x.id) === String(id));
   if (idx < 0) throw new Error(`Batch ${id} not found`);
   const existing = batches[idx];
@@ -255,7 +236,6 @@ export const mockUpdateBatch = (id, payload) => {
 };
 
 export const mockPostBatch = (id) => {
-  guardUnlocked();
   const idx = batches.findIndex((x) => String(x.id) === String(id));
   if (idx < 0) throw new Error(`Batch ${id} not found`);
   const existing = batches[idx];
@@ -294,31 +274,6 @@ export const mockCancelBatch = (id) => {
   const cancelled = { ...existing, status: 'CANCELLED' };
   batches[idx] = cancelled;
   return clone(cancelled);
-};
-
-export const mockFinalize = () => {
-  if (finalized) {
-    const err = new Error('Opening Stock is already finalized.');
-    err.response = { data: { message: err.message }, status: 409 };
-    throw err;
-  }
-  const drafts = batches.filter((b) => b.status === 'DRAFT').length;
-  const posted = batches.filter((b) => b.status === 'POSTED').length;
-  if (drafts > 0) {
-    const err = new Error(`Cleanup required: ${drafts} draft batch(es) must be posted or cancelled before finalizing.`);
-    err.response = { data: { message: err.message }, status: 423 };
-    throw err;
-  }
-  if (posted === 0) {
-    const err = new Error('At least one posted batch is required before finalizing opening stock.');
-    err.response = { data: { message: err.message }, status: 400 };
-    throw err;
-  }
-  finalized = true;
-  finalizedAt = new Date().toISOString().replace('Z', '');
-  finalizedBy = 1;
-  finalizedByName = 'Current User';
-  return mockGetStatus();
 };
 
 // ─── CSV helpers (mock) ───────────────────────────────────────────────────────

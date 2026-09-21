@@ -15,7 +15,8 @@ const StockRegisterPage = () => {
 
   // Fetch opening-stock status once to decide whether to show the first-day
   // banner. No-op failure: if the endpoint isn't reachable, just hide the
-  // banner — the page is still usable.
+  // banner — the page is still usable. Only the batch counts are read; the
+  // feature no longer has a finalized state.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -29,9 +30,10 @@ const StockRegisterPage = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Nothing captured yet and the user could capture it: worth the nudge. Once
+  // any batch exists the point has been made, so the banner retires itself.
   const showBanner = Boolean(
     openingStatus
-    && !openingStatus.finalized
     && (openingStatus.draftCount + openingStatus.postedCount) === 0
     && hasPermission('opening-stock', 'add')
   );
@@ -51,7 +53,7 @@ const StockRegisterPage = () => {
           icon={<InboxOutlined />}
           style={{ marginBottom: 16 }}
           title="Is this Day 1 of your ERP?"
-          description="Capture your existing stock balance as a one-time migration. After finalizing, all stock movements go through GRN or Stock Adjustment."
+          description="Capture the stock you already hold as an opening balance. Everything that arrives afterwards comes in through GRN."
           action={
             <Button
               type="primary"
