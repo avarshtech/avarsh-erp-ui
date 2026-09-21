@@ -8,6 +8,8 @@ import { getActiveOrganisation, saveOrganisation } from '../../services/admin/or
 
 const MODULE_ID = 'company-profile';
 const { TextArea } = Input;
+// Save stays reachable while scrolling the four sections (form-screen pattern)
+const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 
 const Section = ({ title, extra, children }) => (
   <Card size="small" title={title} extra={extra} style={{ marginBottom: 16 }}>
@@ -73,7 +75,11 @@ const CompanyProfile = () => {
 
   return (
     <div>
-      <PageHeader title="Company Profile" subtitle="The exporter record every invoice and export document prints from">
+      <PageHeader
+        title="Company Profile"
+        subtitle="The exporter record every invoice and export document prints from"
+        style={STICKY_HEADER}
+      >
         {canEdit && (
           <ActionButton action="save" text="Save Profile" loading={saving} onClick={() => form.submit()} />
         )}

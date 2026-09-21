@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import {
   App, Form, Segmented, Select, Input, InputNumber, DatePicker, Upload, Button, Alert, Row, Col, Space,
 } from 'antd';
@@ -13,10 +13,55 @@ const MAX_DOC_BYTES = 5 * 1024 * 1024;
 const locationLabel = (l) => (l.city ? `${l.label} — ${l.city}` : l.label);
 
 /**
+ * Saved documents plus the picker, as ONE element so the surrounding Form.Item
+ * has a single child to bind to. The injected value/onChange are deliberately
+ * ignored: the documents live in DispatchForm's state, and what the field
+ * carries is only how many there are — enough for the mandatory-document rule
+ * to decide, and DispatchFields keeps it in step.
+ */
+const DispatchDocuments = ({ documents, fileList, onDownload, beforeUpload, onRemovePending }) => (
+  <>
+    {(documents || []).length > 0 && (
+      <Space orientation="vertical" size={2} style={{ display: 'flex', marginBottom: 8 }}>
+        {documents.map((doc) => (
+          <Space key={doc.fileId || doc.id} size={4}>
+            <PaperClipOutlined style={{ color: 'var(--text-secondary)' }} />
+            <span>{doc.originalFilename}</span>
+            <Button
+              size="small"
+              type="link"
+              icon={<DownloadOutlined />}
+              onClick={() => onDownload(doc)}
+            >
+              Download
+            </Button>
+          </Space>
+        ))}
+      </Space>
+    )}
+    <Upload
+      multiple
+      accept=".pdf,image/*"
+      beforeUpload={beforeUpload}
+      onRemove={onRemovePending}
+      fileList={fileList}
+    >
+      <Button icon={<UploadOutlined />}>Add document</Button>
+    </Upload>
+  </>
+);
+
+/**
  * Dispatch capture fields (PRD §8.4) — presentational section rendered inside
  * DispatchForm's <Form>. Delivery Method drives the mandatory set: Courier →
- * Tracking No mandatory; Local/Hand → Buying Office + Handed Over To mandatory,
- * tracking optional (docket only). A courier flagged isLocal flips the method.
+ * Tracking No mandatory; Local/Hand → Buying Office + Handed Over To + at least
+ * one Dispatch Document mandatory, tracking optional (docket only). A courier
+ * flagged isLocal flips the method.
+ *
+ * A hand delivery has no AWB to prove it happened, so the signed challan is the
+ * only evidence — hence the document rule. It bites on Mark as Dispatched,
+ * which is the irreversible step and the point at which the challan exists;
+ * Save Draft stays permissive so a shipment can be parked mid-entry.
  *
  * The Buying Office is one of the consignee's own shipping locations: the form
  * sends the location id and the server snapshots its label onto the dispatch,
@@ -77,6 +122,21 @@ const DispatchFields = ({
     () => (locations || []).map((l) => ({ value: l.id, label: locationLabel(l) })),
     [locations],
   );
+
+  // What the mandatory-document rule reads. Saved and still-pending documents
+  // count the same: a file staged for upload is one the user has provided.
+  const docCount = (documents || []).length + pendingFiles.length;
+
+  // Keep the field in step with the documents so the rule sees the current
+  // count, and drop a complaint the moment it stops being true. Validation is
+  // never raised here — only cleared — so nothing goes red before the user has
+  // tried to dispatch.
+  useEffect(() => {
+    form.setFieldValue('documentsPresent', docCount);
+    if (form.getFieldError('documentsPresent').length) {
+      form.validateFields(['documentsPresent']).catch(() => {});
+    }
+  }, [form, docCount, isLocal]);
 
   return (
     <>
@@ -177,34 +237,26 @@ const DispatchFields = ({
       <Form.Item name="remarks" label="Dispatch Remarks">
         <TextArea rows={1} />
       </Form.Item>
-      <Form.Item label="Dispatch Documents" extra="Packing list, AWB copy, or signed delivery challan · PDF or image · max 5 MB per file">
-        {(documents || []).length > 0 && (
-          <Space orientation="vertical" size={2} style={{ display: 'flex', marginBottom: 8 }}>
-            {documents.map((doc) => (
-              <Space key={doc.fileId || doc.id} size={4}>
-                <PaperClipOutlined style={{ color: 'var(--text-secondary)' }} />
-                <span>{doc.originalFilename}</span>
-                <Button
-                  size="small"
-                  type="link"
-                  icon={<DownloadOutlined />}
-                  onClick={() => handleDownload(doc)}
-                >
-                  Download
-                </Button>
-              </Space>
-            ))}
-          </Space>
-        )}
-        <Upload
-          multiple
-          accept=".pdf,image/*"
-          beforeUpload={beforeUpload}
-          onRemove={handleRemovePending}
+      <Form.Item
+        name="documentsPresent"
+        label="Dispatch Documents"
+        required={isLocal}
+        extra={isLocal
+          ? 'Signed delivery challan — mandatory for a hand delivery · PDF or image · max 5 MB per file'
+          : 'Packing list, AWB copy, or signed delivery challan · PDF or image · max 5 MB per file'}
+        rules={[{
+          validator: () => (!isLocal || docCount > 0
+            ? Promise.resolve()
+            : Promise.reject(new Error('Upload the signed delivery challan — a document is mandatory for local / hand delivery'))),
+        }]}
+      >
+        <DispatchDocuments
+          documents={documents}
           fileList={fileList}
-        >
-          <Button icon={<UploadOutlined />}>Add document</Button>
-        </Upload>
+          onDownload={handleDownload}
+          beforeUpload={beforeUpload}
+          onRemovePending={handleRemovePending}
+        />
       </Form.Item>
     </>
   );

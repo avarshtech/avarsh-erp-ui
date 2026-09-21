@@ -10,6 +10,8 @@ import {
   getDispatch,
 } from '../../../services/sr/srService';
 import { getOrderByOrderNo } from '../../../services/orders/orderService';
+import { getBuyers } from '../../../services/master/buyerService';
+import { soleLocationAddress, findBuyerByName } from './consigneeAddress';
 import {
   SAMPLE_INVOICE_STATUS, DISPATCH_MODE_LABELS,
   INVOICE_TYPES, INVOICE_TYPE_LABELS, INVOICE_TYPE_SERIES,
@@ -78,6 +80,9 @@ const SampleInvoiceForm = () => {
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(id ? 1 : 0);
   const [eligible, setEligible] = useState([]);
+  // Buyer master — the consignee picker and its delivery addresses. GET /buyers
+  // already returns only active buyers, each with its shipping locations.
+  const [buyers, setBuyers] = useState([]);
   const [dispatchNo, setDispatchNo] = useState(null);
   const [inv, setInv] = useState(null);
   // 'draft' | 'issue' | null — each header button spins only for its own action
@@ -106,10 +111,30 @@ const SampleInvoiceForm = () => {
     return rows;
   }, [dispatchId]);
 
-  // Consignee / destination / refs / terms / currency derived from an SR row
-  const prefillFromRow = useCallback(async (row) => {
+  /**
+   * The buyer master, loaded once. A failure is not fatal: the consignee falls
+   * back to whatever the SR named and the address stays free text, which is
+   * what the screen did before the picker existed.
+   */
+  const loadBuyers = useCallback(async () => {
+    try {
+      const rows = await getBuyers();
+      setBuyers(rows || []);
+      return rows || [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Consignee / destination / refs / terms / currency derived from an SR row.
+  // `buyerList` is passed rather than read from state because the first prefill
+  // happens inside the init effect, before a setState could have landed.
+  const prefillFromRow = useCallback(async (row, buyerList) => {
     const prefill = {
       consigneeName: row.buyerName,
+      // A buyer with one shipping location has an unambiguous delivery address,
+      // so render it now; several locations wait for a pick on the header step.
+      consigneeAddress: soleLocationAddress(findBuyerByName(buyerList, row.buyerName)),
       destinationCountry: row.buyerCountry || '',
       finalDestination: row.buyerCountry || '',
       buyerOrderNoDate: row.orderNo || '',
@@ -128,6 +153,9 @@ const SampleInvoiceForm = () => {
   useEffect(() => {
     (async () => {
       try {
+        // Needed by both branches: the edit branch to show the saved consignee
+        // as a selection, the create branch to prefill its address.
+        const buyerList = await loadBuyers();
         if (id) {
           const loaded = await getInvoice(id);
           setInv(loaded);
@@ -147,7 +175,7 @@ const SampleInvoiceForm = () => {
             if (picks.length) {
               const [lines, prefill] = await Promise.all([
                 Promise.all(picks.map((row) => addSrLine(row))),
-                prefillFromRow(picks[0]),
+                prefillFromRow(picks[0], buyerList),
               ]);
               Object.assign(base, prefill, { srIds: picks.map((r) => r.id), lines });
             }
@@ -205,8 +233,14 @@ const SampleInvoiceForm = () => {
       };
       // First selection prefills consignee / destination / refs / terms / currency
       if (inv.srIds.length === 0) {
-        const prefill = await prefillFromRow(row);
-        patchObj.consigneeName = inv.consigneeName || prefill.consigneeName;
+        const prefill = await prefillFromRow(row, buyers);
+        // Name and address move together or not at all. Filling them
+        // independently can pair a consignee already chosen here with the
+        // address of the SR's buyer — one party's name over another's address.
+        if (!inv.consigneeName) {
+          patchObj.consigneeName = prefill.consigneeName;
+          patchObj.consigneeAddress = prefill.consigneeAddress;
+        }
         patchObj.destinationCountry = inv.destinationCountry || prefill.destinationCountry;
         patchObj.finalDestination = inv.finalDestination || prefill.finalDestination;
         patchObj.buyerOrderNoDate = inv.buyerOrderNoDate || prefill.buyerOrderNoDate;
@@ -215,7 +249,7 @@ const SampleInvoiceForm = () => {
       }
       patch(patchObj);
     } finally { setSelecting(false); }
-  }, [eligible, inv, patch, addSrLine, prefillFromRow]);
+  }, [eligible, inv, patch, addSrLine, prefillFromRow, buyers]);
 
   // ── Type switch (draft only) ──
   // The two types share almost nothing: different eligible SRs, series,
@@ -449,7 +483,7 @@ const SampleInvoiceForm = () => {
             <InvoiceStepStyles eligible={eligible} selectedIds={inv.srIds} onToggle={toggleSr} locked={locked} />
           </Spin>
         )}
-        {step === 1 && <InvoiceStepHeader inv={inv} patch={patch} profile={profile} locked={locked} />}
+        {step === 1 && <InvoiceStepHeader inv={inv} patch={patch} profile={profile} locked={locked} buyers={buyers} />}
         {step === 2 && <InvoiceStepLines inv={inv} patch={patch} locked={locked} onAddFromSr={() => setStep(0)} />}
         {step === 3 && <InvoiceStepDeclaration inv={inv} patch={patch} profile={profile} totals={totals} locked={locked} />}
 

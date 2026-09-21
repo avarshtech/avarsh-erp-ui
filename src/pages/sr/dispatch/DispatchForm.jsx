@@ -172,6 +172,16 @@ const DispatchForm = () => {
         setDispatching(true);
         try {
           const saved = await persistDraft();
+          // The form checked that a hand delivery HAS a document; this checks
+          // that it actually landed. uploadPending only warns on failure, and
+          // dispatching is irreversible — closing the record with no proof of
+          // delivery is the one outcome the rule exists to prevent. The draft
+          // is saved either way, so retrying costs nothing.
+          if (form.getFieldValue('deliveryMethod') === DELIVERY_METHODS.LOCAL_HAND
+              && !(saved.documents || []).length) {
+            message.error('No dispatch document was stored — upload the signed delivery challan and try again.');
+            return;
+          }
           const done = await markDispatched(saved.id, saved.version);
           message.success(`${done.dispatchNo} dispatched — ${done.srCount} SR(s) moved to Dispatched`);
           navigate(LIST_PATH);

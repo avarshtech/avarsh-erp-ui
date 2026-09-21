@@ -379,7 +379,7 @@ const MainLayoutInner = () => {
       ],
     },
     {
-      // Sits directly after Purchase Orders by user preference (menu order set 2026-09-04)
+      // Sits directly after Purchase Orders by user preference (menu order set 2026-09-18)
       key: "/sample-requests",
       icon: <ExperimentOutlined />,
       label: "Sample Requests",
@@ -388,9 +388,9 @@ const MainLayoutInner = () => {
       moduleId: ["sample-requests", "sample-dispatches", "sample-comments", "sample-invoices"],
       children: [
         { key: "/sample-requests/list", label: "SR List", moduleId: "sample-requests" },
-        { key: "/sample-requests/dispatches/list", label: "Dispatches", moduleId: "sample-dispatches" },
         { key: "/sample-requests/comments", label: "Customer Comments", moduleId: "sample-comments" },
         { key: "/sample-requests/invoices/list", label: "Invoices", moduleId: "sample-invoices" },
+        { key: "/sample-requests/dispatches/list", label: "Dispatches", moduleId: "sample-dispatches" },
       ],
     },
     {
