@@ -23,7 +23,7 @@ const { TextArea } = Input;
  *
  * Every editor works on an ordered list, so all of them share one row-mover.
  *
- * `listEditor` is a plain factory, not a hook — it holds no state, and naming it
+ * `listEditor` is a plain unit, not a hook — it holds no state, and naming it
  * `use…` would both mislead and trip the rules-of-hooks check where a face maps
  * over its lines.
  */

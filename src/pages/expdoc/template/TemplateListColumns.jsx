@@ -7,7 +7,7 @@ import { TEMPLATE_STATUS, TEMPLATE_STATUS_LABELS, DOC_TYPE_LABELS } from '../../
 
 const { Text } = Typography;
 
-/** Column factory for the buyer-template register. */
+/** Column unit for the buyer-template register. */
 export const buildTemplateColumns = ({ onOpen, onClone, onDelete, canUpdate, canDelete }) => [
   {
     title: 'Template',

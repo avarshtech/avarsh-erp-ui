@@ -17,6 +17,8 @@ import {
   OPENING_STOCK_STATUS_LABEL,
 } from '../../../utils/openingStockConstants';
 import { hasPermission } from '../../../utils/permissions';
+import { useBranch } from '../../../context/BranchContext';
+import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const { Text } = Typography;
 
@@ -35,6 +37,9 @@ const { Text } = Typography;
 const OpeningStockDashboard = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
+  // Batches belong to a branch's store; the list follows the header switcher (X-Branch-Id)
+  const { activeBranchId } = useBranch();
+  const branchColumn = useBranchColumn();
 
   const [status, setStatus] = useState(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -71,7 +76,7 @@ const OpeningStockDashboard = () => {
     } finally {
       setLoadingBatches(false);
     }
-  }, [activeType, page, size, message]);
+  }, [activeType, page, size, message, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps -- refetch when the working branch (X-Branch-Id) changes
 
   useEffect(() => { refreshStatus(); }, [refreshStatus]);
   useEffect(() => { refreshBatches(); }, [refreshBatches]);
@@ -84,6 +89,7 @@ const OpeningStockDashboard = () => {
     { title: 'Batch #', dataIndex: 'batchNumber', width: 140, render: (v) => <Text strong>{v}</Text> },
     { title: 'Type', dataIndex: 'batchType', width: 120,
       render: (v) => <Tag color={v === 'FABRIC' ? 'blue' : 'purple'}>{v}</Tag> },
+    ...branchColumn,
     { title: 'Status', dataIndex: 'status', width: 110,
       render: (v) => <Tag color={OPENING_STOCK_STATUS_COLOR[v]}>{OPENING_STOCK_STATUS_LABEL[v]}</Tag> },
     { title: 'Ref Date', dataIndex: 'referenceDate', width: 120,

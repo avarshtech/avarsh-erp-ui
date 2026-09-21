@@ -2,6 +2,8 @@ import { useCallback, useMemo } from 'react';
 import { Row, Col, Input, DatePicker, Select, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { activeLocations, formatLocationAddress, findBuyerByName } from './consigneeAddress';
+import { useBranch } from '../../../context/BranchContext';
+import { withExportingBranch } from './useCompanyProfile';
 
 const { Text } = Typography;
 const { TextArea } = Input;
@@ -36,6 +38,10 @@ const Field = ({ label, required, children, hint }) => (
  * honest answer. Both invoice types render this same step.
  */
 const InvoiceStepHeader = ({ inv, patch, profile, locked, buyers }) => {
+  // Multi-branch only: which branch exports (its address + GSTIN print as the exporter)
+  const { isMultiBranch, allowedBranches } = useBranch();
+  const exporterBlock = withExportingBranch(profile, inv).exporterBlock;
+
   const consigneeBuyer = useMemo(
     () => findBuyerByName(buyers, inv.consigneeName),
     [buyers, inv.consigneeName],
@@ -90,8 +96,24 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked, buyers }) => {
   return (
     <Row gutter={24}>
       <Col xs={24} md={12}>
+        {/* Multi-branch only: which branch exports — its address and GSTIN
+            print as the exporter in place of the company profile's. */}
+        {isMultiBranch && (
+          <Field label="Exporting Branch" hint="Its address and GSTIN print as the exporter; blank = company profile">
+            <Select
+              aria-label="Exporting Branch"
+              value={inv.branchId ?? undefined}
+              disabled={locked}
+              allowClear
+              placeholder="Company profile"
+              style={{ width: '100%' }}
+              options={allowedBranches.map((b) => ({ value: b.id, label: b.branchName }))}
+              onChange={(v) => patch({ branchId: v ?? null })}
+            />
+          </Field>
+        )}
         <Field label="Exporter (Company Master — read-only)">
-          <TextArea value={profile.exporterBlock} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+          <TextArea value={exporterBlock} disabled autoSize style={{ backgroundColor: 'var(--bg-tertiary)' }} />
         </Field>
         <Field
           label="Consignee"

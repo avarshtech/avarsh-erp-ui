@@ -27,6 +27,8 @@ import POLineItemPicker from './POLineItemPicker';
 import AccessoriesGRNItemTable from './AccessoriesGRNItemTable';
 import AccessoriesGRNCartonTable from './AccessoriesGRNCartonTable';
 import AccessoriesGRNSummaryPanel from './AccessoriesGRNSummaryPanel';
+import BranchField from '../../../components/branch/BranchField';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -43,6 +45,7 @@ const AccessoriesGRNForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const [form] = Form.useForm();
+  const { isMultiBranch } = useBranch();
   const isEdit = Boolean(id);
 
   const [savingDraft, setSavingDraft] = useState(false);
@@ -102,6 +105,7 @@ const AccessoriesGRNForm = () => {
 
         form.setFieldsValue({
           poId: grn.poId,
+          branchId: grn.branchId,
           challanNo: grn.challanNo,
           invoiceDate: grn.invoiceDate ? dayjs(grn.invoiceDate) : null,
           deliveryChallanDate: grn.deliveryChallanDate ? dayjs(grn.deliveryChallanDate) : null,
@@ -134,11 +138,13 @@ const AccessoriesGRNForm = () => {
     const po = purchaseOrders.find((p) => p.id === poId);
     const enriched = po ? await enrichPOWithReceipts(po, grnRecord?.id) : null;
     setSelectedPO(enriched);
+    // A new GRN receives where its PO is delivered (the field stays editable)
+    if (!grnRecord?.id && po?.deliveryBranchId != null) form.setFieldsValue({ branchId: po.deliveryBranchId });
     setSelectedLineItemIds([]);
     setItems([]);
     setCartons([]);
     setIsDirty(true);
-  }, [purchaseOrders, grnRecord?.id]);
+  }, [purchaseOrders, grnRecord?.id, form]);
 
   // Merge items + cartons when selection changes — preserving user-entered Receiving Qty,
   // Carton #, and Quantity for line items that remain selected.
@@ -251,6 +257,8 @@ const AccessoriesGRNForm = () => {
       vehicleNumber: values.vehicleNumber,
       transporter: values.transporter,
       remarks: values.remarks,
+      // Received into a branch; a missing value leaves an existing GRN where it is
+      branchId: values.branchId ?? grnRecord?.branchId ?? null,
       lineItems: selectedLineItemIds,
       items,
       cartons,
@@ -392,6 +400,10 @@ const AccessoriesGRNForm = () => {
                 </Row>
               )}
               <Row gutter={16}>
+                {/* Which branch's store receives the goods; hidden for a single-branch company */}
+                {isMultiBranch ? (
+                  <Col xs={24} md={12}><BranchField label="Received At (Branch)" disabled={readOnly} /></Col>
+                ) : <BranchField />}
                 <Col xs={24} md={12}>
                   <Form.Item name="poId" label="Purchase Order" rules={[{ required: true, message: 'Select a PO' }]}>
                     <Select placeholder="Select PO" options={poOptions} onChange={handlePOChange} showSearch optionFilterProp="label" disabled={readOnly} />

@@ -6,20 +6,23 @@ import {
   getAttendanceByDate, bulkMarkAttendance,
   getAttendanceLock, lockAttendanceMonth, unlockAttendanceMonth,
 } from '../../../services/hr/attendanceService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import { ATTENDANCE_STATUS } from '../../../utils/hrConstants';
-import { factoryOptions } from '../../../utils/hrLabels';
+import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 
 const statusOptions = ATTENDANCE_STATUS.map((s) => ({ value: s.value, label: s.label }));
 
 const AttendanceBulkEntry = () => {
   const { message, modal } = App.useApp();
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [factories, setFactories] = useState([]);
-  const [factoryId, setFactoryId] = useState(undefined);
+  const [units, setUnits] = useState([]);
+  const [unitId, setUnitId] = useState(undefined);
   const [selectedDate, setSelectedDate] = useState(dayjs());
   const [data, setData] = useState([]);
   const [lock, setLock] = useState(null);
@@ -30,14 +33,14 @@ const AttendanceBulkEntry = () => {
   const canLock = hasPermission('hr-attendance', 'lock');
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
-  }, []);
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
+  }, [activeBranchId]);
 
   const fetchData = useCallback(async () => {
-    if (!selectedDate || !factoryId) return;
+    if (!selectedDate || !unitId) return;
     setLoading(true);
     try {
-      const result = await getAttendanceByDate(selectedDate.format('YYYY-MM-DD'), factoryId);
+      const result = await getAttendanceByDate(selectedDate.format('YYYY-MM-DD'), unitId);
       // The endpoint returns a plain list. This read result.records, which does
       // not exist, so the grid was empty on every load.
       const records = Array.isArray(result) ? result : result?.records || [];
@@ -48,22 +51,22 @@ const AttendanceBulkEntry = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, factoryId]);
+  }, [selectedDate, unitId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const fetchLock = useCallback(async () => {
-    if (!selectedDate || !factoryId) { setLock(null); return; }
+    if (!selectedDate || !unitId) { setLock(null); return; }
     try {
-      setLock(await getAttendanceLock(factoryId, selectedDate.month() + 1, selectedDate.year()));
+      setLock(await getAttendanceLock(unitId, selectedDate.month() + 1, selectedDate.year()));
     } catch {
       // A missing lock state must not block the grid; treat it as unlocked and
       // let the server refuse the write if it disagrees.
       setLock(null);
     }
-  }, [factoryId, selectedDate]);
+  }, [unitId, selectedDate]);
 
   useEffect(() => { fetchLock(); }, [fetchLock]);
 
@@ -79,7 +82,7 @@ const AttendanceBulkEntry = () => {
       onOk: async () => {
         try {
           const fn = locked ? unlockAttendanceMonth : lockAttendanceMonth;
-          await fn({ factoryId, month: selectedDate.month() + 1, year: selectedDate.year() });
+          await fn({ unitId, month: selectedDate.month() + 1, year: selectedDate.year() });
           message.success(locked ? `${period} reopened` : `${period} locked`);
           fetchLock();
           fetchData();
@@ -89,7 +92,7 @@ const AttendanceBulkEntry = () => {
         }
       },
     });
-  }, [locked, factoryId, selectedDate, modal, message, fetchLock, fetchData]);
+  }, [locked, unitId, selectedDate, modal, message, fetchLock, fetchData]);
 
   const handleFieldChange = useCallback((index, field, value) => {
     setData((prev) => {
@@ -100,15 +103,15 @@ const AttendanceBulkEntry = () => {
   }, []);
 
   const handleSaveAll = useCallback(async () => {
-    if (!selectedDate || !factoryId) {
-      message.warning('Please select a date and factory');
+    if (!selectedDate || !unitId) {
+      message.warning('Please select a date and unit');
       return;
     }
     setSaving(true);
     try {
       const payload = {
         date: selectedDate.format('YYYY-MM-DD'),
-        factoryId,
+        unitId,
         records: data.map((r) => ({
           employeeId: r.employeeId,
           status: r.status,
@@ -126,7 +129,7 @@ const AttendanceBulkEntry = () => {
     } finally {
       setSaving(false);
     }
-  }, [selectedDate, factoryId, data, message, fetchData]);
+  }, [selectedDate, unitId, data, message, fetchData]);
 
   const columns = useMemo(() => [
     {
@@ -227,7 +230,7 @@ const AttendanceBulkEntry = () => {
         title="Bulk Attendance Entry"
         extra={
           <Space>
-            {canLock && factoryId && (
+            {canLock && unitId && (
               <Button
                 icon={locked ? <UnlockOutlined /> : <LockOutlined />}
                 onClick={toggleLock}
@@ -261,17 +264,17 @@ const AttendanceBulkEntry = () => {
         </Col>
         <Col xs={24} sm={8} md={6}>
           <Select
-            placeholder="Select Factory"
+            placeholder="Select Unit"
             allowClear
             style={{ width: '100%' }}
-            value={factoryId}
-            onChange={setFactoryId}
-            options={factoryOptions(factories)}
+            value={unitId}
+            onChange={setUnitId}
+            options={unitOptions(units)}
           />
         </Col>
       </Row>
 
-      {factoryId && locked && (
+      {unitId && locked && (
         <Alert
           type="warning"
           showIcon
@@ -284,7 +287,7 @@ const AttendanceBulkEntry = () => {
           }
         />
       )}
-      {factoryId && !locked && (
+      {unitId && !locked && (
         <Alert
           type="info"
           showIcon

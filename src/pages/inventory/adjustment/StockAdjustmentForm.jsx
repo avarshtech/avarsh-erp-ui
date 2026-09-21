@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { App, Card, Empty, Row, Col, Skeleton, Tag, Typography, Space } from 'antd';
+import { App, Card, Empty, Row, Col, Skeleton, Tag, Typography, Space, Select } from 'antd';
+import { useBranch } from '../../../context/BranchContext';
 import { CalendarOutlined, UserOutlined, AppstoreOutlined, TagsOutlined, ProfileOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
@@ -52,6 +53,14 @@ const StockAdjustmentForm = () => {
   const [isDirty, setIsDirty] = useState(false);
   const { clearDirty } = useUnsavedChanges(isDirty);
 
+  // A count is of one store. Starts at the working branch; a single-branch
+  // company never sees the picker and the server lands it in the head office.
+  const { isMultiBranch, allowedBranches, effectiveBranchId } = useBranch();
+  const [branchId, setBranchId] = useState(null);
+  useEffect(() => {
+    if (branchId == null && effectiveBranchId != null) setBranchId(effectiveBranchId);
+  }, [effectiveBranchId, branchId]);
+
   useEffect(() => {
     setMetaLoading(true);
     getAdjustmentMetaData()
@@ -86,7 +95,7 @@ const StockAdjustmentForm = () => {
     }
     setItemsLoading(true);
     try {
-      const rows = await getAdjustableVariants(next);
+      const rows = await getAdjustableVariants({ ...next, branchId });
       setItems(rows);
       setIsDirty(true);
     } catch {
@@ -94,7 +103,7 @@ const StockAdjustmentForm = () => {
     } finally {
       setItemsLoading(false);
     }
-  }, [message]);
+  }, [message, branchId]);
 
   const handleItemChange = useCallback((index, patch) => {
     setItems((prev) => {
@@ -133,6 +142,7 @@ const StockAdjustmentForm = () => {
       itemTypeId: filter.itemTypeId,
       itemTypeName: type?.name,
       adjustedBy,
+      branchId,
       items: enriched,
       totalVarianceQty,
       uom,
@@ -149,7 +159,7 @@ const StockAdjustmentForm = () => {
     } finally {
       setSaving(false);
     }
-  }, [items, filter, metaData, clearDirty, message, navigate]);
+  }, [items, filter, metaData, branchId, clearDirty, message, navigate]);
 
   const headerTitle = useMemo(() => {
     if (!isEdit) return 'New Stock Adjustment';
@@ -215,6 +225,17 @@ const StockAdjustmentForm = () => {
         <>
           {infoCard}
 
+          {!isEdit && isMultiBranch && (
+            <Card size="small" title="Store being counted" style={{ marginBottom: 24 }}>
+              <Select
+                aria-label="Branch"
+                value={branchId}
+                options={allowedBranches.map((b) => ({ value: b.id, label: b.branchName }))}
+                onChange={(v) => { setBranchId(v); setItems([]); setFilter({}); }}
+                style={{ width: 280 }}
+              />
+            </Card>
+          )}
           {!isEdit && (
             <AdjustmentFilterCard
               metaData={metaData}

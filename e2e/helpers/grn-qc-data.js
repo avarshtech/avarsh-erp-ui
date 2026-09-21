@@ -1,7 +1,7 @@
 /**
  * GRN & QC Test Data Helpers
  *
- * Provides payload factories and PO lookup helpers for GRN/QC E2E tests.
+ * Provides payload units and PO lookup helpers for GRN/QC E2E tests.
  * Each test file has dedicated seeded POs (V116__seed_grn_qc_masters.sql):
  *
  *   E2E-FG-1/2  — fabric-grn-api tests (single + 3-line, 5000 qty each)

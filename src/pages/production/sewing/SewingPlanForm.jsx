@@ -32,7 +32,7 @@ const SewingPlanForm = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { lines, linesByFactory } = useSewingMasters();
+  const { lines, linesByUnit } = useSewingMasters();
   const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
 
   useEffect(() => {
@@ -64,17 +64,17 @@ const SewingPlanForm = () => {
 
   // The unit is read through the chosen line, so the two selects cannot disagree.
   const unitId = useMemo(
-    () => lines.find((l) => l.id === plan?.lineId)?.factoryId ?? null,
+    () => lines.find((l) => l.id === plan?.lineId)?.unitId ?? null,
     [lines, plan?.lineId],
   );
   const unitOptions = useMemo(() => {
     const seen = new Map();
-    lines.forEach((l) => seen.set(l.factoryId, l.factoryName));
+    lines.forEach((l) => seen.set(l.unitId, l.unitName));
     return [...seen].map(([value, label]) => ({ value, label }));
   }, [lines]);
   const lineOptions = useMemo(
-    () => linesByFactory(unitId).map((l) => ({ value: l.id, label: l.name })),
-    [linesByFactory, unitId],
+    () => linesByUnit(unitId).map((l) => ({ value: l.id, label: l.name })),
+    [linesByUnit, unitId],
   );
 
   const totalSam = useMemo(() => totalSamOf(plan?.operations), [plan?.operations]);
@@ -151,7 +151,7 @@ const SewingPlanForm = () => {
             <FieldLabel>Unit</FieldLabel>
             <FormSelect value={unitId} style={{ width: 200 }} placeholder="Unit"
               options={unitOptions}
-              onChange={(v) => patch({ lineId: linesByFactory(v)[0]?.id ?? null })} />
+              onChange={(v) => patch({ lineId: linesByUnit(v)[0]?.id ?? null })} />
           </div>
           <div>
             <FieldLabel>Sewing Line (of unit)</FieldLabel>

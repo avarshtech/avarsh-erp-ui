@@ -32,6 +32,8 @@ export const OP_LABELS = {
   reprint: 'Reprint',
   publish: 'Publish',
   lock: 'Lock',
+  dispatch: 'Dispatch',
+  receive: 'Receive',
 };
 
 export const OP_COLORS = {
@@ -51,6 +53,8 @@ export const OP_COLORS = {
   reprint: '#7c3aed',
   publish: '#059669',
   lock: '#475569',
+  dispatch: '#2563eb',
+  receive: '#0d9488',
 };
 
 /** A screen may rename an operation for itself, e.g. delete → "Cancel GRN". */

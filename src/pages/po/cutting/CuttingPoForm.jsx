@@ -20,6 +20,8 @@ import {
 import {
   getCuttingPo, createCuttingPo, updateCuttingPo, changeCuttingPoStatus, getCuttingPoCoverage,
 } from '../../../services/po/production/cuttingPoService';
+import { getOrderAllocations } from '../../../services/orders/orderAllocationService';
+import { useBranch } from '../../../context/BranchContext';
 
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
@@ -33,11 +35,14 @@ const CuttingPoForm = () => {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
-  const { message, modal } = App.useApp();
+  const { message, modal, notification } = App.useApp();
   const [form] = Form.useForm();
 
+  const { isMultiBranch, effectiveBranchId } = useBranch();
   const [orders, setOrders] = useState([]);
   const [order, setOrder] = useState(null);
+  // The order's branch split; a cutting PO is raised against one row of it
+  const [allocations, setAllocations] = useState([]);
   const [items, setItems] = useState([]);
   const [consumption, setConsumption] = useState([]);
   const [stock, setStock] = useState([]);
@@ -53,12 +58,16 @@ const CuttingPoForm = () => {
   useEffect(() => { getConfirmedOrders().then(setOrders); }, []);
 
   const hydrateFromOrder = useCallback(async (orderId, cadPerPc) => {
-    const [o, pp] = await Promise.all([getOrderForPo(orderId), getPpApprovalStatus(orderId)]);
+    const [o, pp, alloc] = await Promise.all([
+      getOrderForPo(orderId), getPpApprovalStatus(orderId),
+      getOrderAllocations(orderId).catch(() => null),
+    ]);
     const cons = await getConsumptionComparison(o, cadPerPc);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
-    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc })));
+    setAllocations(alloc?.rows || []);
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, branchId: form.getFieldValue('branchId') })));
     return o;
-  }, []);
+  }, [form]);
 
   // Edit: load existing PO
   useEffect(() => {
@@ -74,6 +83,7 @@ const CuttingPoForm = () => {
       form.setFieldsValue({
         orderId: po.orderId, plannedCutDate: po.plannedCutDate ? dayjs(po.plannedCutDate) : null,
         plannedDeliveryDate: po.plannedDeliveryDate ? dayjs(po.plannedDeliveryDate) : null,
+        orderAllocationId: po.orderAllocationId, branchId: po.branchId,
         processingUnitType: po.processingUnitType, processingUnitId: po.processingUnitId, processingUnitName: po.processingUnitName,
         markerFileUrl: po.markerFileUrl, markerEfficiency: po.markerEfficiency, remarks: po.remarks,
       });
@@ -84,7 +94,15 @@ const CuttingPoForm = () => {
     const o = await hydrateFromOrder(orderId);
     setItems((o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
     setAllowanceWarn(null);
+    // A fresh pick of the order clears the allocation; a single-branch company
+    // has no picker, so its branch is the only one there is.
+    form.setFieldsValue({ orderAllocationId: undefined, branchId: isMultiBranch ? undefined : effectiveBranchId, processingUnitId: undefined, processingUnitName: '' });
     getCuttingPoCoverage(orderId).then(setCoverage);
+  };
+
+  const handleAllocationSelect = (allocationId) => {
+    const row = allocations.find((a) => a.id === allocationId);
+    form.setFieldsValue({ branchId: row?.branchId, processingUnitId: undefined, processingUnitName: '' });
   };
 
   // Allowance % is editable on the PO (decision ②) — default comes from the
@@ -118,7 +136,7 @@ const CuttingPoForm = () => {
 
   const refreshStock = (rows) => {
     setConsumption(rows);
-    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty') }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: rows[0]?.cadPerPc, plannedQty: sum(items, 'plannedQty'), branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
   };
 
   // Editing Planned Qty re-derives the BOM-based requirement (per-garment from BOM × planned qty)
@@ -127,7 +145,7 @@ const CuttingPoForm = () => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
-    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total }).then((s) => setStock(normFabricStock(s)));
+    if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
   };
 
   const applyBulkRate = () => {
@@ -139,6 +157,7 @@ const CuttingPoForm = () => {
     orderId: order.id, orderNo: order.orderNo, styleId: order.styleId, styleNo: order.styleNo,
     buyer: order.buyer, bomId: order.bomId, bomNo: order.bomNo,
     processingUnitType: values.processingUnitType, processingUnitId: values.processingUnitId, processingUnitName: values.processingUnitName,
+    orderAllocationId: values.orderAllocationId ?? null, branchId: values.branchId ?? null,
     plannedCutDate: values.plannedCutDate?.format('YYYY-MM-DD'), plannedDeliveryDate: values.plannedDeliveryDate?.format('YYYY-MM-DD'),
     totalOrderQty: sum(items, 'orderQty'), allowancePercent: order.allowancePercent, totalPlannedQty: sum(items, 'plannedQty'),
     bomConsumptionPerPc: consumption[0]?.bomPerPc, cadConsumptionPerPc: consumption[0]?.cadPerPc,
@@ -160,6 +179,10 @@ const CuttingPoForm = () => {
       const saved = isEdit ? await updateCuttingPo(id, payload) : await createCuttingPo(payload);
       if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
       message.success(`${saved.cuttingPoNo} ${submit ? 'submitted' : 'saved'}`);
+      if (saved.warnings?.length) {
+        // The buyer has an approved-unit list and this unit is not on it: warn, never block
+        notification.warning({ title: 'Buyer approval', description: saved.warnings.join(' '), duration: 10 });
+      }
       navigate('/purchase-orders/cutting-po/list');
     } catch (e) {
       message.error(e.message || 'Save failed');
@@ -208,6 +231,18 @@ const CuttingPoForm = () => {
             title={`Order allowance changed from ${allowanceWarn.stored}% to ${allowanceWarn.live}% since this PO was raised — review planned quantities.`} />
         )}
         <FormSection title="Processing Unit">
+          {/* Which branch's share of the order this PO cuts; the unit list below follows it */}
+          {isMultiBranch && (
+            <Col xs={24} md={12}>
+              <Form.Item name="orderAllocationId" label="Branch Allocation" rules={[{ required: true, message: 'Select the branch allocation this PO is raised against' }]}>
+                <FormSelect placeholder={order ? 'Select branch allocation' : 'Select an order first'} disabled={!order} onChange={handleAllocationSelect}
+                  options={allocations.map((a) => ({ value: a.id, label: `${a.branchName}${a.unitName ? ` / ${a.unitName}` : ''} · ${(a.qty || 0).toLocaleString()} pcs` }))} />
+              </Form.Item>
+            </Col>
+          )}
+          <Form.Item name="branchId" hidden><Input /></Form.Item>
+          {/* Always registered: an edit must send the allocation back, or the link would be lost */}
+          {!isMultiBranch && <Form.Item name="orderAllocationId" hidden><Input /></Form.Item>}
           <Col span={24}><ProcessingUnitSelector poType={PO_TYPE.CUTTING} /></Col>
         </FormSection>
         <FormSection title="Other" columns={1}>

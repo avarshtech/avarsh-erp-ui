@@ -75,7 +75,7 @@ const FabricIssueForm = () => {
           remarks: record.remarks,
         });
         if (line) {
-          const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode);
+          const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode, po.branchId);
           if (cancelled) return;
           setAvailableRolls(rolls);
           const preselected = rolls
@@ -107,13 +107,13 @@ const FabricIssueForm = () => {
   const loadRollsForLine = useCallback(async (line) => {
     try {
       // Server-side filtered: In_Stock rolls of this fabric item with remaining
-      // qty; order-earmarked rolls first, free stock after.
-      const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode);
+      // qty at the cutting PO's branch; order-earmarked rolls first, free stock after.
+      const rolls = await getIssuableRolls(line.orderNumber, line.fabricCode, selectedPO?.branchId);
       setAvailableRolls(rolls);
     } catch {
       message.error('Failed to load available rolls');
     }
-  }, [message]);
+  }, [message, selectedPO?.branchId]);
 
   const resetRollState = useCallback(() => {
     setSelectedRollIds([]);

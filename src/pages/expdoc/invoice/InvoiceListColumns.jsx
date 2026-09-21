@@ -12,7 +12,7 @@ const money = (v, dp = 2) => (v === null || v === undefined
   ? '—'
   : Number(v).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp }));
 
-/** Column factory for the export-invoice register. */
+/** Column unit for the export-invoice register. */
 export const buildInvoiceColumns = ({ onView, onDelete, canDelete }) => [
   {
     title: 'Invoice No',

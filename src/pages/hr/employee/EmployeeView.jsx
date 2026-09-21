@@ -172,7 +172,7 @@ const EmployeeView = () => {
           <Descriptions.Item label="Emergency Contact">{employee.emergencyContactName ? `${employee.emergencyContactName} (${employee.emergencyContactPhone || ''})` : '-'}</Descriptions.Item>
           <Descriptions.Item label="Department">{employee.departmentName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Designation">{employee.designationName || '-'}</Descriptions.Item>
-          <Descriptions.Item label="Factory">{employee.factoryName || '-'}</Descriptions.Item>
+          <Descriptions.Item label="Unit">{employee.unitName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Category">{getLabel(EMPLOYEE_CATEGORY, employee.category)}</Descriptions.Item>
           <Descriptions.Item label="Employee Type">{getLabel(EMPLOYEE_TYPE, employee.employeeType)}</Descriptions.Item>
           <Descriptions.Item label="Grade">{employee.grade ? employee.grade.replace('_', '+') : '-'}</Descriptions.Item>

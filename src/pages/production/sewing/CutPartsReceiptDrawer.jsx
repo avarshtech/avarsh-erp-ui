@@ -12,7 +12,7 @@ import { saveCutReceipt, listPendingBundleIssues } from '../../../services/produ
  */
 const CutPartsReceiptDrawer = ({ open, onClose, onSaved }) => {
   const { message } = App.useApp();
-  const { lines: allLines, linesByFactory, options, threshold } = useSewingMasters();
+  const { lines: allLines, linesByUnit, options, threshold } = useSewingMasters();
   const [issues, setIssues] = useState([]);
   const [issueId, setIssueId] = useState(null);
   const [lineId, setLineId] = useState(null);
@@ -33,15 +33,15 @@ const CutPartsReceiptDrawer = ({ open, onClose, onSaved }) => {
   const issue = useMemo(() => issues.find((i) => i.id === issueId), [issues, issueId]);
 
   // The unit is read through the chosen line, so the two selects cannot disagree.
-  const unitId = useMemo(() => allLines.find((l) => l.id === lineId)?.factoryId ?? null, [allLines, lineId]);
+  const unitId = useMemo(() => allLines.find((l) => l.id === lineId)?.unitId ?? null, [allLines, lineId]);
   const unitOptions = useMemo(() => {
     const seen = new Map();
-    allLines.forEach((l) => seen.set(l.factoryId, l.factoryName));
+    allLines.forEach((l) => seen.set(l.unitId, l.unitName));
     return [...seen].map(([value, label]) => ({ value, label }));
   }, [allLines]);
   const lineOptions = useMemo(
-    () => linesByFactory(unitId).map((l) => ({ value: l.id, label: l.name })),
-    [linesByFactory, unitId],
+    () => linesByUnit(unitId).map((l) => ({ value: l.id, label: l.name })),
+    [linesByUnit, unitId],
   );
 
   /** Selecting an issue loads its bundles, pre-filled with what cutting sent. */
@@ -131,7 +131,7 @@ const CutPartsReceiptDrawer = ({ open, onClose, onSaved }) => {
           options={issues.map((i) => ({ value: i.id, label: `${i.issueNo} · ${i.totalPcs} pcs · ${i.orderNo || 'no order'}` }))}
           onChange={handleIssueSelect} />
         <FormSelect value={unitId} style={{ width: 200 }} placeholder="Unit"
-          options={unitOptions} onChange={(v) => setLineId(linesByFactory(v)[0]?.id ?? null)} />
+          options={unitOptions} onChange={(v) => setLineId(linesByUnit(v)[0]?.id ?? null)} />
         <FormSelect value={lineId} style={{ width: 140 }} placeholder="Line"
           options={lineOptions} onChange={setLineId} />
         <Input style={{ width: 180 }} placeholder="Received by" value={receivedBy}

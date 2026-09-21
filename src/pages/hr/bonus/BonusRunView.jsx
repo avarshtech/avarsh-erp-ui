@@ -56,7 +56,7 @@ const BonusRunView = () => {
   const handleCancel = useCallback(() => {
     modal.confirm({
       title: 'Cancel this bonus run?',
-      content: 'The run and its records are abandoned, and the factory and year become free to '
+      content: 'The run and its records are abandoned, and the unit and year become free to '
         + 'calculate again. Nothing has been paid, so nothing needs reversing.',
       okText: 'Cancel Run',
       okButtonProps: { danger: true },
@@ -151,7 +151,7 @@ const BonusRunView = () => {
               <Button type="primary" loading={advancing} onClick={handleApprove}>Approve</Button>
             )}
             {/* A run at the wrong rate or for the wrong year used to be permanent,
-                and it blocked every retry for that factory and year. */}
+                and it blocked every retry for that unit and year. */}
             {run?.status === 'CALCULATED' && canCancel && (
               <Button danger loading={advancing} onClick={handleCancel}>Cancel Run</Button>
             )}
@@ -193,7 +193,7 @@ const BonusRunView = () => {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={12} sm={6}>
-          <Card size="small"><Statistic title="Factory" value={run?.factoryName || '-'} /></Card>
+          <Card size="small"><Statistic title="Unit" value={run?.unitName || '-'} /></Card>
         </Col>
         <Col xs={12} sm={6}>
           <Card size="small">

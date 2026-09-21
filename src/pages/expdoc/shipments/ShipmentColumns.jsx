@@ -7,7 +7,7 @@ const { Text } = Typography;
 const nowrap = (text) => <Text style={{ whiteSpace: 'nowrap' }}>{text || '—'}</Text>;
 
 /**
- * Column factory for the shipment register.
+ * Column unit for the shipment register.
  *
  * Shipments are an entity this module invents — nothing upstream carries ports,
  * vessel, container or ETD — so the register doubles as the place those values are

@@ -666,9 +666,9 @@ const buildPOHtml = (po, org, termsContent, supplier, variantImages = {}) => {
       <div class="info-card">
         <div class="info-card-header">Ship To</div>
         <div class="info-card-body">
-          <div class="name">${companyName}</div>
-          <div class="detail">${[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || '-'}</div>
-          <div class="detail">${[org?.city, org?.state].filter(Boolean).join(', ')}${org?.pincode ? ' - ' + org.pincode : ''}</div>
+          <div class="name">${po.deliveryBranchName ? companyName + " — " + po.deliveryBranchName : companyName}</div>
+          <div class="detail">${po.deliveryBranchAddress || [org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ') || '-'}</div>
+          <div class="detail">${po.deliveryBranchAddress ? (po.deliveryBranchGstin ? 'GSTIN: ' + po.deliveryBranchGstin : '') : [org?.city, org?.state].filter(Boolean).join(', ') + (org?.pincode ? ' - ' + org.pincode : '')}</div>
           ${org?.phone ? `<div class="detail">Phone: ${org.phone}</div>` : ''}
           ${org?.email ? `<div class="detail">Email: ${org.email}</div>` : ''}
         </div>

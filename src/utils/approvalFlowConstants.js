@@ -115,6 +115,7 @@ export const CONDITION_FIELDS = {
   PURCHASE_ORDER: [
     { value: 'grandTotal', label: 'Grand Total', type: 'number' },
     { value: 'poType', label: 'PO Type', type: 'select', options: ['General', 'Regular', 'Combined'] },
+    { value: 'branchId', label: 'Deliver-to Branch', type: 'branch' },
   ],
   COST_SHEET: [
     { value: 'totalPrice', label: 'Total Price', type: 'number' },
@@ -124,7 +125,9 @@ export const CONDITION_FIELDS = {
     { value: 'requestType', label: 'Request Type', type: 'select', options: ['REFER_BACK', 'CANCEL'] },
   ],
   GRN: [],
-  GRN_REVERSAL: [],
+  GRN_REVERSAL: [
+    { value: 'branchId', label: 'Branch', type: 'branch' },
+  ],
   BILL_PASSING: [
     { value: 'netPayable', label: 'Net Payable', type: 'number' },
     { value: 'debitPercent', label: 'Debit % of Invoice', type: 'number' },
@@ -154,12 +157,15 @@ export const CONDITION_FIELDS = {
   CUTTING_PO: [
     { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
     { value: 'processingUnitType', label: 'Processing By', type: 'select', options: ['UNIT', 'VENDOR'] },
+    { value: 'branchId', label: 'Branch', type: 'branch' },
   ],
   WORK_ORDER: [
     { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
     { value: 'processingUnitType', label: 'Processing By', type: 'select', options: ['UNIT', 'VENDOR'] },
+    { value: 'branchId', label: 'Branch', type: 'branch' },
   ],
   FINISHING_PO: [
     { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
+    { value: 'branchId', label: 'Branch', type: 'branch' },
   ],
 };

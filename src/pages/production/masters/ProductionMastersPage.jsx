@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, Tabs } from 'antd';
 import {
   DeploymentUnitOutlined, ToolOutlined, ScissorOutlined, BugOutlined,
-  UnorderedListOutlined, DollarOutlined, ColumnHeightOutlined,
+  UnorderedListOutlined, DollarOutlined, ColumnHeightOutlined, TableOutlined,
 } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
 import ProductionLineMaster from './ProductionLineMaster';
@@ -12,9 +12,11 @@ import SewingDefectTypeMaster from './SewingDefectTypeMaster';
 import SewingLookupMaster from './SewingLookupMaster';
 import IncentiveSlabMaster from './IncentiveSlabMaster';
 import MeasurementChartMaster from './MeasurementChartMaster';
+import CuttingTableMaster from './CuttingTableMaster';
 
 const TABS = [
   { key: 'lines', label: 'Production Lines', icon: <DeploymentUnitOutlined />, Component: ProductionLineMaster },
+  { key: 'tables', label: 'Cutting Tables', icon: <TableOutlined />, Component: CuttingTableMaster },
   { key: 'machines', label: 'Machine Types', icon: <ToolOutlined />, Component: MachineTypeMaster },
   { key: 'operations', label: 'Operations', icon: <ScissorOutlined />, Component: SewingOperationMaster },
   { key: 'defects', label: 'Defect Types', icon: <BugOutlined />, Component: SewingDefectTypeMaster },
@@ -46,10 +48,13 @@ const ProductionMastersPage = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Production Masters"
-        subtitle="The lists the production floor screens read from — lines, machines, operations, defects, thresholds and incentive slabs"
+        subtitle="The lists the production floor screens read from — lines, cutting tables, machines, operations, defects, thresholds and incentive slabs"
       />
       <Card styles={{ body: { paddingTop: 8 } }}>
-        <Tabs items={items} activeKey={activeKey} onChange={setActiveKey} size="small" />
+        {/* Eight masters overflow a 1280px screen at the default 32px gutter,
+            which hides the last tab behind the "more" chevron. Tightening the
+            gutter fits them all again. */}
+        <Tabs items={items} activeKey={activeKey} onChange={setActiveKey} size="small" tabBarGutter={14} />
         {ActiveMaster && <ActiveMaster />}
       </Card>
     </div>

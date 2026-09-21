@@ -30,8 +30,9 @@ export const getIssueWorkOrders = async () => {
 };
 
 /** Flat In_Stock rolls of one fabric item (weight = remaining available qty). */
-export const getIssuableRolls = async (orderRef, itemCode) => {
-  const { data } = await axiosInstance.get(`${BASE}/issuable-rolls`, { params: { orderRef, itemCode } });
+export const getIssuableRolls = async (orderRef, itemCode, branchId) => {
+  // Only the cutting PO's branch: a roll held elsewhere must be transferred first, not issued across
+  const { data } = await axiosInstance.get(`${BASE}/issuable-rolls`, { params: { orderRef, itemCode, branchId: branchId || undefined } });
   return data || [];
 };
 

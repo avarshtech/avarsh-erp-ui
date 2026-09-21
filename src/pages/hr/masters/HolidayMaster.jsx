@@ -4,7 +4,8 @@ import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select, DateP
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getHolidaysByYear, createHoliday, updateHoliday, deleteHoliday } from '../../../services/master/hrMasterService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { HOLIDAY_TYPES } from '../../../utils/hrConstants';
@@ -16,6 +17,8 @@ const MODULE_ID = 'hr-masters';
 const HolidayMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
 
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -27,7 +30,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const [factories, setFactories] = useState([]);
+  const [units, setUnits] = useState([]);
   const [filterYear, setFilterYear] = useState(dayjs().year());
 
   const canAdd = hasPermission(MODULE_ID, 'add');
@@ -35,15 +38,15 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
 
-  const factoryOptions = useMemo(() =>
-    factories.map(f => ({ value: f.id, label: `${f.factoryCode} - ${f.factoryName}` })),
-  [factories]);
+  const unitOptions = useMemo(() =>
+    units.map(f => ({ value: f.id, label: `${f.unitCode} - ${f.unitName}` })),
+  [units]);
 
-  const factoryMap = useMemo(() => {
+  const unitMap = useMemo(() => {
     const map = {};
-    factories.forEach(f => { map[f.id] = f.factoryName; });
+    units.forEach(f => { map[f.id] = f.unitName; });
     return map;
-  }, [factories]);
+  }, [units]);
 
   const holidayTypeMap = useMemo(() => {
     const map = {};
@@ -74,18 +77,18 @@ const HolidayMaster = ({ onDirtyChange }) => {
     }
   }, [filterYear]);
 
-  const fetchFactories = useCallback(async () => {
+  const fetchUnits = useCallback(async () => {
     try {
-      const result = await getActiveFactories();
+      const result = await getActiveUnits(activeBranchId || undefined);
       const list = Array.isArray(result) ? result : (result?.data || []);
-      setFactories(list);
+      setUnits(list);
     } catch {
       // Silent
     }
-  }, []);
+  }, [activeBranchId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { fetchFactories(); }, [fetchFactories]);
+  useEffect(() => { fetchUnits(); }, [fetchUnits]);
 
   const columns = [
     {
@@ -110,10 +113,10 @@ const HolidayMaster = ({ onDirtyChange }) => {
       },
     },
     {
-      title: 'Factory',
-      dataIndex: 'factoryId',
+      title: 'Unit',
+      dataIndex: 'unitId',
       width: 120,
-      render: (val) => factoryMap[val] || 'All',
+      render: (val) => unitMap[val] || 'All',
     },
     {
       title: 'Paid',
@@ -323,17 +326,17 @@ const HolidayMaster = ({ onDirtyChange }) => {
                   <Form.Item name="holidayType" label="Holiday Type" rules={[{ required: true, message: 'Please select a type' }]}>
                     <Select placeholder="Select type" options={HOLIDAY_TYPES} allowClear />
                   </Form.Item>
-                  {/* factory_id is NOT NULL and the holiday lookup is scoped by
-                      factory, so a holiday cannot yet apply to all of them.
+                  {/* unit_id is NOT NULL and the holiday lookup is scoped by
+                      unit, so a holiday cannot yet apply to all of them.
                       Offering that as a blank option only produced a constraint
                       error on save. */}
                   <Form.Item
-                    name="factoryId"
-                    label="Factory"
-                    tooltip="A holiday belongs to one factory. Add it once per factory if it applies to more than one."
-                    rules={[{ required: true, message: 'Select the factory this holiday applies to' }]}
+                    name="unitId"
+                    label="Unit"
+                    tooltip="A holiday belongs to one unit. Add it once per unit if it applies to more than one."
+                    rules={[{ required: true, message: 'Select the unit this holiday applies to' }]}
                   >
-                    <Select placeholder="Select factory" options={factoryOptions} showSearch optionFilterProp="label" />
+                    <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" />
                   </Form.Item>
                   <Form.Item name="isPaid" label="Paid Holiday" valuePropName="checked">
                     <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />

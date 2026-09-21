@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { App, Row, Col, Card, Table, Typography, Tag, Collapse, Skeleton, Alert } from 'antd';
 import ViewDialog from '../../../components/ViewDialog';
 import StatusTag from '../../../components/StatusTag';
+import { BranchTag } from '../../../components/branch/BranchField';
 import ActivityTimeline from '../../../components/ActivityTimeline';
 import { ActionButton } from '../../../components/buttons';
 import { SAMPLE_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
@@ -88,6 +89,7 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
         status: (
           <>
             <Tag color={isSample ? 'gold' : 'geekblue'}>{INVOICE_TYPE_LABELS[inv.invoiceType] || inv.invoiceType}</Tag>
+            <BranchTag branchId={inv.branchId} />
             <StatusTag status={inv.status} config={SAMPLE_INVOICE_STATUS_CONFIG} getLabel={getInvoiceStatusLabel} />
           </>
         ),

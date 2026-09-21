@@ -4,6 +4,7 @@ import { LoadingOutlined } from '@ant-design/icons';
 import { lazy, Suspense, useEffect } from 'react';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { StoreProvider } from './context/StoreContext';
+import { BranchProvider } from './context/BranchContext';
 import { LiveActivityFeedProvider } from './context/LiveActivityFeedContext';
 import MainLayout from './layout/MainLayout';
 import ConflictDialog from './components/ConflictDialog';
@@ -42,6 +43,8 @@ const SampleTrimsIssueForm = lazy(() => import('./pages/inventory/issue/SampleTr
 const StockAdjustmentList = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentList'));
 const StockAdjustmentForm = lazy(() => import('./pages/inventory/adjustment/StockAdjustmentForm'));
 const ReturnToSupplierPage = lazy(() => import('./pages/inventory/return-to-supplier/ReturnToSupplierPage'));
+const StockTransferList = lazy(() => import('./pages/inventory/transfer/StockTransferList'));
+const StockTransferForm = lazy(() => import('./pages/inventory/transfer/StockTransferForm'));
 const BillPassingList = lazy(() => import('./pages/inventory/bill-passing/BillPassingList'));
 const BillPassingForm = lazy(() => import('./pages/inventory/bill-passing/BillPassingForm'));
 // Production PO screens (now grouped under the Purchase Orders module)
@@ -232,7 +235,10 @@ const ThemedApp = () => {
               element={
               <ProtectedRoute>
                 <NotificationPermissionPrompt />
-                <MainLayout />
+                {/* Branch list needs a session, so the provider sits inside the guard */}
+                <BranchProvider>
+                  <MainLayout />
+                </BranchProvider>
               </ProtectedRoute>
             }
           >
@@ -360,6 +366,9 @@ const ThemedApp = () => {
             <Route path="inventory/adjustment/new" element={<PermissionRoute module="inventory-adjustment" operation="add"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/adjustment/:id" element={<PermissionRoute module="inventory-adjustment" operation="view"><Suspense fallback={<PageSkeleton />}><StockAdjustmentForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/return-to-supplier" element={<PermissionRoute module="inventory-return-supplier" operation="view"><Suspense fallback={<PageSkeleton />}><ReturnToSupplierPage /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer" element={<PermissionRoute module="inventory-transfer" operation="view"><Suspense fallback={<PageSkeleton />}><StockTransferList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer/new" element={<PermissionRoute module="inventory-transfer" operation="add"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
+            <Route path="inventory/transfer/:id" element={<PermissionRoute module="inventory-transfer" operation="view"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingList /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
@@ -377,7 +386,7 @@ const ThemedApp = () => {
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows" operation="view"><ApprovalFlowList /></PermissionRoute>} />
             <Route path="admin/company-profile" element={<PermissionRoute module="company-profile" operation="view"><CompanyProfile /></PermissionRoute>} />
             {/* Master Data — one shell screen shared by every master key; opens if any of them grants access */}
-            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'inventory-qc', 'inventory-bill-passing']} operation="view"><MasterDashboard /></PermissionRoute>} />
+            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'branches', 'inventory-qc', 'inventory-bill-passing']} operation="view"><MasterDashboard /></PermissionRoute>} />
             {/* Profile */}
             <Route path="profile" element={<Profile />} />
             {/* HR & Payroll */}

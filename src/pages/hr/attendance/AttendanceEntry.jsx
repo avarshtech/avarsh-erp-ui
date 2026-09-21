@@ -8,10 +8,11 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { markAttendance } from '../../../services/hr/attendanceService';
 import { searchEmployees } from '../../../services/hr/employeeService';
-import { getActiveFactories } from '../../../services/master/factoryService';
+import { getActiveUnits } from '../../../services/master/unitService';
+import { useBranch } from '../../../context/BranchContext';
 import { getActiveLeaveTypes } from '../../../services/master/hrMasterService';
 import { ATTENDANCE_STATUS, HALF_DAY_TYPE } from '../../../utils/hrConstants';
-import { employeeOptions, factoryOptions } from '../../../utils/hrLabels';
+import { employeeOptions, unitOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 
@@ -24,31 +25,33 @@ const AttendanceEntry = () => {
   const [form] = Form.useForm();
   const canAdd = hasPermission('hr-attendance', 'add');
 
-  const [factories, setFactories] = useState([]);
+  // Units of the working branch only; "All branches" lists every unit
+  const { activeBranchId } = useBranch();
+  const [units, setUnits] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [saving, setSaving] = useState(false);
 
-  const factoryId = Form.useWatch('factoryId', form);
+  const unitId = Form.useWatch('unitId', form);
   const status = Form.useWatch('status', form);
 
   useEffect(() => {
-    getActiveFactories().then(setFactories).catch(() => {});
+    getActiveUnits(activeBranchId || undefined).then(setUnits).catch(() => {});
     getActiveLeaveTypes().then(setLeaveTypes).catch(() => {});
-  }, []);
+  }, [activeBranchId]);
 
-  // Employees are scoped to the chosen factory, matching how the rest of the
+  // Employees are scoped to the chosen unit, matching how the rest of the
   // HR screens cascade.
   useEffect(() => {
-    if (!factoryId) {
+    if (!unitId) {
       setEmployees([]);
       return;
     }
-    searchEmployees({ factoryId, status: 'ACTIVE', size: 500 })
+    searchEmployees({ unitId, status: 'ACTIVE', size: 500 })
       .then((res) => setEmployees(res.content || []))
       .catch(() => setEmployees([]));
     form.setFieldsValue({ employeeId: undefined });
-  }, [factoryId, form]);
+  }, [unitId, form]);
 
   const isHalfDay = status === 'HALF_DAY';
   const isLeave = status === 'LEAVE';
@@ -82,7 +85,7 @@ const AttendanceEntry = () => {
       });
 
       message.success('Attendance saved');
-      // Keep factory and date so consecutive entries are quick.
+      // Keep unit and date so consecutive entries are quick.
       form.setFieldsValue({
         employeeId: undefined, status: undefined, halfDaySession: undefined,
         leaveTypeId: undefined, inTime: null, outTime: null, otHours: 0, remarks: undefined,
@@ -110,7 +113,7 @@ const AttendanceEntry = () => {
         showIcon
         style={{ marginBottom: 16 }}
         title="Saving replaces any existing record for that employee and date."
-        description="For a whole factory use Bulk Grid Entry, or Import Attendance for a spreadsheet."
+        description="For a whole unit use Bulk Grid Entry, or Import Attendance for a spreadsheet."
       />
 
       <Card size="small">
@@ -121,10 +124,10 @@ const AttendanceEntry = () => {
         >
           <Row gutter={[16, 0]}>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name="factoryId" label="Factory" rules={[{ required: true, message: 'Factory is required' }]}>
+              <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Unit is required' }]}>
                 <Select
-                  placeholder="Select factory"
-                  options={factoryOptions(factories)}
+                  placeholder="Select unit"
+                  options={unitOptions(units)}
                   showSearch
                   optionFilterProp="label"
                 />
@@ -136,12 +139,12 @@ const AttendanceEntry = () => {
                 name="employeeId"
                 label="Employee"
                 rules={[{ required: true, message: 'Employee is required' }]}
-                extra={!factoryId ? 'Select a factory first' : undefined}
+                extra={!unitId ? 'Select a unit first' : undefined}
               >
                 <Select
                   placeholder="Select employee"
                   options={employeeOptions(employees)}
-                  disabled={!factoryId}
+                  disabled={!unitId}
                   showSearch
                   optionFilterProp="label"
                 />

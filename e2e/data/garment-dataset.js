@@ -412,7 +412,7 @@ export const TERMS_CONDITIONS = [
 ];
 
 export const OVERHEADS = [
-  { name: 'Factory Overhead', type: 'Overheads', defaultCost: 0.35 },
+  { name: 'Unit Overhead', type: 'Overheads', defaultCost: 0.35 },
   { name: 'Administrative Overhead', type: 'Overheads', defaultCost: 0.18 },
   { name: 'Financial Cost', type: 'Overheads', defaultCost: 0.12 },
 ];
@@ -479,7 +479,7 @@ export const COST_SHEETS = [
     ],
     importedTrims: [],
     processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
-    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+    overheads: ['Unit Overhead', 'Administrative Overhead', 'Financial Cost'],
   },
   {
     styleNo: 'HM-PL-2602',
@@ -501,7 +501,7 @@ export const COST_SHEETS = [
       { variant: 'Fusible Interlining 50 GSM White', consumption: 0.05, costUsd: 0.6 },
     ],
     processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
-    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+    overheads: ['Unit Overhead', 'Administrative Overhead', 'Financial Cost'],
   },
   {
     styleNo: 'PRK-DN-2603',
@@ -521,7 +521,7 @@ export const COST_SHEETS = [
       { variant: 'Metal Zipper No5 Antique Brass 16cm', consumption: 1, costUsd: 0.28 },
     ],
     processes: ['Cutting', 'Sewing', 'Finishing', 'Ironing', 'Packing'],
-    overheads: ['Factory Overhead', 'Administrative Overhead', 'Financial Cost'],
+    overheads: ['Unit Overhead', 'Administrative Overhead', 'Financial Cost'],
   },
 ];
 

@@ -32,38 +32,38 @@ export const getAttendanceCalendar = async (employeeId, year, month) => {
 };
 
 /**
- * Get all attendance records for a specific date and optional factory.
- * GET /api/v1/hr/attendance/by-date?date=&factoryId=
+ * Get all attendance records for a specific date and optional unit.
+ * GET /api/v1/hr/attendance/by-date?date=&unitId=
  */
-export const getAttendanceByDate = async (date, factoryId) => {
+export const getAttendanceByDate = async (date, unitId) => {
   const params = { date };
-  if (factoryId) params.factoryId = factoryId;
+  if (unitId) params.unitId = unitId;
   const response = await axiosInstance.get(`${BASE_URL}/by-date`, { params });
   return response.data;
 };
 
 /**
  * Lock attendance for a month (prevent further edits).
- * POST /api/v1/hr/attendance/lock?factoryId=&month=&year=
+ * POST /api/v1/hr/attendance/lock?unitId=&month=&year=
  *
  * The API takes query parameters, not a body. This previously POSTed a JSON
- * body, so the call always failed with "Required request parameter 'factoryId'
+ * body, so the call always failed with "Required request parameter 'unitId'
  * is not present".
  */
-export const lockAttendanceMonth = async ({ factoryId, month, year }) => {
+export const lockAttendanceMonth = async ({ unitId, month, year }) => {
   const response = await axiosInstance.post(`${BASE_URL}/lock`, null, {
-    params: { factoryId, month, year },
+    params: { unitId, month, year },
   });
   return response.data;
 };
 
 /**
  * Unlock attendance for a month (allow edits again).
- * POST /api/v1/hr/attendance/unlock?factoryId=&month=&year=
+ * POST /api/v1/hr/attendance/unlock?unitId=&month=&year=
  */
-export const unlockAttendanceMonth = async ({ factoryId, month, year }) => {
+export const unlockAttendanceMonth = async ({ unitId, month, year }) => {
   const response = await axiosInstance.post(`${BASE_URL}/unlock`, null, {
-    params: { factoryId, month, year },
+    params: { unitId, month, year },
   });
   return response.data;
 };
@@ -82,12 +82,12 @@ export const getAttendanceSummary = async (employeeId, fromDate, toDate) => {
 // ----- spreadsheet import -----
 
 /**
- * Downloads a workbook pre-filled with the factory's active employees.
+ * Downloads a workbook pre-filled with the unit's active employees.
  * GET /api/v1/hr/attendance/import/template
  */
-export const downloadAttendanceTemplate = async ({ factoryId, periodFrom, periodTo }) => {
+export const downloadAttendanceTemplate = async ({ unitId, periodFrom, periodTo }) => {
   const response = await axiosInstance.get(`${BASE_URL}/import/template`, {
-    params: { factoryId, periodFrom, periodTo },
+    params: { unitId, periodFrom, periodTo },
     responseType: 'blob',
   });
   return response.data;
@@ -97,12 +97,12 @@ export const downloadAttendanceTemplate = async ({ factoryId, periodFrom, period
  * Uploads a file for validation. Nothing is written by this call.
  * POST /api/v1/hr/attendance/import/parse
  */
-export const parseAttendanceFile = async ({ file, factoryId, periodFrom, periodTo }) => {
+export const parseAttendanceFile = async ({ file, unitId, periodFrom, periodTo }) => {
   const formData = new FormData();
   formData.append('file', file);
 
   const response = await axiosInstance.post(`${BASE_URL}/import/parse`, formData, {
-    params: { factoryId, periodFrom, periodTo },
+    params: { unitId, periodFrom, periodTo },
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return response.data;
@@ -132,15 +132,15 @@ export const triggerBrowserDownload = (blob, filename) => {
 };
 
 /**
- * Lock state for a factory-month.
- * GET /api/v1/hr/attendance/lock?factoryId=&month=&year=
+ * Lock state for a unit-month.
+ * GET /api/v1/hr/attendance/lock?unitId=&month=&year=
  *
  * Returns an unlocked shape when the period has never been locked, so callers
  * get an answer rather than a 404.
  */
-export const getAttendanceLock = async (factoryId, month, year) => {
+export const getAttendanceLock = async (unitId, month, year) => {
   const response = await axiosInstance.get(`${BASE_URL}/lock`, {
-    params: { factoryId, month, year },
+    params: { unitId, month, year },
   });
   return response.data;
 };

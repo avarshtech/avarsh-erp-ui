@@ -1042,12 +1042,13 @@ const resolveMeta = ({ categoryId, subCategoryId, itemTypeId }) => {
 // Aggregate stock rolls into variant rows for the adjustment count table.
 // For fabric: one row per (itemCode + color + width) with availableRolls[] listing each roll.
 // For accessories: one row per itemCode (no roll concept; rollNumber stays null).
-export const getAdjustableVariants = async ({ categoryId, subCategoryId, itemTypeId }) => {
+export const getAdjustableVariants = async ({ categoryId, subCategoryId, itemTypeId, branchId }) => {
   if (!USE_MOCK_INVENTORY_DATA) {
     const params = {};
     if (categoryId) params.categoryId = categoryId;
     if (subCategoryId) params.subCategoryId = subCategoryId;
     if (itemTypeId) params.itemTypeId = itemTypeId;
+    if (branchId) params.branchId = branchId;
     const response = await axiosInstance.get(`${ADJUSTMENT_ENDPOINT}/adjustable-items`, { params });
     const data = response.data ?? response;
     return Array.isArray(data) ? data : (data.content || []);
