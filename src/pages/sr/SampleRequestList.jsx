@@ -175,7 +175,7 @@ const SampleRequestList = () => {
           dataSource={data}
           loading={loading}
           rowKey="id"
-          scroll={{ x: 1420 }}
+          scroll={{ x: 1560 }}
           onRow={(record) => ({
             // PRD §8.1 — row click opens SR Detail (actions column stops propagation)
             onClick: () => setViewId(record.id),

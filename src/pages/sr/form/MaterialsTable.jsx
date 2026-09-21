@@ -12,7 +12,7 @@ const { Title, Text } = Typography;
  * the (user-defined) sample type; the substitution state drives the lock.
  */
 const MaterialsTable = ({
-  materials, sr, sampleQty, sizes, typeName,
+  materials, sr, sampleQty, sizes, typeName, colourName = null, isMaterialScope = false,
   onColourChange, onMandatoryChange, readOnly = false,
 }) => {
   // The server sends live availability but no status — the requirement it would
@@ -21,12 +21,15 @@ const MaterialsTable = ({
   // they happened to be when the BOM was first loaded.
   const enriched = useMemo(() => (materials || []).map((line) => ({
     ...line,
-    stockStatus: stockStatusFor(line.stockAvailable, computeSampleQtyRequired(line, sampleQty, sizes)),
-  })), [materials, sampleQty, sizes]);
+    stockStatus: stockStatusFor(
+      line.stockAvailable,
+      computeSampleQtyRequired(line, sampleQty, sizes, colourName),
+    ),
+  })), [materials, sampleQty, sizes, colourName]);
 
   const columns = useMemo(() => buildMaterialsColumns({
-    sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange,
-  }), [sr, sampleQty, sizes, readOnly, onColourChange, onMandatoryChange]);
+    sr, sampleQty, sizes, colourName, isMaterialScope, readOnly, onColourChange, onMandatoryChange,
+  }), [sr, sampleQty, sizes, colourName, isMaterialScope, readOnly, onColourChange, onMandatoryChange]);
 
   const fabric = useMemo(() => enriched.filter((l) => l.section === 'FABRIC'), [enriched]);
   const trims = useMemo(() => enriched.filter((l) => l.section !== 'FABRIC'), [enriched]);

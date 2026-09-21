@@ -142,6 +142,8 @@ const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
     ['Substitution', sr.colourSubstitutionAllowed ? <Tag color="green" key="s">Allowed</Tag> : <Tag key="s">Not allowed</Tag>],
     ['Quantity', `${sr.sampleQty ?? '—'} pcs per size`],
     ['Sizes', (sr.sizes || []).join(' · ') || '—'],
+    // Identity first, then the shade note within it — a lab dip carries both.
+    ['Colourway', sr.colourName ? <Tag key="colourway">{sr.colourName}</Tag> : '—'],
     ['Colour / Print Ref', sr.colourReference || '—'],
     ['Priority', SR_PRIORITY_OPTIONS.find((p) => p.value === sr.priority)?.label || sr.priority],
   ] : [];
@@ -181,7 +183,10 @@ const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
               {overseas && <Tag color="purple">overseas</Tag>}
             </>
           ),
-          subtitle: [sr.styleNo, sr.garmentName, sr.buyerName, sr.season].filter(Boolean).join(' • '),
+          // The colourway sits in the subtitle because it is now what separates
+          // two requests that are otherwise the same style for the same buyer.
+          subtitle: [sr.styleNo, sr.garmentName, sr.colourName, sr.buyerName, sr.season]
+            .filter(Boolean).join(' • '),
           highlight: { label: 'Sample Type', value: sr.sampleTypeName },
         } : { title: 'Sample Request' }}
         footer={

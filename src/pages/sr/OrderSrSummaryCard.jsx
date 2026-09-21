@@ -49,6 +49,14 @@ const OrderSrSummaryCard = ({ orderNo }) => {
       render: (v) => <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>,
     },
     {
+      // Without this an order sampled in several colours shows rows that differ
+      // only by SR number, which reads as duplicated data rather than a set.
+      title: 'Colourway', dataIndex: 'colourName', key: 'colourName', width: 140,
+      render: (v) => (v
+        ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{v}</Tag>
+        : <Text type="secondary">—</Text>),
+    },
+    {
       title: 'Status', dataIndex: 'status', key: 'status', width: 175,
       render: (s) => (
         <span style={{ whiteSpace: 'nowrap' }}>
@@ -86,7 +94,7 @@ const OrderSrSummaryCard = ({ orderNo }) => {
         columns={columns}
         dataSource={state.rows}
         pagination={false}
-        scroll={{ x: 750 }}
+        scroll={{ x: 890 }}
       />
     </Card>
   );

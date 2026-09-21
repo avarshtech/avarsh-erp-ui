@@ -5,9 +5,9 @@ import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
-  createSampleRequest, updateSampleRequest, changeStatus,
+  createSampleRequest, createSampleRequestBatch, updateSampleRequest, changeStatus,
 } from '../../services/sr/srService';
-import { SR_STATUS } from '../../utils/sampleRequestConstants';
+import { SR_STATUS, SR_SCOPE, srIsMaterial, srRaisesInBatch } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
 import { toastUnlessHandled } from '../../utils/apiError';
 import useSampleMasters from '../../hooks/useSampleMasters';
@@ -54,7 +54,32 @@ const SampleRequestForm = () => {
   const sampleQty = Form.useWatch('sampleQty', form);
   const watchedSizes = Form.useWatch('sizes', form);
   const sizes = useMemo(() => watchedSizes || [], [watchedSizes]);
+  const colourName = Form.useWatch('colourName', form);
   const typeName = sampleTypes.find((t) => t.id === sampleTypeId)?.name || draft.record?.sampleTypeName || '';
+
+  // How colour divides this type: whether one save becomes several requests,
+  // and whether it is a swatch rather than a garment. An edit is never a batch -
+  // a request that exists is one request.
+  const scope = sampleTypes.find((t) => t.id === sampleTypeId)?.sampleScope
+    || draft.record?.sampleScope || SR_SCOPE.ORDER_NO_COLOUR;
+  const isMaterialScope = srIsMaterial(scope);
+  const batchScope = !savedId && srRaisesInBatch(scope);
+
+  const watchedColours = Form.useWatch('colours', form);
+  /**
+   * The colour the live requirement column is worked out for.
+   *
+   * Exact when the request is for one colourway. With several picked the column
+   * can only show one number, so it shows none of them and falls back to the
+   * conservative largest-across-colours — each request is still saved with its
+   * own colour-exact figure.
+   */
+  const liveColour = useMemo(() => {
+    if (isMaterialScope) return null;
+    if (colourName) return colourName;
+    const picked = watchedColours || [];
+    return picked.length === 1 ? String(picked[0]).trim() : null;
+  }, [isMaterialScope, colourName, watchedColours]);
 
   // Initialise once the draft resolves
   useEffect(() => {
@@ -67,6 +92,7 @@ const SampleRequestForm = () => {
         colourSubstitutionAllowed: Boolean(r.colourSubstitutionAllowed),
         sampleQty: r.sampleQty,
         sizes: r.sizes,
+        colourName: r.colourName,
         colourReference: r.colourReference,
         priority: r.priority || 'NORMAL',
         specialInstructions: r.specialInstructions,
@@ -111,7 +137,7 @@ const SampleRequestForm = () => {
   const totals = useMemo(() => {
     let shortfall = 0;
     materials.forEach((l) => {
-      const required = computeSampleQtyRequired(l, sampleQty, sizes);
+      const required = computeSampleQtyRequired(l, sampleQty, sizes, liveColour);
       if (stockStatusFor(l.stockAvailable, required) !== 'IN_STOCK') shortfall += 1;
     });
     return {
@@ -121,7 +147,7 @@ const SampleRequestForm = () => {
       available: materials.length - shortfall,
       shortfall,
     };
-  }, [materials, sampleQty, sizes]);
+  }, [materials, sampleQty, sizes, liveColour]);
 
   // Only what the server accepts. The header the BOM supplies — order, style,
   // buyer, country, season, order qty — is deliberately absent: the server
@@ -139,6 +165,10 @@ const SampleRequestForm = () => {
       colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
       sampleQty: v.sampleQty ?? null,
       sizes: v.sizes || [],
+      // The colourway this request IS. A per-colour type sends its set through
+      // the batch instead, and a lab dip sends none at all — its colour comes
+      // off the BOM line, server-side, so it cannot be made to disagree.
+      colourName: v.colourName || null,
       colourReference: v.colourReference || '',
       priority: v.priority || 'NORMAL',
       specialInstructions: v.specialInstructions || '',
@@ -154,22 +184,42 @@ const SampleRequestForm = () => {
     };
   };
 
+  /**
+   * Saves, and always answers with a LIST - one entry for a single request, N
+   * for a set. One shape means one branch at the call sites rather than two.
+   *
+   * A batch deliberately does not set savedId: it became N independent
+   * documents and there is no single row for this form to go on editing, so the
+   * caller navigates away instead.
+   */
   const persist = async () => {
     const payload = buildPayload();
-    const saved = savedId
-      ? await updateSampleRequest(savedId, payload)
-      : await createSampleRequest(payload);
+    if (savedId) return [await updateSampleRequest(savedId, payload)];
+
+    const v = form.getFieldsValue();
+    if (batchScope) {
+      const batch = isMaterialScope
+        ? { request: payload, bomLineIds: v.bomLineIds || [] }
+        : { request: payload, colours: (v.colours || []).map((c) => String(c).trim()).filter(Boolean) };
+      const raised = await createSampleRequestBatch(batch);
+      setIsDirty(false);
+      return raised;
+    }
+
+    const saved = await createSampleRequest(payload);
     setSavedId(saved.id);
     setSavedVersion(saved.version ?? null);
     setIsDirty(false);
-    return saved;
+    return [saved];
   };
 
   const handleSaveDraft = async () => {
     setBusy('draft');
     try {
       const saved = await persist();
-      message.success(`${saved.srNo} saved as draft`);
+      message.success(saved.length > 1
+        ? `${saved.length} sample requests saved as draft — ${saved.map((s) => s.srNo).join(', ')}`
+        : `${saved[0].srNo} saved as draft`);
       navigate('/sample-requests/list');
     } catch (e) { toastUnlessHandled(message, e, 'Failed to save'); } finally { setBusy(null); }
   };
@@ -179,8 +229,16 @@ const SampleRequestForm = () => {
     setBusy('submit');
     try {
       const saved = await persist();
-      await changeStatus(saved.id, SR_STATUS.SUBMITTED, saved.version);
-      message.success(`${saved.srNo} submitted`);
+      // Submitting is per request, so a set would need N calls of which any
+      // could fail halfway - exactly the half-done state the all-or-nothing
+      // batch save avoids. A set is saved as drafts and submitted from the list.
+      if (saved.length > 1) {
+        message.success(`${saved.length} sample requests saved as draft — submit each from the list`);
+        navigate('/sample-requests/list');
+        return;
+      }
+      await changeStatus(saved[0].id, SR_STATUS.SUBMITTED, saved[0].version);
+      message.success(`${saved[0].srNo} submitted`);
       navigate('/sample-requests/list');
     } catch (e) { toastUnlessHandled(message, e, 'Failed to submit'); } finally { setBusy(null); }
   };
@@ -311,6 +369,8 @@ const SampleRequestForm = () => {
           sampleTypes={sampleTypes}
           typesLoading={typesLoading}
           orderSizes={draft.orderSizes}
+          orderColours={draft.orderColours}
+          materials={materials}
           existingRequests={draft.existingRequests}
           record={draft.record}
         />
@@ -320,6 +380,8 @@ const SampleRequestForm = () => {
           sr={srForRules}
           sampleQty={sampleQty}
           sizes={sizes}
+          colourName={liveColour}
+          isMaterialScope={isMaterialScope}
           typeName={typeName}
           onColourChange={onColourChange}
           onMandatoryChange={onMandatoryChange}

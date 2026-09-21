@@ -23,13 +23,22 @@ const lockedCell = (value) => (
  * a mandatory trim (per-line override, OQ2). Stock status is indicative only.
  */
 export const buildMaterialsColumns = ({
-  sr, sampleQty, sizes, readOnly = false,
+  sr, sampleQty, sizes, colourName = null, isMaterialScope = false, readOnly = false,
   onColourChange, onMandatoryChange,
 }) => [
   { title: 'Line', dataIndex: 'lineNo', key: 'lineNo', width: 52, align: 'center' },
   { title: 'Fabric Type', dataIndex: 'fabricType', key: 'fabricType', width: 110, render: lockedCell },
   { title: 'Classification', dataIndex: 'classification', key: 'classification', width: 130, render: lockedCell },
   { title: 'Description', dataIndex: 'description', key: 'description', width: 190, render: lockedCell },
+  // Where the material sits on the garment. Three rows of the same jersey in
+  // three colours are otherwise indistinguishable.
+  {
+    title: 'Parts',
+    dataIndex: 'partsName',
+    key: 'partsName',
+    width: 150,
+    render: (v) => lockedCell(Array.isArray(v) && v.length ? v.join(', ') : '—'),
+  },
   { title: 'Width Std', dataIndex: 'width', key: 'width', width: 90, align: 'center', render: (v) => lockedCell(v || '—') },
   { title: 'Cons.', dataIndex: 'consumption', key: 'consumption', width: 80, align: 'right', render: (v) => lockedCell(v ?? '—') },
   { title: 'UOM', dataIndex: 'uom', key: 'uom', width: 70, align: 'center', render: lockedCell },
@@ -66,7 +75,10 @@ export const buildMaterialsColumns = ({
     width: 120,
     align: 'right',
     render: (_, line) => {
-      const qty = computeSampleQtyRequired(line, sampleQty, sizes);
+      // A lab dip is a swatch dyed by the mill: there is no size run to multiply
+      // and no BOM consumption to draw, so a figure here would be invented.
+      if (isMaterialScope) return lockedCell('—');
+      const qty = computeSampleQtyRequired(line, sampleQty, sizes, colourName);
       return <Text strong>{qty ? qty.toLocaleString() : '—'}</Text>;
     },
   },

@@ -15,13 +15,15 @@ const SampleIssueSrPicker = ({ id, srs = [], value, onChange, disabled = false }
   const options = useMemo(() => srs.map((r) => ({
     value: r.id,
     // Searched against, so the storekeeper can type a style or a buyer too
-    name: `${r.srNo} ${r.styleNo || ''} ${r.garmentName || ''} ${r.buyerName || ''} ${r.sampleTypeName || ''}`,
+    // Colourway is searchable too: with a style sampled in several colours the
+    // number alone is not how the store person thinks about which one this is.
+    name: `${r.srNo} ${r.styleNo || ''} ${r.garmentName || ''} ${r.buyerName || ''} ${r.sampleTypeName || ''} ${r.colourName || ''}`,
     label: (
       // alignItems centres the tag against the text — without it the tag
       // stretches to the control height and its label rides high
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {r.srNo} · {r.styleNo} — {r.buyerName}
+          {r.srNo} · {r.styleNo}{r.colourName ? ` · ${r.colourName}` : ''} — {r.buyerName}
         </span>
         <Tag color="purple" style={{ marginInlineEnd: 0, flexShrink: 0 }}>{r.sampleTypeName}</Tag>
       </span>

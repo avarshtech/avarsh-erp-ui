@@ -78,6 +78,17 @@ export const buildSrColumns = ({
       <Tag color="purple" style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{name}</Tag>
     ),
   },
+  // Beside the type, because together they are what tells two otherwise
+  // identical rows apart once a style is sampled in several colours.
+  {
+    title: 'Colourway',
+    dataIndex: 'colourName',
+    key: 'colourName',
+    width: 140,
+    render: (name) => (name
+      ? <Tag style={{ whiteSpace: 'nowrap', marginInlineEnd: 0 }}>{name}</Tag>
+      : <Text type="secondary">—</Text>),
+  },
   {
     title: 'Status',
     dataIndex: 'status',

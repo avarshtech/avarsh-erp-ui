@@ -22,7 +22,7 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
   const [state, setState] = useState({
     loading: true, error: null, needsPicker: false,
     mode: id ? 'edit' : 'create',
-    record: null, header: null, materials: [], orderSizes: [], existingRequests: [],
+    record: null, header: null, materials: [], orderSizes: [], orderColours: [], existingRequests: [],
   });
 
   const loadCreate = async () => {
@@ -39,6 +39,9 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
         materials: preview.materials || [],
         // Size run of the order — the Sizes field's options and its default
         orderSizes: preview.orderSizes || [],
+        // The order's colourways — what a per-colour type offers, and how many
+        // requests one save can become.
+        orderColours: preview.orderColours || [],
         existingRequests: preview.existingRequests || [],
       });
     } catch (e) {
@@ -53,9 +56,13 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
         setState((s) => ({ ...s, loading: false, error: 'NOT_EDITABLE', record }));
         return;
       }
-      const existingRequests = record.bomId
-        ? await bomPreview({ bomId: record.bomId }).then((p) => p.existingRequests || []).catch(() => [])
-        : [];
+      // Both come off the one preview call: the edit form needs the colourways
+      // as much as the create form does, since re-colouring a draft is allowed.
+      const { existingRequests, orderColours } = record.bomId
+        ? await bomPreview({ bomId: record.bomId })
+          .then((p) => ({ existingRequests: p.existingRequests || [], orderColours: p.orderColours || [] }))
+          .catch(() => ({ existingRequests: [], orderColours: [] }))
+        : { existingRequests: [], orderColours: [] };
       setState({
         loading: false, error: null, needsPicker: false, mode: 'edit',
         record,
@@ -67,6 +74,7 @@ const useSampleRequestDraft = ({ id, bomId, orderNo }) => {
         },
         materials: record.materials || [],
         orderSizes: record.sizes || [],
+        orderColours,
         existingRequests,
       });
     } catch (e) {

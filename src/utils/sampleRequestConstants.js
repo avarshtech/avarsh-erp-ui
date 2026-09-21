@@ -53,17 +53,65 @@ export const getSrStatusLabel = (s) => SR_STATUS_LABELS[s] || (s || '').replace(
 export const srRevisionLabel = (sr) => (sr?.revisionNo > 0 ? `Rev ${sr.revisionNo}` : '');
 
 /**
- * Which sample types a BOM already carries, keyed by sample type id, each holding
- * the LATEST request for that type. An order has one sample of each type at a
- * time, so the latest row is what decides: open → taken, approved → closed,
- * canRaiseRevision → re-made through a revision rather than a new request.
- * `excludeId` is the request being edited, which must not count against itself.
- * Rows arrive oldest first, so the last write per type is the latest.
+ * How colour divides a sample type into requests — the server's SampleScope,
+ * read off the sample type master.
  */
-export const sampleTypeAvailability = (existingRequests = [], excludeId = null) => {
+export const SR_SCOPE = {
+  ORDER_NO_COLOUR: 'ORDER_NO_COLOUR',
+  ORDER_ONE_COLOUR: 'ORDER_ONE_COLOUR',
+  ORDER_PER_COLOUR: 'ORDER_PER_COLOUR',
+  BOM_PER_ITEM: 'BOM_PER_ITEM',
+};
+
+/** A type that asks for a colour at all — everything except Proto, Fit and Others. */
+export const srNamesAColour = (scope) => scope && scope !== SR_SCOPE.ORDER_NO_COLOUR;
+
+/** A lab dip or strike off: a swatch of one fabric, with none of the garment lifecycle. */
+export const srIsMaterial = (scope) => scope === SR_SCOPE.BOM_PER_ITEM;
+
+/** One save becomes several requests. */
+export const srRaisesInBatch = (scope) => scope === SR_SCOPE.ORDER_PER_COLOUR || srIsMaterial(scope);
+
+/** Blank and null are the same absence of a colour, here as on the server. */
+export const srColourKey = (colourName) => (colourName == null ? '' : String(colourName).trim());
+
+/**
+ * What makes one request distinct from another on the same BOM and type.
+ *
+ * A mirror of SampleScope.keyColour / keyBomLine: only the parts the scope
+ * actually divides by take part. A size set is the one that looks wrong and is
+ * not — it records the colour it is made in, but there is still one size set per
+ * order, so its colour is deliberately left out of the key.
+ */
+export const srIdentityKey = (scope, sampleTypeId, colourName, bomLineId) => {
+  const colour = scope === SR_SCOPE.ORDER_PER_COLOUR || srIsMaterial(scope) ? srColourKey(colourName) : '';
+  const line = srIsMaterial(scope) && bomLineId != null ? String(bomLineId) : '';
+  return `${sampleTypeId}::${colour}::${line}`;
+};
+
+/**
+ * What a BOM already carries, keyed the way the server refuses a duplicate, each
+ * entry holding the LATEST request on that key: open → taken, approved → closed,
+ * canRaiseRevision → re-made through a revision rather than a new request.
+ *
+ * `scopeFor` resolves a sample type id to its scope. Every row is keyed under
+ * the CURRENT scope of its type rather than the one it was raised under — the
+ * rule in force is the one being applied now, which is how the server compares
+ * them too.
+ *
+ * `excludeId` is the request being edited, which must not count against itself.
+ * Rows arrive oldest first, so the last write per key is the latest.
+ */
+export const sampleTypeAvailability = (
+  existingRequests = [],
+  excludeId = null,
+  scopeFor = () => SR_SCOPE.ORDER_NO_COLOUR,
+) => {
   const latest = new Map();
   existingRequests.forEach((r) => {
-    if (r.id !== excludeId && r.sampleTypeId != null) latest.set(r.sampleTypeId, r);
+    if (r.id !== excludeId && r.sampleTypeId != null) {
+      latest.set(srIdentityKey(scopeFor(r.sampleTypeId), r.sampleTypeId, r.colourName, r.bomLineId), r);
+    }
   });
   return latest;
 };

@@ -31,7 +31,8 @@ export const SEED_BUYER = 'Next PLC';
 
 /** Sample type ids are a fixed code list, seeded by the M1 migration. */
 export const SAMPLE_TYPE = {
-  PROTO: 1, FIT: 2, SIZE_SET: 3, LAB_DIP: 9, STRIKE_OFF: 10,
+  PROTO: 1, FIT: 2, SIZE_SET: 3, PHOTOSHOOT: 4, PP: 5, SHIPMENT: 6, SMS: 7, OTHERS: 8,
+  LAB_DIP: 9, STRIKE_OFF: 10,
 };
 
 // ── UI plumbing ─────────────────────────────────────────────────────────────
@@ -216,7 +217,7 @@ export async function seedBomId(api) {
  * the BOM itself.
  */
 export async function raiseSr(api, {
-  sampleTypeId = SAMPLE_TYPE.PROTO, sampleQty = 2, sizes = ['S', 'M'], bomId,
+  sampleTypeId = SAMPLE_TYPE.PROTO, sampleQty = 2, sizes = ['S', 'M'], bomId, colourName,
 } = {}) {
   return ok(await api.post('/sample-requests', {
     bomId: bomId ?? await seedBomId(api),
@@ -224,6 +225,9 @@ export async function raiseSr(api, {
     colourSubstitutionAllowed: true,
     sampleQty,
     sizes,
+    // Ignored by a type that does not divide by colour, which is deliberate:
+    // a spec can send one without having to know the type's scope.
+    colourName: colourName ?? null,
     colourReference: 'Pantone 19-4052 Classic Blue',
     priority: 'NORMAL',
     specialInstructions: 'Raised by the e2e suite',
@@ -233,6 +237,45 @@ export async function raiseSr(api, {
     remarks: '',
     materials: [],
   }), 'create sample request');
+}
+
+/**
+ * A set of DRAFT requests raised in one call — one per colourway, or one per
+ * BOM material for a lab dip. All or nothing: a colour or material already
+ * sampled under this type refuses the whole set.
+ */
+export async function raiseSrBatch(api, {
+  sampleTypeId, colours, bomLineIds, sampleQty = 2, sizes = ['S', 'M'], bomId,
+} = {}) {
+  const resolvedBomId = bomId ?? await seedBomId(api);
+  const request = {
+    bomId: resolvedBomId,
+    sampleTypeId,
+    colourSubstitutionAllowed: false,
+    sampleQty,
+    // A material submission has no size run; the server does not ask for one.
+    sizes: bomLineIds ? [] : sizes,
+    colourReference: 'Pantone 19-4052 Classic Blue',
+    priority: 'NORMAL',
+    specialInstructions: 'Raised by the e2e suite',
+    inHandDate: iso(3),
+    dispatchDeadline: iso(10),
+    buyerApprovalDeadline: iso(20),
+    remarks: '',
+    materials: [],
+  };
+  const payload = bomLineIds ? { request, bomLineIds } : { request, colours };
+  return ok(await api.post('/sample-requests/batch', payload), 'create sample request batch');
+}
+
+/** The raw response, for a spec asserting on a refusal rather than a success. */
+export async function tryRaiseSrBatch(api, payload) {
+  return api.post('/sample-requests/batch', payload);
+}
+
+/** The order's colourways and BOM materials, as the form would offer them. */
+export async function seedPreview(api, bomId) {
+  return ok(await api.get(`/sample-requests/bom-preview?bomId=${bomId}`), 'bom-preview');
 }
 
 export async function submitSr(api, sr) {

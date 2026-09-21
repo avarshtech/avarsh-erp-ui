@@ -26,11 +26,22 @@ const round2 = (n) => Math.round(n * 100) / 100;
 
 /**
  * Sample Qty Required = Consumption × Sample Qty × No. of Sizes (PRD §8.2 D).
+ *
  * SIZE_WISE / VARIANT_PER_SIZE lines sum the per-size matrix consumption over
- * the selected sizes (MAX across matrix colours — conservative, since the
- * sample colour may not match a bulk matrix colour), × sampleQty per size.
+ * the selected sizes, × sampleQty per size. Which consumption depends on
+ * whether the request names a colourway: the matrix is keyed by the ORDER's own
+ * colour names, which is the list the request's colour is chosen from, so a
+ * named colour is a direct lookup. A request that names none — a proto, a fit
+ * sample — or one naming a shade the bulk matrix does not carry keeps the older
+ * hedge of the MAX across colours, which is then the only figure guaranteed to
+ * be enough.
+ *
+ * This is a port of SampleQtyCalculator.java and has to agree with it digit for
+ * digit: the form shows this figure live while the user types and the server
+ * stores its own on save. Change one and change the other in the same commit —
+ * there is no JS test runner in this repo to catch a drift.
  */
-export const computeSampleQtyRequired = (line, sampleQty = 0, sizes = []) => {
+export const computeSampleQtyRequired = (line, sampleQty = 0, sizes = [], colourName = null) => {
   const qty = Number(sampleQty) || 0;
   if (!qty || !sizes.length) return 0;
   const mode = line?.consumptionMode || 'SIMPLE';
@@ -38,10 +49,17 @@ export const computeSampleQtyRequired = (line, sampleQty = 0, sizes = []) => {
   if (mode === 'SIMPLE' || !line?.consumptionMatrix) {
     return round2(base * qty * sizes.length);
   }
-  const colours = Object.keys(line.consumptionMatrix || {});
+  const matrix = line.consumptionMatrix || {};
+  const trimmed = colourName == null ? '' : String(colourName).trim();
+  const named = trimmed ? matrix[trimmed] : null;
+  const colours = Object.keys(matrix);
   let total = 0;
   sizes.forEach((size) => {
-    const perSize = Math.max(0, ...colours.map((c) => Number(line.consumptionMatrix?.[c]?.[size]) || 0));
+    // A size the named colour does not cover reads 0 here and falls through to
+    // the base below, exactly as an uncovered size does on the hedge path.
+    const perSize = named
+      ? (Number(named[size]) || 0)
+      : Math.max(0, ...colours.map((c) => Number(matrix?.[c]?.[size]) || 0));
     total += (perSize || base) * qty;
   });
   return round2(total);

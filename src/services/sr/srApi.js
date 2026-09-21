@@ -69,6 +69,15 @@ export const getSampleRequest = async (id) => (await axiosInstance.get(`${BASE}/
 
 export const createSampleRequest = async (payload) => (await axiosInstance.post(BASE, payload)).data;
 
+/**
+ * One sample request per colourway, or per BOM material, raised together.
+ *
+ * All or nothing: a colour the order already has a sample of refuses the whole
+ * set, and no SRQ number is spent on a batch that was refused. Returns the
+ * saved requests in the order the colours or materials were given.
+ */
+export const createSampleRequestBatch = async (payload) => (await axiosInstance.post(`${BASE}/batch`, payload)).data;
+
 export const updateSampleRequest = async (id, payload) => (await axiosInstance.put(`${BASE}/${id}`, payload)).data;
 
 /** The two fields that stay editable once the sample is In Production. */
