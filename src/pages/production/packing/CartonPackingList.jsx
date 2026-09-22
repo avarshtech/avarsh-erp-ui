@@ -10,11 +10,12 @@ import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { hasPermission } from '../../../utils/permissions';
 import {
-  EXPDOC_MODULE, PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
+  PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { searchPackingEntries, deletePackingEntry } from '../../../services/expdoc/expDocService';
 import { buildCartonPackingColumns } from './CartonPackingColumns';
 import CartonPackingView from './CartonPackingView';
+import { MODULE_ID } from './packingModule';
 
 const STATUS_OPTIONS = Object.values(PACKING_ENTRY_STATUS).map((s) => ({
   value: s,
@@ -39,9 +40,9 @@ const CartonPackingList = () => {
   const [statusFilter, setStatusFilter] = useState();
   const [viewId, setViewId] = useState(null);
 
-  const canAdd = hasPermission(EXPDOC_MODULE.PACKING, 'add');
-  const canUpdate = hasPermission(EXPDOC_MODULE.PACKING, 'update');
-  const canDelete = hasPermission(EXPDOC_MODULE.PACKING, 'delete');
+  const canAdd = hasPermission(MODULE_ID, 'add');
+  const canUpdate = hasPermission(MODULE_ID, 'update');
+  const canDelete = hasPermission(MODULE_ID, 'delete');
 
   // Current page is read through a ref so fetchData does not have to depend on
   // pagination — depending on it would rebuild the callback on every page change
@@ -98,7 +99,7 @@ const CartonPackingList = () => {
     () =>
       buildCartonPackingColumns({
         onView: (record) => setViewId(record.id),
-        onEdit: (record) => navigate(`/export-docs/packing/edit/${record.id}`),
+        onEdit: (record) => navigate(`/production/packing/edit/${record.id}`),
         onDelete: handleDelete,
         canUpdate,
         canDelete,
@@ -138,7 +139,7 @@ const CartonPackingList = () => {
       <PageHeader
         title="Carton Packing"
         subtitle="Carton ranges, quantities, weights and dimensions — the source every export document reads"
-        onAdd={canAdd ? () => navigate('/export-docs/packing/new') : undefined}
+        onAdd={canAdd ? () => navigate('/production/packing/new') : undefined}
         addLabel="New Packing Entry"
       />
 
@@ -184,7 +185,7 @@ const CartonPackingList = () => {
                 title="No packing entries yet"
                 description="Pick a confirmed order and start recording carton ranges, weights and dimensions."
                 actionLabel={canAdd ? 'New Packing Entry' : undefined}
-                onAction={canAdd ? () => navigate('/export-docs/packing/new') : undefined}
+                onAction={canAdd ? () => navigate('/production/packing/new') : undefined}
                 showAction={canAdd}
               />
             ),
@@ -197,7 +198,7 @@ const CartonPackingList = () => {
         onClose={() => setViewId(null)}
         onEdit={(record) => {
           setViewId(null);
-          navigate(`/export-docs/packing/edit/${record.id}`);
+          navigate(`/production/packing/edit/${record.id}`);
         }}
         canUpdate={canUpdate}
       />

@@ -13,10 +13,11 @@ import { hasPermission } from '../../../utils/permissions';
 import { validate } from '../../../utils/expDocValidation';
 import { PACKING_ENTRY_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
-  EXPDOC_MODULE, PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
+  PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
   PACKABLE_ORDER_STATUSES, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
 } from '../../../utils/expDocConstants';
 import { sectionTotals } from '../../../utils/expDocCalc';
+import { MODULE_ID } from './packingModule';
 import { searchOrders } from '../../../services/orders/orderService';
 import { getAllSizePresets } from '../../../services/master/sizePresetService';
 import {
@@ -65,7 +66,7 @@ const CartonPackingForm = () => {
     useDebouncedSearch();
 
   const { clearDirty } = useUnsavedChanges(isDirty);
-  const canWrite = hasPermission(EXPDOC_MODULE.PACKING, isEdit ? 'update' : 'add');
+  const canWrite = hasPermission(MODULE_ID, isEdit ? 'update' : 'add');
 
   // ── Load the record ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -264,7 +265,7 @@ const CartonPackingForm = () => {
     try {
       const saved = await persist();
       message.success(`${saved.packingNo} saved`);
-      if (!isEdit) navigate(`/export-docs/packing/edit/${saved.id}`, { replace: true });
+      if (!isEdit) navigate(`/production/packing/edit/${saved.id}`, { replace: true });
     } catch (e) {
       if (e?.errorFields) message.warning('Complete the mandatory fields first');
       else if (!e.isOptimisticLockConflict) message.error(e.message || 'Failed to save');
@@ -324,7 +325,7 @@ const CartonPackingForm = () => {
         status="warning"
         title="Packing entry could not be opened"
         subTitle={loadError}
-        extra={<ActionButton action="back" text="Back to packing" onClick={() => navigate('/export-docs/packing/list')} />}
+        extra={<ActionButton action="back" text="Back to packing" onClick={() => navigate('/production/packing/list')} />}
       />
     );
   }
@@ -372,7 +373,7 @@ const CartonPackingForm = () => {
       <PageHeader
         title={record?.packingNo || 'New Packing Entry'}
         subtitle={record ? `${record.orderNo} · ${record.styleNo}` : 'Record carton ranges, quantities, weights and dimensions'}
-        onBack={() => navigate('/export-docs/packing/list')}
+        onBack={() => navigate('/production/packing/list')}
         status={record ? (
           <StatusTag
             status={record.status}
@@ -382,7 +383,7 @@ const CartonPackingForm = () => {
         ) : null}
         style={STICKY_HEADER}
       >
-        <ActionButton action="close" text="Cancel" onClick={() => navigate('/export-docs/packing/list')} />
+        <ActionButton action="close" text="Cancel" onClick={() => navigate('/production/packing/list')} />
         {!readOnly && <ActionButton action="save" text="Save" {...busyProps('save')} onClick={handleSave} />}
         {isEdit && record?.status === PACKING_ENTRY_STATUS.OPEN && canWrite && (
           <ActionButton

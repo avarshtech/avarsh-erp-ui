@@ -250,12 +250,12 @@ export const SCREENS = [
     path: '/production/finishing',
     routes: ['/production/finishing', '/production/finishing/checking/new', '/production/finishing/checking/:id'],
     ops: STANDARD_OPERATIONS },
+  { id: 'production-packing', name: 'Production — Packing', section: 'production', kind: 'screen',
+    path: '/production/packing/list',
+    routes: ['/production/packing/list', '/production/packing/new', '/production/packing/edit/:id'],
+    ops: STANDARD_OPERATIONS },
 
   // ── Export Documentation ──
-  { id: 'export-packing', name: 'Carton Packing Entry', section: 'expdoc', kind: 'screen',
-    path: '/export-docs/packing/list',
-    routes: ['/export-docs/packing/list', '/export-docs/packing/new', '/export-docs/packing/edit/:id'],
-    ops: STANDARD_OPERATIONS },
   { id: 'export-shipments', name: 'Shipments', section: 'expdoc', kind: 'screen',
     path: '/export-docs/shipments/list',
     routes: ['/export-docs/shipments/list', '/export-docs/shipments/new', '/export-docs/shipments/edit/:id'],

@@ -89,7 +89,7 @@ export const MODULE_CONFIG = {
     color: '#0e7490',
     bg: 'rgba(14, 116, 144, 0.08)',
     icon: BuildOutlined,
-    route: (id) => `/export-docs/packing/edit/${id}`,
+    route: (id) => `/production/packing/edit/${id}`,
   },
   SHIPMENT: {
     label: 'Shipment',

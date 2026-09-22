@@ -74,6 +74,8 @@ const TopseForm = lazy(() => import('./pages/production/sewing/TopseForm'));
 const FinishingWorkspace = lazy(() => import('./pages/production/finishing/FinishingWorkspace'));
 const ProductionMastersPage = lazy(() => import('./pages/production/masters/ProductionMastersPage'));
 const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
+const CartonPackingList = lazy(() => import('./pages/production/packing/CartonPackingList'));
+const CartonPackingForm = lazy(() => import('./pages/production/packing/CartonPackingForm'));
 import CostingList from './pages/costing/CostingList';
 import CostingForm from './pages/costing/CostingForm';
 import CostingView from './pages/costing/CostingView';
@@ -138,8 +140,6 @@ const CustomerCommentsPage = lazy(() => import('./pages/sr/comments/CustomerComm
 // Export Documentation (lazy-loaded — UI mock phase)
 const ShipmentList = lazy(() => import('./pages/expdoc/shipments/ShipmentList'));
 const ShipmentForm = lazy(() => import('./pages/expdoc/shipments/ShipmentForm'));
-const CartonPackingList = lazy(() => import('./pages/expdoc/packing/CartonPackingList'));
-const CartonPackingForm = lazy(() => import('./pages/expdoc/packing/CartonPackingForm'));
 const PackingListList = lazy(() => import('./pages/expdoc/packing-list/PackingListList'));
 const PackingListWorkspace = lazy(() => import('./pages/expdoc/packing-list/PackingListWorkspace'));
 const StickerConsole = lazy(() => import('./pages/expdoc/sticker/StickerConsole'));
@@ -315,15 +315,22 @@ const ThemedApp = () => {
             <Route path="production/finishing/checking/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production-finishing" operation="view"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
 
+            {/* Production — Packing (UI mock phase; shares the export-docs carton store) */}
+            <Route path="production/packing/list" element={<PermissionRoute module="production-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingList /></Suspense></PermissionRoute>} />
+            <Route path="production/packing/new" element={<PermissionRoute module="production-packing" operation="add"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+            <Route path="production/packing/edit/:id" element={<PermissionRoute module="production-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+
             {/* Export Documentation (UI mock phase) — packing entry -> packing list -> stickers / invoice.
                 One RBAC module per screen. Following the sample-requests precedent, edit/:id routes carry
                 no `operation`: a viewer must be able to open them, and write actions are gated per button. */}
             <Route path="export-docs/shipments/list" element={<PermissionRoute module="export-shipments" operation="view"><Suspense fallback={<PageSkeleton />}><ShipmentList /></Suspense></PermissionRoute>} />
             <Route path="export-docs/shipments/new" element={<PermissionRoute module="export-shipments" operation="add"><Suspense fallback={<PageSkeleton />}><ShipmentForm /></Suspense></PermissionRoute>} />
             <Route path="export-docs/shipments/edit/:id" element={<PermissionRoute module="export-shipments" operation="view"><Suspense fallback={<PageSkeleton />}><ShipmentForm /></Suspense></PermissionRoute>} />
-            <Route path="export-docs/packing/list" element={<PermissionRoute module="export-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingList /></Suspense></PermissionRoute>} />
-            <Route path="export-docs/packing/new" element={<PermissionRoute module="export-packing" operation="add"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
-            <Route path="export-docs/packing/edit/:id" element={<PermissionRoute module="export-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+            {/* Carton Packing moved to /production/packing/* — old URLs stay alive for
+                bookmarks and live-feed deep links already delivered. */}
+            <Route path="export-docs/packing/list" element={<LegacyPORedirect to="/production/packing/list" />} />
+            <Route path="export-docs/packing/new" element={<LegacyPORedirect to="/production/packing/new" />} />
+            <Route path="export-docs/packing/edit/:id" element={<LegacyPORedirect to="/production/packing/edit" />} />
             <Route path="export-docs/packing-lists/list" element={<PermissionRoute module="export-packing-list" operation="view"><Suspense fallback={<PageSkeleton />}><PackingListList /></Suspense></PermissionRoute>} />
             <Route path="export-docs/packing-lists/edit/:id" element={<PermissionRoute module="export-packing-list" operation="view"><Suspense fallback={<PageSkeleton />}><PackingListWorkspace /></Suspense></PermissionRoute>} />
             <Route path="export-docs/stickers" element={<PermissionRoute module="export-stickers" operation="view"><Suspense fallback={<PageSkeleton />}><StickerConsole /></Suspense></PermissionRoute>} />

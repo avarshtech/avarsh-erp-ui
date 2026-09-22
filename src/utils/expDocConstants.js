@@ -10,7 +10,6 @@
 // ─── RBAC module ids ────────────────────────────────────────────────────────────
 // One key per URL-addressable screen. Kept here so screens never stringly-type them.
 export const EXPDOC_MODULE = {
-  PACKING: 'export-packing',
   SHIPMENTS: 'export-shipments',
   PACKING_LIST: 'export-packing-list',
   INVOICE: 'export-invoice',

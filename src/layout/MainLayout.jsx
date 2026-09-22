@@ -427,16 +427,16 @@ const MainLayoutInner = () => {
       key: "/production",
       icon: <ScissorOutlined />,
       label: "Production",
-      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-masters"],
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-packing", "production-masters"],
       children: [
         { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
         { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
+        { key: "/production/packing/list", label: "Packing", moduleId: "production-packing" },
         // Moved here from the Export Documentation children, where it sat while this group
         // already claimed its permission key above — so the menu and the RBAC matrix disagreed
         // about which module it belonged to.
         { key: "/production/masters", label: "Production Masters", moduleId: "production-masters" },
-        // Carton packing lives under Export Documentation for now — see the note there.
       ],
     },
     {
@@ -457,15 +457,13 @@ const MainLayoutInner = () => {
       icon: <ContainerOutlined />,
       label: "Export Documentation",
       // Each child is its own RBAC module; the group shows if ANY is accessible.
-      // Carton Packing sits here rather than under Production because it is the only
-      // producer of the PRD §7.3 dataset these documents consume; the Finishing
-      // workspace reserves the eventual home for it.
+      // Carton Packing now lives in the Production group — it is shop-floor capture.
+      // These documents still read the PRD §7.3 carton dataset it produces.
       moduleId: [
-        "export-packing", "export-shipments", "export-packing-list",
+        "export-shipments", "export-packing-list",
         "export-stickers", "export-invoice", "export-templates",
       ],
       children: [
-        { key: "/export-docs/packing/list", label: "Carton Packing", moduleId: "export-packing" },
         { key: "/export-docs/shipments/list", label: "Shipments", moduleId: "export-shipments" },
         { key: "/export-docs/packing-lists/list", label: "Packing Lists", moduleId: "export-packing-list" },
         { key: "/export-docs/stickers", label: "Carton Stickers", moduleId: "export-stickers" },
@@ -628,10 +626,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/inventory/grn')) return ['/inventory/grn/list'];
     if (path.startsWith('/inventory/dashboard')) return ['/inventory/dashboard'];
     if (path.startsWith('/tna/plan')) return ['/tna/control-tower'];
-    // Order matters: '/export-docs/packing-lists/...' also startsWith
-    // '/export-docs/packing', so the longer prefix must be tested first.
     if (path.startsWith('/export-docs/packing-lists')) return ['/export-docs/packing-lists/list'];
-    if (path.startsWith('/export-docs/packing')) return ['/export-docs/packing/list'];
     if (path.startsWith('/export-docs/shipments')) return ['/export-docs/shipments/list'];
     if (path.startsWith('/export-docs/stickers')) return ['/export-docs/stickers'];
     if (path.startsWith('/export-docs/invoices')) return ['/export-docs/invoices/list'];
@@ -641,6 +636,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/cutting')) return ['/production/cutting'];
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
+    if (path.startsWith('/production/packing')) return ['/production/packing/list'];
     if (path.startsWith('/production/masters')) return ['/production/masters'];
     if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
