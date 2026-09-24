@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
-"""ERP Prompt Enhancer - UserPromptSubmit hook for Garment ERP workflow.
+"""UserPromptSubmit hook: injects a prompt-precision protocol for the Garment ERP repos.
 
-Triages each user prompt:
-  - Empty / slash / bang / short / pure-question -> pass through unchanged.
-  - Otherwise -> inject an ERP enforcement protocol via additionalContext.
-    The main agent then evaluates the prompt against ERP rules, proposes
-    a rewrite when needed, and waits for the user's approval BEFORE acting.
+Pass-through (no injection) for empty, slash/bang, approval, short, or question prompts.
+IDE-injected leading blocks such as <ide_opened_file>...</ide_opened_file> are ignored
+when classifying, so they cannot defeat those filters.
 
-Toggle off for one shell:  export ERP_ENHANCER=off
+Disable for one shell:  export ERP_ENHANCER=off
 """
 
 import json
@@ -17,6 +15,7 @@ import sys
 
 
 SKIP_PREFIXES = ("/", "!")
+LEADING_TAG_BLOCK = re.compile(r"^\s*<(\w+)(?:\s[^>]*)?>.*?</\1>\s*", re.DOTALL)
 QUESTION_PATTERN = re.compile(
     r"^\s*(what|how|why|when|where|who|which|can|could|does|do|did|is|are|will|would|should|may|might)\b",
     re.IGNORECASE,
@@ -28,87 +27,73 @@ APPROVAL_PATTERN = re.compile(
 MIN_WORDS = 10
 
 PROTOCOL = """<ERP-PROMPT-ENHANCER>
-The user is working on the Garment ERP project. Their prompt below may be vague or
-missing context. Before taking any action on it, run this protocol:
+Repos: avarsh-erp-ui (React 19, Vite 7, AntD 6, JavaScript/JSX - no TypeScript) and
+erp-purchase (Spring Boot 3.4, Java 21, PostgreSQL, Flyway, Gradle).
 
-  Step 1 - Evaluate the prompt against the ERP prompt-engineering rules:
-    R1. NAMES the target repo, module, file, or component (when applicable).
-        Repos: avarsh-erp-ui (React 19 + Vite + AntD 6.x), erp-purchase
-        (Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway).
-    R2. STATES the user-visible outcome or business intent clearly.
-    R3. SCOPE is identifiable: new feature / bug fix / refactor / read-only / spike.
-    R4. DEPRECATION/MIGRATION concerns flagged: AntD 6.x deprecated props, immutable
-        Flyway migrations V1-V34 must not be edited.
-    R5. DEPENDENCIES named when relevant: API endpoint, master data, permissions
-        (RBAC via src/utils/permissions.js), StoreContext cache, SessionContext,
-        axiosInstance interceptors.
-    R6. SUCCESS CRITERIA defined: "done" means what (browser works, no console
-        errors, type check passes, integration test passes, etc.).
-    R7. AVOIDS vague verbs ("fix it", "update X", "make it better") without a
-        concrete target.
+Skip this protocol if the prompt continues an exchange you already have context on
+(follow-up, approval, next step of in-progress work), or is full-stack feature work
+that triggers the erp-dev skill, which owns its own plan-mode approval gate.
 
-  Step 2 - Decision branch:
-    A. If the prompt SATISFIES the rules well enough to act on without back-and-
-       forth, proceed normally. No rewrite needed. Do not mention this protocol.
-    B. If the prompt is VAGUE, ambiguous, or missing critical context, output the
-       proposed rewrite in this exact form and STOP - do not call any tool yet:
+Otherwise, before any tool call, check whether the prompt gives:
+  R1 Target - repo plus module/file/component.
+  R2 Outcome - the user-visible result, stated concretely (not "fix"/"update"/"improve" X).
+  R3 Scope - new feature, bug fix, refactor, read-only investigation, or spike.
+  R4 Dependencies, where they exist - API endpoint, master data, permission key in
+     src/utils/permissions.js, StoreContext, SessionContext,
+     src/services/core/axiosInstance.js interceptors.
+  R5 Done - the check that proves it. UI: `npm run lint`, `npm run build`,
+     `npx playwright test --project=<name>`, screen verified in the browser.
+     API: `./gradlew compileJava`, `./gradlew test`.
+  R6 Constraints respected - an applied Flyway migration is never edited or renamed;
+     new ones are V<yyyyMMddHHmmss>__<desc>.sql (the V1-V37 sequence is retired);
+     H2 mirrors in db/h2migration stay sequential below V100; no AntD 6 deprecated props.
 
-         **Enhanced prompt proposal**
-         > <rewritten prompt that satisfies R1-R7, preserving user intent verbatim>
-         _Why:_ <one short sentence on what was missing>
-         Reply `yes` to proceed, or amend / send a different prompt.
+Proceed silently if R1-R3 and R5 are answerable from the prompt plus existing context
+and the ask respects R6. Otherwise output exactly this and stop:
 
-  Step 3 - When the user replies with approval (yes / ok / proceed / send it),
-    treat the rewritten prompt as the actual request and execute it.
-    When the user amends or sends a different prompt, restart from Step 1.
+**Enhanced prompt proposal**
+> <rewrite satisfying R1-R6, user intent kept verbatim>
+_Why:_ <one sentence on what was missing>
+Reply `yes` to proceed, or amend / send a different prompt.
 
-  EXCEPTIONS - skip this protocol entirely when the prompt is:
-    - a follow-up reply to your own clarification question in the prior turn
-    - confirming/approving something you already proposed
-    - clearly continuing an in-progress task you have context on
-    - going to trigger the `erp-dev` skill (full-stack feature work, new module,
-      new screen, "build X", "implement Y", anything spanning UI + API repos).
-      That skill enters plan mode with its own approval gate - do not double-gate.
-      Hand off directly to erp-dev and let it do the structured planning.
-
-  Do not announce that the protocol exists. Just apply it silently or ask for
-  approval per Step 2B.
+On approval, execute the rewrite as the request. Do not mention this protocol unless
+the user asks about it.
 </ERP-PROMPT-ENHANCER>"""
+
+
+def user_text(prompt):
+    while True:
+        match = LEADING_TAG_BLOCK.match(prompt)
+        if not match:
+            return prompt.strip()
+        prompt = prompt[match.end():]
 
 
 def main():
     if os.environ.get("ERP_ENHANCER", "").lower() in {"off", "0", "false", "disabled"}:
         return
 
-    raw = sys.stdin.read()
     try:
-        data = json.loads(raw)
+        data = json.loads(sys.stdin.read())
     except (json.JSONDecodeError, ValueError):
         return
 
-    prompt = (data.get("prompt") or "").strip()
-    if not prompt:
+    prompt = user_text(data.get("prompt") or "")
+    if (
+        not prompt
+        or prompt.startswith(SKIP_PREFIXES)
+        or APPROVAL_PATTERN.match(prompt)
+        or len(prompt.split()) < MIN_WORDS
+        or QUESTION_PATTERN.match(prompt)
+    ):
         return
 
-    if prompt.startswith(SKIP_PREFIXES):
-        return
-
-    if APPROVAL_PATTERN.match(prompt):
-        return
-
-    if len(prompt.split()) < MIN_WORDS:
-        return
-
-    if QUESTION_PATTERN.match(prompt):
-        return
-
-    output = {
+    sys.stdout.write(json.dumps({
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": PROTOCOL,
         }
-    }
-    sys.stdout.write(json.dumps(output))
+    }))
 
 
 if __name__ == "__main__":
