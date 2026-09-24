@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$HOME/.claude/hooks/erp_prompt_enhancer.py\"",
+            "command": "python \"$CLAUDE_PROJECT_DIR/.claude/hooks/erp_prompt_enhancer.py\"",
             "timeout": 10,
             "statusMessage": "ERP prompt enhancer..."
           }
