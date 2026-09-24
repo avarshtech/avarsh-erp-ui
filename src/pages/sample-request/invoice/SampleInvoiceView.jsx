@@ -13,7 +13,7 @@ import {
 import { amountInWords } from '../../../utils/amountInWords';
 import { formatDate } from '../../../utils/formatters';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import { getInvoice } from '../../../services/sr/srService';
+import { getInvoice } from '../../../services/sample-request/sampleRequestService';
 
 const { Text, Title } = Typography;
 

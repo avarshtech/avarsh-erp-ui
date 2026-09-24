@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getDispatch, listDispatchableSrs, listDispatchableCustomers,
-} from '../../../services/sr/srService';
+} from '../../../services/sample-request/sampleRequestService';
 import { getBuyerById } from '../../../services/master/buyerService';
 import { DISPATCH_STATUS } from '../../../utils/sampleRequestConstants';
 import { toastUnlessHandled } from '../../../utils/apiError';

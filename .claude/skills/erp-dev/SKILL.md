@@ -370,7 +370,7 @@ Report to user:
 ### Modules as the product groups them
 `SECTIONS` in `src/utils/permissions.js`, in sidebar order: Dashboard · Orders · Bill of Materials · Costing · Purchase Orders · Sample Requests · Inventory · Production · Time & Action · Export Documentation · Master Data · Reports · HR & Payroll · Administration.
 
-UI page directories (`src/pages/`): Dashboard, Profile, admin, approvals, auth, bom, costing, expdoc, hr, inventory, master, orders, po, production, reports, sample-request, sr, tna.
+UI page directories (`src/pages/`): Dashboard, Profile, admin, approvals, auth, bom, costing, expdoc, hr, inventory, master, orders, po, production, reports, sample-request, tna.
 API packages (`com.avarsh.erp.`): activity, ai, approval, bom, config, costing, dashboard, email, ewaybill, exception, exchangerate, hr, iam, inventory, item, masterdata, mobile, notification, order, production, purchaseorder, reporting, sampling, shared, storage, system, whatsapp.
 
 The section → package mapping and the list of modules still running on UI mocks are in [`codebase-map.md`](references/codebase-map.md). Do not assume the textbook lifecycle (tech pack → BOM → costing → order → …): this product's `Order` carries a `costingId`, orders are mapped to purchase orders after the fact, and samples run their own multi-stage flow. When a task depends on how modules feed each other, run the `impact-map.md` greps instead of reasoning from the generic industry model.
@@ -847,7 +847,7 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 | `components/MasterSplitView.jsx` | Shared layout for master-data screens. |
 | `components/ConflictDialog.jsx` | The 409 / version-conflict dialog; raised by `axiosInstance`, not by screens. |
 | `components/PermissionRoute.jsx` | Wraps every screen route; pass `module` and `operation`. |
-| `SizeColorMatrix` | **Not shared** — two copies exist (`pages/po/`, `pages/inventory/stock/`). Reuse one; do not add a third. |
+| `pages/po/SizeColorMatrix.jsx` | The one size × colour matrix; used by the cutting, work-order and finishing PO forms and `ProductionPoView`. Reuse it rather than adding a copy (an unreached `inventory/stock` twin was removed 2026-09-24). |
 
 ---
 

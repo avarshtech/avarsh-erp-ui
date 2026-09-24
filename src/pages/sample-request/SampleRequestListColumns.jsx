@@ -32,7 +32,7 @@ const renderDeadline = (original, revised) => {
  * A revision is marked in the number cell rather than given a column of its
  * own: most rows are first requests, and an empty column says nothing.
  */
-export const buildSrColumns = ({
+export const buildSampleRequestColumns = ({
   onView, onEdit, onDelete, canUpdate, canDelete,
 }) => [
   {
@@ -160,4 +160,4 @@ export const buildSrColumns = ({
   },
 ];
 
-export default buildSrColumns;
+export default buildSampleRequestColumns;

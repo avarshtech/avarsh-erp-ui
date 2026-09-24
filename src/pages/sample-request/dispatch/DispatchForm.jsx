@@ -4,7 +4,7 @@ import {
 } from 'antd';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { createDispatch, updateDispatch, markDispatched } from '../../../services/sr/srService';
+import { createDispatch, updateDispatch, markDispatched } from '../../../services/sample-request/sampleRequestService';
 import { uploadFile } from '../../../services/core/fileService';
 import useSampleMasters from '../../../hooks/useSampleMasters';
 import { DELIVERY_METHODS, DISPATCH_STATUS, getDispatchStatusLabel } from '../../../utils/sampleRequestConstants';
@@ -15,7 +15,7 @@ import { ActionButton } from '../../../components/buttons';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
 import DispatchFields from './DispatchFields';
-import DispatchSrTable from './DispatchSrTable';
+import DispatchSampleRequestTable from './DispatchSampleRequestTable';
 import useDispatchFormData from './useDispatchFormData';
 import { invoiceRequiredModal } from './invoiceRequired';
 
@@ -325,7 +325,7 @@ const DispatchForm = () => {
         />
       )}
 
-      <DispatchSrTable
+      <DispatchSampleRequestTable
         customers={customers}
         customersLoading={customersLoading}
         buyerId={buyerId}

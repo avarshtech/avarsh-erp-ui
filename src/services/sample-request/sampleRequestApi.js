@@ -1,5 +1,5 @@
 /**
- * Real `/api/v1/sample-*` client. srService.js is the only file screens import;
+ * Real `/api/v1/sample-*` client. sampleRequestService.js is the only file screens import;
  * it delegates here.
  */
 import axiosInstance, { upload } from '../core/axiosInstance';

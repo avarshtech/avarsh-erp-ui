@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { App, Card, Upload, Button, Table, Alert, Space, Typography, Steps, Spin } from 'antd';
 import { FileSearchOutlined, InboxOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { parseCommentSheet } from '../../../services/sr/srService';
+import { parseCommentSheet } from '../../../services/sample-request/sampleRequestService';
 import { toastUnlessHandled, errorText } from '../../../utils/apiError';
 import feedbackImportColumns from './feedbackImportColumns';
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getSampleRequest, bomPreview } from '../../services/sr/srService';
+import { getSampleRequest, bomPreview } from '../../services/sample-request/sampleRequestService';
 import { errorText } from '../../utils/apiError';
 import { isSrEditable } from '../../utils/sampleRequestConstants';
 

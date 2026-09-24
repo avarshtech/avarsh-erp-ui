@@ -3,7 +3,7 @@ import { App, Table, Card } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   searchSampleRequests, deleteSampleRequest, listSrBuyers, getSampleDashboard,
-} from '../../services/sr/srService';
+} from '../../services/sample-request/sampleRequestService';
 import { hasPermission } from '../../utils/permissions';
 import { toastUnlessHandled } from '../../utils/apiError';
 import useSampleMasters from '../../hooks/useSampleMasters';
@@ -16,7 +16,7 @@ import SampleKpiRow from '../../components/sample/SampleKpiRow';
 import SampleDeadlineAlert from '../../components/sample/SampleDeadlineAlert';
 import { getTablePagination } from '../../utils/paginationConfig';
 import useDebouncedSearch from '../../hooks/useDebouncedSearch';
-import { buildSrColumns } from './SrListColumns';
+import { buildSampleRequestColumns } from './SampleRequestListColumns';
 import SampleRequestView from './SampleRequestView';
 
 const SampleRequestList = () => {
@@ -131,7 +131,7 @@ const SampleRequestList = () => {
     });
   }, [modal, message, refreshAll]);
 
-  const columns = useMemo(() => buildSrColumns({
+  const columns = useMemo(() => buildSampleRequestColumns({
     onView: (record) => setViewId(record.id),
     onEdit: (record) => navigate(`/sample-requests/edit/${record.id}`),
     onDelete: handleDelete,

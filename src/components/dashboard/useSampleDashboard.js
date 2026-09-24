@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { hasModuleAccess } from '../../utils/permissions';
-import { getSampleDashboard } from '../../services/sr/srService';
+import { getSampleDashboard } from '../../services/sample-request/sampleRequestService';
 
 /**
  * Permission-gated sample dashboard fetch. Returns null data when the user

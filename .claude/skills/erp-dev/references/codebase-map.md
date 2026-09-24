@@ -17,11 +17,10 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
   `context/` (Session, Store, Branch, LiveActivityFeed, Theme + `index.js`), `hooks/` (17),
   `pages/`, `services/` (104 files in 15 dirs), `utils/`, `styles/`, `assets/`, `sw.js`.
 - `ls src/pages`: `Dashboard.jsx Profile.jsx admin approvals auth bom costing expdoc hr inventory
-  master orders po production reports sample-request sr tna`.
-  Trap: `pages/sample-request/` is an unrouted copy of `pages/sr/` — `App.jsx:133-138` imports only
-  `./pages/sr/…` (7 imports, 0 from `sample-request`).
+  master orders po production reports sample-request tna` (the stale `pages/sr` twin was removed
+  on 2026-09-24; `App.jsx:133-139` lazy-imports the seven sample screens from `./pages/sample-request/…`).
 - `ls src/services`: `admin auth bom core costing dashboard expdoc hr inventory master orders po
-  production sr tna`; cross-cutting calls live in `services/core/` (axiosInstance, approvalFlowService,
+  production sample-request tna` (`sample-request/sampleRequestService.js` is a pass-through facade over `sampleRequestApi.js`); cross-cutting calls live in `services/core/` (axiosInstance, approvalFlowService,
   fileService, liveActivityFeedService, notificationService, reportService, aiService, activityLogService).
 - **API** `erp-purchase`: Spring Boot 3.4.0, Java 21 toolchain (`build.gradle:3,13`), Gradle only
   (no `pom.xml`), Lombok + MapStruct 1.6.2 (`build.gradle:89-94`), springdoc 2.7.0 (`:120`), H2 at
@@ -128,7 +127,7 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
   carry `@RequiresPermission`, 13 carry `@NoPermissionRequired(reason = …)`; the mapping is pinned by
   `src/test/java/com/avarsh/erp/iam/permission/ControllerPermissionMappingTest.java`, `PermissionRegistryTest.java`, `RolePermissionMatrixTest.java`.
 - **UI file naming**: transactional screens `XList.jsx / XForm.jsx / XView.jsx` (orders, bom, costing, po = `POList/POForm/POView`,
-  sr = `SampleRequestList/Form/View`); masters `XMaster.jsx` in `pages/master/` (`ls src/pages/master`); sub-features as folders
+  sample-request = `SampleRequestList/Form/View`); masters `XMaster.jsx` in `pages/master/` (`ls src/pages/master`); sub-features as folders
   (`pages/inventory/grn/`, `pages/production/finishing/`, `pages/hr/payroll/`); `services/<module>/xService.js`.
 - **Constants**: 22 `src/utils/*Constants.js` mirror API enums (`orderConstants.js:7` `ORDER_STATUS` ↔ `order/domain/OrderStatus.java`);
   tag colours in `utils/statusConfig.js` (`ORDER_STATUS_CONFIG:33`, `PO_STATUS_CONFIG:53`, `GRN_STATUS_CONFIG:81`…);

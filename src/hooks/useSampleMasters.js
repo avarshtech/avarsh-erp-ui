@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useStore } from '../context/StoreContext';
 import {
   listSampleTypes, listCouriers, listRejectionReasons, getFeedbackCategoryLabels,
-} from '../services/sr/srService';
+} from '../services/sample-request/sampleRequestService';
 
 const EMPTY = Object.freeze({
   sampleTypes: [], couriers: [], rejectionReasons: [], feedbackLabels: {},

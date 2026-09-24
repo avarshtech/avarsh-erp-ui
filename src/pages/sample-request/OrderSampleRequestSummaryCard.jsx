@@ -7,7 +7,7 @@ import {
   getSrStatusLabel, SR_STATUS, getEffectiveDispatchDeadline, getEffectiveBuyerApprovalDeadline,
 } from '../../utils/sampleRequestConstants';
 import { hasModuleAccess } from '../../utils/permissions';
-import { listByOrderNo } from '../../services/sr/srService';
+import { listByOrderNo } from '../../services/sample-request/sampleRequestService';
 import DaysRemainingTag from './DaysRemainingTag';
 
 const { Text } = Typography;
@@ -18,7 +18,7 @@ const { Text } = Typography;
  * (summed once per dispatch). Renders nothing when the module is inaccessible
  * or the order has no SRs — OrderView is unchanged for everyone else.
  */
-const OrderSrSummaryCard = ({ orderNo }) => {
+const OrderSampleRequestSummaryCard = ({ orderNo }) => {
   const [state, setState] = useState({ rows: [], totalCourierCost: 0, loaded: false });
   const enabled = hasModuleAccess('sample-requests');
 
@@ -100,4 +100,4 @@ const OrderSrSummaryCard = ({ orderNo }) => {
   );
 };
 
-export default OrderSrSummaryCard;
+export default OrderSampleRequestSummaryCard;

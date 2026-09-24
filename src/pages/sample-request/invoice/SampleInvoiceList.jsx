@@ -4,7 +4,7 @@ import {
   FileProtectOutlined, FileTextOutlined, SendOutlined, WarningOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { listInvoices, cancelInvoice, duplicateInvoice, getInvoice } from '../../../services/sr/srService';
+import { listInvoices, cancelInvoice, duplicateInvoice, getInvoice } from '../../../services/sample-request/sampleRequestService';
 import { hasPermission } from '../../../utils/permissions';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import {

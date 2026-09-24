@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { App, Table, Card, Tag, Typography, Tooltip, Space } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { searchDispatches, deleteDispatch, markDispatched } from '../../../services/sr/srService';
+import { searchDispatches, deleteDispatch, markDispatched } from '../../../services/sample-request/sampleRequestService';
 import { hasPermission } from '../../../utils/permissions';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { DISPATCH_STATUS, DISPATCH_STATUS_LABELS, DELIVERY_METHOD_LABELS, getDispatchStatusLabel } from '../../../utils/sampleRequestConstants';

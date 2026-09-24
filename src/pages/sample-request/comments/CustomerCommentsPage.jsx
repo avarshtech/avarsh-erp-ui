@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { App, Card, Table, Tag, Typography, Skeleton, Space, Row, Col, Button } from 'antd';
 import { CommentOutlined } from '@ant-design/icons';
 import { useSearchParams } from 'react-router-dom';
-import { searchSampleRequests, getSampleRequest } from '../../../services/sr/srService';
+import { searchSampleRequests, getSampleRequest } from '../../../services/sample-request/sampleRequestService';
 import { hasPermission } from '../../../utils/permissions';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { SR_STATUS, getSrStatusLabel, getEffectiveBuyerApprovalDeadline } from '../../../utils/sampleRequestConstants';

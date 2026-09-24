@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import { ActionButton } from '../../../components/buttons';
-import { listIssuableSrs, createSampleTrimsIssue } from '../../../services/sr/srService';
+import { listIssuableSrs, createSampleTrimsIssue } from '../../../services/sample-request/sampleRequestService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission, getCurrentUser } from '../../../utils/permissions';
 import { errorText, toastUnlessHandled } from '../../../utils/apiError';

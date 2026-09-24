@@ -16,7 +16,7 @@ const LABEL_STYLE = {
  * would orphan every request already selected on it. The rows come from the
  * server already filtered to that buyer, including this draft's own requests.
  */
-const DispatchSrTable = ({
+const DispatchSampleRequestTable = ({
   customers, customersLoading, buyerId, onBuyerChange, locked, current,
   rows, rowsLoading, selectedIds, onSelectionChange,
 }) => {
@@ -97,4 +97,4 @@ const DispatchSrTable = ({
   );
 };
 
-export default DispatchSrTable;
+export default DispatchSampleRequestTable;

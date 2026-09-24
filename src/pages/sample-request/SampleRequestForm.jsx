@@ -6,7 +6,7 @@ import PageHeader from '../../components/PageHeader';
 import { ActionButton } from '../../components/buttons';
 import {
   createSampleRequest, createSampleRequestBatch, updateSampleRequest, changeStatus,
-} from '../../services/sr/srService';
+} from '../../services/sample-request/sampleRequestService';
 import { SR_STATUS, SR_SCOPE, srIsMaterial, srRaisesInBatch } from '../../utils/sampleRequestConstants';
 import { computeSampleQtyRequired, stockStatusFor } from '../../utils/sampleBomMapper';
 import { toastUnlessHandled } from '../../utils/apiError';

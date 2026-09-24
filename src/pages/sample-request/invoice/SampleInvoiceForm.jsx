@@ -8,7 +8,7 @@ import { ActionButton } from '../../../components/buttons';
 import {
   getInvoice, createInvoice, updateInvoice, issueInvoice, listEligibleSrs, getHsnDefault,
   getDispatch,
-} from '../../../services/sr/srService';
+} from '../../../services/sample-request/sampleRequestService';
 import { getOrderByOrderNo } from '../../../services/orders/orderService';
 import { getBuyers } from '../../../services/master/buyerService';
 import { soleLocationAddress, findBuyerByName } from './consigneeAddress';

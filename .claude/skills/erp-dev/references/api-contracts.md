@@ -246,9 +246,9 @@
 | deleteTermsConditions | DELETE | `/terms-conditions/{id}` |
 
 ### Sample Requests
-`src/services/sr/srService.js` is still the single import surface every screen uses, but every
-export now delegates to `src/services/sr/srApi.js` and the real `com.avarsh.erp.sampling` module.
-The `srMock*` files, `srDocNumbers.js` and `srEnv.js` are deleted; `srApi.js` clears the old
+`src/services/sample-request/sampleRequestService.js` is still the single import surface every screen uses, but every
+export now delegates to `src/services/sample-request/sampleRequestApi.js` and the real `com.avarsh.erp.sampling` module.
+The `srMock*` files, `srDocNumbers.js` and `srEnv.js` are deleted; `sampleRequestApi.js` (formerly `srApi.js`) clears the old
 `avarsh.sr.mockStore.v1` key on load.
 
 | Function | Method | Endpoint |

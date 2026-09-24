@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal, DatePicker, Input, Typography, Tag, App } from 'antd';
 import { CalendarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { reviseDeadline } from '../../../services/sr/srService';
+import { reviseDeadline } from '../../../services/sample-request/sampleRequestService';
 import {
   getEffectiveDispatchDeadline, getEffectiveBuyerApprovalDeadline,
 } from '../../../utils/sampleRequestConstants';

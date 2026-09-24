@@ -52,7 +52,7 @@ test.describe('Sample Requests — the rules hold', () => {
 
     expect(
       await page.evaluate((key) => localStorage.getItem(key), MOCK_STORE_KEY),
-      'srApi clears the demolished mock store at module load',
+      'sampleRequestApi clears the demolished mock store at module load',
     ).toBeNull();
 
     await page.getByPlaceholder('Search SR No or Order No...').fill(sr.srNo);

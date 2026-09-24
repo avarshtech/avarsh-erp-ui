@@ -5,7 +5,7 @@ import {
 } from 'antd';
 import { SearchOutlined, FileDoneOutlined, ClockCircleOutlined, ToolOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { listSampleIssues, cancelSampleIssue } from '../../../services/sr/srService';
+import { listSampleIssues, cancelSampleIssue } from '../../../services/sample-request/sampleRequestService';
 import { SAMPLE_TYPE_LIST } from '../../../utils/sampleRequestConstants';
 import { hasPermission } from '../../../utils/permissions';
 import { errorText, toastUnlessHandled } from '../../../utils/apiError';

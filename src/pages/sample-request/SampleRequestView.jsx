@@ -16,7 +16,7 @@ import { formatDate } from '../../utils/formatters';
 import { toastUnlessHandled } from '../../utils/apiError';
 import {
   getSampleRequest, changeStatus, deleteSampleRequest, updateInstructions, raiseSrRevision,
-} from '../../services/sr/srService';
+} from '../../services/sample-request/sampleRequestService';
 import SectionHeader from './form/SectionHeader';
 import ViewMaterials from './view/ViewMaterials';
 import DeadlinesPanel from './view/DeadlinesPanel';

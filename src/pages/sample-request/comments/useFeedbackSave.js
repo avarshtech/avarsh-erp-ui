@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { App } from 'antd';
-import { recordFeedback, saveFeedbackDraft } from '../../../services/sr/srService';
+import { recordFeedback, saveFeedbackDraft } from '../../../services/sample-request/sampleRequestService';
 import { uploadFile } from '../../../services/core/fileService';
 import { getSrStatusLabel } from '../../../utils/sampleRequestConstants';
 import { toastUnlessHandled } from '../../../utils/apiError';

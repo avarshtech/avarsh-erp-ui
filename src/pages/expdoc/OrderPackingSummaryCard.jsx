@@ -17,7 +17,7 @@ const int = (v) => (Number(v) || 0).toLocaleString('en-IN');
  * the screen.
  *
  * Renders NOTHING when the module is inaccessible or the order has no packing, so
- * OrderView is unchanged for everyone else — the same contract OrderSrSummaryCard
+ * OrderView is unchanged for everyone else — the same contract OrderSampleRequestSummaryCard
  * already keeps.
  */
 const OrderPackingSummaryCard = ({ orderNo }) => {

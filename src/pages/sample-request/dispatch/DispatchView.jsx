@@ -12,7 +12,7 @@ import {
 } from '../../../utils/sampleRequestConstants';
 import { formatDate } from '../../../utils/formatters';
 import { toastUnlessHandled } from '../../../utils/apiError';
-import { getDispatch } from '../../../services/sr/srService';
+import { getDispatch } from '../../../services/sample-request/sampleRequestService';
 import { downloadStoredFile } from '../../../services/core/fileService';
 
 const { Text, Title } = Typography;
