@@ -109,6 +109,8 @@ allowance[size] = Σ_over_processes(rejectionPercent[size] + shipmentAllowancePe
 purchaseQty[size] = sizeReq[size] × (1 + allowance[size] / 100)
 ```
 
+> `calcVariantBreakdown` is defined at `src/utils/bomConstants.js:185` and has **no callers** as of 2026-09-24 (`grep -rn calcVariantBreakdown src` finds only the definition). Treat it as the reference formula; do not extend it expecting a screen to pick the change up.
+
 ```javascript
 export const calcVariantBreakdown = (consumptionMatrix, orderQtyGrid, variantMapping, processAllowances) => {
   // Step 1: Sum requirement per size across all colors

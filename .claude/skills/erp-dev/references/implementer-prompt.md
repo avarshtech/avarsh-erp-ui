@@ -17,13 +17,19 @@ Agent({
     [Scene-setting: where this fits in the ERP lifecycle, dependencies, architectural context]
     [Which repo: avarsh-erp-ui (React 19 + AntD 6.x) and/or erp-purchase (Spring Boot 3.4)]
 
+    ## Impact Table (consumers you must update — from the plan's Core Behavior Rule 3)
+
+    | symbol | consumer file:line | impact | action |
+    |--------|--------------------|--------|--------|
+    [paste the rows for this task; a consumer left unchanged needs a reason in your report]
+
     ## ERP-Specific Rules (MUST follow)
 
     ### Frontend (if UI work)
-    - Ant Design 6.x ONLY — ZERO deprecated props allowed
+    - Ant Design 6.x ONLY — ZERO deprecated props allowed (the verified list: references/antd6-deprecations.md)
     - `open` not `visible`, `onOpenChange` not `onVisibleChange`
-    - `variant="borderless"` not `bordered={false}`
-    - `popupClassName` not `dropdownClassName`
+    - `variant` replaces `bordered` on Input/Select/Card — `bordered` stays valid on Table and Descriptions
+    - `classNames={{ popup: { root } }}` — both `dropdownClassName` and `popupClassName` are deprecated
     - `size="middle"` not `size="default"`
     - Form.useForm() hook — never class-based forms
     - App.useApp() for message/notification/modal — never static methods
@@ -39,7 +45,9 @@ Agent({
     - @Transactional on service write methods, @Transactional(readOnly=true) on reads
     - Never return entities from controllers — always map to DTO via MapStruct
     - @Valid on all controller request body parameters
-    - V1-V34 Flyway migrations are IMMUTABLE — never edit them
+    - @RequiresPermission("<key>") on every new handler; /search endpoints return PaginatedResponse<T>, master lists return List<DTO>
+    - Never edit or rename an applied Flyway migration; new ones are V<yyyyMMddHHmmss>__<desc>.sql
+      with a sequential H2 twin (next number below V100) in db/h2migration
 
     ### General (Karpathy Guidelines)
     - Simplicity first: minimum code that solves the problem

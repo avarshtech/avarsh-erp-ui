@@ -298,7 +298,7 @@ PO Edit (Draft/Referred_Back only)
 ## ⚠️ Approval Flow Integrity (CRITICAL)
 
 > **⛔ READ THIS BEFORE TOUCHING ANY APPROVAL-FLOW CODE.**
-> The approval engine is shared across PO, Costing, Order, GRN, Work Order, Cutting PO, Production PO. Its integrity protects the audit trail for every business-critical document in the ERP. Breaking it silently corrupts history for ALL modules, not just the one you're editing.
+> The approval engine is shared across every value of `approval/domain/EntityType` — 17 document types on 2026-09-24, from purchase orders and cost sheets to GRN reversals, QC, HR documents, finishing POs and bill passing. Its integrity protects the audit trail for every business-critical document in the ERP. Breaking it silently corrupts history for ALL modules, not just the one you're editing.
 
 ### The audit-trail landmine
 
@@ -336,7 +336,7 @@ addLevelsToFlow(flow, request.getLevels()); // INSERTS fresh rows
 
 #### Rule 1 — Block structural edits once any request exists
 
-The current check only blocks on `PENDING` requests. That is **insufficient**. Expand to:
+Implemented in `approval/service/ApprovalFlowService` (`levelsStructurallyDiffer` + `countByApprovalFlowId`, around lines 140–149 on 2026-09-24). Keep it intact when editing the service — this is what it does:
 
 ```java
 long totalRequestCount = requestRepository.countByApprovalFlowId(id);
@@ -354,7 +354,7 @@ if (levelsChanged && totalRequestCount > 0) {
 
 #### Rule 2 — Block delete on ANY historical usage
 
-The current `deleteFlow()` only blocks on PENDING. Must also block on ANY `apv_requests` row referencing the flow, to convert the FK RESTRICT exception into a business-friendly message:
+Implemented in `ApprovalFlowService.deleteFlow()` (around lines 177–182 on 2026-09-24): any `apv_requests` row referencing the flow blocks the delete and converts the FK RESTRICT exception into a business-friendly message. Keep it:
 
 ```java
 long totalRequestCount = requestRepository.countByApprovalFlowId(id);

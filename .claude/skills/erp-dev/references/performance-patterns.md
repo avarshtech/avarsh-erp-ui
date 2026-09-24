@@ -138,9 +138,9 @@ const PageLoader = () => (
 </Suspense>
 ```
 
-**Vite chunk configuration:**
+**Vite chunk configuration** — not applied yet: `vite.config.js` has no `manualChunks` (2026-09-24). Add it only when a bundle analysis shows a reason:
 ```js
-// vite.config.js
+// vite.config.js (proposed)
 export default defineConfig({
   build: {
     rollupOptions: {
@@ -454,10 +454,10 @@ public class GeminiService {
 
 ### Rate Limiting
 
-Auth and expensive endpoints MUST have rate limiting:
+Auth and expensive endpoints SHOULD have rate limiting. Neither Bucket4j nor Resilience4j is in `build.gradle` (2026-09-24), so this is a new-dependency decision for the user (Core Behavior Rule 6), not something to add silently:
 
 ```java
-// Using Bucket4j or similar
+// Example with Resilience4j — NOT present in the codebase
 @RateLimiter(name = "authLogin", fallbackMethod = "rateLimitFallback")
 @PostMapping("/login")
 public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) { ... }
@@ -574,10 +574,12 @@ console.debug('CategoryMaster: categories from store, count=', categories?.lengt
 // ACCEPTABLE — error logging in catch blocks (but prefer centralized logger)
 console.error('Failed to save item:', error);
 
-// BEST — centralized logger
+// BEST — a centralized logger. `utils/logger.js` does NOT exist (2026-09-24); user-facing
+// errors go through utils/apiError.js (errorText, toastUnlessHandled). If you add a logger,
+// this is the shape:
 import { logger } from '../utils/logger';
 
-// utils/logger.js
+// utils/logger.js (proposed)
 const isDev = import.meta.env.DEV;
 
 export const logger = {

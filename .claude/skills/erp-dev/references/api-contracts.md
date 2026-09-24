@@ -85,7 +85,7 @@
 | getBuyerById | GET | `/buyers/{id}` |
 | createBuyer | POST | `/buyers` |
 | updateBuyer | POST | `/buyers` |
-| deleteBuyer | POST | `/buyers` |
+| deleteBuyer | DELETE | `/buyers/{id}` |
 
 ### Suppliers
 | Function | Method | Endpoint |
@@ -351,33 +351,10 @@ mutation carries `version`.
 
 ## Controller File Locations (API Repo)
 
-Base: `f:/Ranjith/project/RK/Repos/erp-purchase/src/main/java/com/avarsh/erp/controller/`
-
-| Controller | Sub-package |
-|---|---|
-| AuthController | (root) |
-| UserController | (root) |
-| RoleController | (root) |
-| BuyerController | (root) |
-| SupplierController | (root) |
-| StyleController | (root) |
-| ItemController | (root) |
-| OrderController | (root) |
-| BomController | (root) |
-| PurchaseOrderController | (root) |
-| CostSheetController | `costing/` |
-| ExchangeRateController | `costing/` |
-| FileStorageController | `storage/` |
-| NotificationController | `notification/` |
-| EwayBillController | `ewaybill/` |
-| AiExtractionController | (root) |
-| Report*Controllers | `reporting/` |
-| Master data controllers | (root) |
+Controllers are feature-first under `src/main/java/com/avarsh/erp/<feature>/` — flat for masters (`masterdata/buyer/BuyerController.java`), under `controller/` for layered modules (`order/controller/OrderController.java`, `iam/controller/AuthController.java`, `mobile/approvals/controller/MobileApprovalsController.java`). There is no `erp/controller/` package. Locate one with `find src/main/java -name '<Name>Controller.java'`; the package list is in `codebase-map.md` §1.
 
 ---
 
 ## Service File Locations (UI Repo)
 
-All at: `f:/Ranjith/project/RK/Repos/avarsh-erp-ui/src/services/`
-
-28 service files covering 219 API functions across all modules.
+`src/services/<module>/<name>Service.js` — 104 files across `admin auth bom core costing dashboard expdoc hr inventory master orders po production sr tna` on 2026-09-24 (`ls src/services`). The tables above cover 29 of them; for any other module read the service file and its controller directly.
