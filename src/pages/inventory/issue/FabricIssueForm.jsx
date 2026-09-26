@@ -13,6 +13,7 @@ import {
 } from '../../../services/inventory/materialIssueService';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { formatNumber } from '../../../utils/formatters';
+import { sameUom } from '../../../utils/uomConversions';
 import FabricIssueRollPicker from './FabricIssueRollPicker';
 import FabricIssueSummaryPanel from './FabricIssueSummaryPanel';
 
@@ -173,7 +174,8 @@ const FabricIssueForm = () => {
 
   const uomMismatch = useMemo(() => {
     if (!selectedLine || !availableRolls.length) return false;
-    return availableRolls.some((r) => r.uom !== selectedLine.uom);
+    // by alias: the rolls say 'Kilogram' where the line may say 'KG'
+    return availableRolls.some((r) => !sameUom(r.uom, selectedLine.uom));
   }, [selectedLine, availableRolls]);
 
   const bomRequired = selectedLine?.bomRequired || 0;

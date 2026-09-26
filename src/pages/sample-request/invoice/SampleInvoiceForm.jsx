@@ -11,7 +11,7 @@ import {
 } from '../../../services/sample-request/sampleRequestService';
 import { getOrderByOrderNo } from '../../../services/orders/orderService';
 import { getBuyers } from '../../../services/master/buyerService';
-import { soleLocationAddress, findBuyerByName } from './consigneeAddress';
+import { findBuyer, consigneeFromBuyer } from './consigneeAddress';
 import {
   SAMPLE_INVOICE_STATUS, DISPATCH_MODE_LABELS,
   INVOICE_TYPES, INVOICE_TYPE_LABELS, INVOICE_TYPE_SERIES,
@@ -51,6 +51,8 @@ const makeBlankInvoice = (type, keep = {}) => ({
   invoiceDate: dayjs().format('YYYY-MM-DD'),
   consigneeName: '', consigneeAddress: '', consigneeContact: '',
   buyerOrderNoDate: '', otherReferences: '', buyerOtherThanConsignee: '', notifyParty: '',
+  // null = not set yet; the create screen fills it with the company's IEC number
+  exporterRef: null,
   countryOfOrigin: 'India',
   destinationCountry: '',
   preCarriage: 'N.A.', placeOfReceipt: 'N.A.', vesselFlightNo: '',
@@ -131,13 +133,17 @@ const SampleInvoiceForm = () => {
   // `buyerList` is passed rather than read from state because the first prefill
   // happens inside the init effect, before a setState could have landed.
   const prefillFromRow = useCallback(async (row, buyerList) => {
+    // By id first: buyer names are not unique, and a renamed buyer still has its id
+    const buyer = findBuyer(buyerList, { id: row.buyerId, name: row.buyerName });
+    // A buyer with one shipping location has an unambiguous delivery address, so it
+    // and the buyer's contact render now; several locations wait for a pick.
+    const consignee = consigneeFromBuyer(buyer);
     const prefill = {
-      consigneeName: row.buyerName,
-      // A buyer with one shipping location has an unambiguous delivery address,
-      // so render it now; several locations wait for a pick on the header step.
-      consigneeAddress: soleLocationAddress(findBuyerByName(buyerList, row.buyerName)),
-      destinationCountry: row.buyerCountry || '',
-      finalDestination: row.buyerCountry || '',
+      consigneeName: buyer?.name || row.buyerName,
+      consigneeAddress: consignee.consigneeAddress,
+      consigneeContact: consignee.consigneeContact,
+      destinationCountry: row.buyerCountry || consignee.destinationCountry || '',
+      finalDestination: consignee.finalDestination || row.buyerCountry || '',
       buyerOrderNoDate: row.orderNo || '',
       termsOfDelivery: termsFromMode(row.dispatchMode),
     };
@@ -194,6 +200,11 @@ const SampleInvoiceForm = () => {
     if (!loading && profile.exporterCountry && inv && !id) {
       patch({ countryOfOrigin: profile.exporterCountry });
     }
+    // Exporter's Ref defaults to the IEC number and is saved with the invoice, so a
+    // later change to the company profile does not rewrite it; the user may override it.
+    if (!loading && profile.extra?.iecNumber && inv && !id && inv.exporterRef == null) {
+      patch({ exporterRef: profile.extra.iecNumber });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, profile.exporterCountry]);
 
@@ -241,6 +252,7 @@ const SampleInvoiceForm = () => {
         if (!inv.consigneeName) {
           patchObj.consigneeName = prefill.consigneeName;
           patchObj.consigneeAddress = prefill.consigneeAddress;
+          patchObj.consigneeContact = inv.consigneeContact || prefill.consigneeContact;
         }
         patchObj.destinationCountry = inv.destinationCountry || prefill.destinationCountry;
         patchObj.finalDestination = inv.finalDestination || prefill.finalDestination;

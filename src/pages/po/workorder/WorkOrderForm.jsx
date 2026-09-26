@@ -9,13 +9,13 @@ import { numericInputProps } from '../../../utils/inputHelpers';
 import useBusyAction from '../../../hooks/useBusyAction';
 import SizeColorMatrix from '../SizeColorMatrix';
 import ProcessingUnitSelector from '../components/ProcessingUnitSelector';
-import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel';
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import PpSampleGate from '../components/PpSampleGate';
+import ReferBackNotice from '../components/ReferBackNotice';
 import OrderCoveragePanel from '../components/OrderCoveragePanel';
-import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, VARIANCE_THRESHOLD, isPpApproved } from '../../../utils/productionConstants';
+import { PROCESSING_UNIT_TYPE, PO_TYPE, PO_ACTION, computeVariancePercent, isPpApproved } from '../../../utils/productionConstants';
 import {
-  getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom,
+  getConfirmedOrders, getOrderForPo, getStockByBom,
   getPpApprovalStatus, setPpApprovalStatus, getSewingLines,
 } from '../../../services/po/production/productionLookupService';
 import { getApprovedCuttingPos } from '../../../services/po/production/cuttingPoService';
@@ -44,8 +44,6 @@ const WorkOrderForm = () => {
   const [cuttingPos, setCuttingPos] = useState([]);
   const [cuttingPo, setCuttingPo] = useState(null);
   const [items, setItems] = useState([]);
-  const [consumption, setConsumption] = useState([]);
-  const [justification, setJustification] = useState('');
   const [stock, setStock] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
   const [lines, setLines] = useState([]);
@@ -54,6 +52,7 @@ const WorkOrderForm = () => {
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
+  const [saved, setSaved] = useState(null); // the work order being edited, for its refer-back notice
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
 
@@ -66,9 +65,10 @@ const WorkOrderForm = () => {
     return o;
   }, [form]);
 
-  const applyCuttingPo = useCallback(async (cp, o) => {
+  // Consumption is settled on the cutting PO; a work order inherits it and does not
+  // review it again, so there is no consumption screen here.
+  const applyCuttingPo = useCallback((cp, o) => {
     setCuttingPo(cp);
-    setConsumption(await getConsumptionComparison(o, cp.cadConsumptionPerPc, cp.totalPlannedQty));
     setItems((cp.items || o.items || []).map((i) => ({ ...i, ratePerPiece: 0 })));
   }, []);
 
@@ -76,14 +76,17 @@ const WorkOrderForm = () => {
     if (!isEdit) return;
     getWorkOrder(id).then(async (wo) => {
       if (!wo) { message.error('Work Order not found'); return navigate('/purchase-orders/work-order/list'); }
+      setSaved(wo);
       const o = await hydrateOrder(wo.orderId);
       getWorkOrderCoverage(wo.orderId, id).then(setCoverage);
       if (o && wo.allowancePercent != null && o.allowancePercent !== wo.allowancePercent) {
         setAllowanceWarn({ stored: wo.allowancePercent, live: o.allowancePercent });
       }
-      const cp = (await getApprovedCuttingPos(wo.orderId)).find((c) => c.id === wo.cuttingPoId) || { id: wo.cuttingPoId, cuttingPoNo: wo.cuttingPoNo, cadConsumptionPerPc: wo.cadConsumptionPerPc, items: wo.items };
+      const cp = (await getApprovedCuttingPos(wo.orderId)).find((c) => c.id === wo.cuttingPoId) || {
+        id: wo.cuttingPoId, cuttingPoNo: wo.cuttingPoNo, branchId: wo.branchId, items: wo.items,
+        bomConsumptionPerPc: wo.bomConsumptionPerPc, cadConsumptionPerPc: wo.cadConsumptionPerPc,
+      };
       setCuttingPo(cp);
-      setConsumption(await getConsumptionComparison(o, wo.cadConsumptionPerPc, wo.totalPlannedQty));
       setItems(wo.items || []);
       form.setFieldsValue({
         orderId: wo.orderId, cuttingPoId: wo.cuttingPoId, branchId: wo.branchId,
@@ -97,7 +100,7 @@ const WorkOrderForm = () => {
   }, [id, isEdit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleOrderSelect = async (orderId) => {
-    form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]); setConsumption([]);
+    form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]);
     setAllowanceWarn(null);
     await hydrateOrder(orderId);
     getWorkOrderCoverage(orderId).then(setCoverage);
@@ -105,7 +108,7 @@ const WorkOrderForm = () => {
 
   const handleCuttingPoSelect = async (cpId) => {
     const cp = cuttingPos.find((c) => c.id === cpId);
-    if (cp && order) await applyCuttingPo(cp, order);
+    if (cp && order) applyCuttingPo(cp, order);
     // Made where the cutting was: the unit picker narrows to that branch's units
     form.setFieldsValue({ branchId: cp?.branchId, processingUnitId: undefined, processingUnitName: '' });
   };
@@ -115,24 +118,21 @@ const WorkOrderForm = () => {
     setItems(items.map((i) => ({ ...i, ratePerPiece: bulkRate })));
   };
 
-  // Editing Planned Qty re-derives the BOM-based requirement in the consumption totals
-  // and the trim stock panel (requirement per garment = BOM consumption).
+  // Editing Planned Qty re-derives the BOM-based requirement in the trim stock panel
+  // (requirement per garment = BOM consumption).
   const onItemsChange = (newItems) => {
     setItems(newItems);
     const total = sum(newItems, 'plannedQty');
-    setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
     if (order) getStockByBom(order, 'trim', { plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normTrimStock(s)));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
   const overAuth = coverage && (coverage.authorizedQty + thisPoQty) > coverage.orderQty;
-  const redVariance = consumption.some((r) => Math.abs(computeVariancePercent(r.cadPerPc, r.bomPerPc)) > VARIANCE_THRESHOLD.YELLOW);
 
   const confirmWarnings = () => {
     const reasons = [];
     if (hasShortage) reasons.push('trim/accessory shortage');
     if (overAuth) reasons.push('quantity over the order qty');
-    if (redVariance) reasons.push('consumption variance > 5%');
     if (!reasons.length) return Promise.resolve(true);
     return new Promise((res) => modal.confirm({
       title: 'Submit despite warnings?',
@@ -151,10 +151,11 @@ const WorkOrderForm = () => {
     plannedStartDate: values.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: values.plannedEndDate?.format('YYYY-MM-DD'),
     plannedDeliveryDate: values.plannedDeliveryDate?.format('YYYY-MM-DD'),
     totalOrderQty: sum(items, 'orderQty'), allowancePercent: order.allowancePercent, totalPlannedQty: sum(items, 'plannedQty'),
-    bomConsumptionPerPc: consumption[0]?.bomPerPc, cadConsumptionPerPc: consumption[0]?.cadPerPc,
-    consumptionVariance: +computeVariancePercent(consumption[0]?.cadPerPc, consumption[0]?.bomPerPc).toFixed(2),
+    // Carried over from the cutting PO for the record; the work order does not revisit them.
+    bomConsumptionPerPc: cuttingPo?.bomConsumptionPerPc, cadConsumptionPerPc: cuttingPo?.cadConsumptionPerPc,
+    consumptionVariance: +computeVariancePercent(cuttingPo?.cadConsumptionPerPc, cuttingPo?.bomConsumptionPerPc).toFixed(2),
     garmentProcesses: order.garmentProcesses || [],
-    consumptionOverrideNote: justification || null, items, remarks: values.remarks,
+    consumptionOverrideNote: null, items, remarks: values.remarks,
   });
 
   const save = async (submit) => {
@@ -185,6 +186,7 @@ const WorkOrderForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
+        <ReferBackNotice record={saved} />
         {ppStatus && (
           <PpSampleGate
             status={ppStatus}
@@ -257,10 +259,6 @@ const WorkOrderForm = () => {
         </Space>
         <SizeColorMatrix items={items} onChange={onItemsChange} editable allowanceEditable={false} plannedQtyEditable />
       </>
-    ) },
-    { key: 'consumption', label: 'Consumption', disabled: !cuttingPo, children: (
-      <ConsumptionComparisonPanel rows={consumption} mode="inherited" onChange={setConsumption}
-        justification={justification} onJustificationChange={setJustification} />
     ) },
     { key: 'stock', label: 'Trim Stock', disabled: !order, children: (
       <MaterialStockPanel rows={stock} materialType="trim" allocatedEditable onChange={setStock} onShortageChange={setHasShortage} />

@@ -15,7 +15,7 @@ import {
   PROD_PO_STATUS, getStatusLabel, EDITABLE_STATUSES, PROCESSING_UNIT_OPTIONS, PO_TYPE,
 } from '../../../utils/productionConstants';
 import { listWorkOrders, getWorkOrder } from '../../../services/po/production/workOrderService';
-import { generateProductionPoPdf } from '../../../utils/productionPoPdfGenerator';
+import { printWorkOrder } from '../../../utils/workOrderPdfGenerator';
 import { useBranch } from '../../../context/BranchContext';
 import { useBranchColumn } from '../../../components/branch/BranchField';
 
@@ -67,6 +67,14 @@ const WorkOrderList = () => {
     setSearchParams(searchParams, { replace: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const printRow = useCallback(async (r) => {
+    try {
+      if (!(await printWorkOrder(r.id))) message.warning('Allow pop-ups for this site to print the work order');
+    } catch (e) {
+      message.error(e.message || 'Could not prepare the work order print');
+    }
+  }, [message]);
+
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
 
   const columns = useMemo(() => [
@@ -87,7 +95,7 @@ const WorkOrderList = () => {
       render: (_, r) => (
         <Space size={0}>
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
-          <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.WORK_ORDER)} />
+          <ActionButton action="print" onClick={() => printRow(r)} />
           {EDITABLE_STATUSES.includes(r.status) && (
             <PermissionGuard module="work-order" operation="update">
               <ActionButton action="edit" onClick={() => navigate(`/purchase-orders/work-order/edit/${r.id}`)} />
@@ -95,7 +103,7 @@ const WorkOrderList = () => {
           )}
         </Space>
       ) },
-  ], [navigate, branchColumn]);
+  ], [navigate, branchColumn, printRow]);
 
   return (
     <div className="animate-fade-in-up">

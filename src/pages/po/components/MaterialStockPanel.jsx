@@ -6,6 +6,17 @@ import { numericInputProps } from '../../../utils/inputHelpers';
 const { Text } = Typography;
 
 const TYPE_LABEL = { fabric: 'Fabric', trim: 'Trim / Accessory', packing: 'Packing Material' };
+
+// Req / Garment is in the BOM's consumption unit (Gms); requirements and stock figures
+// are in the unit the stock is held in (Kg). When the API knows no conversion between
+// the two, the requirements stay in the BOM's unit — reqUom says which, per row.
+const perPcUom = (r) => r.perPcUom || r.uom;
+const stockUom = (r) => r.stockUom || r.uom;
+const reqUom = (r) => r.reqUom || stockUom(r);
+const Uom = ({ children }) => (children
+  ? <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>{children}</Text>
+  : null);
+const qty = (v, uom) => <span style={{ whiteSpace: 'nowrap' }}>{(v || 0).toLocaleString()}<Uom>{uom}</Uom></span>;
 const STALE_MS = 48 * 60 * 60 * 1000;
 // Captured once at module load — a 48h staleness heuristic doesn't need per-render "now",
 // and keeping the impure Date call out of the component body keeps render pure.
@@ -48,27 +59,26 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
     { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v, r) => <Text strong>{r.variantCode || v}</Text> },
     { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true, render: (v, r) => r.variantName || v },
     { title: 'PO No', dataIndex: 'poNumber', width: 150, render: (v) => v || '—' },
-    { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
-    { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 110, align: 'right',
-      render: (v) => <Text type="secondary">{(v || 0).toFixed(3)}</Text> },
-    { title: 'BOM Req', dataIndex: 'bomRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() },
+    { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 120, align: 'right',
+      render: (v, r) => <Text type="secondary">{(v || 0).toFixed(3)}<Uom>{perPcUom(r)}</Uom></Text> },
+    { title: 'BOM Req', dataIndex: 'bomRequired', width: 120, align: 'right', render: (v, r) => qty(v, reqUom(r)) },
     ...(materialType === 'fabric'
-      ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 100, align: 'right', render: (v) => (v || 0).toLocaleString() }]
+      ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 120, align: 'right', render: (v, r) => qty(v, reqUom(r)) }]
       : []),
-    { title: 'Current Stock', dataIndex: 'currentStock', width: 120, align: 'right', render: (v) => (v || 0).toLocaleString() },
-    { title: 'Order Stock', dataIndex: 'orderStock', width: 120, align: 'right',
-      render: (v) => <Text style={{ color: '#1677ff' }}>{(v || 0).toLocaleString()}</Text> },
-    { title: 'Free Stock', dataIndex: 'freeStock', width: 120, align: 'right',
-      render: (v) => <Text style={{ color: '#389e0d' }}>{(v || 0).toLocaleString()}</Text> },
-    { title: 'Allocated', dataIndex: 'allocated', width: 120, align: 'right',
+    { title: 'Current Stock', dataIndex: 'currentStock', width: 130, align: 'right', render: (v, r) => qty(v, stockUom(r)) },
+    { title: 'Order Stock', dataIndex: 'orderStock', width: 130, align: 'right',
+      render: (v, r) => <Text style={{ color: '#1677ff' }}>{qty(v, stockUom(r))}</Text> },
+    { title: 'Free Stock', dataIndex: 'freeStock', width: 130, align: 'right',
+      render: (v, r) => <Text style={{ color: '#389e0d' }}>{qty(v, stockUom(r))}</Text> },
+    { title: 'Allocated', dataIndex: 'allocated', width: 140, align: 'right',
       render: (v, r) => (allocatedEditable
-        ? <InputNumber size="small" min={0} value={v} onChange={(val) => handleAllocated(r.key, val)} style={{ width: 100 }} {...numericInputProps} />
-        : (v || 0).toLocaleString()) },
-    { title: 'Available', dataIndex: 'availableBalance', width: 110, align: 'right', render: (v) => <Text strong>{(v || 0).toLocaleString()}</Text> },
-    { title: 'Shortage / Surplus', dataIndex: 'shortageSurplus', width: 150, align: 'right',
-      render: (v) => (
+        ? <InputNumber name={`allocated-${r.key}`} size="small" min={0} value={v} onChange={(val) => handleAllocated(r.key, val)} style={{ width: 120 }} suffix={stockUom(r)} {...numericInputProps} />
+        : qty(v, stockUom(r))) },
+    { title: 'Available', dataIndex: 'availableBalance', width: 150, align: 'right', render: (v, r) => <Text strong>{qty(v, stockUom(r))}</Text> },
+    { title: 'Shortage / Surplus', dataIndex: 'shortageSurplus', width: 160, align: 'right',
+      render: (v, r) => (
         <Tag color={v < 0 ? 'red' : 'green'}>
-          {v < 0 ? '▼ ' : '▲ '}{Math.abs(v || 0).toLocaleString()}
+          {v < 0 ? '▼ ' : '▲ '}{Math.abs(v || 0).toLocaleString()} {stockUom(r)}
         </Tag>
       ) },
   ], [materialType, allocatedEditable, handleAllocated]);

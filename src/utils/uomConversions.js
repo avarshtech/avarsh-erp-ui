@@ -90,6 +90,29 @@ const GRAMS_PER_MASS_UNIT = {
 export const normaliseUomSymbol = (symbol) =>
   String(symbol ?? '').trim().toLowerCase().replace(/\.+$/, '');
 
+// Unit identity by alias, mirroring the API's shared.uom.StockUom: the UOM master
+// ships 'KG' while goods receipts wrote 'Kilogram', and both are the same unit.
+const UOM_ALIASES = {
+  g: ['g', 'gm', 'gms', 'gram', 'grams', 'grm', 'grms'],
+  kg: ['kg', 'kgs', 'kilo', 'kilos', 'kilogram', 'kilograms'],
+  lb: ['lb', 'lbs', 'pound', 'pounds'],
+  m: ['m', 'mtr', 'mtrs', 'meter', 'meters', 'metre', 'metres'],
+  cm: ['cm', 'cms', 'centimeter', 'centimeters', 'centimetre', 'centimetres'],
+  yd: ['yd', 'yds', 'yard', 'yards'],
+  pcs: ['pc', 'pcs', 'piece', 'pieces', 'nos', 'no'],
+  cone: ['cone', 'cones'],
+};
+const CANONICAL_UOM = Object.fromEntries(
+  Object.entries(UOM_ALIASES).flatMap(([canon, names]) => names.map((n) => [n, canon])),
+);
+
+/** Whether two unit names denote the same unit ('KG' and 'Kilogram' do). */
+export const sameUom = (a, b) => {
+  const ca = CANONICAL_UOM[normaliseUomSymbol(a)] ?? normaliseUomSymbol(a);
+  const cb = CANONICAL_UOM[normaliseUomSymbol(b)] ?? normaliseUomSymbol(b);
+  return ca !== '' && ca === cb;
+};
+
 /** Grams per one unit of `symbol`, or null when it is not a unit of mass. */
 export const gramsPerUnitOf = (symbol) =>
   GRAMS_PER_MASS_UNIT[normaliseUomSymbol(symbol)] ?? null;

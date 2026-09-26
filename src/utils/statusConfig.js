@@ -123,6 +123,7 @@ export const PRODUCTION_PO_STATUS_CONFIG = {
   [PROD_PO_STATUS.APPROVED]:         { color: 'green',      icon: CheckCircleOutlined },
   [PROD_PO_STATUS.REJECTED]:         { color: 'red',        icon: CloseCircleOutlined },
   [PROD_PO_STATUS.CANCELLED]:        { color: 'volcano',    icon: StopOutlined },
+  [PROD_PO_STATUS.REFERRED_BACK]:    { color: 'orange',     icon: UndoOutlined },
 };
 
 

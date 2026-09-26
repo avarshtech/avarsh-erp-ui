@@ -7,6 +7,13 @@ import { computeVariancePercent, getVarianceStatus, VARIANCE_THRESHOLD } from '.
 
 const { Text } = Typography;
 
+// Per-piece consumption is in the BOM's unit (Gms); totals are stated in the unit the
+// stock is held in (Kg), so they compare with the Fabric Stock tab.
+const total = (perPc, r) => ((perPc || 0) * (r.plannedQty || 0)) / (r.uomDivisor || 1);
+const withUom = (value, uom) => (
+  <>{value}{uom && <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>{uom}</Text>}</>
+);
+
 /**
  * BOM vs CAD consumption comparison (PRD §4.3 / §5.3).
  * mode: 'editable' (Cutting PO — CAD entered/uploaded), 'inherited' (Work Order —
@@ -26,12 +33,11 @@ const ConsumptionComparisonPanel = ({
   const columns = [
     { title: 'Fabric Item', key: 'item', width: 220,
       render: (_, r) => (<div><Text strong>{r.variantCode || r.itemCode}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>{r.variantName || r.itemName}</Text></div>) },
-    { title: 'UOM', dataIndex: 'uom', width: 70, align: 'center' },
-    { title: 'BOM /Pc', dataIndex: 'bomPerPc', width: 90, align: 'right', render: (v) => (v || 0).toFixed(3) },
-    { title: 'CAD /Pc', key: 'cad', width: 120, align: 'right',
+    { title: 'BOM /Pc', dataIndex: 'bomPerPc', width: 110, align: 'right', render: (v, r) => withUom((v || 0).toFixed(3), r.perPcUom) },
+    { title: 'CAD /Pc', key: 'cad', width: 150, align: 'right',
       render: (_, r, index) => cadEditable
-        ? <InputNumber size="small" min={0} precision={3} value={r.cadPerPc} onChange={(v) => handleCad(index, v)} style={{ width: 100 }} {...numericInputProps} />
-        : (r.cadPerPc || 0).toFixed(3) },
+        ? <InputNumber size="small" min={0} precision={3} value={r.cadPerPc} onChange={(v) => handleCad(index, v)} style={{ width: 110 }} suffix={r.perPcUom} {...numericInputProps} />
+        : withUom((r.cadPerPc || 0).toFixed(3), r.perPcUom) },
     { title: 'Variance %', key: 'variance', width: 120, align: 'right',
       render: (_, r) => {
         const v = computeVariancePercent(r.cadPerPc, r.bomPerPc);
@@ -43,8 +49,8 @@ const ConsumptionComparisonPanel = ({
         const s = getVarianceStatus(computeVariancePercent(r.cadPerPc, r.bomPerPc));
         return <Tag color={s.tagColor}>{s.label}</Tag>;
       } },
-    { title: 'Total BOM', key: 'tbom', width: 110, align: 'right', render: (_, r) => ((r.bomPerPc || 0) * (r.plannedQty || 0)).toFixed(2) },
-    { title: 'Total CAD', key: 'tcad', width: 110, align: 'right', render: (_, r) => <Text strong>{((r.cadPerPc || 0) * (r.plannedQty || 0)).toFixed(2)}</Text> },
+    { title: 'Total BOM', key: 'tbom', width: 130, align: 'right', render: (_, r) => withUom(total(r.bomPerPc, r).toFixed(2), r.reqUom) },
+    { title: 'Total CAD', key: 'tcad', width: 130, align: 'right', render: (_, r) => withUom(<Text strong>{total(r.cadPerPc, r).toFixed(2)}</Text>, r.reqUom) },
   ];
 
   const hasEscalation = rows.some((r) => Math.abs(computeVariancePercent(r.cadPerPc, r.bomPerPc)) > VARIANCE_THRESHOLD.YELLOW);

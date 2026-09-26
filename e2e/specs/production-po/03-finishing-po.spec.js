@@ -50,9 +50,14 @@ test.describe('Finishing PO', () => {
       await vendorOption.click();
       await page.getByRole('button', { name: /^Next$/ }).click();
 
-      // Step 3 — review shows the split, then generate
+      // Step 3 — review shows the split; every PO (in-house too) needs its Rate / Pc
       await expect(page.getByText(/2 Finishing POs will be created/i)).toBeVisible({ timeout: 10000 });
-      await page.getByRole('button', { name: /Confirm & Generate/i }).click();
+      const generateBtn = page.getByRole('button', { name: /Confirm & Generate/i });
+      await expect(generateBtn).toBeDisabled();
+      const rateInputs = page.locator('input[name^="rate-"]');
+      await expect(rateInputs).toHaveCount(2);
+      for (let i = 0; i < 2; i += 1) await rateInputs.nth(i).fill(String(4 + i));
+      await generateBtn.click();
       await expectSuccessToast(page, /Finishing PO\(s\) created/i);
       await waitForPageReady(page);
       await waitForTableSettled(page);

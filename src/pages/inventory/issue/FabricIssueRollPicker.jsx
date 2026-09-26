@@ -144,8 +144,8 @@ const FabricIssueRollPicker = ({
   return (
     <>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 12 }}>
-        <Text>BOM Required: <Text strong>{formatNumber(bomRequired, 1)} {uom}</Text></Text>
-        <Text>Selected: <Text strong>{formatNumber(selectedQty, 1)} {uom}</Text></Text>
+        <Text>BOM Required: <Text strong>{formatNumber(bomRequired, 2)} {uom}</Text></Text>
+        <Text>Selected: <Text strong>{formatNumber(selectedQty, 2)} {uom}</Text></Text>
       </div>
       {uomMismatch && (
         <Alert
