@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Alert, App, Col, Collapse, Form, Result, Row, Select, Skeleton, Space, Spin, Tag, Typography } from 'antd';
+import { Alert, App, Col, Collapse, Form, Result, Row, Skeleton, Space, Spin, Tag, Typography } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
+import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
 import StatCard from '../../../components/StatCard';
 import { ActionButton } from '../../../components/buttons';
-import { FormSection, FormInput, FormSelect } from '../../../components/form';
+import { FormSection, FormInput, FormSelect, FormDatePicker } from '../../../components/form';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import useBusyAction from '../../../hooks/useBusyAction';
@@ -14,7 +15,7 @@ import { validate } from '../../../utils/expDocValidation';
 import { PACKING_ENTRY_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
-  PACKABLE_ORDER_STATUSES, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
+  PACKABLE_ORDER_STATUSES, SECTION_KEY, SECTION_TITLES, PHASE,
 } from '../../../utils/expDocConstants';
 import { sectionTotals } from '../../../utils/expDocCalc';
 import { MODULE_ID } from './packingModule';
@@ -22,8 +23,7 @@ import { searchOrders } from '../../../services/orders/orderService';
 import { getAllSizePresets } from '../../../services/master/sizePresetService';
 import {
   getPackingEntry, createPackingEntry, updatePackingEntry, setPackingEntryStatus,
-  listShipmentOptions, getBuyerCommercial, resolveTemplateFor,
-} from '../../../services/expdoc/expDocService';
+} from '../../../services/production/packingService';
 import CartonGroupEditor from './CartonGroupEditor';
 
 const { Text } = Typography;
@@ -33,8 +33,11 @@ const SECTION_KEYS = [SECTION_KEY.MAIN, SECTION_KEY.EXTRA];
 const num = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
+/** Packing is recorded as it happens, so a future day is never a valid packing date. */
+const isFutureDay = (d) => Boolean(d) && d.isAfter(dayjs(), 'day');
+
 /**
- * Carton Packing Entry.
+ * Carton Packing Entry — one order's cartons for one packing day.
  *
  * Sizes are FROZEN onto the entry at creation, copied from the order's size preset
  * in preset order. A later edit to the preset must not reorder the columns of an
@@ -49,6 +52,7 @@ const CartonPackingForm = () => {
   const isEdit = Boolean(id);
   const [record, setRecord] = useState(null);
   const [groups, setGroups] = useState([]);
+  const [orderId, setOrderId] = useState(null);
   const [sizes, setSizes] = useState([]);
   const [orderBreakdown, setOrderBreakdown] = useState([]);
   const [loading, setLoading] = useState(isEdit);
@@ -59,8 +63,9 @@ const CartonPackingForm = () => {
 
   const [orderOptions, setOrderOptions] = useState([]);
   const [orderLoading, setOrderLoading] = useState(false);
-  const [shipmentOptions, setShipmentOptions] = useState([]);
   const presetsRef = useRef([]);
+  // Read once at mount: a new entry defaults to the day it is opened.
+  const initialValues = useMemo(() => ({ packingDate: dayjs() }), []);
 
   const { searchText: orderSearch, setSearchText: setOrderSearch, debouncedSearch: debouncedOrder } =
     useDebouncedSearch();
@@ -78,16 +83,16 @@ const CartonPackingForm = () => {
         if (cancelled) return;
         setRecord(data);
         setGroups(data.groups || []);
+        setOrderId(data.orderId);
         setSizes(data.sizes || []);
         setOrderBreakdown(data.orderBreakdown || []);
         form.setFieldsValue({
           orderNo: data.orderNo,
+          packingDate: data.packingDate ? dayjs(data.packingDate) : null,
           buyerName: data.buyerName,
-          subClientCode: data.subClientCode,
           styleNo: data.styleNo,
           garmentName: data.garmentName,
           compositionText: data.compositionText,
-          shipmentId: data.shipmentId,
         });
       })
       .catch((e) => { if (!cancelled) setLoadError(e.message || 'Failed to load packing entry'); })
@@ -98,7 +103,6 @@ const CartonPackingForm = () => {
 
   // ── Pickers ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    listShipmentOptions().then(setShipmentOptions).catch(() => setShipmentOptions([]));
     getAllSizePresets()
       .then((res) => { presetsRef.current = res?.data ?? res ?? []; })
       .catch(() => { presetsRef.current = []; });
@@ -136,6 +140,8 @@ const CartonPackingForm = () => {
     const fromLines = new Set();
     (order.orderLines || []).forEach((l) => {
       Object.keys(l.sizePrices || {}).forEach((s) => fromLines.add(s));
+      // Some orders carry no size prices, only colour-wise quantities.
+      (l.colorRows || []).forEach((cr) => Object.keys(cr.quantities || {}).forEach((s) => fromLines.add(s)));
     });
     const presetId = (order.orderLines || [])[0]?.sizePresetId;
     const preset = presetsRef.current.find((p) => p.id === presetId);
@@ -152,7 +158,7 @@ const CartonPackingForm = () => {
     (orderNo) => {
       const order = orderOptions.find((o) => o.orderNo === orderNo);
       if (!order) return;
-      const commercial = getBuyerCommercial({ buyerName: order.buyerName });
+      setOrderId(order.id);
       setSizes(resolveSizes(order));
       // Snapshot the ordered quantities now, while the real order is in hand. The
       // packing list reads them from here rather than re-fetching an order that may
@@ -172,38 +178,11 @@ const CartonPackingForm = () => {
         styleNo: order.styleNo,
         garmentName: order.garmentName,
         compositionText: order.fabricDescription,
-        subClientCode: undefined,
       });
       setIsDirty(true);
-      if (!commercial.buyerCode) {
-        message.info('This buyer has no commercial profile yet — defaults will be used on the documents.');
-      }
     },
-    [orderOptions, form, resolveSizes, message],
+    [orderOptions, form, resolveSizes],
   );
-
-  const watchedBuyerName = Form.useWatch('buyerName', form);
-  const watchedSubClient = Form.useWatch('subClientCode', form);
-
-  /*
-   * The buyer's packing-list template, resolved before any document exists, so the
-   * pack types on offer are the ones this buyer's layout can actually print (§10.1).
-   */
-  const [buyerTemplate, setBuyerTemplate] = useState(null);
-  useEffect(() => {
-    if (!watchedBuyerName) { setBuyerTemplate(null); return; }
-    const buyerCode = getBuyerCommercial({ buyerName: watchedBuyerName }).buyerCode;
-    resolveTemplateFor({ buyerCode, subClientCode: watchedSubClient, docType: DOC_TYPE.PACKING_LIST })
-      .then((r) => setBuyerTemplate(r.template))
-      .catch(() => setBuyerTemplate(null));
-  }, [watchedBuyerName, watchedSubClient]);
-  const subClientOptions = useMemo(() => {
-    if (!watchedBuyerName) return [];
-    return (getBuyerCommercial({ buyerName: watchedBuyerName }).subClients || []).map((s) => ({
-      value: s.code,
-      label: `${s.code} — ${s.name}`,
-    }));
-  }, [watchedBuyerName]);
 
   // ── Derived ──────────────────────────────────────────────────────────────────
   const totals = useMemo(() => sectionTotals(groups), [groups]);
@@ -243,12 +222,14 @@ const CartonPackingForm = () => {
   // ── Actions ──────────────────────────────────────────────────────────────────
   const persist = useCallback(async () => {
     const values = await form.validateFields();
+    // Order number, buyer, style and garment are snapshotted server-side from the order.
     const payload = {
-      ...values,
+      orderId,
+      packingDate: values.packingDate.format('YYYY-MM-DD'),
+      compositionText: values.compositionText,
       sizes,
       orderBreakdown,
       groups,
-      buyerCode: getBuyerCommercial({ buyerName: values.buyerName }).buyerCode ?? null,
     };
     const saved = isEdit
       ? await updatePackingEntry(id, { ...payload, version: record?.version })
@@ -258,7 +239,7 @@ const CartonPackingForm = () => {
     setIsDirty(false);
     clearDirty();
     return saved;
-  }, [form, sizes, orderBreakdown, groups, isEdit, id, record, clearDirty]);
+  }, [form, orderId, sizes, orderBreakdown, groups, isEdit, id, record, clearDirty]);
 
   const handleSave = useCallback(async () => {
     setBusy('save');
@@ -362,7 +343,6 @@ const CartonPackingForm = () => {
         issuesByRow={issuesByRow}
         styleNo={form.getFieldValue('styleNo')}
         buyerPoNo={null}
-        allowedPackingTypes={buyerTemplate?.packingTypesAllowed}
         onChange={handleGroupsChange}
       />
     ),
@@ -423,7 +403,13 @@ const CartonPackingForm = () => {
       )}
 
       <Spin spinning={busy !== null}>
-        <Form form={form} layout="vertical" disabled={readOnly} onValuesChange={() => setIsDirty(true)}>
+        <Form
+          form={form}
+          layout="vertical"
+          disabled={readOnly}
+          initialValues={initialValues}
+          onValuesChange={() => setIsDirty(true)}
+        >
           <FormSection title="Order & Style" columns={4}>
             <Form.Item name="orderNo" label="Order" rules={[{ required: true, message: 'Select an order' }]}>
               <FormSelect
@@ -444,22 +430,16 @@ const CartonPackingForm = () => {
                 }
               />
             </Form.Item>
-            <Form.Item name="shipmentId" label="Shipment" rules={[{ required: true, message: 'Select a shipment' }]}>
-              <FormSelect placeholder="Select shipment" options={shipmentOptions} />
+            <Form.Item
+              name="packingDate"
+              label="Packing Date"
+              tooltip="The day these cartons were packed — the daily packing summary counts them on this date."
+              rules={[{ required: true, message: 'Select the packing date' }]}
+            >
+              <FormDatePicker disabledDate={isFutureDay} allowClear={false} />
             </Form.Item>
             <Form.Item name="buyerName" label="Buyer">
               <FormInput disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
-            </Form.Item>
-            <Form.Item
-              name="subClientCode"
-              label="Sub-client / End customer"
-              tooltip="Mock-only: the ERP has no sub-client concept yet. It drives buyer template resolution."
-            >
-              <FormSelect
-                options={subClientOptions}
-                placeholder={subClientOptions.length ? 'Optional' : 'None configured'}
-                disabled={!subClientOptions.length || readOnly}
-              />
             </Form.Item>
             <Form.Item name="styleNo" label="Style">
               <FormInput disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
@@ -470,7 +450,7 @@ const CartonPackingForm = () => {
             <Form.Item
               name="compositionText"
               label="Composition"
-              tooltip="Mock-only: stl_styles has no composition column yet. Printed on the invoice description."
+              tooltip="Pre-filled from the order's fabric description. Printed on the invoice description."
             >
               <FormInput placeholder="95% COTTON 5% ELASTANE" />
             </Form.Item>

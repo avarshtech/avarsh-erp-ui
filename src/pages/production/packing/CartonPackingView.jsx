@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Alert, App, Col, Row, Skeleton, Space, Table, Tag, Typography } from 'antd';
-import { AppstoreOutlined, InboxOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, CalendarOutlined, InboxOutlined } from '@ant-design/icons';
 import ViewDialog from '../../../components/ViewDialog';
 import DetailCard from '../../../components/DetailCard';
 import StatCard from '../../../components/StatCard';
@@ -12,7 +12,8 @@ import {
   SECTION_KEY, SECTION_TITLES,
 } from '../../../utils/expDocConstants';
 import { sizeQtyPerCarton, formatRanges } from '../../../utils/expDocCalc';
-import { getPackingEntry } from '../../../services/expdoc/expDocService';
+import { formatDate } from '../../../utils/formatters';
+import { getPackingEntry } from '../../../services/production/packingService';
 
 const { Text } = Typography;
 
@@ -134,10 +135,10 @@ const CartonPackingView = ({ open, entryId, onClose, onEdit, canUpdate }) => {
             getLabel={(s) => PACKING_ENTRY_STATUS_LABELS[s] || s}
           />
         ),
-        tags: fresh.subClientCode ? [<Tag key="sc" color="geekblue">{fresh.subClientCode}</Tag>] : [],
         subtitle: [fresh.orderNo, fresh.styleNo, fresh.garmentName, fresh.buyerName]
           .filter(Boolean).join(' • '),
         meta: [
+          { icon: <CalendarOutlined />, text: `Packed ${formatDate(fresh.packingDate)}` },
           { icon: <InboxOutlined />, text: `Cartons ${fresh.cartonRangeLabel || '—'}` },
           { icon: <AppstoreOutlined />, text: `${fresh.sizes?.length || 0} sizes` },
         ],
@@ -194,8 +195,8 @@ const CartonPackingView = ({ open, entryId, onClose, onEdit, canUpdate }) => {
 
           <DetailCard title="Order & Style" style={{ marginBottom: 16 }}>
             <DetailCard.Field label="Order" value={fresh.orderNo} />
+            <DetailCard.Field label="Packing Date" value={formatDate(fresh.packingDate)} />
             <DetailCard.Field label="Buyer" value={fresh.buyerName} />
-            <DetailCard.Field label="Sub-client" value={fresh.subClientCode} />
             <DetailCard.Field label="Style" value={fresh.styleNo} />
             <DetailCard.Field label="Garment" value={fresh.garmentName} />
             <DetailCard.Field label="Composition" value={fresh.compositionText} />

@@ -57,9 +57,6 @@ export const isMemoryOnly = () => memoryDb != null;
 // Every series follows the ERP standard <PREFIX>/<FY>/<NNNN> handed out by the
 // backend DocumentNumberService — see expDocDocNumbers.js.
 
-/** Carton packing entry, e.g. CPK/26-27/1001. */
-export const nextPackingNo = (db) => nextDocNo(db, EXPDOC_PREFIX.PACKING_ENTRY);
-
 /** Shipment, e.g. SHP/26-27/1001. */
 export const nextShipmentNo = (db) => nextDocNo(db, EXPDOC_PREFIX.SHIPMENT);
 
