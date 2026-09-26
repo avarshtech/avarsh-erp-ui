@@ -2,7 +2,7 @@
  * State of the Cut Panel Requirement screen: the CPR document being edited plus the
  * order context it was built from. Pure — every quantity rule lives in utils/cutPanelCalc.
  */
-import { recalcLine, renumberSequences, setSizeQty } from '../../../utils/cutPanelCalc';
+import { highestLineNo, recalcLine, renumberSequences, setSizeQty } from '../../../utils/cutPanelCalc';
 import { REQUIREMENT_STATUS } from '../../../utils/requirementStatus';
 
 export const initialCprState = { doc: null, order: null, dirty: false };
@@ -27,15 +27,18 @@ export const cprReducer = (state, action) => {
   switch (action.type) {
     case 'LOADED':
       return { doc: action.doc, order: action.order, dirty: false };
+    case 'LOAD_FAILED':
+      return initialCprState;
     case 'ORDER_SELECTED':
       return { doc: newCprDoc(action.order), order: action.order, dirty: true };
     case 'BOM_SELECTED':
       return { ...state, dirty: true, doc: { ...state.doc, bomVersion: action.bomVersion } };
     case 'LINES_ADDED':
       return { ...state, dirty: true, doc: { ...state.doc, lines: [...state.doc.lines, ...action.lines] } };
-    case 'LINES_REMOVED': {
+    case 'LINES_REMOVED': { // lastLineNo remembers the removed keys, so they are never reissued
       const drop = new Set(action.keys);
-      return { ...state, dirty: true, doc: { ...state.doc, lines: renumberSequences(state.doc.lines.filter((l) => !drop.has(l.key))) } };
+      const lines = renumberSequences(state.doc.lines.filter((l) => !drop.has(l.key)));
+      return { ...state, dirty: true, doc: { ...state.doc, lastLineNo: highestLineNo(state.doc), lines } };
     }
     case 'LINE_PATCHED':
       return mapLine(state, action.key, (l) => ({ ...l, ...action.patch }));

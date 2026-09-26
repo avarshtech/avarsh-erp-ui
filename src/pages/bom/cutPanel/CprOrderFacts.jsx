@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Descriptions } from 'antd';
 import { formatDate } from '../../../utils/formatters';
+import { calcRequiredQty } from '../../../utils/cutPanelCalc';
 
 const qty = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN'));
 
@@ -18,7 +19,7 @@ const CprOrderFacts = memo(function CprOrderFacts({ order, doc }) {
       { key: 'delivery', label: 'Delivery Date', children: formatDate(order.deliveryDate, 'DD-MM-YYYY') },
       { key: 'qty', label: 'Order Quantity', children: qty(order.totalQty) },
       { key: 'allow', label: 'Order Allowance %', children: `${allowance.toFixed(2)}%` },
-      { key: 'qtyAllow', label: 'Qty incl. Allowance', children: qty(Math.ceil(order.totalQty * (1 + allowance / 100))) },
+      { key: 'qtyAllow', label: 'Qty incl. Allowance', children: qty(calcRequiredQty(order.totalQty, 1, allowance)) },
       { key: 'colours', label: 'Colours in Order', children: order.colors.length },
       { key: 'sizes', label: 'Size Set', children: order.sizes.join(' · ') },
       {

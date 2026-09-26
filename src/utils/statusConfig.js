@@ -208,6 +208,11 @@ export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISP
 export const PL_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 export const REQUIREMENT_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'PARTIALLY_USED', 'FULLY_USED'];
+// CLOSED is an outcome, appended like the SR terminal step: a closed requirement's flow
+// ends where it was closed from (Submitted, or Partially Used once the PO module used some).
+export const requirementStatusFlow = (status, consumedQty) => (status === REQUIREMENT_STATUS.CLOSED
+  ? ['DRAFT', 'SUBMITTED', ...(consumedQty > 0 ? ['PARTIALLY_USED'] : []), 'CLOSED']
+  : REQUIREMENT_STATUS_FLOW);
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

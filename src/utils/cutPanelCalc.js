@@ -57,9 +57,18 @@ export const lineWarnings = (line, orderAllowancePct) => {
 
 export const needsReason = (line, orderAllowancePct) => lineWarnings(line, orderAllowancePct).length > 0;
 
+const lineNo = (key) => Number(String(key).replace(/\D/g, '')) || 0;
+
+/**
+ * Highest line number this requirement has ever issued. `lastLineNo` keeps it after lines
+ * are removed, so a key is never reissued (a reissued key would inherit the removed
+ * line's grid selection and audit history).
+ */
+export const highestLineNo = (doc) => doc.lines.reduce((m, l) => Math.max(m, lineNo(l.key)), doc.lastLineNo || 0);
+
 /** Monotonic line keys (never Date.now — two lines added in one millisecond would collide). */
-export const lineKeyFactory = (lines) => {
-  let n = lines.reduce((m, l) => Math.max(m, Number(String(l.key).replace(/\D/g, '')) || 0), 0);
+export const lineKeyFactory = (lines, lastLineNo = 0) => {
+  let n = highestLineNo({ lines, lastLineNo });
   return () => `L${++n}`;
 };
 
@@ -68,9 +77,9 @@ export const lineKeyFactory = (lines) => {
  * skipped (§8.2.3). Sequence follows the chip order and continues after the highest
  * sequence already on that Fabric + Colour + Panel, so it stays continuous.
  */
-export const expandSelection = ({ fabric, colorNames, panels, processes, allowancePct, order, existingLines }) => {
+export const expandSelection = ({ fabric, colorNames, panels, processes, allowancePct, order, existingLines, lastLineNo }) => {
   const existing = new Set(existingLines.map(duplicateKey));
-  const nextKey = lineKeyFactory(existingLines);
+  const nextKey = lineKeyFactory(existingLines, lastLineNo);
   const lines = [];
   let skipped = 0;
   colorNames.forEach((colorName) => {
@@ -189,16 +198,17 @@ export const draftSaveErrors = (doc, order) => {
 
 /**
  * Pre-submit checks (PRD §8.4 / §12). `blocking` stops Submit; `uncoveredColors`
- * (WRN-03) only asks for confirmation.
+ * (WRN-03) only asks for confirmation. `orderAllowancePct` is the requirement's snapshot,
+ * the same one the grid compares each line's allowance with (WRN-04).
  */
-export const runPreSubmitChecks = (lines, order) => {
+export const runPreSubmitChecks = (lines, order, orderAllowancePct) => {
   const blocking = [];
   if (!order) return { blocking: [CPR_VAL.VAL_01], uncoveredColors: [], checks: [] };
   const zeroCells = lines.filter((l) => Object.values(l.sizes)
     .some((c) => c.baseQty > 0 && !(Number(c.requiredQty) > 0)));
   const invalidNumbers = lines.filter(hasInvalidNumbers);
   const badSeq = invalidSequenceGroups(lines);
-  const missingReason = lines.filter((l) => needsReason(l, order.allowancePercent) && !String(l.varianceReason || '').trim());
+  const missingReason = lines.filter((l) => needsReason(l, orderAllowancePct) && !String(l.varianceReason || '').trim());
   const uncoveredColors = order.colors.filter((c) => !lines.some((l) => l.colorName === c.name)).map((c) => c.name);
 
   const checks = [

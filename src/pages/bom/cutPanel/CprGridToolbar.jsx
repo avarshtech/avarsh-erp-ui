@@ -16,13 +16,18 @@ const CprGridToolbar = memo(function CprGridToolbar({ defaultAllowance, overridd
   const apply = () => {
     if (pct == null) return;
     if (!overriddenCount) { onApplyAllowance(pct, false); return; }
-    modal.confirm({
+    // Three answers: include the edited lines, skip them, or Cancel / Esc — nothing changes.
+    const answer = (includeOverridden) => { dialog.destroy(); if (includeOverridden !== null) onApplyAllowance(pct, includeOverridden); };
+    const dialog = modal.confirm({
       title: `${overriddenCount} line(s) have edited quantities`,
       content: `Apply ${Number(pct).toFixed(2)}% to them as well? Their edited quantities will be replaced by the calculation.`,
-      okText: 'Include edited lines',
-      cancelText: 'Skip edited lines',
-      onOk: () => onApplyAllowance(pct, true),
-      onCancel: () => onApplyAllowance(pct, false),
+      footer: (
+        <Space style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+          <Button onClick={() => answer(null)}>Cancel</Button>
+          <Button onClick={() => answer(false)}>Skip edited lines</Button>
+          <Button type="primary" onClick={() => answer(true)}>Include edited lines</Button>
+        </Space>
+      ),
     });
   };
 

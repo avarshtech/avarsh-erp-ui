@@ -28,7 +28,7 @@ const ProcessChips = memo(function ProcessChips({ items, onReorder, onRemove, di
           draggable={!disabled}
           onDragStart={() => setDragIndex(idx)}
           onDragOver={(e) => e.preventDefault()}
-          onDrop={() => { move(dragIndex, idx); setDragIndex(null); }}
+          onDrop={() => { if (dragIndex !== null) move(dragIndex, idx); setDragIndex(null); }}
           onDragEnd={() => setDragIndex(null)}
           style={{ opacity: dragIndex === idx ? 0.5 : 1, cursor: disabled ? 'default' : 'grab' }}
         >

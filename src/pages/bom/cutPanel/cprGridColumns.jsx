@@ -3,35 +3,10 @@ import { DeleteOutlined, DownOutlined, RightOutlined } from '@ant-design/icons';
 import ColorDot from '../shared/ColorDot';
 import { lineTotal, needsReason, processLabel, varianceOf } from '../../../utils/cutPanelCalc';
 import { CPR_WRN } from '../../../utils/cutPanelConstants';
+import { QtyInput, SeqInput } from './CprGridInputs';
 
 const { Text } = Typography;
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const groupKeyOf = (l) => `${l.fabricId}|${l.colorName}`;
-
-/**
- * Grid rows grouped by fabric + colour (PRD §8.3): a header row, a grey reference row
- * with the colour's order qty per size, then the lines ordered by panel and sequence.
- * Collapsed groups show only their header.
- */
-export const buildGridRows = (lines, order, allowancePct, collapsed) => {
-  const colourRank = Object.fromEntries(order.colors.map((c, i) => [c.name, i]));
-  const groups = {};
-  lines.forEach((l) => { (groups[groupKeyOf(l)] ||= []).push(l); });
-  return Object.entries(groups)
-    .sort(([, a], [, b]) => a[0].fabricName.localeCompare(b[0].fabricName) || colourRank[a[0].colorName] - colourRank[b[0].colorName])
-    .flatMap(([gk, ls]) => {
-      const first = ls[0];
-      const color = order.colors.find((c) => c.name === first.colorName) || { name: first.colorName };
-      const header = {
-        type: 'group', key: `g:${gk}`, gk, fabricName: first.fabricName, fabricCode: first.fabricCode, color,
-        lineCount: ls.length, orderQty: color.qty || 0,
-        orderQtyAllow: Math.ceil((color.qty || 0) * (1 + (Number(allowancePct) || 0) / 100)),
-      };
-      if (collapsed.has(gk)) return [header];
-      const sorted = [...ls].sort((a, b) => a.panelName.localeCompare(b.panelName) || a.sequenceNo - b.sequenceNo);
-      return [header, { type: 'ref', key: `r:${gk}`, gk, base: order.qtyMatrix[first.colorName] || {} }, ...sorted.map((l) => ({ ...l, type: 'line' }))];
-    });
-};
 
 const span = (row, full, refSpan) => {
   if (row.type === 'group') return { colSpan: full };
@@ -43,23 +18,6 @@ const hideOn = (...types) => (row) => (types.includes(row.type) ? { colSpan: 0 }
 export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers, collapsed, focusNext }) => {
   const sizes = order.sizes;
   const fullSpan = 7 + sizes.length;
-  const qtyInput = (row, size, idx) => {
-    const cell = row.sizes[size] || { baseQty: 0, calculatedQty: 0, requiredQty: 0 };
-    if (!(cell.baseQty > 0)) return <Text type="secondary" style={{ fontSize: 12 }}>N/A</Text>;
-    const differs = Number(cell.requiredQty) !== cell.calculatedQty;
-    const style = differs ? { background: 'color-mix(in srgb, var(--warning-color, #faad14) 18%, transparent)' } : undefined;
-    if (!editable) return <Tooltip title={differs ? `Calculated ${n(cell.calculatedQty)}` : undefined}><span style={{ ...style, padding: '0 4px' }}>{n(cell.requiredQty)}</span></Tooltip>;
-    return (
-      <Tooltip title={differs ? `Calculated ${n(cell.calculatedQty)}` : undefined}>
-        <InputNumber
-          id={`cpr-qty-${row.key}-${idx}`} name={`qty-${row.key}-${size}`} size="small" min={0} precision={0} controls={false}
-          aria-label={`${row.colorName} ${row.panelName} ${processLabel(row)} ${size} quantity`}
-          value={cell.requiredQty} onChange={(v) => handlers.onQty(row.key, size, v)}
-          onPressEnter={() => focusNext(row.key, idx)} style={{ width: 72, ...style }}
-        />
-      </Tooltip>
-    );
-  };
 
   return [
     {
@@ -90,7 +48,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
     {
       title: 'Seq', key: 'seq', width: 70, align: 'center', onCell: hideOn('group', 'ref'),
       render: (_, row) => (row.type !== 'line' ? null : editable
-        ? <InputNumber size="small" name={`seq-${row.key}`} aria-label={`${processLabel(row)} sequence`} min={1} max={99} precision={0} controls={false} value={row.sequenceNo} onChange={(v) => handlers.onSeq(row.key, v)} style={{ width: 52 }} />
+        ? <SeqInput key={`${row.key}:${row.sequenceNo}`} row={row} onSeq={handlers.onSeq} />
         : row.sequenceNo),
     },
     {
@@ -104,7 +62,9 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
       // AntD still calls render for colSpan-0 cells, so every column guards its row type.
       render: (_, row) => {
         if (row.type === 'group') return null;
-        return row.type === 'ref' ? <Text type="secondary">{n(row.base[size])}</Text> : qtyInput(row, size, idx);
+        return row.type === 'ref'
+          ? <Text type="secondary">{n(row.base[size])}</Text>
+          : <QtyInput row={row} size={size} idx={idx} editable={editable} onQty={handlers.onQty} focusNext={focusNext} />;
       },
     })),
     {

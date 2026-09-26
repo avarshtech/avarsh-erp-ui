@@ -16,8 +16,12 @@ export const triggerBrowserDownload = (blob, filename) => {
   window.URL.revokeObjectURL(url);
 };
 
+// Text starting with = + - @ (or a tab / CR) runs as a formula in Excel; a leading
+// apostrophe keeps free text such as an "Other" process name inert. Numbers pass as they are.
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 const csvCell = (value) => {
-  const text = String(value ?? '');
+  const text = typeof value === 'string' && FORMULA_START.test(value) ? `'${value}` : String(value ?? '');
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 

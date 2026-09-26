@@ -17,9 +17,9 @@ const tint = (v, orderQty) => {
  * Row keys and column keys are stable, so typing never remounts an input (keeps focus).
  */
 const GprQtyGrid = memo(function GprQtyGrid({ line, order, editable, onQty }) {
-  const colors = order.colors.filter((c) => line.colors.includes(c.name));
-  const sizes = order.sizes.filter((s) => line.sizes.includes(s));
-  const totals = gprLineTotals(line, order);
+  const colors = useMemo(() => order.colors.filter((c) => line.colors.includes(c.name)), [order, line.colors]);
+  const sizes = useMemo(() => order.sizes.filter((s) => line.sizes.includes(s)), [order, line.sizes]);
+  const totals = useMemo(() => gprLineTotals(line, order), [line, order]);
 
   const columns = useMemo(() => [
     {
@@ -60,7 +60,7 @@ const GprQtyGrid = memo(function GprQtyGrid({ line, order, editable, onQty }) {
       pagination={false}
       scroll={{ x: 240 + sizes.length * 100 }}
       summary={() => (
-        <Table.Summary fixed>
+        <Table.Summary>
           <Table.Summary.Row>
             <Table.Summary.Cell index={0}><strong>Size total</strong></Table.Summary.Cell>
             {sizes.map((s, i) => <Table.Summary.Cell key={s} index={i + 1} align="right"><strong>{n(totals.cols[s])}</strong></Table.Summary.Cell>)}

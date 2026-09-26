@@ -2,7 +2,8 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { Card, Table, Typography } from 'antd';
 import EmptyState from '../../../components/EmptyState';
 import { cprTotals } from '../../../utils/cutPanelCalc';
-import { buildGridColumns, buildGridRows } from './cprGridColumns';
+import { buildGridColumns } from './cprGridColumns';
+import { buildGridRows } from './cprGridRows';
 import CprGridToolbar from './CprGridToolbar';
 
 const { Text } = Typography;
@@ -10,7 +11,8 @@ const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * Section 3 — Cut Panel Requirement grid (PRD §8.3). Size columns come from the order's
- * size set, never hard-coded; a totals row sums every size and the whole CPR.
+ * size set, never hard-coded; a totals row sums every size and the whole CPR. No sticky
+ * header: .ant-card-body scrolls (styles/overrides.css), so it would stick inside the card.
  */
 const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editable, handlers }) {
   const [collapsed, setCollapsed] = useState(() => new Set());
@@ -24,13 +26,17 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
 
   const rows = useMemo(() => buildGridRows(doc.lines, order, doc.orderAllowancePct, collapsed), [doc.lines, order, doc.orderAllowancePct, collapsed]);
   const lineKeys = useMemo(() => rows.filter((r) => r.type === 'line').map((r) => r.key), [rows]);
+  // A removed line leaves the selection here (the row's delete button bypasses onChange).
+  const selected = useMemo(() => selectedKeys.filter((k) => doc.lines.some((l) => l.key === k)), [selectedKeys, doc.lines]);
 
-  /** Enter in a size cell: next size on the row, then the first size of the next row. */
+  /** Enter in a size cell: the next editable size on the row, then on the rows below (N/A cells have no input). */
   const focusNext = useCallback((key, idx) => {
-    const next = idx + 1 < order.sizes.length
-      ? `cpr-qty-${key}-${idx + 1}`
-      : `cpr-qty-${lineKeys[lineKeys.indexOf(key) + 1]}-0`;
-    document.getElementById(next)?.focus();
+    for (let r = lineKeys.indexOf(key), i = idx + 1; r >= 0 && r < lineKeys.length; r += 1, i = 0) {
+      for (; i < order.sizes.length; i += 1) {
+        const input = document.getElementById(`cpr-qty-${lineKeys[r]}-${i}`);
+        if (input) { input.focus(); return; }
+      }
+    }
   }, [order.sizes.length, lineKeys]);
 
   const columns = useMemo(() => buildGridColumns({
@@ -46,31 +52,30 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
         <CprGridToolbar
           defaultAllowance={doc.orderAllowancePct}
           overriddenCount={doc.lines.filter((l) => l.isManualOverride).length}
-          selectedCount={selectedKeys.length}
+          selectedCount={selected.length}
           onRecalcAll={handlers.onRecalcAll}
           onApplyAllowance={handlers.onApplyAllowance}
-          onRemoveSelected={() => { handlers.onRemoveMany(selectedKeys); setSelectedKeys([]); }}
+          onRemoveSelected={() => { handlers.onRemoveMany(selected); setSelectedKeys([]); }}
         />
       )}
       <Table
         size="small"
         bordered
         rowKey="key"
-        sticky={{ offsetHeader: 64 }}
         columns={columns}
         dataSource={rows}
         pagination={false}
         scroll={{ x: 760 + order.sizes.length * 90 }}
         onRow={(r) => ({ style: r.type === 'group' ? { background: 'var(--bg-secondary, #fafafa)' } : undefined })}
         rowSelection={editable ? {
-          selectedRowKeys: selectedKeys,
+          selectedRowKeys: selected,
           onChange: (keys) => setSelectedKeys(keys.filter((k) => lineKeys.includes(k))),
           getCheckboxProps: (r) => ({ disabled: r.type !== 'line', name: `select-${r.key}` }),
           renderCell: (checked, r, i, node) => (r.type === 'line' ? node : null),
         } : undefined}
         locale={{ emptyText: <EmptyState title="No requirement lines yet" description="Pick a fabric, colours, panels and processes above, then Add to Grid." /> }}
         summary={() => (doc.lines.length ? (
-          <Table.Summary fixed>
+          <Table.Summary>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={4 + offset}><strong>Total cut panel requirement</strong></Table.Summary.Cell>
               {order.sizes.map((s, i) => (

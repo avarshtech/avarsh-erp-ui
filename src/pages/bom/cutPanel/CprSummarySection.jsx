@@ -26,7 +26,7 @@ const checkIcon = (c) => {
 const CprSummarySection = memo(function CprSummarySection({ doc, order, showChecks, onPrint, onExport }) {
   const colourSummary = useMemo(() => buildColourSummary(doc.lines, order), [doc.lines, order]);
   const rollup = useMemo(() => buildProcessRollup(doc.lines), [doc.lines]);
-  const { checks } = useMemo(() => runPreSubmitChecks(doc.lines, order), [doc.lines, order]);
+  const { checks } = useMemo(() => runPreSubmitChecks(doc.lines, order, doc.orderAllowancePct), [doc.lines, order, doc.orderAllowancePct]);
 
   return (
     <Card

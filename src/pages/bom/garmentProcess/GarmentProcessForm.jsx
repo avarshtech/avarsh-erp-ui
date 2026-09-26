@@ -1,29 +1,32 @@
 import { useMemo, useState } from 'react';
-import { Alert, Button, Card, Col, Input, Row, Skeleton, Space } from 'antd';
+import { Button, Card, Col, Input, Row, Skeleton, Space } from 'antd';
 import { CloseCircleOutlined, HistoryOutlined, RollbackOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
-import StatusSteps from '../../../components/StatusSteps';
-import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useRequirementMasters from '../../../hooks/useRequirementMasters';
-import { hasPermission, canReopenRequirement, canCloseRequirement, canSubmitGarmentProcessOverQty } from '../../../utils/permissions';
-import { REQUIREMENT_STATUS_CONFIG, REQUIREMENT_STATUS_FLOW } from '../../../utils/statusConfig';
+import {
+  hasPermission, canReopenRequirement, canCloseRequirement, canSubmitRequirement, canSubmitGarmentProcessOverQty,
+} from '../../../utils/permissions';
+import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   getRequirementStatusLabel, isRequirementClosable, isRequirementEditable, isRequirementReopenable,
 } from '../../../utils/requirementStatus';
 import { GPR_MODULE_ID, GPR_PROCESS_CATEGORY, GPR_REMARKS_MAX } from '../../../utils/garmentProcessConstants';
-import { formatDate } from '../../../utils/formatters';
 import { getGprAudit } from '../../../services/bom/garmentProcess/garmentProcessService';
-import { CLOSE_ACTION, REOPEN_ACTION } from '../shared/requirementDialogs';
 import RequirementHistoryDrawer from '../shared/RequirementHistoryDrawer';
+import RequirementNotFound from '../shared/RequirementNotFound';
+import RequirementStatusBanner from '../shared/RequirementStatusBanner';
+import RequirementTransitionDialog from '../shared/RequirementTransitionDialog';
 import useGarmentProcessRequirement from './useGarmentProcessRequirement';
 import useGprActions from './useGprActions';
 import GprOrderSection from './GprOrderSection';
 import GprSequenceList from './GprSequenceList';
 import GprLineEditor from './GprLineEditor';
 import GprActionBar from './GprActionBar';
+
+const LIST_PATH = '/bom/garment-process/list';
 
 /**
  * Garment Process Requirement — one vertically scrolling screen (PRD §6): A. Order
@@ -35,9 +38,8 @@ const GarmentProcessForm = () => {
   const navigate = useNavigate();
   const { doc, order, activeKey, dirty, dispatch, loading, orders, siblings, selectOrder } = useGarmentProcessRequirement(id);
   const { clearDirty } = useUnsavedChanges(dirty);
-  const actions = useGprActions({ doc, order, dispatch, clearDirty });
-  const [dialog, setDialog] = useState(null);
-  const [reason, setReason] = useState('');
+  const actions = useGprActions({ doc, dirty, order, dispatch, clearDirty });
+  const [dialog, setDialog] = useState({ kind: 'close', open: false });
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const canEdit = hasPermission(GPR_MODULE_ID, doc?.id ? 'update' : 'add');
@@ -56,41 +58,30 @@ const GarmentProcessForm = () => {
     resetQty: () => dispatch({ type: 'RESET_QTY', key: activeKey }),
   }), [dispatch, activeKey]);
 
-  const confirmDialog = async (text) => {
-    const ok = dialog === 'close' ? await actions.close(text.trim()) : await actions.reopen();
-    if (ok) { setDialog(null); setReason(''); }
-  };
-
-  if (loading || !doc) return <Skeleton active paragraph={{ rows: 12 }} />;
+  if (loading) return <Skeleton active paragraph={{ rows: 12 }} />;
+  if (!doc) return <RequirementNotFound listPath={LIST_PATH} />;
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader
         title={doc.requirementNo ? `Garment Process Requirement ${doc.requirementNo}` : 'New Garment Process Requirement'}
         subtitle="Which sewn garments need which process, in what sequence and quantity"
-        backPath="/bom/garment-process/list"
+        backPath={LIST_PATH}
         status={<StatusTag status={doc.status} config={REQUIREMENT_STATUS_CONFIG} getLabel={getRequirementStatusLabel} />}
       >
         <Space wrap>
-          <Button icon={<UnorderedListOutlined />} onClick={() => navigate('/bom/garment-process/list')}>View all requirements</Button>
+          <Button icon={<UnorderedListOutlined />} onClick={() => navigate(LIST_PATH)}>View all requirements</Button>
           {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
           {canReopenRequirement(GPR_MODULE_ID) && isRequirementReopenable(doc.status, doc.consumedQty) && (
-            <Button icon={<RollbackOutlined />} onClick={() => setDialog('reopen')}>Reopen</Button>
+            <Button icon={<RollbackOutlined />} onClick={() => setDialog({ kind: 'reopen', open: true })}>Reopen</Button>
           )}
           {canCloseRequirement(GPR_MODULE_ID) && isRequirementClosable(doc.status) && (
-            <Button danger icon={<CloseCircleOutlined />} onClick={() => setDialog('close')}>Close</Button>
+            <Button danger icon={<CloseCircleOutlined />} onClick={() => setDialog({ kind: 'close', open: true })}>Close</Button>
           )}
         </Space>
       </PageHeader>
 
-      {REQUIREMENT_STATUS_FLOW.includes(doc.status) && (
-        <StatusSteps statusFlow={REQUIREMENT_STATUS_FLOW} currentStatus={doc.status} statusConfig={REQUIREMENT_STATUS_CONFIG}
-          getLabel={getRequirementStatusLabel} size="small" style={{ marginBottom: 16 }} />
-      )}
-      {doc.closeReason && (
-        <Alert type="info" showIcon style={{ marginBottom: 16 }}
-          title={`Closed by ${doc.closedBy} on ${formatDate(doc.closedOn, 'DD-MM-YYYY')}`} description={doc.closeReason} />
-      )}
+      <RequirementStatusBanner doc={doc} />
 
       <GprOrderSection doc={doc} order={order} orders={orders} siblings={siblings} editable={editable} onSelectOrder={selectOrder} />
 
@@ -133,14 +124,12 @@ const GarmentProcessForm = () => {
       )}
 
       <GprActionBar
-        doc={doc} editable={editable} busy={actions.busy} errors={actions.errors}
-        on={{ cancel: () => navigate('/bom/garment-process/list'), save: actions.save, submit: actions.submit }}
+        doc={doc} editable={editable} canSubmit={canSubmitRequirement(GPR_MODULE_ID)} busy={actions.busy} errors={actions.errors}
+        on={{ cancel: () => navigate(LIST_PATH), save: actions.save, submit: actions.submit }}
       />
-      <ApprovalReasonDialog
-        open={Boolean(dialog)} onCancel={() => { setDialog(null); setReason(''); }} onConfirm={confirmDialog}
-        loading={actions.busy === 'close' || actions.busy === 'reopen'}
-        action={dialog === 'close' ? CLOSE_ACTION : REOPEN_ACTION}
-        docLabel="Garment Process Requirement" docNumber={doc.requirementNo} reason={reason} onReasonChange={setReason}
+      <RequirementTransitionDialog
+        dialog={dialog} onDone={() => setDialog((d) => ({ ...d, open: false }))} actions={actions}
+        docLabel="Garment Process Requirement" docNumber={doc.requirementNo}
       />
       <RequirementHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.requirementNo} loadAudit={getGprAudit} />
     </div>

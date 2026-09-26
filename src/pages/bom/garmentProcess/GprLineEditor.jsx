@@ -27,6 +27,7 @@ const GprLineEditor = memo(function GprLineEditor({ line, lines, index, order, p
   return (
     <Card size="small" style={{ marginBottom: 16 }} title={`Seq ${line.seqNo} — ${gprLineLabel(line) || 'Select a process'}`}>
       {masters.forbidden && <Alert type="warning" showIcon style={{ marginBottom: 12 }} title="You need view access to Processes (Master Data) to pick a process." />}
+      {masters.failed && <Alert type="error" showIcon style={{ marginBottom: 12 }} title="The Processes master could not be loaded — reload the page to pick a process." />}
       <Form layout="vertical" component="div">
         <Row gutter={12}>
           <Col xs={24} md={12}>

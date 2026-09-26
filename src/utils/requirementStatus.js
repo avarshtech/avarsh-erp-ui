@@ -42,12 +42,6 @@ export const isRequirementReopenable = (status, consumedQty = 0) =>
 export const isRequirementClosable = (status) =>
   status === REQUIREMENT_STATUS.SUBMITTED || status === REQUIREMENT_STATUS.PARTIALLY_USED;
 
-/** Status of a submitted requirement from its required and consumed totals. */
-export const deriveUsageStatus = (requiredQty, consumedQty) => {
-  if (!(consumedQty > 0)) return REQUIREMENT_STATUS.SUBMITTED;
-  return consumedQty >= requiredQty ? REQUIREMENT_STATUS.FULLY_USED : REQUIREMENT_STATUS.PARTIALLY_USED;
-};
-
 /**
  * Next number in a `<PREFIX>-<YYYY>-NNNNN` series. The year is the financial year's
  * start year; numbers are never reused, so the serial continues from the highest ever

@@ -69,6 +69,19 @@ test.describe.serial('Parts — CRUD', () => {
       expect(data.description).toBe('Updated by E2E');
     });
 
+    test('API — Panels per garment is mandatory on create and update (400)', async () => {
+      test.skip(!created?.id, 'No record created to update');
+      const { panelsPerGarment: _omitted, ...newWithout } = partPayload();
+      const create = await api.post('/parts', newWithout);
+      expect(create.response.status()).toBe(400);
+      expect(create.data.message).toBe('Panels per garment is required');
+
+      const { panelsPerGarment: _cleared, ...editWithout } = created;
+      const update = await api.put(`/parts/${created.id}`, editWithout);
+      expect(update.response.status()).toBe(400);
+      expect(update.data.message).toBe('Panels per garment is required');
+    });
+
     test('API — Delete removes record', async () => {
       test.skip(!created?.id, 'No record created to delete');
       const { response } = await api.delete(`/parts/${created.id}`);

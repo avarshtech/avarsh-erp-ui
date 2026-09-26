@@ -15,10 +15,12 @@ const Stat = ({ label, value }) => <span><Text type="secondary">{label}</Text> <
 /**
  * Section 5 — sticky action bar (PRD §8.5, no approval): live totals, then
  * Draft: Cancel · Delete · Save Draft · Submit; Submitted: Reopen (nothing consumed) · Close;
- * Partially Used: Close. There is no PO action anywhere on this screen.
+ * Partially Used: Close. There is no PO action anywhere on this screen. Submit needs add
+ * or update (an add-only user submits their saved draft as it is).
  */
 const CprActionBar = memo(function CprActionBar({ doc, totals, orderColourCount, can, busy, errors, on }) {
-  const editable = isRequirementEditable(doc.status) && can.edit;
+  const draft = isRequirementEditable(doc.status);
+  const editable = draft && can.edit;
   return (
     <StickyActionBar
       errors={errors}
@@ -39,7 +41,7 @@ const CprActionBar = memo(function CprActionBar({ doc, totals, orderColourCount,
         </DeleteConfirm>
       )}
       {editable && <Button icon={<SaveOutlined />} onClick={on.save} loading={busy === 'save'} disabled={Boolean(busy)}>Save Draft</Button>}
-      {editable && <Button type="primary" icon={<SendOutlined />} onClick={on.submit} loading={busy === 'submit'} disabled={Boolean(busy)}>Submit</Button>}
+      {draft && can.submit && <Button type="primary" icon={<SendOutlined />} onClick={on.submit} loading={busy === 'submit'} disabled={Boolean(busy)}>Submit</Button>}
       {can.reopen && isRequirementReopenable(doc.status, doc.consumedQty) && (
         <Button icon={<RollbackOutlined />} onClick={on.reopen} disabled={Boolean(busy)}>Reopen</Button>
       )}

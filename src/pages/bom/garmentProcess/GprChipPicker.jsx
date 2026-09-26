@@ -22,16 +22,25 @@ const GprChipPicker = memo(function GprChipPicker({ label, items, selected, onCh
         )}
       </Space>
       <div role="group" aria-label={label} style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {items.map((i) => (
-          <Tag.CheckableTag
-            key={i.value}
-            checked={set.has(i.value)}
-            onChange={(checked) => { if (!disabled) toggle(i.value, checked); }}
-            style={{ border: '1px solid var(--border-color, #d9d9d9)', padding: '2px 8px', cursor: disabled ? 'default' : 'pointer' }}
-          >
-            {i.label}{i.extra ? <span style={{ opacity: 0.75, marginLeft: 6 }}>{i.extra}</span> : null}
-          </Tag.CheckableTag>
-        ))}
+        {items.map((i) => {
+          const checked = set.has(i.value);
+          // CheckableTag renders a bare <span>: give it checkbox semantics and keyboard toggling.
+          return (
+            <Tag.CheckableTag
+              key={i.value}
+              checked={checked}
+              role="checkbox"
+              aria-checked={checked}
+              aria-disabled={disabled || undefined}
+              tabIndex={disabled ? -1 : 0}
+              onChange={(next) => { if (!disabled) toggle(i.value, next); }}
+              onKeyDown={(e) => { if (!disabled && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); toggle(i.value, !checked); } }}
+              style={{ border: '1px solid var(--border-color, #d9d9d9)', padding: '2px 8px', cursor: disabled ? 'default' : 'pointer' }}
+            >
+              {i.label}{i.extra ? <span style={{ opacity: 0.75, marginLeft: 6 }}>{i.extra}</span> : null}
+            </Tag.CheckableTag>
+          );
+        })}
       </div>
     </div>
   );
