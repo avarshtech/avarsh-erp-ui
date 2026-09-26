@@ -177,6 +177,20 @@ export const SCREENS = [
   { id: 'bom', name: 'Bill of Materials', section: 'bom', kind: 'screen',
     path: '/bom/list', routes: ['/bom/list', '/bom/new', '/bom/edit/:id'],
     ops: STANDARD_OPERATIONS },
+  // Process requirements (UI mock phase). No approval step: Submit is add || update,
+  // refer_back reopens a submitted requirement nothing has consumed yet, cancel closes it.
+  { id: 'cut-panel', name: 'Cut Panel Requirement', section: 'bom', kind: 'screen',
+    path: '/bom/cut-panel/list',
+    routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id'],
+    ops: ['view', 'add', 'update', 'delete', 'refer_back', 'cancel'],
+    opLabels: { delete: 'Delete draft', refer_back: 'Reopen', cancel: 'Close' },
+    description: 'Processes (printing, embroidery…) needed on cut panels before sewing.' },
+  { id: 'garment-process', name: 'Garment Process Requirement', section: 'bom', kind: 'screen',
+    path: '/bom/garment-process/list',
+    routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id'],
+    ops: ['view', 'add', 'update', 'override', 'refer_back', 'cancel'],
+    opLabels: { override: 'Submit above order qty', refer_back: 'Reopen', cancel: 'Close' },
+    description: 'Processes (washing, dyeing…) needed on sewn garments.' },
 
   // ── Sample Requests ──
   { id: 'sample-requests', name: 'Sample Requests', section: 'samples', kind: 'screen',
@@ -392,9 +406,9 @@ export const SCREENS = [
   { id: 'terms-conditions', name: 'Terms & Conditions', section: 'master', kind: 'tab',
     path: '/master', description: 'Purchase Order', ops: STANDARD_OPERATIONS },
   { id: 'process-master', name: 'Processes', section: 'master', kind: 'tab',
-    path: '/master', description: 'BOM, Manufacturing', ops: STANDARD_OPERATIONS },
+    path: '/master', description: 'BOM, Manufacturing, Cut Panel, Garment Process', ops: STANDARD_OPERATIONS },
   { id: 'parts-master', name: 'Parts Master', section: 'master', kind: 'tab',
-    path: '/master', description: 'BOM, Manufacturing', ops: STANDARD_OPERATIONS },
+    path: '/master', description: 'BOM, Manufacturing, Cut Panel', ops: STANDARD_OPERATIONS },
   { id: 'overhead-master', name: 'Overheads', section: 'master', kind: 'tab',
     path: '/master', description: 'Costing, Shipment', ops: STANDARD_OPERATIONS },
   { id: 'couriers', name: 'Couriers', section: 'master', kind: 'tab',
@@ -757,6 +771,19 @@ export const canApproveCostSheet = () =>
 
 export const canReviseCostSheet = () =>
   hasModuleAccess('costing') && hasPermission('costing-approval', 'revise');
+
+// ─── PROCESS REQUIREMENT HELPERS (Cut Panel / Garment Process) ───────────────
+// No approval step. Submit = add || update (as canSubmitOrder); status rules
+// (Draft only, nothing consumed…) live in utils/requirementStatus.js.
+
+export const canSubmitRequirement = (moduleId) =>
+  hasPermission(moduleId, 'add') || hasPermission(moduleId, 'update');
+
+export const canReopenRequirement = (moduleId) => hasPermission(moduleId, 'refer_back');
+
+export const canCloseRequirement = (moduleId) => hasPermission(moduleId, 'cancel');
+
+export const canSubmitGarmentProcessOverQty = () => hasPermission('garment-process', 'override');
 
 // ─── FIRST ACCESSIBLE ROUTE ──────────────────────────────────────────────────
 

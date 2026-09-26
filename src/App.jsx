@@ -47,6 +47,11 @@ const StockTransferList = lazy(() => import('./pages/inventory/transfer/StockTra
 const StockTransferForm = lazy(() => import('./pages/inventory/transfer/StockTransferForm'));
 const BillPassingList = lazy(() => import('./pages/inventory/bill-passing/BillPassingList'));
 const BillPassingForm = lazy(() => import('./pages/inventory/bill-passing/BillPassingForm'));
+// BOM — process requirements (UI mock phase, lazy-loaded)
+const CutPanelList = lazy(() => import('./pages/bom/cutPanel/CutPanelList'));
+const CutPanelForm = lazy(() => import('./pages/bom/cutPanel/CutPanelForm'));
+const GarmentProcessList = lazy(() => import('./pages/bom/garmentProcess/GarmentProcessList'));
+const GarmentProcessForm = lazy(() => import('./pages/bom/garmentProcess/GarmentProcessForm'));
 // Production PO screens (now grouped under the Purchase Orders module)
 const CuttingPoList = lazy(() => import('./pages/po/cutting/CuttingPoList'));
 const CuttingPoForm = lazy(() => import('./pages/po/cutting/CuttingPoForm'));
@@ -253,6 +258,13 @@ const ThemedApp = () => {
             <Route path="bom/list" element={<PermissionRoute module="bom" operation="view"><BOMList /></PermissionRoute>} />
             <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
             <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
+            {/* BOM — Cut Panel / Garment Process Requirement (UI mock phase). :id opens the same screen, editable only in Draft */}
+            <Route path="bom/cut-panel/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelList /></Suspense></PermissionRoute>} />
+            <Route path="bom/cut-panel/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/cut-panel/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/list" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessList /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/new" element={<PermissionRoute module="garment-process" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/:id" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessForm /></Suspense></PermissionRoute>} />
             {/* Sample Requests (R2) — SR / Dispatches / Customer Comments / Invoices, one RBAC module per screen */}
             <Route path="sample-requests/list" element={<PermissionRoute module="sample-requests" operation="view"><Suspense fallback={<PageSkeleton />}><SampleRequestList /></Suspense></PermissionRoute>} />
             <Route path="sample-requests/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />

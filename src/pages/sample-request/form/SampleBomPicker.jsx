@@ -107,7 +107,7 @@ const SampleBomPicker = ({ onPick, resolving = false, pickedBomId = null }) => {
           type="info"
           showIcon
           title="No BOMs yet"
-          description="Create an order and give it a BOM first (BOM → Create BOM). The Sample Request can then be raised against that BOM, from here or from the BOM screen."
+          description="Create an order and give it a BOM first (Bill of Materials → BOM List → Create BOM). The Sample Request can then be raised against that BOM, from here or from the BOM screen."
         />
       )}
     </Card>

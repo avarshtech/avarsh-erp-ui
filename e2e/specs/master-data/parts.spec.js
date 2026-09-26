@@ -139,14 +139,18 @@ test.describe.serial('Parts — CRUD', () => {
       await expect(page.locator('#isActive')).toHaveAttribute('aria-checked', 'true');
       await expect(page.locator('#partName')).toHaveValue('');
       await expect(page.locator('#description')).toHaveValue('');
+      // panels per garment is mandatory and starts empty, so the user has to enter it
+      await expect(page.locator('#panelsPerGarment')).toHaveValue('');
 
       // required-field validation
       await page.getByRole('button', { name: /Save/i }).click();
       await expect(page.getByText(/please enter a part name/i)).toBeVisible();
+      await expect(page.getByText(/enter panels per garment/i)).toBeVisible();
 
       // all fields
       await page.locator('#partName').fill(name);
       await page.locator('#description').fill('Full-coverage E2E part');
+      await page.locator('#panelsPerGarment').fill('2');
 
       const [resp] = await Promise.all([
         page.waitForResponse(
@@ -159,6 +163,7 @@ test.describe.serial('Parts — CRUD', () => {
       const body = resp.request().postDataJSON();
       expect(body.partName).toBe(name);
       expect(body.description).toBe('Full-coverage E2E part');
+      expect(body.panelsPerGarment).toBe(2);
       expect(body.isActive).toBe(true);
 
       await antTableWaitForData(page);
@@ -180,6 +185,7 @@ test.describe.serial('Parts — CRUD', () => {
       await page.getByRole('button', { name: /Add Part/i }).click();
       await page.waitForTimeout(400);
       await page.locator('#partName').fill(name);
+      await page.locator('#panelsPerGarment').fill('1');
       await Promise.all([
         page.waitForResponse((r) => r.url().includes('/parts') && r.request().method() === 'POST'),
         page.getByRole('button', { name: /Save/i }).click(),
@@ -190,6 +196,7 @@ test.describe.serial('Parts — CRUD', () => {
       await page.getByRole('button', { name: /Add Part/i }).click();
       await page.waitForTimeout(400);
       await page.locator('#partName').fill(name);
+      await page.locator('#panelsPerGarment').fill('1');
       const [dupResp] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('/parts') && r.request().method() === 'POST'),
         page.getByRole('button', { name: /Save/i }).click(),
@@ -210,6 +217,7 @@ test.describe.serial('Parts — CRUD', () => {
       await page.getByRole('button', { name: /Add Part/i }).click();
       await page.waitForTimeout(400);
       await page.locator('#partName').fill(name);
+      await page.locator('#panelsPerGarment').fill('1');
       await page.locator('#description').fill('Before edit');
       await Promise.all([
         page.waitForResponse((r) => r.url().includes('/parts') && r.request().method() === 'POST'),
@@ -253,6 +261,7 @@ test.describe.serial('Parts — CRUD', () => {
       await page.getByRole('button', { name: /Add Part/i }).click();
       await page.waitForTimeout(400);
       await page.locator('#partName').fill(name);
+      await page.locator('#panelsPerGarment').fill('1');
       await Promise.all([
         page.waitForResponse((r) => r.url().includes('/parts') && r.request().method() === 'POST'),
         page.getByRole('button', { name: /Save/i }).click(),

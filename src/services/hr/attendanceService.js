@@ -119,17 +119,8 @@ export const commitAttendanceImport = async (rows, overwriteExisting = false) =>
   return response.data;
 };
 
-/** Saves a blob the browser has already received. */
-export const triggerBrowserDownload = (blob, filename) => {
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.URL.revokeObjectURL(url);
-};
+/** Saves a blob the browser has already received (shared helper, re-exported for existing callers). */
+export { triggerBrowserDownload } from '../../utils/download';
 
 /**
  * Lock state for a unit-month.

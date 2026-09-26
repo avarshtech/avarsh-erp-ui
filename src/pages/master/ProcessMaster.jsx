@@ -21,6 +21,10 @@ const MODULE_ID = 'process-master';
  *   Trims         → BOM trims lines.   ┘ ProcessAllowanceModal seeds to derive
  *                   purchase qty. A fabric line offers only Fabric processes, a trims
  *                   line only Trims processes.
+ *   Cut Panel     → Cut Panel Requirement (work on cut panels: printing, embroidery…).
+ *   Garment       → Garment Process Requirement (work on sewn garments: washing, dyeing…).
+ *                   These two carry neither a cost nor allowances — the requirement
+ *                   screens only need the process name.
  *
  * Cost sheet Section E (Overhead / Markup) is NOT a consumer of this master — its rows
  * come from the separate Overhead master (mst_overheads), so there is no Overheads
@@ -33,10 +37,15 @@ const CATEGORY_OPTIONS = [
   { value: 'Manufacturing', label: 'Manufacturing' },
   { value: 'Fabric', label: 'Fabric' },
   { value: 'Trims', label: 'Trims' },
+  { value: 'Cut Panel', label: 'Cut Panel' },
+  { value: 'Garment', label: 'Garment' },
 ];
 
 /** Manufacturing is cost-bearing; Fabric and Trims are allowance-bearing. */
 const isCostCategory = (category) => category === 'Manufacturing';
+
+/** Cut Panel and Garment feed the BOM requirement screens and carry no defaults. */
+const isRequirementCategory = (category) => category === 'Cut Panel' || category === 'Garment';
 
 const ProcessMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
@@ -90,6 +99,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
       width: 90,
       render: (_, record) => {
         if (!record.category) return <Tag color="default">—</Tag>;
+        if (isRequirementCategory(record.category)) return <Tag color="cyan">Requirement</Tag>;
         return isCostCategory(record.category)
           ? <Tag color="blue">Cost</Tag>
           : <Tag color="purple">Allowance</Tag>;
@@ -139,7 +149,13 @@ const ProcessMaster = ({ onDirtyChange }) => {
       // zeroed so a process can never carry both a cost and an allowance. Blank inputs
       // are coerced to 0 because every default_* column is NOT NULL.
       const payload = { ...values };
-      if (isCostCategory(values.category)) {
+      if (isRequirementCategory(values.category)) {
+        payload.defaultCost = 0;
+        payload.defaultShrinkageInches = 0;
+        payload.defaultProcessLossPercent = 0;
+        payload.defaultRejectionPercent = 0;
+        payload.defaultShipmentAllowancePercent = 0;
+      } else if (isCostCategory(values.category)) {
         payload.defaultCost = values.defaultCost ?? 0;
         payload.defaultShrinkageInches = 0;
         payload.defaultProcessLossPercent = 0;
@@ -248,7 +264,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
                 {selectedId ? (isReadOnly ? 'View Process' : 'Edit Process') : 'New Process'}
               </h2>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                {selectedId ? 'Modify the process details below' : 'Define a new process — the category decides whether it carries a cost or allowances'}
+                {selectedId ? 'Modify the process details below' : 'Define a new process — the category decides where it is used and whether it carries a cost or allowances'}
               </Text>
             </div>
             <Space>
@@ -299,6 +315,17 @@ const ProcessMaster = ({ onDirtyChange }) => {
                   {() => {
                     const category = form.getFieldValue('category');
                     if (!category) return null;
+                    if (isRequirementCategory(category)) return (
+                      <Alert
+                        type="info"
+                        showIcon
+                        icon={<InfoCircleOutlined />}
+                        title={category === 'Cut Panel'
+                          ? 'Listed on the Cut Panel Requirement screen (BOM). No cost or allowance applies.'
+                          : 'Listed on the Garment Process Requirement screen (BOM). No cost or allowance applies.'}
+                        style={{ marginBottom: 16, fontSize: 12 }}
+                      />
+                    );
                     if (isCostCategory(category)) return (
                       <Form.Item name="defaultCost" label="Default Cost">
                         <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />

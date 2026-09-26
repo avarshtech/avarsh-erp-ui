@@ -24,9 +24,11 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
   useEffect(() => {
     if (!open) return;
     getActiveParts().then(setParts).catch(() => setParts([]));
-    getActiveProcesses().then(setProcesses).catch(() => setProcesses([]));
+    // Only the 'Cut Panel' category — the process master also holds Garment processes
+    // (washing, dyeing on sewn garments) that never apply to cut panels.
+    getActiveProcesses('Cut Panel').then(setProcesses).catch(() => setProcesses([]));
   }, [open]);
-  const partOptions = useMemo(() => parts.map((p) => ({ value: p.name, label: p.name })), [parts]);
+  const partOptions = useMemo(() => parts.map((p) => ({ value: p.partName, label: p.partName })), [parts]);
   const processOptions = useMemo(
     () => processes.map((p) => ({ value: p.id, label: p.processName })), [processes],
   );

@@ -105,6 +105,7 @@ export function partPayload(overrides = {}) {
   return {
     partName: `E2E Part ${ts()}`,
     description: 'Created by E2E test',
+    panelsPerGarment: 1,
     isActive: true,
     ...overrides,
   };

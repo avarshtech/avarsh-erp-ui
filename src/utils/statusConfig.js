@@ -28,6 +28,7 @@ import {
   TEMPLATE_STATUS,
 } from './expDocConstants';
 import { MAPPING_STATUS } from './poOrderMappingConstants';
+import { REQUIREMENT_STATUS } from './requirementStatus';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -74,6 +75,17 @@ export const PO_ORDER_MAPPING_STATUS_CONFIG = {
 export const BOM_STATUS_CONFIG = {
   [BOM_STATUS.DRAFT]:   { color: 'default', icon: FileTextOutlined },
   [BOM_STATUS.CREATED]: { color: 'green',   icon: CheckCircleOutlined },
+};
+
+// ==================== PROCESS REQUIREMENT STATUS CONFIG ====================
+// Cut Panel Requirement + Garment Process Requirement share one lifecycle
+// (utils/requirementStatus.js). No approval: Submitted is the PO-visible state.
+export const REQUIREMENT_STATUS_CONFIG = {
+  [REQUIREMENT_STATUS.DRAFT]:          { color: 'default',    icon: FileTextOutlined },
+  [REQUIREMENT_STATUS.SUBMITTED]:      { color: 'processing', icon: SendOutlined },
+  [REQUIREMENT_STATUS.PARTIALLY_USED]: { color: 'warning',    icon: ClockCircleOutlined },
+  [REQUIREMENT_STATUS.FULLY_USED]:     { color: 'success',    icon: CheckCircleOutlined },
+  [REQUIREMENT_STATUS.CLOSED]:         { color: 'default',    icon: StopOutlined },
 };
 
 // ==================== GRN STATUS CONFIG ====================
@@ -195,6 +207,7 @@ export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISP
 // steps, so they stay off the flow and show as a status tag instead.
 export const PL_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
+export const REQUIREMENT_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'PARTIALLY_USED', 'FULLY_USED'];
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

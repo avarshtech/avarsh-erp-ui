@@ -364,10 +364,12 @@ const MainLayoutInner = () => {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
-      moduleId: "bom",
+      moduleId: ["bom", "cut-panel", "garment-process"],
+      // Creation happens via the BOM List page button — no "Create BOM" menu item.
       children: [
-        { key: "/bom/list", label: "BOM List" },
-        { key: "/bom/new", label: "Create BOM" },
+        { key: "/bom/list", label: "BOM List", moduleId: "bom" },
+        { key: "/bom/cut-panel/list", label: "Cut Panel", moduleId: "cut-panel" },
+        { key: "/bom/garment-process/list", label: "Garment Process", moduleId: "garment-process" },
       ],
     },
     {
@@ -638,6 +640,9 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
     if (path.startsWith('/production/packing')) return ['/production/packing/list'];
     if (path.startsWith('/production/masters')) return ['/production/masters'];
+    if (path.startsWith('/bom/cut-panel')) return ['/bom/cut-panel/list'];
+    if (path.startsWith('/bom/garment-process')) return ['/bom/garment-process/list'];
+    if (path.startsWith('/bom/new') || path.startsWith('/bom/edit')) return ['/bom/list'];
     if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];

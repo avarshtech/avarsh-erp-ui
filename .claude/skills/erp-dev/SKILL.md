@@ -591,6 +591,7 @@ grep -n "dropdownClassName\|popupClassName" <file>        # → classNames.popup
 grep -n "addonAfter\|addonBefore" <file>   # → InputNumber only: suffix= / prefix=
 grep -n "iconPosition" <file>      # → Button: iconPlacement=
 grep -n "tabPosition" <file>       # → Tabs: tabPlacement=
+grep -n "<List\b\|List\.Item" <file>   # → List itself is deprecated (6.2.2): plain ul/li or a Table
 ```
 
 ### Pre-Implementation: CSS Deprecated Patterns

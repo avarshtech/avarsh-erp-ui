@@ -18,7 +18,7 @@ const TmbCheckGrid = ({ check, sizes, onChange }) => {
   // Panels are the garment parts master, shared with the tech pack and BOM.
   const [parts, setParts] = useState([]);
   useEffect(() => { getActiveParts().then(setParts).catch(() => setParts([])); }, []);
-  const partOptions = useMemo(() => parts.map((p) => ({ value: p.name, label: p.name })), [parts]);
+  const partOptions = useMemo(() => parts.map((p) => ({ value: p.partName, label: p.partName })), [parts]);
 
   const setRow = useCallback((idx, field, val) => {
     onChange((prev) => ({ ...prev, rows: prev.rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)) }));

@@ -134,6 +134,7 @@ Merge into one object when a component needs several:
 | `Tabs.TabPane`, `Timeline.Item`, `Breadcrumb.Item`, `Mentions.Option` | the parent's `items` prop |
 | `Anchor`/`Menu`/`Descriptions`/`Collapse` children | `items` |
 | `Select.Option` / `Select.OptGroup` | `options` |
+| `List` (the whole component — 6.2.2 warns "deprecated … will be removed in next major version", `antd/es/list/index.js:196`) | plain `ul`/`li` markup or a `Table` |
 | `Dropdown placement="bottomCenter"` etc. | drop the `Center` suffix |
 
 ## Still valid — do not "fix" these

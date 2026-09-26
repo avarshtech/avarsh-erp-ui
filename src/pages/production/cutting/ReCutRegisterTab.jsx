@@ -30,7 +30,7 @@ const ReCutRegisterTab = () => {
   const reCutAlertPct = threshold('RECUT_ALERT_PCT', 2);
   const [parts, setParts] = useState([]);
   useEffect(() => { getActiveParts().then(setParts).catch(() => setParts([])); }, []);
-  const partOptions = useMemo(() => parts.map((p) => ({ value: p.name, label: p.name })), [parts]);
+  const partOptions = useMemo(() => parts.map((p) => ({ value: p.partName, label: p.partName })), [parts]);
 
   const load = useCallback(async () => {
     setLoading(true);

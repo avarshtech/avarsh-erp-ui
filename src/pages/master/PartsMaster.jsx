@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../components/MasterSplitView';
-import { Form, Input, Button, Space, App, Tag, Switch, Typography } from 'antd';
+import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -49,6 +49,13 @@ const PartsMaster = ({ onDirtyChange }) => {
       title: 'Part Name',
       dataIndex: 'partName',
       sorter: (a, b) => (a.partName || '').localeCompare(b.partName || ''),
+    },
+    {
+      title: 'Panels / Garment',
+      dataIndex: 'panelsPerGarment',
+      width: 130,
+      align: 'right',
+      render: (val) => val ?? '—',
     },
     {
       title: 'Status',
@@ -226,6 +233,14 @@ const PartsMaster = ({ onDirtyChange }) => {
                 </Form.Item>
                 <Form.Item name="description" label="Description">
                   <Input.TextArea rows={2} placeholder="Optional description" maxLength={500} />
+                </Form.Item>
+                <Form.Item
+                  name="panelsPerGarment"
+                  label="Panels per Garment"
+                  extra="Pieces of this part in one garment — used to pre-fill cut panel quantities."
+                  rules={[{ required: true, message: 'Enter panels per garment' }]}
+                >
+                  <InputNumber min={1} max={99} precision={0} placeholder="e.g. 2 for a pair of cuffs" style={{ width: 220 }} />
                 </Form.Item>
 
                 <Form.Item name="isActive" label="Active" valuePropName="checked">
