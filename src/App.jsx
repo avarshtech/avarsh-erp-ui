@@ -62,6 +62,8 @@ const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/Finish
 const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
 const CutPanelPoList = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoList'));
 const CutPanelPoForm = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoForm'));
+const GarmentProcessPoList = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoList'));
+const GarmentProcessPoForm = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoForm'));
 // TNA (Time & Action) module — mock-data design phase (lazy-loaded)
 const TnaControlTower = lazy(() => import('./pages/tna/control-tower/ControlTower'));
 const TnaPlanPage = lazy(() => import('./pages/tna/plan/TnaPlanPage'));
@@ -300,6 +302,10 @@ const ThemedApp = () => {
             <Route path="purchase-orders/cut-panel-po/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/cut-panel-po/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/cut-panel-po/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            {/* Garment Process PO (UI mock phase) — reuses the garment-process key; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/garment-process-po/list" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/new" element={<PermissionRoute module="garment-process" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/:id" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
             {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />

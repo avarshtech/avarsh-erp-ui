@@ -109,3 +109,6 @@ export const CLOSE_REASONS = opts([
 
 /** A rate above the vendor's last rate by more than this warns and needs a reason (CPP BR-12). */
 export const RATE_VARIANCE_PCT = 10;
+
+/** The most a Garment Process PO line may exceed its balance: % of its required qty (GPO §11, deviation D23). */
+export const GPO_EXCESS_CAP_PCT = 3;

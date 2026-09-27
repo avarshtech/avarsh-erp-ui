@@ -19,7 +19,12 @@ const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({ levels = [], a
     return {
       title: name,
       status: a ? 'finish' : i === approvals.length ? 'process' : 'wait',
-      description: a ? <Text type="secondary" style={{ fontSize: 12 }}>{a.by} · {formatDateTime(a.at)}{a.selfApproved ? ' · self-approved (superuser)' : ''}{a.remark ? ` · ${a.remark}` : ''}</Text> : null,
+      description: a ? (
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          {a.by} · {formatDateTime(a.at)}{a.selfApproved ? ' · self-approved (superuser)' : ''}{a.remark ? ` · ${a.remark}` : ''}
+          {a.vendorSignOff?.length ? ` · vendor signed off: ${a.vendorSignOff.join('; ')}` : ''}
+        </Text>
+      ) : null,
     };
   });
   const columns = [

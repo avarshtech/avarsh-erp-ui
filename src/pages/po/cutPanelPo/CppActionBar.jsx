@@ -1,6 +1,7 @@
 import { memo } from 'react';
-import { Button, Popconfirm, Tooltip, Typography } from 'antd';
+import { Typography } from 'antd';
 import StickyActionBar from '../../../components/StickyActionBar';
+import JobWorkActionButtons from '../jobWork/JobWorkActionButtons';
 import StatusTag from '../../../components/StatusTag';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
@@ -13,25 +14,10 @@ const Stat = ({ label, value }) => <span><Text type="secondary">{label}</Text> <
 /**
  * ⑥ Sticky action bar (PRD §18.1/18.2): process, lines, PO qty, balance after this PO,
  * PO value and status, always visible; then the actions `buttons` lists (cppActionButtons).
- * A button with `dialog` opens that reason dialog; `confirm` asks first; the rest call on[key].
  */
 const CppActionBar = memo(function CppActionBar({ doc, ctx, value, buttons, busy, errors, on, openDialog }) {
   const live = doc.lines.filter((l) => Number(l.poQty) > 0);
   const balanceAfter = balanceBlock(doc, ctx).reduce((s, b) => s + b.balanceAfter, 0);
-  const render = (b) => {
-    const button = (
-      <Button
-        key={b.key} type={b.primary ? 'primary' : 'default'} danger={b.danger} loading={busy === b.key}
-        disabled={Boolean(busy && busy !== b.key) || Boolean(b.disabledReason)}
-        onClick={b.confirm ? undefined : () => (b.dialog ? openDialog(b.dialog) : on[b.key]())}
-      >
-        {b.label}
-      </Button>
-    );
-    if (b.disabledReason) return <Tooltip key={b.key} title={b.disabledReason}>{button}</Tooltip>;
-    if (b.confirm) return <Popconfirm key={b.key} title={`${b.label}?`} okText="Yes" onConfirm={() => on[b.key]()}>{button}</Popconfirm>;
-    return button;
-  };
   return (
     <StickyActionBar
       errors={errors}
@@ -46,7 +32,7 @@ const CppActionBar = memo(function CppActionBar({ doc, ctx, value, buttons, busy
         </>
       )}
     >
-      {buttons.map(render)}
+      <JobWorkActionButtons buttons={buttons} busy={busy} on={on} openDialog={openDialog} />
     </StickyActionBar>
   );
 });

@@ -32,7 +32,7 @@ const BASE = '/purchase-orders/cut-panel-po';
 const plusDays = (n) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
-  const mon = d.toLocaleString('en-GB', { month: 'short' });
+  const mon = d.toLocaleString('en-US', { month: 'short' });
   return `${String(d.getDate()).padStart(2, '0')}-${mon}-${d.getFullYear()}`;
 };
 

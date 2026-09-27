@@ -1,8 +1,9 @@
 import { memo } from 'react';
-import { Alert, AutoComplete, Card, Col, Input, Row, Select, Typography } from 'antd';
+import { Alert, AutoComplete, Card, Col, Input, Row, Typography } from 'antd';
 import dayjs from 'dayjs';
 import JobWorkVendorSelect from '../jobWork/JobWorkVendorSelect';
 import JobWorkVendorCard from '../jobWork/JobWorkVendorCard';
+import PaymentTermsField from '../jobWork/PaymentTermsField';
 import IsoDatePicker from '../../../components/form/IsoDatePicker';
 import { DELIVERY_TERM_SUGGESTIONS } from '../../../utils/jobWorkConstants';
 import { vendorSnapshot } from '../../../utils/jobWorkPoLines';
@@ -45,10 +46,7 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
         </Col>
         <Col xs={12} md={6}>
           <Label required>Payment terms</Label>
-          {masters.paymentTerms.length ? (
-            <Select id="cpp-paymentTerms" style={{ width: '100%' }} disabled={!editable.terms} value={doc.paymentTerms ?? undefined}
-              options={masters.paymentTerms.map((t) => ({ value: t.name, label: t.name }))} onChange={(v) => onPatch({ paymentTerms: v })} />
-          ) : <Input id="cpp-paymentTerms" disabled={!editable.terms} value={doc.paymentTerms ?? ''} onChange={(e) => onPatch({ paymentTerms: e.target.value })} />}
+          <PaymentTermsField id="cpp-paymentTerms" terms={masters.paymentTerms} value={doc.paymentTerms} disabled={!editable.terms} onChange={(paymentTerms) => onPatch({ paymentTerms })} />
         </Col>
         <Col xs={12} md={6}>
           <Label>Delivery terms</Label>

@@ -62,7 +62,8 @@ export const lineLedger = (db, poId, lineKey) => db.ledger
 
 /** The PO as the screen reads it: with what each line holds in the ledger (and its requirement). */
 export const withHeld = (db, doc) => ({
-  ...doc, held: Object.fromEntries(doc.lines.map((l) => [l.key, { ...lineLedger(db, doc.id, l.key), cprId: l.cprId }])),
+  ...doc,
+  held: Object.fromEntries(doc.lines.map((l) => [l.key, { ...lineLedger(db, doc.id, l.key), cprId: l.cprId, gprId: l.gprId }])),
 });
 
 /** Releases whatever a PO line still holds beyond `keep` (0 = everything). */

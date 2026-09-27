@@ -19,7 +19,7 @@ const Body = ({ request, onSubmit, onClose }) => {
   };
   return (
     <Modal
-      open title="Request over-allocation override" okText="Request override" onOk={submit} onCancel={onClose}
+      open title={request.title ?? 'Request over-allocation override'} okText="Request override" onOk={submit} onCancel={onClose}
       confirmLoading={busy} okButtonProps={{ disabled: !reasonCode || !justification.trim() }} destroyOnHidden
     >
       <Alert
@@ -42,7 +42,7 @@ const Body = ({ request, onSubmit, onClose }) => {
 /**
  * Requests an excess on one line (CPP §14.4 over-allocation, GPO §11 excess): a reason
  * code and a justification; someone other than the requester authorises it. `request` =
- * { lineKey, label, poQty, balance, excess, note }.
+ * { lineKey, label, poQty, balance, excess, note, title? }.
  */
 const OverrideRequestDialog = memo(function OverrideRequestDialog({ request, onSubmit, onClose }) {
   return request ? <Body request={request} onSubmit={onSubmit} onClose={onClose} /> : null;

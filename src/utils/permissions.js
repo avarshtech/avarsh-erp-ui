@@ -197,7 +197,8 @@ export const SCREENS = [
     description: 'Processes (printing, embroidery…) needed on cut panels before sewing, and the Cut Panel POs that give them to job workers.' },
   { id: 'garment-process', name: 'Garment Process Requirement & PO', section: 'bom', kind: 'screen',
     path: '/bom/garment-process/list',
-    routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id'],
+    routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id',
+      '/purchase-orders/garment-process-po/list', '/purchase-orders/garment-process-po/new', '/purchase-orders/garment-process-po/:id'],
     ops: ['view', 'add', 'update', 'override', 'approve', 'reject', 'refer_back', 'cancel'],
     opLabels: {
       override: 'Submit above order qty · Approve PO excess',
@@ -206,7 +207,7 @@ export const SCREENS = [
       refer_back: 'Reopen requirement',
       cancel: 'Close requirement · Cancel / short close PO',
     },
-    description: 'Processes (washing, dyeing…) needed on sewn garments.' },
+    description: 'Processes (washing, dyeing…) needed on sewn garments, and the Garment Process POs that give them to job workers.' },
 
   // ── Sample Requests ──
   { id: 'sample-requests', name: 'Sample Requests', section: 'samples', kind: 'screen',

@@ -14,6 +14,7 @@ import { formatDate } from './formatters';
 
 const n = (v, dp = 0) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 const money = (v) => n(v, 2);
+const rate = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 const uniq = (vals) => [...new Set(vals.filter(Boolean))].join(', ') || '—';
 
 const CSS = `
@@ -56,10 +57,16 @@ export const printJobWorkPo = (doc, value, org = {}) => {
   ].map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   const head = `${cols.map(([t]) => `<th>${esc(t)}</th>`).join('')}<th class="num">Qty</th><th>UOM</th><th class="num">Billing qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th>`;
   const rows = lines.map((l) => `<tr>${cols.map(([, f]) => `<td>${esc(f(l))}</td>`).join('')}<td class="num">${n(l.poQty)}</td>
-    <td>${esc(jobWorkUomLabel(l.uom))}</td><td class="num">${n(billingQty(l), 3)}</td><td class="num">${money(l.rate)}</td><td class="num">${money(lineAmount(l))}</td></tr>`).join('');
+    <td>${esc(jobWorkUomLabel(l.uom))}</td><td class="num">${n(billingQty(l), 3)}</td><td class="num">${rate(l.rate)}</td><td class="num">${money(lineAmount(l))}</td></tr>`).join('');
   const foot = byUom.map((t) => `<tr><td colspan="${cols.length}">Subtotal — ${esc(jobWorkUomLabel(t.uom))}</td><td class="num">${n(t.poQty)}</td>
     <td></td><td class="num">${n(t.billingQty, 3)}</td><td></td><td class="num">${money(t.amount)}</td></tr>`).join('');
   const half = value.gstRatePercent / 2;
+  // The Garment Process PO states a grand total, unrounded (GPO §8.4); the Cut Panel PO rounds (CPP §13.3).
+  const total = doc.type === 'CPP'
+    ? `<tr><td><b>PO value (INR)</b></td><td class="num"><b>${money(value.total)}</b></td></tr>
+      <tr><td>Rounding</td><td class="num">${money(value.roundOff)}</td></tr>
+      <tr><td><b>Rounded</b></td><td class="num"><b>${money(value.rounded)}</b></td></tr>`
+    : `<tr><td><b>Grand total (INR)</b></td><td class="num"><b>${money(value.total)}</b></td></tr>`;
   const tax = value.igst ? `<tr><td>IGST @ ${value.gstRatePercent}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.igstAmount)}</td></tr>`
     : `<tr><td>CGST @ ${half}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.cgst)}</td></tr><tr><td>SGST @ ${half}%</td><td class="num">${money(value.sgst)}</td></tr>`;
   const body = `
@@ -70,15 +77,13 @@ export const printJobWorkPo = (doc, value, org = {}) => {
     <div class="grid">${meta}</div>
     <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table>
     <table class="value"><tbody>
-      <tr><td>Basic amount</td><td class="num">${money(value.basic)}</td></tr>
+      <tr><td>${doc.type === 'CPP' ? 'Basic amount' : 'Subtotal'}</td><td class="num">${money(value.basic)}</td></tr>
       ${value.discount ? `<tr><td>Discount</td><td class="num">− ${money(value.discount)}</td></tr>` : ''}
       ${value.otherCharges ? `<tr><td>Other charges</td><td class="num">${money(value.otherCharges)}</td></tr>` : ''}
       <tr><td>Taxable value</td><td class="num">${money(value.taxable)}</td></tr>${tax}
-      <tr><td><b>PO value (INR)</b></td><td class="num"><b>${money(value.total)}</b></td></tr>
-      <tr><td>Rounding</td><td class="num">${money(value.roundOff)}</td></tr>
-      <tr><td><b>Rounded</b></td><td class="num"><b>${money(value.rounded)}</b></td></tr>
+      ${total}
     </tbody></table>
-    <p><b>Amount in words:</b> ${esc(amountInWordsIndian(value.rounded))}</p>
+    <p><b>Amount in words:</b> ${esc(amountInWordsIndian(doc.type === 'CPP' ? value.rounded : value.total))}</p>
     <h2>Processing instructions</h2><p>${esc(doc.instructions || '—')}</p>
     <p>${esc(doc.type === 'CPP' ? 'Panels are issued against a delivery challan quoting this PO number; return every panel with the challan reference.'
       : 'Garments are sent against a delivery challan quoting this PO number; return them with the challan reference.')}</p>

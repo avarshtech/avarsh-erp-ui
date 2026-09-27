@@ -37,7 +37,7 @@ export const gpoLineFromGpr = ({ key, gpr, line, color, size, order, prevPoQty =
     orderId: gpr.orderId, orderNo: gpr.orderNo, buyer: gpr.buyer, styleNo: gpr.styleNo,
     processLabel: gprLineLabel(line), seqNo: line.seqNo,
     required, prevPoQty, snapshot: { required, seqNo: line.seqNo },
-    poQty: Math.max(0, required - prevPoQty), uom, rate: null, excess: null, receivedQty: 0,
+    poQty: Math.max(0, required - prevPoQty), uom, billingQty: null, rate: null, excess: null, receivedQty: 0,
   };
 };
 
