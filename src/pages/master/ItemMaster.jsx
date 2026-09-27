@@ -44,6 +44,16 @@ const toCamelCase = (str) => {
   return str.toLowerCase();
 };
 
+// The unit options for an item being edited: its type's units plus the item's own, so a unit
+// saved before the type listed it (or picked on the costing sheet) shows by name, not by id.
+const withItemUoms = (typeUoms, item) => {
+  const options = [...(typeUoms || [])];
+  [[item.uomId, item.uomSymbol, item.uomName], [item.secondaryUomId, item.secondaryUomSymbol, item.secondaryUomName]]
+    .filter(([id]) => id != null && !options.some((u) => String(u.id) === String(id)))
+    .forEach(([id, symbol, name]) => options.push({ id, symbol, name }));
+  return options;
+};
+
 // Color Picker Component
 const ColorPicker = ({ value, onChange, placeholder }) => {
   const [open, setOpen] = useState(false);
@@ -653,7 +663,7 @@ const ItemMaster = () => {
         const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
         if (itemType) {
           setFormAttributes(itemType.attributes || []);
-          setFormUomOptions(itemType.uoms || []);
+          setFormUomOptions(withItemUoms(itemType.uoms, item));
 
           // Load variants
           if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
@@ -666,7 +676,7 @@ const ItemMaster = () => {
                 isActive: variant.isActive ?? true,
               };
               if (variant.attributes && typeof variant.attributes === 'object') {
-                itemType.attributes.forEach((attr) => {
+                (itemType.attributes || []).forEach((attr) => {
                   variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
                 });
               }
@@ -918,7 +928,7 @@ const ItemMaster = () => {
         const itemType = subcategory.itemTypes?.find((it) => it.id === itemTypeId);
         if (itemType) {
           setFormAttributes(itemType.attributes || []);
-          setFormUomOptions(itemType.uoms || []);
+          setFormUomOptions(withItemUoms(itemType.uoms, item));
 
           // Load variants
           if (item.variants && Array.isArray(item.variants) && item.variants.length > 0) {
@@ -935,7 +945,7 @@ const ItemMaster = () => {
 
               // Map attributes from variant.attributes
               if (variant.attributes && typeof variant.attributes === 'object') {
-                itemType.attributes.forEach((attr) => {
+                (itemType.attributes || []).forEach((attr) => {
                   variantObj[attr.id] = resolveAttributeValue(variant.attributes, attr);
                 });
               }
@@ -997,6 +1007,11 @@ const ItemMaster = () => {
   };
 
   // Variant Management
+  // The variants section is on when the item type defines attributes — or when the item already
+  // has variants: an existing item keeps showing them even if its type has no attributes, told
+  // apart by name. A new item of an attribute-less type still gets none, as before.
+  const hasVariantSection = formAttributes.length > 0 || variants.some((v) => v.id != null);
+
   const createEmptyVariant = useCallback(() => {
     const empty = { isActive: true, variantName: '' };
     formAttributes.forEach((attr) => {
@@ -1029,12 +1044,19 @@ const ItemMaster = () => {
     const activeVariants = variants.filter((v) => v.isActive !== false);
     if (activeVariants.length > 0) {
       const currentVariant = variants[activeVariantIndex];
-      const hasAnyValue = formAttributes.some(
-        (attr) => currentVariant[attr.id] && currentVariant[attr.id].toString().trim() !== ''
-      );
-      if (!hasAnyValue) {
-        message.warning('Please fill at least one attribute before adding a new variant');
-        return;
+      if (formAttributes.length === 0) {
+        if ((currentVariant?.variantName || '').trim().length < 5) {
+          message.warning('Name this variant (at least 5 characters) before adding another');
+          return;
+        }
+      } else {
+        const hasAnyValue = formAttributes.some(
+          (attr) => currentVariant[attr.id] && currentVariant[attr.id].toString().trim() !== ''
+        );
+        if (!hasAnyValue) {
+          message.warning('Please fill at least one attribute before adding a new variant');
+          return;
+        }
       }
     }
     const newVariant = createEmptyVariant();
@@ -1083,6 +1105,8 @@ const ItemMaster = () => {
   };
 
   const checkDuplicateVariants = () => {
+    // With no attributes every pair would "match"; names alone tell those variants apart.
+    if (formAttributes.length === 0) return { isDuplicate: false, index1: -1, index2: -1 };
     const activeVariants = variants
       .map((v, idx) => ({ variant: v, originalIndex: idx }))
       .filter((item) => item.variant.isActive !== false);
@@ -1193,16 +1217,14 @@ const ItemMaster = () => {
   const handleSubmit = async (values) => {
     // Validation
     const activeVariants = variants.filter((v) => v.isActive !== false);
-    if (formAttributes.length > 0 && activeVariants.length === 0) {
+    if (hasVariantSection && activeVariants.length === 0) {
       message.error('At least one variant is required');
       return;
     }
 
-    // Variant validations apply only when the item type defines attributes — that is
-    // the same condition that renders the variants section. Without it, the default
-    // empty variant kept in state failed the name rule and silently blocked the save
-    // of every attribute-less item, with an error about a field the user cannot see.
-    const hasVariantSection = formAttributes.length > 0;
+    // Variant validations apply only when the variants section is shown (hasVariantSection).
+    // Without that gate, the default empty variant of a new attribute-less item failed the
+    // name rule and silently blocked its save, with an error about a field nobody could see.
 
     // Validate variant name length — mirrors the server rule so users get inline feedback
     // instead of a 400. Uniqueness is checked below, where the offending tab is highlighted.
@@ -1323,9 +1345,9 @@ const ItemMaster = () => {
         defaultAllowance: values.defaultAllowance,
         // Add mode does not render the Active checkbox, so values.isActive is absent there.
         isActive: isEditMode ? values.isActive : true,
-        // No attributes → no variants section → nothing to send. Without this gate the
-        // default empty variant leaked into the payload and the server 400ed on its name.
-        variants: formAttributes.length > 0 ? variantsPayload : [],
+        // No variants section → nothing to send. Without this gate the default empty variant
+        // of a new attribute-less item leaked into the payload and the server 400ed on its name.
+        variants: hasVariantSection ? variantsPayload : [],
       };
 
       let response;
@@ -1843,8 +1865,10 @@ const ItemMaster = () => {
                   name="secondaryUomId"
                   label="Secondary UOM"
                   tooltip="The lower unit this item is consumed in, used for BOM consumption"
+                  // Required when creating. Editing locks the field, so an older fabric saved without
+                  // one must still save — otherwise its variants could never be added to or changed.
                   rules={[
-                    { required: isFabricCategory, message: 'Secondary UOM is required for fabric items' },
+                    { required: isFabricCategory && !isEditMode, message: 'Secondary UOM is required for fabric items' },
                   ]}
                 >
                     <Select
@@ -1926,7 +1950,7 @@ const ItemMaster = () => {
             )}
 
             {/* Variants Section */}
-            {formAttributes.length > 0 && (
+            {hasVariantSection && (
               <div
                 style={{
                   background: 'var(--card-bg)',

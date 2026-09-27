@@ -77,7 +77,7 @@ const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingFor
 const CartonPackingList = lazy(() => import('./pages/production/packing/CartonPackingList'));
 const CartonPackingForm = lazy(() => import('./pages/production/packing/CartonPackingForm'));
 import CostingList from './pages/costing/CostingList';
-import CostingForm from './pages/costing/CostingForm';
+import CostingSheetPage from './pages/costing/sheet/CostingSheetPage';
 import CostingView from './pages/costing/CostingView';
 import CostComparison from './pages/costing/CostComparison';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -380,8 +380,8 @@ const ThemedApp = () => {
             <Route path="inventory/bill-passing/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
             <Route path="costing/list" element={<PermissionRoute module="costing" operation="view"><CostingList /></PermissionRoute>} />
-            <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingForm /></PermissionRoute>} />
-            <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><CostingForm /></PermissionRoute>} />
+            <Route path="costing/new" element={<PermissionRoute module="costing" operation="add"><CostingSheetPage /></PermissionRoute>} />
+            <Route path="costing/edit/:id" element={<PermissionRoute module="costing" operation="update"><CostingSheetPage /></PermissionRoute>} />
             <Route path="costing/compare" element={<PermissionRoute module="costing" operation="view"><CostComparison /></PermissionRoute>} />
             <Route path="costing/:id" element={<PermissionRoute module="costing" operation="view"><CostingView /></PermissionRoute>} />
             {/* Admin — the sidebar hides these by module access, but without a route

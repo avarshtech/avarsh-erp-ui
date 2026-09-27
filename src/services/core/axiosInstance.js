@@ -200,8 +200,9 @@ axiosInstance.interceptors.response.use(
     // Attach extracted message to error object
     error.errorMessage = errorMessage;
 
-    // Show error toast for non-401 errors
-    if (!error.response || error.response.status !== 401) {
+    // Show error toast for non-401 errors. A caller that expects the failure and explains it
+    // itself (e.g. "no exchange rate stored yet") passes `silent: true` in the request config.
+    if ((!error.response || error.response.status !== 401) && !originalRequest?.silent) {
       emitMessage('error', errorMessage);
     }
 
