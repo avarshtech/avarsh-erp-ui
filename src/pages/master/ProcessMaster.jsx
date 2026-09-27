@@ -3,6 +3,8 @@ import MasterSplitView from '../../components/MasterSplitView';
 import { Form, Input, InputNumber, Button, Space, App, Tag, Switch, Typography, Row, Col, Divider, Select, Alert } from 'antd';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
+import ProcessJobWorkFields from './jobWork/ProcessJobWorkFields';
+import { jobWorkDefaultsFor } from '../../utils/jobWorkConstants';
 
 const { Text } = Typography;
 import { getAllProcesses, createProcess, updateProcess, deleteProcess } from '../../services/master/processService';
@@ -21,10 +23,14 @@ const MODULE_ID = 'process-master';
  *   Trims         → BOM trims lines.   ┘ ProcessAllowanceModal seeds to derive
  *                   purchase qty. A fabric line offers only Fabric processes, a trims
  *                   line only Trims processes.
- *   Cut Panel     → Cut Panel Requirement (work on cut panels: printing, embroidery…).
- *   Garment       → Garment Process Requirement (work on sewn garments: washing, dyeing…).
- *                   These two carry neither a cost nor allowances — the requirement
- *                   screens only need the process name.
+ *   Cut Panel     → Cut Panel Requirement and Cut Panel PO (work on cut panels:
+ *                   printing, embroidery…).
+ *   Garment       → Garment Process Requirement and Garment Process PO (work on sewn
+ *                   garments: washing, dyeing…).
+ *                   These two carry neither a cost nor allowances. They carry the job-work
+ *                   PO defaults instead — SAC code, GST %, billing unit, instructions,
+ *                   artwork required (ProcessJobWorkFields); the API keeps those on these
+ *                   two categories only.
  *
  * Cost sheet Section E (Overhead / Markup) is NOT a consumer of this master — its rows
  * come from the separate Overhead master (mst_overheads), so there is no Overheads
@@ -299,7 +305,13 @@ const ProcessMaster = ({ onDirtyChange }) => {
                 layout="vertical"
                 onFinish={handleSave}
                 disabled={isReadOnly}
-                onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
+                onValuesChange={(changed) => {
+                  if (!skipDirty.current) markDirty(true);
+                  if (isRequirementCategory(changed.category)) {
+                    const current = form.getFieldsValue(['sacCode', 'gstRatePercent', 'defaultUom', 'artworkRequired']);
+                    form.setFieldsValue(jobWorkDefaultsFor(changed.category, current));
+                  }
+                }}
               >
                 <Form.Item name="processName" label="Process Name" rules={[{ required: true, message: 'Please enter a process name' }]}>
                   <Input placeholder="e.g. Fabric Dyeing" maxLength={200} />
@@ -315,17 +327,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
                   {() => {
                     const category = form.getFieldValue('category');
                     if (!category) return null;
-                    if (isRequirementCategory(category)) return (
-                      <Alert
-                        type="info"
-                        showIcon
-                        icon={<InfoCircleOutlined />}
-                        title={category === 'Cut Panel'
-                          ? 'Listed on the Cut Panel Requirement screen (BOM). No cost or allowance applies.'
-                          : 'Listed on the Garment Process Requirement screen (BOM). No cost or allowance applies.'}
-                        style={{ marginBottom: 16, fontSize: 12 }}
-                      />
-                    );
+                    if (isRequirementCategory(category)) return <ProcessJobWorkFields category={category} />;
                     if (isCostCategory(category)) return (
                       <Form.Item name="defaultCost" label="Default Cost">
                         <InputNumber min={0} precision={2} controls={false} prefix="₹" placeholder="e.g. 25.50" style={{ width: '100%' }} {...numericInputProps} />

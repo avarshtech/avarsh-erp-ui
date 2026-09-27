@@ -179,17 +179,32 @@ export const SCREENS = [
     ops: STANDARD_OPERATIONS },
   // Process requirements (UI mock phase). No approval step: Submit is add || update,
   // refer_back reopens a submitted requirement nothing has consumed yet, cancel closes it.
+  // The job-work POs raised against them (Cut Panel PO, Garment Process PO) reuse these
+  // keys, so one operation can cover both documents: the labels name both uses.
   { id: 'cut-panel', name: 'Cut Panel Requirement', section: 'bom', kind: 'screen',
     path: '/bom/cut-panel/list',
     routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id'],
-    ops: ['view', 'add', 'update', 'delete', 'refer_back', 'cancel'],
-    opLabels: { delete: 'Delete draft', refer_back: 'Reopen', cancel: 'Close' },
+    ops: ['view', 'add', 'update', 'delete', 'approve', 'reject', 'override', 'refer_back', 'cancel'],
+    opLabels: {
+      delete: 'Delete draft',
+      approve: 'Approve PO',
+      reject: 'Reject PO',
+      override: 'Authorise PO over-allocation',
+      refer_back: 'Reopen requirement · Send back PO',
+      cancel: 'Close requirement · Cancel / short close PO',
+    },
     description: 'Processes (printing, embroidery…) needed on cut panels before sewing.' },
   { id: 'garment-process', name: 'Garment Process Requirement', section: 'bom', kind: 'screen',
     path: '/bom/garment-process/list',
     routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id'],
-    ops: ['view', 'add', 'update', 'override', 'refer_back', 'cancel'],
-    opLabels: { override: 'Submit above order qty', refer_back: 'Reopen', cancel: 'Close' },
+    ops: ['view', 'add', 'update', 'override', 'approve', 'reject', 'refer_back', 'cancel'],
+    opLabels: {
+      override: 'Submit above order qty · Approve PO excess',
+      approve: 'Approve / send PO',
+      reject: 'Reject PO (back to draft)',
+      refer_back: 'Reopen requirement',
+      cancel: 'Close requirement · Cancel / short close PO',
+    },
     description: 'Processes (washing, dyeing…) needed on sewn garments.' },
 
   // ── Sample Requests ──
