@@ -69,11 +69,22 @@ export const gpoValue = (doc) => poValue({
   otherCharges: doc.otherCharges, gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),
 });
 
-/** V1 / V2 — the only checks a draft save makes. */
-export const gpoSaveBlocking = (doc) => [
-  ...(doc.vendor ? [] : ['Select a vendor (V1).']),
-  ...(doc.lines.length ? [] : ['Add at least one requirement (V2).']),
-];
+/**
+ * The checks a draft save makes: V1 and V2, and the line integrity the screen already keeps
+ * — one line per requirement cell (V9) and one process per PO (deviation D23).
+ */
+export const gpoSaveBlocking = (doc) => {
+  const out = [...(doc.vendor ? [] : ['Select a vendor (V1).']), ...(doc.lines.length ? [] : ['Add at least one requirement (V2).'])];
+  const seen = new Set();
+  doc.lines.forEach((l) => {
+    const cell = `${l.gprId}|${l.gprLineKey}|${l.color}|${l.size}`;
+    if (seen.has(cell)) out.push(`${gpoLineLabel(l)}: line already added (V9).`);
+    seen.add(cell);
+  });
+  const processes = [...new Set(doc.lines.map((l) => l.processLabel))];
+  if (processes.length > 1) out.push(`One process per PO: ${processes.join(', ')} need separate POs.`);
+  return out;
+};
 
 const dateChecks = (doc, blocking, warnings) => {
   if (!doc.requiredDate) blocking.push('Enter the required date.');
@@ -108,7 +119,7 @@ export const validateGpo = (doc, ctx, { today = dayjs() } = {}) => {
     if (!hasValue(l.rate) || !(Number(l.rate) > 0)) lineError(l, i, 'enter a rate (V6)');
     else if (!dp(l.rate, 4)) lineError(l, i, 'rate takes at most four decimals (§14)');
     if (!l.uom) lineError(l, i, 'select a UOM (V7)');
-    else if (isKeyedBilling(l.uom) && !hasValue(l.billingQty)) lineError(l, i, `enter the billing quantity in ${jobWorkUomLabel(l.uom)}`);
+    else if (isKeyedBilling(l.uom) && !(Number(l.billingQty) > 0)) lineError(l, i, `enter the billing quantity in ${jobWorkUomLabel(l.uom)}`);
     const change = ctx?.state ? gpoRequirementChange(l, ctx.state) : null;
     if (change) lineError(l, i, `${change} (V12)`);
     const excess = Number(l.poQty) - gpoLiveBalance(l, ctx, doc.held);
@@ -122,6 +133,7 @@ export const validateGpo = (doc, ctx, { today = dayjs() } = {}) => {
     else blocking.push(`${doc.vendor?.name}: ${issue.text} — choose another vendor (§13).`);
   });
   const { basic, discount } = gpoValue(doc);
+  if (Number(doc.discountValue) < 0 || Number(doc.otherCharges) < 0) blocking.push('Discount and other charges cannot be negative (§8.4).');
   if (discount > basic) blocking.push('The discount cannot exceed the subtotal (§8.4).');
   return { blocking: [...new Set(blocking)], warnings, byLine };
 };

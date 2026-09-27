@@ -15,6 +15,8 @@ const Body = ({ doc, onSubmit, onClose }) => {
   const set = (f) => (value) => setV((cur) => ({ ...cur, [f]: value }));
   const backwards = v.expectedReturnDate && v.plannedSendDate && dayjs(v.expectedReturnDate).isBefore(v.plannedSendDate, 'day');
   const changed = FIELDS.some((f) => (v[f] ?? '') !== (doc[f] ?? ''));
+  // The amended PO must still meet the delivery rules (V14): nothing mandatory left blank.
+  const incomplete = !v.requiredDate || !v.plannedSendDate || !v.expectedReturnDate || !v.returnTo || (v.returnTo === 'OTHER' && !String(v.returnToOther || '').trim());
   const submit = async () => {
     setBusy(true);
     try {
@@ -25,7 +27,7 @@ const Body = ({ doc, onSubmit, onClose }) => {
   };
   return (
     <Modal open title="Amend dates / remarks" okText="Save amendment" onOk={submit} onCancel={onClose} confirmLoading={busy} width={720} destroyOnHidden
-      okButtonProps={{ disabled: !changed || !reason.trim() || backwards || !v.plannedSendDate || !v.expectedReturnDate }}>
+      okButtonProps={{ disabled: !changed || !reason.trim() || backwards || incomplete }}>
       <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
         Quantities, rates and the vendor stay as approved. Every change is kept in the PO history with your reason.
       </Text>

@@ -51,7 +51,7 @@ const GpoHeaderSection = memo(function GpoHeaderSection({ doc, editable, masters
               id="gpo-vendor-select" vendors={masters.jobWorkers} loading={masters.loading} value={vendorId} allowWarnings
               processId={doc.process?.id ?? null} processLabel={processLabel} onDate={doc.poDate} onChange={(v) => v && onVendor(v)}
             />
-          ) : <Input value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
+          ) : <Input id="gpo-vendor-name" aria-label="Vendor / Job Worker" value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
           {editable && masters.denied.includes('Suppliers') && <Text type="warning" style={{ fontSize: 12 }}>Picking a vendor needs Suppliers (view) permission.</Text>}
         </Col>
       </Row>

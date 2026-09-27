@@ -2,13 +2,13 @@
  * Which actions the Garment Process PO action bar offers (PRD §16, §19): by status and
  * permission. Pure — the bar renders the list in order.
  *
- * `s` = { doc, can, isCreator, superuser, received, blocked }
+ * `s` = { doc, can, isMaker, superuser, username, received, blocked }
  * Each item: { key, label, primary?, danger?, dialog?, disabledReason? } — `dialog` names
  * the reason dialog the action needs; the bar calls on[key] otherwise.
  */
 import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
-export const gpoActionButtons = ({ doc, can, isCreator, superuser, received, blocked }) => {
+export const gpoActionButtons = ({ doc, can, isMaker, superuser, username, received, blocked }) => {
   const out = [];
   const add = (show, item) => { if (show) out.push(item); };
   const st = doc.status;
@@ -21,9 +21,9 @@ export const gpoActionButtons = ({ doc, can, isCreator, superuser, received, blo
     return out;
   }
   if (st === S.SUBMITTED) {
-    add(can.edit && (isCreator || superuser), { key: 'recall', label: 'Recall' });
+    add(can.edit && (doc.createdByUser === username || superuser), { key: 'recall', label: 'Recall' });
     add(can.reject, { key: 'reject', label: 'Reject to Draft', danger: true, dialog: 'reject' });
-    add(can.approve, { key: 'approve', label: 'Approve', primary: true, disabledReason: isCreator && !superuser ? 'You raised this PO — someone else approves it.' : null });
+    add(can.approve, { key: 'approve', label: 'Approve', primary: true, disabledReason: isMaker && !superuser ? 'You raised, edited or submitted this PO — someone else approves it.' : null });
     return out;
   }
   add([S.APPROVED, S.SENT_TO_VENDOR].includes(st) && can.edit, { key: 'amend', label: 'Amend dates / remarks' });

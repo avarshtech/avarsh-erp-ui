@@ -14,7 +14,8 @@ import { processLabel } from './cutPanelCalc';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
-const twoDp = (v) => Math.round(Number(v) * 100) === Number(v) * 100;
+/** At most `places` decimals, tolerant of binary floats (1.1 × 100 is 110.00000000000001). */
+const dp = (v, places) => Math.abs(Math.round(Number(v) * 10 ** places) - Number(v) * 10 ** places) < 1e-6;
 
 export const lineLabel = (l) => `${l.cprNo} ${l.colorName} ${l.panelName} ${l.size}`;
 
@@ -39,10 +40,14 @@ export const liveBalance = (line, ctx, held) => {
   return cell.required - cell.allocated + (ctx.ownAllocation?.[line.key] ?? held?.[line.key]?.allocated ?? 0);
 };
 
-/** VR-03 / VR-20: the requirement is no longer visible, the line is gone, or its qty / sequence changed since fetch. */
+/**
+ * VR-03 / VR-20: the requirement is gone or back in Draft, the line is gone, or its qty /
+ * sequence changed since fetch. A Closed requirement still answers here: what a PO already
+ * holds on it stands; validateCpp refuses anything more.
+ */
 export const requirementChange = (line, state) => {
   const req = state?.[line.cprId];
-  if (!req) return `${line.cprNo} is no longer available to the PO module`;
+  if (!req || req.status === 'DRAFT') return `${line.cprNo} is no longer available to the PO module`;
   const cell = liveCell(line, state);
   if (!cell) return `${lineLabel(line)} no longer exists on ${line.cprNo}`;
   if (cell.required !== line.snapshot.required || cell.sequenceNo !== line.snapshot.sequenceNo) {
@@ -121,8 +126,22 @@ export const balanceBlock = (doc, ctx) => {
  *   stage        'approve' words a lost balance for the approver (EC-10)
  * Returns { blocking: [msg], advisories: [{ code, msg, resolved }] }.
  */
+/** One line per requirement cell, all of the PO's process — the integrity a save also enforces. */
+export const cppLineIntegrity = (doc) => {
+  const out = [];
+  const label = doc.process?.label ?? doc.process?.name;
+  const seen = new Set();
+  doc.lines.forEach((l) => {
+    const cell = `${l.cprId}|${l.cprLineKey}|${l.size}`;
+    if (seen.has(cell)) out.push(`${lineLabel(l)} is on the PO twice — keep one line per requirement cell.`);
+    seen.add(cell);
+    if (label && l.processLabel !== label) out.push(`${lineLabel(l)} is ${l.processLabel}, not this PO's ${label} (BR-03).`);
+  });
+  return out;
+};
+
 export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
-  const blocking = [];
+  const blocking = cppLineIntegrity(doc);
   const advisories = [];
   const live = doc.lines.filter((l) => Number(l.poQty) > 0);
   if (!doc.poDate || !doc.vendor || !doc.process || !doc.requiredDeliveryDate || !doc.expectedCompletionDate) {
@@ -144,12 +163,17 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
     }
   });
   live.forEach((l) => {
-    if (!twoDp(l.poQty) || Number(l.poQty) < 0) blocking.push(`${lineLabel(l)}: PO quantity must be positive with at most two decimals (VR-15).`);
+    if (!dp(l.poQty, 2)) blocking.push(`${lineLabel(l)}: PO quantity must be positive with at most two decimals (VR-15).`);
     if (!hasValue(l.rate)) blocking.push(`${lineLabel(l)}: enter a rate (VR-09).`);
+    else if (Number(l.rate) < 0 || !dp(l.rate, 2)) blocking.push(`${lineLabel(l)}: the rate must be zero or more, with at most two decimals (FR-14).`);
     else if (Number(l.rate) === 0 && l.rateReasonCode !== ZERO_RATE_REASON.value) blocking.push(`${lineLabel(l)}: a rate of 0.00 needs the ${ZERO_RATE_REASON.label} reason (VR-10).`);
-    if (isKeyedBilling(l.uom) && !hasValue(l.billingQty)) blocking.push(`${lineLabel(l)}: enter the billing quantity for ${l.uom} (§11.3).`);
+    if (isKeyedBilling(l.uom) && !(Number(l.billingQty) > 0)) blocking.push(`${lineLabel(l)}: enter the billing quantity for ${l.uom} (§11.3).`);
     const change = ctx.state ? requirementChange(l, ctx.state) : null;
     if (change) blocking.push(`${change} — re-fetch the line (VR-20).`);
+    const own = ctx.ownAllocation?.[l.key] ?? doc.held?.[l.key]?.allocated ?? 0;
+    if (!change && ctx.state?.[l.cprId]?.status === 'CLOSED' && Number(l.poQty) > own) {
+      blocking.push(`${lineLabel(l)}: ${l.cprNo} is closed — the PO can keep what it holds (${n(own)}) but not take more.`);
+    }
     // An amendment is checked against the balance plus what its own PO already holds (R0).
     const excess = Number(l.poQty) - liveBalance(l, ctx, doc.held);
     if (excess > 0 && !coveringOverride(doc, l, excess)) {
@@ -166,6 +190,7 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
   if (lateOrders.length) advisories.push({ code: 'LATE_DELIVERY', msg: 'The required delivery date is after the order delivery date (VR-08).', resolved: Boolean(String(doc.lateDeliveryReason || '').trim()) });
   if (ctx.duplicates?.length) advisories.push({ code: 'DUPLICATE_PO', msg: `${ctx.duplicates.join(', ')} already goes to this job worker for the same requirement and process today (VR-14).`, resolved: Boolean(String(doc.duplicateReason || '').trim()) });
   const { basic, discount } = cppValue(doc);
+  if (Number(doc.discountValue) < 0 || Number(doc.otherCharges) < 0) blocking.push('Discount and other charges cannot be negative.');
   if (discount > basic) blocking.push('The discount cannot exceed the basic amount.');
   advisories.filter((a) => !a.resolved).forEach((a) => blocking.push(`${a.msg} Record a reason to continue.`));
   return { blocking: [...new Set(blocking)], advisories };

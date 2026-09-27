@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
+import { withLiveVendor, vendorChanged } from '../../../utils/jobWorkPoLines';
 import {
   saveCpp, submitCpp, deleteCpp, requestCppOverride, authoriseCppOverride,
 } from '../../../services/po/cutPanelPo/cutPanelPoService';
@@ -8,17 +9,18 @@ import {
 const BASE = JOB_WORK_PO_PATH.CPP;
 
 /**
- * Draft actions of a Cut Panel PO: save (number on first save), submit (saving first),
- * delete, and the over-allocation override — requested on the saved draft, authorised by
- * someone else. `unit` fills the PO's unit and return unit when the draft has none yet.
+ * Draft actions of a Cut Panel PO: save (number on first save), submit (saving first — also
+ * when the live supplier changed since the snapshot), delete, and the over-allocation
+ * override — requested on the saved draft, authorised by someone else. `unit` fills the
+ * PO's unit and return unit when the draft has none yet.
  */
-const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit }) => {
+const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, liveVendor }) => {
   const navigate = useNavigate();
   const { run } = runner;
 
   const persist = useCallback(async () => {
     const saved = await saveCpp({
-      ...doc,
+      ...withLiveVendor(doc, liveVendor),
       branchId: doc.branchId ?? unit?.id ?? null, branchName: doc.branchName ?? unit?.branchName ?? null,
       returnBranchId: doc.returnBranchId ?? unit?.id ?? null, returnBranchName: doc.returnBranchName ?? unit?.branchName ?? null,
     });
@@ -26,9 +28,9 @@ const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit }) 
     clearDirty();
     if (!doc.id) navigate(`${BASE}/${saved.id}`, { replace: true });
     return saved;
-  }, [doc, unit, dispatch, clearDirty, navigate]);
+  }, [doc, unit, liveVendor, dispatch, clearDirty, navigate]);
 
-  const savedDoc = useCallback(async () => (doc.id && !dirty ? doc : persist()), [doc, dirty, persist]);
+  const savedDoc = useCallback(async () => (doc.id && !dirty && !vendorChanged(doc, liveVendor) ? doc : persist()), [doc, dirty, liveVendor, persist]);
 
   const save = useCallback(() => run('save', persist, 'Draft saved'), [run, persist]);
 

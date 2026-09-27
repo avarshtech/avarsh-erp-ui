@@ -58,8 +58,8 @@ const GarmentProcessPoForm = () => {
   const view = useGpoView(po, ctx, checks);
   const cards = useMemo(() => (po.doc ? requirementCards(po.doc, ctx) : []), [po.doc, ctx]);
   const req = useGpoRequirementRows({ enabled: Boolean(view?.draft), refresh: `${po.doc?.version}|${po.doc?.lines.length}` });
-  const runner = useActionRunner();
-  const draft = useGpoDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch });
+  const runner = useActionRunner(id ?? 'new');
+  const draft = useGpoDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch, liveVendor: ctx?.liveVendor });
   const flow = useGpoFlowActions({ ...po, clearDirty, runner });
   const lines = useGpoLineHandlers({ ...po, masters });
   const h = useGpoHandlers({ ...po, masters, ctx, value: view?.value, flow });

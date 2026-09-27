@@ -58,7 +58,8 @@ export const sumLedger = (entries) => {
     const q = Number(e.qty) || 0;
     if (e.type === LEDGER_ENTRY.ALLOCATE) t.allocated += q;
     if (e.type === LEDGER_ENTRY.OVERRIDE_ALLOCATE) { t.allocated += q; t.overAllocated += q; }
-    if (e.type === LEDGER_ENTRY.RELEASE) { t.allocated -= q; t.released += q; }
+    // A release gives back the excess first: what sits above the requirement goes before the rest.
+    if (e.type === LEDGER_ENTRY.RELEASE) { t.allocated -= q; t.released += q; t.overAllocated = Math.max(0, t.overAllocated - q); }
     if (e.type === LEDGER_ENTRY.COMPLETE) t.completed += q;
     out.set(id, t);
   });

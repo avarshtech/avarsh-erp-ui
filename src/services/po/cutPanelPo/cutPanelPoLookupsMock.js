@@ -82,11 +82,17 @@ export const cppFetchLines = async ({ label, cprIds, colours, sizes, existing, f
   return { lines: out, skipped };
 };
 
-/** The CPRs a PO draws on, as they are now: status, submission date and per-cell required qty (VR-03/05/20). */
+/**
+ * The CPRs a PO draws on, as they are now, whatever their status — a Closed one keeps what
+ * its POs hold, a Draft (reopened) one is no longer available (VR-03/05/20).
+ */
 export const cppRequirementState = async (cprIds) => {
-  const live = await liveCprs();
-  return Object.fromEntries(cprIds.map((id) => {
-    const c = live.find((x) => x.doc.id === id);
-    return [id, c ? { status: c.usage.status, submittedOn: c.doc.submittedOn, doc: c.doc, usage: c.usage } : null];
+  const docs = await Promise.all(cprIds.map((id) => getCpr(id).catch(() => null)));
+  const inputs = usageInputs(REQUIREMENT_SOURCE.CPR);
+  return Object.fromEntries(cprIds.map((id, i) => {
+    const doc = docs[i];
+    if (!doc) return [id, null];
+    const usage = requirementUsage(REQUIREMENT_SOURCE.CPR, doc, inputs);
+    return [id, { status: usage.status, submittedOn: doc.submittedOn, doc, usage }];
   }));
 };

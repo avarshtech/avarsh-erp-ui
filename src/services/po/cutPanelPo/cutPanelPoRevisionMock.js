@@ -8,7 +8,7 @@
 import { detach, mockDelay, mockError } from '../../bom/requirementMockStore';
 import { loadJobWorkDb, saveJobWorkDb } from '../jobWork/jobWorkMockStore';
 import { actor, now, findPo, addPoAudit, lineLedger, releaseLine, withHeld } from '../jobWork/jobWorkMockHelpers';
-import { cppContext, allocateLines } from './cutPanelPoWorkflowMock';
+import { cppContext, allocateLines, isMaker } from './cutPanelPoWorkflowMock';
 import { validateCpp, approvalLevels } from '../../../utils/cutPanelPoCalc';
 import { revisionChanges, mergedRevision, REVISION_FIELDS } from '../../../utils/cutPanelPoRevision';
 import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T } from '../../../utils/jobWorkPoStatus';
@@ -50,7 +50,7 @@ export const saveCppRevision = async (id, patch) => {
   const { db, doc, rev } = await open(id, S.DRAFT);
   const keys = new Set(rev.lines.map((l) => l.key));
   const lines = (patch.lines || rev.lines).filter((l) => keys.has(l.key));
-  Object.assign(rev, pick(patch, REVISION_FIELDS), { lines });
+  Object.assign(rev, pick(patch, REVISION_FIELDS), { lines, modifiedByUser: actor().username });
   return commit(db, doc, `saved amendment R${rev.revisionNo}`, `${revisionChanges(doc, rev).length} change(s)`);
 };
 
@@ -69,8 +69,8 @@ export const submitCppRevision = async (id) => {
 /** One level per call; on the last, R0's allocation is released and R1's taken (§15.3). */
 export const approveCppRevision = async (id, remark = '') => {
   const { db, doc, rev, who } = await open(id, S.SUBMITTED);
-  const self = rev.createdByUser === who.username;
-  if (self && !who.superuser) throw mockError('You raised this amendment, so you cannot approve it (BR-15).', 403);
+  const self = isMaker(rev, who.username);
+  if (self && !who.superuser) throw mockError('You raised, edited or submitted this amendment, so you cannot approve it (BR-15).', 403);
   if (!who.superuser && rev.approvals.some((a) => a.byUser === who.username)) throw mockError('You approved an earlier level; the next level needs another approver.', 409);
   const merged = mergedRevision(doc, rev);
   const held = Object.fromEntries(doc.lines.map((l) => [l.key, lineLedger(db, doc.id, l.key).allocated]));

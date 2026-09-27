@@ -5,7 +5,7 @@
  * rate move — a different vendor or process means cancelling and raising a fresh PO.
  */
 export const REVISION_FIELDS = ['discountType', 'discountValue', 'otherCharges', 'requiredDeliveryDate',
-  'expectedCompletionDate', 'panelIssueDate', 'paymentTerms', 'deliveryTerms', 'lateDeliveryReason'];
+  'expectedCompletionDate', 'panelIssueDate', 'paymentTerms', 'deliveryTerms', 'lateDeliveryReason', 'duplicateReason'];
 
 /** Still editable once Approved, until Sent to Vendor (BR-16) — without an amendment. */
 export const ISSUED_FIELDS = ['vendor', 'paymentTerms', 'deliveryTerms', 'requiredDeliveryDate', 'expectedCompletionDate',
@@ -13,14 +13,20 @@ export const ISSUED_FIELDS = ['vendor', 'paymentTerms', 'deliveryTerms', 'requir
 
 const pick = (src, fields) => Object.fromEntries(fields.filter((f) => f in src).map((f) => [f, src[f]]));
 
-/** The PO as the amendment would make it — what is shown, validated and, on approval, allocated. */
-export const mergedRevision = (doc, rev) => ({ ...doc, ...pick(rev, REVISION_FIELDS), lines: rev.lines, overrides: [] });
+/**
+ * The PO as the amendment would make it — what is shown, validated and, on approval,
+ * allocated. The live PO's authorised overrides carry over (they can only be requested on a
+ * draft), so an amendment is never refused for an excess that was already authorised.
+ */
+export const mergedRevision = (doc, rev) => ({
+  ...doc, ...pick(rev, REVISION_FIELDS), lines: rev.lines, overrides: (doc.overrides || []).filter((o) => o.status === 'AUTHORISED'),
+});
 
 const LABELS = {
   discountType: 'Discount type', discountValue: 'Discount', otherCharges: 'Other charges',
   requiredDeliveryDate: 'Required delivery', expectedCompletionDate: 'Expected completion',
   panelIssueDate: 'Panel issue date', paymentTerms: 'Payment terms', deliveryTerms: 'Delivery terms',
-  lateDeliveryReason: 'Late delivery reason', vendor: 'Job worker', processingLocation: 'Processing location',
+  lateDeliveryReason: 'Late delivery reason', duplicateReason: 'Duplicate PO reason', vendor: 'Job worker', processingLocation: 'Processing location',
   vendorLocation: 'Vendor location', returnTo: 'Return to', returnToOther: 'Return to (other)',
   returnBranchName: 'Return unit', freight: 'Freight', instructions: 'Processing instructions',
   remarks: 'Remarks', references: 'Reference documents',

@@ -9,7 +9,7 @@ import { loadJobWorkDb, saveJobWorkDb } from '../jobWork/jobWorkMockStore';
 import { getMockOrderContext } from '../../bom/requirementMockOrders';
 import { actor, now, findPo, expectStatus, addPoAudit, nextPoNumber, withHeld } from '../jobWork/jobWorkMockHelpers';
 import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T } from '../../../utils/jobWorkPoStatus';
-import { cppValue } from '../../../utils/cutPanelPoCalc';
+import { cppValue, cppLineIntegrity } from '../../../utils/cutPanelPoCalc';
 import { ISSUED_FIELDS, fieldLabel } from '../../../utils/cutPanelPoRevision';
 import { vendorEligibility } from '../../../utils/vendorEligibility';
 import { CPP_RETURN_TO, FREIGHT_OPTIONS, PROCESSING_LOCATIONS, optionLabel } from '../../../utils/jobWorkConstants';
@@ -71,6 +71,8 @@ export const saveCpp = async (doc) => {
   const db = loadJobWorkDb();
   if (!doc.process) throw mockError('Choose the panel process first.');
   const lines = doc.lines.filter((l) => Number(l.poQty) > 0);
+  const integrity = cppLineIntegrity({ ...doc, lines });
+  if (integrity.length) throw mockError(integrity[0], 422);
   const who = actor();
   if (!doc.id) {
     const poNo = nextPoNumber(db, 'CPP');
@@ -91,7 +93,7 @@ export const saveCpp = async (doc) => {
   const keys = new Set(lines.map((l) => l.key));
   Object.assign(existing, pick(doc, DRAFT_FIELDS), {
     lines, overrides: existing.overrides.filter((o) => keys.has(o.lineKey)),
-    version: existing.version + 1, modifiedBy: who.name, modifiedOn: now(),
+    version: existing.version + 1, modifiedBy: who.name, modifiedByUser: who.username, modifiedOn: now(),
   });
   addPoAudit(db, existing.id, 'saved the draft', `${lines.length} line(s)`);
   saveJobWorkDb(db);
@@ -116,7 +118,8 @@ export const updateCppDetails = async (id, patch) => {
   await mockDelay();
   const db = loadJobWorkDb();
   const doc = findPo(db, id, T.CPP);
-  const allowed = doc.status === S.APPROVED ? [...ISSUED_FIELDS, ...NOTE_FIELDS] : NOTE_FIELDS;
+  // An open amendment owns the issued terms until it is approved or dropped; notes stay open.
+  const allowed = doc.status === S.APPROVED && !doc.pendingRevision ? [...ISSUED_FIELDS, ...NOTE_FIELDS] : NOTE_FIELDS;
   if ([S.CANCELLED, S.REJECTED].includes(doc.status)) throw mockError('A cancelled or rejected PO cannot change.', 409);
   const clean = pick(patch, allowed);
   const changes = changesOf(doc, clean);

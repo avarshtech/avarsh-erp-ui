@@ -15,7 +15,7 @@ const useGpoFlowActions = ({ doc, dispatch, clearDirty, runner }) => {
     }, okText);
     return {
       recall: () => act('recall', () => svc.recallGpo(id), 'Recalled to Draft — the allocation is released'),
-      approve: (signOff = false) => act('approve', () => svc.approveGpo(id, { signOff }), 'Approved'),
+      approve: (signOff = false, acknowledged = []) => act('approve', () => svc.approveGpo(id, { signOff, acknowledged }), 'Approved'),
       reject: ({ remark }) => act('reject', () => svc.rejectGpo(id, remark), 'Rejected to Draft — the allocation is released'),
       send: () => act('send', () => svc.sendGpoToVendor(id), 'Sent to the vendor'),
       cancel: (reason) => act('cancel', () => svc.cancelGpo(id, reason), 'PO cancelled — its allocation is released'),

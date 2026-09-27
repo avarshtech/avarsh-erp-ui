@@ -25,16 +25,14 @@ const useGpoHandlers = ({ doc, dispatch, masters, ctx, value, flow }) => {
   }, [doc, dispatch, masters.paymentTerms]);
 
   const approve = useCallback(() => {
-    // While the context reloads (right after a submit), the PO's own vendor snapshot answers.
-    const eligibility = ctx?.eligibility ?? (doc.vendor && vendorEligibility(doc.vendor, {
-      processId: doc.process?.id ?? null, processLabel: doc.lines[0]?.processLabel, onDate: dayjs(),
-    }));
-    const warnings = (eligibility?.issues || []).filter((i) => i.warnOnly);
+    // Warnings on the live supplier and on the PO's own vendor snapshot both need the sign-off.
+    const snapshot = doc.vendor ? vendorEligibility(doc.vendor, { processId: doc.process?.id ?? null, processLabel: doc.lines[0]?.processLabel, onDate: dayjs() }) : null;
+    const warnings = [...new Set([...(ctx?.eligibility?.issues || []), ...(snapshot?.issues || [])].filter((i) => i.warnOnly).map((i) => i.text))];
     if (!warnings.length) return flow.approve(false);
     return modal.confirm({
       title: `Sign off ${doc.vendor?.name}?`, okText: 'Sign off and approve',
-      content: `${warnings.map((w) => w.text).join('; ')}. Approving records your sign-off on the PO.`,
-      onOk: () => flow.approve(true),
+      content: `${warnings.join('; ')}. Approving records your sign-off on the PO.`,
+      onOk: () => flow.approve(true, warnings),
     });
   }, [ctx, doc, flow, modal]);
 

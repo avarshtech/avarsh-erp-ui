@@ -20,15 +20,15 @@ const useGpoView = ({ doc }, ctx, checks) => useMemo(() => {
     edit: hasPermission(KEY, doc.id ? 'update' : 'add'), submit: canSubmitRequirement(KEY), approve: hasPermission(KEY, 'approve'),
     reject: hasPermission(KEY, 'reject'), cancel: hasPermission(KEY, 'cancel'), override: hasPermission(KEY, 'override'),
   };
-  const isCreator = doc.createdByUser === user.username;
+  const isMaker = [doc.createdByUser, doc.modifiedByUser, doc.submittedByUser].includes(user.username);
   const received = doc.lines.some((l) => Number(l.receivedQty) > 0);
   const flags = poFlags(doc, {
     orderCancelled: Boolean(ctx) && doc.lines.some((l) => ctx.orders?.[l.orderId]?.status === 'CANCELLED'),
     requirementChanged: Boolean(ctx?.state) && doc.status !== S.DRAFT && doc.lines.some((l) => gpoRequirementChange(l, ctx.state)),
   });
   return {
-    can, draft: doc.status === S.DRAFT && can.edit, value: gpoValue(doc), flags, isCreator, superuser, username: user.username,
-    buttons: gpoActionButtons({ doc, can, isCreator, superuser, received, blocked: Boolean(checks?.blocking.length) }),
+    can, draft: doc.status === S.DRAFT && can.edit, value: gpoValue(doc), flags, isMaker, superuser, username: user.username,
+    buttons: gpoActionButtons({ doc, can, isMaker, superuser, username: user.username, received, blocked: Boolean(checks?.blocking.length) }),
   };
 }, [doc, ctx, checks]);
 

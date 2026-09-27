@@ -11,7 +11,8 @@ import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
 const EMPTY_SELECTION = { cprIds: [], colours: [], sizes: [] };
 
-export const initialCppState = { doc: null, rev: null, dirty: false, selection: EMPTY_SELECTION, selectedKeys: [] };
+/** `dirty`: anything unsaved; `docDirty`: unsaved edits to the live PO itself (not to an open amendment). */
+export const initialCppState = { doc: null, rev: null, dirty: false, docDirty: false, selection: EMPTY_SELECTION, selectedKeys: [] };
 
 const today = () => {
   const d = new Date();
@@ -40,7 +41,7 @@ const target = (state) => (state.rev ? 'rev' : 'doc');
 
 const withLines = (state, fn) => {
   const t = target(state);
-  return { ...state, dirty: true, [t]: { ...state[t], lines: fn(state[t].lines) } };
+  return { ...state, dirty: true, docDirty: state.docDirty || t === 'doc', [t]: { ...state[t], lines: fn(state[t].lines) } };
 };
 
 export const cppReducer = (state, action) => {
@@ -51,9 +52,9 @@ export const cppReducer = (state, action) => {
     case 'LOAD_FAILED':
       return initialCppState;
     case 'PATCH': // header, vendor, delivery, notes
-      return { ...state, dirty: true, doc: { ...state.doc, ...action.patch } };
+      return { ...state, dirty: true, docDirty: true, doc: { ...state.doc, ...action.patch } };
     case 'COMMERCIAL': // discount, other charges and amendable dates / terms: the amendment's while one is open
-      return { ...state, dirty: true, [target(state)]: { ...state[target(state)], ...action.patch } };
+      return { ...state, dirty: true, docDirty: state.docDirty || !state.rev, [target(state)]: { ...state[target(state)], ...action.patch } };
     case 'PROCESS_SELECTED':
       return {
         ...state, dirty: true, selection: EMPTY_SELECTION,

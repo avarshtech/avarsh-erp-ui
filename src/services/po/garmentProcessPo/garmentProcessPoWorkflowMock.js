@@ -95,16 +95,18 @@ export const recallGpo = async (id) => {
  * superuser may, logged — deviation D21). An unapproved or untagged job worker needs the
  * approver's explicit sign-off (§13), recorded on the PO.
  */
-export const approveGpo = async (id, { signOff = false, remark = '' } = {}) => {
+export const approveGpo = async (id, { signOff = false, acknowledged = [], remark = '' } = {}) => {
   const { db, doc, who } = await open(id, [S.SUBMITTED], 'Only a submitted PO can be approved.');
-  const self = doc.createdByUser === who.username;
-  if (self && !who.superuser) throw mockError('You raised this PO, so you cannot approve it.', 403);
+  const self = [doc.createdByUser, doc.modifiedByUser, doc.submittedByUser].includes(who.username);
+  if (self && !who.superuser) throw mockError('You raised, edited or submitted this PO, so you cannot approve it.', 403);
   const ctx = await gpoContext(doc);
   const issues = ctx.eligibility?.issues || [];
   const blocked = issues.filter((i) => !i.warnOnly);
   if (blocked.length) throw mockError(`${doc.vendor.name}: ${blocked[0].text} — the PO cannot be approved to this vendor.`, 422);
-  const warnings = issues.filter((i) => i.warnOnly).map((i) => i.text);
-  if (warnings.length && !signOff) throw mockError(`${doc.vendor.name}: ${warnings.join('; ')} — sign off the vendor to approve.`, 422);
+  const own = issues.filter((i) => i.warnOnly).map((i) => i.text);
+  if (own.length && !signOff) throw mockError(`${doc.vendor.name}: ${own.join('; ')} — sign off the vendor to approve.`, 422);
+  // What the approver signed off: the warnings on the PO's vendor and any the screen saw on the live supplier.
+  const warnings = [...new Set([...own, ...(signOff ? acknowledged : [])])];
   doc.approvals = [{ level: 1, name: GPO_LEVELS[0], by: who.name, byUser: who.username, at: now(), remark, selfApproved: self, vendorSignOff: warnings }];
   Object.assign(doc, { status: S.APPROVED, approvedBy: who.name, approvedOn: now() });
   const notes = [self && 'self-approved (superuser)', warnings.length && `vendor signed off: ${warnings.join('; ')}`].filter(Boolean);

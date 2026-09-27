@@ -109,12 +109,20 @@ export const saveGpo = async (doc) => {
   const keys = new Set(lines.map((l) => l.key));
   Object.assign(existing, pick(doc, DRAFT_FIELDS), {
     lines, overrides: existing.overrides.filter((o) => keys.has(o.lineKey)),
-    version: existing.version + 1, modifiedBy: who.name, modifiedOn: now(),
+    version: existing.version + 1, modifiedBy: who.name, modifiedByUser: who.username, modifiedOn: now(),
   });
   if (changes.length) addPoAudit(db, existing.id, 'saved the draft', '', changes);
   saveJobWorkDb(db);
   return detach(withHeld(db, existing));
 };
+
+/** The delivery rules an amended PO must still meet (V14): required date, Return To, both dates in order. */
+const amendBlocking = (d) => [
+  ...(d.requiredDate ? [] : ['Enter the required date.']),
+  ...(d.returnTo && (d.returnTo !== 'OTHER' || String(d.returnToOther || '').trim()) ? [] : ['Select where the garments return to (V14).']),
+  ...(d.plannedSendDate && d.expectedReturnDate ? [] : ['Planned send and expected return dates are mandatory (V14).']),
+  ...(d.plannedSendDate && d.expectedReturnDate && d.expectedReturnDate < d.plannedSendDate ? ['Check dates: the expected return is before the planned send date (V14).'] : []),
+];
 
 /** PATCH /garment-process-po/{id}/dates — Amend dates / remarks on an issued PO (§16), with a reason. */
 export const amendGpoDates = async (id, patch, reason) => {
@@ -124,7 +132,10 @@ export const amendGpoDates = async (id, patch, reason) => {
   const doc = findPo(db, id, T.GPO);
   expectStatus(doc, [S.APPROVED, S.SENT_TO_VENDOR], 'Dates and remarks are amended on an approved or sent PO.');
   const clean = pick(patch, AMEND_FIELDS);
-  const changes = fieldChanges(doc, { ...doc, ...clean }, AMEND_FIELDS);
+  const next = { ...doc, ...clean };
+  const broken = amendBlocking(next);
+  if (broken.length) throw mockError(broken[0], 422);
+  const changes = fieldChanges(doc, next, AMEND_FIELDS);
   if (!changes.length) throw mockError('The amendment changes nothing yet.');
   Object.assign(doc, clean, { version: doc.version + 1, modifiedBy: actor().name, modifiedOn: now() });
   addPoAudit(db, doc.id, 'amended dates / remarks', reason, changes);

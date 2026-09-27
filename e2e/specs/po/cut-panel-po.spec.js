@@ -199,8 +199,11 @@ test('Approve the seeded submitted PO, then change its terms before it is sent',
   await expect(page.getByText('Balance after 0')).toBeVisible(); // its own allocation is not counted against it
 
   await setDate(page, 'cpp-requiredDeliveryDate', plusDays(25));
+  // Unsaved changes block the workflow: sending now would send the stored terms.
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeDisabled();
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('Changes saved')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeEnabled();
   await page.getByRole('button', { name: 'History' }).click();
   await expect(page.locator('.ant-drawer-open')).toContainText(`Required delivery:`);
   await expect(page.locator('.ant-drawer-open')).toContainText(plusDays(25));

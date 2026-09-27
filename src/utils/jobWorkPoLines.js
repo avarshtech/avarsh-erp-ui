@@ -55,6 +55,12 @@ export const processSnapshot = (option, masterProcesses, category) => {
   };
 };
 
+/** The PO with its vendor snapshot re-taken from the live supplier, when the screen has one (FR-20). */
+export const withLiveVendor = (doc, liveVendor) => (liveVendor ? { ...doc, vendor: vendorSnapshot(liveVendor) } : doc);
+
+/** The live supplier no longer matches the PO's snapshot (approval renewed, processes changed…). */
+export const vendorChanged = (doc, liveVendor) => Boolean(liveVendor) && JSON.stringify(vendorSnapshot(liveVendor)) !== JSON.stringify(doc.vendor);
+
 /** The snapshot a PO keeps of its supplier (CPP FR-20), refreshed on every save until approval. */
 export const vendorSnapshot = (v) => ({
   id: v.id, name: v.name, gstin: v.gstin, stateCode: v.stateCode, igstApplicable: Boolean(v.igstApplicable),

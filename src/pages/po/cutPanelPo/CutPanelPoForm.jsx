@@ -54,13 +54,13 @@ const CutPanelPoForm = () => {
   const { allowedBranches, activeBranch, defaultBranch } = useBranch();
   const baseView = useCppView(po, null);
   const working = baseView?.working ?? null;
-  const masters = useJobWorkMasters('Cut Panel', { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery) });
+  const masters = useJobWorkMasters('Cut Panel', { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery || baseView?.edit.terms) });
   const ctx = useCppContext(working, masters.jobWorkers);
   const view = useCppView(po, ctx);
   const checks = useMemo(() => (ctx && working ? validateCpp(working, ctx) : null), [working, ctx]);
   const lookup = useCppRequirementLookup({ enabled: Boolean(view?.edit.draft), label: po.doc?.process?.label, refresh: po.doc?.lines.length });
-  const runner = useActionRunner();
-  const draft = useCppDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch });
+  const runner = useActionRunner(id ?? 'new');
+  const draft = useCppDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch, liveVendor: ctx?.liveVendor });
   const flow = useCppFlowActions({ ...po, clearDirty, runner });
   const h = useCppHandlers({ ...po, view, masters });
   const [dialog, setDialog] = useState(null);

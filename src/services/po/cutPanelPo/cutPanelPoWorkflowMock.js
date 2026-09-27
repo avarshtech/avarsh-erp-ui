@@ -18,7 +18,7 @@ import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T } from '../../../utils/jobWork
 
 /** What validateCpp needs, gathered as the server will: requirements, order dates, vendor, rates, duplicates. */
 export const cppContext = async (doc, { ownAllocation = null } = {}) => {
-  const lines = doc.lines.filter((l) => Number(l.poQty) > 0);
+  const { lines } = doc;
   const cprIds = [...new Set(lines.map((l) => l.cprId))];
   const label = doc.process?.label ?? doc.process?.name;
   const orders = await Promise.all([...new Set(lines.map((l) => l.orderId))].map((id) => getCprOrderContext(id)));
@@ -59,11 +59,15 @@ const open = async (id, statuses, message) => {
 
 const needReason = (text, what) => { if (!String(text || '').trim()) throw mockError(`${what} needs a reason.`); };
 
+/** Who made the PO what it is — its creator, last editor or submitter — never approves it (BR-15). */
+export const isMaker = (doc, username) => [doc.createdByUser, doc.modifiedByUser, doc.submittedByUser].includes(username);
+
 /** Allocation at the last approval: the balance first, any authorised excess as OVERRIDE_ALLOCATE. */
 export const allocateLines = (db, doc, ctx) => doc.lines.forEach((l) => {
-  const cell = liveCell(l, ctx.state);
-  const balance = Math.max(0, cell.required - cell.allocated + (ctx.ownAllocation?.[l.key] || 0));
   const qty = Number(l.poQty);
+  const cell = liveCell(l, ctx.state);
+  if (!(qty > 0) || !cell) return;
+  const balance = Math.max(0, cell.required - cell.allocated + (ctx.ownAllocation?.[l.key] || 0));
   const normal = Math.min(qty, balance);
   const o = coveringOverride(doc, l, qty - balance);
   postLedger(db, doc, l, LEDGER_ENTRY.ALLOCATE, normal);
@@ -94,8 +98,8 @@ export const recallCpp = async (id) => {
  */
 export const approveCpp = async (id, remark = '') => {
   const { db, doc, who } = await open(id, [S.SUBMITTED], 'Only a submitted PO can be approved.');
-  const self = doc.createdByUser === who.username;
-  if (self && !who.superuser) throw mockError('You raised this PO, so you cannot approve it (BR-15).', 403);
+  const self = isMaker(doc, who.username);
+  if (self && !who.superuser) throw mockError('You raised, edited or submitted this PO, so you cannot approve it (BR-15).', 403);
   if (!who.superuser && doc.approvals.some((a) => a.byUser === who.username)) throw mockError('You approved an earlier level; the next level needs another approver.', 409);
   const ctx = { ...(await cppContext(doc)), stage: 'approve' };
   const { blocking } = validateCpp(doc, ctx);

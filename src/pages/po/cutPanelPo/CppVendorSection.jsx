@@ -41,7 +41,7 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
               processId={doc.process?.id ?? null} processLabel={doc.process?.label ?? doc.process?.name} onDate={doc.poDate}
               onChange={(v) => v && pickVendor(v)} disabled={!doc.process}
             />
-          ) : <Input value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
+          ) : <Input id="cpp-vendor-name" aria-label="Job worker" value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
           {editable.vendor && deniedSuppliers && <Text type="warning" style={{ fontSize: 12 }}>Picking a job worker needs Suppliers (view) permission.</Text>}
         </Col>
         <Col xs={12} md={6}>
