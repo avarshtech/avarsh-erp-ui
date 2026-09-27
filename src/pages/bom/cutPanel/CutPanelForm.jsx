@@ -15,7 +15,7 @@ import { CPR_MODULE_ID, CPR_PROCESS_CATEGORY } from '../../../utils/cutPanelCons
 import { cprTotals, expandSelection } from '../../../utils/cutPanelCalc';
 import { exportCprCsv, printCprStatement } from '../../../utils/cutPanelStatementPrint';
 import { getCprAudit, getCprAllocation } from '../../../services/bom/cutPanel/cutPanelService';
-import RequirementHistoryDrawer from '../shared/RequirementHistoryDrawer';
+import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
 import RequirementStatusBanner from '../shared/RequirementStatusBanner';
@@ -132,7 +132,7 @@ const CutPanelForm = () => {
         dialog={dialog} onDone={() => setDialog((d) => ({ ...d, open: false }))} actions={actions}
         docLabel="Cut Panel Requirement" docNumber={doc.cprNo}
       />
-      <RequirementHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.cprNo} loadAudit={getCprAudit} />
+      <DocumentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.cprNo} loadAudit={getCprAudit} />
       <RequirementAllocationDrawer open={allocationOpen} onClose={() => setAllocationOpen(false)} source="CPR" docId={doc.id} docNo={doc.cprNo} load={getCprAllocation} />
     </div>
   );

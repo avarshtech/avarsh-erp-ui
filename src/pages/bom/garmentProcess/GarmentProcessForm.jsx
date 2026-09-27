@@ -15,7 +15,7 @@ import {
 } from '../../../utils/requirementStatus';
 import { GPR_MODULE_ID, GPR_PROCESS_CATEGORY, GPR_REMARKS_MAX } from '../../../utils/garmentProcessConstants';
 import { getGprAudit, getGprAllocation } from '../../../services/bom/garmentProcess/garmentProcessService';
-import RequirementHistoryDrawer from '../shared/RequirementHistoryDrawer';
+import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
 import RequirementStatusBanner from '../shared/RequirementStatusBanner';
@@ -134,7 +134,7 @@ const GarmentProcessForm = () => {
         dialog={dialog} onDone={() => setDialog((d) => ({ ...d, open: false }))} actions={actions}
         docLabel="Garment Process Requirement" docNumber={doc.requirementNo}
       />
-      <RequirementHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.requirementNo} loadAudit={getGprAudit} />
+      <DocumentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.requirementNo} loadAudit={getGprAudit} />
       <RequirementAllocationDrawer open={allocationOpen} onClose={() => setAllocationOpen(false)} source="GPR" docId={doc.id} docNo={doc.requirementNo} load={getGprAllocation} />
     </div>
   );

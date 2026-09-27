@@ -18,7 +18,7 @@
 import { buildCprSeed } from '../../bom/cutPanel/cutPanelMockData';
 import { buildGprSeed } from '../../bom/garmentProcess/garmentProcessMockData';
 import { getMockOrderContext } from '../../bom/requirementMockOrders';
-import { seedVendorSnapshot } from './jobWorkSeedVendors';
+import { seedVendorSnapshot, seedDay as day } from './jobWorkSeedVendors';
 import { cppLineFromCpr, gpoLineFromGpr } from '../../../utils/jobWorkPoLines';
 import { LEDGER_ENTRY, poLineRequirementCell } from '../../../utils/jobWorkAllocation';
 import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T, allocatingStatuses } from '../../../utils/jobWorkPoStatus';
@@ -27,11 +27,6 @@ const ANITHA = { name: 'Anitha R', username: 'anitha.r' };
 const KARTHIK = { name: 'Karthik S', username: 'karthik.s' };
 const MEENA = { name: 'Meena V', username: 'meena.v' };
 
-const day = (offset) => {
-  const d = new Date();
-  d.setDate(d.getDate() + offset);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 const at = (offset, time = '10:00:00') => `${day(offset)}T${time}`;
 
 const INSTRUCTIONS = {
@@ -41,9 +36,10 @@ const INSTRUCTIONS = {
   'Garment Dyeing': 'Dye to the approved lab dip; shade band A only; no patchiness at seams.',
 };
 
+/** The shape utils/jobWorkPoLines processSnapshot gives; ids are the live master's, unknown to the seed. */
 const processSnapshot = (name, category) => ({
-  id: null, name, category, sacCode: '998821', gstRatePercent: 5, defaultUom: 'PIECE',
-  artworkRequired: false, defaultInstructions: INSTRUCTIONS[name],
+  id: null, name, label: name, otherName: null, category, sacCode: '998821', gstRatePercent: 5, defaultUom: 'PIECE',
+  artworkRequired: false, defaultInstructions: INSTRUCTIONS[name], fromMaster: false,
 });
 
 const po = ({ type, id, poNo, status, dateOffset, vendor, processName, category, lines, by = ANITHA, ...rest }) => {

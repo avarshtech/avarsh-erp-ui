@@ -181,9 +181,10 @@ export const SCREENS = [
   // refer_back reopens a submitted requirement nothing has consumed yet, cancel closes it.
   // The job-work POs raised against them (Cut Panel PO, Garment Process PO) reuse these
   // keys, so one operation can cover both documents: the labels name both uses.
-  { id: 'cut-panel', name: 'Cut Panel Requirement', section: 'bom', kind: 'screen',
+  { id: 'cut-panel', name: 'Cut Panel Requirement & PO', section: 'bom', kind: 'screen',
     path: '/bom/cut-panel/list',
-    routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id'],
+    routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id',
+      '/purchase-orders/cut-panel-po/list', '/purchase-orders/cut-panel-po/new', '/purchase-orders/cut-panel-po/:id'],
     ops: ['view', 'add', 'update', 'delete', 'approve', 'reject', 'override', 'refer_back', 'cancel'],
     opLabels: {
       delete: 'Delete draft',
@@ -193,8 +194,8 @@ export const SCREENS = [
       refer_back: 'Reopen requirement · Send back PO',
       cancel: 'Close requirement · Cancel / short close PO',
     },
-    description: 'Processes (printing, embroidery…) needed on cut panels before sewing.' },
-  { id: 'garment-process', name: 'Garment Process Requirement', section: 'bom', kind: 'screen',
+    description: 'Processes (printing, embroidery…) needed on cut panels before sewing, and the Cut Panel POs that give them to job workers.' },
+  { id: 'garment-process', name: 'Garment Process Requirement & PO', section: 'bom', kind: 'screen',
     path: '/bom/garment-process/list',
     routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id'],
     ops: ['view', 'add', 'update', 'override', 'approve', 'reject', 'refer_back', 'cancel'],

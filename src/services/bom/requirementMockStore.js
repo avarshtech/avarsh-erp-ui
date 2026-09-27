@@ -14,7 +14,7 @@ const memory = {};
  * job-work PO store (services/po/jobWork). The POs' allocation ledger names requirement
  * line keys, so the three always reseed together: bump this one number, never one store.
  */
-export const DEMO_SEED_VERSION = 2;
+export const DEMO_SEED_VERSION = 3;
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 

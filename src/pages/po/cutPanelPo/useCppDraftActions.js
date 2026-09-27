@@ -1,0 +1,58 @@
+import { useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
+import {
+  saveCpp, submitCpp, deleteCpp, requestCppOverride, authoriseCppOverride,
+} from '../../../services/po/cutPanelPo/cutPanelPoService';
+
+const BASE = JOB_WORK_PO_PATH.CPP;
+
+/**
+ * Draft actions of a Cut Panel PO: save (number on first save), submit (saving first),
+ * delete, and the over-allocation override — requested on the saved draft, authorised by
+ * someone else. `unit` fills the PO's unit and return unit when the draft has none yet.
+ */
+const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit }) => {
+  const navigate = useNavigate();
+  const { run } = runner;
+
+  const persist = useCallback(async () => {
+    const saved = await saveCpp({
+      ...doc,
+      branchId: doc.branchId ?? unit?.id ?? null, branchName: doc.branchName ?? unit?.branchName ?? null,
+      returnBranchId: doc.returnBranchId ?? unit?.id ?? null, returnBranchName: doc.returnBranchName ?? unit?.branchName ?? null,
+    });
+    dispatch({ type: 'SAVED', doc: saved });
+    clearDirty();
+    if (!doc.id) navigate(`${BASE}/${saved.id}`, { replace: true });
+    return saved;
+  }, [doc, unit, dispatch, clearDirty, navigate]);
+
+  const savedDoc = useCallback(async () => (doc.id && !dirty ? doc : persist()), [doc, dirty, persist]);
+
+  const save = useCallback(() => run('save', persist, 'Draft saved'), [run, persist]);
+
+  const submit = useCallback(() => run('submit', async () => {
+    const saved = await savedDoc();
+    dispatch({ type: 'SAVED', doc: await submitCpp(saved.id) });
+  }, 'Submitted for approval'), [run, savedDoc, dispatch]);
+
+  const remove = useCallback(() => run('delete', async () => {
+    await deleteCpp(doc.id);
+    clearDirty();
+    navigate(`${BASE}/list`, { replace: true });
+  }, 'Draft deleted'), [run, doc, clearDirty, navigate]);
+
+  const requestOverride = useCallback((payload) => run('override', async () => {
+    const saved = await savedDoc();
+    dispatch({ type: 'SAVED', doc: await requestCppOverride(saved.id, payload) });
+  }, 'Override requested — an authoriser must approve it before you submit'), [run, savedDoc, dispatch]);
+
+  const authorise = useCallback((o) => run('authorise', async () => {
+    dispatch({ type: 'SAVED', doc: await authoriseCppOverride(doc.id, o.id) });
+  }, 'Override authorised'), [run, doc, dispatch]);
+
+  return { save, submit, remove, requestOverride, authorise };
+};
+
+export default useCppDraftActions;

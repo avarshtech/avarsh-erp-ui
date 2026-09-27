@@ -40,3 +40,25 @@ export const gpoLineFromGpr = ({ key, gpr, line, color, size, order, prevPoQty =
     poQty: Math.max(0, required - prevPoQty), uom, rate: null, excess: null, receivedQty: 0,
   };
 };
+
+/**
+ * The PO's process as it is snapshotted on the PO (CPP §11.2 tax code / rate, FR-16 UOM,
+ * FR-22 instructions): the live master row matched by name within the category, or the
+ * job-work defaults when the master is not readable. `option` = { label, processName, otherName }.
+ */
+export const processSnapshot = (option, masterProcesses, category) => {
+  const m = (masterProcesses || []).find((p) => p.processName === option.processName);
+  return {
+    id: m?.id ?? null, name: option.processName, label: option.label, otherName: option.otherName ?? null, category,
+    sacCode: m?.sacCode ?? '998821', gstRatePercent: m?.gstRatePercent ?? 5, defaultUom: m?.defaultUom ?? 'PIECE',
+    artworkRequired: Boolean(m?.artworkRequired), defaultInstructions: m?.defaultInstructions ?? '', fromMaster: Boolean(m),
+  };
+};
+
+/** The snapshot a PO keeps of its supplier (CPP FR-20), refreshed on every save until approval. */
+export const vendorSnapshot = (v) => ({
+  id: v.id, name: v.name, gstin: v.gstin, stateCode: v.stateCode, igstApplicable: Boolean(v.igstApplicable),
+  address: v.address, city: v.city, state: v.state, pincode: v.pincode, contactPerson: v.contactPerson,
+  phone: v.phone, email: v.email, paymentTerms: v.paymentTerms, jobWorker: v.jobWorker, active: v.active !== false,
+  processIds: v.processIds || [], jobWorkApprovedUntil: v.jobWorkApprovedUntil || null,
+});

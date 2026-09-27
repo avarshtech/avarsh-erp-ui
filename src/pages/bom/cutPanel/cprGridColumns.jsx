@@ -1,6 +1,6 @@
 import { Button, Input, InputNumber, Tag, Tooltip, Typography } from 'antd';
 import { DeleteOutlined, DownOutlined, RightOutlined } from '@ant-design/icons';
-import ColorDot from '../shared/ColorDot';
+import ColorDot from '../../../components/ColorDot';
 import { lineTotal, needsReason, processLabel, varianceOf } from '../../../utils/cutPanelCalc';
 import { CPR_WRN } from '../../../utils/cutPanelConstants';
 import { QtyInput, SeqInput } from './CprGridInputs';

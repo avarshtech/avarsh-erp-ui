@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Drawer, Skeleton } from 'antd';
-import ActivityTimeline from '../../../components/ActivityTimeline';
+import ActivityTimeline from './ActivityTimeline';
 
 /** Fetches on mount — the drawer destroys it on close, so every opening shows fresh rows. */
 const HistoryContent = ({ docId, loadAudit }) => {
@@ -16,16 +16,16 @@ const HistoryContent = ({ docId, loadAudit }) => {
 };
 
 /**
- * Audit trail of a requirement: every save, submit, reopen and close, plus quantity
- * changes and reasons. `loadAudit(id)` resolves to
+ * Audit trail of a document (process requirements, job-work POs): every save and status
+ * change, with quantity or field changes and reasons. `loadAudit(id)` resolves to
  * [{ id, type: 'user' | 'system', user, action, details, timestamp }], newest first.
  */
-const RequirementHistoryDrawer = memo(function RequirementHistoryDrawer({ open, onClose, docId, docNo, loadAudit }) {
+const DocumentHistoryDrawer = memo(function DocumentHistoryDrawer({ open, onClose, docId, docNo, loadAudit }) {
   return (
-    <Drawer title={`History — ${docNo || 'New requirement'}`} open={open} onClose={onClose} size={480} destroyOnHidden>
+    <Drawer title={`History — ${docNo || 'New document'}`} open={open} onClose={onClose} size={480} destroyOnHidden>
       {open && docId ? <HistoryContent docId={docId} loadAudit={loadAudit} /> : null}
     </Drawer>
   );
 });
 
-export default RequirementHistoryDrawer;
+export default DocumentHistoryDrawer;

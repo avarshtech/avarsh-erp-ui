@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Button, Typography } from 'antd';
 import { SaveOutlined, SendOutlined } from '@ant-design/icons';
-import StickyActionBar from '../shared/StickyActionBar';
+import StickyActionBar from '../../../components/StickyActionBar';
 import StatusTag from '../../../components/StatusTag';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getRequirementStatusLabel, isRequirementEditable } from '../../../utils/requirementStatus';

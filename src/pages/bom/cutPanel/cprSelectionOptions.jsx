@@ -1,4 +1,4 @@
-import ColorDot from '../shared/ColorDot';
+import ColorDot from '../../../components/ColorDot';
 
 export const ALL_COLOURS = '__all__';
 

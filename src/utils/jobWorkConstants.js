@@ -67,3 +67,45 @@ export const jobWorkDefaultsFor = (category, current) => {
   if (!jobWorkUomOptions(category).some((u) => u.value === uom)) next.defaultUom = JOB_WORK_PROCESS_DEFAULTS.defaultUom;
   return next;
 };
+
+const opts = (pairs) => pairs.map(([value, label]) => ({ value, label }));
+export const optionLabel = (options, value) => options.find((o) => o.value === value)?.label ?? value ?? '—';
+
+/** Where the work is done (CPP PRD §10.1 processing_location). */
+export const PROCESSING_LOCATIONS = opts([
+  ['VENDOR_PREMISES', 'Vendor premises'], ['IN_HOUSE', 'In-house'], ['THIRD_LOCATION', 'Third location'],
+]);
+
+/** Where processed panels come back to (CPP FR-21). */
+export const CPP_RETURN_TO = opts([
+  ['FACTORY', 'Factory'], ['UNIT', 'Unit'], ['CUTTING', 'Cutting Department'], ['SEWING', 'Sewing'], ['OTHER', 'Other'],
+]);
+
+/** Where processed garments come back to (GPO PRD §8.3). */
+export const GPO_RETURN_TO = opts([
+  ['FACTORY', 'Factory'], ['PRODUCTION_UNIT', 'Production Unit'], ['FINISHING', 'Finishing Department'], ['OTHER', 'Other'],
+]);
+
+export const FREIGHT_OPTIONS = opts([['VENDOR', 'Vendor account'], ['COMPANY', 'Company account']]);
+
+/** Delivery terms are free text on the PO (deviation D5); these are suggestions. */
+export const DELIVERY_TERM_SUGGESTIONS = ['Door delivery', 'Ex-works', 'Vendor pickup', 'Our transport both ways'];
+
+/** Over-allocation override reasons (CPP PRD §14.4); the same list serves a Garment Process PO excess. */
+export const OVERRIDE_REASONS = opts([
+  ['PROCESS_WASTAGE', 'Process wastage allowance'], ['RECUT_COVER', 'Recut cover'], ['VENDOR_MIN_LOT', 'Vendor minimum lot'],
+  ['SAMPLING', 'Sampling / trial'], ['OTHER', 'Other'],
+]);
+
+/** A rate of 0.00 needs this reason code (CPP BR-11 / VR-10). */
+export const ZERO_RATE_REASON = { value: 'FREE_REWORK', label: 'Free / rework' };
+
+/** Cancel and short close (CPP VR-18): a reason code and a remark, both mandatory. */
+export const CLOSE_REASONS = opts([
+  ['VENDOR_CANNOT_COMPLETE', 'Vendor cannot complete'], ['ORDER_CANCELLED', 'Order cancelled'],
+  ['REQUIREMENT_REDUCED', 'Requirement reduced'], ['DAMAGED_AT_VENDOR', 'Damaged at the vendor'],
+  ['RAISED_IN_ERROR', 'Raised in error'], ['OTHER', 'Other'],
+]);
+
+/** A rate above the vendor's last rate by more than this warns and needs a reason (CPP BR-12). */
+export const RATE_VARIANCE_PCT = 10;

@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Button, Typography } from 'antd';
 import { CloseCircleOutlined, RollbackOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
-import StickyActionBar from '../shared/StickyActionBar';
+import StickyActionBar from '../../../components/StickyActionBar';
 import StatusTag from '../../../components/StatusTag';
 import { DeleteConfirm } from '../../../components/buttons';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';

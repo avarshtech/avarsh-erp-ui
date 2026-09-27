@@ -1,6 +1,6 @@
 import { memo, useMemo } from 'react';
 import { InputNumber, Table, Typography } from 'antd';
-import ColorDot from '../shared/ColorDot';
+import ColorDot from '../../../components/ColorDot';
 import { gprLineTotals } from '../../../utils/garmentProcessCalc';
 
 const { Text } = Typography;

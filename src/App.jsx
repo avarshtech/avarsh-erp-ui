@@ -60,6 +60,8 @@ const WorkOrderForm = lazy(() => import('./pages/po/workorder/WorkOrderForm'));
 const FinishingPoList = lazy(() => import('./pages/po/finishing/FinishingPoList'));
 const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/FinishingPoGenerateWizard'));
 const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
+const CutPanelPoList = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoList'));
+const CutPanelPoForm = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoForm'));
 // TNA (Time & Action) module — mock-data design phase (lazy-loaded)
 const TnaControlTower = lazy(() => import('./pages/tna/control-tower/ControlTower'));
 const TnaPlanPage = lazy(() => import('./pages/tna/plan/TnaPlanPage'));
@@ -293,7 +295,12 @@ const ThemedApp = () => {
             <Route path="purchase-orders/work-order/edit/:id" element={<PermissionRoute module="work-order" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="finishing-po" operation="view"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />            {/* Production — Cutting (UI mock phase) */}
+            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
+            {/* Cut Panel PO (UI mock phase) — reuses the cut-panel key; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/cut-panel-po/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
             <Route path="tna/plan/:planId" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />

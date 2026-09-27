@@ -2,7 +2,8 @@ import { memo } from 'react';
 import { Alert } from 'antd';
 
 /**
- * Bottom action bar that stays visible while a long requirement screen scrolls.
+ * Bottom action bar that stays visible while a long document screen scrolls (process
+ * requirements, job-work POs).
  * `summary` sits on the left (live totals), the buttons (children) on the right, and
  * `errors` — blocking messages from the last Save / Submit — above both.
  */

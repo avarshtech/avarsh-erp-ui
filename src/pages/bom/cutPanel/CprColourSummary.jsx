@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Typography } from 'antd';
 import { ArrowRightOutlined } from '@ant-design/icons';
-import ColorDot from '../shared/ColorDot';
+import ColorDot from '../../../components/ColorDot';
 import { NO_PROCESS_LABEL } from '../../../utils/cutPanelConstants';
 
 const { Text } = Typography;
