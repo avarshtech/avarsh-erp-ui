@@ -44,6 +44,9 @@ const ROUTES = {
   'rbac-soak-costing': [
     '/',
     '/costing/list',
+    // The one-page sheet loads buyers, suppliers, size presets, processes, overheads,
+    // categories and variants for its pickers — each must be readable by a costing role.
+    '/costing/new',
     '/bom/list',
     '/orders/list',
     '/reports/list',

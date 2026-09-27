@@ -1,0 +1,28 @@
+/* Rows just added by a template, an import or the Help Genie — a short fade so the eye finds them. */
+.sheet-row-new > td {
+  animation: sheet-row-new 2.4s ease-out;
+}
+
+@keyframes sheet-row-new {
+  0%, 30% { background: color-mix(in srgb, var(--warning-color) 22%, transparent); }
+  100% { background: transparent; }
+}
+
+/* The Help Genie points at a field by pulsing it. */
+.sheet-anchor-pulse {
+  border-radius: 8px;
+  animation: sheet-anchor-pulse 1.2s ease-out 2;
+}
+
+@keyframes sheet-anchor-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-color) 45%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--primary-color) 0%, transparent); }
+}
+
+/* Sticky live price panel: stays in view while the sections scroll on wide screens. */
+@media (min-width: 1200px) {
+  .sheet-price-panel {
+    position: sticky;
+    top: 136px;
+  }
+}
