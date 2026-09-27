@@ -9,6 +9,13 @@
  */
 const memory = {};
 
+/**
+ * One seed version for the Cut Panel and Garment Process Requirement stores and the
+ * job-work PO store (services/po/jobWork). The POs' allocation ledger names requirement
+ * line keys, so the three always reseed together: bump this one number, never one store.
+ */
+export const DEMO_SEED_VERSION = 2;
+
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
 export const loadMockStore = (key, seedVersion, buildSeed) => {

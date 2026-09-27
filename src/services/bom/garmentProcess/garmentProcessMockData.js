@@ -3,13 +3,18 @@
  *
  * GPR-2026-00001 is the PRD example (ORD-2026-0418, 10,000 pcs): Seq 1 Enzyme Washing
  * Black + Navy 7,000 → Seq 2 Bleach Washing Black 4,000 → Seq 3 Softener Washing
- * Black + Navy 6,850 (Navy 5-6Y lowered to 450). One seed per status.
+ * Black + Navy 6,850 (Navy 5-6Y lowered to 450). GPR-2026-00006 adds Enzyme Washing
+ * for White on the same order, so one Garment Process PO can carry two requirements.
  * Process names are the real 'Garment' process seeds.
+ *
+ * Seeds store Submitted, never Partially / Fully Used: those are derived from the job-work
+ * PO ledger (services/po/jobWork), whose seeded POs cover GPR-2026-00003 and -00004.
  */
 import { getMockOrderContext } from '../requirementMockOrders';
+import { DEMO_SEED_VERSION } from '../requirementMockStore';
 import { selectedCells } from '../../../utils/garmentProcessCalc';
 
-export const GPR_SEED_VERSION = 1;
+export const GPR_SEED_VERSION = DEMO_SEED_VERSION;
 export const GPR_STORAGE_KEY = 'avarsh.bom.garmentProcess.mockStore.v1';
 
 /** A saved line: only the selected cells, each defaulting to its order qty unless overridden. */
@@ -25,8 +30,9 @@ const snapshot = (order) => JSON.parse(JSON.stringify(order.qtyMatrix));
 
 const header = (order, overrides) => ({
   orderId: order.id, orderNo: order.orderNo, buyer: order.buyer, styleNo: order.styleNo,
-  remarks: '', consumedQty: 0, closeReason: null, version: 1, orderQtySnapshot: null,
+  remarks: '', closeReason: null, version: 1, orderQtySnapshot: null,
   ...overrides,
+  lastLineNo: overrides.lines.length,
 });
 
 const audit = (id, user, action, details, timestamp) => ({ id, type: 'user', user, action, details, timestamp });
@@ -54,15 +60,15 @@ export const buildGprSeed = () => {
       lines: [line(polo, 'G1', 1, 'Garment Washing', ['Sky Blue'])],
     }),
     header(jomo, {
-      id: 3, requirementNo: 'GPR-2026-00003', status: 'PARTIALLY_USED', remarks: 'Process only White colour.',
+      id: 3, requirementNo: 'GPR-2026-00003', status: 'SUBMITTED', remarks: 'Process only White colour.',
       createdBy: 'Anitha R', createdOn: '2026-09-08T09:40:00', submittedBy: 'Anitha R', submittedOn: '2026-09-08T16:00:00',
-      orderQtySnapshot: snapshot(jomo), consumedQty: 300,
+      orderQtySnapshot: snapshot(jomo),
       lines: [line(jomo, 'G1', 1, 'Garment Dyeing', ['White'])],
     }),
     header(oxford, {
-      id: 4, requirementNo: 'GPR-2026-00004', status: 'FULLY_USED',
+      id: 4, requirementNo: 'GPR-2026-00004', status: 'SUBMITTED',
       createdBy: 'Karthik S', createdOn: '2026-09-11T14:05:00', submittedBy: 'Karthik S', submittedOn: '2026-09-11T17:20:00',
-      orderQtySnapshot: snapshot(oxford), consumedQty: 1500,
+      orderQtySnapshot: snapshot(oxford),
       lines: [line(oxford, 'G1', 1, 'Softener Washing', ['White'])],
     }),
     header(jogger, {
@@ -71,6 +77,12 @@ export const buildGprSeed = () => {
       closedBy: 'Meena V', closedOn: '2026-09-09T11:00:00', closeReason: 'Buyer changed White to an unwashed finish.',
       orderQtySnapshot: snapshot(jogger),
       lines: [line(jogger, 'G1', 1, 'Stone Washing', ['White'])],
+    }),
+    header(jogger, {
+      id: 6, requirementNo: 'GPR-2026-00006', status: 'SUBMITTED', remarks: 'White joggers get the same enzyme wash.',
+      createdBy: 'Anitha R', createdOn: '2026-09-18T10:30:00', submittedBy: 'Anitha R', submittedOn: '2026-09-18T15:10:00',
+      orderQtySnapshot: snapshot(jogger),
+      lines: [line(jogger, 'G1', 1, 'Enzyme Washing', ['White'])],
     }),
   ];
 
@@ -81,12 +93,12 @@ export const buildGprSeed = () => {
     ],
     2: [audit('a2-1', 'Karthik S', 'created GPR-2026-00002', 'ORD-2026-0502', '2026-09-24T11:10:00')],
     3: [
-      audit('a3-3', 'System', 'PO module used 300 pcs', 'Status → Partially Used', '2026-09-14T09:00:00'),
+      audit('a3-3', 'System', 'GPO-2026-00002 submitted — Garment Dyeing, White 2Y / 4Y, 276 pcs', 'Status → Partially Used', '2026-09-14T09:00:00'),
       audit('a3-2', 'Anitha R', 'submitted the requirement', 'Released to the PO module', '2026-09-08T16:00:00'),
       audit('a3-1', 'Anitha R', 'created GPR-2026-00003', 'ORD-2026-00125', '2026-09-08T09:40:00'),
     ],
     4: [
-      audit('a4-3', 'System', 'PO module used 1,500 pcs', 'Status → Fully Used', '2026-09-19T09:00:00'),
+      audit('a4-3', 'System', 'GPO-2026-00001 submitted — Softener Washing, White, 1,500 pcs', 'Status → Fully Used', '2026-09-12T09:00:00'),
       audit('a4-2', 'Karthik S', 'submitted the requirement', 'Released to the PO module', '2026-09-11T17:20:00'),
       audit('a4-1', 'Karthik S', 'created GPR-2026-00004', 'ORD-2026-0450', '2026-09-11T14:05:00'),
     ],
@@ -95,7 +107,11 @@ export const buildGprSeed = () => {
       audit('a5-2', 'Anitha R', 'submitted the requirement', 'Released to the PO module', '2026-09-05T15:00:00'),
       audit('a5-1', 'Anitha R', 'created GPR-2026-00005', 'ORD-2026-0418', '2026-09-05T10:20:00'),
     ],
+    6: [
+      audit('a6-2', 'Anitha R', 'submitted the requirement', 'Released to the PO module · 1 process', '2026-09-18T15:10:00'),
+      audit('a6-1', 'Anitha R', 'created GPR-2026-00006', 'ORD-2026-0418', '2026-09-18T10:30:00'),
+    ],
   };
 
-  return { docs, audits, issuedNos: docs.map((d) => d.requirementNo), nextId: 6 };
+  return { docs, audits, issuedNos: docs.map((d) => d.requirementNo), nextId: 7 };
 };

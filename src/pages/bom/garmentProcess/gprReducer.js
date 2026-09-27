@@ -9,8 +9,16 @@ import { REQUIREMENT_STATUS } from '../../../utils/requirementStatus';
 
 export const initialGprState = { doc: null, order: null, activeKey: null, dirty: false };
 
+/**
+ * Highest line number this GPR has ever issued. `lastLineNo` keeps it after lines are
+ * removed, so a key is never reissued: Garment Process PO lines point at (GPR, line key),
+ * and a reissued key would hand a PO's allocation to a different process line.
+ */
+const highestLineNo = (doc) => (doc?.lines || [])
+  .reduce((m, l) => Math.max(m, Number(String(l.key).replace(/\D/g, '')) || 0), doc?.lastLineNo || 0);
+
 /** Monotonic line keys — never Date.now(). */
-const nextKey = (lines) => `G${lines.reduce((m, l) => Math.max(m, Number(String(l.key).replace(/\D/g, '')) || 0), 0) + 1}`;
+const nextKey = (doc) => `G${highestLineNo(doc) + 1}`;
 
 const orderHeader = (order) => ({
   orderId: order?.id ?? null, orderNo: order?.orderNo ?? null, buyer: order?.buyer ?? null, styleNo: order?.styleNo ?? null,
@@ -38,12 +46,16 @@ export const gprReducer = (state, action) => {
       return { doc: action.doc, order: action.order, activeKey: action.doc.lines[0]?.key ?? null, dirty: false };
     case 'LOAD_FAILED':
       return initialGprState;
-    case 'ORDER_SELECTED': { // the lines restart for the new order; a saved draft keeps its number and version
-      const lines = [newGprLine(action.order, 'G1', 1)];
-      return { doc: { ...(doc || newGprDoc(null)), ...orderHeader(action.order), lines }, order: action.order, activeKey: 'G1', dirty: true };
+    case 'ORDER_SELECTED': { // the lines restart for the new order; a saved draft keeps its number, version and key series
+      const base = doc || newGprDoc(null);
+      const line = newGprLine(action.order, nextKey({ ...base, lastLineNo: highestLineNo(base) }), 1);
+      return {
+        doc: { ...base, ...orderHeader(action.order), lastLineNo: highestLineNo(base), lines: [line] },
+        order: action.order, activeKey: line.key, dirty: true,
+      };
     }
     case 'LINE_ADDED': {
-      const line = newGprLine(order, nextKey(doc.lines), doc.lines.length + 1);
+      const line = newGprLine(order, nextKey(doc), doc.lines.length + 1);
       return withLines(state, [...doc.lines, line], line.key);
     }
     case 'LINE_SELECTED':
@@ -56,7 +68,7 @@ export const gprReducer = (state, action) => {
       const idx = doc.lines.findIndex((l) => l.key === action.key);
       const lines = renumberGprLines(doc.lines.filter((l) => l.key !== action.key));
       const activeKey = action.key === state.activeKey ? lines[Math.min(idx, lines.length - 1)]?.key ?? null : state.activeKey;
-      return withLines(state, lines, activeKey);
+      return { ...withLines(state, lines, activeKey), doc: { ...doc, lastLineNo: highestLineNo(doc), lines } };
     }
     case 'LINE_PATCHED': // colours / sizes / process; newly selected cells start at order qty
       return mapLine(state, action.key, (l) => ensureSelectedCells({ ...l, ...action.patch }, order));

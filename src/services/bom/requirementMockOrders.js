@@ -13,6 +13,17 @@ const matrix = (rows, sizes) =>
   Object.entries(rows).flatMap(([color, qtys]) =>
     sizes.map((size, i) => ({ color, size, orderQty: qtys[i] || 0 })));
 
+/**
+ * Order dates are relative to today, so a PO raised in the demo meets a live delivery
+ * date instead of a fixed one that slips into the past (and would make every new job-work
+ * PO warn "delivery after the order cut-off").
+ */
+const day = (offset) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const SINGLE_JERSEY = {
   id: 'FAB-SJ-160', code: 'FAB-SJ-160', name: 'Single Jersey',
   composition: '100% Cotton', gsm: 160, consumption: 0.215, uom: 'kg',
@@ -24,7 +35,7 @@ const ORDERS = [
     // Black totals 798, which reproduces the appendix CPR (816 / 825 / 714 → 5,415).
     id: 125, orderNo: 'ORD-2026-00125', buyer: 'JOMO BV', styleNo: 'ST-4471',
     garmentDescription: 'Infant full sleeve bodysuit', season: 'SS27',
-    orderDate: '2026-08-18', deliveryDate: '2026-11-20', status: 'CONFIRMED', orderLineCount: 1,
+    orderDate: day(-40), deliveryDate: day(54), status: 'CONFIRMED', orderLineCount: 1,
     allowancePercent: 2, // MOCK-ONLY: orders carry no allowance today
     sizes: ['2Y', '4Y', '6Y', '8Y'],
     colors: [ // MOCK-ONLY code / hex: OrderLineColor has colorName only
@@ -54,7 +65,7 @@ const ORDERS = [
     // GPR example: 10,000 pcs. Navy 5-6Y = 600, so lowering it to 450 gives 6,850.
     id: 418, orderNo: 'ORD-2026-0418', buyer: 'Northwind Kids', styleNo: 'NK-2231',
     garmentDescription: 'Kids garment-washed jogger', season: 'AW27',
-    orderDate: '2026-08-02', deliveryDate: '2026-12-05', status: 'CONFIRMED', orderLineCount: 1,
+    orderDate: day(-56), deliveryDate: day(69), status: 'CONFIRMED', orderLineCount: 1,
     allowancePercent: 3,
     sizes: ['3-4Y', '5-6Y', '7-8Y', '9-10Y'],
     colors: [
@@ -74,7 +85,7 @@ const ORDERS = [
     // Two order lines (EU, US) merged; Olive has no XL, so that cell is 0 (N/A).
     id: 502, orderNo: 'ORD-2026-0502', buyer: 'Harbor & Co', styleNo: 'HB-7710',
     garmentDescription: 'Ladies pique polo', season: 'SS27',
-    orderDate: '2026-09-01', deliveryDate: '2027-01-15', status: 'IN_PRODUCTION', orderLineCount: 2,
+    orderDate: day(-26), deliveryDate: day(110), status: 'IN_PRODUCTION', orderLineCount: 2,
     allowancePercent: 2.5,
     sizes: ['S', 'M', 'L', 'XL'],
     colors: [
@@ -97,7 +108,7 @@ const ORDERS = [
     // Confirmed, but its BOM is not approved yet: Garment Process only (CPR needs an approved BOM).
     id: 450, orderNo: 'ORD-2026-0450', buyer: 'Harbor & Co', styleNo: 'HB-7802',
     garmentDescription: 'Men\'s oxford shirt', season: 'SS27',
-    orderDate: '2026-09-10', deliveryDate: '2027-02-10', status: 'CONFIRMED', orderLineCount: 1,
+    orderDate: day(-17), deliveryDate: day(136), status: 'CONFIRMED', orderLineCount: 1,
     allowancePercent: 2,
     sizes: ['S', 'M', 'L'],
     colors: [{ name: 'White', code: 'WHT', hex: '#f4f4f4' }],
@@ -106,9 +117,29 @@ const ORDERS = [
     bomVersions: [{ version: 'V1', approved: false, fabrics: [] }],
   },
   {
+    // Cut Panel PO worked example (PRD §13.4): 3,960 pcs, 0% allowance, so the Panel
+    // Printing requirement equals the order qty — Navy 380 / 420 / 440 / 360, White 300 /
+    // 340 / 350 / 290, Grey Melange 260 / 280 / 300 / 240.
+    id: 110, orderNo: 'ORD-2026-00110', buyer: 'JOMO BV', styleNo: 'ST-4388',
+    garmentDescription: 'Infant short sleeve tee', season: 'SS27',
+    orderDate: day(-30), deliveryDate: day(60), status: 'CONFIRMED', orderLineCount: 1,
+    allowancePercent: 0,
+    sizes: ['2Y', '4Y', '6Y', '8Y'],
+    colors: [
+      { name: 'Navy', code: 'NVY', hex: '#1a237e' },
+      { name: 'White', code: 'WHT', hex: '#f4f4f4' },
+      { name: 'Grey Melange', code: 'GRM', hex: '#9e9e9e' },
+    ],
+    items: matrix({
+      Navy: [380, 420, 440, 360], White: [300, 340, 350, 290], 'Grey Melange': [260, 280, 300, 240],
+    }, ['2Y', '4Y', '6Y', '8Y']),
+    bomId: 9110, bomNo: 'BOM-ORD-2026-00110',
+    bomVersions: [{ version: 'V1', approved: true, fabrics: [{ ...SINGLE_JERSEY, colors: ['Navy', 'White', 'Grey Melange'] }] }],
+  },
+  {
     id: 377, orderNo: 'ORD-2026-0377', buyer: 'JOMO BV', styleNo: 'ST-4390',
     garmentDescription: 'Infant romper', season: 'SS27',
-    orderDate: '2026-07-11', deliveryDate: '2026-10-30', status: 'CANCELLED', orderLineCount: 1,
+    orderDate: day(-78), deliveryDate: day(33), status: 'CANCELLED', orderLineCount: 1,
     allowancePercent: 2,
     sizes: ['2Y', '4Y'],
     colors: [{ name: 'Pink', code: 'PNK', hex: '#f48fb1' }],

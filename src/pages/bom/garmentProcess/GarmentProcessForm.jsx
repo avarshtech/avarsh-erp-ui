@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, Card, Col, Input, Row, Skeleton, Space } from 'antd';
-import { CloseCircleOutlined, HistoryOutlined, RollbackOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { CloseCircleOutlined, HistoryOutlined, PartitionOutlined, RollbackOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
@@ -14,8 +14,9 @@ import {
   getRequirementStatusLabel, isRequirementClosable, isRequirementEditable, isRequirementReopenable,
 } from '../../../utils/requirementStatus';
 import { GPR_MODULE_ID, GPR_PROCESS_CATEGORY, GPR_REMARKS_MAX } from '../../../utils/garmentProcessConstants';
-import { getGprAudit } from '../../../services/bom/garmentProcess/garmentProcessService';
+import { getGprAudit, getGprAllocation } from '../../../services/bom/garmentProcess/garmentProcessService';
 import RequirementHistoryDrawer from '../shared/RequirementHistoryDrawer';
+import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
 import RequirementStatusBanner from '../shared/RequirementStatusBanner';
 import RequirementTransitionDialog from '../shared/RequirementTransitionDialog';
@@ -41,6 +42,7 @@ const GarmentProcessForm = () => {
   const actions = useGprActions({ doc, dirty, order, dispatch, clearDirty });
   const [dialog, setDialog] = useState({ kind: 'close', open: false });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [allocationOpen, setAllocationOpen] = useState(false);
 
   const canEdit = hasPermission(GPR_MODULE_ID, doc?.id ? 'update' : 'add');
   const editable = Boolean(doc) && isRequirementEditable(doc.status) && canEdit;
@@ -71,6 +73,7 @@ const GarmentProcessForm = () => {
       >
         <Space wrap>
           <Button icon={<UnorderedListOutlined />} onClick={() => navigate(LIST_PATH)}>View all requirements</Button>
+          {doc.id && !editable && <Button icon={<PartitionOutlined />} onClick={() => setAllocationOpen(true)}>PO allocation</Button>}
           {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
           {canReopenRequirement(GPR_MODULE_ID) && isRequirementReopenable(doc.status, doc.consumedQty) && (
             <Button icon={<RollbackOutlined />} onClick={() => setDialog({ kind: 'reopen', open: true })}>Reopen</Button>
@@ -132,6 +135,7 @@ const GarmentProcessForm = () => {
         docLabel="Garment Process Requirement" docNumber={doc.requirementNo}
       />
       <RequirementHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.requirementNo} loadAudit={getGprAudit} />
+      <RequirementAllocationDrawer open={allocationOpen} onClose={() => setAllocationOpen(false)} source="GPR" docId={doc.id} docNo={doc.requirementNo} load={getGprAllocation} />
     </div>
   );
 };

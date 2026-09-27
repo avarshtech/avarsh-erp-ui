@@ -19,3 +19,4 @@ export const submitGpr = pick('submitGpr');
 export const reopenGpr = pick('reopenGpr');
 export const closeGpr = pick('closeGpr');
 export const getGprAudit = pick('getGprAudit');
+export const getGprAllocation = pick('getGprAllocation');

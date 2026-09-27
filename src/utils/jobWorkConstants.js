@@ -6,6 +6,12 @@
  * constraint chk_mst_processes_default_uom — keep all three in step.
  */
 
+/** Where each job-work PO type lives (routes in App.jsx). */
+export const JOB_WORK_PO_PATH = {
+  CPP: '/purchase-orders/cut-panel-po',
+  GPO: '/purchase-orders/garment-process-po',
+};
+
 /** Process categories job workers do and the job-work POs buy (JobWorkCategory.java). */
 export const JOB_WORK_CATEGORIES = ['Cut Panel', 'Garment'];
 

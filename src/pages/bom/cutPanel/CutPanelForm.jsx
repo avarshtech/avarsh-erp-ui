@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
-import { App, Button, Skeleton } from 'antd';
-import { HistoryOutlined } from '@ant-design/icons';
+import { App, Button, Skeleton, Space } from 'antd';
+import { HistoryOutlined, PartitionOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
@@ -14,8 +14,9 @@ import { getRequirementStatusLabel, isRequirementEditable } from '../../../utils
 import { CPR_MODULE_ID, CPR_PROCESS_CATEGORY } from '../../../utils/cutPanelConstants';
 import { cprTotals, expandSelection } from '../../../utils/cutPanelCalc';
 import { exportCprCsv, printCprStatement } from '../../../utils/cutPanelStatementPrint';
-import { getCprAudit } from '../../../services/bom/cutPanel/cutPanelService';
+import { getCprAudit, getCprAllocation } from '../../../services/bom/cutPanel/cutPanelService';
 import RequirementHistoryDrawer from '../shared/RequirementHistoryDrawer';
+import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
 import RequirementStatusBanner from '../shared/RequirementStatusBanner';
 import RequirementTransitionDialog from '../shared/RequirementTransitionDialog';
@@ -42,6 +43,7 @@ const CutPanelForm = () => {
   const actions = useCprActions({ doc, dirty, order, dispatch, clearDirty });
   const [dialog, setDialog] = useState({ kind: 'close', open: false });
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [allocationOpen, setAllocationOpen] = useState(false);
 
   const isSaved = Boolean(doc?.id);
   const can = useMemo(() => ({
@@ -95,7 +97,10 @@ const CutPanelForm = () => {
         backPath={LIST_PATH}
         status={<StatusTag status={doc.status} config={REQUIREMENT_STATUS_CONFIG} getLabel={getRequirementStatusLabel} />}
       >
-        {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
+        <Space wrap>
+          {doc.id && !editable && <Button icon={<PartitionOutlined />} onClick={() => setAllocationOpen(true)}>PO allocation</Button>}
+          {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
+        </Space>
       </PageHeader>
 
       <RequirementStatusBanner doc={doc} />
@@ -128,6 +133,7 @@ const CutPanelForm = () => {
         docLabel="Cut Panel Requirement" docNumber={doc.cprNo}
       />
       <RequirementHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.cprNo} loadAudit={getCprAudit} />
+      <RequirementAllocationDrawer open={allocationOpen} onClose={() => setAllocationOpen(false)} source="CPR" docId={doc.id} docNo={doc.cprNo} load={getCprAllocation} />
     </div>
   );
 };

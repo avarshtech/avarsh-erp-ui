@@ -20,3 +20,4 @@ export const reopenCpr = pick('reopenCpr');
 export const closeCpr = pick('closeCpr');
 export const deleteCpr = pick('deleteCpr');
 export const getCprAudit = pick('getCprAudit');
+export const getCprAllocation = pick('getCprAllocation');

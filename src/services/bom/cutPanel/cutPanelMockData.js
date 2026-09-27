@@ -3,13 +3,20 @@
  *
  * CPR-2026-00001 is the PRD appendix requirement (ORD-2026-00125, Single Jersey, BOM V2):
  * seven lines, 5,415 pieces, four distinct processes; White and Navy have no process.
+ * CPR-2026-00005 is the Cut Panel PO worked example (PO PRD §13.4, ORD-2026-00110):
+ * Front Panel × Navy / White / Grey Melange, Panel Printing → Panel Embroidery → Heat
+ * Transfer, 3,960 pcs per step.
  * Panel and process names are the ones the real Parts / Processes masters carry
  * ("Front Panel", "Back Panel"; the 'Cut Panel' process seeds).
+ *
+ * Seeds store Submitted, never Partially / Fully Used: those are derived from the job-work
+ * PO ledger (services/po/jobWork), whose seeded POs cover CPR-2026-00003 and -00005.
  */
 import { getMockOrderContext } from '../requirementMockOrders';
+import { DEMO_SEED_VERSION } from '../requirementMockStore';
 import { sizeCells } from '../../../utils/cutPanelCalc';
 
-export const CPR_SEED_VERSION = 1;
+export const CPR_SEED_VERSION = DEMO_SEED_VERSION;
 export const CPR_STORAGE_KEY = 'avarsh.bom.cutPanel.mockStore.v1';
 
 let seq = 0;
@@ -35,7 +42,6 @@ const header = (order, bomVersion, overrides) => ({
   orderQtySnapshot: order.totalQty,
   orderAllowancePct: order.allowancePercent,
   remarks: '',
-  consumedQty: 0,
   closeReason: null,
   version: 1,
   ...overrides,
@@ -48,10 +54,17 @@ export const buildCprSeed = () => {
   const jomo = getMockOrderContext(125);
   const polo = getMockOrderContext(502);
   const jogger = getMockOrderContext(418);
+  const tee = getMockOrderContext(110);
   const sj = jomo.approvedBoms.find((b) => b.version === 'V2').fabrics[0];
   const sjV1 = jomo.approvedBoms.find((b) => b.version === 'V1').fabrics[0];
   const pique = polo.approvedBoms[0].fabrics[0];
   const terry = jogger.approvedBoms[0].fabrics[0];
+  const teeJersey = tee.approvedBoms[0].fabrics[0];
+  const stepsFor = (colorName) => [
+    line(tee, teeJersey, colorName, 'Front Panel', 'Panel Printing', 1, 0),
+    line(tee, teeJersey, colorName, 'Front Panel', 'Panel Embroidery', 2, 0),
+    line(tee, teeJersey, colorName, 'Front Panel', 'Heat Transfer', 3, 0),
+  ];
 
   const docs = [
     header(jomo, 'V2', {
@@ -76,10 +89,9 @@ export const buildCprSeed = () => {
       ],
     }),
     header(jogger, 'V1', {
-      id: 3, cprNo: 'CPR-2026-00003', status: 'PARTIALLY_USED',
+      id: 3, cprNo: 'CPR-2026-00003', status: 'SUBMITTED', // Partially Used through CPP-2026-00032
       orderQtySnapshot: 9800, // the order was revised to 10,000 after this CPR — shows "Order revised"
       createdBy: 'Anitha R', createdOn: '2026-09-12T11:30:00', submittedBy: 'Anitha R', submittedOn: '2026-09-12T15:00:00',
-      consumedQty: 1800,
       lines: [
         line(jogger, terry, 'Black', 'Front Panel', 'Panel Printing', 1, 3),
         line(jogger, terry, 'Navy', 'Front Panel', 'Panel Printing', 1, 3),
@@ -91,6 +103,11 @@ export const buildCprSeed = () => {
       closedBy: 'Meena V', closedOn: '2026-09-10T12:00:00', closeReason: 'Buyer dropped the heat-transfer logo on White.',
       lines: [line(jomo, sjV1, 'White', 'Front Panel', 'Heat Transfer', 1, 2)],
     }),
+    header(tee, 'V1', {
+      id: 5, cprNo: 'CPR-2026-00005', status: 'SUBMITTED', // Navy 2Y / 4Y printing covered by CPP-2026-00031
+      createdBy: 'Anitha R', createdOn: '2026-09-17T10:00:00', submittedBy: 'Anitha R', submittedOn: '2026-09-17T17:30:00',
+      lines: [...stepsFor('Navy'), ...stepsFor('White'), ...stepsFor('Grey Melange')],
+    }),
   ];
 
   const audits = {
@@ -100,7 +117,7 @@ export const buildCprSeed = () => {
     ],
     2: [audit('a2-1', 'Karthik S', 'created CPR-2026-00002', 'ORD-2026-0502 · BOM V1', '2026-09-24T09:05:00')],
     3: [
-      audit('a3-3', 'System', 'PO module used 1,800 pcs', 'Status → Partially Used', '2026-09-18T09:00:00'),
+      audit('a3-3', 'System', 'CPP-2026-00032 approved — Panel Printing, Black, 4,120 pcs', 'Status → Partially Used', '2026-09-18T09:00:00'),
       audit('a3-2', 'Anitha R', 'submitted the requirement', 'Released to the PO module', '2026-09-12T15:00:00'),
       audit('a3-1', 'Anitha R', 'created CPR-2026-00003', 'ORD-2026-0418 · BOM V1', '2026-09-12T11:30:00'),
     ],
@@ -109,7 +126,12 @@ export const buildCprSeed = () => {
       audit('a4-2', 'Karthik S', 'submitted the requirement', 'Released to the PO module', '2026-09-03T10:00:00'),
       audit('a4-1', 'Karthik S', 'created CPR-2026-00004', 'ORD-2026-00125 · BOM V1', '2026-09-02T14:20:00'),
     ],
+    5: [
+      audit('a5-3', 'System', 'CPP-2026-00031 approved — Panel Printing, Navy 2Y / 4Y, 800 pcs', 'Status → Partially Used', '2026-09-19T11:00:00'),
+      audit('a5-2', 'Anitha R', 'submitted the requirement', 'Released to the PO module · 9 lines · 11,880 pcs', '2026-09-17T17:30:00'),
+      audit('a5-1', 'Anitha R', 'created CPR-2026-00005', 'ORD-2026-00110 · BOM V1', '2026-09-17T10:00:00'),
+    ],
   };
 
-  return { docs, audits, issuedNos: docs.map((d) => d.cprNo), nextId: 5 };
+  return { docs, audits, issuedNos: docs.map((d) => d.cprNo), nextId: 6 };
 };

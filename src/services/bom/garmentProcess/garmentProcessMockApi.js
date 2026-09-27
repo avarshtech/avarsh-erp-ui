@@ -1,8 +1,13 @@
 /**
  * Garment Process Requirement — mock API (UI design phase), persisted to localStorage.
  * Each function names the endpoint it stands in for (PRD §18.1).
+ *
+ * Partially / Fully Used and consumedQty are derived on every read from the job-work PO
+ * ledger (Garment Process PO PRD §10) and never stored: the store keeps Draft, Submitted or Closed.
  */
 import { loadMockStore, saveMockStore, detach, mockDelay, mockError } from '../requirementMockStore';
+import { usageInputs, posForRequirement } from '../../po/jobWork/allocationReader';
+import { requirementUsage, REQUIREMENT_SOURCE } from '../../../utils/jobWorkAllocation';
 import { getMockOrderContext, getMockGprEligibleOrders } from '../requirementMockOrders';
 import { buildGprSeed, GPR_SEED_VERSION, GPR_STORAGE_KEY } from './garmentProcessMockData';
 import { gprLineLabel, gprLineTotals, toSavedLine } from '../../../utils/garmentProcessCalc';
@@ -18,6 +23,19 @@ const persist = (db) => saveMockStore(GPR_STORAGE_KEY, db);
 const who = () => getCurrentUser()?.name || getCurrentUser()?.username || 'You';
 const now = () => new Date().toISOString();
 const fyStartYear = () => `20${getCurrentFinancialYear().slice(0, 2)}`;
+
+/** The document as the PO ledger leaves it: derived status and consumed (allocated) qty. */
+const live = (doc, inputs = usageInputs(REQUIREMENT_SOURCE.GPR)) => {
+  const usage = requirementUsage(REQUIREMENT_SOURCE.GPR, doc, inputs);
+  return { ...doc, status: usage.status, consumedQty: usage.consumedQty };
+};
+
+/** Derived fields never reach the store. */
+const stored = (doc) => {
+  const out = { ...doc };
+  delete out.consumedQty;
+  return out;
+};
 
 const findDoc = (db, id) => {
   const doc = db.docs.find((d) => d.id === Number(id));
@@ -41,15 +59,30 @@ const summary = (d) => ({
 });
 
 /** GET /gpr — newest first; filters run client-side in the mock. */
-export const listGprs = async () => { await mockDelay(); return detach(load().docs.map(summary).reverse()); };
+export const listGprs = async () => {
+  await mockDelay();
+  const inputs = usageInputs(REQUIREMENT_SOURCE.GPR);
+  return detach(load().docs.map((d) => summary(live(d, inputs))).reverse());
+};
 
 /** GET /gpr/{id} */
-export const getGpr = async (id) => { await mockDelay(); return detach(findDoc(load(), id)); };
+export const getGpr = async (id) => { await mockDelay(); return detach(live(findDoc(load(), id))); };
 
 /** The order's other open requirements, with per-line totals (PRD OP-2). */
-export const getGprsForOrder = async (orderId, exceptId) => detach(load().docs
-  .filter((d) => d.orderId === Number(orderId) && d.id !== Number(exceptId) && d.status !== REQUIREMENT_STATUS.CLOSED)
-  .map(summary));
+export const getGprsForOrder = async (orderId, exceptId) => {
+  const inputs = usageInputs(REQUIREMENT_SOURCE.GPR);
+  return detach(load().docs
+    .filter((d) => d.orderId === Number(orderId) && d.id !== Number(exceptId) && d.status !== REQUIREMENT_STATUS.CLOSED)
+    .map((d) => summary(live(d, inputs))));
+};
+
+/** GET /api/gpr/{id}/allocation — per-cell usage and the POs raised against it (GPO PRD FR-20). */
+export const getGprAllocation = async (id) => {
+  await mockDelay(150);
+  const doc = findDoc(load(), id);
+  const usage = requirementUsage(REQUIREMENT_SOURCE.GPR, doc, usageInputs(REQUIREMENT_SOURCE.GPR));
+  return detach({ doc: { ...doc, status: usage.status }, usage, pos: posForRequirement(REQUIREMENT_SOURCE.GPR, doc.id) });
+};
 
 /** Confirmed, non-cancelled orders. */
 export const getGprEligibleOrders = async () => { await mockDelay(150); return getMockGprEligibleOrders(); };
@@ -66,21 +99,21 @@ export const saveGpr = async (doc) => {
   const lines = doc.lines.map((l) => toSavedLine(l, order));
   if (!doc.id) {
     const requirementNo = nextRequirementNumber(GPR_PREFIX, fyStartYear(), db.issuedNos);
-    const created = { ...doc, lines, id: db.nextId, requirementNo, status: REQUIREMENT_STATUS.DRAFT, createdBy: who(), createdOn: now(), version: 1, consumedQty: 0 };
+    const created = { ...stored(doc), lines, id: db.nextId, requirementNo, status: REQUIREMENT_STATUS.DRAFT, createdBy: who(), createdOn: now(), version: 1 };
     db.nextId += 1;
     db.issuedNos.push(requirementNo);
     db.docs.push(created);
     addAudit(db, created.id, `created ${requirementNo}`, `${doc.orderNo} · ${lines.length} process line(s)`);
     persist(db);
-    return detach(created);
+    return detach(live(created));
   }
   const existing = findDoc(db, doc.id);
   if (!isRequirementEditable(existing.status)) throw mockError('This requirement is submitted and can no longer be edited.', 409);
-  const saved = { ...existing, ...doc, lines, status: existing.status, version: existing.version + 1, modifiedBy: who(), modifiedOn: now() };
+  const saved = { ...existing, ...stored(doc), lines, status: existing.status, version: existing.version + 1, modifiedBy: who(), modifiedOn: now() };
   db.docs = db.docs.map((d) => (d.id === saved.id ? saved : d));
   addAudit(db, saved.id, 'saved the draft', `${lines.length} process line(s)`);
   persist(db);
-  return detach(saved);
+  return detach(live(saved));
 };
 
 /** POST /gpr/{id}/submit — snapshots each cell's order qty; over-qty reasons are logged. */
@@ -97,7 +130,7 @@ export const submitGpr = async (id) => {
   });
   addAudit(db, doc.id, 'submitted the requirement', `Released to the PO module · ${doc.lines.length} process(es)${reasons.length ? ` · Above order qty: ${reasons.join('; ')}` : ''}`);
   persist(db);
-  return detach(doc);
+  return detach(live(doc));
 };
 
 /** POST /gpr/{id}/reopen — only with zero consumption (PRD OP-1). */
@@ -105,11 +138,12 @@ export const reopenGpr = async (id) => {
   await mockDelay();
   const db = load();
   const doc = findDoc(db, id);
-  if (!isRequirementReopenable(doc.status, doc.consumedQty)) throw mockError('Only a submitted requirement that no PO has used can be reopened.', 409);
+  const current = live(doc);
+  if (!isRequirementReopenable(current.status, current.consumedQty)) throw mockError('Only a submitted requirement that no PO has used can be reopened.', 409);
   Object.assign(doc, { status: REQUIREMENT_STATUS.DRAFT, version: doc.version + 1 });
   addAudit(db, doc.id, 'reopened the requirement', 'Lines withdrawn from the PO module; back to Draft');
   persist(db);
-  return detach(doc);
+  return detach(live(doc));
 };
 
 /** POST /gpr/{id}/close — releases the unconsumed balance; reason mandatory. */
@@ -117,11 +151,12 @@ export const closeGpr = async (id, reason) => {
   await mockDelay();
   const db = load();
   const doc = findDoc(db, id);
-  if (!isRequirementClosable(doc.status)) throw mockError('Only a submitted or partially used requirement can be closed.', 409);
+  const current = live(doc);
+  if (!isRequirementClosable(current.status)) throw mockError('Only a submitted or partially used requirement can be closed.', 409);
   Object.assign(doc, { status: REQUIREMENT_STATUS.CLOSED, closeReason: reason, closedBy: who(), closedOn: now(), version: doc.version + 1 });
   addAudit(db, doc.id, 'closed the requirement', reason);
   persist(db);
-  return detach(doc);
+  return detach(live(doc));
 };
 
 export const getGprAudit = async (id) => { await mockDelay(150); return detach(load().audits[id] || []); };
