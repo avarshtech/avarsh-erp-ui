@@ -18,8 +18,14 @@
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 
+const selectRoot = (page, id) => page.locator(`#${id}`).locator('xpath=ancestor::div[contains(@class,"ant-select")][1]');
+
 async function openSelect(page, id) {
-  await page.locator(`#${id}`).locator('xpath=ancestor::div[contains(@class,"ant-select")][1]').click();
+  // Centred first, as in the PO specs: opened near the bottom edge, the dropdown flips above
+  // its input once the page scrolls to reach an option, and a click in flight then misses.
+  const select = selectRoot(page, id);
+  await select.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await select.click();
   const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
   await dropdown.waitFor({ state: 'visible' });
   return dropdown;
@@ -29,6 +35,7 @@ async function pickOption(page, id, text) {
   const dropdown = await openSelect(page, id);
   await page.keyboard.type(text);
   await dropdown.locator('.ant-select-item-option').filter({ hasText: text }).first().click();
+  await expect(selectRoot(page, id)).toContainText(text); // a missed pick fails here, not steps later
 }
 
 const chip = (page, group, text) => page.getByRole('group', { name: group }).locator('.ant-tag').filter({ hasText: text });
