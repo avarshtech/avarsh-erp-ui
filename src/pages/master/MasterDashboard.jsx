@@ -242,7 +242,7 @@ const NAV_GROUPS = [
         moduleId: 'process-master',
         Component: ProcessMaster,
         loadingKey: null,
-        description: 'Manufacturing processes and allowance defaults for BOM',
+        description: 'Processes for the cost sheet, BOM allowances and cut panel / garment process requirements',
       },
       {
         key: 'parts',
@@ -251,7 +251,7 @@ const NAV_GROUPS = [
         moduleId: 'parts-master',
         Component: PartsMaster,
         loadingKey: null,
-        description: 'Garment part names for BOM line items',
+        description: 'Garment parts / panels (with panels per garment) for BOM lines, cutting and cut panel requirements',
       },
     ],
   },

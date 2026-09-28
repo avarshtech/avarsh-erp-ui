@@ -12,11 +12,13 @@ const ENDPOINTS = {
 };
 
 /**
- * Get all suppliers
+ * Get all suppliers — active ones, or every supplier with { includeInactive: true }
+ * (the job-work POs show inactive job workers greyed rather than hiding them).
+ * @param {{ includeInactive?: boolean }} [params]
  * @returns {Promise<Array>} Array of suppliers
  */
-export const getSuppliers = async () => {
-  const response = await axiosInstance.get(ENDPOINTS.SUPPLIERS);
+export const getSuppliers = async (params) => {
+  const response = await axiosInstance.get(ENDPOINTS.SUPPLIERS, params ? { params } : undefined);
   return response;
 };
 

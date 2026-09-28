@@ -42,4 +42,30 @@ export const amountInWords = (amount, currency = 'USD') => {
   return `${out} ONLY`;
 };
 
+/**
+ * Indian grouping (crore, lakh, thousand) for INR documents — the job-work POs.
+ * e.g. amountInWordsIndian(26098) → "RUPEES TWENTY SIX THOUSAND NINETY EIGHT ONLY".
+ * The export documents keep amountInWords (million grouping).
+ */
+export const numberToIndianWords = (n) => {
+  if (n === 0) return 'ZERO';
+  const parts = [];
+  const crore = Math.floor(n / 10000000);
+  const lakh = Math.floor((n % 10000000) / 100000);
+  const thousand = Math.floor((n % 100000) / 1000);
+  const rest = n % 1000;
+  if (crore) parts.push(`${numberToIndianWords(crore)} CRORE`);
+  if (lakh) parts.push(`${below1000(lakh)} LAKH`);
+  if (thousand) parts.push(`${below1000(thousand)} THOUSAND`);
+  if (rest) parts.push(below1000(rest));
+  return parts.join(' ');
+};
+
+export const amountInWordsIndian = (amount) => {
+  if (amount == null || Number.isNaN(Number(amount))) return '';
+  const whole = Math.floor(Number(amount));
+  const paise = Math.round((Number(amount) - whole) * 100);
+  return `RUPEES ${numberToIndianWords(whole)}${paise > 0 ? ` AND ${numberToIndianWords(paise)} PAISE` : ''} ONLY`;
+};
+
 export default amountInWords;

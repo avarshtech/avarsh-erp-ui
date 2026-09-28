@@ -47,6 +47,11 @@ const StockTransferList = lazy(() => import('./pages/inventory/transfer/StockTra
 const StockTransferForm = lazy(() => import('./pages/inventory/transfer/StockTransferForm'));
 const BillPassingList = lazy(() => import('./pages/inventory/bill-passing/BillPassingList'));
 const BillPassingForm = lazy(() => import('./pages/inventory/bill-passing/BillPassingForm'));
+// BOM — process requirements (UI mock phase, lazy-loaded)
+const CutPanelList = lazy(() => import('./pages/bom/cutPanel/CutPanelList'));
+const CutPanelForm = lazy(() => import('./pages/bom/cutPanel/CutPanelForm'));
+const GarmentProcessList = lazy(() => import('./pages/bom/garmentProcess/GarmentProcessList'));
+const GarmentProcessForm = lazy(() => import('./pages/bom/garmentProcess/GarmentProcessForm'));
 // Production PO screens (now grouped under the Purchase Orders module)
 const CuttingPoList = lazy(() => import('./pages/po/cutting/CuttingPoList'));
 const CuttingPoForm = lazy(() => import('./pages/po/cutting/CuttingPoForm'));
@@ -55,6 +60,10 @@ const WorkOrderForm = lazy(() => import('./pages/po/workorder/WorkOrderForm'));
 const FinishingPoList = lazy(() => import('./pages/po/finishing/FinishingPoList'));
 const FinishingPoGenerateWizard = lazy(() => import('./pages/po/finishing/FinishingPoGenerateWizard'));
 const FinishingPoForm = lazy(() => import('./pages/po/finishing/FinishingPoForm'));
+const CutPanelPoList = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoList'));
+const CutPanelPoForm = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoForm'));
+const GarmentProcessPoList = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoList'));
+const GarmentProcessPoForm = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoForm'));
 // TNA (Time & Action) module — mock-data design phase (lazy-loaded)
 const TnaControlTower = lazy(() => import('./pages/tna/control-tower/ControlTower'));
 const TnaPlanPage = lazy(() => import('./pages/tna/plan/TnaPlanPage'));
@@ -253,6 +262,13 @@ const ThemedApp = () => {
             <Route path="bom/list" element={<PermissionRoute module="bom" operation="view"><BOMList /></PermissionRoute>} />
             <Route path="bom/new" element={<PermissionRoute module="bom" operation="add"><BOMForm /></PermissionRoute>} />
             <Route path="bom/edit/:id" element={<PermissionRoute module="bom" operation="update"><BOMForm /></PermissionRoute>} />
+            {/* BOM — Cut Panel / Garment Process Requirement (UI mock phase). :id opens the same screen, editable only in Draft */}
+            <Route path="bom/cut-panel/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelList /></Suspense></PermissionRoute>} />
+            <Route path="bom/cut-panel/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/cut-panel/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/list" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessList /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/new" element={<PermissionRoute module="garment-process" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessForm /></Suspense></PermissionRoute>} />
+            <Route path="bom/garment-process/:id" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessForm /></Suspense></PermissionRoute>} />
             {/* Sample Requests (R2) — SR / Dispatches / Customer Comments / Invoices, one RBAC module per screen */}
             <Route path="sample-requests/list" element={<PermissionRoute module="sample-requests" operation="view"><Suspense fallback={<PageSkeleton />}><SampleRequestList /></Suspense></PermissionRoute>} />
             <Route path="sample-requests/new" element={<PermissionRoute module="sample-requests" operation="add"><Suspense fallback={<PageSkeleton />}><SampleRequestForm /></Suspense></PermissionRoute>} />
@@ -281,7 +297,16 @@ const ThemedApp = () => {
             <Route path="purchase-orders/work-order/edit/:id" element={<PermissionRoute module="work-order" operation="update"><Suspense fallback={<PageSkeleton />}><WorkOrderForm /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="finishing-po" operation="view"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />            {/* Production — Cutting (UI mock phase) */}
+            <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
+            {/* Cut Panel PO (UI mock phase) — reuses the cut-panel key; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/cut-panel-po/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            {/* Garment Process PO (UI mock phase) — reuses the garment-process key; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/garment-process-po/list" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/new" element={<PermissionRoute module="garment-process" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/:id" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
+            {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
             <Route path="tna/plan/:planId" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />

@@ -365,22 +365,26 @@ const MainLayoutInner = () => {
       key: "/bom",
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
-      moduleId: "bom",
+      moduleId: ["bom", "cut-panel", "garment-process"],
+      // Creation happens via the BOM List page button — no "Create BOM" menu item.
       children: [
-        { key: "/bom/list", label: "BOM List" },
-        { key: "/bom/new", label: "Create BOM" },
+        { key: "/bom/list", label: "BOM List", moduleId: "bom" },
+        { key: "/bom/cut-panel/list", label: "Cut Panel", moduleId: "cut-panel" },
+        { key: "/bom/garment-process/list", label: "Garment Process", moduleId: "garment-process" },
       ],
     },
     {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po"],
+      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po", "cut-panel", "garment-process"],
       children: [
         { key: "/purchase-orders/supplier-po/list", label: "Supplier PO", moduleId: "purchase-orders" },
         { key: "/purchase-orders/cutting-po/list", label: "Cutting PO", moduleId: "cutting-po" },
         { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "work-order" },
         { key: "/purchase-orders/finishing-po/list", label: "Finishing PO", moduleId: "finishing-po" },
+        { key: "/purchase-orders/cut-panel-po/list", label: "Cut Panel PO", moduleId: "cut-panel" },
+        { key: "/purchase-orders/garment-process-po/list", label: "Garment Process PO", moduleId: "garment-process" },
       ],
     },
     {
@@ -639,10 +643,15 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
     if (path.startsWith('/production/packing')) return ['/production/packing/list'];
     if (path.startsWith('/production/masters')) return ['/production/masters'];
+    if (path.startsWith('/bom/cut-panel')) return ['/bom/cut-panel/list'];
+    if (path.startsWith('/bom/garment-process')) return ['/bom/garment-process/list'];
+    if (path.startsWith('/bom/new') || path.startsWith('/bom/edit')) return ['/bom/list'];
     if (path.startsWith('/purchase-orders/supplier-po')) return ['/purchase-orders/supplier-po/list'];
     if (path.startsWith('/purchase-orders/cutting-po')) return ['/purchase-orders/cutting-po/list'];
     if (path.startsWith('/purchase-orders/work-order')) return ['/purchase-orders/work-order/list'];
     if (path.startsWith('/purchase-orders/finishing-po')) return ['/purchase-orders/finishing-po/list'];
+    if (path.startsWith('/purchase-orders/cut-panel-po')) return ['/purchase-orders/cut-panel-po/list'];
+    if (path.startsWith('/purchase-orders/garment-process-po')) return ['/purchase-orders/garment-process-po/list'];
     // Each attendance screen has its own menu entry, so highlight the specific
     // one rather than always falling back to the calendar.
     if (path.startsWith('/hr/attendance/entry') || path.startsWith('/hr/attendance/bulk')) return ['/hr/attendance/entry'];

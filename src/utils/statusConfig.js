@@ -28,6 +28,8 @@ import {
   TEMPLATE_STATUS,
 } from './expDocConstants';
 import { MAPPING_STATUS } from './poOrderMappingConstants';
+import { REQUIREMENT_STATUS } from './requirementStatus';
+import { JW_PO_STATUS } from './jobWorkPoStatus';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -74,6 +76,31 @@ export const PO_ORDER_MAPPING_STATUS_CONFIG = {
 export const BOM_STATUS_CONFIG = {
   [BOM_STATUS.DRAFT]:   { color: 'default', icon: FileTextOutlined },
   [BOM_STATUS.CREATED]: { color: 'green',   icon: CheckCircleOutlined },
+};
+
+// ==================== PROCESS REQUIREMENT STATUS CONFIG ====================
+// Cut Panel Requirement + Garment Process Requirement share one lifecycle
+// (utils/requirementStatus.js). No approval: Submitted is the PO-visible state.
+export const REQUIREMENT_STATUS_CONFIG = {
+  [REQUIREMENT_STATUS.DRAFT]:          { color: 'default',    icon: FileTextOutlined },
+  [REQUIREMENT_STATUS.SUBMITTED]:      { color: 'processing', icon: SendOutlined },
+  [REQUIREMENT_STATUS.PARTIALLY_USED]: { color: 'warning',    icon: ClockCircleOutlined },
+  [REQUIREMENT_STATUS.FULLY_USED]:     { color: 'success',    icon: CheckCircleOutlined },
+  [REQUIREMENT_STATUS.CLOSED]:         { color: 'default',    icon: StopOutlined },
+};
+
+// ==================== JOB-WORK PO STATUS CONFIG ====================
+// Cut Panel PO + Garment Process PO (utils/jobWorkPoStatus.js).
+export const JOB_WORK_PO_STATUS_CONFIG = {
+  [JW_PO_STATUS.DRAFT]:               { color: 'default',    icon: FileTextOutlined },
+  [JW_PO_STATUS.SUBMITTED]:           { color: 'processing', icon: ClockCircleOutlined },
+  [JW_PO_STATUS.APPROVED]:            { color: 'blue',       icon: SafetyCertificateOutlined },
+  [JW_PO_STATUS.SENT_TO_VENDOR]:      { color: 'cyan',       icon: SendOutlined },
+  [JW_PO_STATUS.PARTIALLY_COMPLETED]: { color: 'geekblue',   icon: InboxOutlined },
+  [JW_PO_STATUS.COMPLETED]:           { color: 'green',      icon: CheckCircleOutlined },
+  [JW_PO_STATUS.CLOSED]:              { color: 'default',    icon: StopOutlined },
+  [JW_PO_STATUS.REJECTED]:            { color: 'red',        icon: CloseCircleOutlined },
+  [JW_PO_STATUS.CANCELLED]:           { color: 'volcano',    icon: StopOutlined },
 };
 
 // ==================== GRN STATUS CONFIG ====================
@@ -196,6 +223,14 @@ export const SR_STATUS_FLOW_BASE = ['DRAFT', 'SUBMITTED', 'IN_PRODUCTION', 'DISP
 // steps, so they stay off the flow and show as a status tag instead.
 export const PL_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
 export const EXPORT_INVOICE_STATUS_FLOW = ['DRAFT', 'FINAL', 'EXPORTED'];
+export const REQUIREMENT_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'PARTIALLY_USED', 'FULLY_USED'];
+// Rejected and Cancelled are outcomes, shown as the status tag rather than a step.
+export const JOB_WORK_PO_STATUS_FLOW = ['DRAFT', 'SUBMITTED', 'APPROVED', 'SENT_TO_VENDOR', 'PARTIALLY_COMPLETED', 'COMPLETED', 'CLOSED'];
+// CLOSED is an outcome, appended like the SR terminal step: a closed requirement's flow
+// ends where it was closed from (Submitted, or Partially Used once the PO module used some).
+export const requirementStatusFlow = (status, consumedQty) => (status === REQUIREMENT_STATUS.CLOSED
+  ? ['DRAFT', 'SUBMITTED', ...(consumedQty > 0 ? ['PARTIALLY_USED'] : []), 'CLOSED']
+  : REQUIREMENT_STATUS_FLOW);
 
 // ==================== HELPER ====================
 export const getStatusConfig = (moduleConfig, status) => {

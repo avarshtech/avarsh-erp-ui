@@ -35,6 +35,9 @@ import {
 } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
+import SupplierJobWorkFields from './jobWork/SupplierJobWorkFields';
+import SupplierJobWorkDetails from './jobWork/SupplierJobWorkDetails';
+import useJobWorkProcesses from './jobWork/useJobWorkProcesses';
 
 const { Text, Title } = Typography;
 
@@ -71,6 +74,7 @@ const SupplierMaster = () => {
   const [viewingSupplier, setViewingSupplier] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [form] = Form.useForm();
+  const jobWorkProcesses = useJobWorkProcesses();
 
   // Permissions
   const canView = hasPermission('supplier-info', 'view');
@@ -150,6 +154,7 @@ const SupplierMaster = () => {
       suppliesFabric: false,
       suppliesTrims: false,
       igstApplicable: false,
+      jobWorker: false,
     });
     setModalVisible(true);
     setSupplierUnsaved(false);
@@ -202,9 +207,10 @@ const SupplierMaster = () => {
     try {
       const values = await form.validateFields();
 
-      // Additional custom validations
-      if (!values.suppliesFabric && !values.suppliesTrims) {
-        message.error('At least one supply product (Fabric or Trims) must be selected');
+      // Additional custom validations. A job worker may supply neither: it is paid for
+      // work on the buyer's own panels or garments.
+      if (!values.suppliesFabric && !values.suppliesTrims && !values.jobWorker) {
+        message.error('At least one supply product (Fabric or Trims) must be selected, or tick Job worker');
         return;
       }
 
@@ -367,7 +373,8 @@ const SupplierMaster = () => {
         <Space size={4} wrap>
           {record.suppliesFabric && <Tag color="success">Fabric</Tag>}
           {record.suppliesTrims && <Tag color="processing">Trims</Tag>}
-          {!record.suppliesFabric && !record.suppliesTrims && (
+          {record.jobWorker && <Tag color="purple">Job work</Tag>}
+          {!record.suppliesFabric && !record.suppliesTrims && !record.jobWorker && (
             <Text type="secondary">-</Text>
           )}
         </Space>
@@ -502,6 +509,7 @@ const SupplierMaster = () => {
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Supplies:</span>
                 {viewingSupplier.suppliesFabric && <Tag color="success">Fabric</Tag>}
                 {viewingSupplier.suppliesTrims && <Tag color="processing">Trims</Tag>}
+                {viewingSupplier.jobWorker && <Tag color="purple">Job work</Tag>}
               </div>
             </div>
 
@@ -536,6 +544,8 @@ const SupplierMaster = () => {
                 ),
               },
             ]} />
+
+            <SupplierJobWorkDetails supplier={viewingSupplier} processes={jobWorkProcesses} />
 
             <Divider titlePlacement="start"><BankOutlined style={{ marginRight: 6 }} />Bank Details</Divider>
             {hasBankDetails(viewingSupplier) ? (
@@ -607,6 +617,7 @@ const SupplierMaster = () => {
             suppliesFabric: false,
             suppliesTrims: false,
             igstApplicable: false,
+            jobWorker: false,
           }}
           onValuesChange={() => setSupplierUnsaved(true)}
         >
@@ -814,6 +825,10 @@ const SupplierMaster = () => {
               </Form.Item>
             </Col>
           </Row>
+
+          {/* --- Job Work --- */}
+          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>Job Work</Divider>
+          <SupplierJobWorkFields form={form} processes={jobWorkProcesses} />
 
           {/* --- Bank Details --- */}
           <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
