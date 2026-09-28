@@ -2,7 +2,8 @@
  * Production PO Constants
  * Shared across Cutting PO, Work Order (Sewing PO) and Finishing PO.
  * Status machine (PRD §7.1): DRAFT → PENDING_APPROVAL → APPROVED → CANCELLED,
- * with refer-back (PENDING_APPROVAL → DRAFT) and reject (terminal).
+ * with reject (terminal) and refer-back from pending or approved (→ REFERRED_BACK,
+ * which is edited and re-submitted like a draft).
  */
 
 // ==================== STATUS ====================
@@ -13,6 +14,7 @@ export const PROD_PO_STATUS = {
   APPROVED:          'APPROVED',
   REJECTED:          'REJECTED',
   CANCELLED:         'CANCELLED',
+  REFERRED_BACK:     'REFERRED_BACK',
 };
 
 const STATUS_LABELS = {
@@ -21,6 +23,7 @@ const STATUS_LABELS = {
   [PROD_PO_STATUS.APPROVED]:         'Approved',
   [PROD_PO_STATUS.REJECTED]:         'Rejected',
   [PROD_PO_STATUS.CANCELLED]:        'Cancelled',
+  [PROD_PO_STATUS.REFERRED_BACK]:    'Referred Back',
 };
 
 export const getStatusLabel = (status) => {
@@ -29,10 +32,10 @@ export const getStatusLabel = (status) => {
 };
 
 // Status-driven action gating
-export const EDITABLE_STATUSES    = [PROD_PO_STATUS.DRAFT];
-export const SUBMITTABLE_STATUSES = [PROD_PO_STATUS.DRAFT];
+export const EDITABLE_STATUSES    = [PROD_PO_STATUS.DRAFT, PROD_PO_STATUS.REFERRED_BACK];
+export const SUBMITTABLE_STATUSES = [PROD_PO_STATUS.DRAFT, PROD_PO_STATUS.REFERRED_BACK];
 export const APPROVABLE_STATUSES  = [PROD_PO_STATUS.PENDING_APPROVAL];
-export const CANCELLABLE_STATUSES = [PROD_PO_STATUS.DRAFT, PROD_PO_STATUS.PENDING_APPROVAL, PROD_PO_STATUS.APPROVED];
+export const CANCELLABLE_STATUSES = [PROD_PO_STATUS.DRAFT, PROD_PO_STATUS.PENDING_APPROVAL, PROD_PO_STATUS.APPROVED, PROD_PO_STATUS.REFERRED_BACK];
 export const DELETABLE_STATUSES   = [PROD_PO_STATUS.DRAFT];
 
 // Status-change actions handled by the (mock) server
@@ -61,6 +64,7 @@ export const PO_TYPE_META = {
     stage: 'Cutting',
     prefix: 'CPO',
     noField: 'cuttingPoNo',
+    permission: 'cutting-po',
     basePath: '/purchase-orders/cutting-po',
     listPath: '/purchase-orders/cutting-po/list',
     newPath: '/purchase-orders/cutting-po/new',
@@ -73,6 +77,7 @@ export const PO_TYPE_META = {
     stage: 'Sewing',
     prefix: 'WO',
     noField: 'workOrderNo',
+    permission: 'work-order',
     basePath: '/purchase-orders/work-order',
     listPath: '/purchase-orders/work-order/list',
     newPath: '/purchase-orders/work-order/new',
@@ -85,6 +90,7 @@ export const PO_TYPE_META = {
     stage: 'Finishing',
     prefix: 'FPO',
     noField: 'finishingPoNo',
+    permission: 'finishing-po',
     basePath: '/purchase-orders/finishing-po',
     listPath: '/purchase-orders/finishing-po/list',
     newPath: '/purchase-orders/finishing-po/new',

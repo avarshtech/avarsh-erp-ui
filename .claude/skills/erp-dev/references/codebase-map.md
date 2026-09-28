@@ -158,6 +158,8 @@ Recipe: `grep -rn "USE_MOCK" src/services` — every switch is a `USE_MOCK_*` ex
 
 Everything else calls the API with no switch. `services/production/sewingService.js` and `cuttingService.js` have no mock flag.
 
+Carton Packing (`pages/production/packing/`) calls the real API through `services/production/packingService.js` (`/api/v1/packing`, package `production.packing`, tables `prd_pack_*`) since 2026-09-26 — it no longer goes through `expDocService`. Export Documentation is still a mock, so its packing lists, invoices and reports bind the entries **seeded into the expdoc mock store**, never the live ones; `expDocMockPacking.js` keeps only `listBindablePackingEntries` plus a re-export of `utils/packingEntryIssues.js`, which both sides share.
+
 ## 6. Read next
 
 - `impact-map.md` — cross-module seams (permission keys, JWT, enums, feed, delay engine) with the grep that lists live consumers.

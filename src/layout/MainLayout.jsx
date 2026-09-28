@@ -54,6 +54,7 @@ import NotificationCenter from "../components/NotificationCenter";
 import BranchSwitcher from "../components/branch/BranchSwitcher";
 import { useBranch } from "../context/BranchContext";
 import LiveActivityFeedWindow from "../components/LiveActivityFeed/LiveActivityFeedWindow";
+import GenieProvider from "../components/genie/GenieProvider";
 import useNetworkStatus from "../hooks/useNetworkStatus";
 import useResponsive from "../hooks/useResponsive";
 import useIsPwa from "../hooks/useIsPwa";
@@ -703,6 +704,7 @@ const MainLayoutInner = () => {
 
   return (
     <SessionExpiryGuard>
+      <GenieProvider>
       <OfflineBanner />
       {/* Skip-to-content link for keyboard users */}
       <a href="#main-content" className="skip-to-content">
@@ -1016,6 +1018,7 @@ const MainLayoutInner = () => {
         </Layout>
         <LiveActivityFeedWindow />
       </Layout>
+      </GenieProvider>
     </SessionExpiryGuard>
   );
 };

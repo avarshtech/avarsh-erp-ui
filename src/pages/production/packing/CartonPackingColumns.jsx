@@ -1,9 +1,11 @@
-import { Badge, Space, Tag, Tooltip, Typography } from 'antd';
+import { Badge, Space, Tooltip, Typography } from 'antd';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';
 import RecordLink from '../../../components/RecordLink';
 import StatusTag from '../../../components/StatusTag';
 import { PACKING_ENTRY_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { PACKING_ENTRY_STATUS_LABELS } from '../../../utils/expDocConstants';
+import { formatDate } from '../../../utils/formatters';
+import { DATE_TIME_FORMAT } from '../../../utils/uiConstants';
 
 const { Text } = Typography;
 
@@ -21,20 +23,15 @@ export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate,
     width: 170,
     render: (text, record) => <RecordLink text={text} onClick={() => onView(record)} />,
   },
-  { title: 'Order No', dataIndex: 'orderNo', key: 'orderNo', width: 160, render: nowrap },
   {
-    title: 'Buyer',
-    dataIndex: 'buyerName',
-    key: 'buyerName',
-    width: 200,
-    ellipsis: true,
-    render: (name, record) => (
-      <Space size={4} wrap={false}>
-        <Text ellipsis>{name || '—'}</Text>
-        {record.subClientCode && <Tag color="geekblue">{record.subClientCode}</Tag>}
-      </Space>
-    ),
+    title: 'Packing Date',
+    dataIndex: 'packingDate',
+    key: 'packingDate',
+    width: 128,
+    render: (v) => nowrap(formatDate(v)),
   },
+  { title: 'Order No', dataIndex: 'orderNo', key: 'orderNo', width: 160, render: nowrap },
+  { title: 'Buyer', dataIndex: 'buyerName', key: 'buyerName', width: 200, ellipsis: true },
   { title: 'Style', dataIndex: 'styleNo', key: 'styleNo', width: 150, ellipsis: true },
   {
     title: 'Cartons',
@@ -116,7 +113,13 @@ export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate,
       </span>
     ),
   },
-  { title: 'Updated', dataIndex: 'lastUpdated', key: 'lastUpdated', width: 150, render: nowrap },
+  {
+    title: 'Updated',
+    dataIndex: 'updatedAt',
+    key: 'updatedAt',
+    width: 150,
+    render: (v) => nowrap(formatDate(v, DATE_TIME_FORMAT)),
+  },
   {
     title: 'Actions',
     key: 'actions',

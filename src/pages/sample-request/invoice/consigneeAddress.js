@@ -36,3 +36,35 @@ export const soleLocationAddress = (buyer) => {
 export const findBuyerByName = (buyers, name) => (name
   ? (buyers || []).find((b) => b.name === name) || null
   : null);
+
+/** The buyer by id when the caller has one (names are not unique), else by name. */
+export const findBuyer = (buyers, { id, name }) => (
+  (id != null && (buyers || []).find((b) => b.id === id)) || findBuyerByName(buyers, name)
+);
+
+/** The "Attn:" line that prints under the consignee address. */
+export const buyerContact = (buyer) => [buyer?.contactPerson, buyer?.phone].filter(Boolean).join(' · ');
+
+/**
+ * Everything a shipping location says about the consignee: the address block,
+ * the buyer's contact and where the goods are going. One place, so a manually
+ * placed invoice fills the same buyer details an SR-driven one does.
+ */
+export const consigneeFromLocation = (buyer, loc) => ({
+  consigneeAddress: formatLocationAddress(loc),
+  consigneeContact: buyerContact(buyer),
+  destinationCountry: loc?.country || '',
+  finalDestination: [loc?.city, loc?.country].filter(Boolean).join(', '),
+});
+
+/**
+ * The consignee details for a buyer nobody has picked a location for yet: a lone
+ * location fills everything; several leave the address and destination to be
+ * picked, but the contact is the buyer's either way.
+ */
+export const consigneeFromBuyer = (buyer) => {
+  const locations = activeLocations(buyer);
+  return locations.length === 1
+    ? consigneeFromLocation(buyer, locations[0])
+    : { consigneeAddress: '', consigneeContact: buyerContact(buyer), destinationCountry: '', finalDestination: '' };
+};

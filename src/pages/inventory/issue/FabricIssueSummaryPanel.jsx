@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Card, Descriptions, Divider, Typography } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { formatNumber } from '../../../utils/formatters';
+import { isMassUom } from '../../../utils/uomConversions';
 
 const { Title, Text } = Typography;
 
@@ -42,7 +43,7 @@ const FabricIssueSummaryPanel = ({ cuttingPO, cuttingPOLine, selectedRolls = [],
           <Title level={5} style={{ marginBottom: 12 }}>Issue Summary</Title>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <SummaryRow label="Rolls Selected" value={selectedRolls.length} />
-            <SummaryRow label={`Total ${uom === 'kg' ? 'Weight' : 'Qty'}`} value={`${formatNumber(totalWeight, 1)} ${uom}`} />
+            <SummaryRow label={`Total ${isMassUom(uom) ? 'Weight' : 'Qty'}`} value={`${formatNumber(totalWeight, 1)} ${uom}`} />
             <SummaryRow label="BOM Required" value={`${formatNumber(bomRequired, 1)} ${uom}`} />
           </div>
         </>

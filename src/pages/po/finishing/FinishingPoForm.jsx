@@ -8,6 +8,7 @@ import { FormDatePicker, FormInputNumber, FormSelect, FormSection } from '../../
 import useBusyAction from '../../../hooks/useBusyAction';
 import SizeColorMatrix from '../SizeColorMatrix';
 import MaterialStockPanel from '../components/MaterialStockPanel';
+import ReferBackNotice from '../components/ReferBackNotice';
 import { FINISHING_PROCESS, getProcessLabel, PO_ACTION, isPpApproved } from '../../../utils/productionConstants';
 import {
   getFinishingPo, updateFinishingPo, changeFinishingPoStatus,
@@ -66,6 +67,9 @@ const FinishingPoForm = () => {
 
   const save = async (submit) => {
     const v = await form.validateFields();
+    if (submit && !(v.vendorRate > 0)) {
+      return message.warning(`Enter the Rate / Pc${po.isOutsourced ? ' on the Vendor tab' : ''} before submitting`);
+    }
     if (submit && hasShortage && !(await new Promise((res) => modal.confirm({
       title: 'Submit despite packing-material shortage?',
       content: 'One or more packing materials are short for this PO. Submit for approval anyway?',
@@ -97,6 +101,7 @@ const FinishingPoForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
+        <ReferBackNotice record={po} />
         <Descriptions bordered size="small" column={{ xs: 1, sm: 2 }} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Order">{po.orderNo}</Descriptions.Item>
           <Descriptions.Item label="Style">{po.styleNo}</Descriptions.Item>
@@ -110,6 +115,10 @@ const FinishingPoForm = () => {
           <FormSection title="Processing Unit" columns={2}>
             <Form.Item name="processingUnitId" label="In-house Unit">
               <FormSelect placeholder="Select finishing unit" options={units.map((u) => ({ value: u.id, label: u.name }))} />
+            </Form.Item>
+            {/* In-house work is paid per piece as well; a vendor's rate sits on the Vendor tab */}
+            <Form.Item name="vendorRate" label="Rate / Pc" required>
+              <FormInputNumber variant="currency" currency="INR" />
             </Form.Item>
           </FormSection>
         )}
@@ -130,9 +139,11 @@ const FinishingPoForm = () => {
     ...(hasPacking ? [{ key: 'packing', label: 'Packing Stock', children: (
       <MaterialStockPanel rows={stock} materialType="packing" onShortageChange={setHasShortage} />
     ) }] : []),
-    ...(po.isOutsourced ? [{ key: 'vendor', label: 'Vendor', children: (
+    // forceRender: an unopened tab is not mounted, and an unmounted field is left out of
+    // validateFields — saving would then send no rate and wipe the one the wizard captured
+    ...(po.isOutsourced ? [{ key: 'vendor', label: 'Vendor', forceRender: true, children: (
       <FormSection title={`Vendor — ${po.vendorName}`} columns={2}>
-        <Form.Item name="vendorRate" label="Rate / Pc"><FormInputNumber variant="currency" currency="INR" /></Form.Item>
+        <Form.Item name="vendorRate" label="Rate / Pc" required><FormInputNumber variant="currency" currency="INR" /></Form.Item>
         <Form.Item name="vendorDeliveryDate" label="Vendor Delivery Date"><FormDatePicker /></Form.Item>
       </FormSection>
     ) }] : []),

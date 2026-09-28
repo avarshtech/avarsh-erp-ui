@@ -4,11 +4,12 @@ import { App, Card, Row, Col, Table, Progress, Alert, Space, Tag, Spin } from 'a
 import { ScissorOutlined, PercentageOutlined, RedoOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import StatCard from '../../../components/StatCard';
 import EmptyState from '../../../components/EmptyState';
+import CuttingOutputCards from './CuttingOutputCards';
 import { statusLabel, CUTTING_STATUS_COLORS } from '../../../utils/cuttingConstants';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { getDashboard, getReconciliation, getCutPos } from '../../../services/production/cuttingService';
 
-/** ENH-04 — cutting room overview: KPIs, order progress, relaxation queue, alerts. */
+/** ENH-04 — cutting room overview: KPIs, 30-day and style-wise output, order progress, relaxation queue, alerts. */
 const CuttingDashboard = ({ onNavigateTab }) => {
   const { message } = App.useApp();
   const [data, setData] = useState(null);
@@ -36,6 +37,8 @@ const CuttingDashboard = ({ onNavigateTab }) => {
         <Col xs={12} md={6}><StatCard title="Re-Cut Rate" value={`${data.reCutPct}%`} color={data.reCutPct > reCutAlertPct ? 'var(--error-color)' : 'var(--warning-color)'} icon={<RedoOutlined />} /></Col>
         <Col xs={12} md={6}><StatCard title="TMB First-Pass Rate" value={`${data.tmbPassPct}%`} color="var(--success-color)" icon={<SafetyCertificateOutlined />} /></Col>
       </Row>
+
+      <CuttingOutputCards data={data} />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
         <Col xs={24} lg={14}>

@@ -13,6 +13,7 @@ import ConsumptionComparisonPanel from '../components/ConsumptionComparisonPanel
 import MaterialStockPanel from '../components/MaterialStockPanel';
 import MarkerUploadCard from '../components/MarkerUploadCard';
 import PpSampleGate from '../components/PpSampleGate';
+import ReferBackNotice from '../components/ReferBackNotice';
 import { PO_TYPE, PO_ACTION, isPpApproved, computeVariancePercent, VARIANCE_THRESHOLD } from '../../../utils/productionConstants';
 import {
   getConfirmedOrders, getOrderForPo, getConsumptionComparison, getStockByBom, getPpApprovalStatus, setPpApprovalStatus,
@@ -26,7 +27,8 @@ import { useBranch } from '../../../context/BranchContext';
 const { Text } = Typography;
 const sum = (arr, f) => arr.reduce((s, i) => s + (i[f] || 0), 0);
 
-// Allocated defaults to CAD requirement and is editable on the Cutting PO fabric panel.
+// Allocated defaults to CAD requirement (in the stock unit, e.g. Kg) and is editable on
+// the Cutting PO fabric panel.
 const normFabricStock = (rows) => rows.map((r) => ({
   ...r, allocated: r.cadRequired, availableBalance: r.currentStock - r.cadRequired, shortageSurplus: r.currentStock - r.cadRequired,
 }));
@@ -52,20 +54,24 @@ const CuttingPoForm = () => {
   const [hasShortage, setHasShortage] = useState(false);
   const [bulkRate, setBulkRate] = useState(null);
   const [booting, setBooting] = useState(isEdit);
+  const [saved, setSaved] = useState(null); // the PO being edited, for its refer-back notice
   // 'draft' | 'submit' | null — each header button spins only for its own action
   const { setBusy, busyProps } = useBusyAction();
 
   useEffect(() => { getConfirmedOrders().then(setOrders); }, []);
 
-  const hydrateFromOrder = useCallback(async (orderId, cadPerPc) => {
+  // plannedQty: the PO's total when editing; a fresh order's own planned rows otherwise.
+  // Both the consumption totals and the stock requirement are per-piece × this total.
+  const hydrateFromOrder = useCallback(async (orderId, cadPerPc, plannedQty) => {
     const [o, pp, alloc] = await Promise.all([
       getOrderForPo(orderId), getPpApprovalStatus(orderId),
       getOrderAllocations(orderId).catch(() => null),
     ]);
-    const cons = await getConsumptionComparison(o, cadPerPc);
+    const total = plannedQty ?? sum(o.items || [], 'plannedQty');
+    const cons = await getConsumptionComparison(o, cadPerPc, total);
     setOrder(o); setConsumption(cons); setPpStatus(pp);
     setAllocations(alloc?.rows || []);
-    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, branchId: form.getFieldValue('branchId') })));
+    setStock(normFabricStock(await getStockByBom(o, 'fabric', { cadPerPc: cons[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') })));
     return o;
   }, [form]);
 
@@ -74,7 +80,8 @@ const CuttingPoForm = () => {
     if (!isEdit) return;
     getCuttingPo(id).then(async (po) => {
       if (!po) { message.error('Cutting PO not found'); return navigate('/purchase-orders/cutting-po/list'); }
-      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc);
+      setSaved(po);
+      const o = await hydrateFromOrder(po.orderId, po.cadConsumptionPerPc, po.totalPlannedQty);
       setItems(po.items || []);
       getCuttingPoCoverage(po.orderId, id).then(setCoverage);
       if (o && po.allowancePercent != null && o.allowancePercent !== po.allowancePercent) {
@@ -103,17 +110,6 @@ const CuttingPoForm = () => {
   const handleAllocationSelect = (allocationId) => {
     const row = allocations.find((a) => a.id === allocationId);
     form.setFieldsValue({ branchId: row?.branchId, processingUnitId: undefined, processingUnitName: '' });
-  };
-
-  // Allowance % is editable on the PO (decision ②) — default comes from the
-  // order's BOM items; changing it recomputes every row's planned qty.
-  const applyAllowance = (pct) => {
-    const val = pct == null ? 0 : pct;
-    setOrder((o) => ({ ...o, allowancePercent: val }));
-    setItems((rows) => rows.map((i) => ({
-      ...i, allowancePercent: val,
-      plannedQty: Math.ceil((i.orderQty || 0) * (1 + val / 100)),
-    })));
   };
 
   const thisPoQty = sum(items, 'plannedQty');
@@ -146,6 +142,18 @@ const CuttingPoForm = () => {
     const total = sum(newItems, 'plannedQty');
     setConsumption((cons) => cons.map((r) => ({ ...r, plannedQty: total })));
     if (order) getStockByBom(order, 'fabric', { cadPerPc: consumption[0]?.cadPerPc, plannedQty: total, branchId: form.getFieldValue('branchId') }).then((s) => setStock(normFabricStock(s)));
+  };
+
+  // Allowance % is editable on the PO (decision ②) — default comes from the
+  // order's BOM items; changing it recomputes every row's planned qty, and with it
+  // the consumption totals and the fabric requirement.
+  const applyAllowance = (pct) => {
+    const val = pct == null ? 0 : pct;
+    setOrder((o) => ({ ...o, allowancePercent: val }));
+    onItemsChange(items.map((i) => ({
+      ...i, allowancePercent: val,
+      plannedQty: Math.ceil((i.orderQty || 0) * (1 + val / 100)),
+    })));
   };
 
   const applyBulkRate = () => {
@@ -195,6 +203,7 @@ const CuttingPoForm = () => {
   const tabs = [
     { key: 'general', label: 'General', children: (
       <>
+        <ReferBackNotice record={saved} />
         {ppStatus && (
           <PpSampleGate
             status={ppStatus}

@@ -29,9 +29,9 @@ const CostingTemplateModal = ({ open, onClose, onApply, mode = 'load', currentDa
     }
   }, [open, mode]);
 
+  // The sheet reports the result itself (including how many rates it refreshed).
   const handleLoad = (template) => {
     onApply(template.templateData);
-    message.success(`Template "${template.templateName}" loaded`);
     onClose();
   };
 

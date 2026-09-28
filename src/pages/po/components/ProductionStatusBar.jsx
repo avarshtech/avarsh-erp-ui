@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { App, Space } from 'antd';
-import { SendOutlined, StopOutlined } from '@ant-design/icons';
+import { SendOutlined, StopOutlined, RollbackOutlined } from '@ant-design/icons';
 import { ActionButton } from '../../../components/buttons';
 import ApprovalReasonDialog from '../../../components/ApprovalReasonDialog';
 import { PROD_PO_STATUS, PO_ACTION, PO_TYPE_META } from '../../../utils/productionConstants';
+import { hasPermission } from '../../../utils/permissions';
 import { changeCuttingPoStatus } from '../../../services/po/production/cuttingPoService';
 import { changeWorkOrderStatus } from '../../../services/po/production/workOrderService';
 import { changeFinishingPoStatus } from '../../../services/po/production/finishingPoService';
@@ -14,23 +15,26 @@ const CHANGE_FN = {
   FINISHING: changeFinishingPoStatus,
 };
 
-// Dialog config per action. Approve/Reject/Refer-Back are NOT offered here —
-// pending-approval decisions go through the shared level-aware ApprovalActionBar
-// (centralised approval engine); this bar only handles submit and cancel.
+// Dialog config per action. Approve/Reject and the pending-approval refer back are
+// NOT offered here — they go through the shared level-aware ApprovalActionBar
+// (centralised approval engine). This bar handles submit, cancel, and the refer back
+// of an already-approved PO, which is a direct rework request with no engine step.
 const DIALOGS = {
   [PO_ACTION.SUBMIT]: { label: 'Submit', color: '#1677ff', icon: <SendOutlined />, title: 'Submit for Approval', subtitle: 'Sends this PO into the approval workflow.', btnText: 'Submit', requiresReason: false },
+  [PO_ACTION.REFER_BACK]: { label: 'Refer Back', color: '#fa8c16', icon: <RollbackOutlined />, title: 'Refer Back for Rework', subtitle: 'Returns the approved PO for correction and releases its stock allocation. It can then be edited and submitted again.', btnText: 'Refer Back', requiresReason: true, minChars: 10 },
   [PO_ACTION.CANCEL]: { label: 'Cancel', color: '#cf1322', icon: <StopOutlined />, title: 'Cancel PO', subtitle: 'Cancels the PO and reverses any inventory allocation.', btnText: 'Cancel PO', requiresReason: true, danger: true, minChars: 10 },
 };
 
 const actionsForStatus = (status) => {
   switch (status) {
-    case PROD_PO_STATUS.DRAFT:    return [PO_ACTION.SUBMIT, PO_ACTION.CANCEL];
-    case PROD_PO_STATUS.APPROVED: return [PO_ACTION.CANCEL];
-    default:                      return [];
+    case PROD_PO_STATUS.DRAFT:
+    case PROD_PO_STATUS.REFERRED_BACK: return [PO_ACTION.SUBMIT, PO_ACTION.CANCEL];
+    case PROD_PO_STATUS.APPROVED:      return [PO_ACTION.REFER_BACK, PO_ACTION.CANCEL];
+    default:                           return [];
   }
 };
 
-const BTN_ACTION = { SUBMIT: 'send', CANCEL: 'cancel' };
+const BTN_ACTION = { SUBMIT: 'send', CANCEL: 'cancel', REFER_BACK: 'refer-back' };
 
 /** Status workflow action bar (PRD §7.1) + reason dialog. */
 const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) => {
@@ -40,7 +44,8 @@ const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) =
   const [loading, setLoading] = useState(false);
 
   if (!record) return null;
-  const available = actionsForStatus(record.status);
+  // Every status change here is an update of the PO (the API maps refer back to update too)
+  const available = hasPermission(PO_TYPE_META[poType]?.permission, 'update') ? actionsForStatus(record.status) : [];
   if (!available.length) return null;
 
   const docNumber = record[PO_TYPE_META[poType]?.noField];

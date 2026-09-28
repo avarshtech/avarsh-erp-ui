@@ -107,6 +107,17 @@ export const updateCostSheet = async (id, data) => {
 };
 
 /**
+ * Autosave an existing Draft while the user types.
+ * POST /api/v1/cost-sheets?autosave=true — no WhatsApp message, no feed row. Silent: the
+ * sheet shows its own "autosave paused" state; a version conflict still raises the dialog.
+ */
+export const autosaveCostSheet = async (id, data) => {
+  const payload = { id: Number(id), ...data };
+  const response = await axiosInstance.post(ENDPOINTS.COST_SHEETS, payload, { params: { autosave: true }, silent: true });
+  return response.data;
+};
+
+/**
  * Approve a cost sheet. Routed through the centralized approval engine when a
  * flow is configured; applied directly otherwise.
  * PUT /api/v1/cost-sheets/{id}/approve
@@ -183,21 +194,6 @@ export const getCostSheetHistory = async (id) => {
 
 // ==================== PAST PRICES ====================
 
-/**
- * Get past PO price suggestions for a given item.
- * GET /api/v1/cost-sheets/past-prices?type=fabric&itemId=42
- * @param {string} type - Item category ('fabric', 'trim', 'manufacturing', 'overhead')
- * @param {number} itemId - Item ID from items table
- * @returns {Promise<Array>} PastPriceSuggestionDTO[]
- */
-export const getPastPOSuggestions = async (type, itemId) => {
-  if (!itemId) return [];
-  const response = await axiosInstance.get(`${ENDPOINTS.COST_SHEETS}/past-prices`, {
-    params: { type, itemId },
-  });
-  return response.data ?? [];
-};
-
 // ==================== SUMMARIES ====================
 
 /**
@@ -246,22 +242,6 @@ export const getTodaysRate = async (fromCurrency, toCurrency) => {
   }
 
   return 1;
-};
-
-// ==================== TECHPACK AI IMPORT ====================
-
-/**
- * Upload a Buyer Techpack PDF and extract costing data using AI.
- * The backend runs Gemini extraction + master data matching.
- * Returns TechpackCostingDTO with match info for the frontend review modal.
- * POST /api/v1/cost-sheets/extract-techpack (multipart/form-data)
- * @param {File} file - PDF techpack file
- * @returns {Promise<Object>} TechpackCostingDTO
- */
-export const extractTechpackForCosting = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  return upload(`${ENDPOINTS.COST_SHEETS}/extract-techpack`, formData);
 };
 
 // ==================== CONSUMPTION CALCULATION ====================

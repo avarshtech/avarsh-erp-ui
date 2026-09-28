@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { App, Card, Steps, Form, Button, Space, Typography, Tag, Alert, Grid } from 'antd';
+import { App, Card, Steps, Form, Button, Space, Typography, Tag, Alert, Grid, InputNumber } from 'antd';
 import { HomeOutlined, CarOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import { FormSelect, FormDatePicker, FormSection } from '../../../components/form';
 import ProcessAssignmentTable from './ProcessAssignmentTable';
 import PpSampleGate from '../components/PpSampleGate';
+import { numericInputProps } from '../../../utils/inputHelpers';
 import { FINISHING_PROCESSES, getProcessLabel, isPpApproved } from '../../../utils/productionConstants';
 import {
   getConfirmedOrders, getPpApprovalStatus, getVendors,
@@ -28,6 +29,9 @@ const FinishingPoGenerateWizard = () => {
   const [vendors, setVendors] = useState([]);
   const [ppStatus, setPpStatus] = useState(null);
   const [assignments, setAssignments] = useState(initAssignments);
+  // Rate / pc of each PO to be raised, keyed by group ('INHOUSE' or the vendor id) —
+  // in-house work is paid per piece too, so every PO carries its price from the start.
+  const [rates, setRates] = useState({});
   const [formData, setFormData] = useState({});
   const [generating, setGenerating] = useState(false);
 
@@ -46,9 +50,9 @@ const FinishingPoGenerateWizard = () => {
       (byVendor[a.vendorId] = byVendor[a.vendorId] || []).push(a.processKey);
     });
     const groups = [];
-    if (inhouse.length) groups.push({ label: 'In-house', processes: inhouse });
+    if (inhouse.length) groups.push({ key: 'INHOUSE', label: 'In-house', processes: inhouse });
     Object.entries(byVendor).forEach(([vid, procs]) =>
-      groups.push({ label: vendors.find((v) => v.id === Number(vid))?.name || 'Vendor', processes: procs }));
+      groups.push({ key: vid, label: vendors.find((v) => v.id === Number(vid))?.name || 'Vendor', processes: procs }));
     return groups;
   }, [assignments, vendors]);
 
@@ -77,6 +81,8 @@ const FinishingPoGenerateWizard = () => {
         orderId: formData.orderId, workOrderId: formData.workOrderId, workOrderNo: wo?.workOrderNo,
         plannedStartDate: formData.plannedStartDate?.format('YYYY-MM-DD'), plannedEndDate: formData.plannedEndDate?.format('YYYY-MM-DD'),
         assignments,
+        inhouseRatePerPiece: rates.INHOUSE ?? null,
+        vendorRatePerPiece: Object.fromEntries(Object.entries(rates).filter(([k]) => k !== 'INHOUSE')),
       });
       message.success(`${created.length} Finishing PO(s) created`);
       navigate('/purchase-orders/finishing-po/list');
@@ -87,6 +93,7 @@ const FinishingPoGenerateWizard = () => {
 
   const groups = computeGroups();
   const ppApproved = isPpApproved(ppStatus);
+  const ratesMissing = groups.some((g) => !(rates[g.key] > 0));
 
   const steps = [
     { title: 'Order & Work Order', content: (
@@ -122,6 +129,15 @@ const FinishingPoGenerateWizard = () => {
                 {g.processes.sort((a, b) => FINISHING_PROCESSES.find((p) => p.key === a).sequence - FINISHING_PROCESSES.find((p) => p.key === b).sequence)
                   .map((p) => <Tag key={p} color="blue">{getProcessLabel(p)}</Tag>)}
               </Space>
+              <div style={{ marginTop: 10 }}>
+                <Text strong>Rate / Pc <Text type="danger">*</Text></Text>{' '}
+                <InputNumber
+                  name={`rate-${g.key}`} aria-label={`Rate per piece — ${g.label}`}
+                  min={0} precision={2} prefix="₹" placeholder="0.00" style={{ width: 160 }}
+                  value={rates[g.key]} onChange={(v) => setRates((r) => ({ ...r, [g.key]: v }))}
+                  status={rates[g.key] > 0 ? undefined : 'warning'} {...numericInputProps}
+                />
+              </div>
             </Card>
           ))}
         </Space>
@@ -138,7 +154,12 @@ const FinishingPoGenerateWizard = () => {
         <Space style={{ marginTop: 24, justifyContent: 'flex-end', width: '100%' }}>
           {step > 0 && <Button onClick={() => setStep((s) => s - 1)}>Back</Button>}
           {step < 2 && <Button type="primary" onClick={next}>Next</Button>}
-          {step === 2 && <Button type="primary" loading={generating} disabled={!ppApproved || !groups.length} onClick={generate}>Confirm & Generate</Button>}
+          {step === 2 && (
+            <Button type="primary" loading={generating} disabled={!ppApproved || !groups.length || ratesMissing}
+              title={ratesMissing ? 'Enter the Rate / Pc of every PO' : undefined} onClick={generate}>
+              Confirm & Generate
+            </Button>
+          )}
         </Space>
       </Card>
     </div>

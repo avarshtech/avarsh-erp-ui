@@ -56,3 +56,9 @@ export {
   recordGarmentIssueReceipt,
   getBomLabelItems,
 } from './sewingApi';
+
+// External Process (garments to washing / printing / embroidery and back) is on the real API
+export {
+  listProcessIssues, createProcessIssue, cancelProcessIssue,
+  listProcessReturns, createProcessReturn, getProcessWorkOrders, getProcessVendors,
+} from './finishingProcessApi';

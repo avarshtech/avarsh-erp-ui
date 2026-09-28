@@ -12,9 +12,10 @@ import { hasPermission } from '../../../utils/permissions';
 import {
   PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
-import { searchPackingEntries, deletePackingEntry } from '../../../services/expdoc/expDocService';
+import { searchPackingEntries, deletePackingEntry } from '../../../services/production/packingService';
 import { buildCartonPackingColumns } from './CartonPackingColumns';
 import CartonPackingView from './CartonPackingView';
+import DailyPackingSummary from './DailyPackingSummary';
 import { MODULE_ID } from './packingModule';
 
 const STATUS_OPTIONS = Object.values(PACKING_ENTRY_STATUS).map((s) => ({
@@ -23,11 +24,8 @@ const STATUS_OPTIONS = Object.values(PACKING_ENTRY_STATUS).map((s) => ({
 }));
 
 /**
- * Carton packing register.
- *
- * The PRD defers carton capture to a separate Packing-module PRD, but it is the
- * only producer of the §7.3 dataset the packing list, invoice and stickers all
- * consume, so a thin version lives here behind its own RBAC key.
+ * Carton packing register — one entry per order per packing day — with the
+ * Daily Packing summary (per-style cartons and pieces for a chosen day) above it.
  */
 const CartonPackingList = () => {
   const navigate = useNavigate();
@@ -38,7 +36,10 @@ const CartonPackingList = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
   const [statusFilter, setStatusFilter] = useState();
+  const [dateRange, setDateRange] = useState(null);
   const [viewId, setViewId] = useState(null);
+  // Bumped after the register changes so the daily summary re-reads its day.
+  const [summaryKey, setSummaryKey] = useState(0);
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
@@ -60,6 +61,8 @@ const CartonPackingList = () => {
         const params = { page: nextPage - 1, size: nextSize };
         if (debouncedSearch) params.search = debouncedSearch;
         if (statusFilter) params.status = statusFilter;
+        if (dateRange?.[0]) params.dateFrom = dateRange[0].format('YYYY-MM-DD');
+        if (dateRange?.[1]) params.dateTo = dateRange[1].format('YYYY-MM-DD');
         const res = await searchPackingEntries(params);
         setRows(res.content || []);
         setPagination((p) => ({
@@ -75,7 +78,7 @@ const CartonPackingList = () => {
         setLoading(false);
       }
     },
-    [debouncedSearch, statusFilter, message],
+    [debouncedSearch, statusFilter, dateRange, message],
   );
 
   useEffect(() => {
@@ -88,6 +91,7 @@ const CartonPackingList = () => {
         await deletePackingEntry(record.id);
         message.success(`${record.packingNo} deleted`);
         fetchData();
+        setSummaryKey((k) => k + 1);
       } catch (e) {
         message.error(e.message || 'Failed to delete packing entry');
       }
@@ -130,8 +134,20 @@ const CartonPackingList = () => {
           options: STATUS_OPTIONS,
         },
       },
+      {
+        key: 'packingDate',
+        type: 'rangePicker',
+        span: { xs: 24, sm: 12, md: 7, lg: 6 },
+        props: {
+          name: 'packingDateRange',
+          placeholder: ['Packed From', 'Packed To'],
+          value: dateRange,
+          onChange: setDateRange,
+          allowClear: true,
+        },
+      },
     ],
-    [statusFilter],
+    [statusFilter, dateRange],
   );
 
   return (
@@ -158,6 +174,8 @@ const CartonPackingList = () => {
         </Col>
       </Row>
 
+      <DailyPackingSummary refreshKey={summaryKey} />
+
       <Card>
         <SearchFilterBar
           searchText={searchText}
@@ -172,7 +190,7 @@ const CartonPackingList = () => {
           loading={loading}
           rowKey="id"
           size="small"
-          scroll={{ x: 1720 }}
+          scroll={{ x: 1850 }}
           onRow={(record) => ({
             onClick: () => setViewId(record.id),
             style: { cursor: 'pointer' },

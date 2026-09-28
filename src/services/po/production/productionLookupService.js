@@ -55,13 +55,14 @@ export const getStockByBom = async (order, kind = 'fabric', opts = {}) => {
   return data || [];
 };
 
-// Consumption comparison rows are the fabric stock rows (bomPerPc/cadPerPc/plannedQty
-// are all present there) — no separate endpoint needed.
+// Consumption comparison rows are the fabric stock rows — no separate endpoint needed.
+// Per-piece figures are in perPcUom (Gms); totals divide by uomDivisor into reqUom (Kg).
 export const getConsumptionComparison = async (order, cadPerPc, plannedQty) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.getConsumptionComparison(order?.id ?? order?.orderId, cadPerPc);
   const rows = await getStockByBom(order, 'fabric', { cadPerPc, plannedQty });
   return rows.map((r) => ({
     key: r.key, itemCode: r.itemCode, itemName: r.itemName, uom: r.uom,
+    perPcUom: r.perPcUom || r.uom, reqUom: r.reqUom || r.stockUom || r.uom, uomDivisor: r.uomDivisor || 1,
     bomPerPc: r.bomPerPc, cadPerPc: r.cadPerPc, plannedQty: plannedQty ?? r.plannedQty,
   }));
 };

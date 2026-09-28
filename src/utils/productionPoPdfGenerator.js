@@ -29,11 +29,13 @@ const totals = (items = []) => items.reduce((a, i) => ({
 
 const processingBlock = (record, poType) => {
   if (poType === PO_TYPE.FINISHING) {
+    // In-house finishing is paid per piece too, so its rate prints as well
+    const rate = record.vendorRate ? ` &nbsp;|&nbsp; Rate/Pc: ${money(record.vendorRate)}` : '';
     return record.isOutsourced
-      ? `Vendor: <b>${esc(record.vendorName)}</b>${record.vendorRate ? ` &nbsp;|&nbsp; Rate/Pc: ${money(record.vendorRate)}` : ''}`
-      : 'Processing: <b>In-house</b>';
+      ? `Vendor: <b>${esc(record.vendorName)}</b>${rate}`
+      : `Processing: <b>In-house${record.processingUnitName ? ` — ${esc(record.processingUnitName)}` : ''}</b>${rate}`;
   }
-  return `${record.processingUnitType === 'VENDOR' ? 'Vendor' : 'Unit Unit'}: <b>${esc(record.processingUnitName)}</b>`;
+  return `${record.processingUnitType === 'VENDOR' ? 'Vendor' : 'Unit'}: <b>${esc(record.processingUnitName)}</b>`;
 };
 
 const datesBlock = (record, poType) => {
@@ -42,8 +44,9 @@ const datesBlock = (record, poType) => {
   return `Start: <b>${fmtDate(record.plannedStartDate)}</b> &nbsp;|&nbsp; End: <b>${fmtDate(record.plannedEndDate)}</b>`;
 };
 
+// Consumption is settled on the cutting PO; the work order and finishing PO do not review it.
 const consumptionBlock = (record, poType) => {
-  if (poType === PO_TYPE.FINISHING || record.bomConsumptionPerPc == null) return '';
+  if (poType !== PO_TYPE.CUTTING || record.bomConsumptionPerPc == null) return '';
   const v = computeVariancePercent(record.cadConsumptionPerPc, record.bomConsumptionPerPc);
   return `<div class="sec"><div class="sec-h">Fabric Consumption</div>
     <div class="kv">BOM /Pc: <b>${(record.bomConsumptionPerPc || 0).toFixed(3)}</b> &nbsp;|&nbsp; CAD /Pc: <b>${(record.cadConsumptionPerPc || 0).toFixed(3)}</b> &nbsp;|&nbsp; Variance: <b>${v >= 0 ? '+' : ''}${v.toFixed(2)}%</b>${record.markerEfficiency != null ? ` &nbsp;|&nbsp; Marker Eff.: <b>${record.markerEfficiency}%</b>` : ''}</div></div>`;
@@ -63,7 +66,11 @@ export const generateProductionPoPdf = async (record, poType) => {
 
   const company = org?.organisationName || 'Avarsh Apparels';
   const addr = [[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', '), [org?.city, org?.state].filter(Boolean).join(', ') + (org?.pincode ? ' - ' + org.pincode : '')].filter(Boolean).join('<br>');
-  const t = totals(record.items);
+  // A finishing PO prices the whole PO at one Rate/Pc rather than per size-colour row
+  const items = poType === PO_TYPE.FINISHING
+    ? (record.items || []).map((i) => ({ ...i, ratePerPiece: record.vendorRate || 0 }))
+    : record.items;
+  const t = totals(items);
   const poNo = record[meta.noField] || '';
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(poNo)}</title>
@@ -102,7 +109,7 @@ export const generateProductionPoPdf = async (record, poType) => {
     <div class="sec"><div class="sec-h">Size-Colour Matrix</div>
       <table>
         <thead><tr><th>Colour</th><th>Size</th><th class="r">Order Qty</th><th class="r">Allow.</th><th class="r">Planned</th><th class="r">Rate/Pc</th><th class="r">Total</th></tr></thead>
-        <tbody>${matrixRows(record.items)}</tbody>
+        <tbody>${matrixRows(items)}</tbody>
         <tfoot><tr><td colspan="2">Grand Total</td><td class="r">${num(t.orderQty)}</td><td></td><td class="r">${num(t.plannedQty)}</td><td></td><td class="r">${money(t.cost)}</td></tr></tfoot>
       </table>
     </div>

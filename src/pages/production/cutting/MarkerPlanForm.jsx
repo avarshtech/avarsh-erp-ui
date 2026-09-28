@@ -206,7 +206,7 @@ const MarkerPlanForm = () => {
               { key: 'b', label: 'Buyer', children: po.buyer },
               { key: 's', label: 'Style #', children: po.styleNo },
               { key: 'u', label: 'Unit', children: po.unitName || '—' },
-              { key: 'f', label: 'Fabric Details', children: `${po.fabricType || '—'} · ${po.color || '—'}` },
+              { key: 'f', label: 'Fabric Details', children: `${po.fabricName || po.fabricType || '—'} · ${po.color || '—'}` },
               { key: 'q', label: 'Plan Qty (order)', children: po.orderQty },
               { key: 'a', label: `Cut Qty (+${plan.allowancePct || 0}%)`, children: <strong>{totalAllowanceQty(po.sizes, po.sizeQty, plan.allowancePct)}</strong> },
             ]} />

@@ -60,15 +60,10 @@ export const createShipment = (...a) => shipments.createShipment(...a);
 export const updateShipment = (...a) => shipments.updateShipment(...a);
 export const deleteShipment = (...a) => shipments.deleteShipment(...a);
 
-// ── Carton packing entry ── GET/POST /packing-entries, GET/PUT/DELETE /{id},
-//    POST /{id}/status. Supplies the PRD §7.3 carton dataset.
-export const searchPackingEntries = (...a) => packing.searchPackingEntries(...a);
-export const getPackingEntry = (...a) => packing.getPackingEntry(...a);
+// ── Carton packing entry ── the Packing screens use the real API
+//    (services/production/packingService.js). Packing lists still bind the mock's
+//    seeded entries until the export-docs backend exists.
 export const listBindablePackingEntries = (...a) => packing.listBindablePackingEntries(...a);
-export const createPackingEntry = (...a) => packing.createPackingEntry(...a);
-export const updatePackingEntry = (...a) => packing.updatePackingEntry(...a);
-export const setPackingEntryStatus = (...a) => packing.setPackingEntryStatus(...a);
-export const deletePackingEntry = (...a) => packing.deletePackingEntry(...a);
 
 // ── Packing lists ── GET/POST /packing-lists, GET/PUT/DELETE /{id},
 //    POST /{id}/status · /{id}/refresh · /{id}/acknowledge · /{id}/revise

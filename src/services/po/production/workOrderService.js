@@ -35,6 +35,12 @@ export const changeWorkOrderStatus = async (id, action, payload = {}) => {
   return data;
 };
 
+/** Everything the Work Order print sheet shows — order details, fabrics, size grid, accessories. */
+export const getWorkOrderPrint = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/${id}/print`);
+  return data;
+};
+
 export const getApprovedWorkOrders = async (orderId) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.getApprovedWorkOrders(orderId);
   const { data } = await axiosInstance.get(`${BASE}/approved`, { params: { orderId } });

@@ -146,13 +146,19 @@
 | getCostSheetById | GET | `/cost-sheets/{id}` |
 | getCostSheetByCostingId | GET | `/cost-sheets/by-costing-id` |
 | createCostSheet | POST | `/cost-sheets` |
-| updateCostSheet | PUT | `/cost-sheets/{id}` |
+| updateCostSheet | POST | `/cost-sheets` (id in body) |
+| autosaveCostSheet | POST | `/cost-sheets?autosave=true` — existing Draft only; no WhatsApp, no feed row |
 | deleteCostSheet | DELETE | `/cost-sheets/{id}` |
 | duplicateCostSheet | POST | `/cost-sheets/{id}/duplicate` |
 | getCostSheetHistory | GET | `/cost-sheets/{id}/history` |
-| getPastPOSuggestions | GET | `/cost-sheets/suggestions/past-po` |
+| getVariantPastPrices (costingPriceService) | GET | `/cost-sheets/past-prices?variantId=` (itemId still accepted) |
+| getLastPrices (costingPriceService) | GET | `/cost-sheets/last-prices?variantIds=` |
+| getRecentCostings (costingPriceService) | GET | `/cost-sheets/recent?buyerId=&limit=&statuses=` (no params = last 5 Approved) |
+| getStoredRate (exchangeRateService) | GET | `/exchange-rates/today?from=&to=` — 404 when no rate is stored |
+| findOrCreateItem / findOrCreateItems (quickItemService) | POST | `/items/find-or-create`, `/items/find-or-create/batch` (422 + rowErrors) |
 | getAllCostSheetSummaries | GET | `/cost-sheets/summaries` |
-| extractTechpackForCosting | POST | `/cost-sheets/extract-techpack` |
+| createAiDraft (costingAiService) | POST | `/cost-sheets/ai-draft` multipart `files[]` (audio/photo/PDF, ≤5, ≤18 MB) + `text` + `buyerId` + `styleId` → AiCostingDraftDTO; 503 AI_NOT_CONFIGURED, 502 upstream; save sends back `aiSourceFileIds` |
+| genieChat (core/genieService) | POST | `/genie/chat` {screenId, message \| audioBase64, history[{role,text}], context} → {reply, transcript, actions[{tool,args}], proposals[{id,kind,title,detail,data}]}; deferred permission: the screen's view key (costing-sheet → costing); 429 after 40 turns / 10 min |
 | calculateConsumption | POST | `/cost-sheets/calculate-consumption` |
 | uploadAttachmentsBatch | POST | `/cost-sheets/{costSheetId}/attachments` |
 | getAttachments | GET | `/cost-sheets/{costSheetId}/attachments` |

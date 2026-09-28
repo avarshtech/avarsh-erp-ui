@@ -12,6 +12,7 @@ import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission, getCurrentUser } from '../../../utils/permissions';
 import { errorText, toastUnlessHandled } from '../../../utils/apiError';
 import { formatNumber } from '../../../utils/formatters';
+import { sameUom } from '../../../utils/uomConversions';
 import { SAMPLE_TYPE_LIST } from '../../../utils/sampleRequestConstants';
 import FabricIssueRollPicker from './FabricIssueRollPicker';
 import SampleIssueSummaryPanel from './SampleIssueSummaryPanel';
@@ -181,7 +182,8 @@ const SampleFabricIssueForm = () => {
 
   const uomMismatch = useMemo(() => {
     if (!selectedLine || !availableRolls.length) return false;
-    return availableRolls.some((r) => r.uom !== selectedLine.uom);
+    // by alias: the rolls say 'Kilogram' where the line may say 'KG'
+    return availableRolls.some((r) => !sameUom(r.uom, selectedLine.uom));
   }, [selectedLine, availableRolls]);
 
   const borrowedOffered = useMemo(

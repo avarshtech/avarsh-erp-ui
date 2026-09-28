@@ -143,6 +143,7 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
             <Row gutter={[24, 16]}>
               <Field label="Invoice Date">{formatDate(inv.invoiceDate)}</Field>
               <Field label="Series">{inv.series}</Field>
+              <Field label="Exporter's Ref.">{inv.exporterRef}</Field>
               <Field label="Buyer's Order No. & Date">{inv.buyerOrderNoDate}</Field>
               <Field label="Other References">{inv.otherReferences}</Field>
               <Field label="Country of Origin">{inv.countryOfOrigin}</Field>

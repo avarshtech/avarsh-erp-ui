@@ -7,8 +7,10 @@
  * database looking like a real garment export house rather than a pile of test junk.
  *
  * Load-bearing names — do not rename without checking the consumer:
- *   - Categories 'Fabric' / 'Local Trims' / 'Imported Trims' are matched by exact name
- *     in CostingForm.jsx, and passed verbatim to GET /variants/search?category=.
+ *   - Categories 'Fabric' / 'Local Trims' / 'Imported Trims' are matched by name in the
+ *     costing sheet (resolveCategorySlots in src/pages/costing/sheet/model/masterOptions.js)
+ *     and by CostingMasterMatcher on the server, and passed verbatim to
+ *     GET /variants/search?category=.
  *   - Category 'Fabric' also drives the "secondary UOM required" rule in ItemMaster.jsx.
  *
  * Item identity note: the backend allows exactly ONE item per

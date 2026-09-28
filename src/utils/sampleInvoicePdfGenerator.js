@@ -57,7 +57,7 @@ export const buildSampleInvoiceHtml = (inv, profile) => {
     <tr>
       ${cell('Exporter', `${profile.exporterBlock}`, { colspan: 2, bold: true })}
       ${cell('Invoice No. & Date', `${inv.invoiceNo || 'DRAFT'}   Dt. ${inv.invoiceDate || ''}`, { bold: true })}
-      ${cell("Exporter's Ref. (IEC No.)", profile.extra?.iecNumber || '')}
+      ${cell("Exporter's Ref. (IEC No.)", inv.exporterRef || profile.extra?.iecNumber || '')}
     </tr>
     <tr>
       ${cell('Consignee', [inv.consigneeName, inv.consigneeAddress, inv.consigneeContact].filter(Boolean).join('\n'), { colspan: 2, bold: true })}

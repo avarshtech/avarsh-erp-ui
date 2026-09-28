@@ -88,7 +88,7 @@ const DispatchSampleRequestTable = ({
         rowSelection={{ selectedRowKeys: selectedIds, onChange: onSelectionChange }}
         locale={{
           emptyText: buyerId != null
-            ? 'No dispatchable In-Production SRs for this customer'
+            ? 'Nothing ready to ship for this customer — garment samples list once In Production, lab dips and strike offs once Submitted'
             : 'Select a customer to list its dispatchable SRs',
         }}
       />

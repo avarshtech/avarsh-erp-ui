@@ -1,7 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { Row, Col, Input, DatePicker, Select, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { activeLocations, formatLocationAddress, findBuyerByName } from './consigneeAddress';
+import {
+  activeLocations, formatLocationAddress, findBuyerByName, consigneeFromLocation, consigneeFromBuyer,
+} from './consigneeAddress';
 import { useBranch } from '../../../context/BranchContext';
 import { withExportingBranch } from './useCompanyProfile';
 
@@ -26,8 +28,9 @@ const Field = ({ label, required, children, hint }) => (
 
 /**
  * Step 2 — header fields following the existing Avarsh export invoice layout
- * (PRD §10.4). Exporter block + IEC are read-only from the Company Master
- * (real organisation-info + profile extras).
+ * (PRD §10.4). The exporter block is read-only from the Company Master (real
+ * organisation-info + profile extras); Exporter's Ref starts as its IEC number
+ * and is the invoice's own, editable.
  *
  * The consignee is chosen from the Buyer master and its delivery address is
  * rendered from that buyer's shipping locations, but both are still written to
@@ -77,21 +80,17 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked, buyers }) => {
   }, [locations, inv.consigneeAddress]);
 
   const handleConsigneeChange = useCallback((name) => {
-    const next = findBuyerByName(buyers, name);
-    const locs = activeLocations(next);
-    patch({
-      consigneeName: name,
-      // A different consignee means a different address — carrying the previous
-      // buyer's over would be worse than blanking it. One location is
-      // unambiguous and fills itself; several wait to be picked.
-      consigneeAddress: locs.length === 1 ? formatLocationAddress(locs[0]) : '',
-    });
+    // A different consignee means different buyer details — carrying the previous
+    // buyer's over would be worse than blanking them. One location is unambiguous
+    // and fills the address, contact and destination; several wait to be picked.
+    patch({ consigneeName: name, ...consigneeFromBuyer(findBuyerByName(buyers, name)) });
   }, [buyers, patch]);
 
+  // Picking a location loads the buyer's details from it: address, contact, destination.
   const handleLocationChange = useCallback((locationId) => {
     const loc = locations.find((l) => l.id === locationId);
-    if (loc) patch({ consigneeAddress: formatLocationAddress(loc) });
-  }, [locations, patch]);
+    if (loc) patch(consigneeFromLocation(consigneeBuyer, loc));
+  }, [locations, consigneeBuyer, patch]);
 
   return (
     <Row gutter={24}>
@@ -196,8 +195,12 @@ const InvoiceStepHeader = ({ inv, patch, profile, locked, buyers }) => {
             </Field>
           </Col>
           <Col span={12}>
-            <Field label="Exporter's Ref. (IEC No.)">
-              <Input value={profile.extra?.iecNumber || ''} disabled style={{ backgroundColor: 'var(--bg-tertiary)' }} />
+            <Field label="Exporter's Ref." hint="Defaults to the IEC No. in Company Profile">
+              <Input
+                aria-label="Exporter's Ref."
+                value={inv.exporterRef ?? profile.extra?.iecNumber ?? ''} disabled={locked} maxLength={100}
+                onChange={(e) => patch({ exporterRef: e.target.value })}
+              />
             </Field>
           </Col>
           <Col span={12}>

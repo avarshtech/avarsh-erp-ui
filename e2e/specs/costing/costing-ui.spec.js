@@ -8,7 +8,7 @@
  *   - IN-BROWSER calculation wiring: a fabric row's Net Cost cell updates to the
  *     formula result as Qty/Price/Allowance/Wastage are typed, and the Cost Summary
  *     reacts to agent% / profit% — proving the form wires inputs → formula → display
- *   - Create a Draft through the form (buyer + style) → POST 200 → navigates to list
+ *   - Create a Draft through the form (buyer + style) → POST 200 → stays on the sheet (edit URL)
  *   - Submitting an empty form surfaces the required-field validation
  *
  * Selectors: AntD Form sets each control's id to its Form.Item name (#buyerId, #styleNo).
@@ -126,7 +126,7 @@ async function setSummaryPct(page, labelText, value) {
 }
 
 test.describe('Costing — Create & Validation (UI)', () => {
-  test('Create a Draft via the form → POST 200 → returns to list', async ({ page }) => {
+  test('Create a Draft via the form → POST 200 → stays on the sheet as /costing/edit/:id', async ({ page }) => {
     // One cost sheet per style (rule added 2026-08): the first style in the dropdown
     // is usually taken, so mint a fresh style for buyer 1 and pick it by name.
     const api = await createAuthenticatedClient();
@@ -175,7 +175,10 @@ test.describe('Costing — Create & Validation (UI)', () => {
     ]);
     expect(resp.status()).toBeGreaterThanOrEqual(200);
     expect(resp.status()).toBeLessThan(300);
-    await expect(page).toHaveURL(/\/costing\/list/, { timeout: 15000 });
+    // Save as Draft keeps you on the sheet: a new one moves to its edit URL.
+    const saved = await resp.json();
+    await expect(page).toHaveURL(new RegExp(`/costing/edit/${saved.id}$`), { timeout: 15000 });
+    await expect(page.getByText(saved.costingId).first()).toBeVisible();
   });
 
   test('Draft save without sizes is blocked inline; sizes offer preset options only (B-052)', async ({ page }) => {
