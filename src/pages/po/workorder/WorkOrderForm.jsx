@@ -102,7 +102,9 @@ const WorkOrderForm = () => {
   const handleOrderSelect = async (orderId) => {
     form.setFieldValue('cuttingPoId', undefined); setCuttingPo(null); setItems([]);
     setAllowanceWarn(null);
-    await hydrateOrder(orderId);
+    const o = await hydrateOrder(orderId);
+    // the order's delivery date (its earliest line dispatch date) is the default; still editable
+    form.setFieldValue('plannedDeliveryDate', o?.deliveryDate ? dayjs(o.deliveryDate) : null);
     getWorkOrderCoverage(orderId).then(setCoverage);
   };
 

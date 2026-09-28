@@ -56,16 +56,15 @@ export async function applyBulkRate(page, rate) {
 }
 
 /** True when the list already shows an Approved row matching `search`. */
-export async function approvedRowExists(page, search) {
-  const searchBox = page.locator('input[placeholder*="Search"]').first();
+export async function approvedRowExists(page, search, { waitMs = 0 } = {}) {
+  // The list's own search box: the header's global search also says "Search…" and comes first
+  const searchBox = page.locator('.ant-card input[placeholder*="Search"]').first();
   await searchBox.fill(search);
   await page.waitForTimeout(1200); // debounced search
-  const rows = page.locator('.ant-table-row', { hasText: search });
-  const count = await rows.count();
-  for (let i = 0; i < count; i++) {
-    if (await rows.nth(i).locator('.ant-tag', { hasText: /Approved/i }).count()) return true;
-  }
-  return false;
+  const approved = page.locator('.ant-table-row', { hasText: search }).locator('.ant-tag', { hasText: /Approved/i });
+  // After a save navigates back here the list may still be loading, so the caller can wait for the row
+  if (waitMs) return approved.first().waitFor({ state: 'attached', timeout: waitMs }).then(() => true, () => false);
+  return (await approved.count()) > 0;
 }
 
 export async function expectSuccessToast(page, pattern) {

@@ -31,6 +31,8 @@ const FabricReceiptList = () => {
     { title: 'Receipt #', dataIndex: 'receiptNo', width: 170, render: (v) => <code>{v}</code> },
     { title: 'Date', dataIndex: 'receiptDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150, render: (v) => <code>{v}</code> },
+    // receipts saved before a receipt named its BOM fabric carry only a fabric type
+    { title: 'Fabric', key: 'fabric', width: 200, ellipsis: true, render: (_, r) => r.fabricName || r.fabricType || '—' },
     { title: 'Fabric Issue #', dataIndex: 'materialIssueNo', width: 150, render: (v) => (v ? <code>{v}</code> : '—') },
     {
       title: 'Rolls (received / issued)', key: 'rolls', width: 170, align: 'center',

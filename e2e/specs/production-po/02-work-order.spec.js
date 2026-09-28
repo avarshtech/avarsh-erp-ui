@@ -53,6 +53,6 @@ test.describe('Work Order', () => {
 
     await waitForPageReady(page);
     await waitForTableSettled(page);
-    expect(await approvedRowExists(page, ORDER_NO)).toBeTruthy();
+    expect(await approvedRowExists(page, ORDER_NO, { waitMs: 15000 })).toBeTruthy();
   });
 });

@@ -142,10 +142,13 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
       footer={
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
           <Space>
-            <ActionButton action="print" text={poType === PO_TYPE.WORK_ORDER ? 'Print Work Order' : 'Print PO'}
-              disabled={printBlocked} loading={printing}
-              tooltip={printBlocked ? 'Submit/approve before printing for a unit/vendor' : undefined}
-              onClick={print} />
+            {/* a cancelled PO is not sent to anyone, so there is nothing to print */}
+            {record.status !== PROD_PO_STATUS.CANCELLED && (
+              <ActionButton action="print" text={poType === PO_TYPE.WORK_ORDER ? 'Print Work Order' : 'Print PO'}
+                disabled={printBlocked} loading={printing}
+                tooltip={printBlocked ? 'Submit/approve before printing for a unit/vendor' : undefined}
+                onClick={print} />
+            )}
             {canEdit && (
               <ActionButton action="edit" text="Edit"
                 onClick={() => { onClose?.(); navigate(`${meta.basePath}/edit/${record.id}`); }} />

@@ -138,12 +138,12 @@ const LayAuditForm = () => {
           <div>
             <FieldLabel>Lay Start</FieldLabel>
             <DatePicker showTime={{ format: 'HH:mm' }} format="DD-MMM HH:mm"
-              value={lay.startTime ? dayjs(lay.startTime) : null} onChange={(d) => patch({ startTime: d ? d.format('YYYY-MM-DD HH:mm') : null })} />
+              value={lay.startTime ? dayjs(lay.startTime) : null} onChange={(d) => patch({ startTime: d ? d.format('YYYY-MM-DDTHH:mm:ss') : null })} />
           </div>
           <div>
             <FieldLabel>Lay End</FieldLabel>
             <DatePicker showTime={{ format: 'HH:mm' }} format="DD-MMM HH:mm"
-              value={lay.endTime ? dayjs(lay.endTime) : null} onChange={(d) => patch({ endTime: d ? d.format('YYYY-MM-DD HH:mm') : null })} />
+              value={lay.endTime ? dayjs(lay.endTime) : null} onChange={(d) => patch({ endTime: d ? d.format('YYYY-MM-DDTHH:mm:ss') : null })} />
           </div>
         </Space>
         {po && (

@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import FinishingDashboard from './FinishingDashboard';
 import ReceivingList from './ReceivingList';
+import GarmentProcessTab from './GarmentProcessTab';
 import FinishingHourlyTab from './FinishingHourlyTab';
 import SpotWashTab from './SpotWashTab';
 import CheckingList from './CheckingList';
@@ -28,6 +29,7 @@ const FinishingWorkspace = () => {
   const items = useMemo(() => [
     { key: 'dashboard', label: 'Dashboard', children: <FinishingDashboard /> },
     { key: 'receiving', label: 'Receiving', children: <ReceivingList /> },
+    { key: 'external-process', label: 'External Process', children: <GarmentProcessTab /> },
     { key: 'hourly', label: 'Hourly Stations', children: <FinishingHourlyTab /> },
     { key: 'spot-wash', label: 'Spot Wash', children: <SpotWashTab /> },
     { key: 'checking', label: 'Checking', children: <CheckingList /> },

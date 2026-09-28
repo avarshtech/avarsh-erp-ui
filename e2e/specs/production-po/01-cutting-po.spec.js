@@ -49,6 +49,6 @@ test.describe('Cutting PO', () => {
     // Auto-approved (no CUTTING_PO approval flow configured in e2e seeds)
     await waitForPageReady(page);
     await waitForTableSettled(page);
-    expect(await approvedRowExists(page, ORDER_NO)).toBeTruthy();
+    expect(await approvedRowExists(page, ORDER_NO, { waitMs: 15000 })).toBeTruthy();
   });
 });

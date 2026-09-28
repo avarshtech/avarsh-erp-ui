@@ -52,6 +52,16 @@ const getAccessoriesStockColumns = () => [
     render: (text) => <span style={{ fontWeight: 600, color: 'var(--primary-color)' }}>{text || '-'}</span>,
   },
   {
+    // colour lives on each variant row of the item
+    title: 'Colour',
+    key: 'color',
+    width: 140,
+    align: 'center',
+    ellipsis: true,
+    render: (_, r) => [...new Set((r.variants || []).map((v) => v.color)
+      .filter((c) => c && c !== '-' && c !== '—'))].join(', ') || '-',
+  },
+  {
     title: 'Supplier',
     dataIndex: 'supplier',
     key: 'supplier',

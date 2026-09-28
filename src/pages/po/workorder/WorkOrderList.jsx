@@ -8,6 +8,7 @@ import StatusTag from '../../../components/StatusTag';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import ProductionPoView from '../components/ProductionPoView';
+import PoNoLink from '../components/PoNoLink';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { PRODUCTION_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
@@ -78,7 +79,8 @@ const WorkOrderList = () => {
   const buyerOptions = useMemo(() => [...new Set(data.map((r) => r.buyer).filter(Boolean))].map((b) => ({ value: b, label: b })), [data]);
 
   const columns = useMemo(() => [
-    { title: 'Work Order', dataIndex: 'workOrderNo', width: 150, fixed: 'left' },
+    { title: 'Work Order', dataIndex: 'workOrderNo', width: 150, fixed: 'left',
+      render: (v, r) => <PoNoLink text={v} onOpen={() => setView({ open: true, record: r })} /> },
     { title: 'Order', dataIndex: 'orderNo', width: 130 },
     { title: 'Style', dataIndex: 'styleNo', width: 130 },
     { title: 'Buyer', dataIndex: 'buyer', width: 150, ellipsis: true },
@@ -92,7 +94,8 @@ const WorkOrderList = () => {
     { title: 'Status', dataIndex: 'status', width: 150, align: 'center',
       render: (s) => <StatusTag status={s} config={PRODUCTION_PO_STATUS_CONFIG} getLabel={getStatusLabel} /> },
     { title: 'Actions', key: 'actions', width: 140, fixed: 'right',
-      render: (_, r) => (
+      // a cancelled PO has nothing left to do: open it from its number instead
+      render: (_, r) => (r.status === PROD_PO_STATUS.CANCELLED ? null : (
         <Space size={0}>
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => printRow(r)} />
@@ -102,7 +105,7 @@ const WorkOrderList = () => {
             </PermissionGuard>
           )}
         </Space>
-      ) },
+      )) },
   ], [navigate, branchColumn, printRow]);
 
   return (

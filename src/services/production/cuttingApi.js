@@ -32,6 +32,12 @@ export const getPendingRolls = async (cutPoId) => {
   return data;
 };
 
+/** The fabrics a receipt can name: the Cut PO's BOM fabric lines, each with its rolls awaiting receipt. */
+export const getCutPoFabrics = async (cutPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/cut-pos/${cutPoId}/fabrics`);
+  return data;
+};
+
 /* ── FR-01 Fabric receipt ────────────────────────────────────────────────── */
 
 export const listReceipts = async (params = {}) => {

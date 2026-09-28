@@ -9,6 +9,7 @@ import StatusTag from '../../../components/StatusTag';
 import EmptyState from '../../../components/EmptyState';
 import { ActionButton } from '../../../components/buttons';
 import ProductionPoView from '../components/ProductionPoView';
+import PoNoLink from '../components/PoNoLink';
 import FinishingCoverageMatrix from './FinishingCoverageMatrix';
 import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
 import { getTablePagination } from '../../../utils/paginationConfig';
@@ -77,7 +78,8 @@ const FinishingPoList = () => {
   const vendorOptions = useMemo(() => vendors.map((v) => ({ value: v.id, label: v.name })), [vendors]);
 
   const columns = useMemo(() => [
-    { title: 'Finishing PO', dataIndex: 'finishingPoNo', width: 150, fixed: 'left' },
+    { title: 'Finishing PO', dataIndex: 'finishingPoNo', width: 150, fixed: 'left',
+      render: (v, r) => <PoNoLink text={v} onOpen={() => setView({ open: true, record: r })} /> },
     { title: 'Order', dataIndex: 'orderNo', width: 130 },
     { title: 'Style', dataIndex: 'styleNo', width: 120 },
     { title: 'Buyer', dataIndex: 'buyer', width: 150, ellipsis: true },
@@ -95,7 +97,8 @@ const FinishingPoList = () => {
     { title: 'Status', dataIndex: 'status', width: 150, align: 'center',
       render: (s) => <StatusTag status={s} config={PRODUCTION_PO_STATUS_CONFIG} getLabel={getStatusLabel} /> },
     { title: 'Actions', key: 'actions', width: 140, fixed: 'right',
-      render: (_, r) => (
+      // a cancelled PO has nothing left to do: open it from its number instead
+      render: (_, r) => (r.status === PROD_PO_STATUS.CANCELLED ? null : (
         <Space size={0}>
           <ActionButton action="view" onClick={() => setView({ open: true, record: r })} />
           <ActionButton action="print" onClick={() => generateProductionPoPdf(r, PO_TYPE.FINISHING)} />
@@ -105,7 +108,7 @@ const FinishingPoList = () => {
             </PermissionGuard>
           )}
         </Space>
-      ) },
+      )) },
   ], [navigate, branchColumn]);
 
   return (

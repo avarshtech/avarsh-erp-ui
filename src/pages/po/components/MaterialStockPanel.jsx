@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useCallback } from 'react';
-import { Table, Tag, Typography, Alert, InputNumber } from 'antd';
+import { Table, Tag, Typography, Alert, InputNumber, Tooltip } from 'antd';
 import EmptyState from '../../../components/EmptyState';
 import { numericInputProps } from '../../../utils/inputHelpers';
 
@@ -17,6 +17,8 @@ const Uom = ({ children }) => (children
   ? <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>{children}</Text>
   : null);
 const qty = (v, uom) => <span style={{ whiteSpace: 'nowrap' }}>{(v || 0).toLocaleString()}<Uom>{uom}</Uom></span>;
+// Stock is this item AND variant (another colour of the item is not this line's stock)
+const hint = (label, text) => <Tooltip title={text}><span style={{ borderBottom: '1px dotted' }}>{label}</span></Tooltip>;
 const STALE_MS = 48 * 60 * 60 * 1000;
 // Captured once at module load — a 48h staleness heuristic doesn't need per-render "now",
 // and keeping the impure Date call out of the component body keeps render pure.
@@ -57,7 +59,8 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
     // The variant is the purchasable identity, so it stands in for the item across
     // these columns rather than being shown beside it.
     { title: 'Item Code', dataIndex: 'itemCode', width: 160, render: (v, r) => <Text strong>{r.variantCode || v}</Text> },
-    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true, render: (v, r) => r.variantName || v },
+    { title: 'Item Name', dataIndex: 'itemName', width: 220, ellipsis: true,
+      render: (v, r) => (r.variantName ? <>{v} <Text type="secondary">· {r.variantName}</Text></> : v) },
     { title: 'PO No', dataIndex: 'poNumber', width: 150, render: (v) => v || '—' },
     { title: 'Req / Garment', dataIndex: 'bomPerPc', width: 120, align: 'right',
       render: (v, r) => <Text type="secondary">{(v || 0).toFixed(3)}<Uom>{perPcUom(r)}</Uom></Text> },
@@ -65,12 +68,15 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
     ...(materialType === 'fabric'
       ? [{ title: 'CAD Req', dataIndex: 'cadRequired', width: 120, align: 'right', render: (v, r) => qty(v, reqUom(r)) }]
       : []),
-    { title: 'Current Stock', dataIndex: 'currentStock', width: 130, align: 'right', render: (v, r) => qty(v, stockUom(r)) },
-    { title: 'Order Stock', dataIndex: 'orderStock', width: 130, align: 'right',
+    { title: hint('Current Stock', 'Order Stock + Free Stock of this item and variant. Stock received for other orders is not counted.'),
+      dataIndex: 'currentStock', width: 130, align: 'right', render: (v, r) => qty(v, stockUom(r)) },
+    { title: hint('Order Stock', 'Received against this order'), dataIndex: 'orderStock', width: 130, align: 'right',
       render: (v, r) => <Text style={{ color: '#1677ff' }}>{qty(v, stockUom(r))}</Text> },
-    { title: 'Free Stock', dataIndex: 'freeStock', width: 130, align: 'right',
+    { title: hint('Free Stock', 'Old stock of this item and variant, not earmarked to any order'),
+      dataIndex: 'freeStock', width: 130, align: 'right',
       render: (v, r) => <Text style={{ color: '#389e0d' }}>{qty(v, stockUom(r))}</Text> },
-    { title: 'Allocated', dataIndex: 'allocated', width: 140, align: 'right',
+    { title: hint('Allocated', 'Reserved by other production POs: in full for this order, and for another order only what its own stock does not cover'),
+      dataIndex: 'allocated', width: 140, align: 'right',
       render: (v, r) => (allocatedEditable
         ? <InputNumber name={`allocated-${r.key}`} size="small" min={0} value={v} onChange={(val) => handleAllocated(r.key, val)} style={{ width: 120 }} suffix={stockUom(r)} {...numericInputProps} />
         : qty(v, stockUom(r))) },

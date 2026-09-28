@@ -6,9 +6,10 @@ import { getFilesByEntity, downloadFileAsBlob } from '../services/core/fileServi
 
 /**
  * Work Order print — the house WORK ORDER sheet handed to the sewing unit:
- * order details beside the style sketch, the CMT cost, the cutting block (fabrics,
- * unit, ship date, garment processes and the size grid) and the accessories list
- * with each item's ordered / in-house status, then the four signatures.
+ * order details beside the style sketch, the CMT cost, the cutting block (fabrics
+ * with their PO numbers, ship date, the cut-panel and garment processes with their
+ * process PO numbers, and the size grid) and the accessories list with each item's
+ * ordered / PO pending / in-house status and PO number, then the four signatures.
  *
  * The data comes from one API call (GET /work-order/{id}/print) so the sheet needs
  * no permission beyond the work order's own.
@@ -27,7 +28,7 @@ const styleImage = async (styleId) => {
   if (!styleId) return null;
   try {
     const files = await getFilesByEntity('STYLE', styleId);
-    const img = (files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
+    const img = (files?.data || files || []).find((f) => ['IMAGE', 'PHOTO'].includes(f.fileCategory));
     if (!img) return null;
     const blob = await downloadFileAsBlob(img.fileId);
     return await new Promise((resolve) => {
@@ -47,10 +48,30 @@ const cmtCost = (d) => {
     ? `${money(d.rateFrom)} – ${money(d.rateTo)}` : money(d.rateFrom);
 };
 
+// A material's PO number(s), or IH when it comes in-house
+const poRef = (m) => (m.poNumbers ? `PO# ${m.poNumbers}` : m.status || 'IH');
+
 const fabricLines = (fabrics) => fabrics.map((f, i) => {
   const parts = [f.particulars, f.spec].filter(Boolean).join(' - ');
-  return `Fab${i + 1}: ${esc(parts)}${f.perGarment != null ? ` - ${esc(qty(f.perGarment))}${esc(f.uom || '')}` : ''}`;
+  return `Fab${i + 1}: ${esc(parts)}${f.perGarment != null ? ` - ${esc(qty(f.perGarment))}${esc(f.uom || '')}` : ''}`
+    + ` &middot; ${esc(poRef(f))}`;
 }).join('<br/>');
+
+/** Printing (Cut Panel) - PPO/26-27/1001; a costing process nothing went out for yet reads "Not issued". */
+const processLines = (processes) => (processes || []).map((p) => {
+  const name = p.stage ? `${p.name} (${p.stage})` : p.name;
+  const pos = (p.poNumbers || []).length ? p.poNumbers.join(', ') : 'Not issued';
+  return `${esc(name)} &ndash; ${esc(pos)}`;
+}).join('<br/>');
+
+/** Fabrics are one accessories row: ordered only when every fabric is, in-house when none has a PO. */
+const fabricsStatus = (fabrics) => {
+  const ordered = fabrics.filter((f) => f.status === 'Ordered').length;
+  const withPo = fabrics.filter((f) => f.poNumbers).length;
+  if (ordered === fabrics.length) return 'Ordered';
+  if (withPo === 0) return 'IH';
+  return withPo === fabrics.length && ordered === 0 ? 'PO Pending' : 'Part ordered';
+};
 
 /** Sizes in the order the matrix holds them; one row per colour; planned (cutting) qty. */
 const sizeGrid = (items) => {
@@ -75,20 +96,22 @@ const sizeGrid = (items) => {
 const accessoryRows = (fabrics, accessories) => {
   const rows = [];
   if (fabrics.length) {
-    const ordered = fabrics.filter((f) => f.status === 'Ordered').length;
     rows.push({
       particulars: fabrics.map((f, i) => `Fabric${i + 1}`).join(', '), spec: '', required: 'See on top',
-      status: ordered === fabrics.length ? 'Ordered' : ordered ? 'Part ordered' : 'IH', remarks: '',
+      status: fabricsStatus(fabrics),
+      poNumbers: [...new Set(fabrics.flatMap((f) => (f.poNumbers ? f.poNumbers.split(', ') : [])))].join(', '),
+      remarks: '',
     });
   }
   accessories.forEach((a) => rows.push({
     particulars: a.particulars, spec: a.spec,
     required: a.perGarment != null ? `${qty(a.perGarment)} ${a.uom || ''}`.trim() : '',
-    status: a.status, remarks: a.remarks,
+    status: a.status, poNumbers: a.poNumbers, remarks: a.remarks,
   }));
   return rows.map((r, i) => `<tr>
     <td class="c">${i + 1}</td><td class="b">${esc(r.particulars)}</td><td>${esc(r.spec)}</td>
-    <td class="b">${esc(r.required)}</td><td class="b">${esc(r.status)}</td><td>${esc(r.remarks)}</td></tr>`).join('');
+    <td class="b">${esc(r.required)}</td><td class="b">${esc(r.status)}</td>
+    <td>${esc(r.poNumbers || '')}</td><td>${esc(r.remarks)}</td></tr>`).join('');
 };
 
 const CSS = `
@@ -137,15 +160,15 @@ export const buildWorkOrderHtml = (d, imageUrl) => {
       <tr><td class="lbl">FABRICS</td>
         <td class="b" colspan="${Math.ceil(sizeCols / 2)}">${fabricLines(fabrics) || '&mdash;'}</td>
         <td class="b big" colspan="${sizeCols - Math.ceil(sizeCols / 2) + 1}" style="vertical-align:top">
-          UNIT: ${esc(d.processingUnitName)}<br/>Ship date: ${esc(fmtDate(d.shipDate))}<br/>
-          Garment Process: ${esc((d.garmentProcesses || []).join(', '))}</td></tr>
+          Ship date: ${esc(fmtDate(d.shipDate))}<br/>
+          Process:<br/><span style="font-size:12px">${processLines(d.processes) || '&mdash;'}</span></td></tr>
       ${sizeGrid(d.items || [])}
     </table>
     <table style="margin-top:14px">
-      <tr><td class="band" colspan="6">ACCESSORIES DETAILS</td></tr>
-      <tr class="grey"><td class="c b" style="width:7%">S.NO</td><td class="c b" style="width:28%">PARTICULARS</td>
-        <td class="c b" style="width:18%">SPEC</td><td class="c b" style="width:15%">REQUIRED QTY/GMT</td>
-        <td class="c b" style="width:12%">Status</td><td class="c b">Remarks</td></tr>
+      <tr><td class="band" colspan="7">ACCESSORIES DETAILS</td></tr>
+      <tr class="grey"><td class="c b" style="width:6%">S.NO</td><td class="c b" style="width:25%">PARTICULARS</td>
+        <td class="c b" style="width:15%">SPEC</td><td class="c b" style="width:13%">REQUIRED QTY/GMT</td>
+        <td class="c b" style="width:11%">Status</td><td class="c b" style="width:15%">PO #</td><td class="c b">Remarks</td></tr>
       ${accessoryRows(fabrics, accessories)}
     </table>
     <div class="sign"><span>CONFIRMED BY</span><span>PASSED BY</span><span>CHECKED BY</span><span>ACCEPTED BY</span></div>`;
@@ -157,6 +180,13 @@ export const buildWorkOrderHtml = (d, imageUrl) => {
     body,
   });
 };
+
+/** Resolves once every image in the print window has loaded or failed, or after 4 s at most. */
+const imagesReady = (doc) => Promise.race([
+  Promise.all([...doc.images].map((img) => (img.complete ? Promise.resolve()
+    : new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; })))),
+  new Promise((resolve) => { setTimeout(resolve, 4000); }),
+]);
 
 /**
  * Print a work order. Resolves false when the pop-up was blocked, so the caller
@@ -176,7 +206,9 @@ export const printWorkOrder = async (workOrderId) => {
     win.document.open();
     win.document.write(buildWorkOrderHtml(data, imageUrl));
     win.document.close();
-    setTimeout(() => { try { win.print(); } catch { /* the user can still print from the window */ } }, 500);
+    // print only once the logo and the style sketch are in, or they print blank
+    await imagesReady(win.document);
+    try { win.print(); } catch { /* the user can still print from the window */ }
     return true;
   } catch (e) {
     win.close();

@@ -6,9 +6,10 @@ import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveRelaxation } from '../../../services/production/cuttingService';
 
 /**
- * FR-02 drawer - start or complete a relaxation; warns when ended before the
- * fabric-type minimum. Opened read-only it is the record of what was done,
- * which is what the lay audit is signed against.
+ * FR-02 drawer - start, complete or edit a relaxation; warns when ended before
+ * the fabric-type minimum. The fabric type is chosen here: a receipt names its
+ * BOM fabric, and the type sets the minimum hours. Opened read-only it is the
+ * record of what was done, which is what the lay audit is signed against.
  */
 const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onClose, onSaved }) => {
   const { message } = App.useApp();
@@ -55,24 +56,25 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
         id: record?.id,
         version: record?.version,
         receiptId: values.receiptId,
-        relaxationDate: dayjs().format('YYYY-MM-DD'),
+        fabricType: values.fabricType,
+        relaxationDate: record?.relaxationDate || dayjs().format('YYYY-MM-DD'),
         startTime: values.startTime.format('YYYY-MM-DDTHH:mm:ss'),
         endTime: values.endTime ? values.endTime.format('YYYY-MM-DDTHH:mm:ss') : null,
         shrinkagePrePct: values.shrinkagePrePct ?? null,
         shrinkagePostPct: values.shrinkagePostPct ?? null,
       });
-      message.success(values.endTime ? 'Relaxation completed' : 'Relaxation started');
+      message.success(record ? `${record.relaxationNo} saved` : 'Relaxation started');
       onSaved();
     } catch (e) {
       if (e?.errorFields) return;
-      message.error('Failed to save relaxation');
+      message.error(e?.response?.data?.message || 'Failed to save relaxation');
     } finally { setSaving(false); }
   };
 
   return (
     <Drawer
       title={record
-        ? `${readOnly ? 'Relaxation' : 'Complete Relaxation'} — ${record.relaxationNo}`
+        ? `${readOnly ? 'Relaxation' : record.endTime ? 'Edit Relaxation' : 'Complete Relaxation'} — ${record.relaxationNo}`
         : 'Start Fabric Relaxation'}
       size={620}
       open={open}
@@ -88,7 +90,10 @@ const FabricRelaxationDrawer = ({ open, record, receipts, readOnly = false, onCl
       <Form form={form} layout="vertical" disabled={readOnly}>
         <Form.Item name="receiptId" label="Fabric Receipt #" rules={[{ required: true, message: 'Select receipt' }]}>
           <FormSelect placeholder="Select confirmed receipt" disabled={Boolean(record)}
-            options={receipts.map((r) => ({ value: r.id, label: `${r.receiptNo} (${r.receivedRollCount} rolls)` }))}
+            options={receipts.map((r) => ({
+              value: r.id,
+              label: `${r.receiptNo}${r.fabricName ? ` · ${r.fabricName}` : ''} (${r.receivedRollCount} rolls)`,
+            }))}
             onChange={(v) => form.setFieldValue('fabricType', receipts.find((r) => r.id === v)?.fabricType)} />
         </Form.Item>
         <Form.Item name="fabricType" label="Fabric Type" rules={[{ required: true, message: 'Select fabric type' }]}
