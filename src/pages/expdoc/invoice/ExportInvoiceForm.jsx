@@ -7,13 +7,15 @@ import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../utils/permissions';
 import {
-  EXPDOC_MODULE, INVOICE_STATUS, INVOICE_STATUS_LABELS, LINE_GRAIN_LABELS,
+  EXPDOC_MODULE, INVOICE_STATUS, INVOICE_STATUS_LABELS, LINE_GRAIN_LABELS, DOC_TYPE,
 } from '../../../utils/expDocConstants';
 import { EXPORT_INVOICE_STATUS_CONFIG } from '../../../utils/statusConfig';
 import {
   getInvoice, updateInvoice, regenerateInvoiceLines, acknowledgeInvoiceWarning,
   changeInvoiceStatus, reviseInvoice, getShipment, listIncoterms, markInvoiceExported,
+  changeInvoiceTemplate, findNewerTemplateRevision,
 } from '../../../services/expdoc/expDocService';
+import ChangeTemplateModal from '../shared/ChangeTemplateModal';
 import PlValidationPanel from '../packing-list/PlValidationPanel';
 import AckReasonModal from '../shared/AckReasonModal';
 import useExporterBlock from '../shared/useExporterBlock';
@@ -59,6 +61,8 @@ const ExportInvoiceForm = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [shipment, setShipment] = useState(null);
   const [incoterms, setIncoterms] = useState([]);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [newer, setNewer] = useState(null);
   const exporter = useExporterBlock();
 
   const canUpdate = hasPermission(EXPDOC_MODULE.INVOICE, 'update');
@@ -92,6 +96,24 @@ const ExportInvoiceForm = () => {
     listIncoterms().then(setIncoterms).catch(() => setIncoterms([]));
   }, []);
 
+  /*
+   * A newer published version of this draft's template — the buyer changed their
+   * layout after the invoice was made. Keyed on the template the invoice holds now,
+   * so a stale answer for an earlier state is never shown.
+   */
+  const newerKey = inv ? `${inv.id}|${inv.templateId}|${inv.templateVersion}|${inv.status}` : null;
+  useEffect(() => {
+    if (!inv?.templateId || inv.status !== INVOICE_STATUS.DRAFT || !inv.template?.templateCode) return undefined;
+    let alive = true;
+    findNewerTemplateRevision({ templateId: inv.templateId, templateCode: inv.template.templateCode, version: inv.templateVersion })
+      .then((row) => { if (alive) setNewer({ key: newerKey, row }); })
+      .catch(() => { if (alive) setNewer({ key: newerKey, row: null }); });
+    return () => { alive = false; };
+    // Re-checked only when the invoice's template or status changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newerKey]);
+  const newerRevision = newer?.key === newerKey ? newer.row : null;
+
   /** One funnel for every mutation: loading, toast and error in a single place. */
   const run = useCallback(async (fn, successMsg) => {
     setSaving(true);
@@ -118,6 +140,11 @@ const ExportInvoiceForm = () => {
     setDraft((d) => ({ ...(d || {}), ...changes }));
     setDirty(true);
   }, []);
+
+  const changeTemplate = useCallback(async (templateId, reason) => {
+    const next = await run(() => changeInvoiceTemplate(inv.id, templateId, reason), 'Template changed — lines rebuilt');
+    if (next) setTemplateOpen(false);
+  }, [inv, run]);
 
   const save = useCallback(() => {
     if (!draft) return Promise.resolve(null);
@@ -336,6 +363,20 @@ const ExportInvoiceForm = () => {
         />
       )}
 
+      {newerRevision && !locked && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`v${newerRevision.version} of ${working.template?.name || 'this template'} is now active`}
+          description={`This invoice was made with v${working.templateVersion}. Move it to the buyer's new layout — the lines are rebuilt, and rates you changed are kept.`}
+          action={(
+            <ActionButton action="refresh" size="small" text={`Move to v${newerRevision.version}`} loading={saving}
+              disabled={dirty} onClick={() => changeTemplate(newerRevision.id, null)} />
+          )}
+        />
+      )}
+
       {dirty && (
         <Alert
           type="info"
@@ -354,7 +395,7 @@ const ExportInvoiceForm = () => {
           items={STEPS.map((s) => ({ title: s.title, content: s.content }))}
           style={{ marginBottom: 20 }}
         />
-        {step === 0 && <InvStepSource {...stepProps} />}
+        {step === 0 && <InvStepSource {...stepProps} onChangeTemplate={locked || dirty ? undefined : () => setTemplateOpen(true)} />}
         {step === 1 && <InvStepHeader {...stepProps} incoterms={incoterms} />}
         {step === 2 && (
           <InvStepLines
@@ -394,6 +435,25 @@ const ExportInvoiceForm = () => {
           await cfg.onSubmit(reason, value);
         }}
       />
+
+      {templateOpen && (
+        <ChangeTemplateModal
+          key={`tpl-${working.id}`}
+          open
+          docType={DOC_TYPE.INVOICE}
+          buyerId={working.buyerId}
+          buyerName={working.buyerName}
+          subClientCode={working.subClientCode}
+          current={working.templateId ? {
+            id: working.templateId, templateCode: working.template?.templateCode,
+            version: working.templateVersion, name: working.template?.name,
+          } : null}
+          canOverride={canOverride}
+          confirming={saving}
+          onCancel={() => setTemplateOpen(false)}
+          onSubmit={changeTemplate}
+        />
+      )}
 
       <InvPreviewDrawer
         open={previewOpen}

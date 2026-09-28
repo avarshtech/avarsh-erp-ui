@@ -99,6 +99,10 @@ export const listShipmentOptions = async (buyerCode) => {
       label: `${s.shipmentNo} — ${s.buyerName} — ETD ${s.etd}`,
       shipmentNo: s.shipmentNo,
       buyerCode: s.buyerCode,
+      // What the packing-list template picker matches buyer templates on.
+      buyerId: s.buyerId ?? null,
+      buyerName: s.buyerName ?? null,
+      subClientCode: s.subClientCode ?? null,
     }));
 };
 

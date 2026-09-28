@@ -306,7 +306,7 @@ export const SCREENS = [
     requires: 'export-packing-list', ops: EXPORT_STICKER_OPERATIONS },
   { id: 'export-templates', name: 'Buyer Document Templates', section: 'expdoc', kind: 'screen',
     path: '/export-docs/templates/list',
-    routes: ['/export-docs/templates/list', '/export-docs/templates/edit/:id'],
+    routes: ['/export-docs/templates/list', '/export-docs/templates/edit/:id', '/export-docs/templates/import'],
     ops: EXPORT_TEMPLATE_OPERATIONS },
 
   // ── Production masters (routed under /production, listed in the Production section) ──

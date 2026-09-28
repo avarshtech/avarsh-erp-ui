@@ -157,6 +157,7 @@ const ExportInvoiceList = lazy(() => import('./pages/expdoc/invoice/ExportInvoic
 const ExportInvoiceForm = lazy(() => import('./pages/expdoc/invoice/ExportInvoiceForm'));
 const BuyerTemplateList = lazy(() => import('./pages/expdoc/template/BuyerTemplateList'));
 const BuyerTemplateBuilder = lazy(() => import('./pages/expdoc/template/BuyerTemplateBuilder'));
+const TemplateImportReview = lazy(() => import('./pages/expdoc/template/review/TemplateImportReview'));
 const ExportDocReports = lazy(() => import('./pages/expdoc/reports/ExportDocReports'));
 const ExportDocAudit = lazy(() => import('./pages/expdoc/reports/AuditTrailViewer'));
 import './index.css';
@@ -364,6 +365,7 @@ const ThemedApp = () => {
             <Route path="export-docs/invoices/edit/:id" element={<PermissionRoute module="export-invoice" operation="view"><Suspense fallback={<PageSkeleton />}><ExportInvoiceForm /></Suspense></PermissionRoute>} />
             <Route path="export-docs/templates/list" element={<PermissionRoute module="export-templates" operation="view"><Suspense fallback={<PageSkeleton />}><BuyerTemplateList /></Suspense></PermissionRoute>} />
             <Route path="export-docs/templates/edit/:id" element={<PermissionRoute module="export-templates" operation="view"><Suspense fallback={<PageSkeleton />}><BuyerTemplateBuilder /></Suspense></PermissionRoute>} />
+            <Route path="export-docs/templates/import" element={<PermissionRoute module="export-templates" operation="add"><Suspense fallback={<PageSkeleton />}><TemplateImportReview /></Suspense></PermissionRoute>} />
             <Route path="export-docs/reports" element={<PermissionRoute module="export-packing-list" operation="view"><Suspense fallback={<PageSkeleton />}><ExportDocReports /></Suspense></PermissionRoute>} />
             <Route path="export-docs/audit" element={<PermissionRoute module="export-packing-list" operation="view"><Suspense fallback={<PageSkeleton />}><ExportDocAudit /></Suspense></PermissionRoute>} />
 

@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Alert, App, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
+import { DOC_TYPE } from '../../../utils/expDocConstants';
 import { getOrderByOrderNo } from '../../../services/orders/orderService';
 import {
   listShipmentOptions, listBindableForShipment, createPackingList, getBuyerCommercial,
 } from '../../../services/expdoc/expDocService';
+import TemplatePickerField from '../shared/TemplatePickerField';
 
 const { Text } = Typography;
 
@@ -28,6 +30,7 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [templateId, setTemplateId] = useState();
 
   useEffect(() => {
     if (!open) return;
@@ -108,6 +111,8 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
       const commercial = getBuyerCommercial({ buyerCode: shipment?.buyerCode });
       const pl = await createPackingList({
         shipmentId,
+        templateId,
+        buyerId: shipment?.buyerId ?? null,
         buyerCode: shipment?.buyerCode ?? null,
         buyerName: commercial.buyerName ?? null,
         subClientCode: commercial.subClients?.length ? undefined : null,
@@ -121,7 +126,7 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
     } finally {
       setCreating(false);
     }
-  }, [chosen, shipmentId, shipment, buildOrderBreakdown, message, onCreated]);
+  }, [chosen, shipmentId, shipment, templateId, buildOrderBreakdown, message, onCreated]);
 
   const columns = [
     { title: 'Packing No', dataIndex: 'packingNo', width: 170 },
@@ -161,7 +166,7 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
       title="New Packing List"
       width={MODAL_WIDTHS.LARGE}
       okText="Create packing list"
-      okButtonProps={{ loading: creating, disabled: !chosen.length }}
+      okButtonProps={{ loading: creating, disabled: !chosen.length || !templateId }}
       onOk={handleCreate}
       onCancel={onCancel}
       destroyOnHidden
@@ -212,9 +217,16 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
           />
         )}
 
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          The buyer template is resolved automatically from the buyer and sub-client — it is not chosen here.
-        </Text>
+        {shipment && (
+          <TemplatePickerField
+            docType={DOC_TYPE.PACKING_LIST}
+            buyerId={shipment.buyerId}
+            buyerName={shipment.buyerName}
+            subClientCode={shipment.subClientCode}
+            value={templateId}
+            onChange={setTemplateId}
+          />
+        )}
       </Space>
     </Modal>
   );

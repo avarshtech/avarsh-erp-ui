@@ -28,7 +28,7 @@ import {
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
 
-export const SEED_VERSION = 10;
+export const SEED_VERSION = 11;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -225,138 +225,14 @@ const buildFxRates = () => {
 };
 
 // ─── Templates ──────────────────────────────────────────────────────────────────
-// Two seeded here so template resolution works from Phase 1; the remaining eight
-// Appendix A sets are cloned from these in the template-management phase.
-
-const STANDARD_PL_COLUMNS = [
-  { key: 'cartonRange', label: 'Carton No.', binding: 'row.cartonRange', width: 92, align: 'center' },
-  { key: 'cartons', label: 'No. of Ctns', binding: 'row.cartonCount', width: 84, align: 'right', total: 'SUM' },
-  { key: 'buyerPoNo', label: 'PO No.', binding: 'row.buyerPoNo', width: 120 },
-  { key: 'styleNo', label: 'Style', binding: 'row.styleNo', width: 120 },
-  { key: 'colour', label: 'Colour', binding: 'row.colorName', width: 140 },
-  { key: '__sizes', label: 'Sizes', binding: 'row.sizeQty', type: 'SIZE_GRID', align: 'right', total: 'SUM' },
-  { key: 'pcsPerCarton', label: 'Pcs / Ctn', binding: 'calc.piecesPerCarton', width: 84, align: 'right' },
-  { key: 'totalPieces', label: 'Total Pcs', binding: 'calc.totalPieces', width: 92, align: 'right', total: 'SUM' },
-  { key: 'netWeightKg', label: 'N.W. (kg)', binding: 'row.netWeightKg', width: 92, align: 'right', decimals: 3, total: 'SUM_EXPANDED' },
-  { key: 'grossWeightKg', label: 'G.W. (kg)', binding: 'row.grossWeightKg', width: 92, align: 'right', decimals: 3, total: 'SUM_EXPANDED' },
-  { key: 'dims', label: 'L × B × H (cm)', binding: 'calc.dimensions', width: 128, align: 'center' },
-  { key: 'cbm', label: 'CBM', binding: 'calc.cbm', width: 84, align: 'right', decimals: 3, total: 'SUM_EXPANDED' },
-];
-
-const STANDARD_PL_HEADER_FIELDS = [
-  { key: 'plNo', label: 'Packing List No.', binding: 'pl.plNo', mandatory: true },
-  { key: 'plDate', label: 'Date', binding: 'pl.plDate', mandatory: true, format: 'DD-MMM-YYYY' },
-  { key: 'shipmentNo', label: 'Shipment', binding: 'shipment.shipmentNo' },
-  { key: 'etd', label: 'ETD', binding: 'shipment.etd', format: 'DD-MMM-YYYY' },
-  { key: 'portOfLoading', label: 'Port of Loading', binding: 'shipment.portOfLoading' },
-  { key: 'portOfDischarge', label: 'Port of Discharge', binding: 'shipment.portOfDischarge' },
-  // Bound to the document's resolved value, not the shipment's raw one: a packing
-  // list may override its container and seal (§12.1), and the resolved path falls
-  // back to the shipment when it has not.
-  { key: 'containerNos', label: 'Container No.', binding: 'pl.resolved.containerNo' },
-  { key: 'sealNo', label: 'Seal No.', binding: 'pl.resolved.sealNo' },
-  { key: 'marksAndNos', label: 'Marks & Nos.', binding: 'pl.marksAndNos' },
-  { key: 'descriptionOfGoods', label: 'Description of Goods', binding: 'pl.descriptionOfGoods' },
-];
+// Carton-sticker templates only. Packing-list and invoice templates live in the API
+// (/export-docs/templates) and the standard layouts in utils/expDocSystemTemplates.js.
+// Sticker ids are strings so a sticker can never collide with an API template id.
 
 const buildTemplates = () => [
   {
-    id: 1,
-    templateCode: 'STD-PL',
-    name: 'Standard Indian Export — Packing List',
-    buyerId: null,
-    buyerCode: null,
-    subClientCode: null,
-    docType: DOC_TYPE.PACKING_LIST,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-365),
-    effectiveTo: null,
-    clonedFromId: null,
-    publishedAt: ts(-365),
-    publishedBy: 'System',
-    identity: { titleText: 'PACKING LIST', showLogo: true, paper: 'A4', orientation: 'LANDSCAPE', marginsMm: [10, 10, 10, 10] },
-    headerFields: STANDARD_PL_HEADER_FIELDS,
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'shipment.consignee.block' },
-    ],
-    sizeSet: { source: 'ORDER_PRESET', fixedSizes: null, hideEmptySizeColumns: true },
-    packingTypesAllowed: Object.values(PACKING_TYPE),
-    columns: STANDARD_PL_COLUMNS,
-    sheets: [
-      { key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN], showSectionTotals: true },
-      { key: 'EXTRA', title: 'EXTRA CARTONS', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
-      { key: 'SUMMARY', title: 'SUMMARY', type: 'SUMMARY', blocks: ['GRAND_TOTAL', 'WEIGHT_PER_PIECE', 'ORDER_VS_SHIPPED'] },
-    ],
-    invoiceLineGrain: null,
-    stickerLayout: null,
-    formatting: {
-      font: 'Arial', baseFontPt: 8.5, headerFontPt: 9, titleFontPt: 13, border: 'ALL',
-      weightDecimals: 3, cbmDecimals: 3, weightPerPieceDecimals: 5, dateFormat: 'DD-MMM-YYYY',
-    },
-    // These two drive V-08: a template that does not print weights must not block on them.
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['row.cartonFrom', 'row.cartonTo'],
-    mandatoryForDocGen: ['row.netWeightKg', 'row.grossWeightKg', 'row.lengthCm', 'row.breadthCm', 'row.heightCm'],
-  },
-  {
-    // Proves sub-client resolution: a JOMO order for end-customer AMG must pick
-    // this template automatically over the generic one (PRD §10.2 / §24.8).
-    id: 2,
-    templateCode: 'JOMO-AMG-PL',
-    name: 'JOMO — AMG — Packing List',
-    buyerId: null,
-    buyerCode: 'JOMO',
-    subClientCode: 'AMG',
-    docType: DOC_TYPE.PACKING_LIST,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180),
-    effectiveTo: null,
-    clonedFromId: 1,
-    publishedAt: ts(-180),
-    publishedBy: 'R. Kumar',
-    identity: { titleText: 'PACKING LIST', showLogo: true, paper: 'A4', orientation: 'LANDSCAPE', marginsMm: [10, 10, 10, 10] },
-    headerFields: [
-      ...STANDARD_PL_HEADER_FIELDS,
-      { key: 'endCustomer', label: 'End Customer', binding: 'row.endCustomer' },
-      { key: 'licenceNo', label: 'Licence No (JOMO)', binding: 'fixed:GOTS-JOMO-2026-114' },
-    ],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'pl.resolved.consignee.block' },
-      { key: 'deliveryCentre', label: 'Delivery Centre', binding: 'pl.resolved.deliveryCentre' },
-    ],
-    sizeSet: { source: 'ORDER_PRESET', fixedSizes: null, hideEmptySizeColumns: true },
-    packingTypesAllowed: Object.values(PACKING_TYPE),
-    columns: [
-      STANDARD_PL_COLUMNS[0],
-      STANDARD_PL_COLUMNS[1],
-      { key: 'danNo', label: 'DAN No.', binding: 'row.danNo', width: 96 },
-      { key: 'endCustomer', label: 'End Customer', binding: 'row.endCustomer', width: 120 },
-      ...STANDARD_PL_COLUMNS.slice(2),
-    ],
-    sheets: [
-      { key: 'MAIN', title: 'UNITS + SOLID', include: [SECTION_KEY.MAIN], showSectionTotals: true },
-      { key: 'EXTRA', title: 'EXTRA CARTON', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
-      { key: 'SUMMARY', title: 'TOTALS', type: 'SUMMARY', blocks: ['GRAND_TOTAL', 'WEIGHT_PER_PIECE', 'ORDER_VS_SHIPPED'] },
-    ],
-    invoiceLineGrain: null,
-    stickerLayout: null,
-    formatting: {
-      font: 'Arial', baseFontPt: 8.5, headerFontPt: 9, titleFontPt: 13, border: 'ALL',
-      weightDecimals: 3, cbmDecimals: 3, weightPerPieceDecimals: 5, dateFormat: 'DD.MM.YYYY',
-    },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['row.cartonFrom', 'row.cartonTo', 'row.danNo'],
-    mandatoryForDocGen: ['row.netWeightKg', 'row.grossWeightKg', 'row.lengthCm', 'row.breadthCm', 'row.heightCm'],
-  },
-  {
     // Two-face sticker layout — the JOMO LONG SIDE / SHORT SIDE pattern (PRD §9.2).
-    id: 3,
+    id: 'STK-3',
     templateCode: 'JOMO-AMG-STICKER',
     name: 'JOMO — AMG — Carton Sticker',
     buyerId: null,
@@ -427,12 +303,12 @@ const buildTemplates = () => [
   {
     // JOMO SCA customer — two faces again, but a different field set: this is the
     // variation the template engine has to absorb without new code (PRD 9.2).
-    id: 5,
+    id: 'STK-5',
     templateCode: 'JOMO-SCA-STICKER',
     name: 'JOMO — SCA — Carton Sticker',
     buyerId: null, buyerCode: 'JOMO', subClientCode: 'SCA',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180), effectiveTo: null, clonedFromId: 3,
+    effectiveFrom: d(-180), effectiveTo: null, clonedFromId: 'STK-3',
     publishedAt: ts(-180), publishedBy: 'R. Kumar',
     identity: { titleText: 'CARTON MARKING', showLogo: false },
     headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
@@ -491,7 +367,7 @@ const buildTemplates = () => [
   },
   {
     // Prenatal solid pack — a single face, FROM/TO addressing.
-    id: 6,
+    id: 'STK-6',
     templateCode: 'PRENATAL-SOLID-STICKER',
     name: 'Prénatal — Solid Pack — Carton Sticker',
     buyerId: null, buyerCode: 'PRENATAL', subClientCode: null,
@@ -528,12 +404,12 @@ const buildTemplates = () => [
   },
   {
     // Prenatal ratio pack — the one layout that prints a colour x size table.
-    id: 7,
+    id: 'STK-7',
     templateCode: 'PRENATAL-RATIO-STICKER',
     name: 'Prénatal — Ratio Pack — Carton Sticker',
     buyerId: null, buyerCode: 'PRENATAL', subClientCode: 'RATIO',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: 6,
+    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: 'STK-6',
     publishedAt: ts(-120), publishedBy: 'R. Kumar',
     identity: { titleText: 'CARTON MARKING', showLogo: false },
     headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
@@ -563,7 +439,7 @@ const buildTemplates = () => [
   {
     // Vingino — a bordered key/value table, and the ONLY analysed buyer whose label
     // carries a barcode (its EAN, printed as a number today). PRD 19.
-    id: 8,
+    id: 'STK-8',
     templateCode: 'VINGINO-STICKER',
     name: 'Vingino — Carton Sticker',
     buyerId: null, buyerCode: 'VINGINO', subClientCode: null,
@@ -603,7 +479,7 @@ const buildTemplates = () => [
   {
     // Van Gennip — the nine-line monospace block that is copy-pasted by hand
     // hundreds of times today (PRD 2). One template row replaces all of it.
-    id: 9,
+    id: 'STK-9',
     templateCode: 'VGT-STICKER',
     name: 'Van Gennip — Carton Sticker',
     buyerId: null, buyerCode: 'VGT', subClientCode: null,
@@ -637,288 +513,6 @@ const buildTemplates = () => [
     },
     formatting: { font: 'Courier New' }, printWeights: true, printDimensions: true,
     mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    id: 4,
-    templateCode: 'STD-INVOICE',
-    name: 'Standard Indian Export — Commercial Invoice',
-    buyerId: null,
-    buyerCode: null,
-    subClientCode: null,
-    docType: DOC_TYPE.INVOICE,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-365),
-    effectiveTo: null,
-    clonedFromId: null,
-    publishedAt: ts(-365),
-    publishedBy: 'System',
-    identity: { titleText: 'COMMERCIAL INVOICE', showLogo: true, paper: 'A4', orientation: 'PORTRAIT' },
-    headerFields: [],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'invoice.consignee.block' },
-      { key: 'notify', label: 'Notify Party', binding: 'invoice.notify.block' },
-    ],
-    columns: [],
-    sheets: [],
-    invoiceLineGrain: {
-      mode: LINE_GRAIN.PER_STYLE_SIZE_RANGE,
-      // Group by what an atom carries. The size RANGE is derived from the group's
-      // members, so it can never be a grouping key.
-      groupBy: ['styleNo', 'colourKey'],
-      descriptionTemplate: '{{style.garmentName}} — {{row.styleNo}} — {{row.colorName}}',
-      rateSource: 'ORDER_SIZE_PRICE',
-      // There is no HS code on the style master, so the category default from the
-      // mock HS master is the only real source (data-gap ledger: hsCodes).
-      hsCodeSource: 'HS_MASTER_CATEGORY',
-      showPackagingAttributes: false,
-      materialRows: null,
-    },
-    charges: {
-      discount: { enabled: true, mode: 'PERCENT', default: 0 },
-      freight: { enabled: true, default: 0 },
-      insurance: { enabled: true, default: 0 },
-      other: { enabled: true, default: 0 },
-    },
-    igst: { enabled: true, defaultRatePct: 12 },
-    bankBlock: true,
-    ediAccounts: false,
-    declarations: SEED_EXPORTER_PROFILE_EXTRA.declarations,
-    annexeSheets: [],
-    series: EXPDOC_PREFIX.INVOICE,
-    stickerLayout: null,
-    formatting: { font: 'Arial', baseFontPt: 9, dateFormat: 'DD-MMM-YYYY' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
-    mandatoryForDocGen: [],
-  },
-
-  /*
-   * Buyer invoice templates. Between them these four cover every §8.3 grain, which
-   * is the point of Appendix A.5: the invoices differ by grain and column labels,
-   * not by structure. A fifth buyer is a row here, not code.
-   */
-  {
-    id: 12,
-    templateCode: 'JOMO-INVOICE',
-    name: 'JOMO BV — Commercial Invoice',
-    buyerId: null,
-    buyerCode: 'JOMO',
-    subClientCode: null,
-    docType: DOC_TYPE.INVOICE,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-300),
-    effectiveTo: null,
-    clonedFromId: 4,
-    publishedAt: ts(-300),
-    publishedBy: 'System',
-    identity: { titleText: 'COMMERCIAL INVOICE', showLogo: true, paper: 'A4', orientation: 'PORTRAIT' },
-    headerFields: [],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'invoice.consignee.block' },
-      { key: 'notify', label: 'Notify Party', binding: 'invoice.notify.block' },
-    ],
-    columns: [],
-    sheets: [],
-    // §8.3 "Per PO / style (JOMO): PO no., masternumber, colours, style name…"
-    invoiceLineGrain: {
-      mode: LINE_GRAIN.PER_PO_STYLE,
-      groupBy: ['buyerPoNo', 'styleNo'],
-      descriptionTemplate: '{{style.garmentName}} — {{style.composition}}',
-      rateSource: 'ORDER_SIZE_PRICE',
-      hsCodeSource: 'HS_MASTER_CATEGORY',
-      showPackagingAttributes: false,
-      materialRows: null,
-    },
-    charges: {
-      discount: { enabled: true, mode: 'PERCENT', default: 0 },
-      freight: { enabled: false, default: 0 },
-      insurance: { enabled: false, default: 0 },
-      other: { enabled: true, default: 0 },
-    },
-    igst: { enabled: true, defaultRatePct: 5 },
-    bankBlock: true,
-    ediAccounts: true,
-    declarations: SEED_EXPORTER_PROFILE_EXTRA.declarations,
-    annexeSheets: [],
-    series: EXPDOC_PREFIX.INVOICE,
-    stickerLayout: null,
-    formatting: { font: 'Arial', baseFontPt: 9, dateFormat: 'DD-MMM-YYYY' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
-    mandatoryForDocGen: [],
-  },
-  {
-    id: 13,
-    templateCode: 'VGT-INVOICE',
-    name: 'Van Gennip Textiles — Commercial Invoice',
-    buyerId: null,
-    buyerCode: 'VGT',
-    subClientCode: null,
-    docType: DOC_TYPE.INVOICE,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-300),
-    effectiveTo: null,
-    clonedFromId: 4,
-    publishedAt: ts(-300),
-    publishedBy: 'System',
-    identity: { titleText: 'COMMERCIAL INVOICE', showLogo: true, paper: 'A4', orientation: 'PORTRAIT' },
-    headerFields: [],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'invoice.consignee.block' },
-    ],
-    columns: [],
-    sheets: [],
-    // §8.3 "Per style / size-range (VGT): description with composition + HS code…"
-    invoiceLineGrain: {
-      mode: LINE_GRAIN.PER_STYLE_SIZE_RANGE,
-      groupBy: ['styleNo', 'colourKey'],
-      descriptionTemplate: '{{style.garmentName}} — {{style.composition}} — {{row.colorName}}',
-      rateSource: 'ORDER_SIZE_PRICE',
-      hsCodeSource: 'HS_MASTER_CATEGORY',
-      showPackagingAttributes: false,
-      materialRows: null,
-    },
-    charges: {
-      discount: { enabled: false, mode: 'PERCENT', default: 0 },
-      freight: { enabled: true, default: 0 },
-      insurance: { enabled: true, default: 0 },
-      other: { enabled: false, default: 0 },
-    },
-    igst: { enabled: true, defaultRatePct: 5 },
-    bankBlock: true,
-    ediAccounts: false,
-    declarations: SEED_EXPORTER_PROFILE_EXTRA.declarations,
-    // The VGT "BUYER" sheet is the SAME data at the per-size grain — an annexe, not
-    // a second document (Appendix A.5).
-    annexeSheets: [
-      { key: 'BUYER', title: 'BUYER', grain: { mode: LINE_GRAIN.PER_SIZE } },
-    ],
-    series: EXPDOC_PREFIX.INVOICE,
-    stickerLayout: null,
-    formatting: { font: 'Arial', baseFontPt: 9, dateFormat: 'DD-MMM-YYYY' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
-    mandatoryForDocGen: [],
-  },
-  {
-    id: 14,
-    templateCode: 'PRENATAL-INVOICE',
-    name: 'Prénatal Moeder en Kind — Commercial Invoice',
-    buyerId: null,
-    buyerCode: 'PRENATAL',
-    subClientCode: null,
-    docType: DOC_TYPE.INVOICE,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-300),
-    effectiveTo: null,
-    clonedFromId: 4,
-    publishedAt: ts(-300),
-    publishedBy: 'System',
-    identity: { titleText: 'COMMERCIAL INVOICE', showLogo: true, paper: 'A4', orientation: 'PORTRAIT' },
-    headerFields: [],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      // Prénatal ships on D/A terms, so the CONSIGNEE is a bank (§8.2, §24).
-      { key: 'consignee', label: 'Consignee (Bank)', binding: 'invoice.consignee.block' },
-      { key: 'notify', label: 'Notify Party', binding: 'invoice.notify.block' },
-    ],
-    columns: [],
-    sheets: [],
-    // §8.3 "Per order line with packaging attributes (Prénatal) … plus a discount line"
-    invoiceLineGrain: {
-      mode: LINE_GRAIN.PER_ORDER_LINE,
-      groupBy: ['sourceEntryId', 'orderLineId'],
-      descriptionTemplate: '{{style.garmentName}} — {{style.composition}}',
-      rateSource: 'ORDER_SIZE_PRICE',
-      hsCodeSource: 'HS_MASTER_CATEGORY',
-      showPackagingAttributes: true,
-      materialRows: null,
-    },
-    charges: {
-      // The standing 3% comes from the buyer's commercial profile, not from here —
-      // this only says the line is printed.
-      discount: { enabled: true, mode: 'PERCENT', default: 3 },
-      freight: { enabled: false, default: 0 },
-      insurance: { enabled: false, default: 0 },
-      other: { enabled: false, default: 0 },
-    },
-    igst: { enabled: true, defaultRatePct: 5 },
-    bankBlock: true,
-    ediAccounts: false,
-    declarations: SEED_EXPORTER_PROFILE_EXTRA.declarations,
-    annexeSheets: [],
-    series: EXPDOC_PREFIX.INVOICE,
-    stickerLayout: null,
-    formatting: { font: 'Arial', baseFontPt: 9, dateFormat: 'DD-MMM-YYYY' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
-    mandatoryForDocGen: [],
-  },
-  {
-    id: 15,
-    templateCode: 'CENTRIC-INVOICE',
-    name: 'Centric Brands — Commercial Invoice',
-    buyerId: null,
-    buyerCode: 'CENTRIC',
-    subClientCode: null,
-    docType: DOC_TYPE.INVOICE,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-300),
-    effectiveTo: null,
-    clonedFromId: 4,
-    publishedAt: ts(-300),
-    publishedBy: 'System',
-    identity: { titleText: 'COMMERCIAL INVOICE', showLogo: false, paper: 'A4', orientation: 'PORTRAIT' },
-    headerFields: [],
-    addressBlocks: [
-      { key: 'exporter', label: 'Exporter', binding: 'exporter.block' },
-      { key: 'consignee', label: 'Consignee', binding: 'invoice.consignee.block' },
-    ],
-    columns: [],
-    sheets: [],
-    // §8.3 "Simple material rows (Centric): Material #, Description, HTS code…"
-    // materialRows stays null: Centric's SAP material numbers are not derivable from
-    // carton data, so the grain falls back to per-style until a template admin
-    // enters them. Inventing them would put a wrong identifier on a customs document.
-    invoiceLineGrain: {
-      mode: LINE_GRAIN.MATERIAL_ROWS,
-      groupBy: ['styleNo'],
-      descriptionTemplate: '{{style.garmentName}}',
-      rateSource: 'ORDER_SIZE_PRICE',
-      hsCodeSource: 'HS_MASTER_CATEGORY',
-      showPackagingAttributes: false,
-      materialRows: null,
-    },
-    charges: {
-      discount: { enabled: false, mode: 'PERCENT', default: 0 },
-      freight: { enabled: true, default: 0 },
-      insurance: { enabled: false, default: 0 },
-      other: { enabled: true, default: 0 },
-    },
-    igst: { enabled: true, defaultRatePct: 5 },
-    bankBlock: true,
-    ediAccounts: false,
-    declarations: SEED_EXPORTER_PROFILE_EXTRA.declarations,
-    annexeSheets: [],
-    series: EXPDOC_PREFIX.INVOICE,
-    stickerLayout: null,
-    formatting: { font: 'Arial', baseFontPt: 9, dateFormat: 'DD-MMM-YYYY' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
-    mandatoryForDocGen: [],
   },
 ];
 

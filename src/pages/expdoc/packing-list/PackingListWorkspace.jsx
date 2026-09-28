@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Alert, App, Col, Collapse, Result, Row, Skeleton, Space, Tag, Timeline, Tooltip, Typography,
+  Alert, App, Button, Col, Collapse, Result, Row, Skeleton, Space, Tag, Timeline, Tooltip, Typography,
 } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
@@ -17,7 +17,7 @@ import {
 import { hasPermission } from '../../../utils/permissions';
 import {
   getPackingList, refreshFromPacking, acknowledgeWarning, changePlStatus, revisePackingList,
-  getShipment, markPackingListExported, overridePlTemplate, clearPlTemplateOverride,
+  getShipment, markPackingListExported, changePlTemplate, findNewerTemplateRevision,
   updatePackingList,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
@@ -26,7 +26,7 @@ import PlCartonGrid from './PlCartonGrid';
 import PlValidationPanel from './PlValidationPanel';
 import PlOrderVsPackedPanel from './PlOrderVsPackedPanel';
 import AckReasonModal from '../shared/AckReasonModal';
-import TemplateOverrideModal from '../shared/TemplateOverrideModal';
+import ChangeTemplateModal from '../shared/ChangeTemplateModal';
 import PlPreviewDrawer from './PlPreviewDrawer';
 import PlHeaderEditor from './PlHeaderEditor';
 import PlCompareModal from './PlCompareModal';
@@ -74,7 +74,8 @@ const PackingListWorkspace = () => {
   const [loadError, setLoadError] = useState(null);
   const [reasonCfg, setReasonCfg] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [overrideOpen, setOverrideOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [newer, setNewer] = useState(null);
   const [compareOpen, setCompareOpen] = useState(false);
   const [shipment, setShipment] = useState(null);
   // Reported up by PlHeaderEditor, so Exit can warn instead of silently discarding.
@@ -104,6 +105,24 @@ const PackingListWorkspace = () => {
     if (!pl?.shipmentId) return;
     getShipment(pl.shipmentId).then(setShipment).catch(() => setShipment(null));
   }, [pl?.shipmentId]);
+
+  /*
+   * A newer published version of this draft's template — the buyer changed their
+   * layout after the list was made. Keyed on the template the list holds now, so a
+   * stale answer for an earlier state is never shown.
+   */
+  const newerKey = pl ? `${pl.id}|${pl.templateId}|${pl.templateVersion}|${pl.status}` : null;
+  useEffect(() => {
+    if (!pl?.templateId || pl.status !== PL_STATUS.DRAFT || !pl.template?.templateCode) return undefined;
+    let alive = true;
+    findNewerTemplateRevision({ templateId: pl.templateId, templateCode: pl.template.templateCode, version: pl.templateVersion })
+      .then((row) => { if (alive) setNewer({ key: newerKey, row }); })
+      .catch(() => { if (alive) setNewer({ key: newerKey, row: null }); });
+    return () => { alive = false; };
+    // Re-checked only when the list's template or status changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newerKey]);
+  const newerRevision = newer?.key === newerKey ? newer.row : null;
 
   /**
    * One funnel for every mutation: loading, toast and error in a single place.
@@ -308,19 +327,15 @@ const PackingListWorkspace = () => {
               <Space size={6} wrap>
                 <Text>{pl.template ? `${pl.template.name} v${pl.template.version}` : '—'}</Text>
                 {pl.templateOverride && (
-                  <Tooltip title={`Overridden by ${pl.templateOverride.user} on ${pl.templateOverride.at} — ${pl.templateOverride.reason}`}>
-                    <Tag color="warning">Overridden</Tag>
+                  <Tooltip title={`Changed by ${pl.templateOverride.user} on ${pl.templateOverride.at} — ${pl.templateOverride.reason}`}>
+                    <Tag color="warning">Changed</Tag>
                   </Tooltip>
                 )}
-                {/* §10.2: the override is a permissioned act on one document, so the
-                    control lives beside the value it changes rather than in the toolbar. */}
-                {pl.status === PL_STATUS.DRAFT && canOverridePerm && (
-                  <a onClick={() => setOverrideOpen(true)}>Change</a>
-                )}
-                {pl.status === PL_STATUS.DRAFT && canOverridePerm && pl.templateOverride && (
-                  <a onClick={() => run('template', () => clearPlTemplateOverride(pl.id), 'Back to the buyer default')}>
-                    Use the buyer default
-                  </a>
+                {/* A draft can move to a newer version of its template (update) or to a
+                    different template (override, with a reason); the control lives beside
+                    the value it changes rather than in the toolbar. */}
+                {pl.status === PL_STATUS.DRAFT && (canUpdate || canOverridePerm) && (
+                  <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={() => setTemplateOpen(true)}>Change</Button>
                 )}
               </Space>
             )}
@@ -547,8 +562,24 @@ const PackingListWorkspace = () => {
           type="warning"
           showIcon
           style={{ margin: '16px 0' }}
-          title="No buyer template configured"
-          description="This packing list is using the standard export template. Configure one for this buyer to match their required layout."
+          title="This packing list uses the standard layout"
+          description="The buyer had no packing-list template when it was made, or the standard layout was picked. Upload the buyer's document under Buyer Templates to match their format."
+        />
+      )}
+
+      {newerRevision && pl.status === PL_STATUS.DRAFT && canUpdate && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ margin: '16px 0' }}
+          title={`v${newerRevision.version} of ${pl.template?.name || 'this template'} is now active`}
+          description={`This packing list was made with v${pl.templateVersion}. Move it to the buyer's new layout — the cartons stay as they are.`}
+          action={(
+            <ActionButton
+              action="refresh" size="small" text={`Move to v${newerRevision.version}`} {...busyProps('upgrade')}
+              onClick={() => run('upgrade', () => changePlTemplate(pl.id, newerRevision.id), `Now on v${newerRevision.version}`)}
+            />
+          )}
         />
       )}
 
@@ -573,19 +604,26 @@ const PackingListWorkspace = () => {
         onCancel={() => setCompareOpen(false)}
       />
 
-      <TemplateOverrideModal
-        open={overrideOpen}
-        docType={DOC_TYPE.PACKING_LIST}
-        buyerCode={pl.buyerCode}
-        currentTemplateId={pl.templateId}
-        currentLabel={pl.template ? `${pl.template.templateCode} v${pl.template.version}` : 'No template'}
-        confirming={busy === 'template'}
-        onCancel={() => setOverrideOpen(false)}
-        onSubmit={async (templateId, reason) => {
-          const next = await run('template', () => overridePlTemplate(pl.id, templateId, reason), 'Template overridden for this document');
-          if (next?.id) setOverrideOpen(false);
-        }}
-      />
+      {templateOpen && (
+        <ChangeTemplateModal
+          key={`tpl-${pl.id}`}
+          open
+          docType={DOC_TYPE.PACKING_LIST}
+          buyerId={pl.buyerId}
+          buyerName={pl.buyerName}
+          subClientCode={pl.subClientCode}
+          current={pl.templateId ? {
+            id: pl.templateId, templateCode: pl.template?.templateCode, version: pl.templateVersion, name: pl.template?.name,
+          } : null}
+          canOverride={canOverridePerm}
+          confirming={busy === 'template'}
+          onCancel={() => setTemplateOpen(false)}
+          onSubmit={async (templateId, reason) => {
+            const next = await run('template', () => changePlTemplate(pl.id, templateId, reason), 'Template changed for this document');
+            if (next?.id) setTemplateOpen(false);
+          }}
+        />
+      )}
 
       <AckReasonModal
         key={reasonCfg?.key || 'none'}

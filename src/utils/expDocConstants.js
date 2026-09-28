@@ -160,6 +160,55 @@ export const LINE_GRAIN_LABELS = {
   MATERIAL_ROWS: 'Simple material rows',
 };
 
+// ─── Invoice header boxes (the standard Indian export invoice grid) ────────────
+// A buyer template may relabel, rebind or hide any of them (`invoiceHeader.boxes`);
+// the keys are shared with the renderer and the API's reader of uploaded invoices.
+export const INVOICE_BOXES = [
+  { key: 'exporter', label: 'Exporter', content: "The exporter's address block" },
+  { key: 'invoiceNoDate', label: 'Invoice No. & Date', content: 'Invoice number and date' },
+  { key: 'exporterRef', label: "Exporter's Ref. (IEC No.)", content: 'IEC number' },
+  { key: 'consignee', label: 'Consignee', content: "The invoice's consignee" },
+  { key: 'buyerOrder', label: "Buyer's Order No. & Date", content: 'Order numbers and date' },
+  { key: 'buyerOther', label: 'Buyer (if other than Consignee)', content: 'Buyer name' },
+  { key: 'otherRefs', label: 'Other References', content: 'AD code, GST state, PAN, LUT, AEPC, REX, star house' },
+  { key: 'notify', label: 'Notify Party', content: "The invoice's notify party" },
+  { key: 'preCarriage', label: 'Pre-Carriage by', content: 'Shipment pre-carriage' },
+  { key: 'placeOfReceipt', label: 'Place of Receipt by Pre-Carrier', content: 'Shipment place of receipt' },
+  { key: 'countryOfOrigin', label: 'Country of Origin of Goods', content: 'INDIA' },
+  { key: 'countryOfDestination', label: 'Country of Final Destination', content: 'Destination country' },
+  { key: 'vessel', label: 'Vessel / Flight No.', content: 'Shipment vessel / flight' },
+  { key: 'portOfLoading', label: 'Port of Loading', content: 'Shipment port of loading' },
+  { key: 'terms', label: 'Terms of Delivery & Payment', content: 'Incoterm and payment terms' },
+  { key: 'portOfDischarge', label: 'Port of Discharge', content: 'Shipment port of discharge' },
+  { key: 'finalDestination', label: 'Final Destination', content: 'Shipment final destination' },
+  { key: 'containerSeal', label: 'Container / Seal No.', content: 'Container and seal numbers' },
+];
+
+// ─── Template layout vocabulary (sheets, text blocks) ───────────────────────────
+export const SUMMARY_BLOCK_LABELS = {
+  GRAND_TOTAL: 'Grand total (cartons, pieces, weights, CBM)',
+  WEIGHT_PER_PIECE: 'Weight per piece',
+  ORDER_VS_SHIPPED: 'Order vs shipped, per colour and size',
+  TOTALS_LIST: 'Totals list (TOTAL QTY / CARTONS / NETT WT / GR WT / CBM / DIMENSION)',
+};
+
+export const TEXT_PLACEMENT_LABELS = {
+  HEADER: 'Under the title',
+  BEFORE_TABLE: 'Before the table',
+  AFTER_TABLE: 'After the table',
+  FOOTER: 'At the foot',
+};
+
+/** Fields a packing-list sheet may repeat a block heading and subtotal for. */
+export const BLOCK_FIELD_LABELS = {
+  buyerPoNo: 'PO / order number',
+  styleNo: 'Style',
+  colorName: 'Colour',
+  packingCode: 'Packing code',
+  endCustomer: 'End customer',
+  destination: 'Destination',
+};
+
 // ─── Template lifecycle (PRD §10) ───────────────────────────────────────────────
 export const TEMPLATE_STATUS = { DRAFT: 'DRAFT', ACTIVE: 'ACTIVE', RETIRED: 'RETIRED' };
 

@@ -1,23 +1,24 @@
 /**
- * Export Documentation — buyer template resolution and field bindings.
+ * Export Documentation — buyer template choice and field bindings.
  *
  * Two jobs:
  *
- *  1. RESOLUTION (PRD §10.2 / BR-09). A document never picks its own template. It
- *     is resolved from buyer + sub-client + document type + the active version on
- *     the document's date, and the resolved choice is recorded on the document as
- *     (templateId, templateVersion) so re-rendering a year later reproduces the
- *     original — templates are immutable once active.
+ *  1. CHOICE. A buyer may keep several active packing-list and invoice templates
+ *     (sea / air, one per end customer …). There is no default: a new document takes
+ *     the buyer's only template, and when there are several the user picks one
+ *     (`rankTemplateCandidates`). The chosen revision is recorded on the document with
+ *     a snapshot of its layout, so re-rendering a year later reproduces the original —
+ *     templates are immutable once active. Carton-sticker templates are still resolved
+ *     automatically, by buyer + sub-client (`resolveTemplate`).
  *
  *  2. BINDINGS. Everything printed is either a binding drawn from this catalogue or
  *     a fixed literal, so an admin cannot invent a field that would force manual
- *     entry downstream (PRD §10.3).
- *
- * The template BUILDER (blank templates, structural validation, clone/publish) is
- * part of the template-management phase; this file is what documents need to render.
+ *     entry downstream (PRD §10.3). The AI reader of uploaded buyer documents is sent
+ *     this catalogue too, so it can only propose fields that exist.
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from './expDocConstants';
 import { round } from './expDocCalc';
+import { systemTemplateFor } from './expDocSystemTemplates';
 
 // ─── Field catalogue ────────────────────────────────────────────────────────────
 // `path` is what a template stores. `category` groups the picker. `sample` is what
@@ -31,6 +32,13 @@ export const FIELD_CATALOGUE = [
   { path: 'exporter.iecNumber', label: 'IEC number', category: 'EXPORTER', type: 'string', sample: 'AAACS1234F' },
   { path: 'exporter.country', label: 'Country of origin', category: 'EXPORTER', type: 'string', sample: 'INDIA' },
   { path: 'exporter.logoUrl', label: 'Exporter logo', category: 'EXPORTER', type: 'string', sample: '' },
+  { path: 'exporter.panNumber', label: 'PAN', category: 'EXPORTER', type: 'string', sample: 'AAACS1234F' },
+  { path: 'exporter.adCode', label: 'AD code', category: 'EXPORTER', type: 'string', sample: '6390004-1900001' },
+  { path: 'exporter.lutNumber', label: 'LUT number', category: 'EXPORTER', type: 'string', sample: 'AD330324000123X' },
+  { path: 'exporter.aepcRegnNo', label: 'AEPC registration no.', category: 'EXPORTER', type: 'string', sample: 'TN/12345/2019' },
+  { path: 'exporter.rexNumber', label: 'REX number', category: 'EXPORTER', type: 'string', sample: 'INREX3300123' },
+  { path: 'exporter.starExportHouse', label: 'Star export house', category: 'EXPORTER', type: 'string', sample: 'Two Star Export House' },
+  { path: 'exporter.bankBlock', label: 'Exporter bank details', category: 'EXPORTER', type: 'block', sample: 'UCO Bank, IBB Branch\nA/C NO: 18100200002081' },
 
   // Buyer and sub-client.
   { path: 'buyer.name', label: 'Buyer name', category: 'BUYER', type: 'string', sample: 'JOMO BV' },
@@ -50,6 +58,9 @@ export const FIELD_CATALOGUE = [
   { path: 'shipment.deliveryCentre', label: 'Delivery centre', category: 'SHIPMENT', type: 'string', sample: 'DM Karlsruhe' },
   { path: 'shipment.consignee.block', label: 'Consignee address block', category: 'SHIPMENT', type: 'block', sample: 'JOMO BV\nValkenswaard' },
   { path: 'shipment.notify.block', label: 'Notify party block', category: 'SHIPMENT', type: 'block', sample: 'ABN AMRO Bank N.V.' },
+  { path: 'shipment.preCarriageBy', label: 'Pre-carriage by', category: 'SHIPMENT', type: 'string', sample: 'N.A.' },
+  { path: 'shipment.placeOfReceipt', label: 'Place of receipt by pre-carrier', category: 'SHIPMENT', type: 'string', sample: 'N.A.' },
+  { path: 'shipment.countryOfFinalDestination', label: 'Country of final destination', category: 'SHIPMENT', type: 'string', sample: 'Netherlands' },
 
   // Document header.
   { path: 'pl.plNo', label: 'Packing list number', category: 'PL', type: 'string', sample: 'PKL/26-27/1001' },
@@ -65,6 +76,11 @@ export const FIELD_CATALOGUE = [
   { path: 'pl.resolved.deliveryCentre', label: 'Delivery centre (document)', category: 'PL', type: 'string', sample: 'DM Karlsruhe' },
   { path: 'pl.resolved.containerNo', label: 'Container no. (document)', category: 'PL', type: 'string', sample: 'MSKU1234567' },
   { path: 'pl.resolved.sealNo', label: 'Seal no. (document)', category: 'PL', type: 'string', sample: 'SL-889210' },
+  { path: 'pl.totals.cartons', label: 'Total cartons', category: 'PL', type: 'number', sample: 48 },
+  { path: 'pl.totals.pieces', label: 'Total pieces', category: 'PL', type: 'number', sample: 2627 },
+  { path: 'pl.totals.netWeightKg', label: 'Total net weight (kg)', category: 'PL', type: 'number', decimals: 3, sample: 322.12 },
+  { path: 'pl.totals.grossWeightKg', label: 'Total gross weight (kg)', category: 'PL', type: 'number', decimals: 3, sample: 371.82 },
+  { path: 'pl.totals.cbm', label: 'Total CBM', category: 'PL', type: 'number', decimals: 3, sample: 2.43 },
 
   // Style.
   { path: 'style.styleNo', label: 'Style number', category: 'STYLE', type: 'string', sample: 'ST-2026-0441' },
@@ -87,6 +103,8 @@ export const FIELD_CATALOGUE = [
   { path: 'row.lengthCm', label: 'Length (cm)', category: 'ROW', type: 'number', sample: 60 },
   { path: 'row.breadthCm', label: 'Breadth (cm)', category: 'ROW', type: 'number', sample: 40 },
   { path: 'row.heightCm', label: 'Height (cm)', category: 'ROW', type: 'number', sample: 35 },
+  { path: 'row.destination', label: 'Destination (row)', category: 'ROW', type: 'string', sample: 'Rotterdam' },
+  { path: 'row.packingType', label: 'Packing type', category: 'ROW', type: 'string', sample: 'Ratio / assortment' },
 
   // Individual carton — sticker layouts only.
   { path: 'carton.cartonNo', label: 'Carton number', category: 'CARTON', type: 'number', sample: 12 },
@@ -111,6 +129,10 @@ export const FIELD_CATALOGUE = [
   { path: 'calc.totalPieces', label: 'Total pieces', category: 'CALC', type: 'number', sample: 2820 },
   { path: 'calc.cbm', label: 'CBM', category: 'CALC', type: 'number', decimals: 3, sample: 0.084 },
   { path: 'calc.dimensions', label: 'L × B × H', category: 'CALC', type: 'string', sample: '60 × 40 × 35' },
+  // Per-row totals: a buyer's "TTL NT.WT" is the carton weight times the cartons in the row.
+  { path: 'calc.totalNetWeightKg', label: 'Net weight, all cartons in the row', category: 'CALC', type: 'number', decimals: 3, sample: 587.0 },
+  { path: 'calc.totalGrossWeightKg', label: 'Gross weight, all cartons in the row', category: 'CALC', type: 'number', decimals: 3, sample: 634.5 },
+  { path: 'calc.totalCbm', label: 'CBM, all cartons in the row', category: 'CALC', type: 'number', decimals: 3, sample: 3.948 },
 
   // Pack structure. A JOMO "Units" section prints pieces-per-assortment ×
   // assortments-per-carton; a Prenatal ratio pack prints PCS/MPB × MPB/carton. The
@@ -130,6 +152,13 @@ export const FIELD_CATALOGUE = [
   { path: 'invoice.invoiceNo', label: 'Invoice number', category: 'INVOICE', type: 'string', sample: 'EXP/26-27/1001' },
   { path: 'invoice.invoiceDate', label: 'Invoice date', category: 'INVOICE', type: 'date', sample: '2026-09-01' },
   { path: 'invoice.buyerOrderNo', label: "Buyer's order number", category: 'INVOICE', type: 'string', sample: 'SG/26-27/1042' },
+  { path: 'invoice.buyerOrderDate', label: "Buyer's order date", category: 'INVOICE', type: 'date', sample: '2026-08-14' },
+  { path: 'invoice.exporterRef', label: "Exporter's reference", category: 'INVOICE', type: 'string', sample: 'IEC AAACS1234F' },
+  { path: 'invoice.plTotals.cartons', label: 'Total cartons (invoice)', category: 'INVOICE', type: 'number', sample: 61 },
+  { path: 'invoice.plTotals.pieces', label: 'Total pieces (invoice)', category: 'INVOICE', type: 'number', sample: 2124 },
+  { path: 'invoice.plTotals.netWeightKg', label: 'Total net weight (invoice)', category: 'INVOICE', type: 'number', decimals: 3, sample: 700.5 },
+  { path: 'invoice.plTotals.grossWeightKg', label: 'Total gross weight (invoice)', category: 'INVOICE', type: 'number', decimals: 3, sample: 760.25 },
+  { path: 'invoice.plTotals.cbm', label: 'Total CBM (invoice)', category: 'INVOICE', type: 'number', decimals: 3, sample: 5.124 },
   { path: 'invoice.consignee.block', label: 'Consignee address block', category: 'INVOICE', type: 'block', sample: 'JOMO BV, Handelsweg 24, 5555 XT Valkenswaard' },
   { path: 'invoice.notify.block', label: 'Notify party block', category: 'INVOICE', type: 'block', sample: 'ABN AMRO Bank N.V., Amsterdam' },
   { path: 'invoice.incoterm', label: 'Incoterm', category: 'INVOICE', type: 'string', sample: 'FOB' },
@@ -145,6 +174,22 @@ export const FIELD_CATALOGUE = [
   { path: 'invoice.totals.netTotal', label: 'Invoice total', category: 'INVOICE', type: 'number', decimals: 2, sample: 24102.07 },
   { path: 'invoice.igst.taxableInr', label: 'Taxable value (INR)', category: 'INVOICE', type: 'number', decimals: 2, sample: 2271620.09 },
   { path: 'invoice.igst.igstValue', label: 'IGST value (INR)', category: 'INVOICE', type: 'number', decimals: 2, sample: 113581.0 },
+
+  // Invoice goods lines — what a buyer's own invoice columns bind to. Quantity, rate
+  // and amount always close the table, so a column bound to them is not repeated.
+  { path: 'line.buyerPoNo', label: 'PO / order number', category: 'LINE', type: 'string', sample: '793272' },
+  { path: 'line.orderNo', label: 'Our order number', category: 'LINE', type: 'string', sample: 'SG/26-27/1042' },
+  { path: 'line.styleNo', label: 'Style / supplier article no.', category: 'LINE', type: 'string', sample: '555-14-01-W24' },
+  { path: 'line.colorName', label: 'Colour', category: 'LINE', type: 'string', sample: 'BEIGE BROWN' },
+  { path: 'line.description', label: 'Description of goods', category: 'LINE', type: 'string', sample: '100% ORGANIC COTTON WOVEN BABIES SHIRT' },
+  { path: 'line.composition', label: 'Composition', category: 'LINE', type: 'string', sample: '100% ORGANIC COTTON' },
+  { path: 'line.sizeRange', label: 'Size range', category: 'LINE', type: 'string', sample: '56-68' },
+  { path: 'line.size', label: 'Size', category: 'LINE', type: 'string', sample: '62' },
+  { path: 'line.hsCode', label: 'HS code', category: 'LINE', type: 'string', sample: '62092090' },
+  { path: 'line.articleNo', label: "Buyer's article number", category: 'LINE', type: 'string', sample: '6342094' },
+  { path: 'line.quantity', label: 'Quantity', category: 'LINE', type: 'number', sample: 264 },
+  { path: 'line.rate', label: 'Rate', category: 'LINE', type: 'number', decimals: 2, sample: 3.55 },
+  { path: 'line.amount', label: 'Amount', category: 'LINE', type: 'number', decimals: 2, sample: 937.2 },
 ];
 
 export const FIELD_CATEGORIES = [
@@ -157,6 +202,7 @@ export const FIELD_CATEGORIES = [
   { key: 'CARTON', label: 'Individual carton' },
   { key: 'CALC', label: 'Calculated' },
   { key: 'INVOICE', label: 'Invoice' },
+  { key: 'LINE', label: 'Invoice line' },
 ];
 
 const CATALOGUE_BY_PATH = FIELD_CATALOGUE.reduce((acc, f) => {
@@ -209,8 +255,102 @@ export const resolveTemplate = (templates, { buyerCode, subClientCode, docType, 
 };
 
 /**
- * Templates that break the "exactly one Active per buyer / sub-client / doc type"
- * invariant. Surfaced on the template register rather than discovered at render time.
+ * A buyer name as the template matcher compares it: accents, case, punctuation and
+ * company-form words do not count, so "Prénatal Moeder en Kind BV" and "PRENATAL
+ * MOEDER EN KIND B.V." are one buyer.
+ */
+export const normBuyerName = (name) => String(name || '')
+  .normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, ' ')
+  .replace(/\b(b v|bv|ltd|limited|gmbh|inc|co|pvt|private|llc|nv|sa|ag)\b/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+/**
+ * Does a template belong to this buyer? By buyer id when both sides have one; by
+ * name otherwise, because packing lists and invoices are still mock documents that
+ * carry the buyer's NAME, while templates are keyed on the real buyer master.
+ */
+export const templateMatchesBuyer = (template, { buyerId, buyerName } = {}) => {
+  if (template.buyerId != null && buyerId != null) return Number(template.buyerId) === Number(buyerId);
+  const own = normBuyerName(template.buyerName);
+  return Boolean(own) && own === normBuyerName(buyerName);
+};
+
+/**
+ * The templates a new packing list or invoice may use, in the order they are offered.
+ *
+ *   1. the buyer's own active templates — those for the document's sub-client first;
+ *   2. tenant-wide templates (no buyer);
+ *   3. the built-in standard layout.
+ *
+ * There is no default: `autoSelectId` is set only when the first tier that has any
+ * template has exactly one. With two or more the user must choose.
+ */
+export const rankTemplateCandidates = (templates, { buyerId, buyerName, subClientCode, docType } = {}) => {
+  const active = (templates || []).filter((t) => t.docType === docType
+    && t.status === TEMPLATE_STATUS.ACTIVE && !t.isSystem);
+  const sub = String(subClientCode || '').trim().toUpperCase();
+  const own = active
+    .filter((t) => (t.buyerId != null || t.buyerName) && templateMatchesBuyer(t, { buyerId, buyerName }))
+    .map((t) => ({ ...t, tier: 'BUYER', matchesSubClient: Boolean(sub) && String(t.subClientCode || '').toUpperCase() === sub }))
+    .sort((a, b) => Number(b.matchesSubClient) - Number(a.matchesSubClient)
+      || String(a.name).localeCompare(String(b.name)));
+  const generic = active
+    .filter((t) => t.buyerId == null && !t.buyerName)
+    .map((t) => ({ ...t, tier: 'GENERIC' }));
+  const standard = systemTemplateFor(docType);
+  const system = standard ? [{ ...standard, tier: 'SYSTEM' }] : [];
+  const first = [own, generic, system].find((tier) => tier.length) || [];
+  return {
+    candidates: [...own, ...generic, ...system],
+    autoSelectId: first.length === 1 ? first[0].id : null,
+    hasOwn: own.length > 0,
+  };
+};
+
+/**
+ * Every bound element of a template, wherever it lives in the layout: header fields,
+ * address blocks, the grid, each sheet's own columns, the invoice's columns and header
+ * boxes, and sticker faces. `label` is what the builder names it by.
+ */
+export const templateBindings = (t = {}) => {
+  const out = [];
+  const add = (label, binding, bindable = true) => out.push({ label, binding, bindable });
+  (t.headerFields || []).forEach((f) => add(f.label, f.binding));
+  (t.addressBlocks || []).forEach((f) => add(f.label, f.binding));
+  const columns = (cols) => (cols || []).forEach((c) => add(c.label, c.binding, c.type !== 'SIZE_GRID'));
+  columns(t.columns);
+  (t.sheets || []).forEach((s) => columns(s.columns));
+  columns(t.invoiceColumns);
+  Object.values(t.invoiceHeader?.boxes || {}).forEach((b) => { if (b?.binding) add(b.label, b.binding); });
+  (t.stickerLayout?.faces || []).forEach((face) => {
+    (face.lines || []).forEach((l) => add(l.label, l.binding, false));
+    if (face.barcode?.binding) add('Barcode', face.barcode.binding, false);
+  });
+  return out;
+};
+
+/** Bindings the catalogue does not know — they print blank (§10.3). */
+export const unknownBindingsOf = (t) => [...new Set(templateBindings(t)
+  .map((e) => e.binding)
+  .filter((b) => b && typeof b === 'string' && !isBindable(b) && !b.startsWith('row.sizeQty')))];
+
+/** Labelled fields and columns with no data source at all — they print their label only. */
+export const unboundLabelsOf = (t) => templateBindings(t)
+  .filter((e) => e.bindable && e.label && !e.binding)
+  .map((e) => e.label);
+
+/** The catalogue as the AI reader of uploaded documents is sent it (no sticker-only fields). */
+export const catalogueForReader = () => FIELD_CATALOGUE
+  .filter((f) => f.category !== 'CARTON')
+  .map(({ path, label, category }) => ({ path, label, category }));
+
+/**
+ * Sticker templates that break "exactly one Active per buyer / sub-client / doc type"
+ * — the rule stickers still resolve by. Surfaced on the template register rather than
+ * discovered at render time. Packing-list and invoice templates may have several.
  */
 export const findActiveConflicts = (templates) => {
   const seen = new Map();
@@ -268,22 +408,25 @@ export const formatBound = (value, spec = {}) => {
  * becomes one column per size, in the order the packing entry froze — which is why
  * the on-screen grid and the printed grid cannot drift apart: they share this spec.
  */
-export const expandColumns = (template, sizes = []) => {
-  const cols = template?.columns || [];
-  return cols.flatMap((col) => {
-    if (col.type !== 'SIZE_GRID') return [col];
-    return sizes.map((size) => ({
-      key: `size-${size}`,
-      label: size,
-      binding: `row.sizeQty.${size}`,
-      size,
-      isSizeColumn: true,
-      width: col.width || 76,
-      align: col.align || 'right',
-      total: col.total,
-    }));
-  });
-};
+export const expandColumnSpec = (cols = [], sizes = []) => (cols || []).flatMap((col) => {
+  if (col.type !== 'SIZE_GRID') return [col];
+  return sizes.map((size) => ({
+    key: `size-${size}`,
+    label: size,
+    binding: `row.sizeQty.${size}`,
+    size,
+    isSizeColumn: true,
+    width: col.width || 76,
+    align: col.align || 'right',
+    total: col.total,
+    // A spanning header over the sizes ("units"), and whether a size cell prints the
+    // pieces in the carton or the assortment ratio (AMG, Prénatal ratio packs).
+    group: col.group,
+    sizeValue: col.sizeValue,
+  }));
+});
+
+export const expandColumns = (template, sizes = []) => expandColumnSpec(template?.columns || [], sizes);
 
 export const templateLabel = (template) =>
   (template ? `${template.name} v${template.version}` : 'No template');

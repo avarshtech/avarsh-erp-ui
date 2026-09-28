@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Alert, App, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
 import { listInvoiceablePls, createInvoice } from '../../../services/expdoc/expDocService';
+import { DOC_TYPE } from '../../../utils/expDocConstants';
+import TemplatePickerField from '../shared/TemplatePickerField';
 
 const { Text } = Typography;
 
@@ -26,6 +28,7 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [templateId, setTemplateId] = useState();
 
   useEffect(() => {
     if (!open) return;
@@ -55,7 +58,7 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
   const handleCreate = async () => {
     setCreating(true);
     try {
-      const inv = await createInvoice({ plIds: selected });
+      const inv = await createInvoice({ plIds: selected, templateId });
       message.success(`Invoice drafted from ${chosen.map((c) => c.plNo).join(', ')}`);
       onCreated(inv);
     } catch (e) {
@@ -96,7 +99,7 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
       okText="Create invoice"
       onOk={handleCreate}
       confirmLoading={creating}
-      okButtonProps={{ disabled: !selected.length || Boolean(blocker) }}
+      okButtonProps={{ disabled: !selected.length || Boolean(blocker) || !templateId }}
       destroyOnHidden
     >
       <Space orientation="vertical" size={12} style={{ width: '100%' }}>
@@ -123,6 +126,16 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
           rowClassName={(r) => (r.eligible ? '' : 'expdoc-row-muted')}
           locale={{ emptyText: 'No final packing lists are waiting to be invoiced.' }}
         />
+        {chosen.length > 0 && !blocker && (
+          <TemplatePickerField
+            docType={DOC_TYPE.INVOICE}
+            buyerId={chosen[0].buyerId}
+            buyerName={chosen[0].buyerName}
+            subClientCode={chosen[0].subClientCode}
+            value={templateId}
+            onChange={setTemplateId}
+          />
+        )}
         {chosen.length > 0 && (
           <Text type="secondary">
             {`${chosen.length} packing list(s) · ${num(totals.cartons)} cartons · ${num(totals.pieces)} pieces`}

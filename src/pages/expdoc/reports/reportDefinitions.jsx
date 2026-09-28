@@ -199,7 +199,7 @@ export const buildReports = () => [
   {
     key: 'TEMPLATE_COVERAGE',
     label: 'Template coverage',
-    blurb: 'Which buyers have their own layout for each document, and which fall back to the generic set.',
+    blurb: 'Which buyers have their own layout for each document — a buyer may keep several — and which fall back to the standard set.',
     fetch: templateCoverageReport,
     scroll: 1100,
     filters: ['search', 'gapsOnly'],

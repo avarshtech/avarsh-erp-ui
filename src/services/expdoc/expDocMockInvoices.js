@@ -31,7 +31,14 @@ import {
   recalcLine,
 } from '../../utils/expDocInvoiceCalc';
 import { validate, buildAcknowledgement, acknowledgementApplies } from '../../utils/expDocValidation';
-import { resolveTemplate } from '../../utils/expDocTemplateSchema';
+import { systemTemplateFor } from '../../utils/expDocSystemTemplates';
+
+/**
+ * The layout an invoice renders with: the snapshot of the template revision chosen
+ * for it (templates live in the API and are frozen once published), else the built-in
+ * standard layout.
+ */
+const templateOf = (inv) => inv.templateSnapshot || systemTemplateFor(DOC_TYPE.INVOICE);
 
 const LIVE_INVOICE_STATUSES = [
   INVOICE_STATUS.DRAFT, INVOICE_STATUS.FINAL, INVOICE_STATUS.EXPORTED,
@@ -174,7 +181,7 @@ export const decorateInvoice = (inv, db, options = {}) => {
   const shipmentRow = (db.shipments || []).find((sh) => sh.id === pls[0]?.shipmentId) || null;
   const shipment = shipmentRow ? decorateShipment(shipmentRow, db) : null;
 
-  const template = (db.templates || []).find((t) => t.id === out.templateId) || null;
+  const template = templateOf(out);
   /*
    * The decorated template carries the EFFECTIVE grain, not the buyer default.
    *
@@ -331,6 +338,7 @@ export const listInvoiceablePls = async (params = {}) => {
         id: pl.id,
         plNo: pl.plNo,
         status: pl.status,
+        buyerId: pl.buyerId ?? null,
         buyerCode: pl.buyerCode,
         buyerName: pl.buyerName,
         subClientCode: pl.subClientCode,
@@ -376,12 +384,11 @@ export const createInvoice = async (payload = {}) => {
   const shipmentRaw = (db.shipments || []).find((s) => s.id === first.shipmentId) || null;
   const shipment = shipmentRaw ? decorateShipment(shipmentRaw, db) : null;
 
-  const { template, matchedOn, isFallback } = resolveTemplate(db.templates || [], {
-    buyerCode: first.buyerCode,
-    subClientCode: first.subClientCode,
-    docType: DOC_TYPE.INVOICE,
-    onDate: todayStr(),
-  });
+  // Chosen by the user (a buyer may have several) and handed in as a snapshot of that
+  // revision; none means the built-in standard layout.
+  const chosen = payload.templateSnapshot || null;
+  if (chosen && chosen.docType !== DOC_TYPE.INVOICE) fail('VALIDATION', 'That template is not an invoice layout.');
+  const template = chosen || systemTemplateFor(DOC_TYPE.INVOICE);
 
   const fx = await getFxRate(todayStr(), commercial.currency || 'USD', 'INR');
   const extra = getExporterProfileExtra();
@@ -398,6 +405,7 @@ export const createInvoice = async (payload = {}) => {
     status: INVOICE_STATUS.DRAFT,
     invoiceDate: payload.invoiceDate || todayStr(),
 
+    buyerId: first.buyerId ?? null,
     buyerCode: first.buyerCode,
     buyerName: first.buyerName,
     subClientCode: first.subClientCode ?? null,
@@ -413,10 +421,11 @@ export const createInvoice = async (payload = {}) => {
       plVersion: pl.version,
     })),
 
-    templateId: template?.id ?? null,
-    templateVersion: template?.version ?? null,
-    templateMatchedOn: matchedOn,
-    templateIsFallback: isFallback,
+    templateId: chosen?.id ?? null,
+    templateVersion: chosen?.version ?? null,
+    templateSnapshot: chosen,
+    templateMatchedOn: chosen && !chosen.isSystem ? 'CHOSEN' : 'STANDARD',
+    templateIsFallback: !chosen || Boolean(chosen.isSystem),
     templateOverride: null,
 
     // Header (§8.2). Every value has a source; none is typed at create.
@@ -550,6 +559,76 @@ export const updateInvoice = async (id, payload = {}) => {
   return decorateInvoice(row, db);
 };
 
+/**
+ * A rate the user deliberately overrode is worth more than a regenerated default, so
+ * it is carried across when the same line comes back.
+ */
+const carryRateOverrides = (previous, lines) => {
+  const byKey = new Map((previous || []).filter((l) => l.rate !== l.orderRate).map((l) => [l.key, l]));
+  return lines.map((l) => (byKey.has(l.key)
+    ? recalcLine({ ...l, rate: byKey.get(l.key).rate, rateOverridden: true })
+    : l));
+};
+
+/**
+ * Change the template ONE draft invoice renders with — a newer revision of its own
+ * template (logged, no reason), or a different template (permissioned, with a reason).
+ * The lines are generated at the template's grain, so they are rebuilt; rates the user
+ * set are kept, and a grain override made under the old template is dropped with it.
+ */
+export const changeInvoiceTemplate = async (id, snapshot, { reason } = {}) => {
+  await delay();
+  const db = loadDb();
+  const row = (db.invoices || []).find((i) => i.id === Number(id));
+  if (!row) fail('NOT_FOUND', `Invoice ${id} not found`);
+  if (row.status !== INVOICE_STATUS.DRAFT) fail('CONFLICT', 'Only a draft invoice can change its template. Revise a final one first.');
+  if (!snapshot) fail('NOT_FOUND', 'That template was not found.');
+  if (snapshot.docType !== DOC_TYPE.INVOICE) fail('VALIDATION', 'That template is not an invoice layout.');
+
+  const current = row.templateSnapshot;
+  const upgrade = Boolean(current && !current.isSystem && current.templateCode === snapshot.templateCode
+    && Number(snapshot.version) > Number(current.version || 0));
+  const trimmed = String(reason || '').trim();
+  if (!upgrade && trimmed.length < 10) {
+    fail('VALIDATION', 'Give a reason of at least 10 characters — it is logged against the document.');
+  }
+
+  const from = current ? `${current.templateCode} v${current.version}` : 'the standard layout';
+  if (upgrade) {
+    row.templateOverride = row.templateOverride && { ...row.templateOverride, templateVersion: snapshot.version };
+  } else {
+    row.templateOverride = {
+      templateId: snapshot.id, templateVersion: snapshot.version, replacedTemplateId: row.templateId,
+      reason: trimmed, user: currentUserName(), at: nowStamp(),
+    };
+    row.grainOverride = null;
+    row.templateMatchedOn = 'CHANGED';
+  }
+  row.templateId = snapshot.id;
+  row.templateVersion = snapshot.version;
+  row.templateSnapshot = snapshot;
+  row.templateIsFallback = Boolean(snapshot.isSystem);
+
+  const pls = boundPls(db, row);
+  const effective = row.grainOverride?.mode
+    ? { ...snapshot, invoiceLineGrain: { ...(snapshot.invoiceLineGrain || {}), mode: row.grainOverride.mode } }
+    : snapshot;
+  const previous = row.lines || [];
+  row.lines = carryRateOverrides(previous, generateLines(db, pls, effective));
+  row.annexes = generateAnnexes(db, pls, effective);
+  row.version += 1;
+  row.updatedAt = nowStamp();
+  row.updatedBy = currentUserName();
+  pushAudit(db, {
+    entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo || row.provisionalNo,
+    action: upgrade ? 'Template revision updated' : 'Template changed',
+    details: `${from} to ${snapshot.templateCode} v${snapshot.version} · ${row.lines.length} line(s) rebuilt`,
+    reason: upgrade ? null : trimmed,
+  });
+  saveDb(db);
+  return decorateInvoice(row, db);
+};
+
 /** V-13's remedy: rebuild the lines from the packing lists as they stand now. */
 export const regenerateLines = async (id, options = {}) => {
   await delay();
@@ -559,7 +638,7 @@ export const regenerateLines = async (id, options = {}) => {
   if (row.status !== INVOICE_STATUS.DRAFT) fail('CONFLICT', 'Only a draft invoice can be regenerated.');
 
   const pls = boundPls(db, row);
-  const template = (db.templates || []).find((t) => t.id === row.templateId) || null;
+  const template = templateOf(row);
   /*
    * Changing the grain is a template-override-level act (§8.3); the caller gates it.
    *
@@ -581,14 +660,7 @@ export const regenerateLines = async (id, options = {}) => {
   row.lines = generateLines(db, pls, effective);
   row.annexes = generateAnnexes(db, pls, effective);
 
-  // A rate the user deliberately overrode is worth more than a regenerated default,
-  // so it is carried across when the same line comes back.
-  if (options.keepRateOverrides !== false) {
-    const byKey = new Map(previous.filter((l) => l.rate !== l.orderRate).map((l) => [l.key, l]));
-    row.lines = row.lines.map((l) => (byKey.has(l.key)
-      ? recalcLine({ ...l, rate: byKey.get(l.key).rate, rateOverridden: true })
-      : l));
-  }
+  if (options.keepRateOverrides !== false) row.lines = carryRateOverrides(previous, row.lines);
 
   if (options.grain) {
     row.grainOverride = { ...options.grain, reason: options.reason || null, by: currentUserName(), at: nowStamp() };

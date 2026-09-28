@@ -1,5 +1,5 @@
 import {
-  Alert, Card, Checkbox, Col, Descriptions, Divider, Input, InputNumber, Row, Space,
+  Alert, Button, Card, Checkbox, Col, Descriptions, Divider, Input, InputNumber, Row, Space,
   Table, Tag, Tooltip, Typography,
 } from 'antd';
 import { LockOutlined } from '@ant-design/icons';
@@ -36,7 +36,7 @@ export const ReadCell = ({ value, source, dp }) => (
 
 // ─── Step 1: source ─────────────────────────────────────────────────────────────
 
-export const InvStepSource = ({ inv }) => (
+export const InvStepSource = ({ inv, onChangeTemplate }) => (
   <Space orientation="vertical" size={16} style={{ width: '100%' }}>
     <Alert
       type="info"
@@ -79,9 +79,12 @@ export const InvStepSource = ({ inv }) => (
           <Text>{inv.template?.name || 'None'}</Text>
           {inv.template && <Tag>v{inv.template.version}</Tag>}
           {inv.templateIsFallback && (
-            <Tooltip title="No invoice template is configured for this buyer, so the generic Indian export layout is being used.">
-              <Tag color="gold">generic fallback</Tag>
+            <Tooltip title="The standard Indian export layout — the buyer had no invoice template, or it was picked.">
+              <Tag color="gold">standard layout</Tag>
             </Tooltip>
+          )}
+          {onChangeTemplate && (
+            <Button type="link" size="small" style={{ paddingInline: 0 }} onClick={onChangeTemplate}>Change</Button>
           )}
         </Space>
       </Descriptions.Item>

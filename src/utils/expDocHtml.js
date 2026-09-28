@@ -12,13 +12,19 @@
  * appears on screen and on paper in the same place, or in neither.
  */
 import exporterLogo from '../assets/images/sristi_logo.jpeg';
-import { esc, escAttr, cell, documentShell, pageCss } from './printDoc';
+import { esc, escAttr, documentShell, pageCss } from './printDoc';
 import { amountInWords } from './amountInWords';
-import { expandColumns, resolveBinding, formatBound } from './expDocTemplateSchema';
 import {
-  cartonCount, piecesPerCarton, totalPieces, cbmPerCarton, dimensionsLabel,
+  expandColumns, expandColumnSpec, resolveBinding, formatBound,
+} from './expDocTemplateSchema';
+import {
+  cartonCount, piecesPerCarton, piecesPerAssortment, totalPieces, cbmPerCarton, dimensionsLabel,
   sizeQtyPerCarton, formatRanges, sectionTotals, grandTotals, weightPerPiece,
 } from './expDocCalc';
+import {
+  textBlocksHtml, groupedHeadRows, sheetSections, blocksOf, blockTitleOf, totalsListHtml,
+  invoiceBoxPrinter, invoiceExtraFieldsHtml, templateInvoiceColumns,
+} from './expDocHtmlBlocks';
 import { PACKING_TYPE_LABELS, SECTION_KEY, PAPER_SPECS } from './expDocConstants';
 import { barcodeSvg } from './barcode1d';
 
@@ -70,9 +76,12 @@ const masthead = (template, ctx) => {
   </tr></table>`;
 };
 
-/** Header grid: the template's header fields, three to a row. */
+/**
+ * Header grid: the template's header fields, three to a row. A labelled field with no
+ * data source still prints — its label with an empty value, as the buyer's form has it.
+ */
 const headerGrid = (template, ctx) => {
-  const fields = (template?.headerFields || []).filter((f) => f.binding || f.fixedValue);
+  const fields = (template?.headerFields || []).filter((f) => f.binding || f.fixedValue || f.label);
   if (!fields.length) return '';
   const rows = [];
   for (let i = 0; i < fields.length; i += 3) rows.push(fields.slice(i, i + 3));
@@ -103,10 +112,16 @@ const cellValue = (col, row) => {
     case 'calc.totalPieces': return num(totalPieces(row));
     case 'calc.cbm': return num(cbmPerCarton(row), 3);
     case 'calc.dimensions': return dimensionsLabel(row) || '—';
+    // Per-row totals — the carton value times the cartons in the row.
+    case 'calc.totalNetWeightKg': return num((Number(row.netWeightKg) || 0) * cartonCount(row), 3);
+    case 'calc.totalGrossWeightKg': return num((Number(row.grossWeightKg) || 0) * cartonCount(row), 3);
+    case 'calc.totalCbm': return num(cbmPerCarton(row) * cartonCount(row), 3);
+    case 'calc.piecesPerAssortment': return num(piecesPerAssortment(row));
     default: break;
   }
   if (col.isSizeColumn) {
-    const q = sizeQtyPerCarton(row)[col.size];
+    // A ratio pack's size cells print the assortment ratio when the layout says so.
+    const q = col.sizeValue === 'RATIO' && row.ratio ? row.ratio[col.size] : sizeQtyPerCarton(row)[col.size];
     return q ? num(q) : '—';
   }
   return formatBound(resolveBinding(col.binding, { row, calc: {} }, { decimals: col.decimals }), {
@@ -118,55 +133,92 @@ const cellValue = (col, row) => {
 
 const alignClass = (col) => (col.align === 'right' ? ' class="n"' : col.align === 'center' ? ' class="c"' : '');
 
-/** A packing section: header row, carton rows, and its own total row. */
-const sectionTable = (section, spec, title) => {
+/** One carton row, and a mixed carton's colour sub-row. */
+const rowHtml = (row, spec) => {
+  const main = `<tr>${spec.map((c) => `<td${alignClass(c)}>${esc(cellValue(c, row))}</td>`).join('')}</tr>`;
+  // A mixed carton's colours cannot fit one line, so they follow as a sub-row —
+  // the same shape the buyer's own workbook uses.
+  if (!row.mixedRows?.length) return main;
+  const colours = row.mixedRows
+    .map((mr) => {
+      const sizes = Object.entries(mr.sizeQty || {}).filter(([, q]) => Number(q))
+        .map(([s, q]) => `${s}: ${q}`).join('   ');
+      return `${mr.colorName || '—'} — ${sizes}`;
+    })
+    .join(' | ');
+  return `${main}<tr><td colspan="${spec.length}" style="font-size:8px;color:#444;padding-left:14px;">${esc(colours)}</td></tr>`;
+};
+
+/**
+ * A total row. When the layout has a per-row total column ("TTL NT.WT"), the weight
+ * or CBM total prints under it rather than under the per-carton column; a size column
+ * that prints the assortment ratio has no meaningful sum.
+ */
+const totalRowHtml = (spec, totals, label) => {
+  const has = (binding) => spec.some((c) => c.binding === binding);
+  const n3 = (v) => `<td class="n">${num(v, 3)}</td>`;
+  return `<tr class="total">${spec.map((c, i) => {
+    if (i === 0) return `<td>${label}</td>`;
+    if (c.binding === 'row.cartonCount') return `<td class="n">${num(totals.cartons)}</td>`;
+    if (c.isSizeColumn) {
+      if (c.sizeValue === 'RATIO') return '<td></td>';
+      return `<td class="n">${totals.sizeQty?.[c.size] ? num(totals.sizeQty[c.size]) : ''}</td>`;
+    }
+    if (c.binding === 'calc.totalPieces') return `<td class="n">${num(totals.pieces)}</td>`;
+    if (c.binding === 'row.netWeightKg') return has('calc.totalNetWeightKg') ? '<td></td>' : n3(totals.netWeightKg);
+    if (c.binding === 'calc.totalNetWeightKg') return n3(totals.netWeightKg);
+    if (c.binding === 'row.grossWeightKg') return has('calc.totalGrossWeightKg') ? '<td></td>' : n3(totals.grossWeightKg);
+    if (c.binding === 'calc.totalGrossWeightKg') return n3(totals.grossWeightKg);
+    if (c.binding === 'calc.cbm') return has('calc.totalCbm') ? '<td></td>' : n3(totals.cbm);
+    if (c.binding === 'calc.totalCbm') return n3(totals.cbm);
+    return '<td></td>';
+  }).join('')}</tr>`;
+};
+
+/**
+ * A packing section: header row(s), carton rows, and its own total row. A sheet that
+ * blocks its rows by order / style prints a heading and a subtotal per block.
+ */
+const sectionTable = (section, spec, title, sheet = {}) => {
   const totals = sectionTotals(section.rows);
   // The template's column widths, honoured. A colgroup rather than per-cell widths
   // so a column that the layout does not size still shares what is left over.
   const cols = spec.some((c) => c.width)
     ? `<colgroup>${spec.map((c) => (c.width ? `<col style="width:${Number(c.width)}px" />` : '<col />')).join('')}</colgroup>`
     : '';
-  const head = `<tr>${spec.map((c) => `<th${alignClass(c)}>${esc(c.label)}</th>`).join('')}</tr>`;
+  const head = groupedHeadRows(spec, alignClass)
+    || `<tr>${spec.map((c) => `<th${alignClass(c)}>${esc(c.label)}</th>`).join('')}</tr>`;
 
-  const body = (section.rows || []).map((row) => {
-    const main = `<tr>${spec.map((c) => `<td${alignClass(c)}>${esc(cellValue(c, row))}</td>`).join('')}</tr>`;
-    // A mixed carton's colours cannot fit one line, so they follow as a sub-row —
-    // the same shape the buyer's own workbook uses.
-    if (!row.mixedRows?.length) return main;
-    const colours = row.mixedRows
-      .map((mr) => {
-        const sizes = Object.entries(mr.sizeQty || {}).filter(([, q]) => Number(q))
-          .map(([s, q]) => `${s}: ${q}`).join('   ');
-        return `${mr.colorName || '—'} — ${sizes}`;
-      })
-      .join(' | ');
-    return `${main}<tr><td colspan="${spec.length}" style="font-size:8px;color:#444;padding-left:14px;">${esc(colours)}</td></tr>`;
-  }).join('');
+  const body = sheet.blockBy?.length
+    ? blocksOf(section.rows, sheet.blockBy).map((rows) => `<tr><td colspan="${spec.length}" style="font-weight:700;background:#f7f7f7;">${
+      esc(blockTitleOf(sheet, rows[0]))}</td></tr>${rows.map((row) => rowHtml(row, spec)).join('')}${
+      sheet.blockTotals === false ? '' : totalRowHtml(spec, sectionTotals(rows), 'Subtotal')}`).join('')
+    : (section.rows || []).map((row) => rowHtml(row, spec)).join('');
 
-  const totalRow = `<tr class="total">${spec.map((c, i) => {
-    if (i === 0) return `<td>Total</td>`;
-    if (c.binding === 'row.cartonCount') return `<td class="n">${num(totals.cartons)}</td>`;
-    if (c.isSizeColumn) return `<td class="n">${totals.sizeQty?.[c.size] ? num(totals.sizeQty[c.size]) : ''}</td>`;
-    if (c.binding === 'calc.totalPieces') return `<td class="n">${num(totals.pieces)}</td>`;
-    if (c.binding === 'row.netWeightKg') return `<td class="n">${num(totals.netWeightKg, 3)}</td>`;
-    if (c.binding === 'row.grossWeightKg') return `<td class="n">${num(totals.grossWeightKg, 3)}</td>`;
-    if (c.binding === 'calc.cbm') return `<td class="n">${num(totals.cbm, 3)}</td>`;
-    return '<td></td>';
-  }).join('')}</tr>`;
+  const totalRow = totalRowHtml(spec, totals, 'Total');
 
   return `<div class="section-title">${esc(title)}</div>
     <table>${cols}${head}${body}${totalRow}</table>`;
 };
 
-/** Grand total, weight per piece, and the order-vs-shipped summary (PRD §7.4). */
-const summaryBlock = (pl, template) => {
+/** A summary sheet with no `blocks` list is the original full summary. */
+const ALL_SUMMARY_BLOCKS = ['GRAND_TOTAL', 'WEIGHT_PER_PIECE', 'ORDER_VS_SHIPPED'];
+
+/**
+ * Grand total, weight per piece, the order-vs-shipped summary (PRD §7.4) and the
+ * footer totals list — whichever of them the summary sheet asks for.
+ */
+const summaryBlock = (pl, template, blocks) => {
+  const want = new Set(blocks?.length ? blocks : ALL_SUMMARY_BLOCKS);
   const totals = grandTotals(pl.sections);
+  const list = want.has('TOTALS_LIST') ? totalsListHtml(pl, totals) : '';
+  if (!want.has('GRAND_TOTAL') && !want.has('WEIGHT_PER_PIECE') && !want.has('ORDER_VS_SHIPPED')) return list;
   const wpp = weightPerPiece(totals, {
     weightPerPieceDecimals: template?.formatting?.weightPerPieceDecimals ?? 5,
   });
   const dp = template?.formatting?.weightPerPieceDecimals ?? 5;
 
-  const grand = `<table class="summary">
+  const grand = !want.has('GRAND_TOTAL') && !want.has('WEIGHT_PER_PIECE') ? '' : `<table class="summary">
     <tr>
       <td>Total cartons</td><td class="grand">${num(totals.cartons)}</td>
       <td>Total pieces</td><td class="grand">${num(totals.pieces)}</td>
@@ -184,9 +236,10 @@ const summaryBlock = (pl, template) => {
     </tr>
   </table>`;
 
+  if (!want.has('ORDER_VS_SHIPPED')) return `${grand}${list}`;
   const variance = pl.orderVsPacked || [];
   if (!variance.length) {
-    return `${grand}<div class="note">No ordered breakdown was captured for this packing list.</div>`;
+    return `${grand}<div class="note">No ordered breakdown was captured for this packing list.</div>${list}`;
   }
 
   const rows = variance.map((v) => `<tr>
@@ -204,7 +257,7 @@ const summaryBlock = (pl, template) => {
       <tr><th>Style</th><th>Colour</th><th class="c">Size</th><th class="n">Order qty</th><th class="n">Shipped qty</th><th class="n">Excess / shortage</th></tr>
       ${rows}
       <tr class="total"><td colspan="3">Total</td><td class="n">${num(tot.o)}</td><td class="n">${num(tot.s)}</td><td class="n">${tot.d > 0 ? `+${num(tot.d)}` : num(tot.d)}</td></tr>
-    </table>`;
+    </table>${list}`;
 };
 
 /**
@@ -290,25 +343,35 @@ export const buildPackingListHtml = (pl, options = {}) => {
     invoice: {},
   };
 
-  const sheets = (template.sheets || [{ key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN] }])
-    .filter((sheet) => sheet.type !== 'SUMMARY')
-    .map((sheet) => (source.sections || [])
-      .filter((s) => (sheet.include || []).includes(s.key))
-      .map((s) => sectionTable(s, spec, sheet.title || s.title))
+  /*
+   * Each grid sheet prints the sections it includes — with its own column set when the
+   * buyer's layout differs per section (solid packs vs ratio packs), and only the rows
+   * of its packing types when it names any (see sheetSections). A sheet split by
+   * packing type that ends up with no rows is left out rather than printed empty.
+   */
+  const gridSheets = (template.sheets || [{ key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN] }])
+    .filter((sheet) => sheet.type !== 'SUMMARY');
+  const bySheet = sheetSections(gridSheets, source.sections);
+  const typed = gridSheets.some((sheet) => sheet.packingTypes?.length);
+  const sheets = gridSheets
+    .map((sheet, i) => bySheet[i]
+      .filter((s) => !typed || (s.rows || []).length)
+      .map((s) => sectionTable(s, sheet.columns?.length ? expandColumnSpec(sheet.columns, sizes) : spec, sheet.title || s.title, sheet))
       .join(''))
     .join('');
 
-  const wantsSummary = (template.sheets || []).some((s) => s.type === 'SUMMARY');
+  const summarySheet = (template.sheets || []).find((s) => s.type === 'SUMMARY');
+  const wantsSummary = Boolean(summarySheet);
 
   const body = `
     ${masthead(template, ctx)}
     <h1>${esc(template.identity?.titleText || 'PACKING LIST')}</h1>
     <div class="sub">${esc([source.plNo, source.buyerName, source.shipmentNo].filter(Boolean).join('  ·  '))}${
-  source.revision ? esc(`  ·  Revision ${source.revision}`) : ''}</div>
+  source.revision ? esc(`  ·  Revision ${source.revision}`) : ''}</div>${textBlocksHtml(template, 'HEADER')}
     ${addressBlocks(template, ctx)}
-    ${headerGrid(template, ctx)}
-    ${sheets}
-    ${wantsSummary ? summaryBlock(source, template) : ''}
+    ${headerGrid(template, ctx)}${textBlocksHtml(template, 'BEFORE_TABLE')}
+    ${sheets}${textBlocksHtml(template, 'AFTER_TABLE')}
+    ${wantsSummary ? summaryBlock(source, template, summarySheet.blocks) : ''}${textBlocksHtml(template, 'FOOTER')}
     <div class="note">${esc(
     band === 'DRAFT'
       ? 'DRAFT — not yet finalised.'
@@ -585,7 +648,14 @@ const TAIL_COLUMNS = (currency, unit) => [
   { key: 'amount', label: `Amount<br/>${esc(currency)}`, width: '84px', align: 'n', get: (l) => money(l.amount, 2) },
 ];
 
-const invoiceColumns = (grainMode, template, currency, unit) => {
+/**
+ * The goods-table columns: the buyer's own (`invoiceColumns`) when the template has
+ * them, else the grain's standard set. An annexe is the same data at another grain,
+ * so it always uses that grain's standard columns.
+ */
+const invoiceColumns = (grainMode, template, currency, unit, { standard = false } = {}) => {
+  const own = standard ? null : templateInvoiceColumns(template);
+  if (own) return [...own, ...TAIL_COLUMNS(currency, unit)];
   const base = (INVOICE_COLUMNS[grainMode] || INVOICE_COLUMNS.PER_STYLE_SIZE_RANGE)
     .filter((c) => !c.packaging || template?.invoiceLineGrain?.showPackagingAttributes);
   return [...base, ...TAIL_COLUMNS(currency, unit)];
@@ -658,26 +728,37 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
   const columns = invoiceColumns(grainMode, template, currency, unit);
   const span = columns.length;
 
+  // What a template's own header boxes, fields and columns bind against.
+  const bindCtx = {
+    invoice: { ...source, totals, plTotals, igst },
+    exporter,
+    shipment,
+    buyer: { name: source.buyerName, subClient: source.subClientCode },
+    pl: {},
+  };
+  const box = invoiceBoxPrinter(template, bindCtx);
+
   const ctx = {
     marksAndNos: source.marksAndNos || '',
     packages: plTotals.cartons ? `${int(plTotals.cartons)} CARTONS` : '',
     exporter,
+    bind: bindCtx,
   };
 
   const headerTable = `
   <table>
     <tr>
-      ${cell('Exporter', exporter.block || '', { colspan: 2, bold: true })}
-      ${cell('Invoice No. & Date', `${source.invoiceNo || source.provisionalNo || 'DRAFT'}   Dt. ${formatDocDate(source.invoiceDate, template.formatting)}`, { bold: true })}
-      ${cell("Exporter's Ref. (IEC No.)", exporter.iecNumber || '')}
+      ${box('exporter', 'Exporter', exporter.block || '', { colspan: 2, bold: true })}
+      ${box('invoiceNoDate', 'Invoice No. & Date', `${source.invoiceNo || source.provisionalNo || 'DRAFT'}   Dt. ${formatDocDate(source.invoiceDate, template.formatting)}`, { bold: true })}
+      ${box('exporterRef', "Exporter's Ref. (IEC No.)", exporter.iecNumber || '')}
     </tr>
     <tr>
-      ${cell('Consignee', source.consignee?.block || '', { colspan: 2, bold: true })}
-      ${cell("Buyer's Order No. & Date", [source.buyerOrderNo, source.buyerOrderDate].filter(Boolean).join('   Dt. '))}
-      ${cell('Buyer (if other than Consignee)', source.buyerName || '')}
+      ${box('consignee', 'Consignee', source.consignee?.block || '', { colspan: 2, bold: true })}
+      ${box('buyerOrder', "Buyer's Order No. & Date", [source.buyerOrderNo, source.buyerOrderDate].filter(Boolean).join('   Dt. '))}
+      ${box('buyerOther', 'Buyer (if other than Consignee)', source.buyerName || '')}
     </tr>
     <tr>
-      ${cell('Other References', [
+      ${box('otherRefs', 'Other References', [
     exporter.adCode ? `AD CODE: ${exporter.adCode}` : null,
     exporter.gstStateCode ? `GST STATE CODE: ${exporter.gstStateCode}` : null,
     exporter.panNumber ? `PAN: ${exporter.panNumber}` : null,
@@ -686,26 +767,26 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     exporter.rexNumber ? `REX: ${exporter.rexNumber}` : null,
     exporter.starExportHouse || null,
   ].filter(Boolean).join('\n'), { colspan: 2 })}
-      ${cell('Notify Party', source.notify?.block || '', { colspan: 2 })}
+      ${box('notify', 'Notify Party', source.notify?.block || '', { colspan: 2 })}
     </tr>
     <tr>
-      ${cell('Pre-Carriage by', shipment.preCarriageBy || 'N.A.')}
-      ${cell('Place of Receipt by Pre-Carrier', shipment.placeOfReceipt || 'N.A.')}
-      ${cell('Country of Origin of Goods', source.countryOfOrigin || 'INDIA', { bold: true })}
-      ${cell('Country of Final Destination', source.countryOfFinalDestination || '', { bold: true })}
+      ${box('preCarriage', 'Pre-Carriage by', shipment.preCarriageBy || 'N.A.')}
+      ${box('placeOfReceipt', 'Place of Receipt by Pre-Carrier', shipment.placeOfReceipt || 'N.A.')}
+      ${box('countryOfOrigin', 'Country of Origin of Goods', source.countryOfOrigin || 'INDIA', { bold: true })}
+      ${box('countryOfDestination', 'Country of Final Destination', source.countryOfFinalDestination || '', { bold: true })}
     </tr>
     <tr>
-      ${cell('Vessel / Flight No.', shipment.vesselFlightNo || '')}
-      ${cell('Port of Loading', shipment.portOfLoading || '')}
-      ${cell('Terms of Delivery & Payment', [
+      ${box('vessel', 'Vessel / Flight No.', shipment.vesselFlightNo || '')}
+      ${box('portOfLoading', 'Port of Loading', shipment.portOfLoading || '')}
+      ${box('terms', 'Terms of Delivery & Payment', [
     [source.incoterm, source.incotermPlace].filter(Boolean).join(' '),
     source.paymentTerms ? `PAYMENT: ${source.paymentTerms}` : null,
   ].filter(Boolean).join('\n'), { colspan: 2 })}
     </tr>
     <tr>
-      ${cell('Port of Discharge', shipment.portOfDischarge || '')}
-      ${cell('Final Destination', shipment.finalDestination || source.countryOfFinalDestination || '')}
-      ${cell('Container / Seal No.', [
+      ${box('portOfDischarge', 'Port of Discharge', shipment.portOfDischarge || '')}
+      ${box('finalDestination', 'Final Destination', shipment.finalDestination || source.countryOfFinalDestination || '')}
+      ${box('containerSeal', 'Container / Seal No.', [
     (shipment.containerNos || []).join(', '),
     shipment.sealNo ? `SEAL: ${shipment.sealNo}` : null,
   ].filter(Boolean).join('\n'), { colspan: 2 })}
@@ -759,7 +840,7 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
   const annexeHtml = (source.annexes || [])
     .filter((a) => (a.lines || []).length)
     .map((a) => {
-      const cols = invoiceColumns(a.grainMode, template, currency, unit);
+      const cols = invoiceColumns(a.grainMode, template, currency, unit, { standard: true });
       // `num` in this file FORMATS; summing with it would concatenate strings.
       const qty = a.lines.filter((l) => !l.nonMerchandise).reduce((t, l) => t + (Number(l.quantity) || 0), 0);
       const amount = a.lines.reduce((t, l) => t + (Number(l.amount) || 0), 0);
@@ -782,8 +863,8 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
 
   const body = `
   ${masthead(template, ctx)}
-  <div class="title"><span>${esc(template.identity?.titleText || 'COMMERCIAL INVOICE')}</span></div>
-  ${headerTable}
+  <div class="title"><span>${esc(template.identity?.titleText || 'COMMERCIAL INVOICE')}</span></div>${textBlocksHtml(template, 'HEADER')}
+  ${headerTable}${invoiceExtraFieldsHtml(template, bindCtx)}${textBlocksHtml(template, 'BEFORE_TABLE')}
   <table>
     <tr>${columns.map((c) => `<th${c.width ? ` style="width:${c.width}"` : ''} class="${c.align === 'n' ? 'n' : 'c'}">${c.label}</th>`).join('')}</tr>
     ${lineRows(lines, columns, ctx)}
@@ -819,8 +900,8 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
         <br/><br/><br/>${esc(exporter.signatory || 'Authorised Signatory')}
       </td>
     </tr>
-  </table>
-  ${annexeHtml}
+  </table>${textBlocksHtml(template, 'AFTER_TABLE')}
+  ${annexeHtml}${textBlocksHtml(template, 'FOOTER')}
   <div class="muted" style="margin-top:6px;">${esc(band === 'DRAFT'
     ? 'DRAFT — not yet finalised. This document has no allocated invoice number.'
     : (band

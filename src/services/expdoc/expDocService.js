@@ -1,10 +1,11 @@
 /**
  * Export Documentation API surface — the ONLY file screens import.
  *
- * Mock-only during this phase; every function keeps the signature the future real
- * endpoints (/api/v1/export-docs/...) will take, so integration swaps the delegate
- * without touching a single screen. The section comments record the endpoint each
- * group maps to.
+ * Buyer templates for packing lists and invoices are on the real API
+ * (/api/v1/export-docs/templates, via expDocTemplateStore); everything else is still
+ * the mock, and every mock function keeps the signature the future real endpoints
+ * will take, so integration swaps the delegate without touching a screen. The
+ * section comments record the endpoint each group maps to.
  *
  * Flipping USE_MOCK_EXPDOC_DATA to false before a backend exists throws a loud,
  * named error rather than silently returning undefined.
@@ -16,10 +17,13 @@ import * as mockPacking from './expDocMockPacking';
 import * as mockPackingLists from './expDocMockPackingLists';
 import * as mockStickers from './expDocMockStickers';
 import * as mockInvoices from './expDocMockInvoices';
-import * as mockTemplates from './expDocMockTemplates';
 import * as mockReports from './expDocMockReports';
 import * as mockNotifications from './expDocMockNotifications';
 import * as mockDashboard from './expDocMockDashboard';
+import * as templateStore from './expDocTemplateStore';
+import {
+  listTemplateCandidates as candidatesFor, loadTemplateSnapshot, findNewerTemplateRevision as newerRevision,
+} from './expDocTemplateBridge';
 
 const notReady = () => {
   throw new Error('Export Documentation backend not implemented yet — mock phase');
@@ -32,7 +36,6 @@ const packing = guard(mockPacking);
 const packingLists = guard(mockPackingLists);
 const stickers = guard(mockStickers);
 const invoices = guard(mockInvoices);
-const templates = guard(mockTemplates);
 const reports = guard(mockReports);
 const notifications = guard(mockNotifications);
 const dashboard = guard(mockDashboard);
@@ -69,15 +72,19 @@ export const listBindablePackingEntries = (...a) => packing.listBindablePackingE
 //    POST /{id}/status · /{id}/refresh · /{id}/acknowledge · /{id}/revise
 export const searchPackingLists = (...a) => packingLists.searchPackingLists(...a);
 export const getPackingList = (...a) => packingLists.getPackingList(...a);
-export const createPackingList = (...a) => packingLists.createPackingList(...a);
+/** `templateId` is the template the user chose; the document keeps a snapshot of it. */
+export const createPackingList = async (payload) => packingLists.createPackingList({
+  ...payload, templateSnapshot: await loadTemplateSnapshot(payload.templateId),
+});
 export const updatePackingList = (...a) => packingLists.updatePackingList(...a);
 export const refreshFromPacking = (...a) => packingLists.refreshFromPacking(...a);
 export const acknowledgeWarning = (...a) => packingLists.acknowledgeWarning(...a);
 export const changePlStatus = (...a) => packingLists.changeStatus(...a);
 export const revisePackingList = (...a) => packingLists.revisePackingList(...a);
 export const markPackingListExported = (...a) => packingLists.markPackingListExported(...a);
-export const overridePlTemplate = (...a) => packingLists.overridePlTemplate(...a);
-export const clearPlTemplateOverride = (...a) => packingLists.clearPlTemplateOverride(...a);
+/** Move a draft to a newer revision of its template, or (with a reason) to another template. */
+export const changePlTemplate = async (id, templateId, reason) =>
+  packingLists.changePlTemplate(id, await loadTemplateSnapshot(templateId), { reason });
 export const comparePackingLists = (...a) => packingLists.comparePackingLists(...a);
 export const deletePackingList = (...a) => packingLists.deletePackingList(...a);
 export const listBindableForShipment = (...a) => packingLists.listBindableForShipment(...a);
@@ -95,7 +102,11 @@ export const cartonPrintHistory = (...a) => stickers.cartonPrintHistory(...a);
 export const searchInvoices = (...a) => invoices.searchInvoices(...a);
 export const getInvoice = (...a) => invoices.getInvoice(...a);
 export const listInvoiceablePls = (...a) => invoices.listInvoiceablePls(...a);
-export const createInvoice = (...a) => invoices.createInvoice(...a);
+export const createInvoice = async (payload) => invoices.createInvoice({
+  ...payload, templateSnapshot: await loadTemplateSnapshot(payload.templateId),
+});
+export const changeInvoiceTemplate = async (id, templateId, reason) =>
+  invoices.changeInvoiceTemplate(id, await loadTemplateSnapshot(templateId), { reason });
 export const updateInvoice = (...a) => invoices.updateInvoice(...a);
 export const regenerateInvoiceLines = (...a) => invoices.regenerateLines(...a);
 export const acknowledgeInvoiceWarning = (...a) => invoices.acknowledgeInvoiceWarning(...a);
@@ -104,23 +115,30 @@ export const reviseInvoice = (...a) => invoices.reviseInvoice(...a);
 export const markInvoiceExported = (...a) => invoices.markInvoiceExported(...a);
 export const deleteInvoice = (...a) => invoices.deleteInvoice(...a);
 
-// ── Buyer document templates ── /export-docs/templates
-export const searchTemplates = (...a) => templates.searchTemplates(...a);
-export const getTemplate = (...a) => templates.getTemplate(...a);
-export const getTemplateHealth = (...a) => templates.getTemplateHealth(...a);
-export const listTemplateBuyers = (...a) => templates.listTemplateBuyers(...a);
-export const createTemplate = (...a) => templates.createTemplate(...a);
-export const cloneTemplate = (...a) => templates.cloneTemplate(...a);
-export const newTemplateVersion = (...a) => templates.newTemplateVersion(...a);
-export const updateTemplate = (...a) => templates.updateTemplate(...a);
-export const publishTemplate = (...a) => templates.publishTemplate(...a);
-export const retireTemplate = (...a) => templates.retireTemplate(...a);
-export const deleteTemplate = (...a) => templates.deleteTemplate(...a);
-export const exportTemplateJson = (...a) => templates.exportTemplateJson(...a);
-export const importTemplateJson = (...a) => templates.importTemplateJson(...a);
-export const compareTemplates = (...a) => templates.compareTemplates(...a);
-export const getTemplateSample = (...a) => templates.getTemplateSample(...a);
-export const resolveTemplateFor = (...a) => templates.resolveTemplateFor(...a);
+// ── Buyer document templates ── REAL API /export-docs/templates (packing list +
+//    invoice); carton-sticker templates still in the mock. Writes take the template
+//    object, whose `source` decides where they go.
+export const listAllTemplates = (...a) => templateStore.listAllTemplates(...a);
+export const getTemplate = (...a) => templateStore.getTemplate(...a);
+export const createTemplate = (...a) => templateStore.createTemplate(...a);
+export const saveUploadedTemplates = (...a) => templateStore.saveUploadedTemplates(...a);
+export const cloneTemplate = (...a) => templateStore.cloneTemplate(...a);
+export const newTemplateVersion = (...a) => templateStore.newTemplateVersion(...a);
+export const updateTemplate = (...a) => templateStore.updateTemplate(...a);
+export const publishTemplate = (...a) => templateStore.publishTemplate(...a);
+export const retireTemplate = (...a) => templateStore.retireTemplate(...a);
+export const deleteTemplate = (...a) => templateStore.deleteTemplate(...a);
+export const exportTemplateJson = (...a) => templateStore.exportTemplateJson(...a);
+export const importTemplateJson = (...a) => templateStore.importTemplateJson(...a);
+export const compareTemplates = (...a) => templateStore.compareTemplates(...a);
+export const getTemplateSample = (...a) => templateStore.getTemplateSample(...a);
+export const stickerTemplateConflicts = (...a) => templateStore.stickerTemplateConflicts(...a);
+export const listStickerBuyers = (...a) => templateStore.listStickerBuyers(...a);
+export const listTemplateCandidates = (...a) => candidatesFor(...a);
+export const findNewerTemplateRevision = (...a) => newerRevision(...a);
+export {
+  extractTemplate, templateAiErrorMessage, isAiNotConfigured, isNotATemplateDocument,
+} from './exportTemplateAiApi';
 
 // ── Reports and audit ── /export-docs/reports, /export-docs/audit
 export const packingStatusReport = (...a) => reports.packingStatusReport(...a);
@@ -128,7 +146,9 @@ export const shipmentRegisterReport = (...a) => reports.shipmentRegisterReport(.
 export const invoiceRegisterReport = (...a) => reports.invoiceRegisterReport(...a);
 export const varianceReport = (...a) => reports.varianceReport(...a);
 export const cartonMasterReport = (...a) => reports.cartonMasterReport(...a);
-export const templateCoverageReport = (...a) => reports.templateCoverageReport(...a);
+export const templateCoverageReport = async (params = {}) => reports.templateCoverageReport({
+  ...params, apiTemplates: await templateStore.apiTemplateSummaries(),
+});
 export const productivityReport = (...a) => reports.productivityReport(...a);
 export const searchAudit = (...a) => reports.searchAudit(...a);
 

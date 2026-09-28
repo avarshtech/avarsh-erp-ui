@@ -18,7 +18,7 @@ import {
 } from '../../utils/expDocCalc';
 import { decoratePl } from './expDocMockPackingLists';
 import { decorateInvoice } from './expDocMockInvoices';
-import { resolveTemplate } from '../../utils/expDocTemplateSchema';
+import { resolveTemplate, normBuyerName, templateMatchesBuyer } from '../../utils/expDocTemplateSchema';
 
 const LIVE_PL = [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 const SHIPPED_PL = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
@@ -385,41 +385,59 @@ export const cartonMasterReport = async (params = {}) => {
 
 // ─── 6. Template usage and coverage (§22) ───────────────────────────────────────
 
+/**
+ * Packing-list and invoice templates come from the API (`params.apiTemplates`, handed
+ * in by expDocService) and a buyer may have several active ones; carton stickers are
+ * still mock templates resolved one-per-buyer.
+ */
 export const templateCoverageReport = async (params = {}) => {
   await delay();
   const db = loadDb();
   const out = [];
+  const apiActive = (params.apiTemplates || []).filter((t) => t.status === TEMPLATE_STATUS.ACTIVE);
 
   /*
-   * Every buyer the system knows about, from EITHER source: a buyer can have
-   * templates without a commercial profile, and reading only the profiles is how a
-   * buyer's coverage gap stays invisible in the very report meant to surface it.
+   * Every buyer the system knows about, from EVERY source: a buyer can have templates
+   * without a commercial profile, and reading only the profiles is how a buyer's
+   * coverage gap stays invisible in the very report meant to surface it.
    */
-  const byCode = new Map();
-  (db.masters?.buyerCommercial || []).forEach((b) => byCode.set(b.buyerCode, b));
-  (db.templates || []).forEach((t) => {
-    if (t.buyerCode && !byCode.has(t.buyerCode)) {
-      byCode.set(t.buyerCode, { buyerCode: t.buyerCode, buyerName: t.buyerCode });
-    }
-  });
-  const buyers = [...byCode.values()];
+  const byName = new Map();
+  const addBuyer = (buyerName, buyerCode) => {
+    const key = normBuyerName(buyerName || buyerCode);
+    if (key && !byName.has(key)) byName.set(key, { buyerName: buyerName || buyerCode, buyerCode: buyerCode || null });
+  };
+  (db.masters?.buyerCommercial || []).forEach((b) => addBuyer(b.buyerName, b.buyerCode));
+  apiActive.forEach((t) => t.buyerName && addBuyer(t.buyerName, null));
+  (db.templates || []).forEach((t) => t.buyerCode && addBuyer(null, t.buyerCode));
 
-  buyers.forEach((b) => {
-    Object.values(DOC_TYPE).forEach((docType) => {
-      const { template, matchedOn, isFallback } = resolveTemplate(db.templates || [], {
-        buyerCode: b.buyerCode, docType,
-      });
+  [...byName.values()].forEach((b) => {
+    [DOC_TYPE.PACKING_LIST, DOC_TYPE.INVOICE].forEach((docType) => {
+      const own = apiActive.filter((t) => t.docType === docType && templateMatchesBuyer(t, { buyerName: b.buyerName }));
       out.push({
-        id: `${b.buyerCode}-${docType}`,
+        id: `${b.buyerName}-${docType}`,
         buyerCode: b.buyerCode,
         buyerName: b.buyerName,
         docType,
-        templateCode: template?.templateCode ?? null,
-        version: template?.version ?? null,
-        matchedOn,
-        usingGeneric: isFallback,
-        covered: Boolean(template) && !isFallback,
+        templateCode: own.length ? own.map((t) => `${t.templateCode} v${t.version}`).join(', ') : null,
+        version: own.length === 1 ? own[0].version : null,
+        matchedOn: own.length ? 'BUYER' : 'NONE',
+        usingGeneric: !own.length,
+        covered: own.length > 0,
       });
+    });
+    const { template, matchedOn, isFallback } = resolveTemplate(db.templates || [], {
+      buyerCode: b.buyerCode, docType: DOC_TYPE.STICKER,
+    });
+    out.push({
+      id: `${b.buyerName}-${DOC_TYPE.STICKER}`,
+      buyerCode: b.buyerCode,
+      buyerName: b.buyerName,
+      docType: DOC_TYPE.STICKER,
+      templateCode: template?.templateCode ?? null,
+      version: template?.version ?? null,
+      matchedOn,
+      usingGeneric: isFallback,
+      covered: Boolean(template) && !isFallback,
     });
   });
 
@@ -439,7 +457,8 @@ export const templateCoverageReport = async (params = {}) => {
     .sort((a, b) => Number(a.covered) - Number(b.covered)
       || String(a.buyerCode).localeCompare(String(b.buyerCode)));
 
-  const activeCount = (db.templates || []).filter((t) => t.status === TEMPLATE_STATUS.ACTIVE).length;
+  const activeCount = apiActive.length
+    + (db.templates || []).filter((t) => t.status === TEMPLATE_STATUS.ACTIVE).length;
   return { ...pageOf(rows, params), overrides, activeTemplates: activeCount };
 };
 

@@ -28,7 +28,7 @@ import {
   toRanges, countCartons, formatRanges, packedQuantities,
 } from '../../utils/expDocCalc';
 import { validate, buildAcknowledgement, acknowledgementApplies } from '../../utils/expDocValidation';
-import { resolveTemplate } from '../../utils/expDocTemplateSchema';
+import { systemTemplateFor } from '../../utils/expDocSystemTemplates';
 
 const find = (db, id) => db.packingLists.find((p) => p.id === Number(id));
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
@@ -130,22 +130,12 @@ const packedElsewhere = (db, pl) => {
   return out;
 };
 
-const templateFor = (db, pl) => {
-  if (pl.templateId) {
-    const exact = (db.templates || []).find(
-      (t) => t.id === pl.templateId && t.version === pl.templateVersion,
-    );
-    // Documents render the version they were built on — templates are immutable
-    // once active, so an exact match is the normal case.
-    if (exact) return exact;
-  }
-  return resolveTemplate(db.templates, {
-    buyerCode: pl.buyerCode,
-    subClientCode: pl.subClientCode,
-    docType: DOC_TYPE.PACKING_LIST,
-    onDate: pl.plDate,
-  }).template;
-};
+/**
+ * The layout a packing list renders with: the snapshot of the template revision it
+ * was made with (templates live in the API and are frozen once published, so the
+ * snapshot IS that revision), else the built-in standard layout.
+ */
+const templateFor = (pl) => pl.templateSnapshot || systemTemplateFor(DOC_TYPE.PACKING_LIST);
 
 /**
  * Staleness against the bound packing entries. Compares the stored entry VERSION,
@@ -183,7 +173,7 @@ const inherited = (own, from) => (own === null || own === undefined || own === '
 export const decoratePl = (pl, db, options = {}) => {
   const out = clone(pl);
   const rows = allRows(out);
-  const template = templateFor(db, out);
+  const template = templateFor(out);
   const tolerancePercent = out.tolerancePercent
     ?? getBuyerCommercial({ buyerCode: out.buyerCode, buyerName: out.buyerName }).tolerancePercent
     ?? 0;
@@ -324,28 +314,20 @@ export const createPackingList = async (payload) => {
 
   const shipment = db.shipments.find((s) => s.id === Number(payload.shipmentId));
 
-  /*
-   * The buyer and sub-client are settled BEFORE the template is resolved, and the
-   * same values are then stored on the document.
-   *
-   * Resolving with only what the caller passed while storing the shipment's or the
-   * entry's meant a JOMO/AMG list resolved as plain JOMO — no sub-client — and fell
-   * all the way through to the generic layout, quietly breaking §10.2's promise that
-   * a JOMO order for AMG picks the AMG template automatically. The packing entry is
-   * the most authoritative source: it is what is actually being packed.
-   */
   const buyerCode = payload.buyerCode ?? shipment?.buyerCode ?? entries[0]?.buyerCode ?? null;
   const subClientCode = payload.subClientCode
     ?? shipment?.subClientCode
     ?? entries[0]?.subClientCode
     ?? null;
 
-  const resolution = resolveTemplate(db.templates, {
-    buyerCode,
-    subClientCode,
-    docType: DOC_TYPE.PACKING_LIST,
-    onDate: payload.plDate || todayStr(),
-  });
+  /*
+   * The template was chosen by the user (a buyer may have several) and arrives as a
+   * snapshot of that revision. None means the built-in standard layout.
+   */
+  const template = payload.templateSnapshot || null;
+  if (template && template.docType !== DOC_TYPE.PACKING_LIST) {
+    fail('VALIDATION', 'That template is not a packing-list layout.');
+  }
   const sections = scaffoldSections(entries);
   const id = Math.max(0, ...db.packingLists.map((p) => p.id)) + 1;
 
@@ -368,6 +350,7 @@ export const createPackingList = async (payload) => {
     remarks: null,
     shipmentId: shipment?.id ?? null,
     shipmentNo: shipment?.shipmentNo ?? null,
+    buyerId: payload.buyerId ?? shipment?.buyerId ?? null,
     buyerCode,
     buyerName: payload.buyerName ?? shipment?.buyerName ?? entries[0]?.buyerName ?? null,
     subClientCode,
@@ -375,10 +358,11 @@ export const createPackingList = async (payload) => {
     orderNos: [...new Set(entries.map((e) => e.orderNo).filter(Boolean))],
     // Frozen from the entries, so a later size-preset edit cannot reorder columns.
     sizes: [...new Set(entries.flatMap((e) => e.sizes || []))],
-    templateId: resolution.template?.id ?? null,
-    templateVersion: resolution.template?.version ?? null,
-    templateMatchedOn: resolution.matchedOn,
-    templateIsFallback: resolution.isFallback,
+    templateId: template?.id ?? null,
+    templateVersion: template?.version ?? null,
+    templateSnapshot: template,
+    templateMatchedOn: template && !template.isSystem ? 'CHOSEN' : 'STANDARD',
+    templateIsFallback: !template || Boolean(template.isSystem),
     templateOverride: null,
     sourceRefs: entries.map((e) => ({
       packingEntryId: e.id,
@@ -407,7 +391,7 @@ export const createPackingList = async (payload) => {
     entityId: id,
     entityNo: record.plNo,
     action: 'Packing list created',
-    details: `Bound ${entries.map((e) => e.packingNo).join(', ')} · template ${resolution.template?.name || 'none'}`,
+    details: `Bound ${entries.map((e) => e.packingNo).join(', ')} · template ${template?.name || 'standard layout'}`,
   });
   saveDb(db);
   return decoratePl(record, db);
@@ -568,72 +552,57 @@ export const markPackingListExported = async (id, options = {}) => {
 };
 
 /**
- * Force a specific template version on ONE document (§10.2).
+ * Change the template ONE draft packing list renders with (§10.2).
  *
- * The buyer default is untouched — this changes what this document renders with, and
- * nothing else. Permissioned (`override`) and logged with a mandatory reason, because
- * it is the one way a document can stop matching what its buyer's register says.
+ * Two cases, told apart by the snapshot the caller hands in:
+ *  - a NEWER REVISION of the template it already uses (v1 to v2): the buyer changed
+ *    their layout and this draft follows. Logged, no reason needed.
+ *  - a DIFFERENT template: the user's choice at creation is being replaced, which is
+ *    permissioned (`override`) and needs a reason, because it is the one way a
+ *    document stops matching what was picked for it.
+ * A final or exported packing list is frozen; revise it first, then change the draft.
  */
-export const overridePlTemplate = async (id, templateId, reason) => {
+export const changePlTemplate = async (id, snapshot, { reason } = {}) => {
   await delay();
   const db = loadDb();
   const pl = find(db, id);
   if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
-  if (pl.status !== PL_STATUS.DRAFT) fail('CONFLICT', 'Only a draft document can have its template overridden.');
-  if (!reason || String(reason).trim().length < 10) {
+  if (pl.status !== PL_STATUS.DRAFT) {
+    fail('CONFLICT', 'Only a draft packing list can change its template. Revise a final one first.');
+  }
+  if (!snapshot) fail('NOT_FOUND', 'That template was not found.');
+  if (snapshot.docType !== DOC_TYPE.PACKING_LIST) fail('VALIDATION', 'That template is not a packing-list layout.');
+
+  const current = pl.templateSnapshot;
+  const upgrade = Boolean(current && !current.isSystem && current.templateCode === snapshot.templateCode
+    && Number(snapshot.version) > Number(current.version || 0));
+  const trimmed = String(reason || '').trim();
+  if (!upgrade && trimmed.length < 10) {
     fail('VALIDATION', 'Give a reason of at least 10 characters — it is logged against the document.');
   }
-  const tpl = (db.templates || []).find((t) => t.id === Number(templateId));
-  if (!tpl) fail('NOT_FOUND', `Template ${templateId} not found`);
-  if (tpl.docType !== DOC_TYPE.PACKING_LIST) fail('VALIDATION', 'That template is not a packing-list layout.');
 
-  const from = `${pl.templateId ? `#${pl.templateId}` : 'none'} v${pl.templateVersion ?? '-'}`;
-  pl.templateOverride = {
-    templateId: tpl.id,
-    templateVersion: tpl.version,
-    replacedTemplateId: pl.templateId,
-    reason: String(reason).trim(),
-    user: currentUserName(),
-    at: nowStamp(),
-  };
-  pl.templateId = tpl.id;
-  pl.templateVersion = tpl.version;
-  pl.templateMatchedOn = 'OVERRIDE';
-  pl.templateIsFallback = false;
+  const from = current ? `${current.templateCode} v${current.version}` : 'the standard layout';
+  pl.templateOverride = upgrade
+    ? (pl.templateOverride && { ...pl.templateOverride, templateVersion: snapshot.version })
+    : {
+      templateId: snapshot.id,
+      templateVersion: snapshot.version,
+      replacedTemplateId: pl.templateId,
+      reason: trimmed,
+      user: currentUserName(),
+      at: nowStamp(),
+    };
+  pl.templateId = snapshot.id;
+  pl.templateVersion = snapshot.version;
+  pl.templateSnapshot = snapshot;
+  if (!upgrade) pl.templateMatchedOn = 'CHANGED';
+  pl.templateIsFallback = Boolean(snapshot.isSystem);
   pl.version = (pl.version || 0) + 1;
   pushAudit(db, {
     entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
-    action: 'Template overridden',
-    details: `${from} to ${tpl.templateCode} v${tpl.version}`,
-    reason: pl.templateOverride.reason,
-  });
-  saveDb(db);
-  return decoratePl(pl, db);
-};
-
-/** Drop the override and go back to whatever the buyer's active template resolves to. */
-export const clearPlTemplateOverride = async (id) => {
-  await delay();
-  const db = loadDb();
-  const pl = find(db, id);
-  if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
-  if (!pl.templateOverride) fail('CONFLICT', 'This document has no template override.');
-  const resolution = resolveTemplate(db.templates, {
-    buyerCode: pl.buyerCode,
-    subClientCode: pl.subClientCode,
-    docType: DOC_TYPE.PACKING_LIST,
-    onDate: pl.plDate,
-  });
-  pl.templateOverride = null;
-  pl.templateId = resolution.template?.id ?? null;
-  pl.templateVersion = resolution.template?.version ?? null;
-  pl.templateMatchedOn = resolution.matchedOn;
-  pl.templateIsFallback = resolution.isFallback;
-  pl.version = (pl.version || 0) + 1;
-  pushAudit(db, {
-    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
-    action: 'Template override removed',
-    details: `Back to ${resolution.template?.templateCode || 'no template'}`,
+    action: upgrade ? 'Template revision updated' : 'Template changed',
+    details: `${from} to ${snapshot.templateCode} v${snapshot.version}`,
+    reason: upgrade ? null : trimmed,
   });
   saveDb(db);
   return decoratePl(pl, db);

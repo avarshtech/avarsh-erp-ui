@@ -1,72 +1,117 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Alert, App, Input, Modal, Segmented, Space, Typography } from 'antd';
+import {
+  Alert, App, AutoComplete, Input, Modal, Segmented, Space, Typography,
+} from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
-import { DOC_TYPE, DOC_TYPE_LABELS } from '../../../utils/expDocConstants';
+import { DOC_TYPE, DOC_TYPE_LABELS, SECTION_KEY } from '../../../utils/expDocConstants';
+import { SYSTEM_TEMPLATES, completeLayout } from '../../../utils/expDocSystemTemplates';
+import { parseImportEnvelope } from '../../../utils/expDocTemplateTransfer';
 import {
-  createTemplate, cloneTemplate, importTemplateJson, listTemplateBuyers,
+  createTemplate, cloneTemplate, importTemplateJson, listStickerBuyers,
 } from '../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
 const { TextArea } = Input;
 
-const MODE = { CLONE: 'Clone an existing', BLANK: 'Start blank', IMPORT: 'Import JSON' };
+const MODE = { CLONE: 'Copy an existing', BLANK: 'Start blank', IMPORT: 'Import JSON' };
+
+/** A layout with nothing buyer-specific in it yet, but sections that print every carton. */
+const blankLayout = (docType) => completeLayout(docType, {
+  headerFields: [],
+  addressBlocks: [],
+  textBlocks: [],
+  columns: [],
+  declarations: [],
+  sheets: docType === DOC_TYPE.PACKING_LIST ? [
+    { key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN], showSectionTotals: true },
+    { key: 'EXTRA', title: 'EXTRA CARTONS', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
+  ] : [],
+});
+
+/** "PRENATAL" from "Prénatal Moeder en Kind BV" — the start of a suggested code. */
+const codeBase = (name) => String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .toUpperCase().split(/[^A-Z0-9]+/).find((w) => w.length >= 3) || 'TPL';
+
+const SUFFIX = { [DOC_TYPE.PACKING_LIST]: 'PL', [DOC_TYPE.INVOICE]: 'INV', [DOC_TYPE.STICKER]: 'STK' };
 
 /**
- * One dialog for the three ways a template comes into being (§10.2, §10.3).
- *
- * Clone is first and default because the PRD makes it the primary path: adding a
- * buyer is meant to be "copy the nearest set and change the deltas", not "fill in
- * eleven blocks from nothing".
+ * The ways a template comes into being besides uploading the buyer's document:
+ * copy the nearest one and change the deltas (the PRD's primary path), start blank,
+ * or import a JSON export. Every one lands as a draft.
  */
-const TemplateCreateModal = ({ open, source, templates, onCancel, onCreated }) => {
+const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaultBuyerId, onCancel, onCreated }) => {
   const { message } = App.useApp();
   const [mode, setMode] = useState(MODE.CLONE);
   const [sourceId, setSourceId] = useState();
   const [templateCode, setTemplateCode] = useState('');
+  const [codeTouched, setCodeTouched] = useState(false);
   const [name, setName] = useState('');
   const [docType, setDocType] = useState(DOC_TYPE.PACKING_LIST);
+  const [buyerId, setBuyerId] = useState();
   const [buyerCode, setBuyerCode] = useState();
-  const [subClientCode, setSubClientCode] = useState();
+  const [subClientCode, setSubClientCode] = useState('');
   const [json, setJson] = useState('');
-  const [buyers, setBuyers] = useState([]);
   const [busy, setBusy] = useState(false);
+  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
   useEffect(() => {
     if (!open) return;
-    setMode(source ? MODE.CLONE : MODE.CLONE);
+    setMode(MODE.CLONE);
     setSourceId(source?.id);
     setTemplateCode('');
+    setCodeTouched(false);
     setName(source ? `${source.name} (copy)` : '');
     setDocType(source?.docType || DOC_TYPE.PACKING_LIST);
+    setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
     setBuyerCode(source?.buyerCode || undefined);
-    setSubClientCode(undefined);
+    setSubClientCode('');
     setJson('');
-    listTemplateBuyers().then(setBuyers).catch(() => setBuyers([]));
-  }, [open, source]);
+  }, [open, source, defaultBuyerId]);
 
-  const subClients = useMemo(
-    () => buyers.find((b) => b.value === buyerCode)?.subClients || [],
-    [buyers, buyerCode],
-  );
+  const pool = useMemo(() => {
+    const seen = new Set(templates.map((t) => t.id));
+    return [...templates, ...Object.values(SYSTEM_TEMPLATES).filter((t) => !seen.has(t.id))];
+  }, [templates]);
+  const chosen = pool.find((t) => t.id === sourceId) || (source?.id === sourceId ? source : null);
 
-  const cloneOptions = useMemo(() => (templates || []).map((t) => ({
+  const parsed = useMemo(() => {
+    if (mode !== MODE.IMPORT || !json.trim()) return null;
+    try { return parseImportEnvelope(json); } catch (e) { return { error: e.message }; }
+  }, [mode, json]);
+
+  const targetType = mode === MODE.CLONE ? chosen?.docType : (mode === MODE.IMPORT ? parsed?.docType : docType);
+  const isSticker = targetType === DOC_TYPE.STICKER;
+  const buyerName = buyers.find((b) => b.id === buyerId)?.name;
+
+  // A code suggested from the buyer and document, until the user types their own.
+  const suggestedCode = targetType ? `${codeBase(isSticker ? buyerCode : buyerName)}-${SUFFIX[targetType]}` : '';
+  const effectiveCode = codeTouched ? templateCode : suggestedCode;
+
+  const cloneOptions = useMemo(() => pool.map((t) => ({
     value: t.id,
-    label: `${t.templateCode} v${t.version} — ${DOC_TYPE_LABELS[t.docType]}`,
-  })), [templates]);
+    label: `${t.templateCode} v${t.version} — ${DOC_TYPE_LABELS[t.docType]}${t.isSystem ? ' (standard)' : ''}${t.buyerName ? ` · ${t.buyerName}` : ''}`,
+  })), [pool]);
 
-  const canSubmit = mode === MODE.IMPORT
-    ? Boolean(json.trim() && templateCode.trim())
-    : Boolean(templateCode.trim() && (mode === MODE.BLANK ? docType : sourceId));
+  const buyerOptions = isSticker
+    ? stickerBuyers
+    : buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
+
+  const canSubmit = Boolean(effectiveCode.trim() && name.trim()) && (
+    mode === MODE.CLONE ? Boolean(chosen) : (mode === MODE.IMPORT ? Boolean(parsed && !parsed.error) : Boolean(docType)));
 
   const handleOk = async () => {
     setBusy(true);
     try {
-      const common = { templateCode: templateCode.trim(), name: name.trim() || undefined, buyerCode, subClientCode };
+      const identity = {
+        templateCode: effectiveCode.trim(), name: name.trim(),
+        buyerId: isSticker ? null : buyerId ?? null, buyerName: isSticker ? null : buyerName ?? null,
+        buyerCode: isSticker ? buyerCode ?? null : null, subClientCode: subClientCode.trim() || null,
+      };
       let created;
-      if (mode === MODE.CLONE) created = await cloneTemplate(sourceId, common);
-      else if (mode === MODE.BLANK) created = await createTemplate({ ...common, docType });
-      else created = await importTemplateJson(json, common);
+      if (mode === MODE.CLONE) created = await cloneTemplate(chosen, identity);
+      else if (mode === MODE.IMPORT) created = await importTemplateJson(json, identity);
+      else created = await createTemplate({ ...blankLayout(docType), ...identity, docType });
       message.success(`${created.templateCode} created as a draft`);
       onCreated(created);
     } catch (e) {
@@ -78,114 +123,69 @@ const TemplateCreateModal = ({ open, source, templates, onCancel, onCreated }) =
 
   return (
     <Modal
-      open={open}
-      onCancel={onCancel}
-      title="New document template"
-      width={MODAL_WIDTHS.MEDIUM}
-      okText="Create draft"
-      onOk={handleOk}
-      confirmLoading={busy}
-      okButtonProps={{ disabled: !canSubmit }}
-      destroyOnHidden
+      open={open} onCancel={onCancel} title="New document template" width={MODAL_WIDTHS.MEDIUM}
+      okText="Create draft" onOk={handleOk} confirmLoading={busy} okButtonProps={{ disabled: !canSubmit }} destroyOnHidden
     >
       <Space orientation="vertical" size={12} style={{ width: '100%' }}>
         <Segmented block options={[MODE.CLONE, MODE.BLANK, MODE.IMPORT]} value={mode} onChange={setMode} />
 
         {mode === MODE.CLONE && (
-          <>
-            <Alert
-              type="info"
-              showIcon
-              title="Clone and edit the deltas"
-              description="Every block comes across — header fields, columns, sheets, declarations, sticker faces. Change only what differs for the new buyer."
-            />
-            <div>
-              <Text type="secondary">Clone from</Text>
-              <FormSelect
-                variant="default"
-                style={{ width: '100%' }}
-                value={sourceId}
-                onChange={setSourceId}
-                options={cloneOptions}
-                placeholder="Pick the nearest existing template"
-              />
-            </div>
-          </>
+          <div>
+            <Text type="secondary">Copy from</Text>
+            <FormSelect variant="default" style={{ width: '100%' }} value={sourceId} onChange={setSourceId}
+              options={cloneOptions} placeholder="Pick the nearest existing layout" />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Every block comes across — header, columns, sheets, declarations. Change only what differs.
+            </Text>
+          </div>
         )}
-
         {mode === MODE.BLANK && (
           <div>
             <Text type="secondary">Document type</Text>
-            <FormSelect
-              variant="default"
-              allowClear={false}
-              style={{ width: '100%' }}
-              value={docType}
-              onChange={setDocType}
-              options={Object.values(DOC_TYPE).map((d) => ({ value: d, label: DOC_TYPE_LABELS[d] }))}
-            />
+            <FormSelect variant="default" allowClear={false} style={{ width: '100%' }} value={docType} onChange={setDocType}
+              options={Object.values(DOC_TYPE).map((d) => ({ value: d, label: DOC_TYPE_LABELS[d] }))} />
+          </div>
+        )}
+        {mode === MODE.IMPORT && (
+          <div>
+            <Text type="secondary">Template JSON</Text>
+            <TextArea rows={6} name="importJson" value={json} placeholder='Paste the exported file, starting {"_format":"avarsh.expdoc.template"…'
+              onChange={(e) => setJson(e.target.value)} />
+            {parsed?.error && <Alert type="error" showIcon style={{ marginTop: 8 }} title={parsed.error} />}
+            {parsed && !parsed.error && (
+              <Text type="secondary" style={{ fontSize: 12 }}>{`A ${DOC_TYPE_LABELS[parsed.docType]} layout — it lands as a draft.`}</Text>
+            )}
           </div>
         )}
 
-        {mode === MODE.IMPORT && (
-          <>
-            <Alert
-              type="info"
-              showIcon
-              title="Imports always land as a draft"
-              description="A layout from another tenant has not been reviewed here, so it is never published on arrival."
-            />
-            <div>
-              <Text type="secondary">Template JSON</Text>
-              <TextArea
-                rows={6}
-                value={json}
-                placeholder='Paste the exported file, starting {"_format":"avarsh.expdoc.template"…'
-                onChange={(e) => setJson(e.target.value)}
-              />
-            </div>
-          </>
-        )}
-
         <div>
-          <Text type="secondary">Template code</Text>
-          <Input
-            value={templateCode}
-            placeholder="e.g. JOMO-PP-PL"
-            onChange={(e) => setTemplateCode(e.target.value.toUpperCase())}
+          <Text type="secondary">Buyer</Text>
+          <FormSelect
+            variant="default" style={{ width: '100%' }}
+            value={(isSticker ? buyerCode : buyerId) ?? undefined}
+            onChange={(v) => (isSticker ? setBuyerCode(v) : setBuyerId(v))}
+            options={buyerOptions} placeholder="Leave blank for a tenant-wide template"
           />
         </div>
-        <div>
-          <Text type="secondary">Name</Text>
-          <Input value={name} placeholder="Shown in the register" onChange={(e) => setName(e.target.value)} />
-        </div>
-        <Space size={12} style={{ width: '100%' }}>
-          <div style={{ minWidth: 220 }}>
-            <Text type="secondary">Buyer</Text>
-            <FormSelect
-              variant="default"
-              style={{ width: '100%' }}
-              value={buyerCode}
-              onChange={(v) => { setBuyerCode(v); setSubClientCode(undefined); }}
-              options={buyers}
-              placeholder="Leave blank for a generic template"
-            />
+        <Space size={12} style={{ width: '100%' }} wrap>
+          <div style={{ minWidth: 200 }}>
+            <Text type="secondary">Template code</Text>
+            <Input name="newTemplateCode" value={effectiveCode} placeholder="e.g. PRENATAL-PL"
+              onChange={(e) => { setCodeTouched(true); setTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); }} />
           </div>
-          <div style={{ minWidth: 220 }}>
+          <div style={{ minWidth: 160 }}>
             <Text type="secondary">Sub-client</Text>
-            <FormSelect
-              variant="default"
-              style={{ width: '100%' }}
-              value={subClientCode}
-              onChange={setSubClientCode}
-              options={subClients}
-              disabled={!subClients.length}
-              placeholder={subClients.length ? 'Optional' : 'This buyer has none'}
-            />
+            <AutoComplete style={{ width: '100%' }} value={subClientCode} placeholder="Optional"
+              onChange={(v) => setSubClientCode(String(v || '').toUpperCase())} options={[]} />
           </div>
         </Space>
+        <div>
+          <Text type="secondary">Name</Text>
+          <Input name="newTemplateName" value={name} placeholder="Shown when staff pick a template, e.g. Packing list — sea"
+            onChange={(e) => setName(e.target.value)} />
+        </div>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          The draft is not used by any document until it is published.
+          The draft is not offered on any document until it is published.
         </Text>
       </Space>
     </Modal>

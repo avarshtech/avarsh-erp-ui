@@ -45,6 +45,16 @@ export default defineConfig({
 
     // ── Module-Wise Test Suites ────────────────────────────
     {
+      // Buyer document templates (API) + the mock packing-list picker that uses them.
+      name: 'export-docs',
+      testDir: './e2e/specs/export-docs',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       name: 'master-data',
       testDir: './e2e/specs/master-data',
       use: {
