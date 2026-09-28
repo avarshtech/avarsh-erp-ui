@@ -106,7 +106,7 @@ test.describe('Sample Requests · lab dips', () => {
     expect(row.quantity).toBe(4);
   });
 
-  test('it never appears in the material issue picker', async () => {
+  test('it never reaches material issue — not in the picker, not awaiting issue, and refused by the server', async () => {
     const [raised] = await raiseSrBatch(api, {
       sampleTypeId: SAMPLE_TYPE.STRIKE_OFF, bomId: bom.bomId, bomLineIds: [lines[2].bomLineId],
     });
@@ -116,6 +116,23 @@ test.describe('Sample Requests · lab dips', () => {
     // place a lab dip would slip in and ask the store to issue fabric for it.
     const issuable = (await api.get('/sample-issues/issuable-srs')).data || [];
     expect(issuable.map((s) => s.id)).not.toContain(raised.id);
+
+    // The register's "awaiting material issue" alert is the other door: every
+    // submitted request used to be listed there, each a chip into the form.
+    const register = (await api.get('/sample-issues')).data || {};
+    expect((register.awaitingSrs || []).map((s) => s.id)).not.toContain(raised.id);
+
+    // And the server holds the rule itself, so a stale form or a direct call
+    // cannot issue stock to it and push it into production.
+    const full = await getSr(api, raised.id);
+    const refused = await api.post('/sample-issues/trims', {
+      sampleRequestId: raised.id,
+      receivedBy: 'E2E Store',
+      items: [{ lineNo: full.materials[0].lineNo, issueQty: 1 }],
+    });
+    expect(refused.status).toBe(409);
+    expect(refused.data?.message).toContain('no material is issued');
+    expect((await getSr(api, raised.id)).status).toBe('SUBMITTED');
   });
 
   test('it dispatches straight from submitted, with no production step', async () => {

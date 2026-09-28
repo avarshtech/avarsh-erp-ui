@@ -9,7 +9,7 @@ import DraftWatermark from '../../components/DraftWatermark';
 import { ActionButton } from '../../components/buttons';
 import { SR_STATUS_CONFIG, SR_STATUS_FLOW_BASE } from '../../utils/statusConfig';
 import {
-  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS, canReviseSrDeadline, srRevisionLabel,
+  SR_STATUS, getSrStatusLabel, SR_PRIORITY_OPTIONS, canReviseSrDeadline, srRevisionLabel, srIsMaterial,
 } from '../../utils/sampleRequestConstants';
 import { hasPermission } from '../../utils/permissions';
 import { formatDate } from '../../utils/formatters';
@@ -74,7 +74,16 @@ const SampleRequestView = ({ open, srId, onClose, onChanged, onOpenSr }) => {
   const statusFlow = useMemo(() => {
     if (!sr) return SR_STATUS_FLOW_BASE;
     const terminal = TERMINALS.includes(sr.status) ? sr.status : 'OUTCOME';
-    return [...SR_STATUS_FLOW_BASE, terminal];
+    // A lab dip or strike off goes from the vendor straight to a dispatch, so
+    // it has no production step — unless material was issued to it before that
+    // rule existed, in which case the step it really took stays on the record.
+    const skipsProduction = srIsMaterial(sr.sampleScope)
+      && sr.status !== SR_STATUS.IN_PRODUCTION
+      && !(sr.statusHistory || []).some((h) => h.status === SR_STATUS.IN_PRODUCTION);
+    const base = skipsProduction
+      ? SR_STATUS_FLOW_BASE.filter((st) => st !== SR_STATUS.IN_PRODUCTION)
+      : SR_STATUS_FLOW_BASE;
+    return [...base, terminal];
   }, [sr]);
 
   const getStepDescription = useCallback((status) => {

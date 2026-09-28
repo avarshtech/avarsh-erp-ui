@@ -11,6 +11,10 @@
  * fetch. Order here is the master's sort_order, NOT id order — Lab Dip and
  * Strike Off were added after "Others", which stays last as the catch-all.
  * Keep both in step with db/migration when the list changes.
+ *
+ * `materialSubmission` marks the types whose master scope is BOM_PER_ITEM: a
+ * swatch the vendor dyes or prints and that goes straight to a dispatch, so the
+ * Sample Issue register gives them no tab.
  */
 export const SAMPLE_TYPE_LIST = [
   { id: 1, name: 'Proto', colourSubstitutionDefault: true },
@@ -20,8 +24,8 @@ export const SAMPLE_TYPE_LIST = [
   { id: 5, name: 'PP Sample', colourSubstitutionDefault: false },
   { id: 6, name: 'Shipment Sample', colourSubstitutionDefault: false },
   { id: 7, name: 'SMS', colourSubstitutionDefault: false },
-  { id: 9, name: 'Lab Dip', colourSubstitutionDefault: false },
-  { id: 10, name: 'Strike Off', colourSubstitutionDefault: false },
+  { id: 9, name: 'Lab Dip', colourSubstitutionDefault: false, materialSubmission: true },
+  { id: 10, name: 'Strike Off', colourSubstitutionDefault: false, materialSubmission: true },
   { id: 8, name: 'Others', colourSubstitutionDefault: false },
 ];
 

@@ -13,6 +13,9 @@ const { Text } = Typography;
  * via material issue (inventory), dispatching via the Dispatches screen, and
  * feedback on the Customer Comments page — those rows NAVIGATE there. A
  * rejected sample is re-made from here as a linked revision.
+ *
+ * The one row that is hidden rather than disabled is material issue on a lab
+ * dip or strike off: that step is not unavailable for it, it does not exist.
  */
 
 const revisionReason = (sr, canAdd) => {
@@ -47,8 +50,9 @@ const ActionRow = ({ enabled, reason, icon, label, onClick, danger, primary }) =
 );
 
 const AvailableActionsPanel = ({ sr, canAdd, canUpdate, canDelete, canIssue, handlers }) => {
-  // A lab dip or strike off runs a shorter lifecycle than a garment sample:
-  // submitted straight to dispatched, with no material issue in between.
+  // A lab dip or strike off runs a shorter lifecycle than a garment sample: the
+  // vendor dyes or prints it and it goes from submitted straight to dispatched,
+  // with no material issue in between.
   const isMaterial = srIsMaterial(sr?.sampleScope);
   const s = sr.status;
   const terminal = [SR_STATUS.APPROVED, SR_STATUS.REJECTED, SR_STATUS.REVISION_REQUIRED].includes(s);
@@ -70,30 +74,31 @@ const AvailableActionsPanel = ({ sr, canAdd, canUpdate, canDelete, canIssue, han
           reason="Available only while Submitted — returned for edits"
           icon={<RollbackOutlined />} label="Return to Draft" onClick={handlers.onReturnToDraft}
         />
-        <ActionRow
-          // Gated on the issue screen's own permission — the route it opens is
-          // wrapped in PermissionRoute, so an ungated button dead-ends on a 403.
-          // Still offered In Production: fabric and trims are separate documents
-          // and are rarely issued the same day, so the second one has to be
-          // reachable from here and not only from the issue register.
-          // A lab dip consumes nothing from the rack — the mill dyes the swatch
-          // — so it never passes through production and this is not its path.
-          enabled={!isMaterial && (s === SR_STATUS.SUBMITTED || s === SR_STATUS.IN_PRODUCTION) && canIssue}
-          reason={isMaterial
-            ? 'A lab dip is dyed by the mill — no material is issued for it'
-            : !canIssue
+        {!isMaterial && (
+          <ActionRow
+            // Gated on the issue screen's own permission — the route it opens is
+            // wrapped in PermissionRoute, so an ungated button dead-ends on a 403.
+            // Still offered In Production: fabric and trims are separate documents
+            // and are rarely issued the same day, so the second one has to be
+            // reachable from here and not only from the issue register.
+            enabled={(s === SR_STATUS.SUBMITTED || s === SR_STATUS.IN_PRODUCTION) && canIssue}
+            reason={!canIssue
               ? 'Needs Material Issue (add) permission'
               : 'Production starts when material is issued — available from Submitted until dispatch'}
-          icon={<ToolOutlined />} primary={s === SR_STATUS.SUBMITTED}
-          label={s === SR_STATUS.IN_PRODUCTION ? 'Issue More Materials' : 'Issue Materials & Start Production'}
-          onClick={handlers.onGoMaterialIssue}
-        />
+            icon={<ToolOutlined />} primary={s === SR_STATUS.SUBMITTED}
+            label={s === SR_STATUS.IN_PRODUCTION ? 'Issue More Materials' : 'Issue Materials & Start Production'}
+            onClick={handlers.onGoMaterialIssue}
+          />
+        )}
         <ActionRow
           // Straight from Submitted for a material submission, which has no
-          // production step to wait for.
-          enabled={isMaterial ? s === SR_STATUS.SUBMITTED : s === SR_STATUS.IN_PRODUCTION}
+          // production step to wait for. In Production too: one issued material
+          // before that rule existed, and the server still ships it.
+          enabled={isMaterial
+            ? s === SR_STATUS.SUBMITTED || s === SR_STATUS.IN_PRODUCTION
+            : s === SR_STATUS.IN_PRODUCTION}
           reason={isMaterial
-            ? 'Available once submitted — a lab dip goes out as soon as it is raised'
+            ? 'Available once submitted — a lab dip or strike off goes to the buyer as soon as the vendor sends it'
             : 'Available while In Production — several SRs of one customer ship together'}
           icon={<CarOutlined />} primary
           label="Add to a Dispatch"

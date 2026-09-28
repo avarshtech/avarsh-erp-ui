@@ -23,11 +23,16 @@ const { Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const ALL = 'ALL';
+// A lab dip or strike off goes from the vendor straight to a dispatch, so it
+// gets no tab here. The few issued before that rule stay under All Types, where
+// they can still be cancelled to put their stock back.
+const ISSUE_TYPES = SAMPLE_TYPE_LIST.filter((t) => !t.materialSubmission);
+const MATERIAL_TYPE_IDS = new Set(SAMPLE_TYPE_LIST.filter((t) => t.materialSubmission).map((t) => t.id));
 // The catch-all tab, found by name rather than by position: the list grows at
-// the end (Lab Dip, Strike Off), and a new type landing here silently would
-// send every unknown row to the wrong tab.
-const OTHERS_TYPE_ID = (SAMPLE_TYPE_LIST.find((t) => t.name === 'Others')
-  || SAMPLE_TYPE_LIST[SAMPLE_TYPE_LIST.length - 1]).id;
+// the end, and a new type landing here silently would send every unknown row
+// to the wrong tab.
+const OTHERS_TYPE_ID = (ISSUE_TYPES.find((t) => t.name === 'Others')
+  || ISSUE_TYPES[ISSUE_TYPES.length - 1]).id;
 
 // Sample volumes are small (a handful of documents per style), so one window
 // covers the register and lets both toggle badges and every tab badge be
@@ -127,8 +132,11 @@ const SampleIssueRegister = ({ issueType = 'FABRIC', onIssueTypeChange }) => {
   const sideRows = bySide[issueType] || bySide.FABRIC;
 
   const byType = useMemo(() => {
-    const map = new Map(SAMPLE_TYPE_LIST.map((t) => [t.id, []]));
+    const map = new Map(ISSUE_TYPES.map((t) => [t.id, []]));
     sideRows.forEach((r) => {
+      // Listed under All Types only — filing it under Others would call it
+      // something it is not
+      if (MATERIAL_TYPE_IDS.has(r.sampleTypeId)) return;
       // A type id the fixed list does not know still lands somewhere sensible
       (map.get(r.sampleTypeId) || map.get(OTHERS_TYPE_ID)).push(r);
     });
@@ -216,7 +224,7 @@ const SampleIssueRegister = ({ issueType = 'FABRIC', onIssueTypeChange }) => {
     const body = (data, typeName) => <>{toggle}{renderTable(data, typeName)}</>;
     return [
       { key: ALL, label: label('All Types', sideRows.length), children: body(sideRows, null) },
-      ...SAMPLE_TYPE_LIST.map((t) => {
+      ...ISSUE_TYPES.map((t) => {
         const data = byType.get(t.id) || [];
         return { key: String(t.id), label: label(t.name, data.length), children: body(data, t.name) };
       }),

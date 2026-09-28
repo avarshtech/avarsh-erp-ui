@@ -95,6 +95,11 @@ test.describe('Sample Requests — every screen loads on the API', () => {
     await expect(toggle).toBeVisible();
     await expect(toggle).toContainText('Trims Issues');
 
+    // A lab dip or strike off goes from the vendor straight to a dispatch, so
+    // the store has no register of them to keep.
+    await expect(page.getByRole('tab', { name: /Lab Dip/ })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /Strike Off/ })).toHaveCount(0);
+
     await page.getByRole('tab', { name: /Proto/ }).click();
     await settle(page, 500);
     const inTab = page.locator('[role="tabpanel"]:visible').locator('.ant-segmented')
