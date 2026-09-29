@@ -17,6 +17,7 @@ import { jobWorkPoStatusOptions, jobWorkPoStatusLabel, isOpenPo, poFlags } from 
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { listGpos } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
+import { LIST_GUTTER, LIST_SEARCH_FLEX, RANGE_COL, lineFilter } from '../jobWork/jobWorkListFilters';
 import { buildGpoListColumns } from './gpoListColumns';
 import { GPO_DIALOGS } from './gpoDialogs';
 import useGpoListActions from './useGpoListActions';
@@ -26,14 +27,14 @@ const OPEN = 'OPEN';
 const options = (rows, field) => [...new Set(rows.flatMap((r) => [].concat(r[field] || [])))].sort().map((v) => ({ value: v, label: v }));
 const inRange = (d, [from, to] = []) => (!from || !dayjs(d).isBefore(from, 'day')) && (!to || !dayjs(d).isAfter(to, 'day'));
 
-/** Garment Process PO list (PRD §22, S1): opens on the open POs; filters of §22; CSV export. */
+/** Garment Process PO list (PRD §22, S1): opens on the open POs; filters of §22 but the delivery date (product team); CSV export. */
 const GarmentProcessPoList = () => {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [filters, setFilters] = useState({ status: [OPEN], process: [], order: undefined, style: undefined, vendor: undefined, poDate: null, returnDate: null });
+  const [filters, setFilters] = useState({ status: [OPEN], process: [], order: undefined, style: undefined, vendor: undefined, poDate: null });
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
 
   const load = useCallback(async () => {
@@ -62,8 +63,7 @@ const GarmentProcessPoList = () => {
       && (!st.length || st.some((s) => (s === OPEN ? isOpenPo(r.status) : r.status === s)))
       && (!filters.process?.length || filters.process.includes(r.processLabel))
       && (!filters.order || r.orderNos.includes(filters.order)) && (!filters.style || r.styleNos.includes(filters.style))
-      && (!filters.vendor || r.vendorName === filters.vendor)
-      && inRange(r.poDate, filters.poDate || []) && inRange(r.expectedReturnDate, filters.returnDate || []));
+      && (!filters.vendor || r.vendorName === filters.vendor) && inRange(r.poDate, filters.poDate || []));
   }, [rows, debouncedSearch, filters]);
 
   const openRow = useCallback((r) => navigate(`${BASE}/${r.id}`), [navigate]);
@@ -76,11 +76,11 @@ const GarmentProcessPoList = () => {
     ...filtered.map((r) => [r.poNo, r.gprNos.join(' '), r.orderNos.join(' '), r.styleNos.join(' '), r.vendorName, r.processLabel, r.poQty,
       r.poValue, r.poDate, r.expectedReturnDate, jobWorkPoStatusLabel(r.status), r.flags.map((f) => f.label).join(' ')]),
   ], `GarmentProcessPOs_${dayjs().format('YYYYMMDD')}.csv`);
-  const select = (key, placeholder, opts, multiple = false) => ({
-    type: 'select', span: multiple ? { xs: 24, sm: 12, md: 6, lg: 4 } : { xs: 12, sm: 8, md: 4, lg: 3 },
+  const select = (key, placeholder, opts, px, multiple = false) => ({
+    type: 'select', ...lineFilter(px, multiple ? { xs: 24, sm: 12, md: 6 } : { xs: 12, sm: 8, md: 4 }),
     props: { placeholder, value: filters[key], onChange: setFilter(key), options: opts, allowClear: true, 'aria-label': placeholder, ...(multiple ? { mode: 'multiple', maxTagCount: 'responsive' } : {}) },
   });
-  const range = (key, placeholder) => ({ type: 'rangePicker', span: { xs: 24, sm: 12, md: 6, lg: 5 }, props: { placeholder, value: filters[key], onChange: setFilter(key) } });
+  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 6 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
 
   return (
     <div className="animate-fade-in-up">
@@ -93,13 +93,13 @@ const GarmentProcessPoList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
-          searchPlaceholder="Search PO no., requirement no., vendor..."
+          searchPlaceholder="PO no., GPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
-            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('GPO')], true),
-            select('process', 'Process', options(rows, 'processLabel'), true),
-            select('order', 'Order', options(rows, 'orderNos')), select('style', 'Style', options(rows, 'styleNos')),
-            select('vendor', 'Vendor', options(rows, 'vendorName')),
-            range('poDate', ['PO date from', 'PO date to']), range('returnDate', ['Delivery from', 'Delivery to']),
+            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('GPO')], 127, true),
+            select('process', 'Process', options(rows, 'processLabel'), 116, true),
+            select('order', 'Order', options(rows, 'orderNos'), 120), select('style', 'Style', options(rows, 'styleNos'), 104),
+            select('vendor', 'Vendor', options(rows, 'vendorName'), 116),
+            range('poDate', ['PO date from', 'PO date to']),
           ]}
         />
         <Table

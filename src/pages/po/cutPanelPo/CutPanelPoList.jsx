@@ -16,6 +16,7 @@ import { downloadCsv } from '../../../utils/download';
 import { jobWorkPoStatusOptions, jobWorkPoStatusLabel, isOpenPo, poFlags } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { listCpps } from '../../../services/po/cutPanelPo/cutPanelPoService';
+import { LIST_GUTTER, LIST_SEARCH_FLEX, RANGE_COL, lineFilter } from '../jobWork/jobWorkListFilters';
 import { buildCutPanelPoColumns } from './cutPanelPoListColumns';
 
 const BASE = JOB_WORK_PO_PATH.CPP;
@@ -67,11 +68,11 @@ const CutPanelPoList = () => {
     ...filtered.map((r) => [r.poNo, r.poDate, r.cprNos.join(' '), r.orderNos.join(' '), r.styleNos.join(' '), r.buyers.join(' '), r.vendorName,
       r.processLabel, r.poQty, r.poValue, r.requiredDeliveryDate, jobWorkPoStatusLabel(r.status), r.flags.map((f) => f.label).join(' ')]),
   ], `CutPanelPOs_${dayjs().format('YYYYMMDD')}.csv`);
-  const select = (key, placeholder, opts) => ({
-    type: 'select', span: { xs: 12, sm: 8, md: 4, lg: 3 },
+  const select = (key, placeholder, opts, px) => ({
+    type: 'select', ...lineFilter(px, { xs: 12, sm: 8, md: 4 }),
     props: { placeholder, value: filters[key], onChange: setFilter(key), options: opts, allowClear: true, 'aria-label': placeholder },
   });
-  const range = (key, placeholder) => ({ type: 'rangePicker', span: { xs: 24, sm: 12, md: 6, lg: 5 }, props: { placeholder, value: filters[key], onChange: setFilter(key) } });
+  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 6 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
 
   return (
     <div className="animate-fade-in-up">
@@ -84,11 +85,11 @@ const CutPanelPoList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
-          searchPlaceholder="Search PO, CPR, order, style, buyer, job worker..."
+          searchPlaceholder="PO no., CPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
-            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('CPP')]),
-            select('process', 'Process', options(rows, 'processLabel')),
-            select('vendor', 'Job worker', options(rows, 'vendorName')),
+            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('CPP')], 108),
+            select('process', 'Process', options(rows, 'processLabel'), 104),
+            select('vendor', 'Job worker', options(rows, 'vendorName'), 110),
             range('poDate', ['PO date from', 'PO date to']),
             range('delivery', ['Delivery from', 'Delivery to']),
           ]}

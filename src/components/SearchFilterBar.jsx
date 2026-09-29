@@ -6,7 +6,7 @@ import { DATE_FORMAT } from '../utils/uiConstants';
 const { RangePicker } = DatePicker;
 
 const renderFilter = (filter, key) => {
-  const { type, props: filterProps = {}, span = {} } = filter;
+  const { type, props: filterProps = {}, span = {}, colStyle } = filter;
 
   const colSpan = {
     xs: span.xs || 24,
@@ -48,16 +48,23 @@ const renderFilter = (filter, key) => {
   }
 
   return (
-    <Col key={key} {...colSpan}>
+    <Col key={key} {...colSpan} style={colStyle}>
       {content}
     </Col>
   );
 };
 
+/**
+ * Search box, `filters` ({ type, props, span, colStyle?, key? }), Clear, Refresh. A bar that must stay
+ * on one line gives each filter a pixel `span.lg` flex with `colStyle: { minWidth: 0 }` (a long value
+ * is cut short, not widening its column) and a `searchFlex` basis, which applies from lg up — below
+ * that, and by default ('auto'), the search box grows into the rest of its line.
+ */
 const SearchFilterBar = memo(function SearchFilterBar({
   searchText,
   onSearchChange,
   searchPlaceholder = 'Search...',
+  searchFlex = 'auto',
   filters = [],
   onClear,
   onRefresh,
@@ -66,6 +73,8 @@ const SearchFilterBar = memo(function SearchFilterBar({
   style,
   ...restProps
 }) {
+  // Col's plain `flex` is an inline style at every width, so a custom basis goes in lg's slot.
+  const searchCol = searchFlex === 'auto' ? { flex: 'auto' } : { xs: { flex: 'auto' }, lg: { flex: searchFlex } };
   return (
     <Row
       gutter={[16, 16]}
@@ -74,7 +83,7 @@ const SearchFilterBar = memo(function SearchFilterBar({
       style={style}
       {...restProps}
     >
-      <Col flex="auto">
+      <Col {...searchCol}>
         <Input
           prefix={<SearchOutlined />}
           allowClear
