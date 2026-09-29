@@ -3,7 +3,7 @@ import { Alert, Button, Flex, Typography } from 'antd';
 import { AudioOutlined, CheckOutlined, CloseOutlined, UndoOutlined } from '@ant-design/icons';
 import GenieText from './GenieText';
 import GenieProposalCard from './GenieProposalCard';
-import GenieMark from './GenieMark';
+import LayaMark from './LayaMark';
 
 const { Text } = Typography;
 
@@ -21,7 +21,7 @@ export default function GenieMessageList({ messages, chat }) {
         </div>
       ) : (
         <div key={m.id} className="genie-msg genie-msg-genie">
-          {m.pending && <div className="genie-thinking"><GenieMark size={26} thinking /><Text type="secondary">Thinking…</Text></div>}
+          {m.pending && <div className="genie-thinking"><LayaMark size={22} thinking /><Text type="secondary">Thinking…</Text></div>}
           {m.error && <Alert type="warning" showIcon title={m.error} />}
           {m.text && <GenieText text={m.text} />}
           {m.results?.length > 0 && (

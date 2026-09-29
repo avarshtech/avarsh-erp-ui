@@ -14,6 +14,11 @@ const sum = (rows, field) => rows.reduce((s, r) => s + (Number(r[field]) || 0), 
 const round2 = (n) => Math.round(n * 100) / 100;
 export const rowSizes = (row) => (row.sizes || '').split(',').map((s) => s.trim()).filter(Boolean);
 const inSize = (row, size) => { const list = rowSizes(row); return list.length === 0 || list.includes(size); };
+// Sizes in the order the sheet lists them (XS, S, M, L…); any a row names outside that list go last.
+const bySheetOrder = (sheetSizes = []) => (a, b) => {
+  const rank = (s) => { const i = sheetSizes.indexOf(s); return i < 0 ? sheetSizes.length : i; };
+  return rank(a) - rank(b) || a.localeCompare(b);
+};
 
 export function computeTotals({ sections, commercial }, header, usdToInrRate) {
   const { currency, quoteCurrency, costingType } = header;
@@ -52,7 +57,7 @@ export function computeTotals({ sections, commercial }, header, usdToInrRate) {
   const price = quote(whole.making, agentPct, profitPct);
 
   const allRows = Object.values(sections).flat();
-  const sizeKeys = [...new Set(allRows.flatMap(rowSizes))].sort();
+  const sizeKeys = [...new Set(allRows.flatMap(rowSizes))].sort(bySheetOrder(header.sizes));
   const perSize = sizeKeys.length <= 1 ? [] : sizeKeys.map((size) => {
     const part = breakdown((key) => sections[key].filter((r) => inSize(r, size)));
     const override = commercial.perSizeOverrides[size] || {};

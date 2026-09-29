@@ -124,6 +124,28 @@ test('A material whose item exists lists its variants, and a known name reuses t
   await expect(row.locator('.ant-select').filter({ has: page.locator('input[aria-label="Fabric Name"]') })).toContainText('Black');
 });
 
+test("Today's Rate sits read-only beside Actual Rate; attachments under Section A; the price panel floats", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await navigateWithAuth(page, '/costing/new');
+
+  // A new sheet starts from today's stored market rate, shown read-only beside the editable one.
+  const today = page.locator('#todaysRate');
+  await expect(today).toHaveAttribute('readonly', '');
+  await expect(today).not.toHaveValue('');
+  await expect.poll(async () => Number(await page.locator('#actualRate').inputValue())).toBe(Number(await today.inputValue()));
+
+  const header = await page.locator('[data-genie-anchor="header"]').boundingBox();
+  const attachments = await page.locator('[data-genie-anchor="attachments"]').boundingBox();
+  expect(attachments.y - (header.y + header.height)).toBeGreaterThanOrEqual(0);
+  expect(attachments.y - (header.y + header.height)).toBeLessThan(40);
+
+  await page.mouse.wheel(0, 2000);
+  await expect.poll(() => page.evaluate(() => window.scrollY || document.scrollingElement.scrollTop)).toBeGreaterThan(300);
+  const panel = await page.locator('.sheet-price-panel').boundingBox();
+  expect(panel.y).toBeGreaterThan(100);
+  expect(panel.y).toBeLessThan(250);
+});
+
 test('Enter on the last row adds the next one', async ({ page }) => {
   await navigateWithAuth(page, '/costing/new');
   await page.getByRole('button', { name: /Add Fabric/i }).click();

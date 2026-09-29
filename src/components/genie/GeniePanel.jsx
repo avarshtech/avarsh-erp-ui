@@ -2,13 +2,14 @@ import { Button, Card, Flex, Tag, Tooltip, Typography } from 'antd';
 import { ClearOutlined, CloseOutlined, WarningOutlined } from '@ant-design/icons';
 import GenieMessageList from './GenieMessageList';
 import GenieComposer from './GenieComposer';
-import GenieMark from './GenieMark';
+import LayaMark from './LayaMark';
+import { ASSISTANT_NAME } from './genieContext';
 import useGenieChat from './useGenieChat';
 
 const { Text } = Typography;
 
 /**
- * The docked chat: never modal, so the screen stays usable while the Genie talks. An empty chat
+ * The docked chat: never modal, so the screen stays usable while Laya AI talks. An empty chat
  * opens with what still blocks the screen and a few things to ask.
  */
 export default function GeniePanel({ screen, handlers, messages, setMessages, onClose }) {
@@ -19,8 +20,8 @@ export default function GeniePanel({ screen, handlers, messages, setMessages, on
 
   const title = (
     <Flex align="center" gap={8}>
-      <GenieMark size={26} thinking={chat.busy} />
-      <span>Help Genie</span>
+      <LayaMark size={24} thinking={chat.busy} />
+      <span className="laya-title">{ASSISTANT_NAME}</span>
       {screen.title && <Text type="secondary" style={{ fontWeight: 400, fontSize: 12 }}>· {screen.title}</Text>}
     </Flex>
   );
@@ -31,19 +32,19 @@ export default function GeniePanel({ screen, handlers, messages, setMessages, on
           <Button type="text" size="small" icon={<ClearOutlined />} aria-label="Start a new chat" disabled={chat.busy} onClick={chat.clear} />
         </Tooltip>
       )}
-      <Button type="text" size="small" icon={<CloseOutlined />} aria-label="Close Help Genie" onClick={onClose} />
+      <Button type="text" size="small" icon={<CloseOutlined />} aria-label={`Close ${ASSISTANT_NAME}`} onClick={onClose} />
     </Flex>
   );
 
   return (
-    <Card className="genie-panel" size="small" title={title} extra={extra} role="dialog" aria-label="Help Genie"
+    <Card className="genie-panel" size="small" title={title} extra={extra} role="dialog" aria-label={ASSISTANT_NAME}
       styles={{ body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 10 } }}>
       <div className="genie-scroll">
         {messages.length === 0 && (
           <Flex vertical gap={10} className="genie-intro">
             <div className="genie-intro-hello">
-              <GenieMark size={44} />
-              <Text>Hi! Ask me how anything on this screen works, or tell me what to add — in English or தமிழ். I fill the
+              <LayaMark size={40} />
+              <Text>Hi, I&apos;m {ASSISTANT_NAME}! Ask me how anything on this screen works, or tell me what to add — in English or தமிழ். I fill the
                 sheet (you can undo), and I only create new masters when you confirm.</Text>
             </div>
             {blockers.length > 0 && (

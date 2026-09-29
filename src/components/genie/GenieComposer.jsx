@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button, Flex, Input, Tooltip, Typography } from 'antd';
 import { AudioOutlined, BorderOutlined, PaperClipOutlined, SendOutlined, StopOutlined } from '@ant-design/icons';
 import useWavRecorder from '../../hooks/useWavRecorder';
+import { ASSISTANT_NAME } from './genieContext';
 
 const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -34,12 +35,12 @@ export default function GenieComposer({ busy, onSend, onStop, onAttach }) {
       ) : (
         <Flex align="flex-end" gap={6}>
           <Input.TextArea
-            aria-label="Ask the Genie" value={text} onChange={(e) => setText(e.target.value)} disabled={rec.status === 'processing'}
-            autoSize={{ minRows: 1, maxRows: 4 }} placeholder="Ask or tell the Genie… (English or தமிழ்)" maxLength={4000}
+            aria-label={`Ask ${ASSISTANT_NAME}`} value={text} onChange={(e) => setText(e.target.value)} disabled={rec.status === 'processing'}
+            autoSize={{ minRows: 1, maxRows: 4 }} placeholder={`Ask or tell ${ASSISTANT_NAME}… (English or தமிழ்)`} maxLength={4000}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }}
           />
           <Tooltip title="Speak (English or Tamil)">
-            <Button icon={<AudioOutlined />} aria-label="Speak to the Genie" disabled={busy} loading={rec.status === 'processing'} onClick={rec.start} />
+            <Button icon={<AudioOutlined />} aria-label={`Speak to ${ASSISTANT_NAME}`} disabled={busy} loading={rec.status === 'processing'} onClick={rec.start} />
           </Tooltip>
           {onAttach && (
             <Tooltip title="Read a tech pack, BOM or photo">

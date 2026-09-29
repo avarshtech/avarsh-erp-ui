@@ -1,25 +1,25 @@
 import { useEffect, useState } from 'react';
-import { getStoredRate } from '../../../../services/costing/exchangeRateService';
+import { getLiveRate, getStoredRate } from '../../../../services/costing/exchangeRateService';
 
 // What CostSheetService falls back to when no USD→INR rate is stored; matching it keeps the
 // live panel equal to what the server saves.
 const SERVER_DEFAULT_USD_INR = 83.8;
 
 /**
- * The server's stored quote→costing rate (the "today's rate" hint for Actual Rate) and its
- * USD→INR rate (for the USD equivalent). Both come from the server — the same figures it saves
- * with — instead of a public API in the browser, so preview and saved totals agree.
+ * Today's rate for the quote→costing currencies — live from the exchange API, or the server's
+ * stored rate when the API cannot be reached — and the server's stored USD→INR rate, which the
+ * server works the USD price out with (so the live panel keeps equal to what is saved).
  */
 export default function useExchangeRate(currency, quoteCurrency) {
   const key = `${quoteCurrency}>${currency}`;
-  const [state, setState] = useState({ key: null, quote: null, usd: null });
+  const [state, setState] = useState({ key: null, quote: null, usd: null, usdToday: null });
 
   useEffect(() => {
     if (!currency || !quoteCurrency) return undefined;
     let cancelled = false;
-    Promise.all([getStoredRate(quoteCurrency, currency), getStoredRate('USD', 'INR')]).then(([quote, usd]) => {
-      if (!cancelled) setState({ key, quote, usd });
-    });
+    const today = (from, to) => getLiveRate(from, to).then((live) => live || getStoredRate(from, to));
+    Promise.all([today(quoteCurrency, currency), getStoredRate('USD', 'INR'), today('USD', 'INR')])
+      .then(([quote, usd, usdToday]) => { if (!cancelled) setState({ key, quote, usd, usdToday }); });
     return () => { cancelled = true; };
   }, [key, currency, quoteCurrency]);
 
@@ -28,7 +28,11 @@ export default function useExchangeRate(currency, quoteCurrency) {
     ready,
     todaysRate: ready ? state.quote?.rate ?? null : null,
     rateDate: ready ? state.quote?.date ?? null : null,
+    rateSource: ready ? state.quote?.source ?? null : null,
     missing: ready && !state.quote,
+    usdRate: ready ? state.usdToday?.rate ?? null : null,
+    usdRateDate: ready ? state.usdToday?.date ?? null : null,
+    usdRateSource: ready ? state.usdToday?.source ?? null : null,
     usdToInrRate: Number(state.usd?.rate) || SERVER_DEFAULT_USD_INR,
   };
 }

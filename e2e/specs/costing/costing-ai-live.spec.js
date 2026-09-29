@@ -1,5 +1,5 @@
 /**
- * Costing — AI capture and the Help Genie against the REAL model. Opt-in: these call Gemini, so
+ * Costing — AI capture and Laya AI against the REAL model. Opt-in: these call Gemini, so
  * they run only with E2E_LIVE_AI=1 against a backend that has the key (never in CI).
  *
  *   L1  A spoken costing (fake microphone playing a real recording) is read, reviewed and applied
@@ -31,7 +31,7 @@ test.use({
 const drawer = (page) => page.locator('.ant-drawer-open').filter({ hasText: 'Check what the AI found' });
 const rows = (page, key) => page.locator(`[data-genie-anchor="section-${key}"] tr.ant-table-row`);
 const allRows = (page) => page.locator('[data-genie-anchor^="section-"] tr.ant-table-row');
-const panel = (page) => page.getByRole('dialog', { name: 'Help Genie' });
+const panel = (page) => page.getByRole('dialog', { name: 'Laya AI' });
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -132,7 +132,7 @@ test('L4 The Genie by text: explains, fills, points, removes, proposes', async (
   await page.locator('.genie-launcher').click();
   const ask = async (text) => {
     const before = await panel(page).locator('.genie-msg-genie').count();
-    await panel(page).getByLabel('Ask the Genie').fill(text);
+    await panel(page).getByLabel('Ask Laya AI').fill(text);
     await panel(page).getByRole('button', { name: 'Send' }).click();
     const reply = panel(page).locator('.genie-msg-genie').nth(before);
     await expect(reply).not.toContainText('Thinking', { timeout: 120000 });
@@ -176,7 +176,7 @@ test('L4 The Genie by text: explains, fills, points, removes, proposes', async (
 test('L5 The Genie by voice: what it heard is shown, and it answers', async ({ page }) => {
   await navigateWithAuth(page, '/costing/new');
   await page.locator('.genie-launcher').click();
-  await panel(page).getByRole('button', { name: 'Speak to the Genie' }).click();
+  await panel(page).getByRole('button', { name: 'Speak to Laya AI' }).click();
   await page.waitForTimeout(12000);
   await panel(page).getByRole('button', { name: 'Send' }).click();
   const heard = panel(page).locator('.genie-msg-user').last();

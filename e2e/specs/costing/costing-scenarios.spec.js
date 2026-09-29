@@ -229,7 +229,7 @@ test('S3 A target price drives the profit; typing a profit clears it; a target b
   await page.locator('input[name="targetPrice"]').fill(String((making * 0.8).toFixed(2)));
   await page.keyboard.press('Tab');
   await page.locator('.genie-launcher').click();
-  await expect(page.getByRole('dialog', { name: 'Help Genie' }).getByText('The target price is below cost')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Laya AI' }).getByText('The target price is below cost')).toBeVisible();
 });
 
 test('S4 Rows limited to some sizes give a per-size breakdown, and the sizes are saved', async ({ page }) => {
@@ -249,6 +249,14 @@ test('S4 Rows limited to some sizes give a per-size breakdown, and the sizes are
 
   await expect(page.getByText(/Section F/)).toBeVisible();
   await expect(page.locator('body')).toContainText(/Per-Size/i);
+
+  // The live price panel prices one size at a time — never the two rows added together.
+  const sizeButtons = page.locator('.sheet-price-panel .ant-radio-button-wrapper');
+  await expect(sizeButtons).toHaveCount(2);
+  await expect(sizeButtons.nth(0)).toContainText(sizes[0]);
+  expect((await panel(page)).fabric).toBeCloseTo(60, 2);
+  await sizeButtons.nth(1).click();
+  await expect.poll(async () => (await panel(page)).fabric).toBeCloseTo(90, 2);
 
   const saved = await (await saveDraft(page)).json();
   expect(saved.fabricRows.map((r) => r.sizes).filter(Boolean)).toHaveLength(2);
@@ -298,6 +306,7 @@ test('S6 Save as template keeps the header defaults; using it brings them back',
 });
 
 test('S7 One costing per style: a second one for the same style is refused and the sheet is kept', async ({ page }) => {
+  test.setTimeout(120000); // two whole sheets
   const style = await newStyle();
   await openSheet(page, style);
   await addRow(page, 'fabric', { qty: 0.2, rate: 300 });

@@ -13,9 +13,9 @@ const STARTERS = [
   'Profit eppadi calculate aagum?',
 ];
 
-/** Puts the Help Genie on the costing sheet. Renders nothing; the Genie shell lives in the layout. */
+/** Puts Laya AI (the genie in the code) on the costing sheet. Renders nothing; the shell lives in the layout. */
 export default function CostingGenieBridge() {
-  const { form, sheet, totals, meta, masters, styles, instanceKey } = useSheet();
+  const { form, sheet, totals, meta, masters, styles, rates, instanceKey } = useSheet();
   const actions = useCostingGenieActions();
   const buyerId = Form.useWatch('buyerId', form);
   const styleNo = Form.useWatch('styleNo', form);
@@ -42,7 +42,7 @@ export default function CostingGenieBridge() {
     getContext: () => {
       const values = form.getFieldsValue(true);
       return sheetSnapshot({
-        values, meta, sheet, totals, problems: blockers,
+        values, meta, sheet, totals, rates, problems: blockers,
         labels: {
           buyerName: masters.buyerOptions.find((b) => b.value === values.buyerId)?.label,
           styleNo: styles.options.find((s) => s.value === values.styleNo)?.label,

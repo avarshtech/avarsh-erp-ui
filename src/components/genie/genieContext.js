@@ -4,8 +4,11 @@ export const GenieContext = createContext(null);
 
 export const useGenie = () => useContext(GenieContext);
 
+/** What the assistant is called on screen (the code still calls it the genie). */
+export const ASSISTANT_NAME = 'Laya AI';
+
 /**
- * Puts the Help Genie on a screen. `view` is what the launcher and panel show and must be
+ * Puts Laya AI on a screen. `view` is what the launcher and panel show and must be
  * memoised by the caller: { id, title, storageKey, blockers: [text], starters: [text] }.
  * `handlers` are called by the panel, always in their latest version:
  *   getContext()                 → the screen's state, sent with every question

@@ -1,9 +1,8 @@
-import { Alert, Badge, Collapse, Divider, Input, Space, Tag, Typography } from 'antd';
+import { Alert, Collapse, Divider, Input, Space, Tag, Typography } from 'antd';
 import { formatCurrency } from '../../../utils/costingConstants';
 import { useSheet } from './CostingSheetContext';
 import SectionGrid from './grid/SectionGrid';
 import PerSizePanel from './price/PerSizePanel';
-import AttachmentsPanel from './header/AttachmentsPanel';
 
 const { Text } = Typography;
 
@@ -27,10 +26,10 @@ const heading = (text, color, total, currency) => (
 
 /**
  * The cost sections as collapsible panels (all open by default), with the per-size breakdown
- * and the images & attachments below them. Titles keep the old sheet's wording.
+ * below them. Titles keep the old sheet's wording.
  */
 export default function SheetSections() {
-  const { totals, header, attachments } = useSheet();
+  const { totals, header } = useSheet();
   const c = header.currency;
 
   const items = [
@@ -79,11 +78,6 @@ export default function SheetSections() {
       key: 'perSize',
       label: heading('Section F — Per-Size Breakdown', '#10b981'),
       children: <PerSizePanel />,
-    },
-    {
-      key: 'attachments',
-      label: <Space><Text strong style={{ fontSize: 15 }}>Images & Attachments</Text><Badge count={attachments.count} showZero={false} /></Space>,
-      children: <AttachmentsPanel />,
     },
   ].filter(Boolean);
 

@@ -1,5 +1,5 @@
 /**
- * Costing — the Help Genie, pinned end to end with POST /genie/chat route-mocked (the suite never
+ * Costing — Laya AI (the Genie in the code), pinned end to end with POST /genie/chat route-mocked (the suite never
  * calls the AI provider; the sheet, the masters and the create endpoints are real).
  *
  *   - The launcher is on the costing sheet and nowhere else; each question carries the sheet's state
@@ -12,11 +12,11 @@ import { ensureSessionActive, navigateWithAuth } from '../../helpers/navigation.
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 
 const launcher = (page) => page.locator('.genie-launcher');
-const panel = (page) => page.getByRole('dialog', { name: 'Help Genie' });
+const panel = (page) => page.getByRole('dialog', { name: 'Laya AI' });
 const fabricRows = (page) => page.locator('[data-genie-anchor="section-fabric"] tr.ant-table-row');
 
 async function ask(page, text) {
-  await panel(page).getByLabel('Ask the Genie').fill(text);
+  await panel(page).getByLabel('Ask Laya AI').fill(text);
   await panel(page).getByRole('button', { name: 'Send' }).click();
 }
 

@@ -19,10 +19,19 @@
   100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--primary-color) 0%, transparent); }
 }
 
-/* Sticky live price panel: stays in view while the sections scroll on wide screens. */
+/* The live price panel floats beside the sheet on wide screens: it stays in view while the
+   sections scroll, and scrolls inside itself when it is taller than the window. The column is
+   sticky, not the card: the card was exactly as tall as its column, so it had no room to move. */
+.sheet-price-col {
+  margin-top: 16px;
+}
+
 @media (min-width: 1200px) {
-  .sheet-price-panel {
+  .sheet-price-col {
     position: sticky;
-    top: 136px;
+    top: 152px;
+    margin-top: 0;
+    max-height: calc(100vh - 168px);
+    overflow-y: auto;
   }
 }

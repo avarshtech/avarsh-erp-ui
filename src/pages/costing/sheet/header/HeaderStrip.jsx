@@ -25,7 +25,7 @@ export default function HeaderStrip() {
           <Form.Item label="Pricing Unit" name="pricingUnit"><Segmented options={PRICING_UNITS} block /></Form.Item>
         </Col>
         <CurrencyRateFields />
-        <Col xs={12} md={6}>
+        <Col xs={24} md={12}>
           <Form.Item label="Scenario Name" name="scenarioName">
             <Input maxLength={100} placeholder="e.g. Option A — Cotton Body" />
           </Form.Item>

@@ -44,7 +44,7 @@ export function sheetBlockers({ values, sheet, totals }) {
   return problems.slice(0, 9);
 }
 
-export function sheetSnapshot({ values, labels, meta, sheet, totals, problems }) {
+export function sheetSnapshot({ values, labels, meta, sheet, totals, rates, problems }) {
   return {
     sheet: { costingId: meta.costingId || null, status: meta.status || 'New (not saved yet)' },
     header: {
@@ -55,6 +55,8 @@ export function sheetSnapshot({ values, labels, meta, sheet, totals, problems })
       sizes: values.sizes || [],
       costingType: values.costingType, pricingUnit: values.pricingUnit,
       currency: values.currency, quoteCurrency: values.quoteCurrency, actualRate: num(values.actualRate),
+      // Today's market rate as the screen shows it: LIVE from the exchange API, or STORED when unreachable.
+      todaysRate: num(rates?.todaysRate), todaysRateSource: rates?.rateSource || null,
     },
     sections: Object.fromEntries(Object.entries(GENIE_SECTIONS).map(([api, key]) => [
       api, sheet.sections[key].map((r, i) => ({ row: i + 1, ...ROW[key](r), sizes: r.sizes || undefined })),
@@ -65,6 +67,10 @@ export function sheetSnapshot({ values, labels, meta, sheet, totals, problems })
       overheadCharges: round(totals.charges), totalPrice: round(totals.total), finalPrice: round(totals.final),
       usdPrice: round(totals.usd), targetPrice: num(sheet.commercial.targetPrice),
     },
+    // Rows limited to some sizes: each size is priced on its own (as the live panel shows it).
+    perSize: totals.perSize.length ? totals.perSize.map((p) => ({
+      size: p.size, makingPrice: round(p.making), totalPrice: round(p.total), finalPrice: round(p.final), usdPrice: round(p.usd),
+    })) : undefined,
     problems,
   };
 }

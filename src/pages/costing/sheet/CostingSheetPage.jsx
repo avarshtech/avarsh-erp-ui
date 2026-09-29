@@ -11,6 +11,7 @@ import HeaderStrip from './header/HeaderStrip';
 import SheetActions from './header/SheetActions';
 import SheetSections from './SheetSections';
 import LivePricePanel from './price/LivePricePanel';
+import AttachmentsPanel from './header/AttachmentsPanel';
 import StartFromBar from './start/StartFromBar';
 import SheetDialogs from './SheetDialogs';
 import CostingGenieBridge from './genie/CostingGenieBridge';
@@ -52,10 +53,11 @@ function SheetLayout() {
             <Form form={form} layout="vertical" initialValues={FORM_DEFAULTS} onValuesChange={() => dispatch({ type: 'MARK_DIRTY' })}>
               <HeaderStrip />
             </Form>
+            <AttachmentsPanel />
             {isNew && empty && <StartFromBar />}
             <SheetSections />
           </Col>
-          <Col xs={24} xl={7} style={{ marginTop: 16 }}>
+          <Col xs={24} xl={7} className="sheet-price-col">
             <LivePricePanel />
           </Col>
         </Row>
