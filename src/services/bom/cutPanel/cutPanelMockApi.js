@@ -1,7 +1,7 @@
 /**
  * Cut Panel Requirement — mock API (UI design phase), persisted to localStorage.
  * Each function names the endpoint it stands in for (PRD §17, without /approve and
- * /reject — there is no approval step; /reopen replaces them).
+ * /reject — there is no approval step; /revise edits a submitted CPR in place instead).
  *
  * Partially / Fully Used and consumedQty are derived on every read from the job-work PO
  * ledger (Cut Panel PO PRD §15) and never stored: the store keeps Draft, Submitted or Closed.
@@ -11,9 +11,11 @@ import { usageInputs, posForRequirement } from '../../po/jobWork/allocationReade
 import { requirementUsage, REQUIREMENT_SOURCE } from '../../../utils/jobWorkAllocation';
 import { getMockOrderContext, getMockCprEligibleOrders } from '../requirementMockOrders';
 import { buildCprSeed, CPR_SEED_VERSION, CPR_STORAGE_KEY } from './cutPanelMockData';
-import { lineTotal, processLabel } from '../../../utils/cutPanelCalc';
+import { lineTotal, processLabel, runPreSubmitChecks } from '../../../utils/cutPanelCalc';
 import { CPR_PREFIX, CPR_VAL } from '../../../utils/cutPanelConstants';
-import { nextRequirementNumber, isRequirementEditable, isRequirementReopenable, isRequirementClosable } from '../../../utils/requirementStatus';
+import {
+  nextRequirementNumber, isRequirementEditable, isRequirementEditableInPlace, isRequirementClosable,
+} from '../../../utils/requirementStatus';
 import { getCurrentFinancialYear } from '../../../utils/numbering';
 import { getCurrentUser } from '../../auth/authService';
 
@@ -23,16 +25,20 @@ const who = () => getCurrentUser()?.name || getCurrentUser()?.username || 'You';
 const now = () => new Date().toISOString();
 const fyStartYear = () => `20${getCurrentFinancialYear().slice(0, 2)}`;
 
-/** The document as the PO ledger leaves it: derived status and consumed (allocated) qty. */
+/**
+ * The document as the PO ledger leaves it: derived status, consumed (allocated) qty and the
+ * placed POs that end editing it in place.
+ */
 const live = (doc, inputs = usageInputs(REQUIREMENT_SOURCE.CPR)) => {
   const usage = requirementUsage(REQUIREMENT_SOURCE.CPR, doc, inputs);
-  return { ...doc, status: usage.status, consumedQty: usage.consumedQty };
+  return { ...doc, status: usage.status, consumedQty: usage.consumedQty, placedPos: inputs.placed.get(doc.id) || [] };
 };
 
 /** Derived fields never reach the store. */
 const stored = (doc) => {
   const out = { ...doc };
   delete out.consumedQty;
+  delete out.placedPos;
   return out;
 };
 
@@ -64,13 +70,30 @@ const qtyChanges = (before, after) => {
   return out;
 };
 
+/** Lines added or removed and quantity changes, for a revision's audit row. */
+const lineChanges = (before, after) => {
+  const label = (l) => `${l.fabricName} ${l.colorName} ${l.panelName} ${processLabel(l)}`;
+  const had = new Set(before.map((l) => l.key));
+  const has = new Set(after.map((l) => l.key));
+  return [
+    ...after.filter((l) => !had.has(l.key)).map((l) => `added ${label(l)}`),
+    ...before.filter((l) => !has.has(l.key)).map((l) => `removed ${label(l)}`),
+    ...qtyChanges(before, after),
+  ];
+};
+
+const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** What a revision may change; the order, BOM version and header stay as submitted. */
+const REVISED_FIELDS = ['lines', 'lastLineNo', 'remarks', 'orderQtySnapshot'];
+
 const summary = (d) => ({
   id: d.id, cprNo: d.cprNo, orderId: d.orderId, orderNo: d.orderNo, buyer: d.buyer, styleNo: d.styleNo,
   fabrics: [...new Set(d.lines.map((l) => l.fabricName))],
   colorCount: new Set(d.lines.map((l) => l.colorName)).size,
   processCount: new Set(d.lines.map(processLabel)).size,
   totalQty: d.lines.reduce((s, l) => s + lineTotal(l), 0),
-  status: d.status, createdBy: d.createdBy, createdOn: d.createdOn,
+  status: d.status, placedPos: d.placedPos, createdBy: d.createdBy, createdOn: d.createdOn,
 });
 
 /** GET /cut-panel-requirements — newest first; filters run client-side in the mock. */
@@ -121,7 +144,7 @@ export const saveCpr = async (doc) => {
     return detach(live(created));
   }
   const existing = findDoc(db, doc.id);
-  if (!isRequirementEditable(existing.status)) throw mockError(CPR_VAL.VAL_10, 409);
+  if (!isRequirementEditable(existing.status)) throw mockError('Only a draft is saved this way — a submitted requirement changes with Edit.', 409);
   const changes = qtyChanges(existing.lines, doc.lines);
   const saved = { ...existing, ...stored(doc), status: existing.status, version: existing.version + 1, modifiedBy: who(), modifiedOn: now() };
   db.docs = db.docs.map((d) => (d.id === saved.id ? saved : d));
@@ -135,7 +158,7 @@ export const submitCpr = async (id) => {
   await mockDelay();
   const db = load();
   const doc = findDoc(db, id);
-  if (!isRequirementEditable(doc.status)) throw mockError(CPR_VAL.VAL_10, 409);
+  if (!isRequirementEditable(doc.status)) throw mockError('Only a draft can be submitted.', 409);
   if (!doc.lines.length) throw mockError(CPR_VAL.VAL_04);
   Object.assign(doc, { status: 'SUBMITTED', submittedBy: who(), submittedOn: now(), version: doc.version + 1 });
   addAudit(db, doc.id, 'submitted the requirement', `Released to the PO module · ${doc.lines.length} line(s) · ${doc.lines.reduce((s, l) => s + lineTotal(l), 0).toLocaleString('en-IN')} pcs`);
@@ -143,17 +166,30 @@ export const submitCpr = async (id) => {
   return detach(live(doc));
 };
 
-/** POST /cut-panel-requirements/{id}/reopen — only while the PO module has used nothing. */
-export const reopenCpr = async (id) => {
+/**
+ * POST /cut-panel-requirements/{id}/revise — edits a submitted CPR in place, until a PO
+ * against it is placed. It stays Submitted and passes Submit's checks again; draft POs on
+ * it are flagged and re-fetch.
+ */
+export const reviseCpr = async (doc) => {
   await mockDelay();
   const db = load();
-  const doc = findDoc(db, id);
-  const current = live(doc);
-  if (!isRequirementReopenable(current.status, current.consumedQty)) throw mockError('Only a submitted requirement that no PO has used can be reopened.', 409);
-  Object.assign(doc, { status: 'DRAFT', version: doc.version + 1 });
-  addAudit(db, doc.id, 'reopened the requirement', 'Withdrawn from the PO module and returned to Draft');
+  const existing = findDoc(db, doc.id);
+  const current = live(existing);
+  if (!isRequirementEditableInPlace(current.status, current.placedPos)) throw mockError(CPR_VAL.VAL_10, 409);
+  const { blocking } = runPreSubmitChecks(doc.lines, getMockOrderContext(existing.orderId), existing.orderAllowancePct);
+  if (blocking.length) throw mockError(blocking[0], 422);
+  if (REVISED_FIELDS.every((f) => same(existing[f], doc[f]))) throw mockError('The revision changes nothing yet.', 422);
+  const changes = lineChanges(existing.lines, doc.lines);
+  const revisionNo = (existing.revisionNo || 0) + 1;
+  Object.assign(existing, Object.fromEntries(REVISED_FIELDS.map((f) => [f, doc[f]])), {
+    version: existing.version + 1, revisionNo, modifiedBy: who(), modifiedOn: now(),
+  });
+  addAudit(db, existing.id, `revised the requirement (R${revisionNo})`, changes.length
+    ? `${changes.slice(0, 8).join('; ')}${changes.length > 8 ? ` (+${changes.length - 8} more)` : ''}`
+    : 'Sequence, allowance or reason changes');
   persist(db);
-  return detach(live(doc));
+  return detach(live(existing));
 };
 
 /** POST /cut-panel-requirements/{id}/close — reason is permanent (BR-16). */

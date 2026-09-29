@@ -62,6 +62,11 @@ const FINISHED = [S.COMPLETED, S.CLOSED, S.REJECTED, S.CANCELLED];
 
 export const isOpenPo = (status) => !FINISHED.includes(status);
 
+const PLACED = [S.SUBMITTED, ...ISSUED];
+
+/** Submitted or beyond, and not rejected or cancelled: a placed PO ends in-place editing of its requirement. */
+export const isPlacedPo = (status) => PLACED.includes(status);
+
 /** The date a PO is due back: required delivery (CPP), expected return (GPO). */
 export const poDueDate = (doc) => (doc.type === JOB_WORK_PO_TYPE.GPO ? doc.expectedReturnDate : doc.requiredDeliveryDate);
 

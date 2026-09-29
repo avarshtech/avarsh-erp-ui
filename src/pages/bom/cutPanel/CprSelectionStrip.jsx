@@ -12,11 +12,12 @@ import {
 /**
  * Section 2 — Cut Panel Selection (PRD §8.2). One combined selection; "+ Add to Grid"
  * expands it into Colours x Panels x Processes lines. `onAdd(selection)` returns
- * { added, skipped }. Masters come from the real Processes / Parts APIs.
+ * { added, skipped }; after an add the panels clear and a notice invites the next panel or
+ * fabric. Masters come from the real Processes / Parts APIs.
  */
 const CprSelectionStrip = memo(function CprSelectionStrip({ order, fabrics, processes, parts, masters, defaultAllowance, onAdd }) {
   const {
-    sel, set, allowance, setAllowance, fabric, chosenProcesses, needsOther, onColours, reset, add,
+    sel, set, allowance, setAllowance, fabric, chosenProcesses, needsOther, onColours, reset, add, notice, clearNotice,
   } = useCprSelection({ order, fabrics, processes, parts, defaultAllowance, onAdd });
 
   if (masters.forbidden || masters.failed) {
@@ -85,6 +86,7 @@ const CprSelectionStrip = memo(function CprSelectionStrip({ order, fabrics, proc
         onReorder={(processIds) => set({ processIds })}
         onRemove={(id) => set({ processIds: sel.processIds.filter((x) => x !== id) })}
       />
+      {notice && <Alert key={notice} type="success" showIcon closable onClose={clearNotice} title={notice} style={{ marginTop: 12 }} />}
     </Card>
   );
 });

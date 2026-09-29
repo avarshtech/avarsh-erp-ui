@@ -22,4 +22,5 @@ export const GPR_VAL = {
   V7_REASON: (seq, color, size) => `Seq ${seq}: enter a reason for ${color} ${size} being above its order quantity.`,
   V8: (seq) => `Seq ${seq}: this process is already on another line.`,
   V10: (seq) => `Seq ${seq}: the total process quantity must be more than 0.`,
+  LOCKED: 'This requirement can no longer be edited — a PO has been placed against it.',
 };

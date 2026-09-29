@@ -4,10 +4,8 @@ import { toastUnlessHandled } from '../../../utils/apiError';
 import useRequirementSiblings from './useRequirementSiblings';
 
 /**
- * Loads a requirement (or starts a new one) with its order context, the eligible orders
- * and the order's other requirements (CPR WRN-07, GPR OP-2). `config` — { reducer,
- * initialState, newDoc, api: { get, eligibleOrders, orderContext, forOrder }, noun } —
- * must be a module-level constant, since the effects depend on it.
+ * Loads a requirement (or starts a new one) with its order context, the eligible orders and the order's other
+ * requirements (CPR WRN-07, GPR OP-2). `config` (reducer, initialState, newDoc, api, noun) must be a module-level constant.
  */
 const useRequirementDocument = (id, { reducer, initialState, newDoc, api, noun }) => {
   const { message } = App.useApp();
@@ -16,8 +14,7 @@ const useRequirementDocument = (id, { reducer, initialState, newDoc, api, noun }
   const [orders, setOrders] = useState([]);
   const siblings = useRequirementSiblings(api.forOrder, state.doc?.orderId, state.doc?.id);
 
-  // After its first save a new requirement moves onto its own URL with the saved document
-  // already in state: reloading it would flash the skeleton under the user's next click.
+  // A new requirement moves onto its own URL with the saved document in state: reloading would flash the skeleton.
   const heldId = useRef(null);
   useEffect(() => { heldId.current = state.doc?.id ?? null; });
 
@@ -42,6 +39,11 @@ const useRequirementDocument = (id, { reducer, initialState, newDoc, api, noun }
     return () => { alive = false; };
   }, [id, message, api, newDoc, noun]);
 
+  /** Re-reads the saved requirement in place (Cancel edit, a refused revision) — no skeleton. */
+  const reload = useCallback(() => api.get(id)
+    .then(async (doc) => dispatch({ type: 'LOADED', doc, order: doc.orderId ? await api.orderContext(doc.orderId) : null }))
+    .catch((e) => toastUnlessHandled(message, e, `Could not reload the ${noun}`)), [id, api, message, noun]);
+
   const selectOrder = useCallback(async (nextOrderId) => {
     try {
       dispatch({ type: 'ORDER_SELECTED', order: await api.orderContext(nextOrderId) });
@@ -50,7 +52,7 @@ const useRequirementDocument = (id, { reducer, initialState, newDoc, api, noun }
     }
   }, [api, message]);
 
-  return { ...state, dispatch, loading, orders, siblings, selectOrder };
+  return { ...state, dispatch, loading, orders, siblings, selectOrder, reload };
 };
 
 export default useRequirementDocument;

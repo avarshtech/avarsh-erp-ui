@@ -29,6 +29,15 @@ const SINGLE_JERSEY = {
   composition: '100% Cotton', gsm: 160, consumption: 0.215, uom: 'kg',
 };
 
+/**
+ * The neck / cuff rib: every approved BOM carries at least two fabrics. Always appended —
+ * the seeds read `fabrics[0]` as the body fabric.
+ */
+const RIB = {
+  id: 'FAB-RIB-220', code: 'FAB-RIB-220', name: '1x1 Rib',
+  composition: '95% Cotton 5% Elastane', gsm: 220, consumption: 0.018, uom: 'kg',
+};
+
 const ORDERS = [
   {
     // PRD appendix order: 2,600 pcs, 2% allowance. Black 4Y = 220 → 225 at 2%;
@@ -50,7 +59,13 @@ const ORDERS = [
     }, ['2Y', '4Y', '6Y', '8Y']),
     bomId: 9125, bomNo: 'BOM-ORD-2026-00125',
     bomVersions: [ // MOCK-ONLY: BOM has no approval or version number today
-      { version: 'V1', approved: true, fabrics: [{ ...SINGLE_JERSEY, gsm: 155, consumption: 0.22, colors: ['Black', 'Red', 'White', 'Navy'] }] },
+      {
+        version: 'V1', approved: true,
+        fabrics: [
+          { ...SINGLE_JERSEY, gsm: 155, consumption: 0.22, colors: ['Black', 'Red', 'White', 'Navy'] },
+          { ...RIB, colors: ['Black', 'Red', 'White', 'Navy'] },
+        ],
+      },
       {
         version: 'V2', approved: true,
         fabrics: [
@@ -78,7 +93,13 @@ const ORDERS = [
     }, ['3-4Y', '5-6Y', '7-8Y', '9-10Y']),
     bomId: 9418, bomNo: 'BOM-ORD-2026-0418',
     bomVersions: [
-      { version: 'V1', approved: true, fabrics: [{ id: 'FAB-FT-280', code: 'FAB-FT-280', name: 'French Terry', composition: '100% Cotton', gsm: 280, consumption: 0.38, uom: 'kg', colors: ['Black', 'Navy', 'White'] }] },
+      {
+        version: 'V1', approved: true,
+        fabrics: [
+          { id: 'FAB-FT-280', code: 'FAB-FT-280', name: 'French Terry', composition: '100% Cotton', gsm: 280, consumption: 0.38, uom: 'kg', colors: ['Black', 'Navy', 'White'] },
+          { ...RIB, colors: ['Black', 'Navy', 'White'] },
+        ],
+      },
     ],
   },
   {
@@ -134,7 +155,10 @@ const ORDERS = [
       Navy: [380, 420, 440, 360], White: [300, 340, 350, 290], 'Grey Melange': [260, 280, 300, 240],
     }, ['2Y', '4Y', '6Y', '8Y']),
     bomId: 9110, bomNo: 'BOM-ORD-2026-00110',
-    bomVersions: [{ version: 'V1', approved: true, fabrics: [{ ...SINGLE_JERSEY, colors: ['Navy', 'White', 'Grey Melange'] }] }],
+    bomVersions: [{
+      version: 'V1', approved: true,
+      fabrics: [{ ...SINGLE_JERSEY, colors: ['Navy', 'White', 'Grey Melange'] }, { ...RIB, colors: ['Navy', 'White', 'Grey Melange'] }],
+    }],
   },
   {
     id: 377, orderNo: 'ORD-2026-0377', buyer: 'JOMO BV', styleNo: 'ST-4390',
@@ -145,7 +169,7 @@ const ORDERS = [
     colors: [{ name: 'Pink', code: 'PNK', hex: '#f48fb1' }],
     items: matrix({ Pink: [300, 300] }, ['2Y', '4Y']),
     bomId: 9377, bomNo: 'BOM-ORD-2026-0377',
-    bomVersions: [{ version: 'V1', approved: true, fabrics: [{ ...SINGLE_JERSEY, colors: ['Pink'] }] }],
+    bomVersions: [{ version: 'V1', approved: true, fabrics: [{ ...SINGLE_JERSEY, colors: ['Pink'] }, { ...RIB, colors: ['Pink'] }] }],
   },
 ];
 

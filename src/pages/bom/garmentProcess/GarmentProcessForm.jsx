@@ -1,18 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Button, Card, Col, Input, Row, Skeleton, Space } from 'antd';
-import { CloseCircleOutlined, HistoryOutlined, PartitionOutlined, RollbackOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { CloseCircleOutlined, HistoryOutlined, PartitionOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useRequirementMasters from '../../../hooks/useRequirementMasters';
 import {
-  hasPermission, canReopenRequirement, canCloseRequirement, canSubmitRequirement, canSubmitGarmentProcessOverQty,
+  hasPermission, canCloseRequirement, canSubmitRequirement, canSubmitGarmentProcessOverQty,
 } from '../../../utils/permissions';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
-import {
-  getRequirementStatusLabel, isRequirementClosable, isRequirementEditable, isRequirementReopenable,
-} from '../../../utils/requirementStatus';
+import { getRequirementStatusLabel, isRequirementClosable, isRequirementEditable } from '../../../utils/requirementStatus';
 import { GPR_MODULE_ID, GPR_PROCESS_CATEGORY, GPR_REMARKS_MAX } from '../../../utils/garmentProcessConstants';
 import { getGprAudit, getGprAllocation } from '../../../services/bom/garmentProcess/garmentProcessService';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
@@ -20,6 +18,7 @@ import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
 import RequirementStatusBanner from '../shared/RequirementStatusBanner';
 import RequirementTransitionDialog from '../shared/RequirementTransitionDialog';
+import useRequirementEditMode from '../shared/useRequirementEditMode';
 import useGarmentProcessRequirement from './useGarmentProcessRequirement';
 import useGprActions from './useGprActions';
 import GprOrderSection from './GprOrderSection';
@@ -32,20 +31,22 @@ const LIST_PATH = '/bom/garment-process/list';
 /**
  * Garment Process Requirement — one vertically scrolling screen (PRD §6): A. Order
  * details, B. Processes (sequence list + editor; stacks below ~980 px), C. Remarks, and a
- * sticky action bar. Reopen and Close are secondary page-head actions. No approval.
+ * sticky action bar. Close is a secondary page-head action. No approval. A submitted GPR is
+ * edited in place (`?edit=1`) until a PO against it is placed; its order stays fixed.
  */
 const GarmentProcessForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { doc, order, activeKey, dirty, dispatch, loading, orders, siblings, selectOrder } = useGarmentProcessRequirement(id);
+  const { doc, order, activeKey, dirty, dispatch, loading, orders, siblings, selectOrder, reload } = useGarmentProcessRequirement(id);
   const { clearDirty } = useUnsavedChanges(dirty);
-  const actions = useGprActions({ doc, dirty, order, dispatch, clearDirty });
-  const [dialog, setDialog] = useState({ kind: 'close', open: false });
+  const canEdit = hasPermission(GPR_MODULE_ID, doc?.id ? 'update' : 'add');
+  const mode = useRequirementEditMode({ id, doc, loading, dirty, canEdit, clearDirty, reload, docNo: doc?.requirementNo });
+  const actions = useGprActions({ doc, dirty, order, dispatch, clearDirty, reload, onRevised: mode.stopEdit });
+  const [closeOpen, setCloseOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [allocationOpen, setAllocationOpen] = useState(false);
 
-  const canEdit = hasPermission(GPR_MODULE_ID, doc?.id ? 'update' : 'add');
-  const editable = Boolean(doc) && isRequirementEditable(doc.status) && canEdit;
+  const editable = Boolean(doc) && canEdit && (isRequirementEditable(doc.status) || mode.editing);
   const masters = useRequirementMasters(GPR_PROCESS_CATEGORY, { enabled: editable && Boolean(order) });
   const lines = doc?.lines;
   const activeIndex = useMemo(() => (lines || []).findIndex((l) => l.key === activeKey), [lines, activeKey]);
@@ -75,18 +76,15 @@ const GarmentProcessForm = () => {
           <Button icon={<UnorderedListOutlined />} onClick={() => navigate(LIST_PATH)}>View all requirements</Button>
           {doc.id && !editable && <Button icon={<PartitionOutlined />} onClick={() => setAllocationOpen(true)}>PO allocation</Button>}
           {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
-          {canReopenRequirement(GPR_MODULE_ID) && isRequirementReopenable(doc.status, doc.consumedQty) && (
-            <Button icon={<RollbackOutlined />} onClick={() => setDialog({ kind: 'reopen', open: true })}>Reopen</Button>
-          )}
-          {canCloseRequirement(GPR_MODULE_ID) && isRequirementClosable(doc.status) && (
-            <Button danger icon={<CloseCircleOutlined />} onClick={() => setDialog({ kind: 'close', open: true })}>Close</Button>
+          {canCloseRequirement(GPR_MODULE_ID) && isRequirementClosable(doc.status) && !mode.editing && (
+            <Button danger icon={<CloseCircleOutlined />} onClick={() => setCloseOpen(true)}>Close</Button>
           )}
         </Space>
       </PageHeader>
 
       <RequirementStatusBanner doc={doc} />
 
-      <GprOrderSection doc={doc} order={order} orders={orders} siblings={siblings} editable={editable} onSelectOrder={selectOrder} />
+      <GprOrderSection doc={doc} order={order} orders={orders} siblings={siblings} editable={editable && !mode.editing} onSelectOrder={selectOrder} />
 
       {order && doc.lines.length > 0 && (
         <Row gutter={16}>
@@ -127,11 +125,15 @@ const GarmentProcessForm = () => {
       )}
 
       <GprActionBar
-        doc={doc} editable={editable} canSubmit={canSubmitRequirement(GPR_MODULE_ID)} busy={actions.busy} errors={actions.errors}
-        on={{ cancel: () => navigate(LIST_PATH), save: actions.save, submit: actions.submit }}
+        doc={doc} can={{ edit: canEdit, submit: canSubmitRequirement(GPR_MODULE_ID) }} editing={mode.editing} dirty={dirty}
+        busy={actions.busy} errors={actions.errors}
+        on={{
+          cancel: () => navigate(LIST_PATH), save: actions.save, submit: actions.submit,
+          edit: mode.startEdit, cancelEdit: mode.cancelEdit, saveChanges: actions.saveChanges,
+        }}
       />
       <RequirementTransitionDialog
-        dialog={dialog} onDone={() => setDialog((d) => ({ ...d, open: false }))} actions={actions}
+        open={closeOpen} onDone={() => setCloseOpen(false)} actions={actions}
         docLabel="Garment Process Requirement" docNumber={doc.requirementNo}
       />
       <DocumentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.requirementNo} loadAudit={getGprAudit} />

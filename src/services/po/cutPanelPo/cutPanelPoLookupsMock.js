@@ -84,7 +84,7 @@ export const cppFetchLines = async ({ label, cprIds, colours, sizes, existing, f
 
 /**
  * The CPRs a PO draws on, as they are now, whatever their status — a Closed one keeps what
- * its POs hold, a Draft (reopened) one is no longer available (VR-03/05/20).
+ * its POs hold; one edited in place shows its new lines, which VR-20 compares (VR-03/05/20).
  */
 export const cppRequirementState = async (cprIds) => {
   const docs = await Promise.all(cprIds.map((id) => getCpr(id).catch(() => null)));

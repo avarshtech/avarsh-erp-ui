@@ -1,8 +1,8 @@
 /**
  * Cut Panel Requirement (CPR) — constants and PRD message texts.
  * PRD: Avarsh_ERP_Cut_Panel_Generation_PRD_v1.0, adjusted for the confirmed decision
- * that there is NO approval step: Submit releases the requirement to the PO module,
- * Reopen (nothing consumed) returns it to Draft, Close ends it.
+ * that there is NO approval step: Submit releases the requirement to the PO module, Edit
+ * changes it in place until a PO against it is placed, Close ends it.
  */
 export const CPR_MODULE_ID = 'cut-panel';
 export const CPR_PREFIX = 'CPR';
@@ -23,7 +23,7 @@ export const CPR_VAL = {
   VAL_06: 'Process sequence must start at 1 and run continuously without duplicates.',
   VAL_07: 'Quantity and allowance must be positive numbers.',
   VAL_08: 'This fabric, colour, panel and process combination already exists on this requirement.',
-  VAL_10: 'This requirement is submitted and cannot be edited. Reopen it first (only possible while no PO has used it).',
+  VAL_10: 'This requirement can no longer be edited — a PO has been placed against it.',
   OTHER_NAME: 'Name the "Other" process before adding it.',
   REASON: 'Record a reason on every line whose quantity or allowance differs from the calculated value.',
 };

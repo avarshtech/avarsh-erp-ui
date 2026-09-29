@@ -13,6 +13,8 @@
  *   - A process on another line is shown "(already added)" and cannot be picked twice
  *   - A cell above its order qty turns amber; Submit then needs a reason (superadmin
  *     holds "Submit above order qty")
+ *   - The list's Edit opens a submitted GPR in place: the order stays fixed, Close hides,
+ *     Save changes keeps it Submitted and is audited; a GPR with POs placed is view-only
  */
 
 import { test, expect } from '@playwright/test';
@@ -116,4 +118,30 @@ test('Above order qty turns amber and needs a reason to submit', async ({ page }
   await page.getByRole('textbox', { name: /Reason for Black 3-4Y above order quantity/ }).fill('Extra for shade band');
   await page.getByRole('button', { name: 'Submit' }).click();
   await expect(page.getByText(/Submitted — the process lines are now available/)).toBeVisible();
+});
+
+test('Edit a submitted GPR in place from the list', async ({ page }) => {
+  await navigateWithAuth(page, '/bom/garment-process/list');
+  await expect(page.getByRole('button', { name: 'View GPR-2026-00003' })).toBeVisible(); // POs placed: view only
+  await page.getByRole('button', { name: 'Edit GPR-2026-00001' }).click();
+  await expect(page).toHaveURL(/\/bom\/garment-process\/1\?edit=1$/);
+  await waitForPageReady(page);
+  await expect(page.locator('#gpr-order')).toHaveCount(0); // the order stays fixed
+  await expect(page.getByRole('button', { name: 'Close' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+
+  await page.locator('input[name="gpr-G1-Black-3-4Y"]').fill('850'); // order qty 900
+  await expect(lineTotal(page)).toContainText('6,950');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
+  await expect(page).toHaveURL(/\/bom\/garment-process\/1$/);
+  await expect(page.getByRole('button', { name: /(^|\s)Edit$/ })).toBeVisible();
+  await page.getByRole('button', { name: 'History' }).click();
+  await expect(page.locator('.ant-drawer-open')).toContainText('revised the requirement (R1)');
+  await page.keyboard.press('Escape');
+
+  await navigateWithAuth(page, '/bom/garment-process/list');
+  const row = page.locator('.ant-table-row').filter({ hasText: 'GPR-2026-00001' });
+  await expect(row).toContainText('6,950 / 4,000 / 6,850');
+  await expect(row).toContainText('Submitted');
 });

@@ -2,11 +2,24 @@ import StatusTag from '../../../components/StatusTag';
 import RecordLink from '../../../components/RecordLink';
 import { ActionButton } from '../../../components/buttons';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getRequirementStatusLabel, isRequirementEditable } from '../../../utils/requirementStatus';
+import { getRequirementStatusLabel, isRequirementEditable, isRequirementEditableInPlace } from '../../../utils/requirementStatus';
 import { formatDate } from '../../../utils/formatters';
 
-/** Columns of the Garment Process Requirement list (PRD §15). */
-export const buildGarmentProcessListColumns = ({ onOpen, canUpdate }) => [
+const rowAction = (r, { onOpen, onEdit, canUpdate }) => {
+  if (canUpdate && isRequirementEditable(r.status)) {
+    return <ActionButton action="edit" size="small" aria-label={`Edit ${r.requirementNo}`} onClick={() => onOpen(r)} />;
+  }
+  if (canUpdate && isRequirementEditableInPlace(r.status, r.placedPos)) {
+    return <ActionButton action="edit" size="small" aria-label={`Edit ${r.requirementNo}`} onClick={() => onEdit(r)} />;
+  }
+  return <ActionButton action="view" size="small" aria-label={`View ${r.requirementNo}`} onClick={() => onOpen(r)} />;
+};
+
+/**
+ * Columns of the Garment Process Requirement list (PRD §15). Edit opens a draft, or a
+ * submitted requirement no PO is placed against yet (in edit mode).
+ */
+export const buildGarmentProcessListColumns = ({ onOpen, onEdit, canUpdate }) => [
   {
     title: 'Requirement No.', dataIndex: 'requirementNo', key: 'requirementNo', width: 160, fixed: 'left',
     render: (v, r) => <RecordLink text={v} onClick={() => onOpen(r)} />,
@@ -32,8 +45,6 @@ export const buildGarmentProcessListColumns = ({ onOpen, canUpdate }) => [
   },
   {
     title: 'Actions', key: 'actions', width: 90, fixed: 'right',
-    render: (_, r) => (isRequirementEditable(r.status) && canUpdate
-      ? <ActionButton action="edit" size="small" onClick={() => onOpen(r)} />
-      : <ActionButton action="view" size="small" onClick={() => onOpen(r)} />),
+    render: (_, r) => rowAction(r, { onOpen, onEdit, canUpdate }),
   },
 ];

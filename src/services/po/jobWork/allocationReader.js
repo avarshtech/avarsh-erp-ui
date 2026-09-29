@@ -5,14 +5,28 @@
  */
 import { loadJobWorkDb } from './jobWorkMockStore';
 import { sumLedger, poLineCellId, poLineRequirementCell } from '../../../utils/jobWorkAllocation';
-import { holdsDraftQty } from '../../../utils/jobWorkPoStatus';
+import { holdsDraftQty, isPlacedPo } from '../../../utils/jobWorkPoStatus';
 
 const touches = (source, reqId) => (type, line) => {
   const c = poLineRequirementCell(type, line);
   return c.source === source && c.reqId === Number(reqId);
 };
 
-/** Ledger totals per cell and "in draft PO" quantities for one requirement source ('CPR' | 'GPR'). */
+/** Requirement id → the numbers of its placed POs, which end editing the requirement in place. */
+const placedPoNos = (db, source) => {
+  const out = new Map();
+  db.docs.filter((d) => isPlacedPo(d.status)).forEach((d) => d.lines.forEach((l) => {
+    const { source: s, reqId } = poLineRequirementCell(d.type, l);
+    const nos = out.get(reqId) || [];
+    if (s === source && !nos.includes(d.poNo)) out.set(reqId, [...nos, d.poNo]);
+  }));
+  return out;
+};
+
+/**
+ * Ledger totals per cell, "in draft PO" quantities and the placed POs per requirement, for
+ * one requirement source ('CPR' | 'GPR').
+ */
 export const usageInputs = (source) => {
   const db = loadJobWorkDb();
   const ledger = sumLedger(db.ledger.filter((e) => e.source === source));
@@ -22,7 +36,7 @@ export const usageInputs = (source) => {
     const id = poLineCellId(d.type, l);
     drafts.set(id, (drafts.get(id) || 0) + (Number(l.poQty) || 0));
   }));
-  return { ledger, drafts };
+  return { ledger, drafts, placed: placedPoNos(db, source) };
 };
 
 /**

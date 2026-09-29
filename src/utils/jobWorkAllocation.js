@@ -91,7 +91,7 @@ export const emptyUsageTotals = () => ({
 /**
  * What the PO module has done with one requirement (PRD FR-25): per cell, per line and in
  * total — required, in draft PO, allocated (PO'd), over-allocated, released, completed and
- * balance — plus the derived status and consumedQty (= allocated) for the Reopen guard.
+ * balance — plus the derived status and consumedQty (= allocated).
  *
  * `ledger` is sumLedger() over the entries; `drafts` maps cell id → PO qty on POs that do
  * not allocate yet (visibility only, PRD §15.1).

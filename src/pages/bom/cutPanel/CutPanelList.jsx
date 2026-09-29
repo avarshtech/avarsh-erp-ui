@@ -68,7 +68,8 @@ const CutPanelList = () => {
   }, [rows, debouncedSearch, filters]);
 
   const openRow = useCallback((r) => navigate(`/bom/cut-panel/${r.id}`), [navigate]);
-  const columns = useMemo(() => buildCutPanelListColumns({ onOpen: openRow, canUpdate }), [openRow, canUpdate]);
+  const editRow = useCallback((r) => navigate(`/bom/cut-panel/${r.id}?edit=1`), [navigate]);
+  const columns = useMemo(() => buildCutPanelListColumns({ onOpen: openRow, onEdit: editRow, canUpdate }), [openRow, editRow, canUpdate]);
 
   const selectFilter = (key, placeholder, options) => ({
     type: 'select',

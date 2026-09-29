@@ -10,11 +10,12 @@ import { usageInputs, posForRequirement } from '../../po/jobWork/allocationReade
 import { requirementUsage, REQUIREMENT_SOURCE } from '../../../utils/jobWorkAllocation';
 import { getMockOrderContext, getMockGprEligibleOrders } from '../requirementMockOrders';
 import { buildGprSeed, GPR_SEED_VERSION, GPR_STORAGE_KEY } from './garmentProcessMockData';
-import { gprLineLabel, gprLineTotals, toSavedLine } from '../../../utils/garmentProcessCalc';
+import { gprLineLabel, gprLineTotals, toSavedLine, validateGpr } from '../../../utils/garmentProcessCalc';
 import { GPR_PREFIX, GPR_VAL } from '../../../utils/garmentProcessConstants';
 import {
-  nextRequirementNumber, isRequirementEditable, isRequirementReopenable, isRequirementClosable, REQUIREMENT_STATUS,
+  nextRequirementNumber, isRequirementEditable, isRequirementEditableInPlace, isRequirementClosable, REQUIREMENT_STATUS,
 } from '../../../utils/requirementStatus';
+import { canSubmitGarmentProcessOverQty } from '../../../utils/permissions';
 import { getCurrentFinancialYear } from '../../../utils/numbering';
 import { getCurrentUser } from '../../auth/authService';
 
@@ -24,16 +25,20 @@ const who = () => getCurrentUser()?.name || getCurrentUser()?.username || 'You';
 const now = () => new Date().toISOString();
 const fyStartYear = () => `20${getCurrentFinancialYear().slice(0, 2)}`;
 
-/** The document as the PO ledger leaves it: derived status and consumed (allocated) qty. */
+/**
+ * The document as the PO ledger leaves it: derived status, consumed (allocated) qty and the
+ * placed POs that end editing it in place.
+ */
 const live = (doc, inputs = usageInputs(REQUIREMENT_SOURCE.GPR)) => {
   const usage = requirementUsage(REQUIREMENT_SOURCE.GPR, doc, inputs);
-  return { ...doc, status: usage.status, consumedQty: usage.consumedQty };
+  return { ...doc, status: usage.status, consumedQty: usage.consumedQty, placedPos: inputs.placed.get(doc.id) || [] };
 };
 
 /** Derived fields never reach the store. */
 const stored = (doc) => {
   const out = { ...doc };
   delete out.consumedQty;
+  delete out.placedPos;
   return out;
 };
 
@@ -53,9 +58,30 @@ const lineSummaries = (d) => {
   return d.lines.map((l) => ({ label: gprLineLabel(l) || '—', total: order ? gprLineTotals(l, order).total : 0 }));
 };
 
+/** Lines added, removed, moved, re-processed or re-quantified, for a revision's audit row. */
+const lineChanges = (before, after) => {
+  const old = new Map(before.map((l) => [l.key, l]));
+  const has = new Set(after.map((l) => l.key));
+  return [
+    ...after.flatMap((l) => {
+      const b = old.get(l.key);
+      if (!b) return [`added Seq ${l.seqNo} ${gprLineLabel(l)}`];
+      return [
+        gprLineLabel(b) !== gprLineLabel(l) && `Seq ${l.seqNo}: ${gprLineLabel(b)} → ${gprLineLabel(l)}`,
+        b.seqNo !== l.seqNo && `${gprLineLabel(l)}: Seq ${b.seqNo} → ${l.seqNo}`,
+        JSON.stringify(b.qty) !== JSON.stringify(l.qty) && `Seq ${l.seqNo} ${gprLineLabel(l)}: quantities changed`,
+      ].filter(Boolean);
+    }),
+    ...before.filter((b) => !has.has(b.key)).map((b) => `removed ${gprLineLabel(b)}`),
+  ];
+};
+
+const overQtyNotes = (lines) => lines.flatMap((l) => Object.entries(l.overQtyReasons || {})
+  .map(([cell, r]) => `Seq ${l.seqNo} ${cell.replace('|', ' ')}: ${r}`));
+
 const summary = (d) => ({
   id: d.id, requirementNo: d.requirementNo, orderId: d.orderId, orderNo: d.orderNo, styleNo: d.styleNo, buyer: d.buyer,
-  lines: lineSummaries(d), status: d.status, createdBy: d.createdBy, createdOn: d.createdOn,
+  lines: lineSummaries(d), status: d.status, placedPos: d.placedPos, createdBy: d.createdBy, createdOn: d.createdOn,
 });
 
 /** GET /gpr — newest first; filters run client-side in the mock. */
@@ -108,7 +134,7 @@ export const saveGpr = async (doc) => {
     return detach(live(created));
   }
   const existing = findDoc(db, doc.id);
-  if (!isRequirementEditable(existing.status)) throw mockError('This requirement is submitted and can no longer be edited.', 409);
+  if (!isRequirementEditable(existing.status)) throw mockError('Only a draft is saved this way — a submitted requirement changes with Edit.', 409);
   const saved = { ...existing, ...stored(doc), lines, status: existing.status, version: existing.version + 1, modifiedBy: who(), modifiedOn: now() };
   db.docs = db.docs.map((d) => (d.id === saved.id ? saved : d));
   addAudit(db, saved.id, 'saved the draft', `${lines.length} process line(s)`);
@@ -123,7 +149,7 @@ export const submitGpr = async (id) => {
   const doc = findDoc(db, id);
   if (!isRequirementEditable(doc.status)) throw mockError('Only a draft can be submitted.', 409);
   const order = getMockOrderContext(doc.orderId);
-  const reasons = doc.lines.flatMap((l) => Object.entries(l.overQtyReasons || {}).map(([cell, r]) => `Seq ${l.seqNo} ${cell.replace('|', ' ')}: ${r}`));
+  const reasons = overQtyNotes(doc.lines);
   Object.assign(doc, {
     status: REQUIREMENT_STATUS.SUBMITTED, submittedBy: who(), submittedOn: now(), version: doc.version + 1,
     orderQtySnapshot: JSON.parse(JSON.stringify(order.qtyMatrix)),
@@ -133,17 +159,35 @@ export const submitGpr = async (id) => {
   return detach(live(doc));
 };
 
-/** POST /gpr/{id}/reopen — only with zero consumption (PRD OP-1). */
-export const reopenGpr = async (id) => {
+/**
+ * POST /gpr/{id}/revise — edits a submitted GPR in place, until a PO against it is placed.
+ * It stays Submitted, passes Submit's checks again and re-snapshots the order qty; draft POs
+ * on it are flagged and re-fetch. The order cannot change.
+ */
+export const reviseGpr = async (doc) => {
   await mockDelay();
   const db = load();
-  const doc = findDoc(db, id);
-  const current = live(doc);
-  if (!isRequirementReopenable(current.status, current.consumedQty)) throw mockError('Only a submitted requirement that no PO has used can be reopened.', 409);
-  Object.assign(doc, { status: REQUIREMENT_STATUS.DRAFT, version: doc.version + 1 });
-  addAudit(db, doc.id, 'reopened the requirement', 'Lines withdrawn from the PO module; back to Draft');
+  const existing = findDoc(db, doc.id);
+  const current = live(existing);
+  if (!isRequirementEditableInPlace(current.status, current.placedPos)) throw mockError(GPR_VAL.LOCKED, 409);
+  const order = getMockOrderContext(existing.orderId);
+  const { errors } = validateGpr({ ...doc, orderId: existing.orderId }, order, { forSubmit: true, canOverQty: canSubmitGarmentProcessOverQty() });
+  if (errors.length) throw mockError(errors[0], 422);
+  const lines = doc.lines.map((l) => toSavedLine(l, order));
+  if (JSON.stringify(lines) === JSON.stringify(existing.lines) && (doc.remarks || '') === (existing.remarks || '')) {
+    throw mockError('The revision changes nothing yet.', 422);
+  }
+  const changes = lineChanges(existing.lines, lines);
+  const reasons = overQtyNotes(lines);
+  const revisionNo = (existing.revisionNo || 0) + 1;
+  Object.assign(existing, {
+    lines, lastLineNo: doc.lastLineNo ?? existing.lastLineNo, remarks: doc.remarks, orderQtySnapshot: JSON.parse(JSON.stringify(order.qtyMatrix)),
+    version: existing.version + 1, revisionNo, modifiedBy: who(), modifiedOn: now(),
+  });
+  addAudit(db, existing.id, `revised the requirement (R${revisionNo})`,
+    [changes.join('; ') || 'Remarks changed', reasons.length && `Above order qty: ${reasons.join('; ')}`].filter(Boolean).join(' · '));
   persist(db);
-  return detach(live(doc));
+  return detach(live(existing));
 };
 
 /** POST /gpr/{id}/close — releases the unconsumed balance; reason mandatory. */

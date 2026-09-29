@@ -177,8 +177,8 @@ export const SCREENS = [
   { id: 'bom', name: 'Bill of Materials', section: 'bom', kind: 'screen',
     path: '/bom/list', routes: ['/bom/list', '/bom/new', '/bom/edit/:id'],
     ops: STANDARD_OPERATIONS },
-  // Process requirements (UI mock phase). No approval step: Submit is add || update,
-  // refer_back reopens a submitted requirement nothing has consumed yet, cancel closes it.
+  // Process requirements (UI mock phase). No approval step: Submit is add || update, update
+  // also edits a submitted requirement in place until a PO is placed, cancel closes it.
   // The job-work POs raised against them (Cut Panel PO, Garment Process PO) reuse these
   // keys, so one operation can cover both documents: the labels name both uses.
   { id: 'cut-panel', name: 'Cut Panel Requirement & PO', section: 'bom', kind: 'screen',
@@ -191,7 +191,7 @@ export const SCREENS = [
       approve: 'Approve PO',
       reject: 'Reject PO',
       override: 'Authorise PO over-allocation',
-      refer_back: 'Reopen requirement · Send back PO',
+      refer_back: 'Send back PO',
       cancel: 'Close requirement · Cancel / short close PO',
     },
     description: 'Processes (printing, embroidery…) needed on cut panels before sewing, and the Cut Panel POs that give them to job workers.' },
@@ -204,7 +204,7 @@ export const SCREENS = [
       override: 'Submit above order qty · Approve PO excess',
       approve: 'Approve / send PO',
       reject: 'Reject PO (back to draft)',
-      refer_back: 'Reopen requirement',
+      refer_back: 'Refer back (not used yet)',
       cancel: 'Close requirement · Cancel / short close PO',
     },
     description: 'Processes (washing, dyeing…) needed on sewn garments, and the Garment Process POs that give them to job workers.' },
@@ -791,12 +791,10 @@ export const canReviseCostSheet = () =>
 
 // ─── PROCESS REQUIREMENT HELPERS (Cut Panel / Garment Process) ───────────────
 // No approval step. Submit = add || update (as canSubmitOrder); status rules
-// (Draft only, nothing consumed…) live in utils/requirementStatus.js.
+// (Draft only, edited in place until a PO is placed…) live in utils/requirementStatus.js.
 
 export const canSubmitRequirement = (moduleId) =>
   hasPermission(moduleId, 'add') || hasPermission(moduleId, 'update');
-
-export const canReopenRequirement = (moduleId) => hasPermission(moduleId, 'refer_back');
 
 export const canCloseRequirement = (moduleId) => hasPermission(moduleId, 'cancel');
 

@@ -47,6 +47,10 @@ export const panelOptions = (parts = []) => parts.map((p) => ({
 
 export const processOptions = (processes = []) => processes.map((p) => ({ value: p.id, label: p.processName }));
 
+/** What an Add to Grid did and what comes next — the panel clears so another can be picked. */
+export const addedNotice = ({ added, fabric, panels }) => `${added} line${added === 1 ? '' : 's'} added for ${fabric.name} › `
+  + `${panels.map((p) => p.partName).join(', ')}. Pick another panel, or change the fabric, and Add to Grid again.`;
+
 /** Each ticked process shows its sequence number (tick order) inside the dropdown. */
 export const renderProcessOption = (selectedIds) => (opt) => {
   const idx = selectedIds.indexOf(opt.value);

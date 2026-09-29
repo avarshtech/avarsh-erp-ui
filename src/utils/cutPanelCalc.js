@@ -176,6 +176,17 @@ export const buildProcessRollup = (lines) => {
   return Object.values(map).map((r) => ({ ...r, colors: [...r.colors], panels: [...r.panels] }));
 };
 
+/** Each fabric on the requirement with its panels and their line counts, in line order ("Fabrics & panels added"). */
+export const fabricPanelSummary = (lines) => {
+  const fabrics = new Map();
+  lines.forEach((l) => {
+    const f = fabrics.get(l.fabricId) || { fabricId: l.fabricId, fabricName: l.fabricName, panels: new Map() };
+    f.panels.set(l.panelName, (f.panels.get(l.panelName) || 0) + 1);
+    fabrics.set(l.fabricId, f);
+  });
+  return [...fabrics.values()].map((f) => ({ ...f, panels: [...f.panels].map(([panelName, count]) => ({ panelName, lines: count })) }));
+};
+
 export const cprTotals = (lines, sizes = []) => ({
   lineCount: lines.length,
   colorCount: new Set(lines.map((l) => l.colorName)).size,

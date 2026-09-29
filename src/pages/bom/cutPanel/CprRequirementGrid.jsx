@@ -5,6 +5,7 @@ import { cprTotals } from '../../../utils/cutPanelCalc';
 import { buildGridColumns } from './cprGridColumns';
 import { buildGridRows } from './cprGridRows';
 import CprGridToolbar from './CprGridToolbar';
+import CprFabricPanelSummary from './CprFabricPanelSummary';
 
 const { Text } = Typography;
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
@@ -48,6 +49,7 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
 
   return (
     <Card title="Cut Panel Requirement" size="small" style={{ marginBottom: 16 }} extra={<Text type="secondary">{doc.lines.length} line(s)</Text>}>
+      <CprFabricPanelSummary lines={doc.lines} />
       {editable && doc.lines.length > 0 && (
         <CprGridToolbar
           defaultAllowance={doc.orderAllowancePct}

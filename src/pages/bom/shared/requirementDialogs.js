@@ -1,7 +1,7 @@
 /**
- * ApprovalReasonDialog action configs for the requirement lifecycle actions.
- * No approval exists on these documents — Close and Reopen are the only confirmed
- * transitions after Submit.
+ * ApprovalReasonDialog action config for the requirement lifecycle. No approval exists on
+ * these documents: Close is the only confirmed transition after Submit — a submitted
+ * requirement is otherwise edited in place until a PO against it is placed.
  */
 export const CLOSE_ACTION = {
   key: 'close',
@@ -13,14 +13,4 @@ export const CLOSE_ACTION = {
   placeholder: 'Why is this requirement being closed? (e.g. order short-shipped, process dropped)',
   requiresReason: true,
   minChars: 10,
-};
-
-export const REOPEN_ACTION = {
-  key: 'reopen',
-  label: 'Reopen',
-  title: 'Reopen requirement',
-  subtitle: 'Returns it to Draft and withdraws it from the PO module until it is submitted again.',
-  color: 'var(--warning-color, #faad14)',
-  btnText: 'Reopen',
-  requiresReason: false,
 };

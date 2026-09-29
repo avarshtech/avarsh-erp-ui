@@ -60,7 +60,8 @@ const GarmentProcessList = () => {
   }, [rows, debouncedSearch, filters]);
 
   const openRow = useCallback((r) => navigate(`/bom/garment-process/${r.id}`), [navigate]);
-  const columns = useMemo(() => buildGarmentProcessListColumns({ onOpen: openRow, canUpdate }), [openRow, canUpdate]);
+  const editRow = useCallback((r) => navigate(`/bom/garment-process/${r.id}?edit=1`), [navigate]);
+  const columns = useMemo(() => buildGarmentProcessListColumns({ onOpen: openRow, onEdit: editRow, canUpdate }), [openRow, editRow, canUpdate]);
 
   const selectFilter = (key, placeholder, options) => ({
     type: 'select',

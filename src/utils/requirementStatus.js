@@ -3,8 +3,8 @@
  * Garment Process Requirement (BOM module). There is no approval step:
  *
  *   Draft ──Submit──▶ Submitted ──(PO module consumes)──▶ Partially Used ──▶ Fully Used
- *     ▲                  │
- *     └──── Reopen ──────┘   only while nothing has been consumed
+ *                        │
+ *                        └── Edit in place (stays Submitted) until a PO against it is placed
  *
  *   Close (manual, reason mandatory) from Submitted or Partially Used.
  *
@@ -34,13 +34,28 @@ export const REQUIREMENT_STATUS_OPTIONS = Object.keys(LABELS).map((value) => ({ 
 /** Only a Draft can be edited, saved or deleted. */
 export const isRequirementEditable = (status) => status === REQUIREMENT_STATUS.DRAFT;
 
-/** Reopen returns a Submitted requirement to Draft — never once the PO module has used any of it. */
-export const isRequirementReopenable = (status, consumedQty = 0) =>
-  status === REQUIREMENT_STATUS.SUBMITTED && !(consumedQty > 0);
+/**
+ * A submitted requirement is edited in place, staying Submitted, until a PO against it is
+ * placed (submitted or beyond). Draft POs do not block it: they are flagged and re-fetch.
+ */
+export const isRequirementEditableInPlace = (status, placedPos = []) =>
+  status === REQUIREMENT_STATUS.SUBMITTED && !placedPos.length;
 
 /** Close releases the unconsumed balance. */
 export const isRequirementClosable = (status) =>
   status === REQUIREMENT_STATUS.SUBMITTED || status === REQUIREMENT_STATUS.PARTIALLY_USED;
+
+export const REQUIREMENT_BAR_MODE = { DRAFT: 'DRAFT', EDITING: 'EDITING', IN_PLACE: 'IN_PLACE', VIEW: 'VIEW' };
+
+/**
+ * What a requirement's action bar offers: DRAFT (save, submit), EDITING (cancel edit, save
+ * changes), IN_PLACE (edit, close) or VIEW (close while closable).
+ */
+export const requirementBarMode = (status, placedPos, editing) => {
+  if (isRequirementEditable(status)) return REQUIREMENT_BAR_MODE.DRAFT;
+  if (!isRequirementEditableInPlace(status, placedPos)) return REQUIREMENT_BAR_MODE.VIEW;
+  return editing ? REQUIREMENT_BAR_MODE.EDITING : REQUIREMENT_BAR_MODE.IN_PLACE;
+};
 
 /**
  * Next number in a `<PREFIX>-<YYYY>-NNNNN` series. The year is the financial year's
