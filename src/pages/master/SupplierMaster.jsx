@@ -38,6 +38,7 @@ import { useStore } from '../../context/StoreContext';
 import SupplierJobWorkFields from './jobWork/SupplierJobWorkFields';
 import SupplierJobWorkDetails from './jobWork/SupplierJobWorkDetails';
 import useJobWorkProcesses from './jobWork/useJobWorkProcesses';
+import { useMasterAssistant } from './genie/masterGenieContext';
 
 const { Text, Title } = Typography;
 
@@ -415,6 +416,14 @@ const SupplierMaster = () => {
       ),
     },
   ];
+
+  // Laya AI on the Master Data page (see ./genie): the list, the search and the supplier form.
+  useMasterAssistant({
+    rows: filteredSuppliers, columns, searchText, search: setSearchText,
+    openNew: canAdd ? handleAdd : undefined, openRecord: handleEdit, close: doCloseSupplierModal,
+    isOpen: modalVisible, recordId: editingSupplier?.id ?? null,
+    form, markDirty: () => setSupplierUnsaved(true), refresh: () => fetchSuppliers(true),
+  });
 
   return (
     <Card

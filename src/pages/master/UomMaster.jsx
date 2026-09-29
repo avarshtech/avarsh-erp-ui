@@ -167,6 +167,7 @@ const UomMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Unit of Measurement"
       subtitle="Item"
       addLabel="Add UOM"

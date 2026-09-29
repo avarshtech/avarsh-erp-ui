@@ -7,6 +7,7 @@ import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 import { getTolerance, saveTolerance } from '../../services/inventory/billPassingService';
 import { BP_MODULE_ID, DEFAULT_TOLERANCE } from '../../utils/billPassingConstants';
 import { hasPermission } from '../../utils/permissions';
+import { useMasterAssistant } from './genie/masterGenieContext';
 
 const BpToleranceSettings = ({ onDirtyChange }) => {
   const { message } = App.useApp();
@@ -21,6 +22,8 @@ const BpToleranceSettings = ({ onDirtyChange }) => {
   const canUpdate = hasPermission(BP_MODULE_ID, 'update');
 
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
+  // Laya AI on the Master Data page (see ./genie): one settings form, always open.
+  useMasterAssistant({ form, isOpen: true, recordId: null, markDirty: () => markDirty(true) });
 
   const applyValues = useCallback((values) => {
     skipDirty.current = true;

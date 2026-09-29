@@ -9,7 +9,8 @@ export const ASSISTANT_NAME = 'Laya AI';
 
 /**
  * Puts Laya AI on a screen. `view` is what the launcher and panel show and must be
- * memoised by the caller: { id, title, storageKey, blockers: [text], starters: [text] }.
+ * memoised by the caller: { id, title, storageKey, blockers: [text], starters: [text], dock? }
+ * (dock: 'left' keeps a right-hand form the assistant fills in view).
  * `handlers` are called by the panel, always in their latest version:
  *   getContext()                 → the screen's state, sent with every question
  *   applyActions(actions)        → [{ ok, text }] — screen tools the Genie called

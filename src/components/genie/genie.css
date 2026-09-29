@@ -81,6 +81,14 @@
   transition: transform 0.1s linear;
 }
 
+/* A screen whose working area is on the right (Master Data's form) docks the chat on the left. */
+@media (min-width: 576px) {
+  .genie-panel.dock-left {
+    right: auto;
+    left: 24px;
+  }
+}
+
 @media (max-width: 575px) {
   .genie-panel {
     left: 8px;
@@ -232,6 +240,17 @@
 @keyframes genie-pop {
   from { transform: rotate(-90deg) scale(0.4); opacity: 0; }
   to { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+
+/* Laya AI points at something on a screen by pulsing it. */
+.laya-pulse {
+  border-radius: 8px;
+  animation: laya-pulse 1.2s ease-out 2;
+}
+
+@keyframes laya-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary-color) 45%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--primary-color) 0%, transparent); }
 }
 
 /* The name in the panel header, in the aura's colours. */

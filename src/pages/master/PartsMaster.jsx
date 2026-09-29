@@ -158,6 +158,7 @@ const PartsMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Parts"
       subtitle="Manufacturing"
       addLabel="Add Part"

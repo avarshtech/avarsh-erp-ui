@@ -37,7 +37,7 @@ export default function GeniePanel({ screen, handlers, messages, setMessages, on
   );
 
   return (
-    <Card className="genie-panel" size="small" title={title} extra={extra} role="dialog" aria-label={ASSISTANT_NAME}
+    <Card className={`genie-panel${screen.dock === 'left' ? ' dock-left' : ''}`} size="small" title={title} extra={extra} role="dialog" aria-label={ASSISTANT_NAME}
       styles={{ body: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 10 } }}>
       <div className="genie-scroll">
         {messages.length === 0 && (

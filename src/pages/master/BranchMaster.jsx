@@ -151,6 +151,7 @@ const BranchMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Branches"
       subtitle="Organisation"
       addLabel="Add Branch"

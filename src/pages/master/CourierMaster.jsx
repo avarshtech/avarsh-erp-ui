@@ -146,6 +146,7 @@ const CourierMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Couriers"
       subtitle="Sampling"
       addLabel="Add Courier"

@@ -169,6 +169,7 @@ const CategoryMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Categories"
       subtitle="Item"
       addLabel="Add Category"

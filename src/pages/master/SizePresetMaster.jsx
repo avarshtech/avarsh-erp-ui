@@ -442,6 +442,7 @@ const SizePresetMaster = ({ onDirtyChange }) => {
   // ── Render ───────────────────────────────────────────────────────
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Size Presets"
       subtitle="Order Entry, Costing"
       addLabel="Add Preset"

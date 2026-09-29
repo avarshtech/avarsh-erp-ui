@@ -132,6 +132,7 @@ const BpChargeTypeMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Charge Types"
       subtitle="Bill Passing"
       addLabel="Add Charge Type"

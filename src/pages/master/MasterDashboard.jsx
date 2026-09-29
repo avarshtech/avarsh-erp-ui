@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useMemo } from 'react';
 import { Breadcrumb, Skeleton, Button, Tooltip, App, Result } from 'antd';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
+import MasterAssistant from './genie/MasterAssistant';
 import {
   DatabaseOutlined, AppstoreOutlined, TagsOutlined, ExperimentOutlined,
   GoldOutlined, SkinOutlined, TeamOutlined, FileProtectOutlined,
@@ -594,6 +595,7 @@ const MasterDashboard = () => {
   }
 
   return (
+    <MasterAssistant item={activeItem} items={accessibleItems} select={handleMenuSelect}>
     <div className="animate-fade-in-up" style={{
       display: 'flex',
       flexDirection: 'column',
@@ -780,6 +782,7 @@ const MasterDashboard = () => {
       </div>
 
     </div>
+    </MasterAssistant>
   );
 };
 

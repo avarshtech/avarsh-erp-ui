@@ -126,6 +126,7 @@ const DefectTypeMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Defect Types"
       subtitle="Quality Control"
       addLabel="Add Defect Type"

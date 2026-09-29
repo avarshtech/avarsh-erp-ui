@@ -161,6 +161,7 @@ const OverheadMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Overheads"
       subtitle="Cost Categories"
       addLabel="Add Overhead"

@@ -133,6 +133,7 @@ const BpDebitTypeMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Debit Types"
       subtitle="Bill Passing"
       addLabel="Add Debit Type"

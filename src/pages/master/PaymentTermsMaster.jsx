@@ -187,6 +187,7 @@ const PaymentTermsMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Payment Terms"
       subtitle="Order Entry"
       addLabel="Add Payment Terms"

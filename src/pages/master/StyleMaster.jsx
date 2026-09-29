@@ -339,6 +339,7 @@ const StyleMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Styles"
       subtitle="Order Entry, Costing"
       addLabel="Add Style"

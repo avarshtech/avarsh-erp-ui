@@ -171,6 +171,7 @@ const ItemTypeMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Item Types"
       subtitle="Item"
       addLabel="Add Item Type"

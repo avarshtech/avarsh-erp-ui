@@ -183,6 +183,7 @@ const VariantMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Variants / Attributes"
       subtitle="Item"
       addLabel="Add Attribute"

@@ -39,6 +39,7 @@ import {
 } from '../../services/master/buyerService';
 import { hasPermission, isAdminRole, getCurrentUser } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
+import { useMasterAssistant } from './genie/masterGenieContext';
 import { COUNTRIES, getCountryISO2 } from '../../utils/countries';
 import { lookupPostalCode } from '../../services/master/locationService';
 
@@ -515,6 +516,14 @@ const BuyerMaster = () => {
       ),
     },
   ];
+
+  // Laya AI on the Master Data page (see ./genie): the list, the search and the buyer form.
+  useMasterAssistant({
+    rows: filteredBuyers, columns, searchText, search: setSearchText,
+    openNew: canAdd ? handleAdd : undefined, openRecord: handleEdit, close: doCloseModal,
+    isOpen: modalVisible, recordId: editingBuyer?.id ?? null,
+    form, markDirty: () => setUnsavedChanges(true), refresh: () => fetchBuyers(true),
+  });
 
   return (
     <Card

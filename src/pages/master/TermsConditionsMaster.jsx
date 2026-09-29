@@ -235,6 +235,7 @@ const TermsConditionsMaster = ({ onDirtyChange }) => {
 
   return (
     <MasterSplitView
+      assistant={{ form, markDirty: () => markDirty(true) }}
       title="Terms & Conditions"
       subtitle="Purchase Order"
       addLabel="Add Terms"

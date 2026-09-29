@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Row, Col, Card, Button, Table, Typography, Input, Drawer } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 import useResponsive from '../hooks/useResponsive';
+import { useMasterAssistant } from '../pages/master/genie/masterGenieContext';
 
 const { Title } = Typography;
 
@@ -20,8 +22,18 @@ const MasterSplitView = ({
   onCloseForm,
   rowKey = "id",
   searchPlaceholder = "Search...",
-  onSearch
+  onSearch,
+  assistant,
 }) => {
+  const [searchText, setSearchText] = useState('');
+  const search = (text) => { setSearchText(text); onSearch?.(text); };
+  // Laya AI on the Master Data page: `assistant` = { form, markDirty, fillable?, refresh? }.
+  useMasterAssistant(assistant ? {
+    rows: data, columns, searchText, search,
+    openNew: onAdd, openRecord: (record) => onSelectRow(record), close: onCloseForm,
+    isOpen: !!isEditing, recordId: selectedId ?? null,
+    form: assistant.form, markDirty: assistant.markDirty, fillable: assistant.fillable !== false, refresh: assistant.refresh,
+  } : null);
   const { isDarkMode } = useTheme();
   const { isMobile, isMobileOrTablet } = useResponsive();
   const borderColor = isDarkMode ? '#334155' : '#f0f0f0';
@@ -50,19 +62,22 @@ const MasterSplitView = ({
         flexWrap: 'wrap',
       }}>
         <Input
+          name="masterSearch"
+          data-laya="search"
           placeholder={searchPlaceholder}
           prefix={<SearchOutlined style={{ color: searchIconColor }} />}
-          onChange={(e) => onSearch?.(e.target.value)}
+          value={searchText}
+          onChange={(e) => search(e.target.value)}
           allowClear
           style={{ flex: '1 1 180px', maxWidth: 280, minWidth: 0 }}
         />
         {onAdd && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} style={{ flexShrink: 0 }}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} style={{ flexShrink: 0 }} data-laya="add">
             {addLabel}
           </Button>
         )}
       </div>
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: 'auto' }} data-laya="list">
         <Table
           className="master-split-table"
           dataSource={data}
@@ -101,7 +116,7 @@ const MasterSplitView = ({
           styles={{
             body: { padding: 0 },
           }}
-          destroyOnClose
+          destroyOnHidden
         >
           {isEditing && renderForm()}
         </Drawer>

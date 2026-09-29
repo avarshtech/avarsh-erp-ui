@@ -24,6 +24,7 @@ import { uploadFile, deleteFile, getFilesByEntity, downloadFileAsBlob } from '..
 import dayjs from 'dayjs';
 
 import { useStore } from '../../context/StoreContext';
+import { useMasterAssistant } from './genie/masterGenieContext';
 const { Text } = Typography;
 
 const MODULE_ID = 'items';
@@ -1562,6 +1563,15 @@ const ItemMaster = () => {
   const activeVariantsWithIndex = variants
     .map((v, idx) => ({ variant: v, originalIndex: idx }))
     .filter((item) => item.variant.isActive !== false);
+
+  // Laya AI on the Master Data page (see ./genie). It searches and opens items; new items go
+  // through its New material card (find-or-create), never by filling this form.
+  useMasterAssistant({
+    rows: filteredItems, columns, searchText: searchTerm, search: setSearchTerm,
+    openNew: canAdd ? handleAdd : undefined, openRecord: handleEdit, close: doCloseModal,
+    isOpen: modalOpen, recordId: selectedItemId ?? null,
+    form, fillable: false, refresh: () => fetchItems(),
+  });
 
   return (
     <div className="animate-fade-in-up">
