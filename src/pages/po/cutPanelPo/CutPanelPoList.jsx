@@ -87,9 +87,9 @@ const CutPanelPoList = () => {
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
           searchPlaceholder="PO no., CPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
-            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('CPP')], 108),
-            select('process', 'Process', options(rows, 'processLabel'), 104),
-            select('vendor', 'Job worker', options(rows, 'vendorName'), 110),
+            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('CPP')], 124),
+            select('process', 'Process', options(rows, 'processLabel'), 110),
+            select('vendor', 'Job worker', options(rows, 'vendorName'), 132),
             range('poDate', ['PO date from', 'PO date to']),
             range('delivery', ['Delivery from', 'Delivery to']),
           ]}

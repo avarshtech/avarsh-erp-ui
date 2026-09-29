@@ -95,10 +95,10 @@ const GarmentProcessPoList = () => {
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
           searchPlaceholder="PO no., GPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
-            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('GPO')], 127, true),
-            select('process', 'Process', options(rows, 'processLabel'), 116, true),
-            select('order', 'Order', options(rows, 'orderNos'), 120), select('style', 'Style', options(rows, 'styleNos'), 104),
-            select('vendor', 'Vendor', options(rows, 'vendorName'), 116),
+            select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('GPO')], 156, true),
+            select('process', 'Process', options(rows, 'processLabel'), 110, true),
+            select('order', 'Order', options(rows, 'orderNos'), 96), select('style', 'Style', options(rows, 'styleNos'), 90),
+            select('vendor', 'Vendor', options(rows, 'vendorName'), 106),
             range('poDate', ['PO date from', 'PO date to']),
           ]}
         />
