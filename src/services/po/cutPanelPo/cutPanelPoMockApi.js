@@ -127,7 +127,8 @@ export const updateCppDetails = async (id, patch) => {
   // Saved on any real change — a new unit id alone included, though the history never shows it.
   if (Object.keys(clean).every((f) => same(doc[f], clean[f]))) return detach(withHeld(db, doc));
   const changes = changesOf(doc, clean);
-  if (changes.some((c) => c.field === 'vendor')) {
+  // A swapped job worker is re-checked (BR-14); `changes` carries labels, so compare the raw value.
+  if (clean.vendor && !same(doc.vendor, clean.vendor)) {
     const check = vendorEligibility(clean.vendor, { processId: doc.process?.id ?? null, processLabel: doc.process?.label ?? doc.process?.name });
     if (!check.eligible) throw mockError(`${clean.vendor.name}: ${check.reason}`, 422);
   }
