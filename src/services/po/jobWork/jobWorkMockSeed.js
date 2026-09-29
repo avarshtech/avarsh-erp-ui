@@ -46,9 +46,8 @@ const po = ({ type, id, poNo, status, dateOffset, vendor, processName, category,
   const snapshot = seedVendorSnapshot(vendor);
   return {
     id, type, poNo, status, poDate: day(dateOffset), currency: 'INR', branchId: null, branchName: 'Head Office',
-    process: processSnapshot(processName, category), vendor: snapshot, paymentTerms: snapshot.paymentTerms,
-    deliveryTerms: 'Door delivery', discountType: 'AMOUNT', discountValue: 0, otherCharges: 0,
-    instructions: INSTRUCTIONS[processName], remarks: '', references: [], overrides: [], approvals: [],
+    process: processSnapshot(processName, category), vendor: snapshot, paymentTerms: snapshot.paymentTerms, otherCharges: 0,
+    instructions: INSTRUCTIONS[processName], overrides: [], approvals: [],
     requiredLevels: 1, lines, createdBy: by.name, createdByUser: by.username, createdOn: at(dateOffset, '09:30:00'),
     version: 1, ...rest,
   };
@@ -84,20 +83,19 @@ const buildDocs = () => {
   const gpr3 = gprs.find((d) => d.id === 3);
   const gpr4 = gprs.find((d) => d.id === 4);
   const rate = (r) => ({ rate: r });
+  // The return unit is a name-only snapshot: the seed cannot know the live Unit master's ids.
   const cppDates = (offset) => ({
-    requiredDeliveryDate: day(offset + 14), expectedCompletionDate: day(offset + 11), panelIssueDate: day(offset + 2),
-    processingLocation: 'VENDOR_PREMISES', returnTo: 'CUTTING', returnToOther: '', returnBranchName: 'Head Office',
-    freight: 'VENDOR', revisionNo: 0, pendingRevision: null,
+    requiredDeliveryDate: day(offset + 14), returnTo: 'CUTTING', returnToOther: '',
+    returnUnitId: null, returnUnitName: 'Cutting Unit (Head Office)', returnUnitAddress: null, revisionNo: 0, pendingRevision: null,
   });
   const gpoDates = (offset, gpr) => ({
-    requiredDate: getMockOrderContext(gpr.orderId).deliveryDate, plannedSendDate: day(offset + 1),
-    expectedReturnDate: day(offset + 10), returnTo: 'FINISHING', returnToOther: '',
+    requiredDate: getMockOrderContext(gpr.orderId).deliveryDate, expectedReturnDate: day(offset + 10), returnTo: 'FINISHING', returnToOther: '',
+    returnUnitId: null, returnUnitName: 'Finishing Unit (Head Office)', returnUnitAddress: null,
   });
 
   return [
     po({ type: T.CPP, id: 1, poNo: 'CPP-2026-00031', status: S.SENT_TO_VENDOR, dateOffset: -8, vendor: 'murugan',
       processName: 'Panel Printing', category: 'Cut Panel', ...cppDates(-8), ...approved(-8), sentOn: at(-7),
-      references: [{ title: 'ST-4388 front print artwork', url: 'https://example.com/artwork/ST-4388-front.pdf' }],
       lines: cppLines(cpr5, 'Panel Printing', [['Navy', '2Y', rate(7)], ['Navy', '4Y', rate(7.5)]]) }),
     po({ type: T.CPP, id: 2, poNo: 'CPP-2026-00032', status: S.PARTIALLY_COMPLETED, dateOffset: -20, vendor: 'murugan',
       processName: 'Panel Printing', category: 'Cut Panel', ...cppDates(-20), ...approved(-19), sentOn: at(-19),

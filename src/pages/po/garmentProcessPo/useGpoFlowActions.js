@@ -20,7 +20,7 @@ const useGpoFlowActions = ({ doc, dispatch, clearDirty, runner }) => {
       send: () => act('send', () => svc.sendGpoToVendor(id), 'Sent to the vendor'),
       cancel: (reason) => act('cancel', () => svc.cancelGpo(id, reason), 'PO cancelled — its allocation is released'),
       shortClose: (reason) => act('shortClose', () => svc.shortCloseGpo(id, reason), 'PO closed — the unreturned balance is released'),
-      amend: (patch, reason) => act('amend', () => svc.amendGpoDates(id, patch, reason), 'Dates / remarks amended'),
+      amend: (patch, reason) => act('amend', () => svc.amendGpoDates(id, patch, reason), 'Delivery / instructions amended'),
     };
   }, [id, run, dispatch, clearDirty]);
 };

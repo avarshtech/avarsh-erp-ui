@@ -8,7 +8,7 @@
 import { esc, documentShell, openPrintWindow, documentFileName } from './printDoc';
 import { amountInWordsIndian } from './amountInWords';
 import { subtotalsByUom, lineAmount, billingQty } from './jobWorkPoCalc';
-import { jobWorkUomLabel, optionLabel, CPP_RETURN_TO, GPO_RETURN_TO, FREIGHT_OPTIONS, PROCESSING_LOCATIONS } from './jobWorkConstants';
+import { jobWorkUomLabel, optionLabel, CPP_RETURN_TO, GPO_RETURN_TO } from './jobWorkConstants';
 import { JOB_WORK_PO_TYPE_LABEL, jobWorkPoStatusLabel, JW_PO_STATUS as S } from './jobWorkPoStatus';
 import { formatDate } from './formatters';
 
@@ -43,17 +43,15 @@ export const printJobWorkPo = (doc, value, org = {}) => {
   const lines = doc.lines.filter((l) => Number(l.poQty) > 0);
   const cols = LINE_COLUMNS[doc.type];
   const byUom = subtotalsByUom(lines);
-  const returnTo = optionLabel(doc.type === 'CPP' ? CPP_RETURN_TO : GPO_RETURN_TO, doc.returnTo);
+  const returnTo = doc.returnTo === 'OTHER' ? doc.returnToOther : optionLabel(doc.type === 'CPP' ? CPP_RETURN_TO : GPO_RETURN_TO, doc.returnTo);
   const meta = [
     ['PO No.', `${doc.poNo || 'Not saved'}${doc.revisionNo ? ` · R${doc.revisionNo}` : ''}`], ['PO Date', formatDate(doc.poDate)],
     ['Status', jobWorkPoStatusLabel(doc.status)], ['Payment terms', doc.paymentTerms || '—'],
     ['Order', uniq(lines.map((l) => l.orderNo))], ['Style', uniq(lines.map((l) => l.styleNo))],
     [doc.type === 'CPP' ? 'Fabric' : 'Buyer', uniq(lines.map((l) => (doc.type === 'CPP' ? l.fabricName : l.buyer)))],
     ['Requirement', uniq(lines.map((l) => l.cprNo || l.gprNo))],
-    [doc.type === 'CPP' ? 'Required delivery' : 'Expected return', formatDate(doc.type === 'CPP' ? doc.requiredDeliveryDate : doc.expectedReturnDate)],
-    ['Return to', doc.returnTo === 'OTHER' ? doc.returnToOther : returnTo],
-    ...(doc.type === 'CPP' ? [['Processing at', optionLabel(PROCESSING_LOCATIONS, doc.processingLocation)], ['Freight', optionLabel(FREIGHT_OPTIONS, doc.freight)]]
-      : [['Planned send', formatDate(doc.plannedSendDate)], ['Delivery terms', doc.deliveryTerms || '—']]),
+    ['Expected delivery date', formatDate(doc.type === 'CPP' ? doc.requiredDeliveryDate : doc.expectedReturnDate)],
+    ['Return to', returnTo || '—'], ['Return unit', doc.returnUnitName || '—'],
   ].map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   const head = `${cols.map(([t]) => `<th>${esc(t)}</th>`).join('')}<th class="num">Qty</th><th>UOM</th><th class="num">Billing qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th>`;
   const rows = lines.map((l) => `<tr>${cols.map(([, f]) => `<td>${esc(f(l))}</td>`).join('')}<td class="num">${n(l.poQty)}</td>
@@ -73,12 +71,11 @@ export const printJobWorkPo = (doc, value, org = {}) => {
     <div class="top"><div><h1>${esc(org.organisationName || 'Company')}</h1>${esc([org.addressLine1, org.addressLine2, org.city, org.state, org.pincode].filter(Boolean).join(', '))}<br/>GSTIN ${esc(org.gstin || '—')}</div>
       <div style="text-align:right"><h1>Job Work Purchase Order</h1>${esc(JOB_WORK_PO_TYPE_LABEL[doc.type])}</div></div>
     <div class="parties">${party('Job worker', [doc.vendor?.name, doc.vendor?.address, [doc.vendor?.city, doc.vendor?.state, doc.vendor?.pincode].filter(Boolean).join(', '), `GSTIN ${doc.vendor?.gstin || '—'}`, [doc.vendor?.contactPerson, doc.vendor?.phone].filter(Boolean).join(' · ')])}
-      ${party('Deliver processed goods to', [returnTo, doc.returnToOther, doc.returnBranchName])}</div>
+      ${party('Deliver processed goods to', [doc.returnUnitName, doc.returnUnitAddress, returnTo])}</div>
     <div class="grid">${meta}</div>
     <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table>
     <table class="value"><tbody>
       <tr><td>${doc.type === 'CPP' ? 'Basic amount' : 'Subtotal'}</td><td class="num">${money(value.basic)}</td></tr>
-      ${value.discount ? `<tr><td>Discount</td><td class="num">− ${money(value.discount)}</td></tr>` : ''}
       ${value.otherCharges ? `<tr><td>Other charges</td><td class="num">${money(value.otherCharges)}</td></tr>` : ''}
       <tr><td>Taxable value</td><td class="num">${money(value.taxable)}</td></tr>${tax}
       ${total}

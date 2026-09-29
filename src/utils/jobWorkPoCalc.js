@@ -5,7 +5,7 @@
  *   billing qty = PO qty converted by the UOM (Piece 1 : 1, Dozen ÷ 12; Kg, Metre, Lot and
  *                 Other are keyed on the line — there is no panel weight to convert by)
  *   amount      = ROUND(billing qty × rate, 2)
- *   taxable     = basic − discount + other charges
+ *   taxable     = basic + other charges (a job-work PO carries no discount)
  *   GST         = ROUND(taxable × rate, 2): IGST, or CGST (half, rounded half-up) + SGST
  *                 (the rest), so the two always add back to the tax
  *   PO value    = taxable + GST;   rounded = PO value to the rupee, half-up
@@ -41,26 +41,21 @@ export const lineAmount = (line) => {
   return qty == null || !hasRate(line) ? 0 : round2(qty * Number(line.rate));
 };
 
-export const discountAmount = (basic, discountType, discountValue) => (discountType === 'PERCENT'
-  ? round2((basic * (Number(discountValue) || 0)) / 100)
-  : round2(Number(discountValue) || 0));
-
 /**
  * The PO value block. `igst` follows the vendor's IGST tick (deviation D2 — place of
  * supply moves to the server in the API phase).
  */
-export const poValue = ({ lines, discountType = 'AMOUNT', discountValue = 0, otherCharges = 0, gstRatePercent = 0, igst = false }) => {
+export const poValue = ({ lines, otherCharges = 0, gstRatePercent = 0, igst = false }) => {
   const basic = round2(lines.reduce((s, l) => s + lineAmount(l), 0));
-  const discount = discountAmount(basic, discountType, discountValue);
   const charges = round2(Number(otherCharges) || 0);
-  const taxable = round2(basic - discount + charges);
+  const taxable = round2(basic + charges);
   const tax = round2((taxable * (Number(gstRatePercent) || 0)) / 100);
   const cgst = igst ? 0 : round2(tax / 2);
   const sgst = igst ? 0 : round2(tax - cgst);
   const total = round2(taxable + tax);
   const rounded = Math.round(total);
   return {
-    basic, discount, otherCharges: charges, taxable, gstRatePercent: Number(gstRatePercent) || 0, igst,
+    basic, otherCharges: charges, taxable, gstRatePercent: Number(gstRatePercent) || 0, igst,
     cgst, sgst, igstAmount: igst ? tax : 0, tax, total, rounded, roundOff: round2(rounded - total),
   };
 };

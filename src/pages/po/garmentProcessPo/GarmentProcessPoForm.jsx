@@ -21,6 +21,7 @@ import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
 import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
 import useJobWorkMasters from '../jobWork/useJobWorkMasters';
 import useJobWorkRefetch from '../jobWork/useJobWorkRefetch';
+import useJobWorkUnits from '../jobWork/useJobWorkUnits';
 import useGarmentProcessPo from './useGarmentProcessPo';
 import useGpoContext from './useGpoContext';
 import useGpoView from './useGpoView';
@@ -43,7 +44,7 @@ const LIST = `${JOB_WORK_PO_PATH.GPO}/list`;
 /**
  * Garment Process PO — one scrolling screen, wireframe sections ①–⑦ and a sticky action
  * bar (PRD §19). UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; suppliers, processes, payment terms and branches are the real API.
+ * localStorage mock; suppliers, processes, payment terms, branches and units are the real API.
  */
 const GarmentProcessPoForm = () => {
   const { id } = useParams();
@@ -66,6 +67,7 @@ const GarmentProcessPoForm = () => {
   const [dialog, setDialog] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [amendOpen, setAmendOpen] = useState(false);
+  const units = useJobWorkUnits(po.doc?.branchId ?? (activeBranch || defaultBranch)?.id, { enabled: Boolean(view?.draft || amendOpen) });
 
   if (po.loading) return <Skeleton active paragraph={{ rows: 14 }} />;
   if (!po.doc) return <Result status="404" title="Garment Process PO not found" extra={<Button onClick={() => navigate(LIST)}>Back to list</Button>} />;
@@ -97,7 +99,7 @@ const GarmentProcessPoForm = () => {
       )}
       <GpoRequirementCards cards={cards} orders={ctx?.orders} onOpenGpr={(gprId) => navigate(`/bom/garment-process/${gprId}`)} />
       <GpoLinesSection doc={doc} ctx={ctx} editable={view.draft} canRequest={view.draft} selectedKeys={po.selectedKeys} h={lines.grid} />
-      <GpoBottomRow doc={doc} cards={cards} value={view.value} editable={{ delivery: view.draft, commercial: view.draft }} onPatch={patch} />
+      <GpoBottomRow doc={doc} value={view.value} units={units} editable={{ delivery: view.draft, commercial: view.draft }} onPatch={patch} />
       {(doc.status !== 'DRAFT' || doc.overrides.length > 0) && (
         <JobWorkApprovalPanel
           levels={doc.levelNames || GPO_LEVELS} approvals={doc.approvals} overrides={doc.overrides} busy={runner.busy === 'excessApprove'} onAuthorise={draft.approveExcess}
@@ -108,7 +110,7 @@ const GarmentProcessPoForm = () => {
       <GpoActionBar doc={doc} value={view.value} checks={checks} buttons={view.buttons} busy={runner.busy} errors={runner.errors} on={on} openDialog={setDialog} />
       <JobWorkReasonDialog dialog={dialog && { open: true, ...GPO_DIALOGS[dialog] }} onSubmit={(r) => on[dialog](r)} onClose={() => setDialog(null)} />
       <OverrideRequestDialog request={lines.excessRequest} onSubmit={draft.requestExcess} onClose={lines.closeExcess} />
-      <GpoAmendDialog open={amendOpen} doc={doc} onSubmit={flow.amend} onClose={() => setAmendOpen(false)} />
+      <GpoAmendDialog open={amendOpen} doc={doc} units={units} onSubmit={flow.amend} onClose={() => setAmendOpen(false)} />
       <DocumentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} docId={doc.id} docNo={doc.poNo} loadAudit={getGpoAudit} />
     </div>
   );

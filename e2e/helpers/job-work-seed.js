@@ -7,6 +7,30 @@
  * state, matched by GSTIN: approval validity relative to today, processes, active flag.
  */
 import { SEED_JOB_WORKERS, seedDay } from '../../src/services/po/jobWork/jobWorkSeedVendors.js';
+import { headOffice, ensureUnit } from './branch-seed.js';
+
+/**
+ * Units for the job-work POs' return unit (HR › Units), in the head office. The e2e seed has
+ * only UNIT-1, with no type or address, so the delivery place would read "—".
+ */
+export const JOB_WORK_UNITS = {
+  cut: {
+    unitCode: 'E2E-JW-CUT', unitName: 'E2E Cutting Unit', unitType: 'CUTTING',
+    address: '12 Mill Road', city: 'Tiruppur', state: 'Tamil Nadu', pincode: '641601',
+  },
+  fin: {
+    unitCode: 'E2E-JW-FIN', unitName: 'E2E Finishing Unit', unitType: 'FINISHING',
+    address: '4 Dye House Street', city: 'Tiruppur', state: 'Tamil Nadu', pincode: '641604',
+  },
+};
+
+/** Creates the job-work units if missing (the H2 database is rebuilt on every boot); returns them keyed cut / fin. */
+export async function ensureJobWorkUnits(api) {
+  const office = await headOffice(api);
+  const saved = {};
+  for (const [key, unit] of Object.entries(JOB_WORK_UNITS)) saved[key] = await ensureUnit(api, office?.id, unit);
+  return saved;
+}
 
 const payload = (w, processIds) => ({
   name: w.name, gstin: w.gstin, igstApplicable: w.igstApplicable, stateCode: w.gstin.slice(0, 2), pan: w.gstin.slice(2, 12),

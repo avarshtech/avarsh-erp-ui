@@ -11,8 +11,9 @@ const { Text } = Typography;
 
 /**
  * ① PO Header (PRD §11.1): number (on first save), date (not future-dated, editable until
- * approval), unit (a branch — deviation D8; locked once lines exist), INR (D11), status;
- * then order, buyer, style, garment and fabric read-only from the requirement lines.
+ * approval), branch (deviation D8; locked once lines exist — changing it clears the return
+ * unit, which belongs to a branch), INR (D11), status; then order, buyer, style, garment and
+ * fabric read-only from the requirement lines.
  */
 const CppHeaderSection = memo(function CppHeaderSection({ doc, editable, branches, unit, onPatch }) {
   const lines = doc.lines;
@@ -29,12 +30,15 @@ const CppHeaderSection = memo(function CppHeaderSection({ doc, editable, branche
           />
         </Col>
         <Col xs={12} md={5}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Unit</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>Branch</Text>
           <Select
-            id="cpp-unit" style={{ width: '100%' }} disabled={!editable || lines.length > 0} value={unitId}
+            id="cpp-unit" aria-label="Branch" style={{ width: '100%' }} disabled={!editable || lines.length > 0} value={unitId}
             options={(branches || []).map((b) => ({ value: b.id, label: b.branchName }))}
             placeholder={doc.branchName || 'Current branch'}
-            onChange={(id) => onPatch({ branchId: id, branchName: branches.find((b) => b.id === id)?.branchName ?? null })}
+            onChange={(id) => onPatch({
+              branchId: id, branchName: branches.find((b) => b.id === id)?.branchName ?? null,
+              returnUnitId: null, returnUnitName: null, returnUnitAddress: null,
+            })}
           />
         </Col>
         <Col xs={12} md={3}><ReadOnlyField label="Currency" value="INR" /></Col>

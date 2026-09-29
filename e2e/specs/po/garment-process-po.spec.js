@@ -17,13 +17,15 @@
  *     keeping its requirement number (AC-07); another process is not selectable
  *   - Excess: 4 over the balance blocks Submit; an approved excess allows it (AC-06)
  *   - An unapproved job worker warns; the approver signs it off (§13)
- *   - Amend dates / remarks on a sent PO, audited (§16, AC-13); print shows no internal quantities
+ *   - ⑤ Delivery Instructions: the return unit from HR › Units (beforeAll creates two in the
+ *     head office), its address as the delivery place
+ *   - Amend delivery / instructions on a sent PO, audited (§16, AC-13); print shows no internal quantities
  */
 
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { ensureJobWorkers } from '../../helpers/job-work-seed.js';
+import { ensureJobWorkers, ensureJobWorkUnits, JOB_WORK_UNITS } from '../../helpers/job-work-seed.js';
 
 const BASE = '/purchase-orders/garment-process-po';
 
@@ -96,8 +98,10 @@ async function bulkRate(page, mode, rate, count) {
 
 const fillRates = (page, rate) => bulkRate(page, 'All lines', rate);
 
-async function deliveryDates(page) {
-  await setDate(page, 'gpo-plannedSendDate', plusDays(2));
+/** ⑤ Delivery Instructions: Return To stays Finishing; the return unit (its address is the delivery place) and the date. */
+async function delivery(page) {
+  await pickSelect(page, 'gpo-returnUnit', JOB_WORK_UNITS.fin.unitName);
+  await expect(page.locator('#gpo-delivery')).toContainText('4 Dye House Street, Tiruppur, Tamil Nadu 641604');
   await setDate(page, 'gpo-expectedReturnDate', plusDays(12));
 }
 
@@ -112,7 +116,12 @@ async function allocation(page, gprId, process) {
 
 test.beforeAll(async () => {
   const api = await createAuthenticatedClient();
-  try { await ensureJobWorkers(api); } finally { await api.dispose(); }
+  try {
+    await ensureJobWorkers(api);
+    await ensureJobWorkUnits(api);
+  } finally {
+    await api.dispose();
+  }
 });
 
 test.beforeEach(async ({ page }) => {
@@ -137,7 +146,7 @@ test('Submit allocates the requirement; recall releases it (AC-05, AC-10)', asyn
   for (const size of ['3-4Y', '5-6Y', '7-8Y', '9-10Y']) await page.getByRole('button', { name: `Remove GPR-2026-00001 Navy ${size}` }).click();
   await pickVendor(page, 'Bluewave Garment Washers');
   await fillRates(page, 18.5);
-  await deliveryDates(page);
+  await delivery(page);
   await expect(page.getByText('All lines within balance · ready to submit')).toBeVisible();
   await expect(page.locator('#gpo-requirements')).toContainText('4,000');
 
@@ -246,7 +255,7 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
   await pickVendor(page, 'Colourtex Dye House');
   await page.getByRole('spinbutton', { name: 'PO qty White 8Y' }).fill('142');
   await fillRates(page, 22);
-  await deliveryDates(page);
+  await delivery(page);
   await expect(page.getByText('Exceeds balance by 4 pcs')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Submit for Approval' })).toBeDisabled();
   await page.getByRole('button', { name: 'Request excess override' }).click();
@@ -267,10 +276,11 @@ test('An unapproved job worker warns; the approver signs it off (§13)', async (
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
   await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' });
+  await expect(page.getByText('4 line(s) added')).toBeVisible(); // the lines fix the process the vendor list is graded for
   await pickVendor(page, 'Nova Prints');
   await expect(page.locator('#gpo-header')).toContainText(/Job-work approval missing|Does not do Enzyme Washing/);
   await fillRates(page, 17);
-  await deliveryDates(page);
+  await delivery(page);
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
   await expect(page.getByText(/Submitted for approval/)).toBeVisible();
   await page.getByRole('button', { name: 'Approve' }).click();
@@ -279,17 +289,17 @@ test('An unapproved job worker warns; the approver signs it off (§13)', async (
   await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible();
 });
 
-test('Amend dates on a sent PO is audited; the print carries no internal quantities', async ({ page }) => {
+test('Amend delivery on a sent PO is audited; the print carries no internal quantities', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/6`);
   await waitForPageReady(page);
-  await page.getByRole('button', { name: 'Amend dates / remarks' }).click();
+  await page.getByRole('button', { name: 'Amend delivery / instructions' }).click();
   const dialog = page.getByRole('dialog');
   await setDate(page, 'amend-expectedReturnDate', plusDays(20));
   await dialog.locator('#amend-reason').fill('Dye house asked for four more days.');
   await dialog.getByRole('button', { name: 'Save amendment' }).click();
-  await expect(page.getByText('Dates / remarks amended')).toBeVisible();
+  await expect(page.getByText('Delivery / instructions amended')).toBeVisible();
   await page.getByRole('button', { name: 'History' }).click();
-  await expect(page.locator('.ant-drawer-open')).toContainText(`Expected return date:`);
+  await expect(page.locator('.ant-drawer-open')).toContainText(`Expected delivery date:`);
   await expect(page.locator('.ant-drawer-open')).toContainText(plusDays(20));
   await page.keyboard.press('Escape');
 

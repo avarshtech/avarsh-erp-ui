@@ -4,12 +4,11 @@
  * (PRD FR-29, report R-8). Lines keep their keys; only quantity, UOM, billing quantity and
  * rate move — a different vendor or process means cancelling and raising a fresh PO.
  */
-export const REVISION_FIELDS = ['discountType', 'discountValue', 'otherCharges', 'requiredDeliveryDate',
-  'expectedCompletionDate', 'panelIssueDate', 'paymentTerms', 'deliveryTerms', 'lateDeliveryReason', 'duplicateReason'];
+export const REVISION_FIELDS = ['otherCharges', 'requiredDeliveryDate', 'paymentTerms', 'lateDeliveryReason', 'duplicateReason'];
 
 /** Still editable once Approved, until Sent to Vendor (BR-16) — without an amendment. */
-export const ISSUED_FIELDS = ['vendor', 'paymentTerms', 'deliveryTerms', 'requiredDeliveryDate', 'expectedCompletionDate',
-  'panelIssueDate', 'processingLocation', 'vendorLocation', 'returnTo', 'returnToOther', 'returnBranchId', 'returnBranchName', 'freight'];
+export const ISSUED_FIELDS = ['vendor', 'paymentTerms', 'requiredDeliveryDate', 'returnTo', 'returnToOther',
+  'returnUnitId', 'returnUnitName', 'returnUnitAddress'];
 
 const pick = (src, fields) => Object.fromEntries(fields.filter((f) => f in src).map((f) => [f, src[f]]));
 
@@ -23,13 +22,10 @@ export const mergedRevision = (doc, rev) => ({
 });
 
 const LABELS = {
-  discountType: 'Discount type', discountValue: 'Discount', otherCharges: 'Other charges',
-  requiredDeliveryDate: 'Required delivery', expectedCompletionDate: 'Expected completion',
-  panelIssueDate: 'Panel issue date', paymentTerms: 'Payment terms', deliveryTerms: 'Delivery terms',
-  lateDeliveryReason: 'Late delivery reason', duplicateReason: 'Duplicate PO reason', vendor: 'Job worker', processingLocation: 'Processing location',
-  vendorLocation: 'Vendor location', returnTo: 'Return to', returnToOther: 'Return to (other)',
-  returnBranchName: 'Return unit', freight: 'Freight', instructions: 'Processing instructions',
-  remarks: 'Remarks', references: 'Reference documents',
+  otherCharges: 'Other charges', requiredDeliveryDate: 'Expected delivery date', paymentTerms: 'Payment terms',
+  lateDeliveryReason: 'Late delivery reason', duplicateReason: 'Duplicate PO reason', vendor: 'Job worker',
+  returnTo: 'Return to', returnToOther: 'Return to (other)', returnUnitName: 'Return unit', returnUnitAddress: 'Delivery place',
+  instructions: 'Processing instructions',
 };
 
 /** A PO header field as the history and the amendment diff name it. */

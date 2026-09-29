@@ -1,8 +1,8 @@
 /**
  * Garment Process PO rules — pure functions (PRD §8–17), run by the screen and by the mock
  * "server" alike. A vendor and one line are needed even to save (V1, V2); the rest block
- * Submit. An expected return after the required date only warns (§8.3), and so does an
- * unapproved or untagged job worker, whom the approver signs off (§13).
+ * Submit. An expected delivery date after the required date only warns (§8.3), and so does
+ * an unapproved or untagged job worker, whom the approver signs off (§13).
  */
 import dayjs from 'dayjs';
 import { cellId, gprCell, REQUIREMENT_SOURCE } from './jobWorkAllocation';
@@ -10,6 +10,7 @@ import { poValue, isKeyedBilling } from './jobWorkPoCalc';
 import { GPO_EXCESS_CAP_PCT, jobWorkUomLabel } from './jobWorkConstants';
 import { REQUIREMENT_STATUS as R } from './requirementStatus';
 import { gprLineLabel } from './garmentProcessCalc';
+import { deliveryIssues } from './jobWorkDelivery';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
@@ -67,8 +68,8 @@ export const gpoRequirementChange = (line, state) => {
 export const withLastRates = (lines, byKey) => lines.map((l) => (l.rate == null && byKey?.[l.uom] != null ? { ...l, rate: byKey[l.uom] } : l));
 
 export const gpoValue = (doc) => poValue({
-  lines: doc.lines.filter((l) => Number(l.poQty) > 0), discountType: doc.discountType, discountValue: doc.discountValue,
-  otherCharges: doc.otherCharges, gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),
+  lines: doc.lines.filter((l) => Number(l.poQty) > 0), otherCharges: doc.otherCharges,
+  gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),
 });
 
 /**
@@ -88,16 +89,13 @@ export const gpoSaveBlocking = (doc) => {
   return out;
 };
 
-const dateChecks = (doc, blocking, warnings) => {
+/** V14 and §8.3: the required date, the Delivery Instructions, and the expected delivery date against the PO and required dates. */
+const deliveryChecks = (doc, blocking, warnings) => {
   if (!doc.requiredDate) blocking.push('Enter the required date.');
-  if (!doc.returnTo || (doc.returnTo === 'OTHER' && !String(doc.returnToOther || '').trim())) blocking.push('Select where the garments return to (V14).');
-  if (!doc.plannedSendDate || !doc.expectedReturnDate) {
-    blocking.push('Planned send and expected return dates are mandatory (V14).');
-    return;
-  }
-  if (doc.poDate && dayjs(doc.plannedSendDate).isBefore(doc.poDate, 'day')) blocking.push('The planned send date cannot be before the PO date (V14).');
-  if (dayjs(doc.expectedReturnDate).isBefore(doc.plannedSendDate, 'day')) blocking.push('Check dates: the expected return is before the planned send date (V14).');
-  if (doc.requiredDate && dayjs(doc.expectedReturnDate).isAfter(doc.requiredDate, 'day')) warnings.push('The expected return is after the required date (§8.3).');
+  deliveryIssues(doc, 'expectedReturnDate').forEach((issue) => blocking.push(`${issue} (V14).`));
+  if (!doc.expectedReturnDate) return;
+  if (doc.poDate && dayjs(doc.expectedReturnDate).isBefore(doc.poDate, 'day')) blocking.push('The expected delivery date cannot be before the PO date (V14).');
+  if (doc.requiredDate && dayjs(doc.expectedReturnDate).isAfter(doc.requiredDate, 'day')) warnings.push('The expected delivery date is after the required date (§8.3).');
 };
 
 /**
@@ -129,14 +127,12 @@ export const validateGpo = (doc, ctx, { today = dayjs() } = {}) => {
       lineError(l, i, ctx?.stage === 'submit' ? `balance changed; exceeds it by ${n(excess)} — review the line (V15)` : `exceeds balance by ${n(excess)} (V4)`);
     }
   });
-  dateChecks(doc, blocking, warnings);
+  deliveryChecks(doc, blocking, warnings);
   (ctx?.eligibility?.issues || []).forEach((issue) => {
     if (issue.warnOnly) warnings.push(`${doc.vendor?.name}: ${issue.text} — the approver signs this off (§13).`);
     else blocking.push(`${doc.vendor?.name}: ${issue.text} — choose another vendor (§13).`);
   });
-  const { basic, discount } = gpoValue(doc);
-  if (Number(doc.discountValue) < 0 || Number(doc.otherCharges) < 0) blocking.push('Discount and other charges cannot be negative (§8.4).');
-  if (discount > basic) blocking.push('The discount cannot exceed the subtotal (§8.4).');
+  if (Number(doc.otherCharges) < 0) blocking.push('Other charges cannot be negative (§8.4).');
   return { blocking: [...new Set(blocking)], warnings, byLine };
 };
 

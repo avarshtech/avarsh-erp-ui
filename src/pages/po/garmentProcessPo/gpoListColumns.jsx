@@ -27,7 +27,7 @@ export const buildGpoListColumns = (a) => [
   { title: 'Qty', dataIndex: 'poQty', width: 90, align: 'right', render: n },
   { title: 'Grand Total', dataIndex: 'poValue', width: 130, align: 'right', render: money },
   { title: 'PO Date', dataIndex: 'poDate', width: 110, render: (v) => formatDate(v) },
-  { title: 'Expected Return', dataIndex: 'expectedReturnDate', width: 130, render: (v) => formatDate(v) },
+  { title: 'Expected delivery', dataIndex: 'expectedReturnDate', width: 140, render: (v) => formatDate(v) },
   {
     title: 'Status', key: 'status', width: 160, align: 'center', fixed: 'right',
     render: (_, r) => (r.flags.length

@@ -19,13 +19,17 @@
  *   - Amend a sent PO: the open amendment's diff is on screen for its approver; approval
  *     releases R0 and allocates R1 (CPR-2026-00005 Panel Printing 800 → 780 PO'd)
  *   - Close short releases the unreceived quantity (AC-17)
- *   - The vendor copy carries no internal quantities
+ *   - A draft CPP does not block editing its CPR; re-fetch rebuilds the changed line; once
+ *     the CPP is submitted, a tab still editing the CPR is refused
+ *   - ⑤ Delivery Instructions: the return unit comes from HR › Units (beforeAll creates two
+ *     in the head office) and its address is the delivery place; no discount anywhere
+ *   - The vendor copy carries the return unit and instructions, no internal quantities
  */
 
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
-import { ensureJobWorkers } from '../../helpers/job-work-seed.js';
+import { ensureJobWorkers, ensureJobWorkUnits, JOB_WORK_UNITS } from '../../helpers/job-work-seed.js';
 
 const BASE = '/purchase-orders/cut-panel-po';
 
@@ -100,15 +104,22 @@ async function draftOnBalance(page, { process, cprNo, vendor, rate, count }) {
   await pickOption(page, selectOf(page, 'cpp-process'), process);
   await page.getByRole('checkbox', { name: `Select ${cprNo}` }).check();
   await page.getByRole('button', { name: 'Add to Grid' }).click();
+  // The lines land after the mock's delay and push ③ down: an open vendor dropdown would miss its click.
+  await expect(page.getByText(/^\d+ line\(s\) added/)).toBeVisible();
   await pickOption(page, selectOf(page, 'cpp-vendor-select'), vendor);
+  await pickOption(page, selectOf(page, 'cpp-returnUnit'), JOB_WORK_UNITS.cut.unitName);
   await setDate(page, 'cpp-requiredDeliveryDate', plusDays(20));
-  await setDate(page, 'cpp-expectedCompletionDate', plusDays(18));
   await fillRate(page, 'All lines', null, rate, count);
 }
 
 test.beforeAll(async () => {
   const api = await createAuthenticatedClient();
-  try { await ensureJobWorkers(api); } finally { await api.dispose(); }
+  try {
+    await ensureJobWorkers(api);
+    await ensureJobWorkUnits(api);
+  } finally {
+    await api.dispose();
+  }
 });
 
 test.beforeEach(async ({ page }) => {
@@ -141,8 +152,13 @@ test('§13.4 worked example: fetch, copy and bulk-fill rates, value, save, submi
   await pickOption(page, selectOf(page, 'cpp-vendor-select'), 'Sri Murugan Prints');
   await expect(page.locator('#cpp-vendor')).toContainText('33AAFCS1234K1Z2');
   await expect(selectOf(page, 'cpp-paymentTerms').locator('xpath=ancestor::div[contains(@class,"ant-select")][1]')).toContainText('Open Account 30 Days');
+
+  // ⑤ Delivery Instructions: Return To stays Cutting; the return unit's address is the delivery place
+  const delivery = page.locator('#cpp-delivery');
+  await expect(delivery).toContainText('Expected delivery date');
+  await pickOption(page, selectOf(page, 'cpp-returnUnit'), JOB_WORK_UNITS.cut.unitName);
+  await expect(delivery).toContainText('12 Mill Road, Tiruppur, Tamil Nadu 641601');
   await setDate(page, 'cpp-requiredDeliveryDate', plusDays(20));
-  await setDate(page, 'cpp-expectedCompletionDate', plusDays(18));
 
   await page.getByRole('button', { name: 'Copy last PO rates' }).click(); // 2Y ₹7.00, 4Y ₹7.50 from CPP-2026-00031
   await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Copy' }).click();
@@ -209,7 +225,7 @@ test('Approve the seeded submitted PO, then change its terms before it is sent',
   await expect(page.getByText('Changes saved')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeEnabled();
   await page.getByRole('button', { name: 'History' }).click();
-  await expect(page.locator('.ant-drawer-open')).toContainText(`Required delivery:`);
+  await expect(page.locator('.ant-drawer-open')).toContainText(`Expected delivery date:`);
   await expect(page.locator('.ant-drawer-open')).toContainText(plusDays(25));
 
   const drawer = await openAllocation(page, 3);
@@ -340,6 +356,9 @@ test('The vendor copy carries no internal quantities', async ({ page }) => {
   const html = await popup.content();
   expect(html).toContain('CPP-2026-00031');
   expect(html).toContain('Sri Murugan Prints');
+  expect(html).toContain('Cutting Unit (Head Office)'); // the return unit the goods come back to
+  expect(html).toContain('Print to the approved strike-off'); // the processing instructions
   expect(html).not.toMatch(/Previously|Balance|Required qty/i);
+  expect(html).not.toMatch(/Freight|Discount|Processing at/);
   await popup.close();
 });

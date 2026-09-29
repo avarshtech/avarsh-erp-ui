@@ -11,6 +11,7 @@ import { cellId, REQUIREMENT_SOURCE } from './jobWorkAllocation';
 import { poValue, isKeyedBilling } from './jobWorkPoCalc';
 import { ZERO_RATE_REASON, RATE_VARIANCE_PCT } from './jobWorkConstants';
 import { processLabel } from './cutPanelCalc';
+import { deliveryIssues } from './jobWorkDelivery';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
@@ -77,8 +78,8 @@ export const approvalLevels = (doc) => {
 };
 
 export const cppValue = (doc) => poValue({
-  lines: doc.lines.filter((l) => Number(l.poQty) > 0), discountType: doc.discountType, discountValue: doc.discountValue,
-  otherCharges: doc.otherCharges, gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),
+  lines: doc.lines.filter((l) => Number(l.poQty) > 0), otherCharges: doc.otherCharges,
+  gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),
 });
 
 const byLines = (lines) => Object.values(lines.reduce((acc, l) => {
@@ -144,17 +145,10 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
   const blocking = cppLineIntegrity(doc);
   const advisories = [];
   const live = doc.lines.filter((l) => Number(l.poQty) > 0);
-  if (!doc.poDate || !doc.vendor || !doc.process || !doc.requiredDeliveryDate || !doc.expectedCompletionDate) {
-    blocking.push('PO date, process, job worker, required delivery date and expected completion date are mandatory (VR-01).');
-  }
+  if (!doc.poDate || !doc.vendor || !doc.process) blocking.push('PO date, process and job worker are mandatory (VR-01).');
+  deliveryIssues(doc, 'requiredDeliveryDate').forEach((issue) => blocking.push(`${issue} (VR-01).`));
   if (!live.length) blocking.push('At least one line needs a PO quantity above zero (VR-02).');
   if (doc.poDate && dayjs(doc.poDate).isAfter(today, 'day')) blocking.push('The PO date cannot be in the future (VR-05).');
-  if (doc.expectedCompletionDate && doc.requiredDeliveryDate && dayjs(doc.expectedCompletionDate).isAfter(doc.requiredDeliveryDate, 'day')) {
-    blocking.push('Expected completion must be on or before the required delivery date (VR-06).');
-  }
-  if (doc.panelIssueDate && doc.expectedCompletionDate && dayjs(doc.panelIssueDate).isAfter(doc.expectedCompletionDate, 'day')) {
-    blocking.push('Panel issue date must be on or before expected completion (VR-07).');
-  }
   if (ctx.eligibility && !ctx.eligibility.eligible) blocking.push(`${doc.vendor?.name}: ${ctx.eligibility.reason} (VR-13).`);
   [...new Set(live.map((l) => l.cprId))].forEach((id) => {
     const since = ctx.state?.[id]?.submittedOn;
@@ -187,11 +181,9 @@ export const validateCpp = (doc, ctx, { today = dayjs() } = {}) => {
     }
   });
   const lateOrders = [...new Set(live.map((l) => l.orderId))].filter((id) => ctx.orderDue?.[id] && doc.requiredDeliveryDate && dayjs(doc.requiredDeliveryDate).isAfter(ctx.orderDue[id], 'day'));
-  if (lateOrders.length) advisories.push({ code: 'LATE_DELIVERY', msg: 'The required delivery date is after the order delivery date (VR-08).', resolved: Boolean(String(doc.lateDeliveryReason || '').trim()) });
+  if (lateOrders.length) advisories.push({ code: 'LATE_DELIVERY', msg: 'The expected delivery date is after the order delivery date (VR-08).', resolved: Boolean(String(doc.lateDeliveryReason || '').trim()) });
   if (ctx.duplicates?.length) advisories.push({ code: 'DUPLICATE_PO', msg: `${ctx.duplicates.join(', ')} already goes to this job worker for the same requirement and process today (VR-14).`, resolved: Boolean(String(doc.duplicateReason || '').trim()) });
-  const { basic, discount } = cppValue(doc);
-  if (Number(doc.discountValue) < 0 || Number(doc.otherCharges) < 0) blocking.push('Discount and other charges cannot be negative.');
-  if (discount > basic) blocking.push('The discount cannot exceed the basic amount.');
+  if (Number(doc.otherCharges) < 0) blocking.push('Other charges cannot be negative.');
   advisories.filter((a) => !a.resolved).forEach((a) => blocking.push(`${a.msg} Record a reason to continue.`));
   return { blocking: [...new Set(blocking)], advisories };
 };

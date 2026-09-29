@@ -129,12 +129,9 @@ export const rejectCpp = async (id, reason) => {
   return commit(db, doc, 'rejected the PO', reason);
 };
 
-/** POST /cut-panel-po/{id}/send — VR-17: a reference must be linked where the process needs artwork. */
+/** POST /cut-panel-po/{id}/send — an approved PO goes to its job worker. */
 export const sendCppToVendor = async (id) => {
   const { db, doc } = await open(id, [S.APPROVED], 'Only an approved PO can be sent to the vendor.');
-  if (doc.process?.artworkRequired && !(doc.references || []).length) {
-    throw mockError(`${doc.process.name} needs an artwork or placement reference linked before the PO goes to the vendor (VR-17).`, 422);
-  }
   Object.assign(doc, { status: S.SENT_TO_VENDOR, sentOn: now() });
   return commit(db, doc, 'sent the PO to the vendor', doc.vendor?.name);
 };

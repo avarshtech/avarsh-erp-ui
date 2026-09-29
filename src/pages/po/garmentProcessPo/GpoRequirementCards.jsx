@@ -14,8 +14,9 @@ const Figure = ({ label, value, strong, danger }) => (
 
 /**
  * ③ Process requirement details (PRD §19): one read-only card per requirement line on the
- * PO — to change them, edit the Garment Process Requirement — with the allocation bar:
- * previously PO'd (green), this PO (blue), balance after. `cards` = requirementCards().
+ * PO — to change them, edit the Garment Process Requirement — with the requirement's
+ * remarks (FR-15) and the allocation bar: previously PO'd (green), this PO (blue), balance
+ * after. `cards` = requirementCards().
  */
 const GpoRequirementCards = memo(function GpoRequirementCards({ cards, orders, onOpenGpr }) {
   if (!cards.length) return null;
@@ -34,6 +35,7 @@ const GpoRequirementCards = memo(function GpoRequirementCards({ cards, orders, o
                 { key: 'style', label: 'Style No.', children: c.styleNo },
                 { key: 'garment', label: 'Garment', children: orders?.[c.orderId]?.garment ?? '—' },
                 { key: 'cells', label: 'Colour · Sizes', children: `${c.colors.join(', ')} · ${c.sizes.join(', ')}` },
+                ...(c.remarks ? [{ key: 'remarks', label: 'Requirement remarks', span: 2, children: c.remarks }] : []),
               ]} />
               <Progress percent={pct(c.prevPoQty + c.thisPo, c.required)} success={{ percent: pct(c.prevPoQty, c.required) }} showInfo={false} style={{ margin: '8px 0 4px' }} />
               <Row gutter={8}>

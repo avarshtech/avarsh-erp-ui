@@ -63,7 +63,7 @@ const CutPanelPoList = () => {
   const openRow = useCallback((r) => navigate(`${BASE}/${r.id}`), [navigate]);
   const columns = useMemo(() => buildCutPanelPoColumns({ onOpen: openRow, canUpdate: hasPermission('cut-panel', 'update') }), [openRow]);
   const exportCsv = () => downloadCsv([
-    ['PO No.', 'PO Date', 'CPR', 'Order', 'Style', 'Buyer', 'Job Worker', 'Process', 'PO Qty', 'PO Value', 'Required Delivery', 'Status', 'Flags'],
+    ['PO No.', 'PO Date', 'CPR', 'Order', 'Style', 'Buyer', 'Job Worker', 'Process', 'PO Qty', 'PO Value', 'Expected Delivery Date', 'Status', 'Flags'],
     ...filtered.map((r) => [r.poNo, r.poDate, r.cprNos.join(' '), r.orderNos.join(' '), r.styleNos.join(' '), r.buyers.join(' '), r.vendorName,
       r.processLabel, r.poQty, r.poValue, r.requiredDeliveryDate, jobWorkPoStatusLabel(r.status), r.flags.map((f) => f.label).join(' ')]),
   ], `CutPanelPOs_${dayjs().format('YYYYMMDD')}.csv`);

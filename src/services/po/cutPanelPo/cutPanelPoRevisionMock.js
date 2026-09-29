@@ -45,7 +45,7 @@ export const amendCpp = async (id, reason) => {
   return commit(db, doc, `opened amendment R${doc.pendingRevision.revisionNo}`, reason);
 };
 
-/** PUT /cut-panel-po/{id}/amendment — quantities, rates, UOM, discount, charges, dates and terms. */
+/** PUT /cut-panel-po/{id}/amendment — quantities, rates, UOM, charges, the expected delivery date and terms. */
 export const saveCppRevision = async (id, patch) => {
   const { db, doc, rev } = await open(id, S.DRAFT);
   const keys = new Set(rev.lines.map((l) => l.key));

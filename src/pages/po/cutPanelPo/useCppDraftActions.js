@@ -11,8 +11,8 @@ const BASE = JOB_WORK_PO_PATH.CPP;
 /**
  * Draft actions of a Cut Panel PO: save (number on first save), submit (saving first — also
  * when the live supplier changed since the snapshot), delete, and the over-allocation
- * override — requested on the saved draft, authorised by someone else. `unit` fills the
- * PO's unit and return unit when the draft has none yet.
+ * override — requested on the saved draft, authorised by someone else. `unit` (the working
+ * branch) fills the PO's branch when the draft has none yet; the return unit is always picked.
  */
 const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, liveVendor }) => {
   const navigate = useNavigate();
@@ -22,7 +22,6 @@ const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
     const saved = await saveCpp({
       ...withLiveVendor(doc, liveVendor),
       branchId: doc.branchId ?? unit?.id ?? null, branchName: doc.branchName ?? unit?.branchName ?? null,
-      returnBranchId: doc.returnBranchId ?? unit?.id ?? null, returnBranchName: doc.returnBranchName ?? unit?.branchName ?? null,
     });
     dispatch({ type: 'SAVED', doc: saved });
     clearDirty();

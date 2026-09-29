@@ -29,7 +29,7 @@ export const buildCutPanelPoColumns = ({ onOpen, canUpdate }) => [
   { title: 'Process', dataIndex: 'processLabel', width: 140 },
   { title: 'PO Qty', dataIndex: 'poQty', width: 100, align: 'right', render: n },
   { title: 'PO Value', dataIndex: 'poValue', width: 130, align: 'right', render: money },
-  { title: 'Delivery', dataIndex: 'requiredDeliveryDate', width: 110, render: (v) => formatDate(v) },
+  { title: 'Expected delivery', dataIndex: 'requiredDeliveryDate', width: 140, render: (v) => formatDate(v) },
   {
     title: 'Status', key: 'status', width: 170, align: 'center', fixed: 'right',
     render: (_, r) => (r.flags.length

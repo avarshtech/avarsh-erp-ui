@@ -71,11 +71,6 @@ export const jobWorkDefaultsFor = (category, current) => {
 const opts = (pairs) => pairs.map(([value, label]) => ({ value, label }));
 export const optionLabel = (options, value) => options.find((o) => o.value === value)?.label ?? value ?? '—';
 
-/** Where the work is done (CPP PRD §10.1 processing_location). */
-export const PROCESSING_LOCATIONS = opts([
-  ['VENDOR_PREMISES', 'Vendor premises'], ['IN_HOUSE', 'In-house'], ['THIRD_LOCATION', 'Third location'],
-]);
-
 /** Where processed panels come back to (CPP FR-21). */
 export const CPP_RETURN_TO = opts([
   ['FACTORY', 'Factory'], ['UNIT', 'Unit'], ['CUTTING', 'Cutting Department'], ['SEWING', 'Sewing'], ['OTHER', 'Other'],
@@ -86,10 +81,9 @@ export const GPO_RETURN_TO = opts([
   ['FACTORY', 'Factory'], ['PRODUCTION_UNIT', 'Production Unit'], ['FINISHING', 'Finishing Department'], ['OTHER', 'Other'],
 ]);
 
-export const FREIGHT_OPTIONS = opts([['VENDOR', 'Vendor account'], ['COMPANY', 'Company account']]);
-
-/** Delivery terms are free text on the PO (deviation D5); these are suggestions. */
-export const DELIVERY_TERM_SUGGESTIONS = ['Door delivery', 'Ex-works', 'Vendor pickup', 'Our transport both ways'];
+/** What "Amend delivery / instructions" may change on an approved or sent Garment Process PO (§16). */
+export const GPO_AMEND_FIELDS = ['requiredDate', 'expectedReturnDate', 'returnTo', 'returnToOther',
+  'returnUnitId', 'returnUnitName', 'returnUnitAddress', 'instructions'];
 
 /** Over-allocation override reasons (CPP PRD §14.4); the same list serves a Garment Process PO excess. */
 export const OVERRIDE_REASONS = opts([

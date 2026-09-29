@@ -22,6 +22,7 @@ import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
 import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
 import useJobWorkMasters from '../jobWork/useJobWorkMasters';
 import useJobWorkRefetch from '../jobWork/useJobWorkRefetch';
+import useJobWorkUnits from '../jobWork/useJobWorkUnits';
 import useCutPanelPo from './useCutPanelPo';
 import useCppContext from './useCppContext';
 import useCppView from './useCppView';
@@ -46,7 +47,7 @@ const AMENDABLE = new Set(REVISION_FIELDS);
 /**
  * Cut Panel PO — one scrolling screen, six numbered sections and a sticky action bar
  * (PRD §18.1); no wizard. UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; suppliers, processes, payment terms and branches are the real API.
+ * localStorage mock; suppliers, processes, payment terms, branches and units are the real API.
  */
 const CutPanelPoForm = () => {
   const { id } = useParams();
@@ -57,6 +58,7 @@ const CutPanelPoForm = () => {
   const baseView = useCppView(po, null);
   const working = baseView?.working ?? null;
   const masters = useJobWorkMasters('Cut Panel', { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery || baseView?.edit.terms) });
+  const units = useJobWorkUnits(po.doc?.branchId ?? (activeBranch || defaultBranch)?.id, { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery) });
   const ctx = useCppContext(working, masters.jobWorkers);
   const view = useCppView(po, ctx);
   const checks = useMemo(() => (ctx && working ? validateCpp(working, ctx) : null), [working, ctx]);
@@ -77,7 +79,7 @@ const CutPanelPoForm = () => {
   const on = {
     ...flow, back: () => navigate(LIST), print: h.print, save: draft.save, remove: draft.remove,
     submit: () => (checks?.blocking.length ? runner.setErrors(checks.blocking) : draft.submit()),
-    saveDetails: () => flow.saveDetails(pick(doc, [...ISSUED_FIELDS, 'instructions', 'remarks', 'references'])),
+    saveDetails: () => flow.saveDetails(pick(doc, [...ISSUED_FIELDS, 'instructions'])),
   };
 
   return (
@@ -101,7 +103,7 @@ const CutPanelPoForm = () => {
       />
       <CppVendorSection doc={working} editable={{ vendor: view.edit.delivery, terms: view.edit.terms }} masters={masters} eligibility={ctx?.eligibility} onPatch={patch} />
       <CppGridSection doc={working} editable={view.edit.lines} ctx={ctx} rates={{ byKey: ctx?.lastRates, recent: ctx?.recentRates }} selectedKeys={po.selectedKeys} h={h.grid} />
-      <CppDeliverySection doc={working} ctx={ctx} value={view.value} branches={allowedBranches} onPatch={patch}
+      <CppDeliverySection doc={working} ctx={ctx} value={view.value} units={units} onPatch={patch}
         can={{ delivery: view.edit.delivery, terms: view.edit.terms, notes: view.edit.notes, commercial: view.edit.commercial }}
         onCommercial={(p) => dispatch({ type: 'COMMERCIAL', patch: p })} />
       <CppAdvisories doc={working} advisories={checks?.advisories.filter((a) => a.code !== 'RATE_VARIANCE' || !a.resolved)} editable={view.edit.draft || view.edit.commercial} onPatch={patch} />

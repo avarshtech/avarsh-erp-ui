@@ -10,9 +10,9 @@ export const initialGpoState = { doc: null, dirty: false, selectedKeys: [] };
 
 export const newGpoDoc = () => ({
   id: null, type: 'GPO', poNo: null, status: S.DRAFT, poDate: dayjs().format('YYYY-MM-DD'), currency: 'INR',
-  branchId: null, branchName: null, vendor: null, paymentTerms: null, deliveryTerms: '', requiredDate: null,
-  process: null, returnTo: 'FINISHING', returnToOther: '', plannedSendDate: null, expectedReturnDate: null,
-  instructions: '', remarks: '', discountType: 'AMOUNT', discountValue: 0, otherCharges: 0,
+  branchId: null, branchName: null, vendor: null, paymentTerms: null, requiredDate: null, process: null,
+  returnTo: 'FINISHING', returnToOther: '', returnUnitId: null, returnUnitName: null, returnUnitAddress: null,
+  expectedReturnDate: null, instructions: '', otherCharges: 0,
   lines: [], overrides: [], approvals: [], lastLineNo: 0,
 });
 
@@ -30,7 +30,7 @@ export const gpoReducer = (state, action) => {
       return { ...initialGpoState, doc: action.doc, selectedKeys: action.type === 'SAVED' ? state.selectedKeys : [] };
     case 'LOAD_FAILED':
       return initialGpoState;
-    case 'PATCH': // header, vendor, delivery, remarks, commercial
+    case 'PATCH': // header, vendor, delivery instructions, commercial
       return { ...state, dirty: true, doc: { ...state.doc, ...action.patch } };
     case 'LINES_ADDED': // the first lines fix the PO's process (one per PO, deviation D23); `header` fills defaults
       return {

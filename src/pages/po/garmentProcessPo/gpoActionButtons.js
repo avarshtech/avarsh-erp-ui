@@ -26,7 +26,7 @@ export const gpoActionButtons = ({ doc, can, isMaker, superuser, username, recei
     add(can.approve, { key: 'approve', label: 'Approve', primary: true, disabledReason: isMaker && !superuser ? 'You raised, edited or submitted this PO — someone else approves it.' : null });
     return out;
   }
-  add([S.APPROVED, S.SENT_TO_VENDOR].includes(st) && can.edit, { key: 'amend', label: 'Amend dates / remarks' });
+  add([S.APPROVED, S.SENT_TO_VENDOR].includes(st) && can.edit, { key: 'amend', label: 'Amend delivery / instructions' });
   add(st === S.APPROVED && can.cancel && !received, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
   add([S.SENT_TO_VENDOR, S.PARTIALLY_COMPLETED, S.COMPLETED].includes(st) && can.cancel,
     { key: 'shortClose', label: st === S.COMPLETED ? 'Close' : 'Close short', danger: st !== S.COMPLETED, dialog: 'shortClose' });

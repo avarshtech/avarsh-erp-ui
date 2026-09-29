@@ -7,9 +7,13 @@ export const getAllUnits = async () => {
   return response.data;
 };
 
-/** Active units; with a branchId only that branch's (a unit with no branch reads as the head office's). */
-export const getActiveUnits = async (branchId) => {
-  const response = await axiosInstance.get(`${BASE_URL}/active`, { params: branchId ? { branchId } : undefined });
+/**
+ * Active units; with a branchId only that branch's (a unit with no branch reads as the head
+ * office's). `config` is extra request config, e.g. `{ silent: true }` for a caller that explains
+ * a refusal itself.
+ */
+export const getActiveUnits = async (branchId, config = {}) => {
+  const response = await axiosInstance.get(`${BASE_URL}/active`, { ...config, params: branchId ? { branchId } : undefined });
   return response.data;
 };
 

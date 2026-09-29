@@ -12,32 +12,34 @@ import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T } from '../../../utils/jobWork
 import { cppValue, cppLineIntegrity } from '../../../utils/cutPanelPoCalc';
 import { ISSUED_FIELDS, fieldLabel } from '../../../utils/cutPanelPoRevision';
 import { vendorEligibility } from '../../../utils/vendorEligibility';
-import { CPP_RETURN_TO, FREIGHT_OPTIONS, PROCESSING_LOCATIONS, optionLabel } from '../../../utils/jobWorkConstants';
+import { CPP_RETURN_TO, optionLabel } from '../../../utils/jobWorkConstants';
 import { formatDate } from '../../../utils/formatters';
 
 /** Fields the screen may write on a draft; everything else is owned by the workflow. */
-const DRAFT_FIELDS = ['poDate', 'branchId', 'branchName', 'currency', 'process', 'vendor', 'paymentTerms', 'deliveryTerms',
-  'requiredDeliveryDate', 'expectedCompletionDate', 'panelIssueDate', 'processingLocation', 'vendorLocation', 'returnTo',
-  'returnToOther', 'returnBranchId', 'returnBranchName', 'freight', 'instructions', 'remarks', 'references',
-  'discountType', 'discountValue', 'otherCharges', 'lateDeliveryReason', 'duplicateReason', 'lastLineNo'];
-
+const DRAFT_FIELDS = ['poDate', 'branchId', 'branchName', 'currency', 'process', 'vendor', 'paymentTerms',
+  'requiredDeliveryDate', 'returnTo', 'returnToOther', 'returnUnitId', 'returnUnitName', 'returnUnitAddress', 'instructions',
+  'otherCharges', 'lateDeliveryReason', 'duplicateReason', 'lastLineNo'];
 
 /** Editable in any status, audited (§11.1). */
-const NOTE_FIELDS = ['instructions', 'remarks', 'references'];
+const NOTE_FIELDS = ['instructions'];
+
+/** Never shown in the history, which names the return unit by its name and delivery place. */
+const QUIET_FIELDS = ['returnUnitId'];
 
 const pick = (src, fields) => Object.fromEntries(fields.filter((f) => f in src).map((f) => [f, src[f]]));
-const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-const CODED = { processingLocation: PROCESSING_LOCATIONS, returnTo: CPP_RETURN_TO, freight: FREIGHT_OPTIONS };
+/** Blank is blank: null, undefined and '' are one value, so emptying an empty field changes nothing. */
+const bare = (v) => (v === '' ? null : v ?? null);
+const same = (a, b) => JSON.stringify(bare(a)) === JSON.stringify(bare(b));
+const CODED = { returnTo: CPP_RETURN_TO };
 /** A value as the history shows it: names, option labels and dates, never raw objects or codes. */
 const shown = (f, v) => {
   if (v == null || v === '') return '—';
-  if (Array.isArray(v)) return v.map((r) => r.title || r.url).join(', ') || '—';
   if (typeof v === 'object') return v.name ?? '—';
   if (CODED[f]) return optionLabel(CODED[f], v);
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? formatDate(v) : v;
 };
-/** Field-level changes (§23); the return unit is named once, by its name. */
-const changesOf = (before, patch) => Object.keys(patch).filter((f) => f !== 'returnBranchId' && !same(before[f], patch[f]))
+/** Field-level changes (§23). */
+const changesOf = (before, patch) => Object.keys(patch).filter((f) => !QUIET_FIELDS.includes(f) && !same(before[f], patch[f]))
   .map((f) => ({ field: fieldLabel(f), from: shown(f, before[f]), to: shown(f, patch[f]) }));
 
 const summary = (d) => ({
@@ -110,9 +112,9 @@ export const deleteCpp = async (id) => {
 };
 
 /**
- * PATCH /cut-panel-po/{id}/issued-details — Approved, not yet sent (BR-16): vendor,
- * dates, terms, location, Return To and freight; instructions and remarks in any status.
- * Every change is audited field by field.
+ * PATCH /cut-panel-po/{id}/issued-details — Approved, not yet sent (BR-16): vendor, payment
+ * terms, the expected delivery date, Return To and the return unit; instructions in any
+ * status. Every change is audited field by field.
  */
 export const updateCppDetails = async (id, patch) => {
   await mockDelay();
@@ -122,8 +124,9 @@ export const updateCppDetails = async (id, patch) => {
   const allowed = doc.status === S.APPROVED && !doc.pendingRevision ? [...ISSUED_FIELDS, ...NOTE_FIELDS] : NOTE_FIELDS;
   if ([S.CANCELLED, S.REJECTED].includes(doc.status)) throw mockError('A cancelled or rejected PO cannot change.', 409);
   const clean = pick(patch, allowed);
+  // Saved on any real change — a new unit id alone included, though the history never shows it.
+  if (Object.keys(clean).every((f) => same(doc[f], clean[f]))) return detach(withHeld(db, doc));
   const changes = changesOf(doc, clean);
-  if (!changes.length) return detach(withHeld(db, doc));
   if (changes.some((c) => c.field === 'vendor')) {
     const check = vendorEligibility(clean.vendor, { processId: doc.process?.id ?? null, processLabel: doc.process?.label ?? doc.process?.name });
     if (!check.eligible) throw mockError(`${clean.vendor.name}: ${check.reason}`, 422);

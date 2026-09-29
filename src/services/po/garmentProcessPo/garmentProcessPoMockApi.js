@@ -9,35 +9,35 @@ import { getMockOrderContext } from '../../bom/requirementMockOrders';
 import { actor, now, findPo, expectStatus, addPoAudit, nextPoNumber, withHeld } from '../jobWork/jobWorkMockHelpers';
 import { JW_PO_STATUS as S, JOB_WORK_PO_TYPE as T } from '../../../utils/jobWorkPoStatus';
 import { gpoValue, gpoSaveBlocking, gpoLineLabel } from '../../../utils/garmentProcessPoCalc';
-import { GPO_RETURN_TO, optionLabel, jobWorkUomLabel } from '../../../utils/jobWorkConstants';
+import { GPO_AMEND_FIELDS, GPO_RETURN_TO, optionLabel, jobWorkUomLabel } from '../../../utils/jobWorkConstants';
+import { deliveryIssues } from '../../../utils/jobWorkDelivery';
 import { formatDate } from '../../../utils/formatters';
 
 /** Fields the screen may write on a draft; everything else is owned by the workflow. */
-const DRAFT_FIELDS = ['poDate', 'branchId', 'branchName', 'currency', 'process', 'vendor', 'paymentTerms', 'deliveryTerms',
-  'requiredDate', 'returnTo', 'returnToOther', 'plannedSendDate', 'expectedReturnDate', 'instructions', 'remarks',
-  'discountType', 'discountValue', 'otherCharges', 'lastLineNo'];
+const DRAFT_FIELDS = ['poDate', 'branchId', 'branchName', 'currency', 'process', 'vendor', 'paymentTerms', 'requiredDate',
+  'returnTo', 'returnToOther', 'returnUnitId', 'returnUnitName', 'returnUnitAddress', 'expectedReturnDate', 'instructions',
+  'otherCharges', 'lastLineNo'];
 
-/** Amend dates / remarks (§16): Approved and Sent to Vendor, with a reason, audited per field. */
-const AMEND_FIELDS = ['requiredDate', 'plannedSendDate', 'expectedReturnDate', 'returnTo', 'returnToOther', 'instructions', 'remarks'];
-
+/** Audited fields and their names; the return unit shows by its name and delivery place, never its id. */
 const LABELS = {
-  vendor: 'Vendor', paymentTerms: 'Payment terms', deliveryTerms: 'Delivery terms', requiredDate: 'Required date',
-  returnTo: 'Return to', returnToOther: 'Return to (other)', plannedSendDate: 'Planned send date',
-  expectedReturnDate: 'Expected return date', instructions: 'Processing instructions', remarks: 'PO remarks',
-  discountType: 'Discount type', discountValue: 'Discount', otherCharges: 'Other charges', poDate: 'PO date',
+  vendor: 'Vendor', paymentTerms: 'Payment terms', requiredDate: 'Required date',
+  returnTo: 'Return to', returnToOther: 'Return to (other)', returnUnitName: 'Return unit', returnUnitAddress: 'Delivery place',
+  expectedReturnDate: 'Expected delivery date', instructions: 'Processing instructions', otherCharges: 'Other charges', poDate: 'PO date',
 };
 const AUDITED = Object.keys(LABELS);
 const LINE_FIELDS = [['poQty', 'PO qty'], ['uom', 'UOM', jobWorkUomLabel], ['rate', 'Rate'], ['billingQty', 'Billing qty']];
 
 const pick = (src, fields) => Object.fromEntries(fields.filter((f) => f in src).map((f) => [f, src[f]]));
-const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** Blank is blank: null, undefined and '' are one value, so emptying an empty field changes nothing. */
+const bare = (v) => (v === '' ? null : v ?? null);
+const same = (a, b) => JSON.stringify(bare(a)) === JSON.stringify(bare(b));
 const shown = (f, v) => {
   if (v == null || v === '') return '—';
   if (typeof v === 'object') return v.name ?? '—';
   if (f === 'returnTo') return optionLabel(GPO_RETURN_TO, v);
   return /^\d{4}-\d{2}-\d{2}$/.test(v) ? formatDate(v) : v;
 };
-const fieldChanges = (before, after, fields) => fields.filter((f) => !same(before[f], after[f]))
+const fieldChanges = (before, after, fields) => fields.filter((f) => LABELS[f] && !same(before[f], after[f]))
   .map((f) => ({ field: LABELS[f], from: shown(f, before[f]), to: shown(f, after[f]) }));
 
 /** Lines added or removed, and per-line quantity, UOM and rate changes (§18). */
@@ -116,29 +116,29 @@ export const saveGpo = async (doc) => {
   return detach(withHeld(db, existing));
 };
 
-/** The delivery rules an amended PO must still meet (V14): required date, Return To, both dates in order. */
+/** The delivery rules an amended PO must still meet (V14): the required date and the Delivery Instructions. */
 const amendBlocking = (d) => [
   ...(d.requiredDate ? [] : ['Enter the required date.']),
-  ...(d.returnTo && (d.returnTo !== 'OTHER' || String(d.returnToOther || '').trim()) ? [] : ['Select where the garments return to (V14).']),
-  ...(d.plannedSendDate && d.expectedReturnDate ? [] : ['Planned send and expected return dates are mandatory (V14).']),
-  ...(d.plannedSendDate && d.expectedReturnDate && d.expectedReturnDate < d.plannedSendDate ? ['Check dates: the expected return is before the planned send date (V14).'] : []),
+  ...deliveryIssues(d, 'expectedReturnDate').map((issue) => `${issue} (V14).`),
+  ...(d.expectedReturnDate && d.poDate && d.expectedReturnDate < d.poDate ? ['The expected delivery date cannot be before the PO date (V14).'] : []),
 ];
 
-/** PATCH /garment-process-po/{id}/dates — Amend dates / remarks on an issued PO (§16), with a reason. */
+/** PATCH /garment-process-po/{id}/delivery — Amend delivery / instructions on an issued PO (§16), with a reason. */
 export const amendGpoDates = async (id, patch, reason) => {
   await mockDelay();
   if (!String(reason || '').trim()) throw mockError('An amendment needs a reason.');
   const db = loadJobWorkDb();
   const doc = findPo(db, id, T.GPO);
-  expectStatus(doc, [S.APPROVED, S.SENT_TO_VENDOR], 'Dates and remarks are amended on an approved or sent PO.');
-  const clean = pick(patch, AMEND_FIELDS);
+  expectStatus(doc, [S.APPROVED, S.SENT_TO_VENDOR], 'Delivery and instructions are amended on an approved or sent PO.');
+  const clean = pick(patch, GPO_AMEND_FIELDS);
   const next = { ...doc, ...clean };
   const broken = amendBlocking(next);
   if (broken.length) throw mockError(broken[0], 422);
-  const changes = fieldChanges(doc, next, AMEND_FIELDS);
-  if (!changes.length) throw mockError('The amendment changes nothing yet.');
+  // Any real change counts — a new unit id alone included, though the history never shows it.
+  if (GPO_AMEND_FIELDS.every((f) => same(doc[f], next[f]))) throw mockError('The amendment changes nothing yet.');
+  const changes = fieldChanges(doc, next, GPO_AMEND_FIELDS);
   Object.assign(doc, clean, { version: doc.version + 1, modifiedBy: actor().name, modifiedOn: now() });
-  addPoAudit(db, doc.id, 'amended dates / remarks', reason, changes);
+  addPoAudit(db, doc.id, 'amended delivery / instructions', reason, changes);
   saveJobWorkDb(db);
   return detach(withHeld(db, doc));
 };

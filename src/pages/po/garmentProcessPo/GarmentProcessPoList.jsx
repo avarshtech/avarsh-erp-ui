@@ -72,7 +72,7 @@ const GarmentProcessPoList = () => {
     canUpdate: hasPermission('garment-process', 'update'), canCancel: hasPermission('garment-process', 'cancel'),
   }), [openRow, actions.print, actions.askCancel]);
   const exportCsv = () => downloadCsv([
-    ['PO No.', 'Requirement No.', 'Order', 'Style', 'Vendor', 'Process', 'Qty', 'Grand Total', 'PO Date', 'Expected Return', 'Status', 'Flags'],
+    ['PO No.', 'Requirement No.', 'Order', 'Style', 'Vendor', 'Process', 'Qty', 'Grand Total', 'PO Date', 'Expected Delivery Date', 'Status', 'Flags'],
     ...filtered.map((r) => [r.poNo, r.gprNos.join(' '), r.orderNos.join(' '), r.styleNos.join(' '), r.vendorName, r.processLabel, r.poQty,
       r.poValue, r.poDate, r.expectedReturnDate, jobWorkPoStatusLabel(r.status), r.flags.map((f) => f.label).join(' ')]),
   ], `GarmentProcessPOs_${dayjs().format('YYYYMMDD')}.csv`);
@@ -99,7 +99,7 @@ const GarmentProcessPoList = () => {
             select('process', 'Process', options(rows, 'processLabel'), true),
             select('order', 'Order', options(rows, 'orderNos')), select('style', 'Style', options(rows, 'styleNos')),
             select('vendor', 'Vendor', options(rows, 'vendorName')),
-            range('poDate', ['PO date from', 'PO date to']), range('returnDate', ['Return from', 'Return to']),
+            range('poDate', ['PO date from', 'PO date to']), range('returnDate', ['Delivery from', 'Delivery to']),
           ]}
         />
         <Table

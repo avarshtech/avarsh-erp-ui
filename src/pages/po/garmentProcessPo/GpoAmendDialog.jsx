@@ -1,22 +1,23 @@
 import { memo, useState } from 'react';
-import { Col, Input, Modal, Row, Select, Typography } from 'antd';
-import dayjs from 'dayjs';
+import { Col, Input, Modal, Row, Typography } from 'antd';
 import IsoDatePicker from '../../../components/form/IsoDatePicker';
-import { GPO_RETURN_TO } from '../../../utils/jobWorkConstants';
+import JobWorkDeliveryFields from '../jobWork/JobWorkDeliveryFields';
+import { GPO_AMEND_FIELDS, GPO_RETURN_TO } from '../../../utils/jobWorkConstants';
+import { deliveryDateNote, deliveryIssues } from '../../../utils/jobWorkDelivery';
 
 const { Text } = Typography;
-const FIELDS = ['requiredDate', 'plannedSendDate', 'expectedReturnDate', 'returnTo', 'returnToOther', 'instructions', 'remarks'];
-const Label = ({ children }) => <Text type="secondary" style={{ fontSize: 12 }}>{children}</Text>;
+const Label = ({ htmlFor, children }) => <label htmlFor={htmlFor}><Text type="secondary" style={{ fontSize: 12 }}>{children}</Text></label>;
+const ALL_EDITABLE = { place: true, date: true, instructions: true };
 
-const Body = ({ doc, onSubmit, onClose }) => {
-  const [v, setV] = useState(() => Object.fromEntries(FIELDS.map((f) => [f, doc[f] ?? null])));
+const Body = ({ doc, units, onSubmit, onClose }) => {
+  const [v, setV] = useState(() => Object.fromEntries(GPO_AMEND_FIELDS.map((f) => [f, doc[f] ?? null])));
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const set = (f) => (value) => setV((cur) => ({ ...cur, [f]: value }));
-  const backwards = v.expectedReturnDate && v.plannedSendDate && dayjs(v.expectedReturnDate).isBefore(v.plannedSendDate, 'day');
-  const changed = FIELDS.some((f) => (v[f] ?? '') !== (doc[f] ?? ''));
+  const patch = (p) => setV((cur) => ({ ...cur, ...p }));
+  const note = deliveryDateNote(v.expectedReturnDate, { notBefore: doc.poDate, warnAfter: v.requiredDate });
+  const changed = GPO_AMEND_FIELDS.some((f) => (v[f] ?? '') !== (doc[f] ?? ''));
   // The amended PO must still meet the delivery rules (V14): nothing mandatory left blank.
-  const incomplete = !v.requiredDate || !v.plannedSendDate || !v.expectedReturnDate || !v.returnTo || (v.returnTo === 'OTHER' && !String(v.returnToOther || '').trim());
+  const incomplete = !v.requiredDate || deliveryIssues(v, 'expectedReturnDate').length > 0 || note?.type === 'error';
   const submit = async () => {
     setBusy(true);
     try {
@@ -26,34 +27,34 @@ const Body = ({ doc, onSubmit, onClose }) => {
     }
   };
   return (
-    <Modal open title="Amend dates / remarks" okText="Save amendment" onOk={submit} onCancel={onClose} confirmLoading={busy} width={720} destroyOnHidden
-      okButtonProps={{ disabled: !changed || !reason.trim() || backwards || incomplete }}>
+    <Modal open title="Amend delivery / instructions" okText="Save amendment" onOk={submit} onCancel={onClose} confirmLoading={busy} width={760} destroyOnHidden
+      okButtonProps={{ disabled: !changed || !reason.trim() || incomplete }}>
       <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
         Quantities, rates and the vendor stay as approved. Every change is kept in the PO history with your reason.
       </Text>
-      <Row gutter={[12, 12]}>
-        <Col span={8}><Label>Required date</Label><IsoDatePicker id="amend-requiredDate" value={v.requiredDate} onChange={set('requiredDate')} /></Col>
-        <Col span={8}><Label>Planned send date</Label><IsoDatePicker id="amend-plannedSendDate" value={v.plannedSendDate} onChange={set('plannedSendDate')} /></Col>
+      <Row gutter={[12, 12]} style={{ marginBottom: 12 }}>
         <Col span={8}>
-          <Label>Expected return</Label>
-          <IsoDatePicker id="amend-expectedReturnDate" status={backwards ? 'error' : undefined} value={v.expectedReturnDate} onChange={set('expectedReturnDate')} />
+          <Label htmlFor="amend-requiredDate">Required date</Label>
+          <IsoDatePicker id="amend-requiredDate" aria-label="Required date" value={v.requiredDate} onChange={(requiredDate) => patch({ requiredDate })} />
         </Col>
-        <Col span={12}><Label>Return to</Label><Select id="amend-returnTo" style={{ width: '100%' }} options={GPO_RETURN_TO} value={v.returnTo} onChange={set('returnTo')} /></Col>
-        {v.returnTo === 'OTHER' && <Col span={12}><Label>Return to (other)</Label><Input id="amend-returnToOther" value={v.returnToOther ?? ''} onChange={(e) => set('returnToOther')(e.target.value)} /></Col>}
-        <Col span={24}><Label>Processing instructions</Label><Input.TextArea id="amend-instructions" rows={2} maxLength={2000} value={v.instructions ?? ''} onChange={(e) => set('instructions')(e.target.value)} /></Col>
-        <Col span={24}><Label>PO remarks</Label><Input.TextArea id="amend-remarks" rows={2} maxLength={1000} value={v.remarks ?? ''} onChange={(e) => set('remarks')(e.target.value)} /></Col>
-        <Col span={24}><Label>Reason for the amendment *</Label><Input.TextArea id="amend-reason" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} /></Col>
       </Row>
+      <JobWorkDeliveryFields value={v} dateKey="expectedReturnDate" idPrefix="amend" returnToOptions={GPO_RETURN_TO} units={units}
+        editable={ALL_EDITABLE} onChange={patch} dateNote={note} minDate={doc.poDate} />
+      <div style={{ marginTop: 12 }}>
+        <Label htmlFor="amend-reason">Reason for the amendment *</Label>
+        <Input.TextArea id="amend-reason" aria-label="Reason for the amendment" rows={2} maxLength={500} value={reason} onChange={(e) => setReason(e.target.value)} />
+      </div>
     </Modal>
   );
 };
 
 /**
- * Amend dates / remarks on an approved or sent Garment Process PO (PRD §16): the dates,
- * Return To, instructions and remarks, with a reason. Mounts fresh per opening.
+ * Amend delivery / instructions on an approved or sent Garment Process PO (PRD §16): the
+ * required date, Return To, the return unit, the expected delivery date and the processing
+ * instructions, with a reason. Mounts fresh per opening; `units` = useJobWorkUnits().
  */
-const GpoAmendDialog = memo(function GpoAmendDialog({ open, doc, onSubmit, onClose }) {
-  return open ? <Body doc={doc} onSubmit={onSubmit} onClose={onClose} /> : null;
+const GpoAmendDialog = memo(function GpoAmendDialog({ open, doc, units, onSubmit, onClose }) {
+  return open ? <Body doc={doc} units={units} onSubmit={onSubmit} onClose={onClose} /> : null;
 });
 
 export default GpoAmendDialog;

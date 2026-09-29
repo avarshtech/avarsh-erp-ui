@@ -50,13 +50,13 @@ export async function restoreSingleBranch(api) {
   return extras.length;
 }
 
-/** A unit at this branch, created if the branch has none yet. */
-export async function ensureUnit(api, branchId, { unitCode, unitName }) {
+/** A unit at this branch, created if the branch has none yet; `extra` (type, address…) goes on the create. */
+export async function ensureUnit(api, branchId, { unitCode, unitName, ...extra }) {
   const { data: all } = await api.get('/units');
   const existing = (all || []).find((f) => f.unitCode === unitCode);
   if (existing) return existing;
   const { data, status } = await api.post('/units', {
-    unitCode, unitName, branchId, isActive: true,
+    unitCode, unitName, branchId, isActive: true, ...extra,
   });
   if (status >= 300) throw new Error(`Could not create unit ${unitCode}: ${status} ${JSON.stringify(data)}`);
   return data;

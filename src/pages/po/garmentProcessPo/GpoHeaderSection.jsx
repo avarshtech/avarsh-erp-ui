@@ -1,21 +1,20 @@
 import { memo } from 'react';
-import { AutoComplete, Card, Col, Input, Row, Typography } from 'antd';
+import { Card, Col, Input, Row, Typography } from 'antd';
 import dayjs from 'dayjs';
 import ReadOnlyField from '../jobWork/ReadOnlyField';
 import JobWorkVendorSelect from '../jobWork/JobWorkVendorSelect';
 import JobWorkVendorCard from '../jobWork/JobWorkVendorCard';
 import PaymentTermsField from '../jobWork/PaymentTermsField';
 import IsoDatePicker from '../../../components/form/IsoDatePicker';
-import { DELIVERY_TERM_SUGGESTIONS } from '../../../utils/jobWorkConstants';
 
 const { Text } = Typography;
 const Label = ({ children, required }) => <Text type="secondary" style={{ fontSize: 12 }}>{children}{required && <Text type="danger"> *</Text>}</Text>;
 
 /**
  * ① PO Header (PRD §8.1, §19): PO number (auto), PO date, required date (defaults to the
- * earliest order delivery date — deviation D16), currency, payment and delivery terms, and
- * the vendor with its card. Job workers only: an inactive one cannot be picked; an
- * unapproved or untagged one warns, and the approver signs it off (§13).
+ * earliest order delivery date — deviation D16), currency, payment terms, and the vendor with
+ * its card. Job workers only: an inactive one cannot be picked; an unapproved or untagged one
+ * warns, and the approver signs it off (§13). Delivery lives in ⑤.
  */
 const GpoHeaderSection = memo(function GpoHeaderSection({ doc, editable, masters, eligibility, onPatch, onVendor }) {
   const vendorId = doc.vendor?.id ?? masters.jobWorkers.find((v) => v.gstin && v.gstin === doc.vendor?.gstin)?.id;
@@ -38,11 +37,6 @@ const GpoHeaderSection = memo(function GpoHeaderSection({ doc, editable, masters
         <Col xs={12} md={4}>
           <Label required>Payment Terms</Label>
           <PaymentTermsField id="gpo-paymentTerms" terms={masters.paymentTerms} value={doc.paymentTerms} disabled={!editable} onChange={(paymentTerms) => onPatch({ paymentTerms })} />
-        </Col>
-        <Col xs={12} md={4}>
-          <Label>Delivery Terms</Label>
-          <AutoComplete id="gpo-deliveryTerms" style={{ width: '100%' }} disabled={!editable} value={doc.deliveryTerms ?? ''}
-            options={DELIVERY_TERM_SUGGESTIONS.map((t) => ({ value: t }))} onChange={(deliveryTerms) => onPatch({ deliveryTerms })} />
         </Col>
         <Col xs={24} md={12}>
           <Label required>Vendor / Job Worker</Label>

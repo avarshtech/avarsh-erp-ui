@@ -19,14 +19,12 @@ const today = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** A fresh draft (PRD §11.1 defaults): today, INR, vendor premises, back to Cutting, vendor pays freight. */
+/** A fresh draft (PRD §11.1 defaults): today, INR, back to Cutting; the return unit is picked. */
 export const newCppDoc = () => ({
   id: null, type: 'CPP', poNo: null, status: S.DRAFT, poDate: today(), currency: 'INR', branchId: null, branchName: null,
-  process: null, vendor: null, paymentTerms: null, deliveryTerms: 'Door delivery',
-  requiredDeliveryDate: null, expectedCompletionDate: null, panelIssueDate: null,
-  processingLocation: 'VENDOR_PREMISES', vendorLocation: '', returnTo: 'CUTTING', returnToOther: '',
-  returnBranchId: null, returnBranchName: null, freight: 'VENDOR', instructions: '', remarks: '', references: [],
-  discountType: 'AMOUNT', discountValue: 0, otherCharges: 0, lateDeliveryReason: '', duplicateReason: '',
+  process: null, vendor: null, paymentTerms: null, requiredDeliveryDate: null,
+  returnTo: 'CUTTING', returnToOther: '', returnUnitId: null, returnUnitName: null, returnUnitAddress: null, instructions: '',
+  otherCharges: 0, lateDeliveryReason: '', duplicateReason: '',
   lines: [], overrides: [], approvals: [], revisionNo: 0, pendingRevision: null, revisions: [], lastLineNo: 0,
 });
 
@@ -51,9 +49,9 @@ export const cppReducer = (state, action) => {
       return { ...initialCppState, doc: action.doc, rev: draftRevision(action.doc), selectedKeys: action.type === 'SAVED' ? state.selectedKeys : [] };
     case 'LOAD_FAILED':
       return initialCppState;
-    case 'PATCH': // header, vendor, delivery, notes
+    case 'PATCH': // header, vendor, delivery instructions
       return { ...state, dirty: true, docDirty: true, doc: { ...state.doc, ...action.patch } };
-    case 'COMMERCIAL': // discount, other charges and amendable dates / terms: the amendment's while one is open
+    case 'COMMERCIAL': // other charges and amendable dates / terms: the amendment's while one is open
       return { ...state, dirty: true, docDirty: state.docDirty || !state.rev, [target(state)]: { ...state[target(state)], ...action.patch } };
     case 'PROCESS_SELECTED':
       return {
