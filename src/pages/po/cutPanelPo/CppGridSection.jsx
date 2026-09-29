@@ -1,6 +1,6 @@
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Card, Empty, Table } from 'antd';
-import CppBulkFillBar from './CppBulkFillBar';
+import JobWorkBulkFillBar from '../jobWork/JobWorkBulkFillBar';
 import { cppGridColumns, gridRows } from './cppGridColumns';
 import { liveBalance } from '../../../utils/cutPanelPoCalc';
 
@@ -12,6 +12,8 @@ import { liveBalance } from '../../../utils/cutPanelPoCalc';
  */
 const CppGridSection = memo(function CppGridSection({ doc, editable, ctx, rates, selectedKeys, h }) {
   const rows = useMemo(() => gridRows(doc.lines), [doc.lines]);
+  const lastRates = rates.byKey;
+  const rateOf = useCallback((l) => lastRates?.[`${l.styleNo}|${l.size}`], [lastRates]);
   const columns = useMemo(() => cppGridColumns({
     ...h,
     editable,
@@ -23,7 +25,7 @@ const CppGridSection = memo(function CppGridSection({ doc, editable, ctx, rates,
     <Card
       id="cpp-grid" size="small" title="④ PO Grid" style={{ marginBottom: 16 }}
       extra={editable && doc.lines.length > 0 && (
-        <CppBulkFillBar lines={doc.lines} selectedKeys={selectedKeys} lastRates={rates.byKey || {}} recent={rates.recent} onApply={h.onLines} />
+        <JobWorkBulkFillBar lines={doc.lines} selectedKeys={selectedKeys} rateOf={rateOf} recent={rates.recent} onApply={h.onLines} />
       )}
     >
       {doc.lines.length ? (

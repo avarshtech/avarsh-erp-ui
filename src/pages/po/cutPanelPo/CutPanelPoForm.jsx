@@ -13,6 +13,7 @@ import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { validateCpp } from '../../../utils/cutPanelPoCalc';
 import { revisionChanges, ISSUED_FIELDS, REVISION_FIELDS } from '../../../utils/cutPanelPoRevision';
+import { refetchCppLines } from '../../../utils/jobWorkRefetch';
 import { getCppAudit } from '../../../services/po/cutPanelPo/cutPanelPoService';
 import JobWorkTypeSwitch from '../jobWork/JobWorkTypeSwitch';
 import JobWorkStatusBanner from '../jobWork/JobWorkStatusBanner';
@@ -20,6 +21,7 @@ import JobWorkApprovalPanel from '../jobWork/JobWorkApprovalPanel';
 import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
 import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
 import useJobWorkMasters from '../jobWork/useJobWorkMasters';
+import useJobWorkRefetch from '../jobWork/useJobWorkRefetch';
 import useCutPanelPo from './useCutPanelPo';
 import useCppContext from './useCppContext';
 import useCppView from './useCppView';
@@ -63,6 +65,7 @@ const CutPanelPoForm = () => {
   const draft = useCppDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch, liveVendor: ctx?.liveVendor });
   const flow = useCppFlowActions({ ...po, clearDirty, runner });
   const h = useCppHandlers({ ...po, view, masters });
+  const refetch = useJobWorkRefetch({ lines: po.doc?.lines, ctx, dispatch: po.dispatch, rebuild: refetchCppLines, enabled: Boolean(view?.edit.draft) });
   const [dialog, setDialog] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -89,7 +92,7 @@ const CutPanelPoForm = () => {
           {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
         </Space>
       </PageHeader>
-      <JobWorkStatusBanner doc={doc} flags={view.flags} />
+      <JobWorkStatusBanner doc={doc} flags={view.flags} refetch={refetch} />
       <CppHeaderSection doc={working} editable={view.edit.draft} branches={allowedBranches} unit={activeBranch || defaultBranch} onPatch={patch} />
       <CppRequirementSection
         doc={working} editable={view.edit.draft} lookup={lookup} selection={po.selection} adding={h.adding}

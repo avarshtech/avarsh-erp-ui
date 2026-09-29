@@ -6,6 +6,8 @@
  * their seed. Job workers are the REAL Supplier master (e2e/helpers/job-work-seed.js).
  *
  * What this tests:
+ *   - Requirement lines come from section ②: Order #, then Garment Process #, then the
+ *     colour × size cells with a select-all that stays within one process, then Add to PO
  *   - List opens on the open POs (GPO-2026-00002 sent, -00003 submitted)
  *   - GPR-2026-00001 Enzyme Washing, Black only (4,000): save → GPO-2026-00004; submit
  *     allocates (AC-10) → the GPR shows 4,000 PO'd, balance 3,000, Partially Used; recall
@@ -66,16 +68,33 @@ async function reason(page, { code, remark }) {
   await expect(dialog).toBeHidden();
 }
 
-/** Ticks requirement rows in section ② and adds them. */
-async function addRequirements(page, labels) {
-  for (const label of labels) await page.getByRole('checkbox', { name: `Select ${label}` }).check();
-  await page.getByRole('button', { name: 'Add selected to PO lines' }).click();
+async function pickSelect(page, id, text) {
+  const input = page.locator(`#${id}`);
+  const dropdown = await openDropdown(page, input);
+  await input.fill(text);
+  await dropdown.locator('.ant-select-item-option').filter({ hasText: text }).first().click();
 }
 
-async function fillRates(page, rate) {
-  const rates = page.getByRole('spinbutton', { name: /^Rate / });
-  for (let i = 0; i < await rates.count(); i += 1) await rates.nth(i).fill(String(rate));
+/** Section ②: Order #, then Garment Process #, then the header select-all (one process), then Add to PO. */
+async function addFromRequirement(page, { order, gpr }) {
+  if (order) await pickSelect(page, 'gpo-order', order);
+  await pickSelect(page, 'gpo-gpr', gpr);
+  await page.locator('#gpo-selection').getByRole('checkbox', { name: 'Select all' }).check();
+  await page.getByRole('button', { name: 'Add to PO' }).click();
 }
+
+/** The grid's bulk bar: one rate on the chosen lines ("All lines", "Selected lines", …). */
+async function bulkRate(page, mode, rate, count) {
+  const dropdown = await openDropdown(page, page.getByRole('combobox', { name: 'Fill rate for' }));
+  await dropdown.locator('.ant-select-item-option').filter({ hasText: mode }).first().click();
+  await page.getByRole('spinbutton', { name: 'Rate to fill' }).fill(String(rate));
+  const apply = page.getByRole('button', { name: count ? `Apply to ${count}` : /^Apply to \d+$/ });
+  await apply.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await apply.click();
+  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Apply' }).click();
+}
+
+const fillRates = (page, rate) => bulkRate(page, 'All lines', rate);
 
 async function deliveryDates(page) {
   await setDate(page, 'gpo-plannedSendDate', plusDays(2));
@@ -97,6 +116,7 @@ test.beforeAll(async () => {
 });
 
 test.beforeEach(async ({ page }) => {
+  test.setTimeout(120000); // journeys across the PO and its requirements, on a mock with deliberate delays
   await ensureSessionActive(page);
   page.on('pageerror', (err) => console.log(`[browser:pageerror] ${err.message}`));
 });
@@ -111,9 +131,9 @@ test('List opens on the open POs', async ({ page }) => {
 test('Submit allocates the requirement; recall releases it (AC-05, AC-10)', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
-  await addRequirements(page, ['GPR-2026-00001 Enzyme Washing']);
+  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' }); // select-all takes Seq 1, Enzyme Washing
   await expect(page.getByText('8 line(s) added')).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: 'Select GPR-2026-00001 Bleach Washing' })).toBeDisabled(); // one process per PO
+  await expect(page.getByRole('checkbox', { name: 'Select Black 3-4Y Bleach Washing' })).toBeDisabled(); // one process per PO
   for (const size of ['3-4Y', '5-6Y', '7-8Y', '9-10Y']) await page.getByRole('button', { name: `Remove GPR-2026-00001 Navy ${size}` }).click();
   await pickVendor(page, 'Bluewave Garment Washers');
   await fillRates(page, 18.5);
@@ -152,8 +172,10 @@ test('Reject to Draft releases the seeded submitted PO', async ({ page }) => {
 test('Two requirements of one process share a PO; lines keep their requirement (AC-07)', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
-  await addRequirements(page, ['GPR-2026-00001 Enzyme Washing', 'GPR-2026-00006 Enzyme Washing']);
-  await expect(page.getByText('12 line(s) added')).toBeVisible();
+  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' });
+  await expect(page.getByText('8 line(s) added')).toBeVisible();
+  await addFromRequirement(page, { gpr: 'GPR-2026-00006' }); // the same order, another requirement of the process
+  await expect(page.getByText('4 line(s) added')).toBeVisible();
   const cards = page.locator('#gpo-requirements');
   await expect(cards).toContainText('GPR-2026-00001');
   await expect(cards).toContainText('GPR-2026-00006');
@@ -161,10 +183,65 @@ test('Two requirements of one process share a PO; lines keep their requirement (
   await expect(page.getByText('Total · 12 lines')).toBeVisible();
 });
 
+test('Bulk rate on selected lines keeps 4 decimals', async ({ page }) => {
+  await navigateWithAuth(page, `${BASE}/new`);
+  await waitForPageReady(page);
+  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' });
+  await expect(page.getByText('8 line(s) added')).toBeVisible();
+  for (const size of ['3-4Y', '5-6Y', '7-8Y']) await page.getByRole('checkbox', { name: `Select GPR-2026-00001 Black ${size}` }).check();
+  await bulkRate(page, 'Selected lines', 12.3456, 3);
+  for (const size of ['3-4Y', '5-6Y', '7-8Y']) await expect(page.getByRole('spinbutton', { name: `Rate Black ${size}` })).toHaveValue('12.3456');
+  await expect(page.getByRole('spinbutton', { name: 'Rate Black 9-10Y' })).toHaveValue('');
+  await expect(page.getByText('Total · 8 lines')).toBeVisible(); // the totals row still lines up with the selection column
+});
+
+test('A draft GPO re-fetches after its GPR is edited', async ({ page }) => {
+  test.setTimeout(180000); // a journey across the PO and its requirement, twice
+  await navigateWithAuth(page, `${BASE}/new`);
+  await waitForPageReady(page);
+  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' }); // Enzyme Washing, White × 4
+  await expect(page.getByText('4 line(s) added')).toBeVisible();
+  await pickVendor(page, 'Bluewave Garment Washers');
+  await page.getByRole('button', { name: 'Save Draft' }).click();
+  await expect(page.getByRole('heading', { name: /GPO-\d{4}-\d{5}/ })).toBeVisible();
+  const poUrl = page.url();
+
+  // The draft does not block GPR-6: White 3-4Y 700 → 650
+  await navigateWithAuth(page, '/bom/garment-process/6?edit=1');
+  await waitForPageReady(page);
+  await page.locator('input[name="gpr-G1-White-3-4Y"]').fill('650');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
+
+  await navigateWithAuth(page, poUrl);
+  await waitForPageReady(page);
+  await expect(page.getByText('Requirement changed').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Re-fetch lines' }).click();
+  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Re-fetch' }).click();
+  await expect(page.getByText('1 line(s) re-fetched at the new balance')).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'PO qty White 3-4Y' })).toHaveValue('650.00');
+  await page.getByRole('button', { name: 'Save Draft' }).click();
+  await expect(page.getByText('Draft saved')).toBeVisible();
+
+  // GPR-6's line becomes another process: the PO keeps one process, so re-fetch drops its lines
+  await navigateWithAuth(page, '/bom/garment-process/6?edit=1');
+  await waitForPageReady(page);
+  await pickSelect(page, 'gpr-process-G1', 'Stone Washing');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
+  await navigateWithAuth(page, poUrl);
+  await waitForPageReady(page);
+  await expect(page.getByText(/is now Stone Washing on GPR-2026-00006/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Re-fetch lines' }).click();
+  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Re-fetch' }).click();
+  await expect(page.getByText('0 line(s) re-fetched at the new balance · 4 removed')).toBeVisible();
+  await expect(page.getByText('Pick an order and a requirement above, then Add to PO.')).toBeVisible();
+});
+
 test('An excess over the balance blocks Submit until approved (AC-06)', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
-  await addRequirements(page, ['GPR-2026-00003 Garment Dyeing']);
+  await addFromRequirement(page, { order: 'ORD-2026-00125', gpr: 'GPR-2026-00003' }); // 2Y-6Y are on other POs: only 8Y is left
   await expect(page.getByText('1 line(s) added')).toBeVisible();
   await pickVendor(page, 'Colourtex Dye House');
   await page.getByRole('spinbutton', { name: 'PO qty White 8Y' }).fill('142');
@@ -189,7 +266,7 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
 test('An unapproved job worker warns; the approver signs it off (§13)', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
-  await addRequirements(page, ['GPR-2026-00006 Enzyme Washing']);
+  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' });
   await pickVendor(page, 'Nova Prints');
   await expect(page.locator('#gpo-header')).toContainText(/Job-work approval missing|Does not do Enzyme Washing/);
   await fillRates(page, 17);

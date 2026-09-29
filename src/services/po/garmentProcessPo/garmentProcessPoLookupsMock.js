@@ -39,33 +39,56 @@ export const gpoRequirementRows = async () => {
   })).filter((r) => r.required > 0).sort((x, y) => x.gprNo.localeCompare(y.gprNo) || x.seqNo - y.seqNo);
 };
 
+const usageOf = (c, line, color, size) => c.usage.cells.find((x) => x.cellId === cellId(REQUIREMENT_SOURCE.GPR, c.doc.id, line.key, gprCell(color, size)));
+
 /**
- * Add selected to PO lines (PRD FR-05, §9): one PO line per GPR line × colour × size with
- * balance, in the order's colour and size sequence. Cells already on the PO are skipped
- * (V9); so are cells with nothing left to order.
+ * GET /api/gpr/{id}/cells — the picker's rows (PRD §9, S3): one per GPR line × colour × size
+ * with a requirement, with its required, PO'd, in-draft-PO and balance quantities, in the
+ * line sequence, then the order's colour and size sequence. Key: `gprId|lineKey|colour|size`.
  */
-export const gpoFetchLines = async ({ rowKeys, existing, firstKeyNo, uom }) => {
+export const gpoRequirementCells = async (gprId) => {
+  const c = (await liveGprs()).find((x) => x.doc.id === Number(gprId));
+  if (!c) return [];
+  const order = await getGprOrderContext(c.doc.orderId);
+  return [...c.doc.lines].sort((a, b) => a.seqNo - b.seqNo).flatMap((line) => order.colors
+    .filter((o) => line.qty?.[o.name]).flatMap((o) => order.sizes
+      .filter((size) => Number(line.qty[o.name][size]) > 0)
+      .map((size) => {
+        const u = usageOf(c, line, o.name, size);
+        return {
+          key: `${c.doc.id}|${line.key}|${o.name}|${size}`, gprId: c.doc.id, gprNo: c.doc.requirementNo, gprLineKey: line.key,
+          orderId: c.doc.orderId, orderNo: c.doc.orderNo, requiredBy: order.deliveryDate ?? null,
+          seqNo: line.seqNo, processLabel: gprLineLabel(line), processName: line.processName, processOtherName: line.processOtherName,
+          color: o.name, colorHex: o.hex ?? null, size,
+          required: u?.required ?? 0, allocated: u?.allocated ?? 0, inDraft: u?.inDraft ?? 0, balance: u?.balance ?? 0,
+        };
+      })));
+};
+
+/**
+ * Add to PO (PRD FR-05, §9): one PO line per ticked cell (`gprId|lineKey|colour|size`), in
+ * the order given. Cells already on the PO are skipped (V9); so are cells with nothing left
+ * to order.
+ */
+export const gpoFetchLines = async ({ cellKeys, existing, firstKeyNo, uom }) => {
   const live = await liveGprs();
   const have = new Set(existing.map((l) => `${l.gprId}|${l.gprLineKey}|${l.color}|${l.size}`));
+  const orders = new Map();
   const out = [];
   let onPo = 0;
   let noBalance = 0;
   let k = firstKeyNo;
-  for (const rowKey of rowKeys) {
-    const [gprId, lineKey] = rowKey.split('|');
+  for (const cellKey of cellKeys) {
+    const [gprId, lineKey, color, size] = cellKey.split('|');
     const c = live.find((x) => x.doc.id === Number(gprId));
     const line = c?.doc.lines.find((l) => l.key === lineKey);
-    if (!line) continue;
-    const order = await getGprOrderContext(c.doc.orderId);
-    order.colors.map((o) => o.name).filter((color) => line.qty?.[color]).forEach((color) => order.sizes
-      .filter((size) => Number(line.qty[color][size]) > 0)
-      .forEach((size) => {
-        if (have.has(`${c.doc.id}|${line.key}|${color}|${size}`)) { onPo += 1; return; }
-        const cell = c.usage.cells.find((x) => x.cellId === cellId(REQUIREMENT_SOURCE.GPR, c.doc.id, line.key, gprCell(color, size)));
-        if (!(cell?.balance > 0)) { noBalance += 1; return; }
-        out.push(gpoLineFromGpr({ key: `L${k}`, gpr: c.doc, line, color, size, order, prevPoQty: cell.allocated, uom }));
-        k += 1;
-      }));
+    if (!line || !(Number(line.qty?.[color]?.[size]) > 0)) continue;
+    if (have.has(cellKey)) { onPo += 1; continue; }
+    const cell = usageOf(c, line, color, size);
+    if (!(cell?.balance > 0)) { noBalance += 1; continue; }
+    if (!orders.has(c.doc.orderId)) orders.set(c.doc.orderId, await getGprOrderContext(c.doc.orderId));
+    out.push(gpoLineFromGpr({ key: `L${k}`, gpr: c.doc, line, color, size, order: orders.get(c.doc.orderId), prevPoQty: cell.allocated, uom }));
+    k += 1;
   }
   return { lines: out, onPo, noBalance };
 };

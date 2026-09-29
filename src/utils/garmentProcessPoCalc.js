@@ -9,6 +9,7 @@ import { cellId, gprCell, REQUIREMENT_SOURCE } from './jobWorkAllocation';
 import { poValue, isKeyedBilling } from './jobWorkPoCalc';
 import { GPO_EXCESS_CAP_PCT, jobWorkUomLabel } from './jobWorkConstants';
 import { REQUIREMENT_STATUS as R } from './requirementStatus';
+import { gprLineLabel } from './garmentProcessCalc';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const hasValue = (v) => v !== null && v !== undefined && v !== '';
@@ -28,7 +29,7 @@ export const gpoLiveCell = (line, state) => {
   if (!req) return null;
   const cell = req.usage.cells.find((c) => c.cellId === cellId(REQUIREMENT_SOURCE.GPR, line.gprId, line.gprLineKey, gprCell(line.color, line.size)));
   const reqLine = req.doc.lines.find((l) => l.key === line.gprLineKey);
-  return cell && reqLine ? { ...cell, seqNo: reqLine.seqNo } : null;
+  return cell && reqLine ? { ...cell, seqNo: reqLine.seqNo, processLabel: gprLineLabel(reqLine) } : null;
 };
 
 /**
@@ -49,14 +50,15 @@ export const excessCap = (line) => Math.floor(Number(line.required) * GPO_EXCESS
 export const approvedExcess = (doc, line, excess) => (doc.overrides || []).find((o) => o.lineKey === line.key
   && o.status === 'AUTHORISED' && Number(o.excessQty) >= excess);
 
-/** V12: the requirement is closed or gone, or the cell changed since it was added. */
+/** V12: the requirement is closed or gone, or the cell — its quantity, sequence or process — changed since it was added. */
 export const gpoRequirementChange = (line, state) => {
   const req = state?.[line.gprId];
   if (!req || !GPO_VISIBLE.includes(req.status)) return `${line.gprNo} is no longer available`;
   const cell = gpoLiveCell(line, state);
   if (!cell) return `${gpoLineLabel(line)} no longer exists on ${line.gprNo}`;
+  if (cell.processLabel !== line.processLabel) return `${gpoLineLabel(line)} is now ${cell.processLabel} on ${line.gprNo}, not ${line.processLabel}`;
   if (cell.required !== line.snapshot.required || cell.seqNo !== line.snapshot.seqNo) {
-    return `${gpoLineLabel(line)} changed on ${line.gprNo} since it was added (required ${n(line.snapshot.required)} → ${n(cell.required)}) — remove and add it again`;
+    return `${gpoLineLabel(line)} changed on ${line.gprNo} since it was added (required ${n(line.snapshot.required)} → ${n(cell.required)}) — re-fetch the line`;
   }
   return null;
 };

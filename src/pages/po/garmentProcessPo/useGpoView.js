@@ -24,7 +24,7 @@ const useGpoView = ({ doc }, ctx, checks) => useMemo(() => {
   const received = doc.lines.some((l) => Number(l.receivedQty) > 0);
   const flags = poFlags(doc, {
     orderCancelled: Boolean(ctx) && doc.lines.some((l) => ctx.orders?.[l.orderId]?.status === 'CANCELLED'),
-    requirementChanged: Boolean(ctx?.state) && doc.status !== S.DRAFT && doc.lines.some((l) => gpoRequirementChange(l, ctx.state)),
+    requirementChanged: Boolean(ctx?.state) && doc.lines.some((l) => gpoRequirementChange(l, ctx.state)),
   });
   return {
     can, draft: doc.status === S.DRAFT && can.edit, value: gpoValue(doc), flags, isMaker, superuser, username: user.username,

@@ -54,6 +54,9 @@ async function pickOption(page, input, text) {
 
 const selectOf = (page, id) => page.locator(`#${id}`);
 
+/** A requirement's action-bar Edit ("edit Edit" with its icon) — never "Cancel edit". */
+const EDIT = /(^|\s)Edit$/;
+
 async function setDate(page, id, text) {
   const input = page.locator(`#${id}`);
   await input.click();
@@ -109,6 +112,7 @@ test.beforeAll(async () => {
 });
 
 test.beforeEach(async ({ page }) => {
+  test.setTimeout(120000); // journeys across the PO and its requirements, on a mock with deliberate delays
   await ensureSessionActive(page);
   page.on('pageerror', (err) => console.log(`[browser:pageerror] ${err.message}`));
 });
@@ -210,6 +214,54 @@ test('Approve the seeded submitted PO, then change its terms before it is sent',
 
   const drawer = await openAllocation(page, 3);
   await expect(drawer.locator('.ant-table-row').filter({ hasText: 'Panel Printing' }).first()).toContainText('Fully allocated');
+});
+
+test('A draft CPP does not block editing its CPR; re-fetch; a submitted CPP ends editing', async ({ page, context }) => {
+  test.setTimeout(180000); // a journey across the PO, the requirement and a second tab
+  // A draft on CPR-2026-00001 Panel Printing: Black Back and Front Panel, four sizes each
+  await draftOnBalance(page, { process: 'Panel Printing', cprNo: 'CPR-2026-00001', vendor: 'Sri Murugan Prints', rate: 6.5, count: 8 });
+  await page.getByRole('button', { name: 'Save Draft' }).click();
+  await expect(page).toHaveURL(new RegExp(`${BASE}/\\d+$`));
+  const poUrl = page.url();
+  const poNo = (await page.getByRole('heading', { name: /CPP-\d{4}-\d{5}/ }).textContent()).match(/CPP-\d{4}-\d{5}/)[0];
+
+  // The draft does not block the CPR: Black Front Panel Printing 4Y 225 → 230
+  await navigateWithAuth(page, '/bom/cut-panel/1');
+  await waitForPageReady(page);
+  await page.getByRole('button', { name: EDIT }).click();
+  const printing = page.locator('.ant-table-row').filter({ hasText: 'Panel Printing' }).first();
+  await printing.locator('input[name$="-4Y"]').fill('230');
+  await printing.locator('input[name$="-4Y"]').press('Tab');
+  await printing.locator('input[name^="reason-"]').fill('Buyer asked for 5 spare fronts');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await page.locator('.ant-modal-confirm').last().getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
+
+  // The draft PO is flagged; Re-fetch rebuilds the changed line at its new balance, the rate kept
+  await navigateWithAuth(page, poUrl);
+  await waitForPageReady(page);
+  await expect(page.getByText('Requirement changed').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Re-fetch lines' }).click();
+  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Re-fetch' }).click();
+  await expect(page.getByText('1 line(s) re-fetched at the new balance')).toBeVisible();
+  const black4Y = page.getByRole('spinbutton', { name: 'PO qty Black 4Y' }); // Front and Back Panel
+  expect((await Promise.all([0, 1].map((i) => black4Y.nth(i).inputValue()))).sort()).toEqual(['225.00', '230.00']); // Front at its new balance
+  for (const i of [0, 1]) await expect(page.getByRole('spinbutton', { name: 'Rate Black 4Y' }).nth(i)).toHaveValue('6.50'); // rates kept
+  await expect(page.getByRole('button', { name: 'Re-fetch lines' })).toHaveCount(0);
+
+  // CPR-1 held in edit mode in a second tab; submitting the PO places it, so that tab's Save changes is refused
+  const editor = await context.newPage();
+  await navigateWithAuth(editor, '/bom/cut-panel/1?edit=1');
+  await waitForPageReady(editor);
+  await editor.locator('.ant-table-row').filter({ hasText: 'Panel Printing' }).first().locator('input[name^="reason-"]').fill('Buyer asked for 5 spare fronts, confirmed by mail');
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await expect(page.getByText('Submitted for approval')).toBeVisible();
+  await editor.getByRole('button', { name: 'Save changes' }).click();
+  await editor.locator('.ant-modal-confirm').last().getByRole('button', { name: 'Save changes' }).click();
+  await expect(editor.getByText(`CPR-2026-00001 can no longer be edited — ${poNo} has been placed against it.`)).toBeVisible();
+  await expect(editor.getByRole('button', { name: EDIT })).toHaveCount(0);
+  await expect(editor).toHaveURL(/\/bom\/cut-panel\/1$/);
+  await editor.close();
 });
 
 test('Two POs on one balance: the second approval stops and shows the new balance', async ({ page }) => {

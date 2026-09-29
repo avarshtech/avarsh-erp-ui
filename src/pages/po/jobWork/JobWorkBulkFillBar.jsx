@@ -1,6 +1,6 @@
 import { memo, useState } from 'react';
 import { Button, InputNumber, Popconfirm, Select, Space, Typography } from 'antd';
-import { BULK_MODE, bulkTargets, bulkImpact, applyRate, lastRateTargets, applyLastRates } from '../../../utils/cutPanelPoBulkFill';
+import { BULK_MODE, bulkTargets, bulkImpact, applyRate, lastRateTargets, applyLastRates } from '../../../utils/jobWorkBulkFill';
 import { numericInputProps } from '../../../utils/inputHelpers';
 
 const { Text } = Typography;
@@ -12,20 +12,21 @@ const MODES = [
 ];
 
 /**
- * Rate bulk fill in the grid header (PRD FR-15, §18.2): says how many lines it sets — and
- * how many already carry a rate — before applying. `recent` are the vendor's last three
- * rates for the process (§20).
+ * Rate bulk fill in a job-work PO grid header (CPP FR-15, §18.2): says how many lines it sets
+ * — and how many already carry a rate — before applying. `colourKey` is the lines' colour
+ * field, `precision` the rate's decimals (2 on a Cut Panel PO, 4 on a Garment Process PO),
+ * `rateOf(line)` the vendor's last rate for a line; `recent` the last three rates (§20).
  */
-const CppBulkFillBar = memo(function CppBulkFillBar({ lines, selectedKeys, lastRates, recent, onApply }) {
+const JobWorkBulkFillBar = memo(function JobWorkBulkFillBar({ lines, selectedKeys, colourKey = 'colorName', precision = 2, rateOf, recent, onApply }) {
   const [mode, setMode] = useState(BULK_MODE.COLOUR);
   const [target, setTarget] = useState(undefined);
   const [rate, setRate] = useState(null);
-  const colours = [...new Set(lines.map((l) => l.colorName))];
+  const colours = [...new Set(lines.map((l) => l[colourKey]))];
   const sizes = [...new Set(lines.map((l) => l.size))];
   const needsTarget = mode === BULK_MODE.COLOUR || mode === BULK_MODE.SIZE;
-  const keys = bulkTargets(lines, mode, target, selectedKeys);
+  const keys = bulkTargets(lines, mode, target, selectedKeys, colourKey);
   const impact = bulkImpact(lines, keys);
-  const lastKeys = lastRateTargets(lines, lastRates);
+  const lastKeys = lastRateTargets(lines, rateOf);
   const lastImpact = bulkImpact(lines, lastKeys);
   return (
     <Space wrap size={8}>
@@ -35,7 +36,8 @@ const CppBulkFillBar = memo(function CppBulkFillBar({ lines, selectedKeys, lastR
           placeholder={mode === BULK_MODE.COLOUR ? 'Colour' : 'Size'} value={target}
           options={(mode === BULK_MODE.COLOUR ? colours : sizes).map((v) => ({ value: v, label: v }))} onChange={setTarget} />
       )}
-      <InputNumber size="small" name="bulkRate" aria-label="Rate to fill" min={0} precision={2} controls={false} prefix="₹" style={{ width: 100 }} value={rate} onChange={setRate} {...numericInputProps} />
+      <InputNumber size="small" name="bulkRate" aria-label="Rate to fill" min={0} precision={precision} controls={false} prefix="₹" style={{ width: precision > 2 ? 120 : 100 }}
+        value={rate} onChange={setRate} {...numericInputProps} />
       <Popconfirm
         title={`Set ₹${rate ?? 0} on ${impact.count} line${impact.count === 1 ? '' : 's'}?`}
         description={impact.overwrites ? `${impact.overwrites} already carry a rate and will be overwritten.` : 'No existing rate is overwritten.'}
@@ -46,17 +48,17 @@ const CppBulkFillBar = memo(function CppBulkFillBar({ lines, selectedKeys, lastR
       <Popconfirm
         title={`Copy the last PO rate onto ${lastImpact.count} line${lastImpact.count === 1 ? '' : 's'}?`}
         description={lastImpact.overwrites ? `${lastImpact.overwrites} already carry a rate and will be overwritten.` : undefined}
-        okText="Copy" onConfirm={() => onApply(applyLastRates(lines, lastRates))} disabled={!lastImpact.count}
+        okText="Copy" onConfirm={() => onApply(applyLastRates(lines, rateOf))} disabled={!lastImpact.count}
       >
         <Button size="small" disabled={!lastImpact.count}>Copy last PO rates</Button>
       </Popconfirm>
       {recent?.length > 0 && (
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Last rates: {recent.map((r) => `₹${Number(r.rate).toFixed(2)} (${r.poNo})`).join(' · ')}
+          Last rates: {recent.map((r) => `₹${Number(r.rate).toFixed(precision)} (${r.poNo})`).join(' · ')}
         </Text>
       )}
     </Space>
   );
 });
 
-export default CppBulkFillBar;
+export default JobWorkBulkFillBar;

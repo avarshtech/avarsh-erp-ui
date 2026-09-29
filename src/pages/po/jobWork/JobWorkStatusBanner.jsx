@@ -1,17 +1,38 @@
 import { memo } from 'react';
-import { Alert, Space, Tag } from 'antd';
+import { Alert, Button, Popconfirm, Space, Tag } from 'antd';
 import StatusSteps from '../../../components/StatusSteps';
 import { JOB_WORK_PO_STATUS_CONFIG, JOB_WORK_PO_STATUS_FLOW } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 import { CLOSE_REASONS, optionLabel } from '../../../utils/jobWorkConstants';
 
+const RefetchAlert = ({ refetch }) => (
+  <Alert
+    type="warning" showIcon style={{ marginTop: 8 }} title="Requirement changed"
+    description={(
+      <>
+        {refetch.changes.slice(0, 3).map((c) => <div key={c}>{c}</div>)}
+        {refetch.changes.length > 3 && <div>… and {refetch.changes.length - 3} more</div>}
+      </>
+    )}
+    action={(
+      <Popconfirm
+        title="Re-fetch lines?" okText="Re-fetch" onConfirm={refetch.onConfirm}
+        description={`${refetch.rebuilt} reset to the new balance, rates kept${refetch.dropped ? `; ${refetch.dropped} removed` : ''}.`}
+      >
+        <Button size="small">Re-fetch lines</Button>
+      </Popconfirm>
+    )}
+  />
+);
+
 /**
  * Where a job-work PO stands: the status steps, derived flags (overdue, approved not
  * sent, order cancelled, requirement changed — CPP §17.3), and the notes a user left on the
  * way: send-back note, rejection (terminal, or back to Draft on a Garment Process PO),
- * cancellation or short close, an open amendment.
+ * cancellation or short close, an open amendment. A draft whose requirement was edited
+ * offers to re-fetch its lines (`refetch` from useJobWorkRefetch).
  */
-const JobWorkStatusBanner = memo(function JobWorkStatusBanner({ doc, flags = [], flow = JOB_WORK_PO_STATUS_FLOW }) {
+const JobWorkStatusBanner = memo(function JobWorkStatusBanner({ doc, flags = [], flow = JOB_WORK_PO_STATUS_FLOW, refetch = null }) {
   const closed = [S.CANCELLED, S.CLOSED, S.REJECTED].includes(doc.status) && (doc.closeRemark || doc.closeReasonCode);
   const rev = doc.pendingRevision;
   return (
@@ -23,6 +44,7 @@ const JobWorkStatusBanner = memo(function JobWorkStatusBanner({ doc, flags = [],
         />
       )}
       {flags.length > 0 && <Space size={4} wrap style={{ margin: '8px 0' }}>{flags.map((f) => <Tag key={f.key} color={f.color}>{f.label}</Tag>)}</Space>}
+      {refetch && <RefetchAlert refetch={refetch} />}
       {doc.status === S.DRAFT && doc.sendBackNote && <Alert type="warning" showIcon title="Sent back for correction" description={doc.sendBackNote} style={{ marginTop: 8 }} />}
       {doc.status === S.DRAFT && doc.rejectNote && <Alert type="warning" showIcon title={`Rejected to Draft by ${doc.rejectedBy || '—'}`} description={doc.rejectNote} style={{ marginTop: 8 }} />}
       {closed && (

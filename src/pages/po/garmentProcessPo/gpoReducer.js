@@ -3,9 +3,10 @@ import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
 /**
  * Screen state of a Garment Process PO: the document, whether it has unsaved changes, and
- * the requirement rows ticked in the selection table (section ②).
+ * the line rows ticked for "apply to selected lines". The requirement picker (section ②)
+ * keeps its own ticks.
  */
-export const initialGpoState = { doc: null, dirty: false, picked: [] };
+export const initialGpoState = { doc: null, dirty: false, selectedKeys: [] };
 
 export const newGpoDoc = () => ({
   id: null, type: 'GPO', poNo: null, status: S.DRAFT, poDate: dayjs().format('YYYY-MM-DD'), currency: 'INR',
@@ -26,16 +27,14 @@ export const gpoReducer = (state, action) => {
   switch (action.type) {
     case 'LOADED':
     case 'SAVED':
-      return { ...initialGpoState, doc: action.doc, picked: action.type === 'SAVED' ? state.picked : [] };
+      return { ...initialGpoState, doc: action.doc, selectedKeys: action.type === 'SAVED' ? state.selectedKeys : [] };
     case 'LOAD_FAILED':
       return initialGpoState;
     case 'PATCH': // header, vendor, delivery, remarks, commercial
       return { ...state, dirty: true, doc: { ...state.doc, ...action.patch } };
-    case 'PICKED':
-      return { ...state, picked: action.keys };
     case 'LINES_ADDED': // the first lines fix the PO's process (one per PO, deviation D23); `header` fills defaults
       return {
-        ...state, dirty: true, picked: [],
+        ...state, dirty: true,
         doc: {
           ...state.doc, ...action.header, lines: [...state.doc.lines, ...action.lines],
           process: state.doc.lines.length ? state.doc.process : action.process,
@@ -49,8 +48,10 @@ export const gpoReducer = (state, action) => {
     case 'LINES_REMOVED': {
       const keys = new Set(action.keys);
       const next = withLines(state, (lines) => lines.filter((l) => !keys.has(l.key)));
-      return { ...next, doc: { ...next.doc, lastLineNo: nextLineNo(state.doc) - 1 } };
+      return { ...next, doc: { ...next.doc, lastLineNo: nextLineNo(state.doc) - 1 }, selectedKeys: state.selectedKeys.filter((k) => !keys.has(k)) };
     }
+    case 'ROWS_SELECTED':
+      return { ...state, selectedKeys: action.keys };
     default:
       return state;
   }

@@ -14,4 +14,5 @@ export const [listGpos, getGpo, saveGpo, amendGpoDates, getGpoAudit] =
 export const [submitGpo, recallGpo, approveGpo, rejectGpo, sendGpoToVendor, cancelGpo, shortCloseGpo] =
   ['submitGpo', 'recallGpo', 'approveGpo', 'rejectGpo', 'sendGpoToVendor', 'cancelGpo', 'shortCloseGpo'].map(pick);
 export const [requestGpoExcess, approveGpoExcess, gpoContext] = ['requestGpoExcess', 'approveGpoExcess', 'gpoContext'].map(pick);
-export const [gpoRequirementRows, gpoFetchLines, lastRates] = ['gpoRequirementRows', 'gpoFetchLines', 'lastRates'].map(pick);
+export const [gpoRequirementRows, gpoRequirementCells, gpoFetchLines, lastRates] =
+  ['gpoRequirementRows', 'gpoRequirementCells', 'gpoFetchLines', 'lastRates'].map(pick);

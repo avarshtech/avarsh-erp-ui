@@ -38,7 +38,7 @@ const useCppView = ({ doc, rev, dirty, docDirty }, ctx) => useMemo(() => {
   const received = doc.lines.some((l) => Number(l.receivedQty) > 0);
   const flags = poFlags(doc, {
     orderCancelled: Boolean(ctx) && doc.lines.some((l) => ctx.orderStatus?.[l.orderId] === 'CANCELLED'),
-    requirementChanged: Boolean(ctx?.state) && doc.status !== S.DRAFT && doc.lines.some((l) => requirementChange(l, ctx.state)),
+    requirementChanged: Boolean(ctx?.state) && doc.lines.some((l) => requirementChange(l, ctx.state)),
   });
   return {
     can, edit, working, value: cppValue(working), flags, isMaker, superuser, username: user.username,
