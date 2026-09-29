@@ -80,7 +80,7 @@ const GarmentProcessPoList = () => {
     type: 'select', ...lineFilter(px, multiple ? { xs: 24, sm: 12, md: 6 } : { xs: 12, sm: 8, md: 4 }),
     props: { placeholder, value: filters[key], onChange: setFilter(key), options: opts, allowClear: true, 'aria-label': placeholder, ...(multiple ? { mode: 'multiple', maxTagCount: 'responsive' } : {}) },
   });
-  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 6 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
+  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 8 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
 
   return (
     <div className="animate-fade-in-up">
@@ -93,7 +93,7 @@ const GarmentProcessPoList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
-          searchPlaceholder="PO no., GPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
+          searchPlaceholder="Search" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
             select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('GPO')], 156, true),
             select('process', 'Process', options(rows, 'processLabel'), 110, true),

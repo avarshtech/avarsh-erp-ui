@@ -72,7 +72,7 @@ const CutPanelPoList = () => {
     type: 'select', ...lineFilter(px, { xs: 12, sm: 8, md: 4 }),
     props: { placeholder, value: filters[key], onChange: setFilter(key), options: opts, allowClear: true, 'aria-label': placeholder },
   });
-  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 6 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
+  const range = (key, placeholder) => ({ type: 'rangePicker', ...lineFilter(RANGE_COL, { xs: 24, sm: 12, md: 8 }), props: { placeholder, value: filters[key], onChange: setFilter(key) } });
 
   return (
     <div className="animate-fade-in-up">
@@ -85,7 +85,7 @@ const CutPanelPoList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText} onSearchChange={(e) => setSearchText(e.target.value)} onRefresh={load} style={{ marginBottom: 16 }}
-          searchPlaceholder="PO no., CPR…" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
+          searchPlaceholder="Search" searchFlex={LIST_SEARCH_FLEX} gutter={LIST_GUTTER}
           filters={[
             select('status', 'Status', [{ value: OPEN, label: 'Open POs' }, ...jobWorkPoStatusOptions('CPP')], 124),
             select('process', 'Process', options(rows, 'processLabel'), 110),
