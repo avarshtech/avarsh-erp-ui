@@ -209,6 +209,95 @@ export const BLOCK_FIELD_LABELS = {
   destination: 'Destination',
 };
 
+// ─── Printed document fonts (template formatting) ───────────────────────────────
+/**
+ * The fonts a template can print in, by kind. A document prints on the computer that
+ * opens it, so these are fonts Windows, macOS or Microsoft Office install — buyers'
+ * own spreadsheets use the same ones. Each carries a full CSS stack, so a computer
+ * without the font prints the nearest one of the same kind (a serif stays a serif)
+ * instead of the browser default.
+ */
+export const DOC_FONT_GROUPS = [
+  {
+    label: 'Sans-serif',
+    fonts: [
+      { name: 'Arial', stack: 'Arial, Helvetica, sans-serif' },
+      { name: 'Arial Narrow', stack: "'Arial Narrow', 'Liberation Sans Narrow', Arial, sans-serif" },
+      { name: 'Calibri', stack: "Calibri, Carlito, 'Segoe UI', Arial, sans-serif" },
+      { name: 'Aptos', stack: "Aptos, Calibri, 'Segoe UI', Arial, sans-serif" },
+      { name: 'Segoe UI', stack: "'Segoe UI', Tahoma, Arial, sans-serif" },
+      { name: 'Tahoma', stack: 'Tahoma, Verdana, Arial, sans-serif' },
+      { name: 'Verdana', stack: 'Verdana, Tahoma, Arial, sans-serif' },
+      { name: 'Trebuchet MS', stack: "'Trebuchet MS', 'Lucida Grande', Arial, sans-serif" },
+      { name: 'Century Gothic', stack: "'Century Gothic', 'Avant Garde', Arial, sans-serif" },
+      { name: 'Gill Sans MT', stack: "'Gill Sans MT', 'Gill Sans', Calibri, Arial, sans-serif" },
+      { name: 'Franklin Gothic Medium', stack: "'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif" },
+      { name: 'Helvetica', stack: 'Helvetica, Arial, sans-serif' },
+    ],
+  },
+  {
+    label: 'Serif',
+    fonts: [
+      { name: 'Times New Roman', stack: "'Times New Roman', Times, serif" },
+      { name: 'Georgia', stack: "Georgia, 'Times New Roman', serif" },
+      { name: 'Cambria', stack: "Cambria, Caladea, Georgia, serif" },
+      { name: 'Garamond', stack: "Garamond, 'EB Garamond', Georgia, serif" },
+      { name: 'Book Antiqua', stack: "'Book Antiqua', Palatino, 'Palatino Linotype', serif" },
+      { name: 'Palatino Linotype', stack: "'Palatino Linotype', Palatino, 'Book Antiqua', serif" },
+      { name: 'Bookman Old Style', stack: "'Bookman Old Style', Bookman, Georgia, serif" },
+    ],
+  },
+  {
+    label: 'Typewriter (fixed width)',
+    fonts: [
+      { name: 'Courier New', stack: "'Courier New', Courier, monospace" },
+      { name: 'Consolas', stack: "Consolas, 'Courier New', monospace" },
+      { name: 'Lucida Console', stack: "'Lucida Console', Monaco, monospace" },
+    ],
+  },
+];
+
+const DOC_FONT_STACKS = Object.fromEntries(DOC_FONT_GROUPS.flatMap((g) => g.fonts).map((f) => [f.name, f.stack]));
+
+/** The CSS stack for a font name from the list above, or null for any other name. */
+export const docFontStack = (name) => DOC_FONT_STACKS[name] || null;
+
+// ─── Printed text sizes (template formatting) ───────────────────────────────────
+/** The main text size — table rows and plain text — when a template sets none, in pt. */
+export const MAIN_TEXT_PT = { PACKING_LIST: 8.5, INVOICE: 10 };
+
+/** Nothing prints smaller than this, whatever the template asks for: below it text blurs on paper. */
+export const MIN_TEXT_PT = 6.5;
+
+/**
+ * The other kinds of text a printed packing list or invoice has. Each prints at the
+ * size the template sets for it, or else at its share of the main text — so changing
+ * the main size scales the whole page, and any one kind can still be set on its own.
+ * `legacy` is the older formatting key an existing template may already carry.
+ */
+export const TEXT_ROLES = [
+  { key: 'title', label: 'Document title', ratio: 1.45, legacy: 'titleFontPt' },
+  { key: 'company', label: 'Company name', ratio: 1.25 },
+  { key: 'section', label: 'Section titles and totals', ratio: 1.1, docTypes: ['PACKING_LIST'] },
+  { key: 'heading', label: 'Table headings', ratio: 0.95 },
+  { key: 'value', label: 'Values in the header boxes', ratio: 1.05, legacy: 'headerFontPt' },
+  { key: 'label', label: 'Small labels above values', ratio: 0.85 },
+  { key: 'note', label: 'Notes, declarations and small print', ratio: 0.9 },
+];
+
+const halfPt = (n) => Math.round(n * 2) / 2;
+
+/** The main text size of a template, in pt. */
+export const mainTextPt = (formatting, docType) => Number(formatting?.baseFontPt) || MAIN_TEXT_PT[docType] || 9;
+
+/** The size one kind of text prints at, in pt: the template's own, else its share of the main text. */
+export const textSizePt = (formatting, role, docType) => {
+  const own = Number(formatting?.textSizes?.[role.key]);
+  const legacy = role.legacy ? Number(formatting?.[role.legacy]) : 0;
+  const set = own > 0 ? own : legacy;
+  return Math.max(MIN_TEXT_PT, set > 0 ? set : halfPt(mainTextPt(formatting, docType) * role.ratio));
+};
+
 // ─── Template lifecycle (PRD §10) ───────────────────────────────────────────────
 export const TEMPLATE_STATUS = { DRAFT: 'DRAFT', ACTIVE: 'ACTIVE', RETIRED: 'RETIRED' };
 

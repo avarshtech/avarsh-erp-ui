@@ -6,32 +6,165 @@
     {
       "name": "INVOICE",
       "rows": [
-        ["INVOICE"],
-        ["SELLER", "", "", "Invoice No. & Date"],
-        ["SRISTI GARMENTS", "", "", "000/26-27"],
-        ["Consignee"],
-        ["DEUTSCHE BANK"],
-        ["ORDER NO", "SUP.ART.NO", "COLOUR", "HANGER", "Quantity", "Rate", "Amount"],
-        ["793272", "555-14-01-W24", "BEIGE BROWN", "WITHOUT HANGER", "#REF!", "4.95", "#REF!"],
-        ["SUPPLY MEANT FOR EXPORT WITH PAYMENT OF IGST"],
-        ["We intend to claim rewards under MEIS"]
+        [
+          "INVOICE"
+        ],
+        [
+          "SELLER",
+          "",
+          "",
+          "Invoice No. & Date"
+        ],
+        [
+          "SRISTI GARMENTS",
+          "",
+          "",
+          "000/26-27"
+        ],
+        [
+          "Consignee"
+        ],
+        [
+          "DEUTSCHE BANK"
+        ],
+        [
+          "ORDER NO",
+          "SUP.ART.NO",
+          "COLOUR",
+          "HANGER",
+          "Quantity",
+          "Rate",
+          "Amount"
+        ],
+        [
+          "793272",
+          "555-14-01-W24",
+          "BEIGE BROWN",
+          "WITHOUT HANGER",
+          "#REF!",
+          "4.95",
+          "#REF!"
+        ],
+        [
+          "SUPPLY MEANT FOR EXPORT WITH PAYMENT OF IGST"
+        ],
+        [
+          "We intend to claim rewards under MEIS"
+        ]
       ],
-      "merges": ["A1:G1"]
+      "merges": [
+        "A1:G1"
+      ]
     },
     {
       "name": "PACKING LIST",
       "rows": [
-        ["PACKING LIST"],
-        ["solid packs"],
-        ["COLOUR", "CRTN NOS", "56", "62", "68", "TTL CRTNS", "TTL QTY", "TTL NT.WT"],
-        ["DARK CLAY", "62", "50", "", "", "1", "50", "5.000"],
-        ["ratio packs"],
-        ["COLOUR", "56", "62", "PCS/MPB", "TTL CRTNS"],
-        ["DARK CLAY", "2", "3", "25", "2"],
-        ["TOTAL QTY", ":", "264"],
-        ["Licence no Client:"]
+        [
+          "PACKING LIST"
+        ],
+        [
+          "solid packs"
+        ],
+        [
+          "COLOUR",
+          "CRTN NOS",
+          "56",
+          "62",
+          "68",
+          "TTL CRTNS",
+          "TTL QTY",
+          "TTL NT.WT"
+        ],
+        [
+          "DARK CLAY",
+          "62",
+          "50",
+          "",
+          "",
+          "1",
+          "50",
+          "5.000"
+        ],
+        [
+          "ratio packs"
+        ],
+        [
+          "COLOUR",
+          "56",
+          "62",
+          "PCS/MPB",
+          "TTL CRTNS"
+        ],
+        [
+          "DARK CLAY",
+          "2",
+          "3",
+          "25",
+          "2"
+        ],
+        [
+          "TOTAL QTY",
+          ":",
+          "264"
+        ],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+          "Licence no Client:"
+        ]
       ],
-      "merges": ["A1:H1"]
+      "merges": [
+        "A1:H1"
+      ]
     }
   ],
   "buyerId": null,
@@ -44,38 +177,115 @@
       "suggestedCode": "E2E-PRENATAL-INV",
       "where": "INVOICE",
       "layout": {
-        "identity": { "titleText": "INVOICE", "showLogo": true, "paper": "A4", "orientation": "PORTRAIT" },
+        "identity": {
+          "titleText": "INVOICE",
+          "showLogo": true,
+          "paper": "A4",
+          "orientation": "PORTRAIT"
+        },
         "headerFields": [],
         "addressBlocks": [],
         "textBlocks": [
-          { "key": "igstNote", "title": null, "text": "SUPPLY MEANT FOR EXPORT WITH PAYMENT OF IGST", "placement": "AFTER_TABLE" }
+          {
+            "key": "igstNote",
+            "title": null,
+            "text": "SUPPLY MEANT FOR EXPORT WITH PAYMENT OF IGST",
+            "placement": "AFTER_TABLE"
+          }
         ],
         "invoiceHeader": {
           "boxes": {
-            "exporter": { "label": "SELLER" },
-            "consignee": { "binding": "fixed:DEUTSCHE BANK\nAMSTERDAM" }
+            "exporter": {
+              "label": "SELLER"
+            },
+            "consignee": {
+              "binding": "fixed:DEUTSCHE BANK\nAMSTERDAM"
+            }
           }
         },
         "invoiceColumns": [
-          { "key": "orderNo", "label": "ORDER NO", "type": "TEXT", "binding": "line.buyerPoNo", "width": 120, "align": "left" },
-          { "key": "supArtNo", "label": "SUP.ART.NO", "type": "TEXT", "binding": "line.styleNo", "width": 120, "align": "left" },
-          { "key": "colour", "label": "COLOUR", "type": "TEXT", "binding": "line.colorName", "width": 120, "align": "left" },
-          { "key": "hanger", "label": "HANGER", "type": "TEXT", "binding": null, "width": 120, "align": "left" }
+          {
+            "key": "orderNo",
+            "label": "ORDER NO",
+            "type": "TEXT",
+            "binding": "line.buyerPoNo",
+            "width": 120,
+            "align": "left"
+          },
+          {
+            "key": "supArtNo",
+            "label": "SUP.ART.NO",
+            "type": "TEXT",
+            "binding": "line.styleNo",
+            "width": 120,
+            "align": "left"
+          },
+          {
+            "key": "colour",
+            "label": "COLOUR",
+            "type": "TEXT",
+            "binding": "line.colorName",
+            "width": 120,
+            "align": "left"
+          },
+          {
+            "key": "hanger",
+            "label": "HANGER",
+            "type": "TEXT",
+            "binding": null,
+            "width": 120,
+            "align": "left"
+          }
         ],
-        "invoiceLineGrain": { "mode": "PER_ORDER_LINE" },
-        "charges": { "discount": { "enabled": true, "mode": "PERCENT", "default": 3 } },
-        "igst": { "enabled": true, "defaultRatePct": 5, "rates": [5, 18] },
+        "invoiceLineGrain": {
+          "mode": "PER_ORDER_LINE"
+        },
+        "charges": {
+          "discount": {
+            "enabled": true,
+            "mode": "PERCENT",
+            "default": 3
+          }
+        },
+        "igst": {
+          "enabled": true,
+          "defaultRatePct": 5,
+          "rates": [
+            5,
+            18
+          ]
+        },
         "bankBlock": true,
         "ediAccounts": true,
         "declarations": []
       },
       "elementMeta": {
-        "invoiceHeader.boxes:exporter": { "evidence": "INVOICE!A2", "confidence": "HIGH", "found": true },
-        "invoiceColumns:orderNo": { "evidence": "INVOICE!A6", "confidence": "HIGH", "found": true, "sample": "793272" },
-        "invoiceColumns:hanger": { "evidence": "INVOICE!D6", "confidence": "LOW", "found": true, "sample": "WITHOUT HANGER" },
-        "textBlocks:igstNote": { "evidence": "INVOICE!A8", "confidence": "HIGH", "found": true }
+        "invoiceHeader.boxes:exporter": {
+          "evidence": "INVOICE!A2",
+          "confidence": "HIGH",
+          "found": true
+        },
+        "invoiceColumns:orderNo": {
+          "evidence": "INVOICE!A6",
+          "confidence": "HIGH",
+          "found": true,
+          "sample": "793272"
+        },
+        "invoiceColumns:hanger": {
+          "evidence": "INVOICE!D6",
+          "confidence": "LOW",
+          "found": true,
+          "sample": "WITHOUT HANGER"
+        },
+        "textBlocks:igstNote": {
+          "evidence": "INVOICE!A8",
+          "confidence": "HIGH",
+          "found": true
+        }
       },
-      "bodyRanges": ["INVOICE!A7:G7"]
+      "bodyRanges": [
+        "INVOICE!A7:G7"
+      ]
     },
     {
       "docType": "PACKING_LIST",
@@ -83,52 +293,223 @@
       "suggestedCode": "E2E-PRENATAL-PL",
       "where": "PACKING LIST",
       "layout": {
-        "identity": { "titleText": "PACKING LIST", "showLogo": true, "paper": "A4", "orientation": "LANDSCAPE" },
+        "identity": {
+          "titleText": "PACKING LIST",
+          "showLogo": true,
+          "paper": "A4",
+          "orientation": "LANDSCAPE"
+        },
         "headerFields": [
-          { "key": "shippingMark", "label": "Shipping Mark Ref", "binding": null }
+          {
+            "key": "shippingMark",
+            "label": "Shipping Mark Ref",
+            "binding": null
+          }
         ],
         "addressBlocks": [],
         "textBlocks": [],
         "columns": [
-          { "key": "colour", "label": "COLOUR", "type": "TEXT", "binding": "row.colorName", "width": 120, "align": "left" },
-          { "key": "crtnNos", "label": "CRTN NOS", "type": "TEXT", "binding": "row.cartonRange", "width": 90, "align": "left" },
-          { "key": "__sizes", "label": "Sizes", "type": "SIZE_GRID", "binding": "row.sizeQty", "group": "units", "align": "right", "total": "SUM" },
-          { "key": "ttlCrtns", "label": "TTL CRTNS", "type": "NUMBER", "binding": "row.cartonCount", "width": 80, "align": "right", "total": "SUM" },
-          { "key": "ttlQty", "label": "TTL QTY", "type": "NUMBER", "binding": "calc.totalPieces", "width": 80, "align": "right", "total": "SUM" },
-          { "key": "ttlNtWt", "label": "TTL NT.WT", "type": "NUMBER", "binding": "calc.totalNetWeightKg", "width": 80, "align": "right" }
+          {
+            "key": "colour",
+            "label": "COLOUR",
+            "type": "TEXT",
+            "binding": "row.colorName",
+            "width": 120,
+            "align": "left"
+          },
+          {
+            "key": "crtnNos",
+            "label": "CRTN NOS",
+            "type": "TEXT",
+            "binding": "row.cartonRange",
+            "width": 90,
+            "align": "left"
+          },
+          {
+            "key": "__sizes",
+            "label": "Sizes",
+            "type": "SIZE_GRID",
+            "binding": "row.sizeQty",
+            "group": "units",
+            "align": "right",
+            "total": "SUM"
+          },
+          {
+            "key": "ttlCrtns",
+            "label": "TTL CRTNS",
+            "type": "NUMBER",
+            "binding": "row.cartonCount",
+            "width": 80,
+            "align": "right",
+            "total": "SUM"
+          },
+          {
+            "key": "ttlQty",
+            "label": "TTL QTY",
+            "type": "NUMBER",
+            "binding": "calc.totalPieces",
+            "width": 80,
+            "align": "right",
+            "total": "SUM"
+          },
+          {
+            "key": "ttlNtWt",
+            "label": "TTL NT.WT",
+            "type": "NUMBER",
+            "binding": "calc.totalNetWeightKg",
+            "width": 80,
+            "align": "right"
+          }
         ],
         "sheets": [
-          { "key": "SOLID_PACKS", "title": "solid packs", "include": ["MAIN"], "packingTypes": ["SOLID"], "showSectionTotals": true },
-          { "key": "RATIO_PACKS", "title": "ratio packs", "include": ["MAIN"], "packingTypes": ["RATIO", "MPB"], "showSectionTotals": true,
+          {
+            "key": "SOLID_PACKS",
+            "title": "solid packs",
+            "include": [
+              "MAIN"
+            ],
+            "packingTypes": [
+              "SOLID"
+            ],
+            "showSectionTotals": true
+          },
+          {
+            "key": "RATIO_PACKS",
+            "title": "ratio packs",
+            "include": [
+              "MAIN"
+            ],
+            "packingTypes": [
+              "RATIO",
+              "MPB"
+            ],
+            "showSectionTotals": true,
             "columns": [
-              { "key": "colour", "label": "COLOUR", "type": "TEXT", "binding": "row.colorName", "width": 120, "align": "left" },
-              { "key": "__sizes", "label": "Sizes", "type": "SIZE_GRID", "binding": "row.sizeQty", "sizeValue": "RATIO", "align": "right", "total": "SUM" },
-              { "key": "pcsMpb", "label": "PCS/MPB", "type": "NUMBER", "binding": "row.pcsPerMpb", "width": 80, "align": "right" }
-            ] },
-          { "key": "EXTRA_CARTONS", "title": "EXTRA CARTONS", "include": ["EXTRA"], "showSectionTotals": true, "joinGrandTotal": true },
-          { "key": "SUMMARY", "title": "SUMMARY", "type": "SUMMARY", "blocks": ["TOTALS_LIST"] }
+              {
+                "key": "colour",
+                "label": "COLOUR",
+                "type": "TEXT",
+                "binding": "row.colorName",
+                "width": 120,
+                "align": "left"
+              },
+              {
+                "key": "__sizes",
+                "label": "Sizes",
+                "type": "SIZE_GRID",
+                "binding": "row.sizeQty",
+                "sizeValue": "RATIO",
+                "align": "right",
+                "total": "SUM"
+              },
+              {
+                "key": "pcsMpb",
+                "label": "PCS/MPB",
+                "type": "NUMBER",
+                "binding": "row.pcsPerMpb",
+                "width": 80,
+                "align": "right"
+              }
+            ]
+          },
+          {
+            "key": "EXTRA_CARTONS",
+            "title": "EXTRA CARTONS",
+            "include": [
+              "EXTRA"
+            ],
+            "showSectionTotals": true,
+            "joinGrandTotal": true
+          },
+          {
+            "key": "SUMMARY",
+            "title": "SUMMARY",
+            "type": "SUMMARY",
+            "blocks": [
+              "TOTALS_LIST"
+            ]
+          }
         ],
-        "sizeSet": { "source": "ORDER_PRESET", "hideEmptySizeColumns": true },
-        "packingTypesAllowed": ["SOLID", "RATIO", "MPB", "MIXED", "EXTRA"]
+        "sizeSet": {
+          "source": "ORDER_PRESET",
+          "hideEmptySizeColumns": true
+        },
+        "packingTypesAllowed": [
+          "SOLID",
+          "RATIO",
+          "MPB",
+          "MIXED",
+          "EXTRA"
+        ]
       },
       "elementMeta": {
-        "headerFields:shippingMark": { "evidence": "PACKING LIST!A1", "confidence": "LOW", "found": false },
-        "columns:colour": { "evidence": "PACKING LIST!A3", "confidence": "HIGH", "found": true },
-        "columns:ttlNtWt": { "evidence": "PACKING LIST!H3", "confidence": "MEDIUM", "found": true, "sample": "5.000" },
-        "sheets:SOLID_PACKS": { "evidence": "PACKING LIST!A2", "confidence": "HIGH", "found": true },
-        "sizeSet": { "sample": "56, 62, 68", "confidence": "HIGH" }
+        "headerFields:shippingMark": {
+          "evidence": "PACKING LIST!A1",
+          "confidence": "LOW",
+          "found": false
+        },
+        "columns:colour": {
+          "evidence": "PACKING LIST!A3",
+          "confidence": "HIGH",
+          "found": true
+        },
+        "columns:ttlNtWt": {
+          "evidence": "PACKING LIST!H3",
+          "confidence": "MEDIUM",
+          "found": true,
+          "sample": "5.000"
+        },
+        "sheets:SOLID_PACKS": {
+          "evidence": "PACKING LIST!A2",
+          "confidence": "HIGH",
+          "found": true
+        },
+        "sizeSet": {
+          "sample": "56, 62, 68",
+          "confidence": "HIGH"
+        }
       },
-      "bodyRanges": ["PACKING LIST!A4:H4", "PACKING LIST!A7:E7"]
+      "bodyRanges": [
+        "PACKING LIST!A4:H4",
+        "PACKING LIST!A7:E7"
+      ]
     }
   ],
   "findings": [
-    { "severity": "WARN", "code": "BUYER_MISMATCH", "message": "The document looks like it is for “PRENATAL MOEDER EN KIND BV”, but you chose “JOMO BV”. Check the buyer before saving.", "document": null, "element": null, "evidence": null },
-    { "severity": "WARN", "code": "NOT_IN_DOCUMENT", "message": "“Shipping Mark Ref” was not found in the document — check it.", "document": 1, "element": "headerFields:shippingMark", "evidence": "PACKING LIST!A1" },
-    { "severity": "INFO", "code": "EXTRA_SECTION_ADDED", "message": "An “Extra cartons” section was added so leftover cartons still print.", "document": 1, "element": null, "evidence": null }
+    {
+      "severity": "WARN",
+      "code": "BUYER_MISMATCH",
+      "message": "The document looks like it is for “PRENATAL MOEDER EN KIND BV”, but you chose “JOMO BV”. Check the buyer before saving.",
+      "document": null,
+      "element": null,
+      "evidence": null
+    },
+    {
+      "severity": "WARN",
+      "code": "NOT_IN_DOCUMENT",
+      "message": "“Shipping Mark Ref” was not found in the document — check it.",
+      "document": 1,
+      "element": "headerFields:shippingMark",
+      "evidence": "PACKING LIST!A1"
+    },
+    {
+      "severity": "INFO",
+      "code": "EXTRA_SECTION_ADDED",
+      "message": "An “Extra cartons” section was added so leftover cartons still print.",
+      "document": 1,
+      "element": null,
+      "evidence": null
+    }
   ],
   "missed": [
-    { "text": "Licence no Client:", "location": "PACKING LIST!A9" },
-    { "text": "We intend to claim rewards under MEIS", "location": "INVOICE!A9" }
+    {
+      "text": "Licence no Client:",
+      "location": "PACKING LIST!A60"
+    },
+    {
+      "text": "We intend to claim rewards under MEIS",
+      "location": "INVOICE!A9"
+    }
   ],
   "skipped": [],
   "model": "gemini"

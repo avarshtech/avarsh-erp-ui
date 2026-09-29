@@ -33,11 +33,28 @@ const SheetSourceView = ({ sheet, highlight }) => {
     return { anchors: a, covered: c };
   }, [sheet]);
 
+  const hitRow = highlight?.row;
+  const hitCol = highlight?.col;
+  const sheetName = sheet.name;
+  // Scrolls the grid itself so the cited cell sits mid-view, clear of the sticky row and
+  // column headers — computed from the two boxes rather than scrollIntoView, and repeated
+  // once the side panel has finished sliding in, because a scroll asked for while it is
+  // still moving is dropped and the view stays at the top-left.
   useEffect(() => {
-    if (!highlight) return;
-    box.current?.querySelector(`[data-cell="${highlight.row}:${highlight.col}"]`)
-      ?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
-  }, [highlight]);
+    if (hitRow == null || hitCol == null) return undefined;
+    const reveal = () => {
+      const grid = box.current;
+      const cell = grid?.querySelector(`[data-cell="${hitRow}:${hitCol}"]`);
+      if (!grid || !cell) return;
+      const g = grid.getBoundingClientRect();
+      const c = cell.getBoundingClientRect();
+      grid.scrollTop += (c.top - g.top) - (grid.clientHeight - c.height) / 2;
+      grid.scrollLeft += (c.left - g.left) - (grid.clientWidth - c.width) / 2;
+    };
+    const frame = requestAnimationFrame(reveal);
+    const settled = setTimeout(reveal, 400);
+    return () => { cancelAnimationFrame(frame); clearTimeout(settled); };
+  }, [hitRow, hitCol, sheetName]);
 
   const cols = Array.from({ length: width }, (_, i) => i);
   return (

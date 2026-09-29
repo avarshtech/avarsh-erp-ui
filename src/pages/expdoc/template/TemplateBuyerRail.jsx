@@ -1,22 +1,40 @@
 import { useMemo, useState } from 'react';
 import {
-  Badge, Button, Card, Empty, Input, Space, Tag, Typography,
+  Card, Empty, Input, Space, Tag, Typography, theme,
 } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
+import { useTheme } from '../../../context/ThemeContext';
 import { RAIL_KEY } from './registerModel';
 
 const { Text } = Typography;
 
-const Counts = ({ counts }) => (
-  <Space size={4} wrap>
-    {counts.pl > 0 && <Tag color="blue" style={{ marginInlineEnd: 0 }}>{`PL ${counts.pl}`}</Tag>}
-    {counts.inv > 0 && <Tag color="purple" style={{ marginInlineEnd: 0 }}>{`INV ${counts.inv}`}</Tag>}
-    {counts.stk > 0 && <Tag style={{ marginInlineEnd: 0 }}>{`STK ${counts.stk}`}</Tag>}
-    {counts.drafts > 0 && <Tag color="gold" style={{ marginInlineEnd: 0 }}>{`${counts.drafts} draft`}</Tag>}
-  </Space>
-);
+/**
+ * The selected row's background — the pair MasterSplitView uses. Dark mode is hand-set
+ * tokens with no dark algorithm, so antd's derived colorPrimaryBg stays a light tint
+ * there and turns the selected row white under white text.
+ */
+const SELECTED_BG = { light: '#e6f7ff', dark: '#312e81' };
 
-const RailItem = ({ group, selected, onSelect }) => (
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/** What a buyer has, in words rather than PL / INV codes. */
+const Counts = ({ counts }) => {
+  const parts = [
+    counts.pl > 0 && plural(counts.pl, 'packing list', 'packing lists'),
+    counts.inv > 0 && plural(counts.inv, 'invoice', 'invoices'),
+    counts.stk > 0 && plural(counts.stk, 'sticker', 'stickers'),
+  ].filter(Boolean);
+  return (
+    <Space size={6} wrap>
+      {parts.length > 0 && <Text type="secondary" style={{ fontSize: 12 }}>{parts.join(' · ')}</Text>}
+      {counts.drafts > 0 && (
+        <Tag color="gold" style={{ marginInlineEnd: 0 }}>{plural(counts.drafts, 'draft', 'drafts')}</Tag>
+      )}
+    </Space>
+  );
+};
+
+const RailItem = ({ group, selected, selectedStyle, onSelect }) => (
   <div
     role="button"
     tabIndex={0}
@@ -29,8 +47,8 @@ const RailItem = ({ group, selected, onSelect }) => (
       borderRadius: 6,
       cursor: 'pointer',
       marginBottom: 4,
-      background: selected ? 'var(--ant-color-primary-bg, #e6f4ff)' : undefined,
-      borderLeft: `3px solid ${selected ? 'var(--ant-color-primary, #1677ff)' : 'transparent'}`,
+      borderLeft: '3px solid transparent',
+      ...(selected ? selectedStyle : null),
     }}
   >
     <Text strong={selected} ellipsis style={{ display: 'block' }} type={group.inactive ? 'secondary' : undefined}>
@@ -43,24 +61,31 @@ const RailItem = ({ group, selected, onSelect }) => (
 );
 
 /**
- * The buyer list down the left of the register. Buyers with templates come first; the
- * rest are one click away, because "which buyers have nothing yet?" is the question an
- * export team asks before a new shipment.
+ * The buyer list down the left of the register: the built-in layouts, then only the
+ * buyers that have templates. A template for a new buyer starts from the page header's
+ * "New buyer template", so buyers with nothing yet do not crowd the list.
  */
 const TemplateBuyerRail = ({ groups, selectedKey, onSelect }) => {
   const [search, setSearch] = useState('');
-  const [showEmpty, setShowEmpty] = useState(false);
+  const { token } = theme.useToken();
+  const { isDarkMode } = useTheme();
+  const selectedStyle = useMemo(() => ({
+    background: isDarkMode ? SELECTED_BG.dark : SELECTED_BG.light,
+    borderLeftColor: token.colorPrimary,
+  }), [isDarkMode, token.colorPrimary]);
+  const item = (g) => (
+    <RailItem key={g.key} group={g} selected={g.key === selectedKey} selectedStyle={selectedStyle} onSelect={onSelect} />
+  );
 
-  const { pinned, withTemplates, without } = useMemo(() => {
+  const { pinned, withTemplates } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const match = (g) => !q || String(g.title).toLowerCase().includes(q);
     const special = groups.filter((g) => g.key === RAIL_KEY.STANDARD || g.key === RAIL_KEY.DEMO_STICKERS);
-    const buyers = groups.filter((g) => !special.includes(g) && match(g))
-      .sort((a, b) => String(a.title).localeCompare(String(b.title)));
     return {
       pinned: special.filter(match),
-      withTemplates: buyers.filter((g) => g.counts.total > 0),
-      without: buyers.filter((g) => g.counts.total === 0 && !g.inactive),
+      withTemplates: groups
+        .filter((g) => !special.includes(g) && g.counts.total > 0 && match(g))
+        .sort((a, b) => String(a.title).localeCompare(String(b.title))),
     };
   }, [groups, search]);
 
@@ -70,22 +95,15 @@ const TemplateBuyerRail = ({ groups, selectedKey, onSelect }) => {
         name="templateBuyerSearch" allowClear prefix={<SearchOutlined />} placeholder="Search buyers"
         value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 8 }}
       />
-      {pinned.map((g) => <RailItem key={g.key} group={g} selected={g.key === selectedKey} onSelect={onSelect} />)}
+      {pinned.map(item)}
       <Text type="secondary" style={{ display: 'block', fontSize: 11, margin: '8px 4px 4px', textTransform: 'uppercase' }}>
         Buyers with templates
       </Text>
-      {withTemplates.length
-        ? withTemplates.map((g) => <RailItem key={g.key} group={g} selected={g.key === selectedKey} onSelect={onSelect} />)
-        : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="None yet" />}
-      {without.length > 0 && (
-        <>
-          <Button type="link" size="small" onClick={() => setShowEmpty((v) => !v)} style={{ paddingInline: 4 }}>
-            <Badge count={without.length} color="gray" size="small" offset={[10, -2]}>
-              {showEmpty ? 'Hide buyers without templates' : 'Buyers without templates'}
-            </Badge>
-          </Button>
-          {showEmpty && without.map((g) => <RailItem key={g.key} group={g} selected={g.key === selectedKey} onSelect={onSelect} />)}
-        </>
+      {withTemplates.length ? withTemplates.map(item) : (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={search.trim() ? 'No buyer with templates matches' : 'None yet — use “New buyer template” above'}
+        />
       )}
     </Card>
   );

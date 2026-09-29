@@ -1,20 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  Alert, App, AutoComplete, Input, Modal, Segmented, Space, Typography,
+  App, AutoComplete, Input, Modal, Segmented, Space, Typography,
 } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
 import { DOC_TYPE, DOC_TYPE_LABELS, SECTION_KEY } from '../../../utils/expDocConstants';
 import { SYSTEM_TEMPLATES, completeLayout } from '../../../utils/expDocSystemTemplates';
-import { parseImportEnvelope } from '../../../utils/expDocTemplateTransfer';
-import {
-  createTemplate, cloneTemplate, importTemplateJson, listStickerBuyers,
-} from '../../../services/expdoc/expDocService';
+import { createTemplate, cloneTemplate, listStickerBuyers } from '../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
-const { TextArea } = Input;
 
-const MODE = { CLONE: 'Copy an existing', BLANK: 'Start blank', IMPORT: 'Import JSON' };
+const MODE = { CLONE: 'Copy an existing', BLANK: 'Start blank' };
 
 /** A layout with nothing buyer-specific in it yet, but sections that print every carton. */
 const blankLayout = (docType) => completeLayout(docType, {
@@ -36,9 +32,9 @@ const codeBase = (name) => String(name || '').normalize('NFD').replace(/[̀-ͯ]/
 const SUFFIX = { [DOC_TYPE.PACKING_LIST]: 'PL', [DOC_TYPE.INVOICE]: 'INV', [DOC_TYPE.STICKER]: 'STK' };
 
 /**
- * The ways a template comes into being besides uploading the buyer's document:
- * copy the nearest one and change the deltas (the PRD's primary path), start blank,
- * or import a JSON export. Every one lands as a draft.
+ * The ways a template comes into being besides uploading the buyer's document: copy
+ * the nearest one and change the deltas (the PRD's primary path), or start blank.
+ * Either lands as a draft.
  */
 const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaultBuyerId, onCancel, onCreated }) => {
   const { message } = App.useApp();
@@ -51,7 +47,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const [buyerId, setBuyerId] = useState();
   const [buyerCode, setBuyerCode] = useState();
   const [subClientCode, setSubClientCode] = useState('');
-  const [json, setJson] = useState('');
   const [busy, setBusy] = useState(false);
   const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
@@ -66,7 +61,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
     setBuyerCode(source?.buyerCode || undefined);
     setSubClientCode('');
-    setJson('');
   }, [open, source, defaultBuyerId]);
 
   const pool = useMemo(() => {
@@ -75,12 +69,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   }, [templates]);
   const chosen = pool.find((t) => t.id === sourceId) || (source?.id === sourceId ? source : null);
 
-  const parsed = useMemo(() => {
-    if (mode !== MODE.IMPORT || !json.trim()) return null;
-    try { return parseImportEnvelope(json); } catch (e) { return { error: e.message }; }
-  }, [mode, json]);
-
-  const targetType = mode === MODE.CLONE ? chosen?.docType : (mode === MODE.IMPORT ? parsed?.docType : docType);
+  const targetType = mode === MODE.CLONE ? chosen?.docType : docType;
   const isSticker = targetType === DOC_TYPE.STICKER;
   const buyerName = buyers.find((b) => b.id === buyerId)?.name;
 
@@ -97,8 +86,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     ? stickerBuyers
     : buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
 
-  const canSubmit = Boolean(effectiveCode.trim() && name.trim()) && (
-    mode === MODE.CLONE ? Boolean(chosen) : (mode === MODE.IMPORT ? Boolean(parsed && !parsed.error) : Boolean(docType)));
+  const canSubmit = Boolean(effectiveCode.trim() && name.trim()) && (mode === MODE.CLONE ? Boolean(chosen) : Boolean(docType));
 
   const handleOk = async () => {
     setBusy(true);
@@ -108,10 +96,9 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
         buyerId: isSticker ? null : buyerId ?? null, buyerName: isSticker ? null : buyerName ?? null,
         buyerCode: isSticker ? buyerCode ?? null : null, subClientCode: subClientCode.trim() || null,
       };
-      let created;
-      if (mode === MODE.CLONE) created = await cloneTemplate(chosen, identity);
-      else if (mode === MODE.IMPORT) created = await importTemplateJson(json, identity);
-      else created = await createTemplate({ ...blankLayout(docType), ...identity, docType });
+      const created = mode === MODE.CLONE
+        ? await cloneTemplate(chosen, identity)
+        : await createTemplate({ ...blankLayout(docType), ...identity, docType });
       message.success(`${created.templateCode} created as a draft`);
       onCreated(created);
     } catch (e) {
@@ -127,7 +114,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
       okText="Create draft" onOk={handleOk} confirmLoading={busy} okButtonProps={{ disabled: !canSubmit }} destroyOnHidden
     >
       <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-        <Segmented block options={[MODE.CLONE, MODE.BLANK, MODE.IMPORT]} value={mode} onChange={setMode} />
+        <Segmented block options={[MODE.CLONE, MODE.BLANK]} value={mode} onChange={setMode} />
 
         {mode === MODE.CLONE && (
           <div>
@@ -146,18 +133,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
               options={Object.values(DOC_TYPE).map((d) => ({ value: d, label: DOC_TYPE_LABELS[d] }))} />
           </div>
         )}
-        {mode === MODE.IMPORT && (
-          <div>
-            <Text type="secondary">Template JSON</Text>
-            <TextArea rows={6} name="importJson" value={json} placeholder='Paste the exported file, starting {"_format":"avarsh.expdoc.template"…'
-              onChange={(e) => setJson(e.target.value)} />
-            {parsed?.error && <Alert type="error" showIcon style={{ marginTop: 8 }} title={parsed.error} />}
-            {parsed && !parsed.error && (
-              <Text type="secondary" style={{ fontSize: 12 }}>{`A ${DOC_TYPE_LABELS[parsed.docType]} layout — it lands as a draft.`}</Text>
-            )}
-          </div>
-        )}
-
         <div>
           <Text type="secondary">Buyer</Text>
           <FormSelect

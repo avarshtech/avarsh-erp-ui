@@ -128,8 +128,6 @@ export const updateTemplate = (...a) => templateStore.updateTemplate(...a);
 export const publishTemplate = (...a) => templateStore.publishTemplate(...a);
 export const retireTemplate = (...a) => templateStore.retireTemplate(...a);
 export const deleteTemplate = (...a) => templateStore.deleteTemplate(...a);
-export const exportTemplateJson = (...a) => templateStore.exportTemplateJson(...a);
-export const importTemplateJson = (...a) => templateStore.importTemplateJson(...a);
 export const compareTemplates = (...a) => templateStore.compareTemplates(...a);
 export const getTemplateSample = (...a) => templateStore.getTemplateSample(...a);
 export const stickerTemplateConflicts = (...a) => templateStore.stickerTemplateConflicts(...a);

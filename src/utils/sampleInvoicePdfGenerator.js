@@ -121,8 +121,7 @@ export const buildSampleInvoiceHtml = (inv, profile) => {
       </td>
       <td colspan="3" style="border:1px solid #333;padding:6px;font-size:10px;text-align:center;vertical-align:top;">
         <em style="font-size:9px;">Signature &amp; Date</em>
-        <br/><br/><br/><strong>For ${esc((profile.companyName || '').toUpperCase())}</strong>
-        <br/><br/><br/>${esc(profile.extra?.signatory || 'Authorised Signatory')}
+        <br/><br/><br/><br/><br/>${esc(profile.extra?.signatory || 'Authorised Signatory')}
       </td>
     </tr>
   </table>

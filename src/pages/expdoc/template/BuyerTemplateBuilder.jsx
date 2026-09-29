@@ -15,13 +15,13 @@ import { TEMPLATE_SOURCE } from '../../../utils/expDocSystemTemplates';
 import { unknownBindingsOf, unboundLabelsOf } from '../../../utils/expDocTemplateSchema';
 import {
   getTemplate, updateTemplate, publishTemplate, retireTemplate, newTemplateVersion,
-  exportTemplateJson, getTemplateSample, listStickerBuyers,
+  getTemplateSample, listStickerBuyers,
 } from '../../../services/expdoc/expDocService';
 import { downloadStoredFile } from '../../../services/core/fileService';
 import AckReasonModal from '../shared/AckReasonModal';
 import useExporterBlock from '../shared/useExporterBlock';
 import TemplateEditor from './editor/TemplateEditor';
-import TplPreviewDrawer from './TplPreviewDrawer';
+import TplPreviewOverlay from './TplPreviewOverlay';
 import TemplateCompareModal from './TemplateCompareModal';
 import TemplateCreateModal from './TemplateCreateModal';
 import useExportBuyers from './useExportBuyers';
@@ -112,16 +112,6 @@ const BuyerTemplateBuilder = () => {
     }
   }, [working, message]);
 
-  const handleExport = useCallback(async () => {
-    try {
-      // Clipboard rather than a download: a support hand-off is a paste more often than a file.
-      await navigator.clipboard.writeText(JSON.stringify(exportTemplateJson(working), null, 2));
-      message.success('Template JSON copied to the clipboard');
-    } catch {
-      message.error('Could not copy the template JSON. Check clipboard permissions.');
-    }
-  }, [working, message]);
-
   const downloadSource = useCallback(() => {
     downloadStoredFile({ fileId: working.sourceFileId, originalFilename: working.sourceFileName })
       .catch(() => message.error('The original document could not be downloaded. It may no longer be in storage.'));
@@ -197,10 +187,9 @@ const BuyerTemplateBuilder = () => {
     if ((working.versions || []).length > 1) {
       list.push(<ActionButton key="cmp" action="history" text="Compare versions" onClick={() => setCompareOpen(true)} />);
     }
-    list.push(<ActionButton key="json" action="custom" text="Copy JSON" onClick={handleExport} />);
     list.push(<ActionButton key="prev" action="print" text="Preview" onClick={openPreview} />);
     return list;
-  }, [working, dirty, saving, canAdd, canUpdate, canPublish, save, run, modal, navigate, handleExport, openPreview]);
+  }, [working, dirty, saving, canAdd, canUpdate, canPublish, save, run, modal, navigate, openPreview]);
 
   if (loadError) {
     return (
@@ -315,7 +304,7 @@ const BuyerTemplateBuilder = () => {
         }}
       />
 
-      <TplPreviewDrawer open={previewOpen} sample={sample} exporter={exporter} onClose={() => setPreviewOpen(false)} />
+      <TplPreviewOverlay open={previewOpen} sample={sample} exporter={exporter} onClose={() => setPreviewOpen(false)} />
       {/* Keyed so it remounts on each open: its lazy version defaults would otherwise be
           whatever the template was at first mount. */}
       <TemplateCompareModal key={`cmp-${working.id}-${compareOpen}`} open={compareOpen} template={working} onCancel={() => setCompareOpen(false)} />

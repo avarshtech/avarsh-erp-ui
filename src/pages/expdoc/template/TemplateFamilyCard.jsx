@@ -1,5 +1,5 @@
 import {
-  Button, Card, Collapse, Space, Tag, Tooltip, Typography,
+  Button, Card, Collapse, Space, Tag, Tooltip, Typography, theme,
 } from 'antd';
 import {
   CopyOutlined, EyeOutlined, FileTextOutlined, EditOutlined, DeleteOutlined,
@@ -21,6 +21,7 @@ const dateOf = (v) => (v ? String(v).slice(0, 10) : null);
 const TemplateFamilyCard = ({
   family, highlighted, canAdd, canDelete, onOpen, onPreview, onCopy, onDelete,
 }) => {
+  const { token } = theme.useToken();
   const { head, active, draft, revisions } = family;
   const older = revisions.filter((r) => r !== active && r !== draft);
 
@@ -28,7 +29,7 @@ const TemplateFamilyCard = ({
     <Card
       size="small"
       data-template-code={head.templateCode}
-      style={{ marginBottom: 12, ...(highlighted ? { boxShadow: '0 0 0 2px var(--ant-color-primary, #1677ff)' } : {}) }}
+      style={{ marginBottom: 12, ...(highlighted ? { boxShadow: `0 0 0 2px ${token.colorPrimary}` } : {}) }}
       title={(
         <Space size={8} wrap>
           <Text strong>{head.name}</Text>

@@ -74,7 +74,7 @@ const InvoiceStepDeclaration = ({ inv, patch, profile, totals, locked }) => {
         <Col span={24}>
           <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 2 }}>Signatory</Text>
           <Input
-            value={`For ${(profile.companyName || '').toUpperCase()} · ${profile.extra?.signatory || 'Authorised Signatory'}`}
+            value={profile.extra?.signatory || 'Authorised Signatory'}
             disabled style={{ backgroundColor: 'var(--bg-tertiary)' }}
           />
         </Col>

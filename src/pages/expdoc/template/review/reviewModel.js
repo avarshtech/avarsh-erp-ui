@@ -1,7 +1,8 @@
 /**
  * The review of an uploaded buyer document, as data: the reader's result turned into
- * editable template drafts, what stops each one from saving, and adding a line the
- * reader did not account for ("possibly missed") to a template.
+ * editable template drafts, what stops each one from saving, and adding a line of the
+ * document the reader did not use to a template. What the review asks the user about
+ * is in attentionModel.
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from '../../../../utils/expDocConstants';
 import { TEMPLATE_SOURCE, completeLayout } from '../../../../utils/expDocSystemTemplates';
@@ -32,13 +33,18 @@ export const draftsFromResult = (result, { buyerId, buyerName, subClientCode } =
 
 const hasAnyColumn = (t) => Boolean(t.columns?.length) || (t.sheets || []).some((s) => s.columns?.length);
 
-/** What stops one document from being saved; empty means it can be. */
+/**
+ * What stops one document from being saved — empty means it can be — each with the
+ * layout editor tab that fixes it.
+ */
 export const blockingIssues = (draft) => {
   const t = draft.template;
   const out = [];
-  if (!String(t.templateCode || '').trim()) out.push('Give it a template code.');
-  if (!String(t.name || '').trim()) out.push('Give it a name.');
-  if (t.docType === DOC_TYPE.PACKING_LIST && !hasAnyColumn(t)) out.push('A packing list needs at least one column.');
+  if (!String(t.name || '').trim()) out.push({ text: 'Give the template a name.', tab: 'identity' });
+  if (!String(t.templateCode || '').trim()) out.push({ text: 'Give the template a code.', tab: 'identity' });
+  if (t.docType === DOC_TYPE.PACKING_LIST && !hasAnyColumn(t)) {
+    out.push({ text: 'A packing list needs at least one table column.', tab: 'columns' });
+  }
   return out;
 };
 
@@ -62,6 +68,14 @@ export const ADD_AS = {
   COLUMN: 'Column',
 };
 
+/** How the review offers each choice, in the user's words rather than the layout's. */
+export const ADD_AS_LABEL = {
+  [ADD_AS.HEADER_FIELD]: 'As a field (a label with a value)',
+  [ADD_AS.TEXT_BLOCK]: 'As a note (the same text on every document)',
+  [ADD_AS.DECLARATION]: 'As a declaration',
+  [ADD_AS.COLUMN]: 'As a table column',
+};
+
 export const addMissedPatch = (template, text, as) => {
   const clean = String(text || '').replace(/[:\s]+$/, '').trim();
   switch (as) {
@@ -83,8 +97,7 @@ export const addMissedPatch = (template, text, as) => {
   }
 };
 
-/** Stable keys for dismissing a finding or a "possibly missed" line on the review page. */
-export const findingKey = (f) => `${f.code}|${f.document ?? ''}|${f.element ?? ''}|${f.message}`;
+/** Stable key for a line of left-over text, so ignoring it holds across documents. */
 export const missedKey = (m) => `missed|${m.location}|${m.text}`;
 
 /** Which "add as" choices make sense for a document type. */

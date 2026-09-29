@@ -1913,3 +1913,25 @@ textarea.ant-input:active {
 .expdoc-row-muted > td {
   opacity: 0.55;
 }
+
+/* Buyer templates — "Bigger view": the printed page alone over the blurred screen. The
+   global modal rules above paint every modal panel, header and body with !important, so
+   this overlay undoes them for itself only, in both themes. Scoped by the modal's class,
+   which also outranks the [data-theme="dark"] rules. */
+.ant-modal.tpl-preview-overlay .ant-modal-container,
+.ant-modal.tpl-preview-overlay .ant-modal-content,
+.ant-modal.tpl-preview-overlay .ant-modal-header,
+.ant-modal.tpl-preview-overlay .ant-modal-body {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.ant-modal.tpl-preview-overlay .ant-modal-header {
+  padding: 0 44px 10px 0 !important;
+  margin: 0 !important;
+}
+.ant-modal.tpl-preview-overlay .ant-modal-body {
+  padding: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+}

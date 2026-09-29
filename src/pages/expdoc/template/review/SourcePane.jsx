@@ -9,14 +9,18 @@ import { parseEvidence } from './sourceRefs';
 const { Text } = Typography;
 
 /**
- * The uploaded document beside the template, so every row can be checked against it:
- * a PDF in the browser's own viewer (opened at the cited page), or the spreadsheet
- * as the reader transcribed it (on the cited sheet, with the cell highlighted).
+ * The uploaded document, so every row can be checked against it: a PDF in the
+ * browser's own viewer (opened at the cited page), or the spreadsheet as the reader
+ * transcribed it (on the cited sheet, with the cell highlighted). With no citation it
+ * opens on `defaultSheet` — the sheet of the document being reviewed.
  */
-const SourcePane = ({ result, fileUrl, fileName, evidence, onAttachFile }) => {
+const SourcePane = ({ result, fileUrl, fileName, evidence, defaultSheet, onAttachFile }) => {
   const target = parseEvidence(evidence);
   const sheets = result?.sheets || [];
-  const [shown, setShown] = useState({ evidence, sheet: target?.sheet || sheets[0]?.name });
+  const [shown, setShown] = useState(() => ({
+    evidence,
+    sheet: target?.sheet || sheets.find((s) => s.name === defaultSheet)?.name || sheets[0]?.name,
+  }));
   // Follow a new citation to its sheet; a tab the user picks stays until the next one.
   if (shown.evidence !== evidence) {
     setShown({ evidence, sheet: (target?.sheet && sheets.some((s) => s.name === target.sheet)) ? target.sheet : shown.sheet });

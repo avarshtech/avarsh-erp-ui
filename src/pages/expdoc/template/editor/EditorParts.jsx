@@ -1,4 +1,6 @@
-import { Button, Space, Tag, Tooltip } from 'antd';
+import {
+  Button, Space, Tag, Tooltip, Typography,
+} from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, WarningOutlined } from '@ant-design/icons';
 
 /** Move / remove buttons for one row of an ordered list. */
@@ -45,7 +47,9 @@ export const EvidenceTag = ({ meta, onEvidence }) => {
             {meta.evidence}
           </Tag>
         )}
-        {notFound && <WarningOutlined style={{ color: '#d48806' }} aria-label="Not found in the document" />}
+        {notFound && (
+          <Typography.Text type="warning"><WarningOutlined aria-label="Not found in the document" /></Typography.Text>
+        )}
       </Space>
     </Tooltip>
   );

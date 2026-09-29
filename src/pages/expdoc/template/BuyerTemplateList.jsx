@@ -12,7 +12,8 @@ import {
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
 import TemplateCreateModal from './TemplateCreateModal';
-import TplPreviewDrawer from './TplPreviewDrawer';
+import NewBuyerTemplateModal from './NewBuyerTemplateModal';
+import TplPreviewOverlay from './TplPreviewOverlay';
 import TemplateBuyerRail from './TemplateBuyerRail';
 import TemplateBuyerPanel from './TemplateBuyerPanel';
 import TemplateUploadModal from './upload/TemplateUploadModal';
@@ -26,7 +27,9 @@ const { Text } = Typography;
  *
  * A buyer's packing list and invoice are uploaded (PDF or Excel) and read into drafts,
  * or built by copying the nearest layout. A buyer may keep several of each — sea and
- * air, one per end customer — and staff pick one when they make a document.
+ * air, one per end customer — and staff pick one when they make a document. A template
+ * for any buyer starts from "New buyer template" in the header; the buyer's own panel
+ * keeps its upload and new-template buttons for the buyer on screen.
  */
 const BuyerTemplateList = () => {
   const navigate = useNavigate();
@@ -40,6 +43,7 @@ const BuyerTemplateList = () => {
   const [conflicts, setConflicts] = useState([]);
   const [createCfg, setCreateCfg] = useState(null);
   const [uploadCfg, setUploadCfg] = useState(null);
+  const [newBuyer, setNewBuyer] = useState({ open: false, seq: 0 });
   const [sample, setSample] = useState(null);
 
   const canAdd = hasPermission(EXPDOC_MODULE.TEMPLATES, 'add');
@@ -92,6 +96,8 @@ const BuyerTemplateList = () => {
     }
   }, [message, selected]);
 
+  const closeNewBuyer = () => setNewBuyer((s) => ({ ...s, open: false }));
+
   const remove = useCallback(async (t) => {
     try {
       await deleteTemplate(t);
@@ -106,7 +112,9 @@ const BuyerTemplateList = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Buyer Document Templates"
-        subtitle="Each buyer's own packing list and invoice layouts — read from the buyer's document or copied from the nearest one"
+        subtitle="The packing list and invoice layouts each buyer wants — made from the buyer's own document, checked by you"
+        onAdd={canAdd ? () => setNewBuyer((s) => ({ open: true, seq: s.seq + 1 })) : undefined}
+        addLabel="New buyer template"
       />
 
       {conflicts.length > 0 && (
@@ -148,6 +156,16 @@ const BuyerTemplateList = () => {
         </Row>
       )}
 
+      <NewBuyerTemplateModal
+        key={`new-buyer-${newBuyer.seq}`}
+        open={newBuyer.open}
+        buyers={buyers}
+        groups={groups}
+        onCancel={closeNewBuyer}
+        onUpload={(buyerId) => { closeNewBuyer(); setUploadCfg({ buyerId }); }}
+        onCopy={(buyerId) => { closeNewBuyer(); setCreateCfg({ source: null, defaultBuyerId: buyerId }); }}
+        onOpenTemplate={(t) => { closeNewBuyer(); open(t); }}
+      />
       <TemplateCreateModal
         open={Boolean(createCfg)}
         source={createCfg?.source || null}
@@ -167,7 +185,7 @@ const BuyerTemplateList = () => {
         onRead={() => { setUploadCfg(null); navigate('/export-docs/templates/import'); }}
         onManual={(buyerId) => setCreateCfg({ source: null, defaultBuyerId: buyerId })}
       />
-      <TplPreviewDrawer open={Boolean(sample)} sample={sample} exporter={exporter} onClose={() => setSample(null)} />
+      <TplPreviewOverlay open={Boolean(sample)} sample={sample} exporter={exporter} onClose={() => setSample(null)} />
     </div>
   );
 };

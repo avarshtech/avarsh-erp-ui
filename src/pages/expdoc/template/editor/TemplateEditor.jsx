@@ -33,13 +33,14 @@ const TAB_LABELS = {
  *
  * Tabs rather than steps, because configuring a layout is not a linear task. `meta`
  * is what the AI reader found for each row (cell or page, confidence, found in the
- * document); `onEvidence` shows a row's place in the uploaded document.
+ * document); `onEvidence` shows a row's place in the uploaded document. `defaultTab`
+ * opens it where a problem is fixed.
  */
 const TemplateEditor = ({
-  tpl, patch, locked, meta, onEvidence, buyers, stickerBuyers, codeEditable = false,
+  tpl, patch, locked, meta, onEvidence, buyers, stickerBuyers, codeEditable = false, defaultTab,
 }) => {
   const tabs = TABS_FOR[tpl.docType] || TABS_FOR[DOC_TYPE.PACKING_LIST];
-  const [tab, setTab] = useState(tabs[0]);
+  const [tab, setTab] = useState(defaultTab || tabs[0]);
   const active = tabs.includes(tab) ? tab : tabs[0];
   const props = { tpl, patch, locked, meta, onEvidence };
 

@@ -8,12 +8,48 @@
  * string that came from a layout — and so possibly from an uploaded document read by
  * the AI — goes through `esc`.
  */
-import { esc, cell } from './printDoc';
+import { esc } from './printDoc';
 import { resolveBinding, formatBound } from './expDocTemplateSchema';
 import { dimensionsLabel } from './expDocCalc';
 
 const num = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+/**
+ * Whether a binding is part of the template rather than a document's data: text fixed
+ * in the layout, the exporter's organisation details, the buyer. Everything else is a
+ * document's own value and carries the `v` class — which a "template only" preview
+ * hides, keeping the page's shape.
+ */
+export const isTemplateBinding = (binding) => typeof binding === 'string'
+  && (binding.startsWith('fixed:') || binding.startsWith('exporter.') || binding.startsWith('buyer.'));
+
+/**
+ * A header value with its label. On one line — "Invoice No. & Date: SAMPLE Dt. 29-Sep"
+ * — wrapping only when the box runs out of room; a value of several lines (an address,
+ * a list of references) keeps them under its label. The label gets one colon. `data`
+ * marks a document's own value (the `v` class).
+ */
+export const labelledValue = (label, value, { bold = false, empty = '&mdash;', data = false } = {}) => {
+  const text = String(value ?? '');
+  const weight = bold ? ' style="font-weight:700;"' : '';
+  const val = data ? 'val v' : 'val';
+  if (text.includes('\n')) {
+    return `<div class="lbl">${esc(label)}</div><div class="${val}"${weight}>${esc(text) || empty}</div>`;
+  }
+  const lbl = /[:：]\s*$/.test(String(label || '')) ? String(label) : `${label}:`;
+  return `<span class="lbl">${esc(lbl)}</span> <span class="${val}"${weight}>${esc(text) || empty}</span>`;
+};
+
+/**
+ * A labelled box of the invoice header grid. Its label and value take their sizes from
+ * the invoice's `.lbl` / `.val` classes — which the template's text sizes set — rather
+ * than the shared printDoc cell's fixed inline sizes, which no template could change.
+ */
+const cell = (label, value, opts = {}) => `
+  <td colspan="${opts.colspan || 1}" style="border:1px solid #333;padding:4px 6px;vertical-align:top;${opts.style || ''}">
+    ${labelledValue(label, value, { bold: opts.bold, data: opts.data })}
+  </td>`;
 
 // ─── Packing list ───────────────────────────────────────────────────────────────
 
@@ -110,11 +146,14 @@ export const totalsListHtml = (pl, totals) => {
     ['TOTAL CBM', `${num(totals.cbm, 3)} M3`],
     ...(dims.length ? [['CARTON DIMENSION', `${dims.join(', ')} CMS`]] : []),
   ];
-  return `<table class="summary" style="width:auto;margin-top:6px;">${items
-    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>:</td><td class="grand">${esc(v)}</td></tr>`).join('')}</table>`;
+  return `<table class="summary cols" style="width:auto;margin-top:6px;">${items
+    .map(([k, v]) => `<tr><td>${esc(k)}</td><td>:</td><td class="grand v">${esc(v)}</td></tr>`).join('')}</table>`;
 };
 
 // ─── Invoice ────────────────────────────────────────────────────────────────────
+
+/** Boxes printing the exporter's organisation details or the buyer's name — the template's, not a document's. */
+const TEMPLATE_BOXES = new Set(['exporter', 'exporterRef', 'otherRefs', 'buyerOther']);
 
 /**
  * The invoice header box printer: the standard box unless the template relabels,
@@ -123,12 +162,13 @@ export const totalsListHtml = (pl, totals) => {
  */
 export const invoiceBoxPrinter = (template, bindCtx) => (key, label, value, opts = {}) => {
   const override = template?.invoiceHeader?.boxes?.[key];
-  if (!override) return cell(label, value, opts);
+  const data = !TEMPLATE_BOXES.has(key) && !isTemplateBinding(override?.binding);
+  if (!override) return cell(label, value, { ...opts, data });
   if (override.hidden) return `<td colspan="${opts.colspan || 1}" style="border:1px solid #333;"></td>`;
   const bound = override.binding
     ? formatBound(resolveBinding(override.binding, bindCtx), { emptyText: '' })
     : value;
-  return cell(override.label ?? label, bound, opts);
+  return cell(override.label ?? label, bound, { ...opts, data });
 };
 
 /** Header values outside the standard boxes, four to a row, under the box grid. */
@@ -138,7 +178,7 @@ export const invoiceExtraFieldsHtml = (template, bindCtx) => {
   const rows = [];
   for (let i = 0; i < fields.length; i += 4) rows.push(fields.slice(i, i + 4));
   return `<table>${rows.map((row) => `<tr>${row.map((f) => cell(
-    f.label, formatBound(resolveBinding(f.binding, bindCtx), { emptyText: '' }),
+    f.label, formatBound(resolveBinding(f.binding, bindCtx), { emptyText: '' }), { data: !isTemplateBinding(f.binding) },
   )).join('')}</tr>`).join('')}</table>`;
 };
 
@@ -160,6 +200,7 @@ export const templateInvoiceColumns = (template) => {
     label: esc(c.label || ''),
     width: c.width ? `${Number(c.width)}px` : undefined,
     align: c.align === 'right' ? 'n' : (c.align === 'center' ? 'c' : undefined),
+    fixed: isTemplateBinding(c.binding),
     firstOnly: DOCUMENT_LEVEL.test(c.binding || ''),
     get: (line, ctx) => formatBound(
       resolveBinding(c.binding, { ...(ctx.bind || {}), line }, { decimals: c.decimals }),

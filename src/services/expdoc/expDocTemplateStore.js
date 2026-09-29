@@ -16,7 +16,6 @@ import {
   SYSTEM_TEMPLATES, isSystemTemplateId, TEMPLATE_SOURCE, pickLayout,
 } from '../../utils/expDocSystemTemplates';
 import { diffTemplates } from '../../utils/expDocTemplateDiff';
-import { toExportEnvelope, parseImportEnvelope } from '../../utils/expDocTemplateTransfer';
 
 const TTL_MS = 60 * 1000;
 let cache = { at: 0, rows: null, pending: null };
@@ -160,20 +159,3 @@ export const retireTemplate = (template, reason) => write(async () => (template.
 export const deleteTemplate = (template) => write(() => (template.source === TEMPLATE_SOURCE.API
   ? api.deleteApiTemplate(template.id)
   : mock.deleteStickerTemplate(template.id)));
-
-export const exportTemplateJson = (template) => toExportEnvelope(template);
-
-/** `identity` names the new template: code, name, and the buyer it belongs to. */
-export const importTemplateJson = (json, identity = {}) => {
-  const parsed = parseImportEnvelope(json);
-  return createTemplate({
-    ...parsed.layout,
-    docType: parsed.docType,
-    stickerLayout: parsed.stickerLayout,
-    templateCode: identity.templateCode || parsed.templateCode,
-    name: identity.name || parsed.name || identity.templateCode || parsed.templateCode,
-    buyerId: identity.buyerId ?? null,
-    buyerCode: identity.buyerCode ?? null,
-    subClientCode: identity.subClientCode ?? parsed.subClientCode ?? null,
-  });
-};

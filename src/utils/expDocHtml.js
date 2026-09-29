@@ -23,28 +23,39 @@ import {
 } from './expDocCalc';
 import {
   textBlocksHtml, groupedHeadRows, sheetSections, blocksOf, blockTitleOf, totalsListHtml,
-  invoiceBoxPrinter, invoiceExtraFieldsHtml, templateInvoiceColumns,
+  invoiceBoxPrinter, invoiceExtraFieldsHtml, templateInvoiceColumns, labelledValue, isTemplateBinding,
 } from './expDocHtmlBlocks';
-import { PACKING_TYPE_LABELS, SECTION_KEY, PAPER_SPECS } from './expDocConstants';
+import {
+  PACKING_TYPE_LABELS, SECTION_KEY, PAPER_SPECS, MIN_TEXT_PT, TEXT_ROLES, docFontStack, mainTextPt, textSizePt,
+} from './expDocConstants';
 import { barcodeSvg } from './barcode1d';
 
 const num = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
-const MASTHEAD_CSS = `
-  .masthead { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-  .masthead td { border: none; padding: 0 8px 0 0; vertical-align: middle; }
-  .masthead td.logo { width: 46px; }
-  .masthead img { width: 42px; height: 42px; object-fit: contain; }
-  .masthead .co { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
-  .masthead .co-sub { font-size: 8px; color: #555; }
+/*
+ * The document's top band (see docHead): the exporter's logo and name on the left, the
+ * document's title and reference on the right. No rule under it — the exporter and
+ * buyer boxes below have borders of their own.
+ */
+const DOC_HEAD_CSS = `
+  table.doc-head { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  .doc-head td { border: none; padding: 0 0 6px; vertical-align: middle; }
+  .doc-head .brand { white-space: nowrap; }
+  .doc-head .brand img { width: 40px; height: 40px; object-fit: contain; vertical-align: middle; margin-right: 10px; }
+  .doc-head .brand-text { display: inline-block; vertical-align: middle; white-space: normal; }
+  .doc-head .co { font-size: 12px; font-weight: 700; letter-spacing: 0.3px; }
+  .doc-head .co-sub { font-size: 8px; color: #555; max-width: 120mm; }
+  .doc-head .co-sub .seg { white-space: nowrap; }
+  .doc-head .doc-title { text-align: right; }
+  .doc-head .doc-title.solo { text-align: left; }
+  .doc-head .t { font-size: 14px; font-weight: 800; letter-spacing: 2px; }
+  .doc-head .ref { font-size: 9px; color: #555; margin-top: 2px; }
 `;
 
 const PL_CSS = `
-  ${MASTHEAD_CSS}
+  ${DOC_HEAD_CSS}
   body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5px; color: #111; padding: 8mm; }
-  h1 { font-size: 14px; margin: 0 0 2px; letter-spacing: 1px; }
-  .sub { font-size: 9px; color: #555; margin-bottom: 8px; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
   th, td { border: 1px solid #333; padding: 3px 5px; }
   th { background: #f0f0f0; font-size: 8px; text-transform: uppercase; letter-spacing: 0.3px; }
@@ -61,24 +72,45 @@ const PL_CSS = `
 `;
 
 /**
- * The exporter masthead, printed when the layout asks for it (`identity.showLogo`).
- *
- * Buyers who supply their own pre-printed stationery turn it off — which is why the
- * switch exists on the template rather than being a global setting.
+ * Whether the document prints the exporter's details in a section of its own: the
+ * invoice's Exporter box (unless the buyer's form hides it), or a packing-list field or
+ * block bound to the exporter.
  */
-const masthead = (template, ctx) => {
-  if (template?.identity?.showLogo === false) return '';
-  const ex = ctx.exporter || {};
-  const lines = String(ex.block || '').split(/\r?\n/).filter(Boolean).join('  ·  ');
-  return `<table class="masthead"><tr>
-    <td class="logo"><img src="${escAttr(exporterLogo)}" alt="" /></td>
-    <td><div class="co">${esc(ex.name || '')}</div><div class="co-sub">${esc(lines)}</div></td>
-  </tr></table>`;
+const hasExporterSection = (template) => {
+  if (template?.docType === 'INVOICE') return !template?.invoiceHeader?.boxes?.exporter?.hidden;
+  return [...(template?.addressBlocks || []), ...(template?.headerFields || [])]
+    .some((f) => String(f?.binding || '').startsWith('exporter.'));
 };
 
 /**
- * Header grid: the template's header fields, three to a row. A labelled field with no
- * data source still prints — its label with an empty value, as the buyer's form has it.
+ * The top of the document as one band: the exporter's logo and name on the left, what
+ * the document is — its title and reference — on the right, level with each other. The
+ * letterhead prints when the layout asks for it (`identity.showLogo`); buyers who supply
+ * pre-printed stationery turn it off, and then only the title and reference print.
+ *
+ * The address, GSTIN and IEC print in the exporter's own section, so the band repeats
+ * them only on a document that has no such section — where it is the one place saying
+ * who shipped the goods. The reference is the document's own data (see `.v`).
+ */
+const docHead = (template, ctx, title, reference) => {
+  const brandOn = template?.identity?.showLogo !== false;
+  const ex = ctx.exporter || {};
+  // The block's first line is the name, printed on its own already. Each line stays
+  // whole ("GSTIN: 27AAB…" never splits); the band wraps only after a separating dot.
+  const lines = brandOn && !hasExporterSection(template)
+    ? String(ex.block || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(1)
+    : [];
+  const details = lines.map((l, i) => `<span class="seg">${esc(l)}${i < lines.length - 1 ? '&nbsp;&middot;' : ''}</span>`).join(' ');
+  const brand = brandOn ? `<td class="brand"><img src="${escAttr(exporterLogo)}" alt="" /><div class="brand-text">
+      <div class="co">${esc(ex.name || '')}</div>${details ? `<div class="co-sub">${details}</div>` : ''}</div></td>` : '';
+  return `<table class="doc-head"><tr>${brand}<td class="doc-title${brandOn ? '' : ' solo'}">
+      <div class="t">${esc(title)}</div>${reference ? `<div class="ref v">${esc(reference)}</div>` : ''}</td></tr></table>`;
+};
+
+/**
+ * Header grid: the template's header fields, three to a row, each label and value on
+ * one line. A labelled field with no data source still prints — its label with an
+ * empty value, as the buyer's form has it.
  */
 const headerGrid = (template, ctx) => {
   const fields = (template?.headerFields || []).filter((f) => f.binding || f.fixedValue || f.label);
@@ -88,7 +120,8 @@ const headerGrid = (template, ctx) => {
   return `<table class="hdr">${rows.map((row) => `<tr>${row
     .map((f) => {
       const raw = f.fixedValue ?? resolveBinding(f.binding, ctx);
-      return `<td style="width:33.3%"><div class="lbl">${esc(f.label)}</div><div class="val">${esc(formatBound(raw, { emptyText: '—' }))}</div></td>`;
+      const data = f.fixedValue == null && !isTemplateBinding(f.binding);
+      return `<td style="width:33.3%">${labelledValue(f.label, formatBound(raw, { emptyText: '—' }), { data })}</td>`;
     })
     .join('')}${row.length < 3 ? '<td></td>'.repeat(3 - row.length) : ''}</tr>`).join('')}</table>`;
 };
@@ -98,7 +131,8 @@ const addressBlocks = (template, ctx) => {
   const blocks = template?.addressBlocks || [];
   if (!blocks.length) return '';
   return `<table class="hdr"><tr>${blocks
-    .map((b) => `<td style="width:${(100 / blocks.length).toFixed(1)}%"><div class="lbl">${esc(b.label)}</div><div class="val">${esc(resolveBinding(b.binding, ctx) || '—')}</div></td>`)
+    .map((b) => `<td style="width:${(100 / blocks.length).toFixed(1)}%"><div class="lbl">${esc(b.label)}</div><div class="${
+      isTemplateBinding(b.binding) ? 'val' : 'val v'}">${esc(resolveBinding(b.binding, ctx) || '—')}</div></td>`)
     .join('')}</tr></table>`;
 };
 
@@ -133,9 +167,16 @@ const cellValue = (col, row) => {
 
 const alignClass = (col) => (col.align === 'right' ? ' class="n"' : col.align === 'center' ? ' class="c"' : '');
 
+/** A data cell's classes: its alignment, and `v` unless the column prints the template's own text. */
+const valueClass = (col) => {
+  const names = [col.align === 'right' ? 'n' : (col.align === 'center' ? 'c' : ''), isTemplateBinding(col.binding) ? '' : 'v'];
+  const joined = names.filter(Boolean).join(' ');
+  return joined ? ` class="${joined}"` : '';
+};
+
 /** One carton row, and a mixed carton's colour sub-row. */
 const rowHtml = (row, spec) => {
-  const main = `<tr>${spec.map((c) => `<td${alignClass(c)}>${esc(cellValue(c, row))}</td>`).join('')}</tr>`;
+  const main = `<tr>${spec.map((c) => `<td${valueClass(c)}>${esc(cellValue(c, row))}</td>`).join('')}</tr>`;
   // A mixed carton's colours cannot fit one line, so they follow as a sub-row —
   // the same shape the buyer's own workbook uses.
   if (!row.mixedRows?.length) return main;
@@ -146,7 +187,7 @@ const rowHtml = (row, spec) => {
       return `${mr.colorName || '—'} — ${sizes}`;
     })
     .join(' | ');
-  return `${main}<tr><td colspan="${spec.length}" style="font-size:8px;color:#444;padding-left:14px;">${esc(colours)}</td></tr>`;
+  return `${main}<tr><td colspan="${spec.length}" class="colours v" style="color:#444;padding-left:14px;">${esc(colours)}</td></tr>`;
 };
 
 /**
@@ -156,15 +197,15 @@ const rowHtml = (row, spec) => {
  */
 const totalRowHtml = (spec, totals, label) => {
   const has = (binding) => spec.some((c) => c.binding === binding);
-  const n3 = (v) => `<td class="n">${num(v, 3)}</td>`;
+  const n3 = (v) => `<td class="n v">${num(v, 3)}</td>`;
   return `<tr class="total">${spec.map((c, i) => {
     if (i === 0) return `<td>${label}</td>`;
-    if (c.binding === 'row.cartonCount') return `<td class="n">${num(totals.cartons)}</td>`;
+    if (c.binding === 'row.cartonCount') return `<td class="n v">${num(totals.cartons)}</td>`;
     if (c.isSizeColumn) {
       if (c.sizeValue === 'RATIO') return '<td></td>';
-      return `<td class="n">${totals.sizeQty?.[c.size] ? num(totals.sizeQty[c.size]) : ''}</td>`;
+      return `<td class="n v">${totals.sizeQty?.[c.size] ? num(totals.sizeQty[c.size]) : ''}</td>`;
     }
-    if (c.binding === 'calc.totalPieces') return `<td class="n">${num(totals.pieces)}</td>`;
+    if (c.binding === 'calc.totalPieces') return `<td class="n v">${num(totals.pieces)}</td>`;
     if (c.binding === 'row.netWeightKg') return has('calc.totalNetWeightKg') ? '<td></td>' : n3(totals.netWeightKg);
     if (c.binding === 'calc.totalNetWeightKg') return n3(totals.netWeightKg);
     if (c.binding === 'row.grossWeightKg') return has('calc.totalGrossWeightKg') ? '<td></td>' : n3(totals.grossWeightKg);
@@ -190,7 +231,7 @@ const sectionTable = (section, spec, title, sheet = {}) => {
     || `<tr>${spec.map((c) => `<th${alignClass(c)}>${esc(c.label)}</th>`).join('')}</tr>`;
 
   const body = sheet.blockBy?.length
-    ? blocksOf(section.rows, sheet.blockBy).map((rows) => `<tr><td colspan="${spec.length}" style="font-weight:700;background:#f7f7f7;">${
+    ? blocksOf(section.rows, sheet.blockBy).map((rows) => `<tr><td colspan="${spec.length}" class="v" style="font-weight:700;background:#f7f7f7;">${
       esc(blockTitleOf(sheet, rows[0]))}</td></tr>${rows.map((row) => rowHtml(row, spec)).join('')}${
       sheet.blockTotals === false ? '' : totalRowHtml(spec, sectionTotals(rows), 'Subtotal')}`).join('')
     : (section.rows || []).map((row) => rowHtml(row, spec)).join('');
@@ -198,7 +239,7 @@ const sectionTable = (section, spec, title, sheet = {}) => {
   const totalRow = totalRowHtml(spec, totals, 'Total');
 
   return `<div class="section-title">${esc(title)}</div>
-    <table>${cols}${head}${body}${totalRow}</table>`;
+    <table class="cols">${cols}${head}${body}${totalRow}</table>`;
 };
 
 /** A summary sheet with no `blocks` list is the original full summary. */
@@ -218,20 +259,20 @@ const summaryBlock = (pl, template, blocks) => {
   });
   const dp = template?.formatting?.weightPerPieceDecimals ?? 5;
 
-  const grand = !want.has('GRAND_TOTAL') && !want.has('WEIGHT_PER_PIECE') ? '' : `<table class="summary">
+  const grand = !want.has('GRAND_TOTAL') && !want.has('WEIGHT_PER_PIECE') ? '' : `<table class="summary cols">
     <tr>
-      <td>Total cartons</td><td class="grand">${num(totals.cartons)}</td>
-      <td>Total pieces</td><td class="grand">${num(totals.pieces)}</td>
-      <td>Carton numbers</td><td class="grand">${esc(formatRanges((pl.sections || []).flatMap((s) => (s.rows || []).map((r) => ({ from: r.cartonFrom, to: r.cartonTo })))))}</td>
+      <td>Total cartons</td><td class="grand v">${num(totals.cartons)}</td>
+      <td>Total pieces</td><td class="grand v">${num(totals.pieces)}</td>
+      <td>Carton numbers</td><td class="grand v">${esc(formatRanges((pl.sections || []).flatMap((s) => (s.rows || []).map((r) => ({ from: r.cartonFrom, to: r.cartonTo })))))}</td>
     </tr>
     <tr>
-      <td>Net weight (kg)</td><td class="grand">${num(totals.netWeightKg, 3)}</td>
-      <td>Gross weight (kg)</td><td class="grand">${num(totals.grossWeightKg, 3)}</td>
-      <td>CBM</td><td class="grand">${num(totals.cbm, 3)}</td>
+      <td>Net weight (kg)</td><td class="grand v">${num(totals.netWeightKg, 3)}</td>
+      <td>Gross weight (kg)</td><td class="grand v">${num(totals.grossWeightKg, 3)}</td>
+      <td>CBM</td><td class="grand v">${num(totals.cbm, 3)}</td>
     </tr>
     <tr>
-      <td>Net / piece (kg)</td><td class="grand">${wpp.netPerPiece.toFixed(dp)}</td>
-      <td>Gross / piece (kg)</td><td class="grand">${wpp.grossPerPiece.toFixed(dp)}</td>
+      <td>Net / piece (kg)</td><td class="grand v">${wpp.netPerPiece.toFixed(dp)}</td>
+      <td>Gross / piece (kg)</td><td class="grand v">${wpp.grossPerPiece.toFixed(dp)}</td>
       <td></td><td></td>
     </tr>
   </table>`;
@@ -243,9 +284,9 @@ const summaryBlock = (pl, template, blocks) => {
   }
 
   const rows = variance.map((v) => `<tr>
-      <td>${esc(v.styleNo)}</td><td>${esc(v.colorName)}</td><td class="c">${esc(v.size)}</td>
-      <td class="n">${num(v.orderQty)}</td><td class="n">${num(v.shippedQty)}</td>
-      <td class="n">${v.variance ? (v.variance > 0 ? `+${num(v.variance)}` : num(v.variance)) : '—'}</td>
+      <td class="v">${esc(v.styleNo)}</td><td class="v">${esc(v.colorName)}</td><td class="c v">${esc(v.size)}</td>
+      <td class="n v">${num(v.orderQty)}</td><td class="n v">${num(v.shippedQty)}</td>
+      <td class="n v">${v.variance ? (v.variance > 0 ? `+${num(v.variance)}` : num(v.variance)) : '—'}</td>
     </tr>`).join('');
   const tot = variance.reduce((a, v) => ({
     o: a.o + v.orderQty, s: a.s + v.shippedQty, d: a.d + v.variance,
@@ -253,10 +294,10 @@ const summaryBlock = (pl, template, blocks) => {
 
   return `${grand}
     <div class="section-title">Order vs shipped</div>
-    <table>
+    <table class="cols">
       <tr><th>Style</th><th>Colour</th><th class="c">Size</th><th class="n">Order qty</th><th class="n">Shipped qty</th><th class="n">Excess / shortage</th></tr>
       ${rows}
-      <tr class="total"><td colspan="3">Total</td><td class="n">${num(tot.o)}</td><td class="n">${num(tot.s)}</td><td class="n">${tot.d > 0 ? `+${num(tot.d)}` : num(tot.d)}</td></tr>
+      <tr class="total"><td colspan="3">Total</td><td class="n v">${num(tot.o)}</td><td class="n v">${num(tot.s)}</td><td class="n v">${tot.d > 0 ? `+${num(tot.d)}` : num(tot.d)}</td></tr>
     </table>${list}`;
 };
 
@@ -288,14 +329,67 @@ const pageBox = (identity, fallbackLandscape) => {
 };
 
 /**
+ * The page a packing-list or invoice template prints on, in millimetres — the same box
+ * the builders below use, so a preview can show the page at its real proportions. A
+ * packing list defaults to landscape, an invoice to portrait.
+ */
+export const templatePageMm = (template) => pageBox(template?.identity, template?.docType === 'PACKING_LIST');
+
+/**
  * The template's own typography. A layout that could set a font and a size but
  * printed Arial 8.5px regardless made the builder's Formatting tab a decoration.
+ * A font from the formatting list prints with its own fallbacks (a serif falls back
+ * to a serif); any other name is cleaned and falls back to a sans-serif.
  */
-const fontCss = (formatting, defaultPt) => {
+const fontCss = (formatting, docType) => {
   const family = formatting?.font || 'Arial';
-  const pt = Number(formatting?.baseFontPt) || defaultPt;
-  return `body { font-family: ${String(family).replace(/[^\w \-,]/g, '')}, Helvetica, sans-serif; font-size: ${pt}pt; }`;
+  const stack = docFontStack(family) || `${String(family).replace(/[^\w \-,]/g, '')}, Helvetica, sans-serif`;
+  const pt = Math.max(MIN_TEXT_PT, mainTextPt(formatting, docType));
+  return `body { font-family: ${stack}; font-size: ${pt}pt; }`;
 };
+
+/** Where each kind of text (TEXT_ROLES) sits in a printed packing list. */
+const PL_TEXT = {
+  title: '.doc-head .t',
+  company: '.doc-head .co',
+  section: '.doc-head .ref, .section-title, .summary td, .grand',
+  heading: 'th',
+  value: '.hdr .val',
+  label: '.hdr .lbl',
+  note: '.note, .doc-head .co-sub, td.colours',
+};
+
+/** Where each kind of text sits in a printed invoice. */
+const INV_TEXT = {
+  title: '.doc-head .t, .title span',
+  company: '.doc-head .co',
+  heading: 'th',
+  value: '.val',
+  label: '.lbl',
+  note: '.muted, .doc-head .co-sub, td.foot',
+};
+
+/**
+ * The cells of the column tables (`table.cols`) — packing-list sections and summary
+ * sheets, the invoice's goods lines and annexes — are centred, headings, figures and
+ * text alike, as the export team asked. The header and parties boxes keep their left
+ * alignment, and so does the invoice's bank and declaration panel, which is running
+ * text. Placed after the fixed stylesheet, so it wins over the column alignments.
+ */
+const COLUMN_CELLS_CSS = `
+  table.cols th, table.cols td { text-align: center; vertical-align: middle; }
+  table.cols td.foot { text-align: left; vertical-align: top; }
+`;
+
+/**
+ * Every kind of text at the size the template gives it (see TEXT_ROLES) — after the
+ * fixed stylesheet, so these win. Before this only the main text followed the
+ * template, and labels, headings and notes stayed at 6pt or less on paper.
+ */
+const textCss = (formatting, docType, selectors) => TEXT_ROLES
+  .filter((role) => selectors[role.key])
+  .map((role) => `${selectors[role.key]} { font-size: ${textSizePt(formatting, role, docType)}pt; }`)
+  .join('\n');
 
 /**
  * A date in the template's configured format. Only the three tokens the seeded
@@ -363,11 +457,10 @@ export const buildPackingListHtml = (pl, options = {}) => {
   const summarySheet = (template.sheets || []).find((s) => s.type === 'SUMMARY');
   const wantsSummary = Boolean(summarySheet);
 
+  const reference = `${[source.plNo, source.buyerName, source.shipmentNo].filter(Boolean).join('  ·  ')}${
+    source.revision ? `  ·  Revision ${source.revision}` : ''}`;
   const body = `
-    ${masthead(template, ctx)}
-    <h1>${esc(template.identity?.titleText || 'PACKING LIST')}</h1>
-    <div class="sub">${esc([source.plNo, source.buyerName, source.shipmentNo].filter(Boolean).join('  ·  '))}${
-  source.revision ? esc(`  ·  Revision ${source.revision}`) : ''}</div>${textBlocksHtml(template, 'HEADER')}
+    ${docHead(template, ctx, template.identity?.titleText || 'PACKING LIST', reference)}${textBlocksHtml(template, 'HEADER')}
     ${addressBlocks(template, ctx)}
     ${headerGrid(template, ctx)}${textBlocksHtml(template, 'BEFORE_TABLE')}
     ${sheets}${textBlocksHtml(template, 'AFTER_TABLE')}
@@ -382,7 +475,8 @@ export const buildPackingListHtml = (pl, options = {}) => {
 
   return documentShell({
     title: options.fileName || `${source.plNo} — Packing List`,
-    bodyCss: `${pageCss(pageBox(template.identity, true))}${PL_CSS}${fontCss(template.formatting, 8.5)}`,
+    bodyCss: `${pageCss(pageBox(template.identity, true))}${PL_CSS}${fontCss(template.formatting, 'PACKING_LIST')}${
+      textCss(template.formatting, 'PACKING_LIST', PL_TEXT)}${COLUMN_CELLS_CSS}`,
     watermark: band,
     draft,
     body,
@@ -571,7 +665,7 @@ export const stickerCounts = (cartonCount, layout, paper, faceKeys) => {
 // ─── Commercial / export invoice (PRD §8) ───────────────────────────────────────
 
 const INV_CSS = `
-  ${MASTHEAD_CSS}
+  ${DOC_HEAD_CSS}
   body { font-family: Arial, Helvetica, sans-serif; font-size: 10px; color: #111; padding: 8mm; }
   table { width: 100%; border-collapse: collapse; }
   td, th { border: 1px solid #333; padding: 4px 6px; vertical-align: top; }
@@ -664,6 +758,8 @@ const invoiceColumns = (grainMode, template, currency, unit, { standard = false 
 const lineRows = (lines, columns, ctx) => lines.map((line, i) => `<tr>${columns.map((col) => {
   // A per-document value (marks, package count) prints once, against the first line.
   if (col.firstOnly && i > 0) return `<td class="${col.align || ''}"></td>`;
+  // A column the template fixes prints its own text; any other is the invoice's data (`v`).
+  const cls = [col.align, col.fixed ? '' : 'v'].filter(Boolean).join(' ');
   const value = col.get(line, ctx);
   // A template whose descriptionTemplate already names the composition must not have
   // it repeated underneath — the JOMO layout does exactly that.
@@ -671,14 +767,14 @@ const lineRows = (lines, columns, ctx) => lines.map((line, i) => `<tr>${columns.
   const sub = rawSub && String(value ?? '').includes(rawSub) ? null : rawSub;
   const body = `${col.strong ? `<strong>${esc(value)}</strong>` : esc(value)}${
     sub ? `<br/><span class="muted">${esc(sub)}</span>` : ''}`;
-  return `<td class="${col.align || ''}">${esc(value) === '' && !sub ? '' : body}</td>`;
+  return `<td class="${cls}">${esc(value) === '' && !sub ? '' : body}</td>`;
 }).join('')}</tr>`).join('');
 
 /** A charge or discount, printed as its own line (§8.4). */
 const chargeRow = (label, value, span, currency, negative = false) => (value
   ? `<tr>
       <td colspan="${span}" class="n">${esc(label)}</td>
-      <td class="n">${negative ? '-' : ''}${money(value, 2)}</td>
+      <td class="n v">${negative ? '-' : ''}${money(value, 2)}</td>
     </tr>`
   : '');
 
@@ -798,24 +894,24 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
   const igstBlockHtml = igst && template.igst?.enabled !== false ? `
     <tr>
       <td colspan="${span - 1}" class="n">Exchange rate (1 ${esc(currency)} = INR)</td>
-      <td class="n">${money(igst.fxRate, 2)}</td>
+      <td class="n v">${money(igst.fxRate, 2)}</td>
     </tr>
     <tr>
       <td colspan="${span - 1}" class="n">Taxable value (INR)</td>
-      <td class="n">${money(igst.taxableInr, 2)}</td>
+      <td class="n v">${money(igst.taxableInr, 2)}</td>
     </tr>
     <tr>
       <td colspan="${span - 1}" class="n">${esc(`IGST @ ${igst.igstRatePct}%`)} (INR)</td>
-      <td class="n">${money(igst.igstValue, 2)}</td>
+      <td class="n v">${money(igst.igstValue, 2)}</td>
     </tr>
     <tr class="b">
       <td colspan="${span - 1}" class="n">Total taxable value (INR)</td>
-      <td class="n">${money(igst.totalTaxableInr, 2)}</td>
+      <td class="n v">${money(igst.totalTaxableInr, 2)}</td>
     </tr>` : '';
 
   const plBlock = `
     <tr>
-      <td colspan="${span}" class="muted">
+      <td colspan="${span}" class="muted v">
         ${esc([
     `Cartons: ${int(plTotals.cartons)}`,
     `Total pieces: ${int(plTotals.pieces)}`,
@@ -847,14 +943,14 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
       return `
   <div class="annexe">
     <div class="title"><span>${esc(a.title)}</span></div>
-    <table>
+    <table class="cols">
       <tr>${cols.map((c) => `<th${c.width ? ` style="width:${c.width}"` : ''} class="${c.align === 'n' ? 'n' : 'c'}">${c.label}</th>`).join('')}</tr>
       ${lineRows(a.lines, cols, ctx)}
       <tr class="b">
         <td colspan="${cols.length - 3}" class="n">Total</td>
-        <td class="n">${int(qty)} ${esc(unit)}</td>
+        <td class="n v">${int(qty)} ${esc(unit)}</td>
         <td></td>
-        <td class="n">${money(amount, 2)}</td>
+        <td class="n v">${money(amount, 2)}</td>
       </tr>
     </table>
   </div>`;
@@ -862,17 +958,19 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     .join('');
 
   const body = `
-  ${masthead(template, ctx)}
-  <div class="title"><span>${esc(template.identity?.titleText || 'COMMERCIAL INVOICE')}</span></div>${textBlocksHtml(template, 'HEADER')}
+  ${template.identity?.showLogo === false
+    // Pre-printed stationery carries the letterhead: the title keeps its box on the grid.
+    ? `<div class="title"><span>${esc(template.identity?.titleText || 'COMMERCIAL INVOICE')}</span></div>`
+    : docHead(template, ctx, template.identity?.titleText || 'COMMERCIAL INVOICE', null)}${textBlocksHtml(template, 'HEADER')}
   ${headerTable}${invoiceExtraFieldsHtml(template, bindCtx)}${textBlocksHtml(template, 'BEFORE_TABLE')}
-  <table>
+  <table class="cols">
     <tr>${columns.map((c) => `<th${c.width ? ` style="width:${c.width}"` : ''} class="${c.align === 'n' ? 'n' : 'c'}">${c.label}</th>`).join('')}</tr>
     ${lineRows(lines, columns, ctx)}
     <tr class="b">
       <td colspan="${span - 3}" class="n">Total</td>
-      <td class="n">${int(totals.quantity)} ${esc(unit)}</td>
+      <td class="n v">${int(totals.quantity)} ${esc(unit)}</td>
       <td></td>
-      <td class="n">${money(totals.linesTotal, 2)}</td>
+      <td class="n v">${money(totals.linesTotal, 2)}</td>
     </tr>
     ${chargeRow(totals.discountPercent ? `Less: Discount @ ${totals.discountPercent}%` : 'Less: Discount', totals.discount, span - 1, currency, true)}
     ${chargeRow('Add: Freight', totals.freight, span - 1, currency)}
@@ -880,15 +978,15 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     ${chargeRow('Add: Other charges', totals.other, span - 1, currency)}
     <tr class="b">
       <td colspan="${span - 1}" class="n">${esc(`Total ${currency}`)}</td>
-      <td class="n">${money(totals.netTotal, 2)}</td>
+      <td class="n v">${money(totals.netTotal, 2)}</td>
     </tr>
     <tr>
-      <td colspan="${span}" class="b">AMOUNT ${esc(amountInWords(totals.netTotal, currency))}</td>
+      <td colspan="${span}" class="b v">AMOUNT ${esc(amountInWords(totals.netTotal, currency))}</td>
     </tr>
     ${igstBlockHtml}
     ${plBlock}
     <tr>
-      <td colspan="${Math.max(1, span - 2)}" style="font-size:9.5px;">
+      <td colspan="${Math.max(1, span - 2)}" class="foot">
         ${template.bankBlock === false ? '' : `<em>Our Bankers</em><br/>${esc(exporter.bankBlock || '')}<br/><br/>`}
         ${ediBlock(template, exporter)}
         <strong>Declaration:</strong><br/>
@@ -896,8 +994,7 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
       </td>
       <td colspan="2" class="c">
         <em class="muted">Signature &amp; Date</em>
-        <br/><br/><br/><strong>For ${esc(String(exporter.name || '').toUpperCase())}</strong>
-        <br/><br/><br/>${esc(exporter.signatory || 'Authorised Signatory')}
+        <br/><br/><br/><br/><br/>${esc(exporter.signatory || 'Authorised Signatory')}
       </td>
     </tr>
   </table>${textBlocksHtml(template, 'AFTER_TABLE')}
@@ -910,7 +1007,8 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
 
   return documentShell({
     title: options.fileName || `${source.invoiceNo || source.provisionalNo || 'DRAFT'} — Commercial Invoice`,
-    bodyCss: `${pageCss(pageBox(template.identity, false))}${INV_CSS}${fontCss(template.formatting, 10)}`,
+    bodyCss: `${pageCss(pageBox(template.identity, false))}${INV_CSS}${fontCss(template.formatting, 'INVOICE')}${
+      textCss(template.formatting, 'INVOICE', INV_TEXT)}${COLUMN_CELLS_CSS}`,
     watermark: band,
     draft,
     body,
