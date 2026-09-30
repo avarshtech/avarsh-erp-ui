@@ -14,7 +14,6 @@ function MasterGenieBridge({ item, items, select, screen }) {
     storageKey: 'master', // one conversation across the masters
     blockers: [],
     starters: mastersStarters(item.key),
-    dock: 'left', // the form Laya AI fills is on the right
   }), [item.key, item.label]);
 
   useGenieScreen(view, {

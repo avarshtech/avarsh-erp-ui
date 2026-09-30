@@ -81,12 +81,16 @@
   transition: transform 0.1s linear;
 }
 
-/* A screen whose working area is on the right (Master Data's form) docks the chat on the left. */
-@media (min-width: 576px) {
-  .genie-panel.dock-left {
-    right: auto;
-    left: 24px;
-  }
+/* The header is the handle for dragging the chat; minimised, only the header shows. */
+.genie-drag {
+  width: 100%;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+}
+
+.genie-panel.is-minimized {
+  height: auto;
 }
 
 @media (max-width: 575px) {
