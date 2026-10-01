@@ -7,6 +7,7 @@
 4. [Search & Filter Patterns](#search--filter-patterns)
 5. [Aggregation Strategy](#aggregation-strategy)
 6. [Rounding & Precision Rules](#rounding--precision-rules)
+7. [Stock & Payroll Posting Rules](#stock--payroll-posting-rules)
 
 ---
 
@@ -474,3 +475,40 @@ totalPrice (INR)     = computed in INR
 finalPrice (quote)   = totalPrice / quoteCurrencyRate
 finalPriceUsd (USD)  = totalPrice / usdToInrRate
 ```
+
+---
+
+## Stock & Payroll Posting Rules
+
+Verified against erp-purchase on 2026-10-02 (review findings F001–F004). Each rule replaced a
+version that posted the wrong quantity or amount.
+
+### QC is per GRN line
+- A QC inspects one GRN line (`inventory/qc/domain/QC.poLineItemId`). `StockPopulationService.populateFromQc`
+  materialises stock for that line only. An older QC with no line still covers the whole GRN.
+- A GRN closes only when every line that received goods (`receivingQty > 0`, with a
+  `poLineItemId`) has a settled QC: Approved, Conditional_Pass or Rejected_With_Backup. The
+  check is `inventory/grn/service/GrnInspection.complete(lines, qcs)`, called through
+  `GRNService.closeIfFullyInspected(grnId)`. Never close a GRN because one QC was approved.
+
+### Returns to supplier (accessories)
+- One pending row and one return line per QC, at the QC's received quantity, counted once
+  (`ReturnToSupplierService.onePerQc`). Returning it settles every PENDING_RETURN criterion of
+  that QC. Never add up a quantity per failed criterion: the supplier was debited once per criterion.
+
+### Opening stock (accessories)
+- Opening lots merge on branch, item, variant, size and colour. The lookup is
+  `AccessoriesStockRepository.findOpeningVariantForUpdate(branchId, itemId, variantId, size, color)`,
+  null-safe on branch and variant. The partial unique index is `uq_acc_stock_opening_variant`
+  `WHERE source_type = 'OPENING_BALANCE'`. A key without the branch put a second branch's
+  opening line into the first branch's lot.
+
+### Payroll approval posts by run
+- Processing writes one `LoanRecovery` per instalment it actually took (with `payrollRunId`;
+  re-processing deletes that run's rows first). It also writes the advance amount taken on the
+  salary record, capped so the net salary never goes negative.
+- Approval posts exactly that (`hr/service/PayrollRecoveries`):
+  - Each loan is reduced by its own recovery row of the run (`loanRecoveryRepository.findByPayrollRunId`). A zero balance makes it FULLY_RECOVERED.
+  - The advance amount taken is shared over the advances due that month, oldest first. A fully recovered advance is RECOVERED. Any other advance stays PENDING with the rest owed and moves to the next month (December moves to January of the next year).
+- Never post "the latest recovery of the loan", and never mark an advance recovered without the
+  amount the payslip took.

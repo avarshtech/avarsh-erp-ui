@@ -180,16 +180,27 @@ Style → BOM → Costing → Order (CONFIRMED) → PO → GRN → Production �
 
 ### Implementation Pattern
 
+A save may only edit a document and submit it. Every other status change has its own action
+endpoint (approve, reject, refer back, cancel) or is set by a downstream receipt. The statuses a
+save may move between are a `shared/state/Transitions` table; `check` throws a 409
+`INVALID_STATUS_TRANSITION` with `from`, `to` and `allowed` in its details.
+
 ```java
-// In saveOrUpdatePO():
-if (isUpdate) {
-    POStatus currentStatus = po.getStatus();
-    if (currentStatus != POStatus.Draft && currentStatus != POStatus.Referred_Back) {
-        throw new IllegalStateException(
-            "Cannot edit PO in status: " + currentStatus + ". Refer back the PO to make changes.");
-    }
-}
+// PurchaseOrderService (erp-purchase, 2026-10-02)
+private static final Transitions<POStatus> SAVE_FLOW = Transitions.of(POStatus.class, "purchase order")
+        .from(POStatus.Draft).to(POStatus.Draft, POStatus.Pending_Approval)
+        .from(POStatus.Referred_Back).to(POStatus.Referred_Back, POStatus.Draft, POStatus.Pending_Approval)
+        .from(POStatus.Rejected).to(POStatus.Rejected, POStatus.Draft, POStatus.Pending_Approval)
+        .build();
+
+// In saveOrUpdatePO(): a new PO is Draft or Pending_Approval; an editable PO goes through
+// SAVE_FLOW.check(current, requested); a locked PO saved with its own status keeps the old
+// "Cannot edit PO in status ..." message; any other change is INVALID_STATUS_TRANSITION.
 ```
+
+A save that accepted any status let a client create a PO as Sent_To_Supplier, or mark one
+received, without an approval (review F005, F010). New lifecycles follow the same shape: one
+`Transitions` table per status enum, and no status taken from a save payload unchecked.
 
 ### Edit Protection by Entity
 
@@ -198,7 +209,7 @@ if (isUpdate) {
 | **Order** | DRAFT, REFERRED_BACK | CONFIRMED and beyond | Refer Back workflow |
 | **BOM** | DRAFT, CREATED (general info + non-PO lines) | PO-generated lines locked always | Cancel/amend the PO first |
 | **CostSheet** | Draft only | Submitted, Approved, Closed | Version history (create new version) |
-| **PO** | Draft, Referred_Back | Approved and beyond | Refer Back workflow |
+| **PO** | Draft, Referred_Back, Rejected (a save may also submit it: Pending_Approval) | Pending_Approval, Approved and beyond | Refer Back workflow |
 | **Master Data** | Always editable | Never locked for edit | N/A (delete blocked by FK) |
 
 ---

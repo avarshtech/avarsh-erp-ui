@@ -280,7 +280,7 @@ When entering plan mode, present this structure:
 | Anything touching a shared seam (permission key, route, StoreContext key, status/enum, DTO field, event, migration, shared component) | `references/impact-map.md` |
 | Approval flows, delete protection, FK vs snapshot rules | `references/referential-integrity-patterns.md` |
 | Performance, caching, N+1 | `references/performance-patterns.md` |
-| BOM / costing formulas | `references/domain-algorithms.md` |
+| BOM / costing formulas; how QC, returns, opening stock and payroll approval post quantities and amounts | `references/domain-algorithms.md` |
 | UI ↔ API field/endpoint mapping (partial: 29 UI-service rows against 104 services / 142 controllers on 2026-09-24 — grep the controller when a module is missing) | `references/api-contracts.md` |
 | Ant Design 6 deprecated props (transcribed from the installed antd) | `references/antd6-deprecations.md` |
 | Migration conventions | `erp-purchase/src/main/resources/db/migration/README.md` |
@@ -428,6 +428,7 @@ Implemented in `src/utils/statusConfig.js`; new statuses go there, not into scre
 - No test, debug or mock endpoints in shipped controllers: delete them rather than guard them (2026-10-01 removed `/whatsapp/test/*`, `/files/test/upload`, `/files/status`, `/ai/test-extract-raw`, `/grns/{id}/close-on-qc-approval`)
 - A setting that is safe only outside production (a debug toggle, a dev-only endpoint) goes into `config/ProductionSafetyCheck` too: the `prod` profile reports it at startup, and refuses to start with it once `erp.production-check.fail-fast=true` (go-live)
 - Logging: no controller echo logs (`log.info("GET /api/v1/...")`) — `AccessLogFilter` already records method, route, status and duration, and Cloud Run records every request. `userId`, `branchId` and `client` reach every line through `shared/logging/LogContext` (set by `JwtAuthenticationFilter`, `BranchContextInterceptor`, `AccessLogFilter`). Log an exception once, where it is handled: 5xx at ERROR with the exception, 4xx at WARN without a stack
+- Health: Cloud Run probes `/actuator/health/liveness` and `/actuator/health/readiness` (readiness includes the database); only `health` and `info` are exposed. `/api/v1/system/**` stays for the mobile app's pre-login checks. Actuator registers a second `RequestMappingHandlerMapping`, so inject the application's one by name (`requestMappingHandlerMapping`, as `iam/permission/RbacRegistryCheck` does) — a by-type lookup fails every Spring context with `NoUniqueBeanDefinitionException`
 
 ### Frontend Patterns (Non-Negotiable)
 - `Form.useForm()` hook — never class-based forms
