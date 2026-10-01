@@ -8,9 +8,9 @@
  * back to its agreed date, or cancelling it, clears the shift again — the figure
  * is recomputed from live data, never remembered.
  *
- * The e2e seed configures an approval flow for POs and the superadmin is not
- * its approver (see po-workflow.spec.js), so the PO is moved to Sent_To_Supplier
- * by a direct status save — the generic save accepts a status transition.
+ * The e2e seed configures a two-level approval flow for POs. The superadmin, a
+ * superuser, approves each level in turn to move the PO to Sent_To_Supplier: a
+ * save may only submit a PO, never decide it.
  */
 
 import { test, expect } from '@playwright/test';
@@ -49,8 +49,13 @@ test.beforeAll(async () => {
   const draft = buildGeneralPo(poRefs.localSupplier, poRefs.item, poRefs.terms, {});
   draft.orderReferences = [{ orderId: order.id, orderNo: order.orderNo }];
   po = ok(await api.post('/purchase-orders', draft), 'create po');
+  // Submit, then approve each level of the flow: a save can no longer jump a PO straight to
+  // Sent_To_Supplier. With no flow, the submit itself approves it.
   const current = await getPo();
-  po = ok(await api.post('/purchase-orders', { ...current, id: po.id, status: 'Sent_To_Supplier' }), 'send po to supplier');
+  po = ok(await api.post('/purchase-orders', { ...current, id: po.id, status: 'Pending_Approval' }), 'submit po');
+  for (let level = 0; po.status === 'Pending_Approval' && level < 5; level++) {
+    po = ok(await api.put(`/purchase-orders/${po.id}/approve`, { comment: 'e2e: send to supplier' }), 'approve po');
+  }
   expect(po.status).toBe('Sent_To_Supplier');
 });
 
