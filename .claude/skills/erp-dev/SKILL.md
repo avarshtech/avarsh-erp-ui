@@ -2,7 +2,7 @@
 name: erp-dev
 description: >
   Full-stack Garment ERP development agent for avarsh-erp-ui (React 19 + Vite 7 + AntD 6,
-  JavaScript/JSX) and erp-purchase (Spring Boot 3.4 + Java 21 + PostgreSQL + Flyway, Gradle).
+  JavaScript/JSX) and erp-purchase (Spring Boot 4.1 + Java 25 + PostgreSQL + Flyway, Gradle 9).
   Handles UI screens, API endpoints, migrations and cross-repo consistency. Runs a mandatory
   cross-module impact analysis (grep-derived from references/impact-map.md) before touching any
   shared seam: permission keys, StoreContext keys, status enums, DTO fields, domain events,
@@ -70,7 +70,7 @@ These banners ensure the user always knows what the agent is doing. Never skip t
 | Repo | Stack | Verify / build |
 |------|-------|----------------|
 | **avarsh-erp-ui** (UI) | React 19.2, Vite 7, Ant Design 6.2, JavaScript/JSX — there is no TypeScript and no type check | `npm run lint` · `npm run build` · `npx playwright test --project=<name>` |
-| **erp-purchase** (API) | Spring Boot 3.4.0, Java 21, Gradle, PostgreSQL + Flyway (H2 for e2e), MapStruct 1.6.2, Lombok | `./gradlew compileJava -q` · `./gradlew test` (unit tests; integration tests need Docker and are excluded) |
+| **erp-purchase** (API) | Spring Boot 4.1.1, Java 25, Gradle 9, PostgreSQL + Flyway (H2 for e2e), Jackson 3 (`tools.jackson`), MapStruct 1.6.3, Lombok | `./gradlew compileJava -q` · `./gradlew test` (unit tests; integration tests need Docker and are excluded) |
 
 The two checkouts sit side by side: `../erp-purchase` from the UI repo, `../avarsh-erp-ui` from the API repo. Confirm with `ls ..` before any cross-repo edit; never assume a drive letter or an absolute path. There is no Maven wrapper — `mvnw` / `mvn` commands do not exist.
 
@@ -84,7 +84,7 @@ These are cross-cutting integrity traps that corrupt data silently. Before editi
 
 | Subsystem | Landmine | Reference |
 |-----------|----------|-----------|
-| **Approval flows** (`apv_*` tables — one flow per value of `approval/domain/EntityType`; read that enum, do not assume the list) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate 6 with "Could not generate fetch". | [`referential-integrity-patterns.md` → Approval Flow Integrity](references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
+| **Approval flows** (`apv_*` tables — one flow per value of `approval/domain/EntityType`; read that enum, do not assume the list) | `apv_actions.level_number` is an **integer, not a FK**. Editing flow levels retroactively rewrites every historical audit record. Two-bag `@EntityGraph` on `levels` + `actions` crashes Hibernate with "Could not generate fetch". | [`referential-integrity-patterns.md` → Approval Flow Integrity](references/referential-integrity-patterns.md#-approval-flow-integrity-critical) |
 | **Flyway migrations** (any applied file) | Frozen by checksum — never edit or rename. New PostgreSQL migration: `V<yyyyMMddHHmmss>__<snake_case>.sql` (the V1–V37 sequence is retired; never create V38). Every schema change needs its H2 twin in `db/h2migration` with the **next sequential number below V100**. | `erp-purchase/src/main/resources/db/migration/README.md` |
 | **Optimistic locking** (`@Version` on `shared/BaseEntity`) | An update endpoint that echoes a stale `version` turns the user's next save into a false 409. `saveAndFlush`, return the saved record, and make the screen adopt it. | [`impact-map.md` §5](references/impact-map.md) |
 | **Activity feed** | Publish the feed event BEFORE `saveAndFlush`, or `FeedAuditEntityListener` adds a duplicate contentless row. | [`impact-map.md` §4](references/impact-map.md) |

@@ -28,7 +28,7 @@ MIN_WORDS = 10
 
 PROTOCOL = """<ERP-PROMPT-ENHANCER>
 Repos: avarsh-erp-ui (React 19, Vite 7, AntD 6, JavaScript/JSX - no TypeScript) and
-erp-purchase (Spring Boot 3.4, Java 21, PostgreSQL, Flyway, Gradle).
+erp-purchase (Spring Boot 4.1, Java 25, Jackson 3, PostgreSQL, Flyway, Gradle 9).
 
 Skip this protocol if the prompt continues an exchange you already have context on
 (follow-up, approval, next step of in-progress work), or is full-stack feature work

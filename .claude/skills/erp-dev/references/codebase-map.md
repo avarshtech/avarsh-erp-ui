@@ -22,9 +22,9 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
 - `ls src/services`: `admin auth bom core costing dashboard expdoc hr inventory master orders po
   production sample-request tna` (`sample-request/sampleRequestService.js` is a pass-through facade over `sampleRequestApi.js`); cross-cutting calls live in `services/core/` (axiosInstance, approvalFlowService,
   fileService, liveActivityFeedService, notificationService, reportService, aiService, activityLogService).
-- **API** `erp-purchase`: Spring Boot 3.4.0, Java 21 toolchain (`build.gradle:3,13`), Gradle only
-  (no `pom.xml`), Lombok + MapStruct 1.6.2 (`build.gradle:89-94`), springdoc 2.7.0 (`:120`), H2 at
-  runtime for e2e (`:91`). Build: `./gradlew compileJava`, `./gradlew test`.
+- **API** `erp-purchase`: Spring Boot 4.1.1, Java 25 toolchain (`build.gradle:3,13`), Gradle 9 only
+  (no `pom.xml`), Lombok (Boot-managed) + MapStruct 1.6.3 (`build.gradle:107-114`), springdoc 3.1.1 (`:144`), H2 2.3.232 at
+  runtime for e2e (`:19,109`). Tracing: Micrometer + OpenTelemetry (trace id in logs and `X-Trace-Id`; export off). Jackson 3 (`tools.jackson.*`; annotations stay `com.fasterxml.jackson.annotation`). Build: `./gradlew compileJava`, `./gradlew test`.
 - `ls erp/`: `activity ai approval bom config costing dashboard email ewaybill exception exchangerate
   hr iam inventory item masterdata mobile notification order production purchaseorder reporting
   sampling shared storage system whatsapp` + `ErpPurchaseApplication.java`

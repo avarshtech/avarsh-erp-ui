@@ -15,7 +15,7 @@ Agent({
     ## Context
 
     [Scene-setting: where this fits in the ERP lifecycle, dependencies, architectural context]
-    [Which repo: avarsh-erp-ui (React 19 + AntD 6.x) and/or erp-purchase (Spring Boot 3.4)]
+    [Which repo: avarsh-erp-ui (React 19 + AntD 6.x) and/or erp-purchase (Spring Boot 4.1)]
 
     ## Impact Table (consumers you must update — from the plan's Core Behavior Rule 3)
 
