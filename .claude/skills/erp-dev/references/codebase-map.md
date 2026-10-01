@@ -55,12 +55,14 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
    `Authorization: Bearer` (`:43`) and `X-Branch-Id` (`:49`, from the localStorage key `context/BranchContext.jsx:44-49`
    writes); response interceptor turns 409 `OPTIMISTIC_LOCK_CONFLICT` into `emitConflict()` (`:85-87`,
    `components/ConflictDialog.jsx`), queues requests behind one refresh on 401 (`:102-148`), toasts other errors (`:204`).
-5. Auth filter: `erp/config/SecurityConfig.java:34,46` permits `/api/v1/auth/**`, swagger, h2-console; the JWT filter
+5. Auth filter: `erp/config/SecurityConfig.java:40-51` permits `/api/v1/auth/**`, swagger (served only where springdoc is
+   on: dev, local, e2e), `/h2-console` only when the console is enabled (e2e), and `/api/v1/system/**`; the JWT filter
    sets the **domain `User`** as principal, not `UserDetails` (`erp/iam/security/JwtAuthenticationFilter.java:63-67`).
 6. Interceptors on `/api/v1/**` (`erp/iam/permission/RbacWebConfig.java:31-36`): `PermissionInterceptor` reads
-   `erp.rbac.mode` (default OFF, `PermissionInterceptor.java:48`; `RbacMode.java` = OFF/AUDIT/ENFORCE);
-   `RbacRegistryCheck.java:49` logs unmapped handlers at startup and fails only when
-   `erp.rbac.registry-check.fail-on-unmapped=true` (`:55`); `SuperuserCheck.java:59` reads `Role.isSuperuser`
+   `erp.rbac.mode` as the `RbacMode` enum (OFF/AUDIT/ENFORCE; a misspelt value fails startup). Base default
+   ENFORCE; dev/qa/local run AUDIT, e2e and the test profiles OFF; `config/ProductionSafetyCheck` refuses to
+   start `prod` on anything but ENFORCE. `RbacRegistryCheck.java:48` fails startup on any unmapped handler
+   (`erp.rbac.registry-check.fail-on-unmapped`, default true); `SuperuserCheck.java:59` reads `Role.isSuperuser`
    (column added by `db/migration/V20260909140000__rbac_server_enforcement.sql:34`). `BranchContextInterceptor.java:18,25`
    sets/clears the `X-Branch-Id` ThreadLocal in `erp/shared/branch/BranchContext.java:16-18`.
 7. Controller: `erp/order/controller/OrderController.java:18-21` — `@RequestMapping("/api/v1/orders")` + class-level

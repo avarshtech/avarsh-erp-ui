@@ -23,6 +23,7 @@ import {
 import { getCurrentUser } from '../services/auth/authService';
 import { getUserById, changePassword } from '../services/admin/userService';
 import NotificationPreferences from '../components/NotificationPreferences';
+import { NEW_PASSWORD_RULES } from '../utils/passwordPolicy';
 
 const { Title, Text } = Typography;
 
@@ -250,7 +251,7 @@ const Profile = () => {
                   label="New Password"
                   rules={[
                     { required: true, message: 'Please enter new password' },
-                    { min: 6, message: 'Password must be at least 6 characters' },
+                    ...NEW_PASSWORD_RULES,
                   ]}
                 >
                   <Input.Password

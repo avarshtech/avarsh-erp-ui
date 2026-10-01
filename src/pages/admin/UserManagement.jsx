@@ -20,6 +20,7 @@ import EmptyState from '../../components/EmptyState';
 import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { MODAL_WIDTHS } from '../../utils/uiConstants';
+import { NEW_PASSWORD_RULES } from '../../utils/passwordPolicy';
 import { useBranch } from '../../context/BranchContext';
 const { Text } = Typography;
 
@@ -389,7 +390,7 @@ const UserManagement = () => {
             <Col xs={24} sm={12}><Form.Item name="email" label="Email" rules={[{ required: true, message: 'Please enter email' }, { type: 'email', message: 'Please enter a valid email' }]}><Input placeholder="Enter email address" /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="phone" label="Phone"><Input placeholder="Enter phone number" /></Form.Item></Col>
           </Row>
-          {!editingUser && (<Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter password' }, { min: 6, message: 'Password must be at least 6 characters' }]}><Input.Password placeholder="Enter password" /></Form.Item>)}
+          {!editingUser && (<Form.Item name="password" label="Password" rules={[{ required: true, message: 'Please enter password' }, ...NEW_PASSWORD_RULES]}><Input.Password placeholder="Enter password" /></Form.Item>)}
           <Row gutter={16}>
             <Col xs={24} sm={12}><Form.Item name="roleId" label="Role" rules={[{ required: true, message: 'Please select a role' }]}><Select placeholder="Select role" options={roles.map(r => ({ value: r.id, label: r.name }))} /></Form.Item></Col>
             <Col xs={24} sm={12}><Form.Item name="isActive" label="Status" valuePropName="checked"><Switch checkedChildren="Active" unCheckedChildren="Inactive" /></Form.Item></Col>
@@ -431,7 +432,7 @@ const UserManagement = () => {
         }
       >
         <Form form={resetPwdForm} layout="vertical" onFinish={handleAdminResetPwd} style={{ marginTop: 16 }}>
-          <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Please enter new password' }, { min: 6, message: 'Password must be at least 6 characters' }]}>
+          <Form.Item name="newPassword" label="New Password" rules={[{ required: true, message: 'Please enter new password' }, ...NEW_PASSWORD_RULES]}>
             <Input.Password placeholder="Enter new password" prefix={<LockOutlined />} />
           </Form.Item>
           <Form.Item name="confirmPassword" label="Confirm Password" dependencies={['newPassword']} rules={[{ required: true, message: 'Please confirm the password' }, ({ getFieldValue }) => ({ validator(_, value) { if (!value || getFieldValue('newPassword') === value) return Promise.resolve(); return Promise.reject(new Error('Passwords do not match')); } })]}>

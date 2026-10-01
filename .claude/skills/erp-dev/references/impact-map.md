@@ -15,10 +15,12 @@ Repos: UI `avarsh-erp-ui` (paths under `src/`), API `erp-purchase` (paths under
 - Consumers: `src/App.jsx` (`<PermissionRoute module operation>` on 152 screen routes; a
   single `<ProtectedRoute>` handles authentication), `src/layout/MainLayout.jsx`
   (`hasModuleAccess` builds the menu), the role matrix screen (fed by the `SCREENS` registry),
-  `erp/iam/permission/PermissionInterceptor` (mode `ERP_RBAC_MODE` = OFF | AUDIT | ENFORCE),
+  `erp/iam/permission/PermissionInterceptor` (mode `ERP_RBAC_MODE` = OFF | AUDIT | ENFORCE; ENFORCE in
+  prod, AUDIT in dev/qa/local, OFF in e2e and tests),
   `SuperuserCheck` bypass.
 - Breaks: an endpoint without the annotation is logged `rbac_unmapped` by `RbacRegistryCheck` at
-  startup and aborts boot when `ERP_RBAC_FAIL_ON_UNMAPPED=true`; renaming a key in one place
+  startup and aborts boot (`ERP_RBAC_FAIL_ON_UNMAPPED`, default true), and
+  `ControllerPermissionMappingTest` fails the build first; renaming a key in one place
   makes menu and matrix disagree (comment at `MainLayout.jsx:437` records that incident); the
   permissions map travels inside the JWT, so every new key grows every user's token — Super
   Admin's has already collided with Tomcat's 8 KB header limit once.

@@ -422,6 +422,9 @@ Implemented in `src/utils/statusConfig.js`; new statuses go there, not into scre
 - `JpaSpecificationExecutor` + `Specification<T>` for searchable entities; `@EntityGraph` or JOIN FETCH for relationships in list queries (never two bag collections in one graph)
 - Every handler under `/api/v1/**` sits behind `@RequiresPermission("<key>")` or `@NoPermissionRequired(reason = …)`
 - `/search` endpoints return `PaginatedResponse<T>` (`shared/PaginatedResponse`); master list endpoints return `List<DTO>` — copy the sibling controller
+- `@Async` methods return `void` or a `Future`, never a value (Spring rejects the call; `config/AsyncMethodContractTest` fails the build). On Cloud Run prefer no `@Async` at all — see `performance-patterns.md` → Long-Running Work and Side Effects
+- No test, debug or mock endpoints in shipped controllers: delete them rather than guard them (2026-10-01 removed `/whatsapp/test/*`, `/files/test/upload`, `/files/status`, `/ai/test-extract-raw`, `/grns/{id}/close-on-qc-approval`)
+- A setting that is safe only outside production (a debug toggle, a dev-only endpoint) goes into `config/ProductionSafetyCheck` too, so the `prod` profile refuses to start with it on
 
 ### Frontend Patterns (Non-Negotiable)
 - `Form.useForm()` hook — never class-based forms
@@ -790,10 +793,12 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 |--------|-----------|
 | **SQL Injection** | JPA parameterized queries only. No string concatenation in SQL. |
 | **XSS** | React auto-escapes. Never use `dangerouslySetInnerHTML`. Sanitize text inputs on backend. |
-| **Broken Auth** | JWT access token (15 min) + refresh token (24 h; 30 days for the PWA) with silent refresh in `SessionContext` / `axiosInstance`. Authorization via `@RequiresPermission` + `PermissionInterceptor` (mode `ERP_RBAC_MODE`) — never `@PreAuthorize`. |
+| **Broken Auth** | JWT access token (15 min) + refresh token (24 h; 30 days for the PWA) with silent refresh in `SessionContext` / `axiosInstance`. Authorization via `@RequiresPermission` + `PermissionInterceptor` (mode `ERP_RBAC_MODE`; ENFORCE in prod) — never `@PreAuthorize`. Only `sys_users.is_active = FALSE` blocks a login (always on, no flag). |
+| **Passwords** | Every password that is set goes through `iam/security/PasswordPolicy` (at least 10 characters, at most BCrypt's 72 bytes); never at login. The UI mirrors it in `src/utils/passwordPolicy.js` (`NEW_PASSWORD_RULES`). |
 | **IDOR** | Branch scoping via `BranchContextInterceptor`. Never trust client-provided IDs. Validate ownership in service layer. |
 | **Mass Assignment** | DTOs with explicit fields only. Never bind request directly to Entity. |
-| **Sensitive Data** | Never log passwords, tokens, or PII. Response DTOs exclude sensitive fields. |
+| **Sensitive Data** | Never log passwords, tokens, or PII. Request-body logging is off by default (`LOG_REQUEST_BODY`). Response DTOs exclude sensitive fields. No secret, token or phone number is committed as a property default. |
+| **Transport** | `server.forward-headers-strategy=framework` makes Cloud Run's `X-Forwarded-Proto` count, so HSTS is sent; Swagger and the H2 console are off outside dev/local/e2e. |
 | **Input Validation** | Jakarta Bean Validation on ALL DTOs. Max lengths on all string fields. |
 | **CORS** | Whitelist specific origins only. No `allowedOrigins("*")` in production. |
 | **Error Info Leak** | `exception/GlobalExceptionHandler` returns generic messages in production. Stack traces only in dev profile. |
@@ -823,7 +828,7 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 
 - **Model**: one permission key per URL-addressable screen (`orders`, `po-approval`, `inventory-qc`, …), each with `access` plus per-operation booleans (`view` / `add` / `update` / `delete` / `approve` / …). The map is stored on `sys_roles.permissions` (JSON) and travels inside the JWT. Roles are `sys_roles` rows; code never branches on a role name — it checks permission keys, and `sys_roles.is_superuser` bypasses every guard (`SuperuserCheck`).
 - **UI**: `src/utils/permissions.js` — `SCREENS` registry, `SECTIONS`, `hasModuleAccess(moduleId)`, `hasPermission(moduleId, operationId)`, `assertRegistryIntegrity` (icon names). `<PermissionRoute module operation>` wraps every screen route in `App.jsx`; `hasModuleAccess` builds the menu in `MainLayout.jsx`. A new screen = key + `SCREENS` entry + route + menu.
-- **API**: `@RequiresPermission("<key>")` or `@NoPermissionRequired(reason = …)` on every controller; `iam/permission/PermissionInterceptor` enforces per `ERP_RBAC_MODE` (OFF / AUDIT / ENFORCE); `RbacRegistryCheck` logs every unannotated `/api/v1/**` handler as `rbac_unmapped` at startup and aborts boot when `ERP_RBAC_FAIL_ON_UNMAPPED=true`. `@PreAuthorize` is deliberately not used — the interceptor's Javadoc explains why.
+- **API**: `@RequiresPermission("<key>")` or `@NoPermissionRequired(reason = …)` on every controller; `iam/permission/PermissionInterceptor` enforces per `ERP_RBAC_MODE` (OFF / AUDIT / ENFORCE, bound as an enum so a typo fails startup): ENFORCE is the base default and the only value `ProductionSafetyCheck` accepts for `prod`, dev/qa/local run AUDIT, e2e and the test profiles OFF. `RbacRegistryCheck` logs every unannotated `/api/v1/**` handler as `rbac_unmapped` and aborts boot (`ERP_RBAC_FAIL_ON_UNMAPPED`, default true); `ControllerPermissionMappingTest` catches it in the build first, `@ConditionalOnProperty` controllers included. `@PreAuthorize` is deliberately not used — the interceptor's Javadoc explains why.
 - **Cost**: every new key grows every user's token — Super Admin's has already hit Tomcat's 8 KB header limit once. Reuse an existing key when the screen is a tab of an existing module.
 
 ---

@@ -528,7 +528,7 @@ test.describe('Full Workflow', () => {
       await expect(grnRow.locator('.ant-tag').last()).toContainText('QC Pending');
     }
 
-    // Step 3: Submit QC + Approve + Close via API
+    // Step 3: Submit QC + Approve via API (approval closes the GRN)
     const { data: grnFull } = await api.get(`/grns/${grn.id}`);
     const poLineItemId = grnFull.lineItems[0].poLineItemId;
     const qcPayload = fabricQcPayload(grnFull, poLineItemId);
@@ -536,7 +536,6 @@ test.describe('Full Workflow', () => {
     expect(qcRes.status).toBe(200);
 
     await api.post(`/qc/${qcRes.data.id}/approve`, { reason: 'E2E workflow' });
-    await api.post(`/grns/${grn.id}/close-on-qc-approval`);
 
     // Step 4: Reload list and verify GRN is Closed
     await page.reload();

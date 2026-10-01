@@ -422,33 +422,22 @@ try (InputStream inputStream = file.getInputStream()) {
 
 ---
 
-### Async for Long-Running Operations
+### Long-Running Work and Side Effects on Cloud Run
 
-Operations taking > 2 seconds MUST be async:
+Cloud Run bills request-based CPU: once the response is sent the container's CPU is throttled, so
+work handed to an executor after the response stalls, and a deploy or scale-in drops it. Do not
+reach for `@Async` to make a slow call "non-blocking" (review finding G3.1).
 
-```java
-@Configuration
-@EnableAsync
-public class AsyncConfig {
-    @Bean("geminiTaskExecutor")
-    public TaskExecutor geminiTaskExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(5);
-        executor.setQueueCapacity(10);
-        executor.setThreadNamePrefix("gemini-");
-        return executor;
-    }
-}
+| Work | Where it runs |
+|------|---------------|
+| A remote call the user waits for (Gemini extraction, e-way bill) | In the request, with a timeout, **outside** any `@Transactional` method |
+| A side effect that must happen (supplier e-mail, WhatsApp) | A row written in the business transaction, sent by the outbox job (roadmap P0.12; today the PO e-mail still runs on `emailTaskExecutor` via `PoEmailEventListener`) |
+| A side effect that may be lost (push) | Synchronously in `afterCommit`, before the response |
 
-@Service
-public class GeminiService {
-    @Async("geminiTaskExecutor")
-    public CompletableFuture<ExtractionResult> extractFromPdf(MultipartFile file) {
-        // 5-30 second Gemini API call — doesn't block request thread
-    }
-}
-```
+Where `@Async` remains, its method returns `void` or a `Future` — never a value. Spring rejects
+any other return type on **every** call (`AsyncExecutionAspectSupport.doSubmit`), which is how
+`@Async UUID sendEmailAsync` silently stopped every PO e-mail. `config/AsyncMethodContractTest`
+fails the build on it. Never chain two `@Async` hops.
 
 ---
 
@@ -724,10 +713,12 @@ public class CostSheetService {
 
 @Component
 public class CostSheetNotificationListener {
-    @TransactionalEventListener(phase = AFTER_COMMIT)
-    @Async
+    // BEFORE_COMMIT: the notification is recorded in the same transaction as the cost sheet,
+    // and the outbox job (roadmap P0.12) sends it. Not AFTER_COMMIT + @Async: Cloud Run stalls that work
+    // once the response is out (see "Long-Running Work and Side Effects on Cloud Run").
+    @TransactionalEventListener(phase = BEFORE_COMMIT)
     public void onCostSheetCreated(CostSheetCreatedEvent event) {
-        whatsAppService.sendCostingNotification(event.getCostSheet());
+        outbox.enqueueWhatsApp(event.getCostSheet());
     }
 }
 ```
@@ -774,7 +765,7 @@ BomService (474 lines) →
 - [ ] Mutation methods have `@CacheEvict`
 - [ ] List endpoints return summary DTOs (not full object graphs)
 - [ ] File uploads stream to storage (no full memory load)
-- [ ] Long-running operations (> 2s) are `@Async`
+- [ ] Slow remote calls run in the request with a timeout and outside a transaction; must-happen side effects go through the outbox, never after-response `@Async`
 - [ ] All monetary fields use `BigDecimal` (never Double/Float)
 - [ ] No broad `catch (Exception e)` — use specific types
 - [ ] Auth endpoints have rate limiting

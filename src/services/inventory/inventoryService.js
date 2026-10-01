@@ -547,16 +547,6 @@ export const rejectGRNReversal = async (grnId, _type, reason, version) => {
   return adaptGRN(response.data ?? response);
 };
 
-// ─── QC approval → GRN close interlock ────────────────────────────────────────
-// Called from QCApprovalActions after a QC is approved. Once the QC API's
-// approve endpoint takes over the interlock server-side, this shim can be
-// removed from the call sites (the backend will close the GRN automatically).
-export const closeGRNOnQCApproval = async (grnId) => {
-  if (!grnId) return null;
-  const response = await axiosInstance.post(`${GRN_ENDPOINT}/${grnId}/close-on-qc-approval`);
-  return adaptGRN(response.data ?? response);
-};
-
 // ─── QC list / get ─────────────────────────────────────────────────────────────
 
 const filterMockQC = (type, params = {}) => {

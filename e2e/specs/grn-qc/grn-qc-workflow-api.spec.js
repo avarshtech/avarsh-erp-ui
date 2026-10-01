@@ -25,7 +25,7 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
   findPOByNumber, refreshPO, fabricGrnPayload, fabricQcPayload,
   submitGrn, draftGrn, submitQc, draftQc, approveQc, qcApproverClient,
-  getDefectTypes, getPOStatus, getPOReceipts,
+  getPOStatus, getPOReceipts,
 } from '../../helpers/grn-qc-data.js';
 
 // ─── Shared State ───────────────────────────────────────────────────────────
@@ -40,9 +40,6 @@ const createdQcIds = [];
 
 test.beforeAll(async () => {
   api = await createAuthenticatedClient();
-
-  // Load reference data for QC payloads
-  defectTypes = await getDefectTypes(api);
 });
 
 test.afterAll(async () => {
@@ -145,19 +142,6 @@ async function createQcForGrn(grn, { approve = false } = {}) {
   return qcApproved;
 }
 
-/**
- * Close a GRN after QC approval.
- */
-async function closeGrn(grnId) {
-  const grnFresh = await fetchGrn(grnId);
-  const { data, status } = await (await qcApproverClient(api)).post(
-    `/grns/${grnId}/close-on-qc-approval`,
-    { version: grnFresh.version },
-  );
-  expect(status).toBe(200);
-  return data;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════
 // GRN WORKFLOW
 // ═══════════════════════════════════════════════════════════════════════════
@@ -200,8 +184,7 @@ test.describe('GRN Workflow (API)', () => {
     const qcApproved = await approveQc(api, qcBeforeApproval.id, 'E2E approved');
     expect(qcApproved.status).toBe('Approved');
 
-    // Step 6: Close GRN on QC approval
-    await closeGrn(grnSubmitted.id);
+    // Step 6: QC approval closes the GRN on the server; nothing to call
 
     // Step 7: Verify final state
     const finalGrn = await fetchGrn(grnSubmitted.id);
@@ -591,7 +574,7 @@ test.describe('PO Status Interlocks (API)', () => {
     const qcApproved = await createQcForGrn(grn, { approve: true });
     expect(qcApproved.status).toBe('Approved');
 
-    await closeGrn(grn.id);
+    // QC approval closed the GRN on the server
 
     const finalGrn = await fetchGrn(grn.id);
     expect(finalGrn.status).toBe('Closed');
