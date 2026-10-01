@@ -202,6 +202,11 @@ A save that accepted any status let a client create a PO as Sent_To_Supplier, or
 received, without an approval (review F005, F010). New lifecycles follow the same shape: one
 `Transitions` table per status enum, and no status taken from a save payload unchecked.
 
+The decision actions check the current status too. Approve applies only to a Pending_Approval PO; an
+already approved one (sent, partly received, completed) answers as it is, because the owner app repeats
+a decision it is unsure reached the server, and approving again used to e-mail the supplier twice.
+Anything else is a 409, as reject, refer back and cancel are (`validatePoStatusTransition`).
+
 ### Edit Protection by Entity
 
 | Entity | Editable When | Locked When | Unlock Via |
