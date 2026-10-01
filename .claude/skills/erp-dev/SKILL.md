@@ -425,6 +425,7 @@ Implemented in `src/utils/statusConfig.js`; new statuses go there, not into scre
 - `@Async` methods return `void` or a `Future`, never a value (Spring rejects the call; `config/AsyncMethodContractTest` fails the build). On Cloud Run prefer no `@Async` at all — see `performance-patterns.md` → Long-Running Work and Side Effects
 - No test, debug or mock endpoints in shipped controllers: delete them rather than guard them (2026-10-01 removed `/whatsapp/test/*`, `/files/test/upload`, `/files/status`, `/ai/test-extract-raw`, `/grns/{id}/close-on-qc-approval`)
 - A setting that is safe only outside production (a debug toggle, a dev-only endpoint) goes into `config/ProductionSafetyCheck` too, so the `prod` profile refuses to start with it on
+- Logging: no controller echo logs (`log.info("GET /api/v1/...")`) — `AccessLogFilter` already records method, route, status and duration, and Cloud Run records every request. `userId`, `branchId` and `client` reach every line through `shared/logging/LogContext` (set by `JwtAuthenticationFilter`, `BranchContextInterceptor`, `AccessLogFilter`). Log an exception once, where it is handled: 5xx at ERROR with the exception, 4xx at WARN without a stack
 
 ### Frontend Patterns (Non-Negotiable)
 - `Form.useForm()` hook — never class-based forms
@@ -797,7 +798,7 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 | **Passwords** | Every password that is set goes through `iam/security/PasswordPolicy` (at least 10 characters, at most BCrypt's 72 bytes); never at login. The UI mirrors it in `src/utils/passwordPolicy.js` (`NEW_PASSWORD_RULES`). |
 | **IDOR** | Branch scoping via `BranchContextInterceptor`. Never trust client-provided IDs. Validate ownership in service layer. |
 | **Mass Assignment** | DTOs with explicit fields only. Never bind request directly to Entity. |
-| **Sensitive Data** | Never log passwords, tokens, or PII. Request-body logging is off by default (`LOG_REQUEST_BODY`). Response DTOs exclude sensitive fields. No secret, token or phone number is committed as a property default. |
+| **Sensitive Data** | Never log passwords, tokens, or PII: log ids, and mask a contact detail with `shared/logging/LogMask` (`email`, `phone`, `host`, `typedUsername`). Headers and bodies are never logged (`config/logging/AccessLogFilter` writes one line per request). A String field named like a password, token, secret or key carries `@ToString.Exclude` (records override `toString()`); `config/logging/SecretFieldsToStringTest` fails the build otherwise. No secret, token or phone number is committed as a property default. |
 | **Transport** | `server.forward-headers-strategy=framework` makes Cloud Run's `X-Forwarded-Proto` count, so HSTS is sent; Swagger and the H2 console are off outside dev/local/e2e. |
 | **Input Validation** | Jakarta Bean Validation on ALL DTOs. Max lengths on all string fields. |
 | **CORS** | Whitelist specific origins only. No `allowedOrigins("*")` in production. |
