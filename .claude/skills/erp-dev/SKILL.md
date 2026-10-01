@@ -803,7 +803,7 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 | **Transport** | `server.forward-headers-strategy=framework` makes Cloud Run's `X-Forwarded-Proto` count, so HSTS is sent; Swagger and the H2 console are off outside dev/local/e2e. |
 | **Input Validation** | Jakarta Bean Validation on ALL DTOs. Max lengths on all string fields. |
 | **CORS** | Whitelist specific origins only. No `allowedOrigins("*")` in production. |
-| **Error Info Leak** | `exception/GlobalExceptionHandler` returns generic messages in production. Stack traces only in dev profile. |
+| **Error Info Leak** | `exception/GlobalExceptionHandler` never sends an exception class name, a cause or a stack trace; a database error (`DataAccessException`) gets a plain sentence because its message can carry SQL. Every error body carries `traceId`, which finds the full log entry. |
 
 ---
 
@@ -817,7 +817,7 @@ Not used here — do not introduce: service interface + `Impl` pairs, a generic 
 6. **Retire, don't delete**: Business rows carry `active`/`is_active` flags; `deleted_at` soft delete exists only where a migration defines it (file storage, report definitions) — check the table's migration before assuming either.
 7. **Pagination**: `/search` endpoints return `PaginatedResponse<T>` and the UI table pages server-side; master list endpoints return `List<DTO>` and the UI reads them from StoreContext.
 8. **Validation**: Jakarta Bean Validation on request DTOs. Frontend mirrors with Ant Design Form validation rules.
-9. **Error handling**: `exception/GlobalExceptionHandler` owns the error body; register new exceptions there, never return ad-hoc maps.
+9. **Error handling**: `exception/GlobalExceptionHandler` owns the error body (`timestamp`, `traceId`, `status`, `error`, `message`; clients read `error` and `message`). New code throws `exception/ErpException` with an `ErrorCode` (`ErpException.notFound("Purchase order", id)`, `.conflict(...)`, `.ruleViolation(...)`, or `new ErpException(code, message, details)`); the code becomes `error` and sets the status. Never rename a code: the web app branches on `OPTIMISTIC_LOCK_CONFLICT`, `INVOICE_REQUIRED`, `DUPLICATE_INVOICE`, `AI_NOT_CONFIGURED`. Convert old `RuntimeException("... not found")` throws when touching the code, not in bulk.
 10. **Flyway**: `V<yyyyMMddHHmmss>__<desc>.sql` plus its H2 twin. Never modify an applied migration.
 11. **Constructor injection**: Always via Lombok `@RequiredArgsConstructor`. No `@Autowired`.
 12. **Document numbers**: A new transactional document type gets its series in `shared/docnumber`.
