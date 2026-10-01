@@ -60,8 +60,8 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
    sets the **domain `User`** as principal, not `UserDetails` (`erp/iam/security/JwtAuthenticationFilter.java:63-67`).
 6. Interceptors on `/api/v1/**` (`erp/iam/permission/RbacWebConfig.java:31-36`): `PermissionInterceptor` reads
    `erp.rbac.mode` as the `RbacMode` enum (OFF/AUDIT/ENFORCE; a misspelt value fails startup). Base default
-   ENFORCE; dev/qa/local run AUDIT, e2e and the test profiles OFF; `config/ProductionSafetyCheck` refuses to
-   start `prod` on anything but ENFORCE. `RbacRegistryCheck.java:48` fails startup on any unmapped handler
+   ENFORCE; dev/qa/local run AUDIT, e2e and the test profiles OFF; `config/ProductionSafetyCheck` reports
+   anything but ENFORCE under `prod` (refuses to start once `erp.production-check.fail-fast=true`). `RbacRegistryCheck.java:48` fails startup on any unmapped handler
    (`erp.rbac.registry-check.fail-on-unmapped`, default true); `SuperuserCheck.java:59` reads `Role.isSuperuser`
    (column added by `db/migration/V20260909140000__rbac_server_enforcement.sql:34`). `BranchContextInterceptor.java:18,25`
    sets/clears the `X-Branch-Id` ThreadLocal in `erp/shared/branch/BranchContext.java:16-18`.
