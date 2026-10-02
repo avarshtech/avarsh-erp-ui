@@ -97,8 +97,12 @@ test.describe('Inventory per branch', () => {
 
     const foreign = rowsOf(rollsThere)[0];
     test.skip(!foreign, 'the second branch holds no roll of this item');
+    // The issuable-rolls rows carry no item id; the issue names the item the rolls were asked for.
+    const { data: items } = await api.get('/items/autocomplete', { q: 'FAB-SJ-001' });
+    const item = rowsOf(items)[0];
+    test.skip(!item?.id, 'no fabric item in the seed');
     const { status, data } = await api.post('/material-issues/fabric', {
-      cuttingPoId: po.id, itemId: foreign.itemId, itemCode: 'FAB-SJ-001',
+      cuttingPoId: po.id, itemId: item.id, itemCode: 'FAB-SJ-001',
       receivedBy: 'e2e', issueDate: new Date().toISOString().slice(0, 10),
       rolls: [{ fabricStockId: foreign.fabricStockId ?? foreign.rollId ?? foreign.id, issuedQty: 1 }],
     });
