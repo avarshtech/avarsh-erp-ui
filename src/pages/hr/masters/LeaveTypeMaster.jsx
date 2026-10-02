@@ -91,6 +91,13 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
       render: (val) => val ? <Tag color="green">Yes</Tag> : <Tag color="default">No</Tag>,
     },
     {
+      title: 'Paid',
+      dataIndex: 'isPaid',
+      width: 90,
+      // Absent on an older API: every type was paid then
+      render: (val) => val === false ? <Tag color="orange">Unpaid</Tag> : <Tag color="green">Paid</Tag>,
+    },
+    {
       title: 'Status',
       dataIndex: 'isActive',
       width: 90,
@@ -108,6 +115,7 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
     form.resetFields();
     form.setFieldsValue({
       isActive: true,
+      isPaid: true,
       isCarryForward: false,
       isEncashable: false,
       accrualType: 'MONTHLY',
@@ -126,6 +134,7 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
     form.setFieldsValue({
       ...record,
       isActive: record.isActive !== false,
+      isPaid: record.isPaid !== false,
       isCarryForward: record.isCarryForward || false,
       isEncashable: record.isEncashable || false,
     });
@@ -150,6 +159,7 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
         maxCarryForward: values.isCarryForward ? (values.maxCarryForward ?? 0) : 0,
         isCarryForward: Boolean(values.isCarryForward),
         isEncashable: Boolean(values.isEncashable),
+        isPaid: values.isPaid !== false,
       };
       if (selectedId) {
         const selectedRecord = data.find(r => r.id === selectedId);
@@ -297,6 +307,14 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
               </Form.Item>
               <Form.Item name="accrualType" label="Accrual Type" rules={[{ required: true, message: 'Please select an accrual type' }]}>
                 <Select placeholder="Select accrual type" options={LEAVE_ACCRUAL_TYPES} />
+              </Form.Item>
+              <Form.Item
+                name="isPaid"
+                label="Paid"
+                valuePropName="checked"
+                tooltip="Unpaid leave, such as leave without pay, is not written to attendance: its days stay loss of pay."
+              >
+                <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />
               </Form.Item>
               <Form.Item name="isCarryForward" label="Carry Forward" valuePropName="checked">
                 <Switch checkedChildren="Yes" unCheckedChildren="No" />

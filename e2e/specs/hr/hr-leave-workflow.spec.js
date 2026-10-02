@@ -17,6 +17,8 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { ensureLeaveType } from '../../helpers/hr-leave-seed.js';
 import {
   antDatePickerType,
   dayAhead,
@@ -53,19 +55,14 @@ async function applyLeaveViaDrawer(page, reason) {
   // Select first available leave type
   await antFormSelect(page, 'Leave Type', null, { first: true });
 
-  // From and To: a day no other application in this run has taken
+  // A day no other application in this run has taken. One day is the drawer's default Duration, which
+  // asks for a single Leave Date; From and To are for "Multiple Days"
   const day = dayAhead(nextDay++);
-  const fromDateFormItem = page
+  const leaveDateFormItem = page
     .locator('.ant-form-item')
-    .filter({ hasText: 'From Date' })
+    .filter({ hasText: 'Leave Date' })
     .first();
-  await antDatePickerType(page, fromDateFormItem.locator('.ant-picker').first(), day);
-
-  const toDateFormItem = page
-    .locator('.ant-form-item')
-    .filter({ hasText: 'To Date' })
-    .first();
-  await antDatePickerType(page, toDateFormItem.locator('.ant-picker').first(), day);
+  await antDatePickerType(page, leaveDateFormItem.locator('.ant-picker').first(), day);
 
   // Fill reason with unique stamp to identify this specific application
   const uniqueReason = reason || `E2E leave ${STAMP()}`;
@@ -91,6 +88,16 @@ async function applyLeaveViaDrawer(page, reason) {
   const body = await saveResp.json().catch(() => null);
   return body?.id ?? null;
 }
+
+// The Apply Leave drawer offers the active leave types, and the e2e data seeds none
+test.beforeAll(async () => {
+  const api = await createAuthenticatedClient();
+  try {
+    await ensureLeaveType(api);
+  } finally {
+    await api.dispose();
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -229,8 +236,9 @@ test.describe('HR Leave Workflow — Apply → Reject', () => {
     const modal = page.locator('.ant-modal').last();
     await modal.waitFor({ state: 'visible', timeout: 5000 });
 
-    // Modal title should mention rejection
-    await expect(modal.getByText(/Reject Leave Application/i)).toBeVisible();
+    // Modal title should mention rejection. antd 6's confirm modal renders the title twice, a hidden
+    // .ant-modal-title and the visible .ant-modal-confirm-title, so look for the visible one
+    await expect(modal.getByText(/Reject Leave Application/i).filter({ visible: true })).toBeVisible();
 
     // Textarea for reason should be present
     const reasonTextarea = modal.locator('textarea');

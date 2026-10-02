@@ -18,6 +18,8 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { ensureLeaveType } from '../../helpers/hr-leave-seed.js';
 import {
   antSelect,
   antDatePickerType,
@@ -36,6 +38,16 @@ import {
 } from '../../helpers/navigation.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
+
+// The Apply Leave drawer offers the active leave types, and the e2e data seeds none
+test.beforeAll(async () => {
+  const api = await createAuthenticatedClient();
+  try {
+    await ensureLeaveType(api);
+  } finally {
+    await api.dispose();
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -215,19 +227,14 @@ test.describe('HR Leave — Apply Leave Drawer', () => {
     // Select first available leave type
     await antFormSelect(page, 'Leave Type', null, { first: true });
 
-    // From and To: a day of its own (the server refuses overlapping leave; hr-leave-workflow uses 40+)
+    // A day of its own (the server refuses overlapping leave; hr-leave-workflow uses 40+). One day is the
+    // drawer's default Duration, which asks for a single Leave Date; From and To are for "Multiple Days"
     const day = dayAhead(80);
-    const fromDateFormItem = page
+    const leaveDateFormItem = page
       .locator('.ant-form-item')
-      .filter({ hasText: 'From Date' })
+      .filter({ hasText: 'Leave Date' })
       .first();
-    await antDatePickerType(page, fromDateFormItem.locator('.ant-picker').first(), day);
-
-    const toDateFormItem = page
-      .locator('.ant-form-item')
-      .filter({ hasText: 'To Date' })
-      .first();
-    await antDatePickerType(page, toDateFormItem.locator('.ant-picker').first(), day);
+    await antDatePickerType(page, leaveDateFormItem.locator('.ant-picker').first(), day);
 
     // Fill reason
     await antFormFill(page, 'Reason', `E2E test leave reason ${STAMP()}`);
