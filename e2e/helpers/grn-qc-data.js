@@ -443,7 +443,7 @@ export async function qcApproverClient(api) {
 export async function approveQc(api, qcId, reason = 'E2E auto-approve', extra = {}) {
   const approver = await qcApproverClient(api);
   const { data, status } = await approver.post(`/qc/${qcId}/approve`, { reason, ...extra });
-  if (!data?.id) throw new Error(`QC approve failed: status=${status}`);
+  if (!data?.id) throw new Error(`QC approve failed: status=${status}${data?.message ? ` (${data.message})` : ''}`);
   return data;
 }
 

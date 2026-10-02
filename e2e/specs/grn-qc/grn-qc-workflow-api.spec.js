@@ -332,9 +332,12 @@ test.describe('QC Workflow (API)', () => {
     const qcAfterReject = await fetchQc(qcSubmitted.id);
     expect(qcAfterReject.status).toBe('Rejected');
 
-    // Re-submit — use the existing QC's ID+version so server updates it
+    // Re-submit — use the existing QC's ID+version so server updates it. The re-inspection measures the
+    // first roll at its own standard (the GRN takes width and GSM from the variant, not 44" / 180), so it
+    // passes; a failing QC cannot be approved outright.
+    const firstRoll = grnFull.lineItems[0]?.rolls?.[0] || {};
     const updatedPayload = fabricQcPayload(grnFull, poLineItemId, {
-      rollOverrides: [{ actualWidth: 44, actualGsm: 180 }],
+      rollOverrides: [{ actualWidth: Number(firstRoll.width) || 44, actualGsm: Number(firstRoll.gsm) || 180 }],
       inspector: 'E2E Inspector Re-inspect',
     });
     updatedPayload.id = qcAfterReject.id;
@@ -399,9 +402,14 @@ test.describe('QC Workflow (API)', () => {
     const qcReferredBack = await fetchQc(qcApproved.id);
     expect(qcReferredBack.status).toBe('Referred_Back');
 
-    // Edit & re-submit QC with updated data
+    // Edit & re-submit QC with updated data: the first roll re-measured 1% heavier than its own
+    // standard (the GRN takes width and GSM from the variant), still within tolerance
+    const firstRoll = grnFull.lineItems[0]?.rolls?.[0] || {};
     const updatedPayload = fabricQcPayload(grnFull, poLineItemId, {
-      rollOverrides: [{ actualWidth: 44, actualGsm: 182 }],
+      rollOverrides: [{
+        actualWidth: Number(firstRoll.width) || 44,
+        actualGsm: Math.round((Number(firstRoll.gsm) || 180) * 1.01 * 100) / 100,
+      }],
       inspector: 'E2E Inspector Refer-back',
     });
     const qcResubmitted = await submitQc(api, {
