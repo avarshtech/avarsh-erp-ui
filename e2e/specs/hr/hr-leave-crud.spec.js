@@ -20,7 +20,8 @@
 import { test, expect } from '@playwright/test';
 import {
   antSelect,
-  antDatePickerToday,
+  antDatePickerType,
+  dayAhead,
   antTableWaitForData,
   antMessageContains,
   antFormFill,
@@ -214,19 +215,19 @@ test.describe('HR Leave — Apply Leave Drawer', () => {
     // Select first available leave type
     await antFormSelect(page, 'Leave Type', null, { first: true });
 
-    // Pick From Date (today)
+    // From and To: a day of its own (the server refuses overlapping leave; hr-leave-workflow uses 40+)
+    const day = dayAhead(80);
     const fromDateFormItem = page
       .locator('.ant-form-item')
       .filter({ hasText: 'From Date' })
       .first();
-    await antDatePickerToday(page, fromDateFormItem.locator('.ant-picker').first());
+    await antDatePickerType(page, fromDateFormItem.locator('.ant-picker').first(), day);
 
-    // Pick To Date (today)
     const toDateFormItem = page
       .locator('.ant-form-item')
       .filter({ hasText: 'To Date' })
       .first();
-    await antDatePickerToday(page, toDateFormItem.locator('.ant-picker').first());
+    await antDatePickerType(page, toDateFormItem.locator('.ant-picker').first(), day);
 
     // Fill reason
     await antFormFill(page, 'Reason', `E2E test leave reason ${STAMP()}`);

@@ -37,6 +37,26 @@ export async function antDatePickerToday(page, pickerLocator) {
 }
 
 /**
+ * Type a date into an Ant Design DatePicker, in the format the picker displays (e.g. 05-Oct-2026).
+ */
+export async function antDatePickerType(page, pickerLocator, text) {
+  const input = pickerLocator.locator('input').first();
+  await input.click();
+  await input.fill(text);
+  await input.press('Enter');
+  const panel = page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').last();
+  await panel.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+}
+
+/** A date `daysAhead` days from today in the DD-MMM-YYYY form the HR date pickers show. */
+export function dayAhead(daysAhead) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  const month = d.toLocaleString('en-US', { month: 'short' });
+  return `${String(d.getDate()).padStart(2, '0')}-${month}-${d.getFullYear()}`;
+}
+
+/**
  * Wait for an Ant Design table to finish loading (spinner gone, rows present).
  */
 export async function antTableWaitForData(page, { timeout = 15000 } = {}) {

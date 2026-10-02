@@ -18,7 +18,8 @@
 
 import { test, expect } from '@playwright/test';
 import {
-  antDatePickerToday,
+  antDatePickerType,
+  dayAhead,
   antTableWaitForData,
   antMessageContains,
   antFormFill,
@@ -32,6 +33,10 @@ import {
 } from '../../helpers/navigation.js';
 
 const STAMP = () => Date.now().toString().slice(-6);
+
+// One day per application: the server refuses leave overlapping a pending or approved one, and these
+// tests all apply for the first employee. 40+ keeps clear of hr-leave-crud's days (80+).
+let nextDay = 40;
 
 /**
  * Helper: Apply a leave application through the UI drawer.
@@ -48,19 +53,19 @@ async function applyLeaveViaDrawer(page, reason) {
   // Select first available leave type
   await antFormSelect(page, 'Leave Type', null, { first: true });
 
-  // Pick From Date (today)
+  // From and To: a day no other application in this run has taken
+  const day = dayAhead(nextDay++);
   const fromDateFormItem = page
     .locator('.ant-form-item')
     .filter({ hasText: 'From Date' })
     .first();
-  await antDatePickerToday(page, fromDateFormItem.locator('.ant-picker').first());
+  await antDatePickerType(page, fromDateFormItem.locator('.ant-picker').first(), day);
 
-  // Pick To Date (today)
   const toDateFormItem = page
     .locator('.ant-form-item')
     .filter({ hasText: 'To Date' })
     .first();
-  await antDatePickerToday(page, toDateFormItem.locator('.ant-picker').first());
+  await antDatePickerType(page, toDateFormItem.locator('.ant-picker').first(), day);
 
   // Fill reason with unique stamp to identify this specific application
   const uniqueReason = reason || `E2E leave ${STAMP()}`;
