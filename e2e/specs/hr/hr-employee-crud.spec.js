@@ -18,6 +18,8 @@
 import { test, expect } from '@playwright/test';
 import {
   antDatePickerToday,
+  antDatePickerType,
+  dayAhead,
   antTableWaitForData,
   antMessageContains,
   antFormFill,
@@ -33,6 +35,8 @@ const STAMP = () => Date.now().toString().slice(-6);
 
 // ── Master data IDs (seeded in beforeAll) ──
 let unitId, departmentId, designationId, shiftId;
+// The labels the cascading selects show for that chain (unit "CODE - Name", the others their name)
+let unitLabel, departmentName, designationName;
 let api;
 
 // ── 12 varied employee profiles ──
@@ -66,6 +70,19 @@ async function pickSelectById(page, idSelector, optionTitle) {
   } else {
     await dropdown.locator('.ant-select-item-option').first().click();
   }
+  await dropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+}
+
+/**
+ * Pick a named option from a searchable Ant Design Select by its input #id: typing filters the list, so
+ * an option far down the virtual list is rendered before it is clicked.
+ */
+async function pickSelectByName(page, idSelector, title) {
+  await page.locator(idSelector).click();
+  await page.locator(idSelector).fill(title);
+  const dropdown = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)').last();
+  await dropdown.waitFor({ state: 'visible', timeout: 5000 });
+  await dropdown.getByTitle(title, { exact: true }).click();
   await dropdown.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
 }
 
@@ -104,15 +121,15 @@ async function createEmployeeViaForm(page, profile, stamp) {
   // Gender — use exact title match
   await selectOption(page, 'Gender', profile.gender === 'MALE' ? 'Male' : 'Female');
 
-  // Date of Birth — required in DB (NOT NULL)
+  // Date of Birth — required in DB (NOT NULL); the form refuses anyone under 14, so about 25 years back
   const dobFormItem = page.locator('.ant-form-item').filter({ hasText: 'Date of Birth' }).first();
-  await antDatePickerToday(page, dobFormItem.locator('.ant-picker').first());
+  await antDatePickerType(page, dobFormItem.locator('.ant-picker').first(), dayAhead(-9131));
 
   // Marital Status — required in DB (NOT NULL)
   await selectOption(page, 'Marital Status', 'Single');
 
-  // Mobile Number — unique per run
-  await antFormFill(page, 'Mobile Number', `9${stamp}${String(Math.floor(Math.random() * 9000) + 1000)}`);
+  // Mobile Number — unique per run, exactly 10 digits as the form requires
+  await antFormFill(page, 'Mobile Number', `9${stamp.slice(-5)}${String(Math.floor(Math.random() * 9000) + 1000)}`);
 
   // Present Address — required in DB (NOT NULL, TEXT)
   const addressTextarea = page.locator('.ant-form-item').filter({ hasText: 'Present Address' }).first().locator('textarea').first();
@@ -131,16 +148,13 @@ async function createEmployeeViaForm(page, profile, stamp) {
     await empNoInput.fill(`E2E-${stamp}-${Math.floor(Math.random() * 9000) + 1000}`);
   }
 
-  // Department — select first available
-  await pickSelectById(page, '#departmentId');
+  // Unit -> Department -> Designation cascade: each select lists the children of the one before, so
+  // pick the chain the setup found, by name
+  await pickSelectByName(page, '#unitId', unitLabel);
   await page.waitForTimeout(300);
-
-  // Designation — select first available
-  await pickSelectById(page, '#designationId');
+  await pickSelectByName(page, '#departmentId', departmentName);
   await page.waitForTimeout(300);
-
-  // Unit — select first available
-  await pickSelectById(page, '#unitId');
+  await pickSelectByName(page, '#designationId', designationName);
   await page.waitForTimeout(300);
 
   // Shift — required NOT NULL in DB
@@ -187,8 +201,8 @@ async function createEmployeeViaForm(page, profile, stamp) {
   // Should see success toast
   await antMessageContains(page, /created|success/i);
 
-  // Should redirect to employee list
-  await page.waitForURL(/\/hr\/employees/, { timeout: 15000 });
+  // Should redirect to the employee list itself (the form's own /hr/employees/new matches a looser pattern)
+  await page.waitForURL(/\/hr\/employees\/?(\?.*)?$/, { timeout: 15000 });
 }
 
 // ── Seed master data via API before tests ──
@@ -196,49 +210,34 @@ test.beforeAll(async () => {
   api = await createAuthenticatedClient();
   const stamp = STAMP();
 
-  // 1. Create Unit (or use existing)
-  const unitsResp = await api.get('/units/active');
-  if (unitsResp.data && unitsResp.data.length > 0) {
-    unitId = unitsResp.data[0].id;
-  } else {
-    const createUnit = await api.post('/units', {
-      unitCode: `E2E-FAC-${stamp}`,
-      unitName: `E2E Test Unit ${stamp}`,
-      city: 'Tirupur',
-      state: 'TN',
-      isActive: true,
-    });
-    unitId = createUnit.data?.id;
+  // 1-3. A unit -> department -> designation chain the cascading selects can follow: the first active
+  // designation whose department belongs to an active unit, else a new one
+  const units = (await api.get('/units/active')).data || [];
+  const depts = (await api.get('/hr/departments/active')).data || [];
+  const desigs = (await api.get('/hr/designations/active')).data || [];
+  let unit, dept, desig;
+  for (const g of desigs) {
+    const d = depts.find((x) => x.id === g.departmentId);
+    const u = d && units.find((x) => x.id === d.unitId);
+    if (u) { unit = u; dept = d; desig = g; break; }
   }
-
-  // 2. Create Department (or use existing)
-  const deptsResp = await api.get('/hr/departments/active');
-  if (deptsResp.data && deptsResp.data.length > 0) {
-    departmentId = deptsResp.data[0].id;
-  } else {
-    const createDept = await api.post('/hr/departments', {
-      code: `E2E-DEP-${stamp}`,
-      name: `E2E Department ${stamp}`,
-      unitId,
-      isActive: true,
-    });
-    departmentId = createDept.data?.id;
+  if (!unit) {
+    unit = (await api.post('/units', {
+      unitCode: `E2E-FAC-${stamp}`, unitName: `E2E Test Unit ${stamp}`, city: 'Tirupur', state: 'TN', isActive: true,
+    })).data;
+    dept = (await api.post('/hr/departments', {
+      code: `E2E-DEP-${stamp}`, name: `E2E Department ${stamp}`, unitId: unit.id, isActive: true,
+    })).data;
+    desig = (await api.post('/hr/designations', {
+      code: `E2E-DES-${stamp}`, name: `E2E Designation ${stamp}`, departmentId: dept.id, category: 'WORKER', isActive: true,
+    })).data;
   }
-
-  // 3. Create Designation (or use existing)
-  const designResp = await api.get('/hr/designations/active');
-  if (designResp.data && designResp.data.length > 0) {
-    designationId = designResp.data[0].id;
-  } else {
-    const createDesig = await api.post('/hr/designations', {
-      code: `E2E-DES-${stamp}`,
-      name: `E2E Designation ${stamp}`,
-      departmentId,
-      category: 'WORKER',
-      isActive: true,
-    });
-    designationId = createDesig.data?.id;
-  }
+  unitId = unit.id;
+  departmentId = dept.id;
+  designationId = desig.id;
+  unitLabel = `${unit.unitCode} - ${unit.unitName}`;
+  departmentName = dept.name;
+  designationName = desig.name;
 
   // 4. Create Shift (or use existing)
   const shiftsResp = await api.get('/hr/shifts/active');
@@ -304,7 +303,7 @@ test.describe('HR Employee — Bulk Creation (12 employees)', () => {
       await createEmployeeViaForm(page, profile, stamp);
 
       // Verify we're back on the list page
-      await expect(page.locator('.ant-table')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.ant-table').first()).toBeVisible({ timeout: 15000 });
     });
   }
 });
@@ -395,16 +394,16 @@ test.describe('HR Employee — Filters', () => {
 
     // Search with a term unlikely to match
     const searchInput = page.getByPlaceholder(/Search by name/i);
-    await searchInput.fill('ZZZNOMATCH999');
 
-    // Wait for debounce + API
-    await page.waitForTimeout(500);
-    await page.waitForResponse(
-      (r) => r.url().includes('/hr/employees/search'),
+    // Listen before typing: the debounced search can answer before a later wait starts
+    const searched = page.waitForResponse(
+      (r) => r.url().includes('/hr/employees/search') && r.url().includes('ZZZNOMATCH999'),
       { timeout: 10000 }
     ).catch(() => {});
+    await searchInput.fill('ZZZNOMATCH999');
+    await searched;
 
-    const filteredCount = await page.locator('.ant-table-row').count();
-    expect(filteredCount).toBeLessThan(initialCount);
+    await expect.poll(() => page.locator('.ant-table-row').count(), { timeout: 10000 })
+      .toBeLessThan(initialCount);
   });
 });

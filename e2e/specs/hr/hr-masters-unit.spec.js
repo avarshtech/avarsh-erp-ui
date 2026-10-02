@@ -100,7 +100,7 @@ test.describe('HR Masters — Units', () => {
         (r) => r.url().includes('/api/v1/units') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
 
     expect(saveResp.status()).toBeGreaterThanOrEqual(200);
@@ -122,7 +122,7 @@ test.describe('HR Masters — Units', () => {
     await page.getByRole('heading', { name: /New Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Click Save without filling anything
-    await page.getByRole('button', { name: /^Save$/i }).click();
+    await page.getByRole('button', { name: /^(save\s+)?save$/i }).click();
 
     // Ant Design inline validation errors should appear
     await expect(page.getByText(/Please enter a unit code/i)).toBeVisible({ timeout: 5000 });
@@ -145,7 +145,7 @@ test.describe('HR Masters — Units', () => {
     await page.getByRole('heading', { name: /Edit Unit|View Unit/i }).waitFor({ state: 'visible', timeout: 8000 });
 
     // Check if edit is possible (not read-only)
-    const saveBtn = page.getByRole('button', { name: /^Save$/i });
+    const saveBtn = page.getByRole('button', { name: /^(save\s+)?save$/i });
     const isReadOnly = await saveBtn.isHidden().catch(() => true);
     test.skip(isReadOnly, 'Unit form is read-only for this user');
 
@@ -187,7 +187,7 @@ test.describe('HR Masters — Units', () => {
         (r) => r.url().includes('/api/v1/units') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(createResp.status()).toBeGreaterThanOrEqual(200);
     expect(createResp.status()).toBeLessThan(300);
@@ -211,7 +211,7 @@ test.describe('HR Masters — Units', () => {
         (r) => r.url().includes('/api/v1/units') && r.request().method() === 'PUT',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(updateResp.status()).toBeGreaterThanOrEqual(200);
     expect(updateResp.status()).toBeLessThan(300);
@@ -241,7 +241,7 @@ test.describe('HR Masters — Units', () => {
         (r) => r.url().includes('/api/v1/units') && r.request().method() === 'POST',
         { timeout: 20000 }
       ),
-      page.getByRole('button', { name: /^Save$/i }).click(),
+      page.getByRole('button', { name: /^(save\s+)?save$/i }).click(),
     ]);
     expect(createResp.status()).toBeGreaterThanOrEqual(200);
     expect(createResp.status()).toBeLessThan(300);
@@ -258,13 +258,14 @@ test.describe('HR Masters — Units', () => {
     await page.getByRole('button', { name: /Delete/i }).click();
 
     // Confirm via Ant Design modal
-    await antModalConfirm(page, { buttonText: /Delete/i });
-
-    // Wait for DELETE API call
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/v1/units') && r.request().method() === 'DELETE',
-      { timeout: 20000 }
-    );
+    // Listen for the DELETE before confirming: a fast response would otherwise be gone already
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/v1/units') && r.request().method() === 'DELETE',
+        { timeout: 20000 }
+      ),
+      antModalConfirm(page, { buttonText: /Delete/i }),
+    ]);
 
     // Success toast
     await antMessageContains(page, /deleted|success/i);
