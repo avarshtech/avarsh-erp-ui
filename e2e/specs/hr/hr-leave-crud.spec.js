@@ -262,8 +262,8 @@ test.describe('HR Leave — Leave Balances Page', () => {
     await navigateWithAuth(page, '/hr/leaves/balances');
     await waitForPageReady(page);
 
-    // Page header
-    await expect(page.getByText('Leave Balances')).toBeVisible({ timeout: 10000 });
+    // Page header (the side menu carries the same words once the HR group is open)
+    await expect(page.getByRole('heading', { name: 'Leave Balances' })).toBeVisible({ timeout: 10000 });
 
     // Year select should be visible
     await page.locator('.ant-select').first().waitFor({ state: 'visible', timeout: 5000 });
