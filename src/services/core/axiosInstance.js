@@ -89,6 +89,19 @@ axiosInstance.interceptors.response.use(
         return Promise.reject(error);
       }
 
+      // The working branch sent in X-Branch-Id is not one this user may work in (taken off their
+      // list, or left by another account in this browser): the server names it in `workingBranch`.
+      // Forget it, so the screens refetch with the user's own branches; the server's message still
+      // shows below. A refused record leaves the working branch alone. No retry, so no loop.
+      if (status === 403 && data?.error === 'BRANCH_ACCESS_DENIED' && data?.workingBranch != null) {
+        try {
+          localStorage.setItem('activeBranchId', 'all');
+        } catch {
+          // storage unavailable — nothing was stored to forget
+        }
+        window.dispatchEvent(new Event('erp:branch-reset'));
+      }
+
       // Sample dispatch blocked on its commercial invoice — the screen shows a
       // modal naming the uncovered SRs, so skip the default toast
       if (status === 409 && data?.error === 'INVOICE_REQUIRED') {

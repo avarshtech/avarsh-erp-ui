@@ -19,8 +19,9 @@ import { getCurrentUser } from '../services/auth/authService';
  * purpose — a list filtered to "all" still creates its documents somewhere.
  *
  * `allowedBranches` is what the switcher offers: the user's allow-list when one
- * is set (sys_user_branches), otherwise every active branch. Not a security
- * boundary; the server does not enforce it in this phase.
+ * is set (sys_user_branches), otherwise every active branch. The server enforces
+ * the same list when RBAC runs in ENFORCE (review F095): a branch outside it is a
+ * 403 BRANCH_ACCESS_DENIED, after which axiosInstance forgets the stored branch.
  */
 const STORAGE_KEY = 'activeBranchId';
 const ALL = 'all';
@@ -55,16 +56,26 @@ export const BranchProvider = ({ children }) => {
   // Runs each time the list is (re)fetched. A fresh browser starts at the
   // user's home branch and that choice is written down, so X-Branch-Id is sent
   // from the first request; a remembered branch that has since been
-  // deactivated falls back to "all".
+  // deactivated, or is not on the user's list, falls back to "all".
   const reconcileStored = useCallback((list) => {
     const current = readStored();
+    const listed = getCurrentUser()?.branchIds;
+    const usable = (id) => list.some((b) => b.id === id)
+      && (!Array.isArray(listed) || !listed.length || listed.includes(id));
     if (current == null) {
       const home = getCurrentUser()?.defaultBranchId;
-      setActiveBranch(list.some((b) => b.id === home) ? home : null);
-    } else if (current !== ALL && !list.some((b) => b.id === Number(current))) {
+      setActiveBranch(usable(home) ? home : null);
+    } else if (current !== ALL && !usable(Number(current))) {
       setActiveBranch(null);
     }
   }, [setActiveBranch]);
+
+  // axiosInstance stores "all" when the server refuses the working branch; follow it here
+  useEffect(() => {
+    const onReset = () => setStored(readStored());
+    window.addEventListener('erp:branch-reset', onReset);
+    return () => window.removeEventListener('erp:branch-reset', onReset);
+  }, []);
 
   const refresh = useCallback(() => getActiveBranches()
     .then(({ data }) => {
