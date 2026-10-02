@@ -38,8 +38,15 @@ async function goTo(page, path) {
  *
  * The service worker is only built for production, so under `vite dev` its
  * registration fails with an HTML MIME type. That is the harness, not the app.
+ *
+ * A failed request logs only "Failed to load resource", with no URL, and the
+ * harness's own sign-in causes some: the saved login carries no access token
+ * (it lives in memory) and the refresh cookie is not sent from :3004 to :8092,
+ * so a page load's first calls answer 401/403 until navigateWithAuth signs in
+ * again. Those messages are skipped; this screen's own API failures are
+ * recorded by URL instead.
  */
-const ENVIRONMENTAL = /ServiceWorker|service worker|unsupported MIME type|favicon|ResizeObserver/i;
+const ENVIRONMENTAL = /ServiceWorker|service worker|unsupported MIME type|favicon|ResizeObserver|Failed to load resource/i;
 
 function watchConsole(page) {
   const errors = [];
@@ -48,6 +55,11 @@ function watchConsole(page) {
   });
   page.on('pageerror', (e) => {
     if (!ENVIRONMENTAL.test(String(e))) errors.push(String(e));
+  });
+  page.on('response', (r) => {
+    if (r.status() >= 400 && BP_ENDPOINT.test(r.url())) {
+      errors.push(`${r.status()} ${r.request().method()} ${r.url()}`);
+    }
   });
   return errors;
 }
