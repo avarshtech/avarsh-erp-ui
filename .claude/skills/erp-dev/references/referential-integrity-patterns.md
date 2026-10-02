@@ -403,6 +403,14 @@ Before shipping any approval flow change:
 2. Attempt flow edits and verify the guards trigger correctly.
 3. Open the approval history view for an old PO and verify level names still render correctly after edits.
 
+#### Rule 6 — A document leaving "pending" by its own action takes its request with it
+
+When a module action moves a document out of its pending-approval status (a bill queried, referred back or put on hold, a production PO cancelled), cancel its engine request in the same transaction: `approvalRequestService.cancelRequest(entityType, id, userId, reason)`. Left pending, the request stays in the approvers' inbox, approving it fails, and the document cannot be sent again. Engine outcomes (the `*ApprovalListener` callbacks) never cancel; they are the request's own decision. Example: `BpStatusService.withdrawFromApproval`.
+
+#### Rule 7 — `apply*` methods check the transition, so a decision lands once
+
+Every `applyApproved` / `applyRejected` / `applyReferredBack` checks the document's current status before it moves a balance, writes stock or corrects attendance, with a `shared/state/Transitions` table (`hr/domain/HrRequestStatus`, `IssueStatus.FLOW`) or the module's own guard. A repeated or late call (a double click, a retried request, the no-flow path after an engine decision) is a 409, never a second deduction. The one exception is the supplier PO's repeated approve, which answers 200 without applying anything, for the owner app.
+
 ### Hibernate pitfall — two-bag fetch
 
 `ApprovalRequest.actions` (List) and `ApprovalFlow.levels` (List) are both Hibernate **bags** (no `@OrderColumn`). Never put both in the same `@EntityGraph` or `JOIN FETCH` — Hibernate 6 throws `"Could not generate fetch"` at query plan time, not at runtime. Always split into separate queries or use lazy-load within `@Transactional`.

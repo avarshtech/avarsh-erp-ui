@@ -512,3 +512,19 @@ version that posted the wrong quantity or amount.
   - The advance amount taken is shared over the advances due that month, oldest first. A fully recovered advance is RECOVERED. Any other advance stays PENDING with the rest owed and moves to the next month (December moves to January of the next year).
 - Never post "the latest recovery of the loan", and never mark an advance recovered without the
   amount the payslip took.
+
+### Receipt, inspection and the PO's received status
+Review findings F065 and F066:
+- A QC decision that creates stock needs a live receipt. Approve, conditional pass and reject-with-back-up are allowed only while the GRN is QC_Pending, or Closed when a referred-back QC is decided again (`QCService.requireGrnOpenForDecision`). They are refused while the GRN is Pending_Reversal, Reversed or Cancelled.
+- A GRN is reversed before its inspection, not after: `requestReversal` refuses once any non-Draft QC exists (`QCRepository.existsByGrnIdAndStatusNot(grnId, Draft)`).
+- `GRNService.recomputePoStatus`:
+  - runs under the PO's row lock (`findByIdForUpdate`);
+  - acts only on a Sent_To_Supplier, Partially_Received or Completed PO, so a cancelled or referred-back PO keeps its status;
+  - counts submitted receipts only (`sumSubmittedReceivingQtyByPoLineItem`: no Draft, Reversed or Cancelled GRN).
+- Over-receipt checks keep `sumReceivingQtyByPoLineItemForPo`, which counts drafts too.
+
+### Earned-leave encashment and committed payroll runs
+Review findings F070 and F071:
+- Approving an EL encashment run moves `ElEncashmentRecord.elBalanceDays` into `LeaveBalance.encashed`. Those are the days the run paid for: `elAmount = elBalanceDays × (basic + DA) / 26`. Never move `totalDays`, which is opening + accrued.
+- Approval refuses when an employee's closing balance has fallen below those days since the run was calculated. Cancel the run and calculate it again.
+- Bonus reads only committed payroll runs, `PayrollRun.isCommitted()` (APPROVED or PAID). The PT return reads committed runs plus PROCESSED ones.
