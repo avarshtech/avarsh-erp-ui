@@ -549,6 +549,14 @@ Review findings F044 and F234:
 - A linked debit note is deducted once per PO line a bill covers, and only on one live bill of the PO (`BpBillRepository.findDebitNoteIdsLinkedOnOtherBills`). Cancelled notes are skipped.
 - A debit refresh merges in place: kept rows keep their ids and drop reasons. Only `MATERIAL_REJECTION` debits count against rejected quantity.
 
+### Stock moves through the ledger
+Review findings F015 and F021 (`inventory/stock/domain/StockLedger`, table `inv_stock_movements`):
+- A lot's quantity or status changes only through the ledger: `receive`, `topUp`, `take`, `takeFifo`, `putBack`, `recount`, `hold`, `release`, `markReturned`. Each one checks the move, saves the lot and appends one movement naming the document (`DocRef`: type, id, number, date, line). Never set `availableQty` or `stockStatus` on a lot directly in new code.
+- So far opening stock, returns to supplier and cutting-room returns post through it. QC holds, counts, transfers and issues still write lots themselves until steps S5-S8 move them over; follow the step plan rather than adding another direct writer.
+- Lock the parent document first, then the lots through `lockFabric`, `lockAccessories` or `lockFifo`, which lock in ascending id order. The ledger joins the caller's transaction (MANDATORY) and refuses a read-only one, so the caller's method needs its own read-write `@Transactional`.
+- Statuses follow `StockStatus.FLOW`; a lot that went back to the supplier never comes back.
+- A seed that inserts lots must insert their BALANCE_FORWARD movements too (see `db/e2eseed/V20261003100100__seed_stock_movements.sql`); PostgreSQL refuses UPDATE and DELETE on the movements table.
+
 ### Bills are judged line by line
 Review finding F020 (`inventory/billpassing/service/calc/BillLineVariances`):
 - Quantity and rate are compared per GRN line. Bill-wide totals let one line's over-billing hide behind another's under-billing, and an average rate over different items raised a rate exception with every line at its PO rate.
