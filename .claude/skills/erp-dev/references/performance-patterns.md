@@ -322,6 +322,15 @@ for (BomLine line : bom.getLines()) {
 }
 ```
 
+#### The safety net: batch fetching is on everywhere
+
+`application.properties` sets `hibernate.default_batch_fetch_size=64` (P0.11a): a lazy association or
+collection touched across a page of rows loads in `IN` batches of up to 64, not one query per row. It
+takes the N+1 out of every list without changing what is loaded, but it is still several queries: a
+list endpoint that reads an association for every row should fetch it (Fix 1) or batch-load it (Fix 2).
+`hibernate.log_slow_query=500` logs any query slower than half a second with its SQL, so a slow list
+shows up in the logs.
+
 ---
 
 ### Server-Side Caching
@@ -431,8 +440,18 @@ reach for `@Async` to make a slow call "non-blocking" (review finding G3.1).
 | Work | Where it runs |
 |------|---------------|
 | A remote call the user waits for (Gemini extraction, e-way bill) | In the request, with a timeout, **outside** any `@Transactional` method |
-| A side effect that must happen (supplier e-mail, WhatsApp) | A row written in the business transaction, sent by the outbox job (roadmap P0.12; today the PO e-mail still runs on `emailTaskExecutor` via `PoEmailEventListener`) |
+| A side effect that must happen (supplier e-mail, WhatsApp) | A row written in the business transaction, sent by the outbox job (roadmap P0.12, not built yet). Until then: never inside the transaction. The cost-sheet WhatsApp registers an `afterCommit` synchronization and hands the send to `notificationTaskExecutor` (`CostSheetService.afterCommit`); the PO e-mail runs on `emailTaskExecutor` via `PoEmailEventListener` |
 | A side effect that may be lost (push) | Synchronously in `afterCommit`, before the response |
+
+Work that leaves the request thread never reads the `HttpServletRequest`: Tomcat recycles it once the
+response is sent, so a later read throws or returns another request's headers. Capture what is needed first
+(`activity/userlog/RequestInfo.of(request)` for the address and user agent). An `@Async` method that names no
+executor runs on `defaultAsyncExecutor` (2-8 threads, 500 queued, caller-runs); every executor finishes within
+the 8 s shutdown phase.
+
+Outbound HTTP goes through the auto-configured `RestClient.Builder`, which carries the global
+`spring.http.clients.connect-timeout` (10 s) and `read-timeout` (150 s); never build a client without them. An API
+key goes in a header (Gemini: `x-goog-api-key`), never in the URL, where logs and error messages print it.
 
 Where `@Async` remains, its method returns `void` or a `Future` — never a value. Spring rejects
 any other return type on **every** call (`AsyncExecutionAspectSupport.doSubmit`), which is how

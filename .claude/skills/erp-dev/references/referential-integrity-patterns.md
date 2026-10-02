@@ -102,37 +102,41 @@ public final class ForeignKeyConstraintMessages {
 
 For entities stored as references inside JSONB columns (no DB FK), add application-level checks.
 
-### Repository Pattern — Native JSONB Query
+### Repository Pattern — Candidates by Either Spelling
+
+The same native SQL has to run on PostgreSQL and on the H2 e2e database, so no jsonb operator (`@>`, `->>`)
+is used: the column is cast to text and matched with `LIKE`. PostgreSQL renders jsonb text with a space after
+the colon (`"processId": 5`) and H2 does not (`"processId":5`), so **both spellings are matched**. A single
+spelling was the review's F014: the order, process and BOM delete guards never matched on PostgreSQL. The match
+is textual, so asking for 5 also returns 50: the query returns candidates, never a yes/no.
 
 ```java
-// Check if JSONB array of objects contains a specific key-value
-@Query(value = "SELECT EXISTS(SELECT 1 FROM bom_lines WHERE processes @> CAST(:jsonParam AS jsonb))",
+// bom/repository/BomLineRepository
+@Query(value = "SELECT * FROM bom_lines"
+        + " WHERE CAST(processes AS VARCHAR) LIKE CONCAT('%\"processId\": ', :processId, '%')"
+        + " OR CAST(processes AS VARCHAR) LIKE CONCAT('%\"processId\":', :processId, '%')",
         nativeQuery = true)
-boolean existsByProcessIdInProcesses(@Param("jsonParam") String jsonParam);
-
-// Check if JSONB array of strings contains a specific value
-@Query(value = "SELECT EXISTS(SELECT 1 FROM bom_lines WHERE parts_name @> CAST(:jsonParam AS jsonb))",
-        nativeQuery = true)
-boolean existsByPartNameInPartsName(@Param("jsonParam") String jsonParam);
+List<BomLine> findMentioningProcess(@Param("processId") Integer processId);
 ```
 
-### Service Pattern — Check Before Delete
+The others: `PurchaseOrderRepository.findMentioningOrder` (`order_references`), `PoLineItemRepository.findByBomIdInSources`
+(`bom_line_sources`). A JSON array of plain strings (`parts_name`) has no colon, so its quoted-value match is the
+same on both databases.
+
+### Service Pattern — Confirm the Exact Id, Then Refuse
 
 ```java
-@Transactional
-public void delete(Integer id) {
-    Process process = processRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Process not found with id: " + id));
-
-    // Check JSONB reference
-    String jsonParam = "[{\"processId\":" + id + "}]";
-    if (bomLineRepository.existsByProcessIdInProcesses(jsonParam)) {
-        throw new ResourceReferencedException("Process", "BOM Lines");
-    }
-
-    processRepository.deleteById(id);
+// masterdata/process/ProcessService
+private boolean usedByBomLines(Integer id) {
+    return bomLineRepository.findMentioningProcess(id).stream()
+            .filter(line -> line.getProcesses() != null)
+            .flatMap(line -> line.getProcesses().stream())
+            .anyMatch(process -> process != null && id.equals(intOf(process.get("processId"))));
 }
 ```
+
+`intOf` accepts a number or its digits, since the screens have written both. Orders use `PoOrderRefs.orderId(ref)`.
+The test is `shared/JsonReferenceDeleteGuardsTest`. The lasting fix is a link table (roadmap P0.10).
 
 ### ResourceReferencedException
 
@@ -419,6 +423,16 @@ Every `applyApproved` / `applyRejected` / `applyReferredBack` checks the documen
 3. Add it to `CONDITION_FIELDS`.
 
 A condition on a key the module never sends never matches, and the document then auto-approves unseen. A stored flow the engine cannot read, or one with an unknown operator, refuses submission (409) rather than counting as no match.
+
+#### Rule 9 — Modules submit their own documents; the generic endpoints are for superusers
+
+`POST /approval-requests/submit` takes its routing figures from the request body, so a caller could pick its own flow (a PO sent with a small `grandTotal` fell to the low-value flow, review F100). It and `/{id}/cancel` need a superuser (`ApprovalPermission.checkSubmit` / `checkCancel`). A module submits through its own action with the figures it holds. The web app has no caller (`approvalFlowService.submitForApproval` is unused): keep it that way.
+
+### One row where the business has one
+
+These rules were added while the tables were empty (P0.10c), each with a service check and a data-checked PostgreSQL index:
+- One active organisation (F250): activating a company profile, by create or by update, clears the flag on the others and flushes first (`OrganisationInfoService.deactivateOthers`), because the invoice, PO print and e-way bill read it through a single-row finder. Index `uq_org_single_active`. A profile sent without the flag is stored without it and leaves the active one alone.
+- One style number per buyer, ignoring case (F251): `StyleRepository.existsDuplicate` makes it a 409 `CONFLICT`, index `ux_stl_styles_buyer_style`. The number is stored trimmed.
 
 ### Hibernate pitfall — two-bag fetch
 

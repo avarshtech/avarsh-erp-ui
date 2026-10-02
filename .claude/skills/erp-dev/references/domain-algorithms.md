@@ -480,8 +480,8 @@ finalPriceUsd (USD)  = totalPrice / usdToInrRate
 
 ## Stock & Payroll Posting Rules
 
-Verified against erp-purchase on 2026-10-02 (review findings F001–F004). Each rule replaced a
-version that posted the wrong quantity or amount.
+Verified against erp-purchase on 2026-10-02 (review findings F001–F004 and those named below). Each
+rule replaced a version that posted the wrong quantity or amount.
 
 ### QC is per GRN line
 - A QC inspects one GRN line (`inventory/qc/domain/QC.poLineItemId`). `StockPopulationService.populateFromQc`
@@ -548,3 +548,28 @@ Review findings F104, F069, F056 and F068:
 Review findings F044 and F234:
 - A linked debit note is deducted once per PO line a bill covers, and only on one live bill of the PO (`BpBillRepository.findDebitNoteIdsLinkedOnOtherBills`). Cancelled notes are skipped.
 - A debit refresh merges in place: kept rows keep their ids and drop reasons. Only `MATERIAL_REJECTION` debits count against rejected quantity.
+
+### Bills are judged line by line
+Review finding F020 (`inventory/billpassing/service/calc/BillLineVariances`):
+- Quantity and rate are compared per GRN line. Bill-wide totals let one line's over-billing hide behind another's under-billing, and an average rate over different items raised a rate exception with every line at its PO rate.
+- A quantity block clears only when confirmed debits cover each over-billed line at its own rate. Debits count on their own `grnLineItemId`; unlinked ones are pooled. Rate-difference debits never count.
+- Rate exceptions name the lines above their PO rate. A line billed with nothing accepted is red. On a multi-line bill the tolerance matrix reads the worst line; a single-line bill reads exactly as before.
+
+### QC keeps its subject; a judged fabric QC takes its verdict from the rolls
+Review finding F104 (3):
+- A saved QC keeps its type, GRN and PO line (`QCService.requireSameSubject`, set once in `syncHeader`). A save naming another is a 409 ("Cancel it and raise another."); a field the client leaves out is not a change.
+- Once every roll of a fabric QC is judged, the verdict and the passed and failed counts come from the rolls (`QCService.verdictFromRolls`): any failed roll fails it. While a roll is undecided the client's figures stand.
+
+### Sewing hours and incentives
+Review findings F059 and F060:
+- The OT hour is an hour worked (`SewHourlyCalculator.workedHours`): its output counted while its hour did not.
+- An incentive is one payout per operator per day (`SewIncentiveService`), on the standard minutes of everything they made over the distinct hours they were counted in, across operations and lines; the worse line's DHU decides the deduction. Slabs are read once per run (`IncentiveSlabService.activeSlabs`, then the static `IncentiveSlabService.slabFor(slabs, efficiency)`).
+
+### Full and final settlement, bonus, gratuity, PT and leave
+Review findings F073, F027, F316, F028 and F013:
+- Changing an F&F amount, or recalculating it, withdraws the open request and sends the new figures. Approval is refused ("Recalculate the settlement, then approve it.") when payroll paid the leaving month after the calculation, or when the loans or advances owed now are less than the settlement deducts.
+- Settling posts what it squared: loans oldest first (a `LoanRecovery` "Recovered in F&F #id"), advances through `PayrollRecoveries.allocateAdvanceRecovery`, and the encashed days off the EL balance, only when `elEncashmentAmount > 0`.
+- The leaving month is paid once. The settlement adds no pending salary when a committed run already paid it. Payroll processing leaves out employees whose F&F is APPROVED or SETTLED by the month's end (`FnfSettlementRepository.findEmployeeIdsPaidOutBy`), and a run processed before that is refused on approval until it is processed again. A leaver on the month's last day is paid that month by the settlement.
+- Bonus follows the Payment of Bonus Act in one place, `hr/service/BonusRules`: 8.33% on the wage capped at 7,000, nothing above the 21,000 ceiling or under 30 days. Gratuity: 15/26 of basic + DA per completed year after five, a remainder of more than six months counting as one more, capped at 20 lakh.
+- Professional tax counts only the slabs in effect in the payroll month, on the half-yearly income in whole rupees (`StatutoryContributionCalculator.professionalTax`).
+- Leave overlapping a PENDING or APPROVED application is refused, except the first and second half of one day. Pending days are not available again, and approval re-checks the balance before anything changes (`LeaveService`).
