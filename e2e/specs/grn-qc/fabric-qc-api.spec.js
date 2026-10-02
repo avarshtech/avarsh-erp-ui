@@ -24,6 +24,7 @@ import {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
+// Used only when the GRN recorded no width or GSM for its rolls
 const STD_WIDTH = 44;
 const STD_GSM = 180;
 
@@ -56,6 +57,16 @@ async function submitFreshGrn(api, poNumber) {
   return { grn, poLineItemId: item.id, po };
 }
 
+/**
+ * The standard a roll is judged against: the width and GSM the GRN recorded for it, which come from the
+ * item variant, so the figures depend on the seeded fabric rather than on this file.
+ */
+function standards(grn, poLineItemId) {
+  const line = (grn.lineItems || []).find((li) => li.poLineItemId === poLineItemId) || grn.lineItems?.[0];
+  const roll = line?.rolls?.[0] || {};
+  return { width: Number(roll.width) || STD_WIDTH, gsm: Number(roll.gsm) || STD_GSM };
+}
+
 /** Track QC IDs for cleanup. */
 function trackQc(qc) {
   if (qc?.id) createdQcIds.push(qc.id);
@@ -83,12 +94,13 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
   test('Combo 15 (E2E-FQ-1): All 3 rolls PASS — width/GSM exact, 0 defects', async () => {
     const { grn, poLineItemId } = await submitFreshGrn(api, 'E2E-FQ-1');
+    const std = standards(grn, poLineItemId);
 
     const payload = fabricQcPayload(grn, poLineItemId, {
       rollOverrides: [
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
+        { actualWidth: std.width, actualGsm: std.gsm },
+        { actualWidth: std.width, actualGsm: std.gsm },
       ],
       defects: [],
       inspector: 'E2E Inspector Combo15',
@@ -110,15 +122,16 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
   test('Combo 16 (E2E-FQ-2): 2 rolls FAIL on width/GSM out of tolerance', async () => {
     const { grn, poLineItemId } = await submitFreshGrn(api, 'E2E-FQ-2');
+    const std = standards(grn, poLineItemId);
 
     const payload = fabricQcPayload(grn, poLineItemId, {
       rollOverrides: [
-        // R1: width 41 → 6.8% off standard 44 → exceeds 5% → FAIL
-        { actualWidth: 41, actualGsm: STD_GSM },
-        // R2: GSM 170 → 5.6% off standard 180 → exceeds 5% → FAIL
-        { actualWidth: STD_WIDTH, actualGsm: 170 },
+        // R1: width 7% off the standard → exceeds 5% → FAIL
+        { actualWidth: Math.round(std.width * 0.93 * 100) / 100, actualGsm: std.gsm },
+        // R2: GSM 6% off the standard → exceeds 5% → FAIL
+        { actualWidth: std.width, actualGsm: Math.round(std.gsm * 0.94 * 100) / 100 },
         // R3: normal → PASS
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
       ],
       defects: [],
       inspector: 'E2E Inspector Combo16',
@@ -134,6 +147,7 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
   test('Combo 17 (E2E-FQ-3): 2 rolls FAIL on defect count exceeding threshold', async () => {
     const { grn, poLineItemId } = await submitFreshGrn(api, 'E2E-FQ-3');
+    const std = standards(grn, poLineItemId);
 
     const grnRolls = grn.lineItems[0]?.rolls || [];
     const defectTypeId = defectTypes[0].id;
@@ -141,9 +155,9 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
     const payload = fabricQcPayload(grn, poLineItemId, {
       rollOverrides: [
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
+        { actualWidth: std.width, actualGsm: std.gsm },
+        { actualWidth: std.width, actualGsm: std.gsm },
       ],
       defects: [
         // R1: 4 defects → exceeds threshold (3) → FAIL
@@ -166,6 +180,7 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
   test('Combo 18 (E2E-FQ-4): Mixed — R1 PASS, R2 FAIL (width), R3 FAIL (defects)', async () => {
     const { grn, poLineItemId } = await submitFreshGrn(api, 'E2E-FQ-4');
+    const std = standards(grn, poLineItemId);
 
     const grnRolls = grn.lineItems[0]?.rolls || [];
     const defectTypeId = defectTypes[0].id;
@@ -174,11 +189,11 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
     const payload = fabricQcPayload(grn, poLineItemId, {
       rollOverrides: [
         // R1: PASS — within tolerance, low defects
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
         // R2: FAIL — width out of tolerance (10% off)
-        { actualWidth: Math.round(STD_WIDTH * 0.90 * 100) / 100, actualGsm: STD_GSM },
+        { actualWidth: Math.round(std.width * 0.90 * 100) / 100, actualGsm: std.gsm },
         // R3: FAIL — defect count over threshold
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
       ],
       defects: [
         // R1: 1 defect — within threshold
@@ -199,17 +214,17 @@ test.describe('Fabric QC — Result Combinations (API)', () => {
 
   test('Tolerance boundary (E2E-FQ-5): exactly 5% deviation should PASS (inclusive)', async () => {
     const { grn, poLineItemId } = await submitFreshGrn(api, 'E2E-FQ-5');
+    const std = standards(grn, poLineItemId);
 
-    // stdWidth = 44, exactly 5% below = 44 * 0.95 = 41.8
-    const boundaryWidth = STD_WIDTH * 0.95; // 41.8
-    // stdGsm = 180, exactly 5% above = 180 * 1.05 = 189
-    const boundaryGsm = STD_GSM * 1.05; // 189
+    // exactly 5% below the standard width, and 5% above the standard GSM
+    const boundaryWidth = std.width * 0.95;
+    const boundaryGsm = std.gsm * 1.05;
 
     const payload = fabricQcPayload(grn, poLineItemId, {
       rollOverrides: [
         { actualWidth: boundaryWidth, actualGsm: boundaryGsm },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
-        { actualWidth: STD_WIDTH, actualGsm: STD_GSM },
+        { actualWidth: std.width, actualGsm: std.gsm },
+        { actualWidth: std.width, actualGsm: std.gsm },
       ],
       defects: [],
       inspector: 'E2E Inspector Boundary',
