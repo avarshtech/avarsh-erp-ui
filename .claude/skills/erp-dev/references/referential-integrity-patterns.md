@@ -411,6 +411,15 @@ When a module action moves a document out of its pending-approval status (a bill
 
 Every `applyApproved` / `applyRejected` / `applyReferredBack` checks the document's current status before it moves a balance, writes stock or corrects attendance, with a `shared/state/Transitions` table (`hr/domain/HrRequestStatus`, `IssueStatus.FLOW`) or the module's own guard. A repeated or late call (a double click, a retried request, the no-flow path after an engine decision) is a 409, never a second deduction. The one exception is the supplier PO's repeated approve, which answers 200 without applying anything, for the owner app.
 
+#### Rule 8 — A flow condition routes only on what the module sends
+
+`approval/service/FlowConditionRules` lists, per `EntityType`, the fields a flow may route on. It mirrors `CONDITION_FIELDS` in `src/utils/approvalFlowConstants.js`, and flows are validated against it on save. To add a routing field:
+1. Put the key in the module's `submitForApproval` entityData.
+2. Add it to `FlowConditionRules`.
+3. Add it to `CONDITION_FIELDS`.
+
+A condition on a key the module never sends never matches, and the document then auto-approves unseen. A stored flow the engine cannot read, or one with an unknown operator, refuses submission (409) rather than counting as no match.
+
 ### Hibernate pitfall — two-bag fetch
 
 `ApprovalRequest.actions` (List) and `ApprovalFlow.levels` (List) are both Hibernate **bags** (no `@OrderColumn`). Never put both in the same `@EntityGraph` or `JOIN FETCH` — Hibernate 6 throws `"Could not generate fetch"` at query plan time, not at runtime. Always split into separate queries or use lazy-load within `@Transactional`.

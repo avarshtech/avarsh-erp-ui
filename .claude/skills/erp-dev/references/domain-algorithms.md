@@ -528,3 +528,23 @@ Review findings F070 and F071:
 - Approving an EL encashment run moves `ElEncashmentRecord.elBalanceDays` into `LeaveBalance.encashed`. Those are the days the run paid for: `elAmount = elBalanceDays × (basic + DA) / 26`. Never move `totalDays`, which is opening + accrued.
 - Approval refuses when an employee's closing balance has fallen below those days since the run was calculated. Cancel the run and calculate it again.
 - Bonus reads only committed payroll runs, `PayrollRun.isCommitted()` (APPROVED or PAID). The PT return reads committed runs plus PROCESSED ones.
+- Payroll takes the salary structure in effect in the processed month, `SalaryStructure.appliesWithin(monthStart, monthEnd)`: the latest one effective by the month's end. Never use `isCurrent` for a run. A structure's gross is the sum of its six components (`SalaryStructureService.grossOf`).
+
+### PO money is the server's
+Review finding F077:
+- `purchaseorder/service/PoAmounts` recomputes each line's CGST, SGST, IGST, tax and total, and the header's subtotal, CGST, SGST, tax and grand total, using POForm's arithmetic. Components are rounded per line; header sums add unrounded figures and round once.
+- A client figure within 0.01 of the server's is kept, because the screen's PDF prints its own. Anything further off is replaced and logged.
+- A null tax component that does not apply stays null; the PO view picks the IGST or CGST/SGST split by which is set.
+- The header totals are set before the PO's first write. Set after the IDENTITY insert, they dirtied the PO again: the commit-time update moved the version past the one the create response echoed, and the next action on the new PO was a false 409. The same holds for any entity whose response carries `version`: finish changing it before it is written, or `saveAndFlush` after the last change and map from that.
+
+### GRN lines, inspection holds and returns
+Review findings F104, F069, F056 and F068:
+- A GRN line's PO quantity, rate, item and variant come from its own PO line, never from the request. A line not on the GRN's PO is refused, and a saved GRN keeps its PO and type.
+- When an approved QC is referred back, its untouched stock goes `On_Hold`, which no issue picks, and the next decision puts it back `In_Stock` (`StockPopulationService.holdForQc`). Stock that has already moved refuses the refer-back.
+- A cutting-room fabric return puts back no more into a stock row than the Cutting PO was issued from it. A receipt roll's `fabricStockId` comes from its issue line.
+- An accessories transfer line keeps every lot it drew from (`StockTransferLine.lots`). A cancel restores each lot; receive costs the new lot at the quantity-weighted cost.
+
+### Bill passing debits
+Review findings F044 and F234:
+- A linked debit note is deducted once per PO line a bill covers, and only on one live bill of the PO (`BpBillRepository.findDebitNoteIdsLinkedOnOtherBills`). Cancelled notes are skipped.
+- A debit refresh merges in place: kept rows keep their ids and drop reasons. Only `MATERIAL_REJECTION` debits count against rejected quantity.
