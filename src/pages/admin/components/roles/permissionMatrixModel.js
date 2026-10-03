@@ -34,6 +34,7 @@ export const OP_LABELS = {
   lock: 'Lock',
   dispatch: 'Dispatch',
   receive: 'Receive',
+  pay: 'Pay',
 };
 
 export const OP_COLORS = {
@@ -55,6 +56,7 @@ export const OP_COLORS = {
   lock: '#475569',
   dispatch: '#2563eb',
   receive: '#0d9488',
+  pay: '#db2777',
 };
 
 /** A screen may rename an operation for itself, e.g. delete → "Cancel GRN". */

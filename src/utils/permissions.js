@@ -214,16 +214,19 @@ export const SCREENS = [
     path: '/sample-requests/list',
     routes: ['/sample-requests/list', '/sample-requests/new', '/sample-requests/edit/:id'],
     ops: STANDARD_OPERATIONS },
+  // dispatch marks the parcel sent, irreversibly; drafting a dispatch stays add / update.
   { id: 'sample-dispatches', name: 'Sample Dispatches', section: 'samples', kind: 'screen',
     path: '/sample-requests/dispatches/list',
     routes: ['/sample-requests/dispatches/list', '/sample-requests/dispatches/new', '/sample-requests/dispatches/edit/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'dispatch'] },
   { id: 'sample-comments', name: 'Customer Comments', section: 'samples', kind: 'screen',
     path: '/sample-requests/comments', ops: STANDARD_OPERATIONS },
+  // post issues an invoice (numbers and locks it); cancel withdraws an issued one.
   { id: 'sample-invoices', name: 'Invoices (Samples)', section: 'samples', kind: 'screen',
     path: '/sample-requests/invoices/list',
     routes: ['/sample-requests/invoices/list', '/sample-requests/invoices/new', '/sample-requests/invoices/edit/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'post', 'cancel'],
+    opLabels: { post: 'Issue' } },
 
   // ── Purchase Orders ──
   { id: 'purchase-orders', name: 'Supplier PO', section: 'purchase', kind: 'screen',
@@ -240,18 +243,20 @@ export const SCREENS = [
     requires: 'inventory', ops: GRN_APPROVAL_OPERATIONS },
   { id: 'grn-reversal', name: 'GRN Reversal Approval', section: 'inventory', kind: 'approval',
     requires: 'inventory', ops: GRN_REVERSAL_OPERATIONS },
+  // approve is the approver's: approve, reject and refer back, and cancelling a PO once it is
+  // approved. Submitting, and cancelling before approval, stay update.
   { id: 'cutting-po', name: 'Cutting PO', section: 'purchase', kind: 'screen',
     path: '/purchase-orders/cutting-po/list',
     routes: ['/purchase-orders/cutting-po/list', '/purchase-orders/cutting-po/new', '/purchase-orders/cutting-po/edit/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve'] },
   { id: 'work-order', name: 'Work Orders', section: 'purchase', kind: 'screen',
     path: '/purchase-orders/work-order/list',
     routes: ['/purchase-orders/work-order/list', '/purchase-orders/work-order/new', '/purchase-orders/work-order/edit/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve'] },
   { id: 'finishing-po', name: 'Finishing PO', section: 'purchase', kind: 'screen',
     path: '/purchase-orders/finishing-po/list',
     routes: ['/purchase-orders/finishing-po/list', '/purchase-orders/finishing-po/new', '/purchase-orders/finishing-po/edit/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve'] },
 
   // ── Time & Action ──
   { id: 'tna', name: 'Time & Action', section: 'tna', kind: 'screen',
@@ -271,12 +276,13 @@ export const SCREENS = [
              '/production/cutting/tmb/new', '/production/cutting/tmb/:id',
              '/production/cutting/panel-check/new', '/production/cutting/panel-check/:id'],
     ops: STANDARD_OPERATIONS },
+  // approve approves a production plan; loading the line and every later move stay update.
   { id: 'production-sewing', name: 'Production — Sewing', section: 'production', kind: 'screen',
     path: '/production/sewing',
     routes: ['/production/sewing', '/production/sewing/plan/new', '/production/sewing/plan/:id',
              '/production/sewing/measurement/new', '/production/sewing/measurement/:id',
              '/production/sewing/topse/new', '/production/sewing/topse/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve'] },
   { id: 'production-finishing', name: 'Production — Finishing', section: 'production', kind: 'screen',
     path: '/production/finishing',
     routes: ['/production/finishing', '/production/finishing/checking/new', '/production/finishing/checking/:id'],
@@ -432,6 +438,13 @@ export const SCREENS = [
     path: '/master', description: 'Sample Dispatch', ops: STANDARD_OPERATIONS },
   { id: 'branches', name: 'Branches', section: 'master', kind: 'tab',
     path: '/master', description: 'Organisation — sites, GSTIN, units', ops: STANDARD_OPERATIONS },
+  // The rules a bill is checked against, kept off the bill workspace key so a bill clerk does not
+  // set them. Saving a type is an upsert by code, so add covers editing one as well as creating it;
+  // update is the tolerance. Either key reads the lists.
+  { id: 'inventory-bill-passing-masters', name: 'Bill Passing Masters', section: 'master', kind: 'tab',
+    path: '/master',
+    description: 'Bill Passing — debit, charge and issue types (Add saves one, new or edited) and the tolerance (Update)',
+    ops: STANDARD_OPERATIONS },
 
   // ── Administration ──
   { id: 'users', name: 'User Management', section: 'admin', kind: 'screen',
@@ -460,24 +473,30 @@ export const SCREENS = [
   { id: 'hr-leave', name: 'Leave Management', section: 'hr', kind: 'screen',
     path: '/hr/leaves', routes: ['/hr/leaves', '/hr/leaves/balances'],
     ops: [...STANDARD_OPERATIONS, 'approve', 'reject'] },
+  // pay marks an approved run paid.
   { id: 'hr-payroll', name: 'Payroll', section: 'hr', kind: 'screen',
     path: '/hr/payroll',
     routes: ['/hr/payroll', '/hr/payroll/new', '/hr/payroll/slip/:id', '/hr/payroll/:id'],
-    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel'] },
+    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel', 'pay'] },
+  // approve is the write-off: closing or cancelling a loan, waiving an advance.
   { id: 'hr-loans', name: 'Loans & Advances', section: 'hr', kind: 'screen',
     path: '/hr/loans', routes: ['/hr/loans', '/hr/loans/:id', '/hr/advances'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve'],
+    opLabels: { approve: 'Write off' } },
   { id: 'hr-bonus', name: 'Bonus', section: 'hr', kind: 'screen',
     path: '/hr/bonus', routes: ['/hr/bonus', '/hr/bonus/new', '/hr/bonus/:id'],
-    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel'] },
+    ops: [...STANDARD_OPERATIONS, 'approve', 'cancel', 'pay'] },
   { id: 'hr-statutory', name: 'Statutory', section: 'hr', kind: 'screen',
     path: '/hr/statutory/pt',
     routes: ['/hr/statutory/pt', '/hr/statutory/pt/:id', '/hr/statutory/el', '/hr/statutory/el/:id',
              '/hr/statutory/pf', '/hr/statutory/esi'],
-    ops: STANDARD_OPERATIONS },
+    ops: [...STANDARD_OPERATIONS, 'approve', 'pay'],
+    description: 'Approve and Pay act on EL encashment runs.' },
+  // pay settles an approved settlement, paying it out.
   { id: 'hr-fnf', name: 'F&F Settlement', section: 'hr', kind: 'screen',
     path: '/hr/fnf', routes: ['/hr/fnf', '/hr/fnf/new', '/hr/fnf/edit/:id', '/hr/fnf/:id'],
-    ops: [...STANDARD_OPERATIONS, 'approve'] },
+    ops: [...STANDARD_OPERATIONS, 'approve', 'pay'],
+    opLabels: { pay: 'Settle' } },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});
