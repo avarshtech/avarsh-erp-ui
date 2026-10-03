@@ -24,7 +24,7 @@ import dayjs from 'dayjs';
 import {
   getCostSheetById,
   duplicateCostSheet,
-  updateCostSheet,
+  withdrawCostSheet,
   approveCostSheet,
   rejectCostSheet,
   revertCostSheetApproval,
@@ -162,8 +162,8 @@ const CostingView = () => {
     }
     setRevising(true);
     try {
-      const { fabricRows, localTrims, importedTrims, manufacturingRows, overheadRows, ...headerFields } = data;
-      await updateCostSheet(id, { ...headerFields, status: COSTING_STATUS.DRAFT, version: data.version });
+      // Taken back to Draft by its own command, rows kept; the reason goes into the history
+      await withdrawCostSheet(id, data.version, reviseReason.trim());
       message.success('Cost sheet reverted to draft for revision');
       setReviseModalOpen(false);
       loadData();

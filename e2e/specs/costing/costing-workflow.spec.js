@@ -2,10 +2,10 @@
  * Costing — Status Lifecycle & Approval Workflow (API)
  *
  * What this tests:
- *   - Draft → submit (status Final) AUTO-APPROVES under e2e because no approval
- *     flow is configured (CostSheetService submits Final sheets to the approval
- *     engine, which returns autoApproved → status Approved). This is the real,
- *     reachable e2e lifecycle: Draft → Approved.
+ *   - Draft → submit (POST /cost-sheets/{id}/submit) AUTO-APPROVES under e2e
+ *     because no approval flow is configured (CostSheetService submits Final sheets
+ *     to the approval engine, which returns autoApproved → status Approved). This
+ *     is the real, reachable e2e lifecycle: Draft → Approved.
  *   - Approved sheets are locked: a data edit is rejected ("not in Draft/Rejected").
  *   - Duplicate → brand-new independent Draft.
  *   - History endpoint returns version snapshots after edits.
@@ -58,10 +58,10 @@ test.describe('Costing — Status Lifecycle', () => {
     const draft = await createSheet('Draft');
     expect(draft.status).toBe('Draft');
 
-    // Submit: save with status Final, mirroring handleSubmit. With no approval flow
-    // configured the engine auto-approves, so the persisted status is Approved.
+    // Submit by its own command, as the sheet's Submit does after saving. With no approval
+    // flow configured the engine auto-approves, so the persisted status is Approved.
     const cur = (await api.get(`/cost-sheets/${draft.id}`)).data;
-    const fin = await api.post('/cost-sheets', { ...cur, id: draft.id, status: 'Final' });
+    const fin = await api.post(`/cost-sheets/${draft.id}/submit`, { version: cur.version });
     expect(fin.status).toBe(200);
     expect(fin.data.status).toBe('Approved');
 
@@ -72,7 +72,7 @@ test.describe('Costing — Status Lifecycle', () => {
   test('Approved sheet is locked from further data edits', async () => {
     const draft = await createSheet('Draft');
     const cur = (await api.get(`/cost-sheets/${draft.id}`)).data;
-    await api.post('/cost-sheets', { ...cur, id: draft.id, status: 'Final' }); // → Approved
+    await api.post(`/cost-sheets/${draft.id}/submit`, { version: cur.version }); // → Approved
     const approved = (await api.get(`/cost-sheets/${draft.id}`)).data;
     expect(approved.status).toBe('Approved');
 
@@ -105,8 +105,8 @@ test.describe('Costing — Duplicate & History', () => {
     const draft = await createSheet('Draft');
     // Two edits → at least one history entry
     const cur = (await api.get(`/cost-sheets/${draft.id}`)).data;
-    await api.post('/cost-sheets', { ...cur, id: draft.id, profitPct: 14 });
-    await api.post('/cost-sheets', { ...cur, id: draft.id, status: 'Final' });
+    const edited = (await api.post('/cost-sheets', { ...cur, id: draft.id, profitPct: 14 })).data;
+    await api.post(`/cost-sheets/${draft.id}/submit`, { version: edited.version });
 
     const hist = await api.get(`/cost-sheets/${draft.id}/history`);
     expect(hist.status).toBe(200);

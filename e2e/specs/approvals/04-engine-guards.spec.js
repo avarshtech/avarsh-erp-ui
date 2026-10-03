@@ -80,7 +80,7 @@ test.describe('Approval engine — guards', () => {
       const sheetId = draft.data.id;
 
       const { data: cur } = await api.get(`/cost-sheets/${sheetId}`);
-      await api.post('/cost-sheets', { ...cur, id: sheetId, status: 'Final' });
+      await api.post(`/cost-sheets/${sheetId}/submit`, { version: cur.version });
       const req = await findPendingRequest(api, 'COST_SHEET', sheetId);
       expect(req).toBeTruthy();
 

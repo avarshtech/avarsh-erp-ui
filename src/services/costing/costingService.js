@@ -118,6 +118,33 @@ export const autosaveCostSheet = async (id, data) => {
 };
 
 /**
+ * Send an existing Draft or Rejected cost sheet for approval, as it was last saved. Approved
+ * at once when no approval flow is configured.
+ * POST /api/v1/cost-sheets/{id}/submit
+ * @param {number|string} id - Cost sheet ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const submitCostSheet = async (id, version) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/${id}/submit`, { version });
+  return response.data;
+};
+
+/**
+ * Take a submitted (Final) cost sheet back to Draft for revision, rows kept; its pending
+ * approval request is cancelled and the reason kept in the history.
+ * POST /api/v1/cost-sheets/{id}/withdraw
+ * @param {number|string} id - Cost sheet ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @param {string} reason - Why, 1 to 500 characters
+ * @returns {Promise<Object>} CostSheetResponse
+ */
+export const withdrawCostSheet = async (id, version, reason) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.COST_SHEETS}/${id}/withdraw`, { version, reason });
+  return response.data;
+};
+
+/**
  * Approve a cost sheet. Routed through the centralized approval engine when a
  * flow is configured; applied directly otherwise.
  * PUT /api/v1/cost-sheets/{id}/approve

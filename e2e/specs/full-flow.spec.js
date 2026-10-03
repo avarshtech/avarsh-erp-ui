@@ -142,7 +142,7 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
 
     if (costSheetId) {
       const { data: draft } = await api.get(`/cost-sheets/${costSheetId}`);
-      const { data: result } = await api.post('/cost-sheets', { ...draft, status: 'Final' });
+      const { data: result } = await api.post(`/cost-sheets/${costSheetId}/submit`, { version: draft.version });
       if (result.status === 'Final') {
         const { data: f } = await api.get(`/cost-sheets/${costSheetId}`);
         await api.post('/cost-sheets', { ...f, status: 'Approved' });

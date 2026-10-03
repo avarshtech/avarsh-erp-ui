@@ -226,7 +226,7 @@ test.describe('Approval engine — multi-level PO flow', () => {
       const sheetId = draft.data.id;
 
       const { data: cur } = await superadmin.get(`/cost-sheets/${sheetId}`);
-      await superadmin.post('/cost-sheets', { ...cur, id: sheetId, status: 'Final' });
+      await superadmin.post(`/cost-sheets/${sheetId}/submit`, { version: cur.version });
       const { data: afterSubmit } = await superadmin.get(`/cost-sheets/${sheetId}`);
       expect(afterSubmit.status, 'flow present → no auto-approve').toBe('Final');
 

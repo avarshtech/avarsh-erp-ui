@@ -613,9 +613,8 @@ test.describe.skip('Costing Module — API Integration', () => {
     const updated = await updateResponse.json();
     expect(updated.agentCommissionPct).toBe(7);
 
-    // Step 6: Submit (Draft → Final)
-    const submitPayload = { ...updated, status: 'Final' };
-    const submitResponse = await authPost(request, '/cost-sheets', submitPayload);
+    // Step 6: Submit (Draft → Final), by its own command with the version the update answered
+    const submitResponse = await authPost(request, `/cost-sheets/${costSheetId}/submit`, { version: updated.version });
     expect(submitResponse.ok()).toBeTruthy();
 
     const submitted = await submitResponse.json();
