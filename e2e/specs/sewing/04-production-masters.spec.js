@@ -44,8 +44,12 @@ test.describe('Production Masters', () => {
         await expect(page.getByText(/Select a style/i)).toBeVisible({ timeout: 10000 });
         continue;
       }
-      const rows = await tableRows(page);
-      expect(rows.length, `${label} loaded no rows`).toBeGreaterThan(0);
+      // A master with no rows yet has loaded too (the e2e data seeds no production line; the
+      // create test below adds one): its list must render and finish loading, rows or empty state.
+      // Only the open tab is mounted, so the page's table is this master's.
+      const list = page.locator('.ant-table').first();
+      await expect(list, `${label} rendered no list`).toBeVisible({ timeout: 10000 });
+      await expect(list.locator('.ant-spin-spinning'), `${label} is still loading`).toHaveCount(0, { timeout: 15000 });
     }
 
     expect(errors, errors.join('\n')).toHaveLength(0);
