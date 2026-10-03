@@ -108,8 +108,11 @@ const FabricQCList = ({ embedded = false, refreshToken = 0 }) => {
     if (statusFilter) result = result.filter((r) => r.status === statusFilter);
     if (searchText) {
       const s = searchText.toLowerCase();
+      // A QC need not carry a description (the API takes it as sent), so every field may be null
       result = result.filter(
-        (r) => r.qcNumber.toLowerCase().includes(s) || r.grnNumber.toLowerCase().includes(s) || r.fabricDescription.toLowerCase().includes(s),
+        (r) => r.qcNumber?.toLowerCase().includes(s)
+          || r.grnNumber?.toLowerCase().includes(s)
+          || r.fabricDescription?.toLowerCase().includes(s),
       );
     }
     if (dateRange?.[0] && dateRange?.[1]) {
