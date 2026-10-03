@@ -8,6 +8,7 @@ import { FormSelect } from '../../../components/form';
 import useSewingMasters from '../../../hooks/useSewingMasters';
 import useModuleSelection from '../../../hooks/useModuleSelection';
 import { targetPerHour, totalSamOf, cmRatePerPc } from '../../../utils/sewingCalc';
+import { hasPermission } from '../../../utils/permissions';
 import {
   getPlan, savePlan, setPlanStatus, getOrders, getSuggestedOperations,
 } from '../../../services/production/sewingService';
@@ -34,6 +35,8 @@ const SewingPlanForm = () => {
   const [saving, setSaving] = useState(false);
   const { lines, linesByUnit } = useSewingMasters();
   const { selectOrder, defaultOrderId } = useModuleSelection('sewing');
+  // Approving a plan is the approver's, not the planner's
+  const canApprove = hasPermission('production-sewing', 'approve');
 
   useEffect(() => {
     (async () => {
@@ -126,7 +129,7 @@ const SewingPlanForm = () => {
         style={{ position: 'sticky', top: 64, zIndex: 10 }}
       >
         <Space>
-          {plan.status === 'DRAFT' && plan.id && (
+          {plan.status === 'DRAFT' && plan.id && canApprove && (
             <Button onClick={() => changeStatus('APPROVED', 'Plan approved')}>Approve</Button>
           )}
           {plan.status === 'APPROVED' && (

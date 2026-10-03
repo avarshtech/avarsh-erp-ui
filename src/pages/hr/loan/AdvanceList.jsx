@@ -41,6 +41,8 @@ const AdvanceList = () => {
 
   const canAdd = hasPermission('hr-loans', 'add');
   const canUpdate = hasPermission('hr-loans', 'update');
+  // Waiving forgives the advance: hr-loans' approve right, labelled Write off
+  const canWriteOff = hasPermission('hr-loans', 'approve');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -130,26 +132,30 @@ const AdvanceList = () => {
     },
     {
       title: 'Actions', key: 'actions', width: 190, fixed: 'right',
-      render: (_, r) => (r.status === 'PENDING' && canUpdate ? (
+      render: (_, r) => (r.status === 'PENDING' && (canUpdate || canWriteOff) ? (
         <Space size="small">
-          <Popconfirm
-            title="Mark as recovered?"
-            description="Only for an advance repaid outside payroll. Payroll records its own recoveries."
-            onConfirm={() => act(recoverAdvance, r.id, 'Marked as recovered')}
-          >
-            <Button type="link" size="small" icon={<CheckCircleOutlined />}>Recovered</Button>
-          </Popconfirm>
-          <Popconfirm
-            title="Waive this advance?"
-            description="Writes it off. It will no longer be deducted from salary."
-            onConfirm={() => act(waiveAdvance, r.id, 'Advance waived')}
-          >
-            <Button type="link" size="small" danger icon={<StopOutlined />}>Waive</Button>
-          </Popconfirm>
+          {canUpdate && (
+            <Popconfirm
+              title="Mark as recovered?"
+              description="Only for an advance repaid outside payroll. Payroll records its own recoveries."
+              onConfirm={() => act(recoverAdvance, r.id, 'Marked as recovered')}
+            >
+              <Button type="link" size="small" icon={<CheckCircleOutlined />}>Recovered</Button>
+            </Popconfirm>
+          )}
+          {canWriteOff && (
+            <Popconfirm
+              title="Waive this advance?"
+              description="Writes it off. It will no longer be deducted from salary."
+              onConfirm={() => act(waiveAdvance, r.id, 'Advance waived')}
+            >
+              <Button type="link" size="small" danger icon={<StopOutlined />}>Waive</Button>
+            </Popconfirm>
+          )}
         </Space>
       ) : null),
     },
-  ], [canUpdate, act]);
+  ], [canUpdate, canWriteOff, act]);
 
   const pendingTotal = useMemo(
     () => data.filter((a) => a.status === 'PENDING')

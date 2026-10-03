@@ -29,6 +29,7 @@ const ElEncashmentList = () => {
   const [form] = Form.useForm();
 
   const canAdd = hasPermission('hr-statutory', 'add');
+  const canApprove = hasPermission('hr-statutory', 'approve');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -147,7 +148,7 @@ const ElEncashmentList = () => {
         fixed: 'right',
         render: (_, r) => (
           <Space>
-            {r.status === 'CALCULATED' && (
+            {r.status === 'CALCULATED' && canApprove && (
               <Button type="link" size="small" icon={<CheckOutlined />} onClick={(e) => { e.stopPropagation(); handleApprove(r.id); }}>
                 Approve
               </Button>
@@ -156,7 +157,7 @@ const ElEncashmentList = () => {
         ),
       },
     ],
-    [handleApprove],
+    [handleApprove, canApprove],
   );
 
   return (

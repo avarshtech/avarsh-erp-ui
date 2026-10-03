@@ -33,7 +33,7 @@ const Field = ({ label, children, span = { xs: 12, sm: 8, md: 6 } }) => (
  * corrections go through Cancel + Duplicate. Cancelled invoices surface
  * their mandatory cancellation reason.
  */
-const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onCancelInvoice, canUpdate }) => {
+const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onCancelInvoice, canCancel }) => {
   const { message } = App.useApp();
   const [inv, setInv] = useState(null);
   // Derived, not set synchronously in the effect: stale/absent record = loading
@@ -103,7 +103,7 @@ const SampleInvoiceView = ({ open, invoiceId, onClose, onPrint, onDuplicate, onC
           <div style={{ display: 'flex', gap: 8 }}>
             <ActionButton action="print" text="Print" disabled={!current} onClick={() => current && onPrint(current)} />
             <ActionButton action="duplicate" text="Duplicate" disabled={!current} onClick={() => current && onDuplicate(current)} />
-            {issued && canUpdate && (
+            {issued && canCancel && (
               <ActionButton action="cancel" text="Cancel Invoice" onClick={() => { onCancelInvoice(current); onClose?.(); }} />
             )}
           </div>

@@ -115,10 +115,9 @@ const FnfView = () => {
     : (data.pendingSalary || 0) + (data.elEncashmentAmount || 0) + (data.bonusProrata || 0) + (data.gratuity || 0) + (data.otherEarnings || 0);
   const totalDeductions = data.totalDeductions != null ? data.totalDeductions
     : (data.outstandingLoan || 0) + (data.outstandingAdvance || 0) + (data.noticePeriodRecovery || 0) + (data.otherDeductions || 0);
-  // Approve and Settle both authorise a payout, so both sit behind the same
-  // permission. Note this is a UI gate only - the API does not yet enforce
-  // per-operation permissions on any module.
   const canApprove = hasPermission('hr-fnf', 'approve');
+  // Settling pays the settlement out: hr-fnf's pay right, labelled Settle, as the API checks it
+  const canPay = hasPermission('hr-fnf', 'pay');
 
   const netSettlement = data.netSettlement != null ? data.netSettlement : totalEarnings - totalDeductions;
 
@@ -150,7 +149,7 @@ const FnfView = () => {
                 Cancel
               </Button>
             )}
-            {data.status === 'APPROVED' && canApprove && (
+            {data.status === 'APPROVED' && canPay && (
               <Button type="primary" icon={<DollarOutlined />} onClick={handleSettle} loading={actionLoading}>
                 Settle
               </Button>

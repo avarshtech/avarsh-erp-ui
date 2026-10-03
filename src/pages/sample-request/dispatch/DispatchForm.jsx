@@ -57,6 +57,8 @@ const DispatchForm = () => {
   const [dirty, setDirty] = useState(false);
 
   const canSave = id ? hasPermission('sample-dispatches', 'update') : hasPermission('sample-dispatches', 'add');
+  // Mark as Dispatched saves the draft first, then sends the parcel: the save's right and dispatch
+  const canDispatch = canSave && hasPermission('sample-dispatches', 'dispatch');
 
   const currentUserLabel = useMemo(() => {
     const u = getCurrentUser();
@@ -297,7 +299,7 @@ const DispatchForm = () => {
         {canSave && (
           <ActionButton action="save" variant="draft" text="Save Draft" loading={saving} onClick={handleSaveDraft} />
         )}
-        {canSave && (
+        {canDispatch && (
           <ActionButton action="send" text="Mark as Dispatched" loading={dispatching} onClick={handleMarkDispatched} />
         )}
       </PageHeader>

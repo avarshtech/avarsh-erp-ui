@@ -25,7 +25,9 @@ const LoanList = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 25, total: 0 });
 
   const canAdd = hasPermission('hr-loans', 'add');
-  const canUpdate = hasPermission('hr-loans', 'update');
+  // Closing a loan writes off what is still owed and cancelling drops the whole amount:
+  // both are hr-loans' approve right, labelled Write off, not the clerk's update
+  const canWriteOff = hasPermission('hr-loans', 'approve');
 
   const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);
@@ -121,7 +123,7 @@ const LoanList = () => {
               <Tooltip title="View the loan and its repayment schedule">
                 <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => navigate(`/hr/loans/${r.id}`)} />
               </Tooltip>
-              {r.status === 'ACTIVE' && canUpdate && (
+              {r.status === 'ACTIVE' && canWriteOff && (
                 <>
                   <Popconfirm
                     title="Stop recovering this loan?"
@@ -155,7 +157,7 @@ const LoanList = () => {
         },
       },
     ],
-    [navigate, canUpdate, handleClose, handleCancel],
+    [navigate, canWriteOff, handleClose, handleCancel],
   );
 
   return (

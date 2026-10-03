@@ -34,6 +34,8 @@ const BonusRunView = () => {
   // hr-bonus declares cancel and nothing checked it, because there was
   // nothing to cancel until now.
   const canCancel = hasPermission('hr-bonus', 'cancel') || canUpdate;
+  // Marking a run paid is the payer's right, not the editor's
+  const canPay = hasPermission('hr-bonus', 'pay');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -155,7 +157,7 @@ const BonusRunView = () => {
             {run?.status === 'CALCULATED' && canCancel && (
               <Button danger loading={advancing} onClick={handleCancel}>Cancel Run</Button>
             )}
-            {run?.status === 'APPROVED' && canUpdate && (
+            {run?.status === 'APPROVED' && canPay && (
               <Button type="primary" loading={advancing} onClick={handleMarkPaid}>Mark as Paid</Button>
             )}
           </Space>

@@ -32,6 +32,9 @@ const ElEncashmentRunView = () => {
   const [records, setRecords] = useState([]);
 
   const canUpdate = hasPermission('hr-statutory', 'update');
+  // Approving and paying a run are the approver's and the payer's; cancelling stays update
+  const canApprove = hasPermission('hr-statutory', 'approve');
+  const canPay = hasPermission('hr-statutory', 'pay');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -108,7 +111,7 @@ const ElEncashmentRunView = () => {
         extra={
           <Space>
             {statusInfo && <Tag color={statusInfo.color}>{statusInfo.label}</Tag>}
-            {run?.status === 'CALCULATED' && canUpdate && (
+            {run?.status === 'CALCULATED' && canApprove && (
               <Button
                 type="primary"
                 loading={advancing}
@@ -137,7 +140,7 @@ const ElEncashmentRunView = () => {
                 Cancel Run
               </Button>
             )}
-            {run?.status === 'APPROVED' && canUpdate && (
+            {run?.status === 'APPROVED' && canPay && (
               <Button
                 type="primary"
                 loading={advancing}

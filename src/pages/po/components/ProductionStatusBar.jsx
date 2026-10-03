@@ -36,6 +36,13 @@ const actionsForStatus = (status) => {
 
 const BTN_ACTION = { SUBMIT: 'send', CANCEL: 'cancel', REFER_BACK: 'refer-back' };
 
+// The right each action needs, as the API decides it from the PO's status: referring back an
+// approved PO, and cancelling one, undo the approver's decision, so they are approve; submitting
+// and cancelling before approval stay the editor's update.
+const operationFor = (action, status) =>
+  (action === PO_ACTION.REFER_BACK || (action === PO_ACTION.CANCEL && status === PROD_PO_STATUS.APPROVED)
+    ? 'approve' : 'update');
+
 /** Status workflow action bar (PRD §7.1) + reason dialog. */
 const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) => {
   const { message } = App.useApp();
@@ -44,8 +51,9 @@ const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) =
   const [loading, setLoading] = useState(false);
 
   if (!record) return null;
-  // Every status change here is an update of the PO (the API maps refer back to update too)
-  const available = hasPermission(PO_TYPE_META[poType]?.permission, 'update') ? actionsForStatus(record.status) : [];
+  const permission = PO_TYPE_META[poType]?.permission;
+  const available = actionsForStatus(record.status)
+    .filter((a) => hasPermission(permission, operationFor(a, record.status)));
   if (!available.length) return null;
 
   const docNumber = record[PO_TYPE_META[poType]?.noField];

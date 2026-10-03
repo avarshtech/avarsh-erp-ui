@@ -51,6 +51,8 @@ const SampleInvoiceList = () => {
 
   const canAdd = hasPermission('sample-invoices', 'add');
   const canUpdate = hasPermission('sample-invoices', 'update');
+  // Withdrawing an issued invoice is its own right, not the update that edits a draft
+  const canCancel = hasPermission('sample-invoices', 'cancel');
   // Exporting branch: a column on multi-branch, and the list follows the header switcher (X-Branch-Id)
   const { activeBranchId, isMultiBranch, branchName } = useBranch();
 
@@ -168,14 +170,14 @@ const SampleInvoiceList = () => {
             )}
             <ActionButton action="print" size="small" onClick={() => handlePrint(record)} />
             <ActionButton action="duplicate" size="small" onClick={() => handleDuplicate(record)} />
-            {record.status === SAMPLE_INVOICE_STATUS.ISSUED && canUpdate && (
+            {record.status === SAMPLE_INVOICE_STATUS.ISSUED && canCancel && (
               <ActionButton action="cancel" size="small" tooltip="Cancel Invoice" onClick={() => handleCancel(record)} />
             )}
           </Space>
         );
       },
     },
-  ], [navigate, canUpdate, handlePrint, handleDuplicate, handleCancel, isMultiBranch, branchName]);
+  ], [navigate, canUpdate, canCancel, handlePrint, handleDuplicate, handleCancel, isMultiBranch, branchName]);
 
   return (
     <div className="animate-fade-in-up">
@@ -263,7 +265,7 @@ const SampleInvoiceList = () => {
         onPrint={(inv) => { if (!printSampleInvoice(inv, profile)) message.error('Pop-up blocked — allow pop-ups to print'); }}
         onDuplicate={handleDuplicate}
         onCancelInvoice={handleCancel}
-        canUpdate={canUpdate}
+        canCancel={canCancel}
       />
 
       {/* Cancel with MANDATORY reason — stored on the invoice + activity trail */}

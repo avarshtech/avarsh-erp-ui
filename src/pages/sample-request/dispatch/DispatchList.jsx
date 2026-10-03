@@ -48,6 +48,8 @@ const DispatchList = () => {
   const canAdd = hasPermission('sample-dispatches', 'add');
   const canUpdate = hasPermission('sample-dispatches', 'update');
   const canDelete = hasPermission('sample-dispatches', 'delete');
+  // Sending the parcel is its own right, not the update that edits a draft
+  const canDispatch = hasPermission('sample-dispatches', 'dispatch');
 
   const fetchData = useCallback(async (page, pageSize) => {
     setLoading(true);
@@ -237,7 +239,7 @@ const DispatchList = () => {
             {draft && canUpdate && (
               <ActionButton action="edit" size="small" onClick={() => goForm(record.id)} />
             )}
-            {draft && canUpdate && (
+            {draft && canDispatch && (
               <ActionButton
                 action="custom"
                 size="small"
@@ -253,7 +255,7 @@ const DispatchList = () => {
         );
       },
     },
-  ], [goForm, handleMarkDispatched, handleDelete, canUpdate, canDelete]);
+  ], [goForm, handleMarkDispatched, handleDelete, canUpdate, canDispatch, canDelete]);
 
   const statusOptions = useMemo(
     () => Object.entries(DISPATCH_STATUS_LABELS).map(([value, label]) => ({ value, label })),

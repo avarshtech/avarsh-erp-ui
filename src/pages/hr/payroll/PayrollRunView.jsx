@@ -39,6 +39,8 @@ const PayrollRunView = () => {
   const canUpdate = hasPermission('hr-payroll', 'update');
   const canApprove = hasPermission('hr-payroll', 'approve');
   const canCancel = hasPermission('hr-payroll', 'cancel');
+  // Marking a run paid is the payer's right, not the editor's
+  const canPay = hasPermission('hr-payroll', 'pay');
 
   const [advancing, setAdvancing] = useState(false);
   const [validation, setValidation] = useState(null);
@@ -237,7 +239,7 @@ const PayrollRunView = () => {
                 <Button type="primary" onClick={handleApprove}>Approve</Button>
               </>
             )}
-            {run?.status === 'APPROVED' && canUpdate && (
+            {run?.status === 'APPROVED' && canPay && (
               <Button type="primary" onClick={() => setPayOpen(true)}>Mark as Paid</Button>
             )}
             {['DRAFT', 'PROCESSED'].includes(run?.status) && canCancel && (

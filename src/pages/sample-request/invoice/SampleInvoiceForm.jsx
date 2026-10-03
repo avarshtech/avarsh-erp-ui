@@ -18,6 +18,7 @@ import {
 } from '../../../utils/sampleRequestConstants';
 import { printSampleInvoice } from '../../../utils/sampleInvoicePdfGenerator';
 import { toastUnlessHandled } from '../../../utils/apiError';
+import { hasPermission } from '../../../utils/permissions';
 import useCompanyProfile, { withExportingBranch } from './useCompanyProfile';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useBusyAction from '../../../hooks/useBusyAction';
@@ -96,6 +97,8 @@ const SampleInvoiceForm = () => {
   const { clearDirty } = useUnsavedChanges(isDirty);
 
   const locked = inv && inv.status !== SAMPLE_INVOICE_STATUS.DRAFT;
+  // Issuing numbers and locks the invoice: sample-invoices' post right, labelled Issue
+  const canIssue = hasPermission('sample-invoices', 'post');
   const invType = inv?.invoiceType || INVOICE_TYPES.COMMERCIAL;
   const patch = useCallback((p) => {
     setIsDirty(true);
@@ -454,12 +457,14 @@ const SampleInvoiceForm = () => {
         {!locked && (
           <>
             <ActionButton action="save" variant="draft" text="Save as Draft" {...busyProps('draft')} onClick={handleSaveDraft} />
-            <ActionButton
-              action="send" text="Issue Invoice"
-              {...busyProps('issue', issueBlockers.length > 0)}
-              tooltip={issueBlockers.length ? `Blocked — still missing: ${issueBlockers.join(', ')}` : undefined}
-              onClick={handleIssue}
-            />
+            {canIssue && (
+              <ActionButton
+                action="send" text="Issue Invoice"
+                {...busyProps('issue', issueBlockers.length > 0)}
+                tooltip={issueBlockers.length ? `Blocked — still missing: ${issueBlockers.join(', ')}` : undefined}
+                onClick={handleIssue}
+              />
+            )}
           </>
         )}
       </PageHeader>
