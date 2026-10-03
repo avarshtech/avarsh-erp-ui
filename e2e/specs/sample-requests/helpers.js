@@ -278,8 +278,9 @@ export async function seedPreview(api, bomId) {
   return ok(await api.get(`/sample-requests/bom-preview?bomId=${bomId}`), 'bom-preview');
 }
 
+/** Submitted by its own command, with the version the caller holds. */
 export async function submitSr(api, sr) {
-  return ok(await api.put(`/sample-requests/${sr.id}/status`, { status: 'SUBMITTED', version: sr.version }), 'submit');
+  return ok(await api.post(`/sample-requests/${sr.id}/submit`, { version: sr.version }), 'submit');
 }
 
 export async function getSr(api, id) {

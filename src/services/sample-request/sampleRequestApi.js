@@ -104,11 +104,20 @@ export const listByOrderNo = async (orderNo) => (await axiosInstance.get(`${BASE
 /** Facet for the list filter — the buyers that actually have sample requests. */
 export const listSrBuyers = async () => (await axiosInstance.get(`${BASE}/buyers`)).data;
 
+/** The two moves the request's own screen makes, each by its own command. */
+const STATUS_COMMAND = { SUBMITTED: 'submit', DRAFT: 'return-to-draft' };
+
 /**
- * Only DRAFT → SUBMITTED and SUBMITTED → DRAFT are taken here; production,
- * dispatch and the buyer's verdict are recorded where they actually happen.
+ * Only DRAFT → SUBMITTED and SUBMITTED → DRAFT are taken here, by POST /{id}/submit and
+ * /{id}/return-to-draft with the version the screen last read; production, dispatch and the
+ * buyer's verdict are recorded where they actually happen (the status endpoint, kept for any
+ * other target, refuses them and names that screen).
  */
-export const changeStatus = async (id, status, version) => (await axiosInstance.put(`${BASE}/${id}/status`, { status, version })).data;
+export const changeStatus = async (id, status, version) => {
+  const command = STATUS_COMMAND[status];
+  if (!command) return (await axiosInstance.put(`${BASE}/${id}/status`, { status, version })).data;
+  return (await axiosInstance.post(`${BASE}/${id}/${command}`, { version })).data;
+};
 
 export const getSampleDashboard = async () => (await axiosInstance.get(`${BASE}/dashboard`)).data;
 

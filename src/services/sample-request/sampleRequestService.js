@@ -27,7 +27,7 @@ export const listByOrderNo = (...a) => sampleRequestApi.listByOrderNo(...a);    
 export const listSrBuyers = (...a) => sampleRequestApi.listSrBuyers(...a);          // GET /buyers facet
 export const bomPreview = (...a) => sampleRequestApi.bomPreview(...a);              // GET /bom-preview?bomId= | ?orderNo=
 
-// ── Workflow ── REAL: PUT /{id}/status · /{id}/feedback[/draft]
+// ── Workflow ── REAL: POST /{id}/submit · /{id}/return-to-draft · PUT /{id}/feedback[/draft]
 // isOverseas is gone — the SR DTO carries `overseas`, decided against the
 // company country the server holds rather than a constant in the browser.
 export const changeStatus = (...a) => sampleRequestApi.changeStatus(...a);              // (id, target, version)

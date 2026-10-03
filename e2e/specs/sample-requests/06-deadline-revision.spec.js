@@ -114,7 +114,7 @@ test.describe('Sample Requests — deadline revision', () => {
 
   test('pulling the request back to Draft withdraws the revision, and a draft offers none', async ({ page }) => {
     const current = await getSr(api, sr.id);
-    ok(await api.put(`/sample-requests/${sr.id}/status`, { status: 'DRAFT', version: current.version }), 'pull back');
+    ok(await api.post(`/sample-requests/${sr.id}/return-to-draft`, { version: current.version }), 'pull back');
 
     const draft = await getSr(api, sr.id);
     expect(draft.revisedDispatchDeadline).toBeNull();
