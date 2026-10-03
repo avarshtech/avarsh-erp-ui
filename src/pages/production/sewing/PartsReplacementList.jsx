@@ -32,11 +32,13 @@ const PartsReplacementList = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  const advance = useCallback(async (requestId, part) => {
+  // The part's own command, sent the version of the request row (each answer replaces the row,
+  // so the next part of the same request goes with the version the last move left)
+  const advance = useCallback(async (request, part) => {
     const next = NEXT_STEP[part.status];
     if (!next) return;
     try {
-      const saved = await setReplacementPartStatus(requestId, part.id, next.status);
+      const saved = await setReplacementPartStatus(request.id, part.id, next.status, request.version);
       setRows((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
       message.success(`${part.part} ${part.size} marked ${next.status.toLowerCase()}`);
     } catch (e) {
@@ -77,7 +79,7 @@ const PartsReplacementList = () => {
           <span style={{ color: 'var(--text-secondary)' }}>{labelOf('DAMAGE_REASON', p.reason)}</span>
           {p.replacedDate && <span style={{ color: 'var(--success-color)' }}>delivered {dayjs(p.replacedDate).format('DD-MMM')}</span>}
           {NEXT_STEP[p.status] && (
-            <Button size="small" onClick={() => advance(record.id, p)}>{NEXT_STEP[p.status].label}</Button>
+            <Button size="small" onClick={() => advance(record, p)}>{NEXT_STEP[p.status].label}</Button>
           )}
         </Space>
       ))}

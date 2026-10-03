@@ -67,8 +67,16 @@ export const savePlan = async (payload) => {
   return data;
 };
 
-export const setPlanStatus = async (id, status) => {
-  const { data } = await axiosInstance.put(`${BASE}/plans/${id}/status`, null, { params: { status } });
+const PLAN_COMMAND = { APPROVED: 'approve', ON_HOLD: 'hold', COMPLETED: 'complete', CANCELLED: 'cancel' };
+
+/**
+ * Moves a plan by its own command, sent the version the screen last read. IN_PROGRESS is the
+ * start of an approved plan, or the resume of one on hold: `from` is the status it has now.
+ */
+export const setPlanStatus = async (id, status, version, from) => {
+  const command = status === 'IN_PROGRESS' ? (from === 'ON_HOLD' ? 'resume' : 'start') : PLAN_COMMAND[status];
+  if (!command) throw new Error(`A production plan is not moved to ${status}`);
+  const { data } = await axiosInstance.post(`${BASE}/plans/${id}/${command}`, { version });
   return data;
 };
 
@@ -124,8 +132,13 @@ export const findHourConflicts = async (payload) => {
   return data;
 };
 
-export const setHourlyStatus = async (id, status) => {
-  const { data } = await axiosInstance.put(`${BASE}/hourly/${id}/status`, null, { params: { status } });
+const HOURLY_COMMAND = { SUBMITTED: 'submit', IN_PROGRESS: 'reopen' };
+
+/** Closes the day's sheet (SUBMITTED) or opens it again (IN_PROGRESS), sent its current version. */
+export const setHourlyStatus = async (id, status, version) => {
+  const command = HOURLY_COMMAND[status];
+  if (!command) throw new Error(`An hourly sheet is not moved to ${status}`);
+  const { data } = await axiosInstance.post(`${BASE}/hourly/${id}/${command}`, { version });
   return data;
 };
 
@@ -205,11 +218,16 @@ export const saveReplacement = async (payload) => {
   return data;
 };
 
-/** Cutting marking one rejected part cut, or delivered back to the line. */
-export const setReplacementPartStatus = async (id, partId, status) => {
-  const { data } = await axiosInstance.put(
-    `${BASE}/replacements/${id}/parts/${partId}/status`, null, { params: { status } },
-  );
+const PART_COMMAND = { CUT: 'mark-cut', DELIVERED: 'mark-delivered' };
+
+/**
+ * Cutting marking one rejected part cut, or delivered back to the line, by its own command. A part
+ * has no version of its own: `version` is its request's, and every part moved moves it on.
+ */
+export const setReplacementPartStatus = async (id, partId, status, version) => {
+  const command = PART_COMMAND[status];
+  if (!command) throw new Error(`A replacement part is marked cut or delivered, not ${status}`);
+  const { data } = await axiosInstance.post(`${BASE}/replacements/${id}/parts/${partId}/${command}`, { version });
   return data;
 };
 

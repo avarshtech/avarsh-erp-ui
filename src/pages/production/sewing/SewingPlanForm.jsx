@@ -96,7 +96,8 @@ const SewingPlanForm = () => {
 
   const changeStatus = async (status, note) => {
     try {
-      setPlan(await setPlanStatus(plan.id, status));
+      // The plan's own command, sent the version the screen holds; the answer carries the new one
+      setPlan(await setPlanStatus(plan.id, status, plan.version, plan.status));
       message.success(note);
     } catch (e) { message.error(e?.response?.data?.message || 'Status change refused'); }
   };
