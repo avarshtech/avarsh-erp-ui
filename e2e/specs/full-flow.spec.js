@@ -11,6 +11,11 @@ import { test } from '@playwright/test';
 import { createAuthenticatedClient } from '../helpers/api-client.js';
 import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
 
+// The credentials every other spec signs in with (e2e/helpers/navigation.js): admin98 on the dev
+// database, E2E_PASSWORD (admin123) on the e2e profile.
+const E2E_USERNAME = process.env.E2E_USERNAME || 'superadmin';
+const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin98';
+
 const runId = Date.now();
 /** Navigate, re-login if needed, wait for ready */
 async function goTo(page, path) {
@@ -22,8 +27,8 @@ async function goTo(page, path) {
     sidebar.waitFor({ state: 'visible', timeout: 10000 }),
   ]).catch(() => {});
   if (await loginField.isVisible().catch(() => false)) {
-    await loginField.fill('superadmin');
-    await page.getByPlaceholder('Password').fill('admin98');
+    await loginField.fill(E2E_USERNAME);
+    await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
       page.getByRole('button', { name: /Sign In/i }).click(),
@@ -54,9 +59,9 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     console.log('\n  ── LOGIN ──────────────────────────────────────');
     await page.goto('/login');
     await page.waitForLoadState('networkidle');
-    await page.getByPlaceholder('Username').fill('superadmin');
+    await page.getByPlaceholder('Username').fill(E2E_USERNAME);
     await page.waitForTimeout(600);
-    await page.getByPlaceholder('Password').fill('admin98');
+    await page.getByPlaceholder('Password').fill(E2E_PASSWORD);
     await page.waitForTimeout(600);
     await Promise.all([
       page.waitForResponse(r => r.url().includes('/auth/login') && r.request().method() === 'POST', { timeout: 30000 }),
