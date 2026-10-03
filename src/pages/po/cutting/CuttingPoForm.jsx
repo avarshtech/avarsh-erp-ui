@@ -185,7 +185,8 @@ const CuttingPoForm = () => {
     try {
       const payload = buildPayload(values);
       const saved = isEdit ? await updateCuttingPo(id, payload) : await createCuttingPo(payload);
-      if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeCuttingPoStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.cuttingPoNo} ${submit ? 'submitted' : 'saved'}`);
       if (saved.warnings?.length) {
         // The buyer has an approved-unit list and this unit is not on it: warn, never block

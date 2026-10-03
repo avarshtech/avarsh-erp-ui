@@ -2,6 +2,7 @@
 import axiosInstance from '../../core/axiosInstance';
 import { USE_MOCK_PRODUCTION_DATA } from './productionEnv';
 import * as mockApi from './mockApi';
+import { sendProductionPoCommand } from './productionPoCommand';
 
 const BASE = '/cutting-po';
 
@@ -29,10 +30,10 @@ export const updateCuttingPo = async (id, payload) => {
   return data;
 };
 
+/** Submit, refer back or cancel: `payload` carries the PO's current `version` and the `reason`. */
 export const changeCuttingPoStatus = async (id, action, payload = {}) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.changeCuttingPoStatus(id, action, payload);
-  const { data } = await axiosInstance.patch(`${BASE}/${id}/status`, { action, ...payload });
-  return data;
+  return sendProductionPoCommand(BASE, id, action, payload);
 };
 
 export const getApprovedCuttingPos = async (orderId) => {

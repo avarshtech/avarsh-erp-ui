@@ -2,6 +2,7 @@
 import axiosInstance from '../../core/axiosInstance';
 import { USE_MOCK_PRODUCTION_DATA } from './productionEnv';
 import * as mockApi from './mockApi';
+import { sendProductionPoCommand } from './productionPoCommand';
 
 const BASE = '/finishing-po';
 
@@ -23,10 +24,10 @@ export const updateFinishingPo = async (id, payload) => {
   return data;
 };
 
+/** Submit, refer back or cancel: `payload` carries the PO's current `version` and the `reason`. */
 export const changeFinishingPoStatus = async (id, action, payload = {}) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.changeFinishingPoStatus(id, action, payload);
-  const { data } = await axiosInstance.patch(`${BASE}/${id}/status`, { action, ...payload });
-  return data;
+  return sendProductionPoCommand(BASE, id, action, payload);
 };
 
 export const getFinishingPosByOrder = async (orderId) => {

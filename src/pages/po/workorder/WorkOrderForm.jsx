@@ -173,7 +173,8 @@ const WorkOrderForm = () => {
     try {
       const payload = buildPayload(values);
       const saved = isEdit ? await updateWorkOrder(id, payload) : await createWorkOrder(payload);
-      if (submit) await changeWorkOrderStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeWorkOrderStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.workOrderNo} ${submit ? 'submitted' : 'saved'}`);
       navigate('/purchase-orders/work-order/list');
     } catch (e) {

@@ -86,7 +86,8 @@ const FinishingPoForm = () => {
         items, totalPlannedQty: items.reduce((s, i) => s + (i.plannedQty || 0), 0),
       };
       const saved = await updateFinishingPo(id, payload);
-      if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, {});
+      // Submitted by its own command, with the version the save answered
+      if (submit) await changeFinishingPoStatus(saved.id, PO_ACTION.SUBMIT, { version: saved.version });
       message.success(`${saved.finishingPoNo} ${submit ? 'submitted' : 'saved'}`);
       navigate('/purchase-orders/finishing-po/list');
     } catch (e) {

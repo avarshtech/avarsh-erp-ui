@@ -56,7 +56,8 @@ const ProductionStatusBar = ({ poType, record, onChanged, ppApproved = true }) =
     const { action } = dialog;
     setLoading(true);
     try {
-      const updated = await CHANGE_FN[poType](record.id, action, { reason: reasonText });
+      // Each action is the PO's own command, sent the version this record was read at
+      const updated = await CHANGE_FN[poType](record.id, action, { version: record.version, reason: reasonText });
       message.success(`${docNumber} — ${DIALOGS[action].label.toLowerCase()} done`);
       setDialog({ open: false, action: null });
       onChanged?.(updated);

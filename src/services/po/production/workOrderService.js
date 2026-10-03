@@ -2,6 +2,7 @@
 import axiosInstance from '../../core/axiosInstance';
 import { USE_MOCK_PRODUCTION_DATA } from './productionEnv';
 import * as mockApi from './mockApi';
+import { sendProductionPoCommand } from './productionPoCommand';
 
 const BASE = '/work-order';
 
@@ -29,10 +30,10 @@ export const updateWorkOrder = async (id, payload) => {
   return data;
 };
 
+/** Submit, refer back or cancel: `payload` carries the Work Order's current `version` and the `reason`. */
 export const changeWorkOrderStatus = async (id, action, payload = {}) => {
   if (USE_MOCK_PRODUCTION_DATA) return mockApi.changeWorkOrderStatus(id, action, payload);
-  const { data } = await axiosInstance.patch(`${BASE}/${id}/status`, { action, ...payload });
-  return data;
+  return sendProductionPoCommand(BASE, id, action, payload);
 };
 
 /** Everything the Work Order print sheet shows — order details, fabrics, size grid, accessories. */
