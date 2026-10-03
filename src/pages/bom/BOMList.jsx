@@ -173,7 +173,7 @@ const BOMList = () => {
       key: 'totalPurchaseQty',
       width: 130,
       align: 'right',
-      sorter: true,
+      // Summed from the lines, so the server cannot sort by it (it answered a 500 before API 7120044)
       render: (qty) => qty ? <Text strong>{Number(qty).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text> : '-',
     },
     {
