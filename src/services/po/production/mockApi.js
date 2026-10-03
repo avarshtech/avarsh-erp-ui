@@ -12,6 +12,7 @@ import {
   cuttingPos, workOrders, finishingPos, CONFIRMED_ORDERS, PROCESSING_UNITS, VENDORS, SEWING_LINES,
   genPoNumber, nextId, nowIso, deepClone, matchPoFilters, paginate, buildStockRows, buildConsumptionRows,
 } from './productionMockData';
+import { sendProductionPoCommand } from './productionPoCommand';
 
 export const USE_MOCK_PRODUCTION_DATA = true;
 
@@ -98,10 +99,7 @@ const TRANSITIONS = {
 
 const changeStatus = async (type, id, action, payload = {}) => {
   const { list, endpoint } = COLLECTIONS[type];
-  if (!USE_MOCK_PRODUCTION_DATA) {
-    const { data } = await axiosInstance.patch(`${endpoint}/${id}/status`, { action, ...payload });
-    return data;
-  }
+  if (!USE_MOCK_PRODUCTION_DATA) return sendProductionPoCommand(endpoint, id, action, payload);
   await delay();
   const po = list.find((p) => String(p.id) === String(id));
   if (!po) throw new Error('PO not found');
