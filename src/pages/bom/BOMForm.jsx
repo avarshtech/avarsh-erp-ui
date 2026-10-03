@@ -36,7 +36,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../utils/permissions';
-import { createBom, updateBom, getBomById } from '../../services/bom/bomService';
+import { createBom, updateBom, getBomById, releaseBom, reopenBom } from '../../services/bom/bomService';
 import { getActiveProcesses } from '../../services/master/processService';
 import { getOrderByOrderNo, getRecentOrders } from '../../services/orders/orderService';
 import { searchItems, getItemMetaData, getItemsByIds } from '../../services/master/itemService';
@@ -1534,18 +1534,22 @@ const BOMForm = () => {
 
     setSavingDraft(true);
     try {
-      const payload = buildPayload(BOM_STATUS.DRAFT);
       const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
+      let stored;
       if (isEdit) {
-        saved = await updateBom(id, payload);
+        // The save keeps the BOM's status; one that is not a draft is reopened by its own command,
+        // sent the version the save answered
+        saved = await updateBom(id, buildPayload(bomStatus));
+        stored = saved.status === BOM_STATUS.DRAFT ? saved : await reopenBom(id, saved.version);
         message.success('BOM saved as draft');
       } else {
-        saved = await createBom(payload);
+        saved = await createBom(buildPayload(BOM_STATUS.DRAFT));
+        stored = saved;
         message.success('BOM created as draft');
       }
       await uploadStagedCadFiles(saved, priorLineIds);
-      if (saved?.version != null) setEntityVersion(saved.version);
+      if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
       navigate('/bom/list');
@@ -1569,18 +1573,22 @@ const BOMForm = () => {
 
     setSubmitting(true);
     try {
-      const payload = buildPayload(BOM_STATUS.CREATED);
       const priorLineIds = new Set(lines.filter((l) => l.id).map((l) => l.id));
       let saved;
+      let stored;
       if (isEdit) {
-        saved = await updateBom(id, payload);
+        // The save keeps the BOM's status; the release command makes it CREATED, sent the version
+        // the save answered. A new BOM is still created released.
+        saved = await updateBom(id, buildPayload(bomStatus));
+        stored = saved.status === BOM_STATUS.CREATED ? saved : await releaseBom(id, saved.version);
         message.success('BOM updated successfully');
       } else {
-        saved = await createBom(payload);
+        saved = await createBom(buildPayload(BOM_STATUS.CREATED));
+        stored = saved;
         message.success('BOM created successfully');
       }
       await uploadStagedCadFiles(saved, priorLineIds);
-      if (saved?.version != null) setEntityVersion(saved.version);
+      if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
       navigate('/bom/list');

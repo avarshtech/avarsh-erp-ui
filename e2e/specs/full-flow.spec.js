@@ -302,7 +302,6 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     }
 
     const bomId = bomData?.id;
-    const bomVersion = bomData?.version;
     console.log(`  ✓ BOM ID: ${bomId}`);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -314,7 +313,9 @@ test('Full ERP Flow — Costing → Order → BOM → PO (all fields)', async ({
     console.log('  ✓ BOM List loaded');
 
     if (bomId != null) {
-      await api.patch(`/boms/${bomId}/status`, { status: 'CREATED', version: bomVersion ?? 0 });
+      // Released by its own command, sent the version the BOM holds now
+      const { data: bomNow } = await api.get(`/boms/${bomId}`);
+      await api.post(`/boms/${bomId}/release`, { version: bomNow.version });
       console.log(`  ✓ BOM FINALIZED — id=${bomId} → CREATED`);
     }
     await page.reload();

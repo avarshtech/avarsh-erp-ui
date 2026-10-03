@@ -27,9 +27,33 @@ export const deleteBom = async (id) => {
   return response.data;
 };
 
-export const changeBomStatus = async (id, status, version) => {
-  const response = await axiosInstance.patch(`${BASE_URL}/${id}/status`, { status, version });
+/**
+ * Releases a BOM: it becomes CREATED, ready for POs. POST /boms/{id}/release.
+ * @param {number} id - BOM ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} BomDTO as stored, with its new version
+ */
+export const releaseBom = async (id, version) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${id}/release`, { version });
   return response.data;
+};
+
+/**
+ * Reopens a BOM as a DRAFT. POST /boms/{id}/reopen.
+ * @param {number} id - BOM ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} BomDTO as stored, with its new version
+ */
+export const reopenBom = async (id, version) => {
+  const response = await axiosInstance.post(`${BASE_URL}/${id}/reopen`, { version });
+  return response.data;
+};
+
+/** CREATED is the release, DRAFT the reopen: a BOM's status moves only by those two commands. */
+export const changeBomStatus = async (id, status, version) => {
+  if (status === 'CREATED') return releaseBom(id, version);
+  if (status === 'DRAFT') return reopenBom(id, version);
+  throw new Error(`A BOM is released or reopened, not moved to ${status}`);
 };
 
 /**
