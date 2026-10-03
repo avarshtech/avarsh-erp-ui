@@ -58,9 +58,12 @@ export function selectAt(scope, index) {
   return scope.locator('.ant-select').nth(index);
 }
 
-/** Read a table as rows of plain text, header row dropped. */
+/**
+ * Read a table's data rows as plain text. Only antd's data rows count: the hidden measure row a
+ * scrolling table adds, and the No data placeholder of an empty one, are not records.
+ */
 export async function tableRows(page, scope = page) {
-  return scope.locator('.ant-table-tbody tr').evaluateAll(
+  return scope.locator('.ant-table-tbody tr.ant-table-row').evaluateAll(
     (rows) => rows
       .map((r) => [...r.querySelectorAll('td')].map((c) => c.innerText.trim()).join(' | '))
       .filter(Boolean),

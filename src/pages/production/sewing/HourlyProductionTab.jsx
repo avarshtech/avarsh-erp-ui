@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Card, Space, DatePicker, InputNumber, Spin, Tag, Alert } from 'antd';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
+import EmptyState from '../../../components/EmptyState';
 import { FormSelect } from '../../../components/form';
 import { getActiveShifts } from '../../../services/master/hrMasterService';
 import { completedOf, efficiencyPct, workedHoursOf } from '../../../utils/sewingCalc';
@@ -30,6 +31,7 @@ const HourlyProductionTab = () => {
   const [shiftId, setShiftId] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -41,6 +43,7 @@ const HourlyProductionTab = () => {
         setPlanId(pl.find((p) => p.status === 'IN_PROGRESS')?.id ?? pl[0]?.id ?? null);
         setShiftId(sh[0]?.id ?? null);
       } catch { message.error('Failed to load plans and shifts'); }
+      finally { setLoaded(true); }
     })();
   }, [message]);
 
@@ -108,6 +111,16 @@ const HourlyProductionTab = () => {
     } finally { setSaving(false); }
   };
 
+  // Without a plan or a shift there is no sheet to open: say what is missing instead of spinning
+  if (loaded && (!plans.length || !shifts.length)) {
+    return (
+      <Card>
+        {!plans.length
+          ? <EmptyState title="No sewing plan yet" description="Create one under Production Plan to record hourly output" />
+          : <EmptyState title="No active shift" description="Add a shift under HR masters to record hourly output" />}
+      </Card>
+    );
+  }
   if (!plan || !sheet) return <Card><div style={{ textAlign: 'center', padding: 60 }}><Spin /></div></Card>;
 
   const light = TRAFFIC_COLORS[LIGHT_KEY[live?.trafficLight] ?? 'red'];

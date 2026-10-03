@@ -30,7 +30,7 @@ const TAB_EXPECTATIONS = [
   { tab: TABS.plan, name: 'Production Plan', marker: /Production Plan|New Sewing Plan|No sewing plans/i },
   { tab: TABS.receipt, name: 'Cut Parts Receipt', marker: /Bundle Issue|Receive Bundles/i },
   { tab: TABS.trims, name: 'Trims Verification', marker: /BOM|Verification Card/i },
-  { tab: TABS.hourly, name: 'Hourly Production', marker: /Operator-wise Hourly Output|Line Efficiency/i },
+  { tab: TABS.hourly, name: 'Hourly Production', marker: /Operator-wise Hourly Output|Line Efficiency|No sewing plan yet|No active shift/i },
   { tab: TABS.measurement, name: 'Measurement', marker: /measurement chart|Measurement Report/i },
   { tab: TABS.topse, name: 'EndLine Check', marker: /DHU|End-Line Check/i },
   { tab: TABS.issue, name: 'Garment Issue', marker: /Over-issuance|Garment Issue/i },
