@@ -127,7 +127,6 @@ const MarkerPlanForm = () => {
         fabricWidthRaw: plan.fabricWidthRaw,
         cuttableWidth: plan.cuttableWidth,
         allowancePct: plan.allowancePct,
-        status: plan.status,
         remarks: plan.remarks,
         markers: plan.markers,
       });

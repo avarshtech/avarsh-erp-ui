@@ -88,8 +88,11 @@ export const getMarkerPlan = async (id) => {
   return data;
 };
 
-/** Upsert — the planning screen saves the whole plan, markers and all. */
-export const saveMarkerPlan = async (payload) => {
+/**
+ * Upsert — the planning screen saves the whole plan, markers and all. The save carries no
+ * status: a new plan starts as a draft, and a plan moves by its own commands.
+ */
+export const saveMarkerPlan = async ({ status: _status, ...payload }) => {
   const { data } = payload.id
     ? await axiosInstance.put(`${BASE}/marker-plans/${payload.id}`, payload)
     : await axiosInstance.post(`${BASE}/marker-plans`, payload);
@@ -106,9 +109,24 @@ export const listMarkersForPo = async (cutPoId) => {
   return data;
 };
 
-/** The size-set (pilot) cut gate that releases a Cut PO for bulk laying. */
+/** The size-set (pilot) cut gate of a Cut PO: its status, and its version once a decision exists. */
+export const getSizeSet = async (cutPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/cut-pos/${cutPoId}/size-set`);
+  return data;
+};
+
+const SIZE_SET_COMMAND = { APPROVED: 'approve', REJECTED: 'reject' };
+
+/**
+ * The size-set (pilot) cut gate that releases a Cut PO for bulk laying: approved or rejected by
+ * its own command, sent the version of the gate as it stands now (none before the first
+ * decision, when there is no gate row yet).
+ */
 export const setSizeSetStatus = async (cutPoId, status, remarks) => {
-  const { data } = await axiosInstance.put(`${BASE}/cut-pos/${cutPoId}/size-set`, { status, remarks });
+  const command = SIZE_SET_COMMAND[status];
+  if (!command) throw new Error(`The size-set cut is approved or rejected, not set to ${status}`);
+  const { version } = await getSizeSet(cutPoId);
+  const { data } = await axiosInstance.post(`${BASE}/cut-pos/${cutPoId}/size-set/${command}`, { version, remarks });
   return data;
 };
 
@@ -124,7 +142,8 @@ export const getLayAudit = async (id) => {
   return data;
 };
 
-export const saveLayAudit = async (payload) => {
+/** The save carries no status: a new lay starts as audited, and a lay moves by its own commands. */
+export const saveLayAudit = async ({ status: _status, ...payload }) => {
   const { data } = payload.id
     ? await axiosInstance.put(`${BASE}/lay-audits/${payload.id}`, payload)
     : await axiosInstance.post(`${BASE}/lay-audits`, payload);
