@@ -263,8 +263,9 @@ const CartonPackingForm = () => {
       onOk: async () => {
         setBusy('complete');
         try {
-          if (isDirty) await persist();
-          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.COMPLETED);
+          // Unsaved edits are saved first; the complete command goes with the version the entry holds then
+          const current = isDirty ? await persist() : record;
+          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.COMPLETED, current.version);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} marked complete`);
@@ -275,7 +276,7 @@ const CartonPackingForm = () => {
         }
       },
     });
-  }, [modal, id, isDirty, persist, message, setBusy]);
+  }, [modal, id, isDirty, persist, record, message, setBusy]);
 
   const handleReopen = useCallback(() => {
     modal.confirm({
@@ -286,7 +287,7 @@ const CartonPackingForm = () => {
       onOk: async () => {
         setBusy('reopen');
         try {
-          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.OPEN);
+          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.OPEN, record.version);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} reopened`);
@@ -297,7 +298,7 @@ const CartonPackingForm = () => {
         }
       },
     });
-  }, [modal, id, message, setBusy]);
+  }, [modal, id, record, message, setBusy]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loadError) {

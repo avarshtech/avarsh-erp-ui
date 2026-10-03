@@ -35,8 +35,14 @@ export const createPackingEntry = async (payload) =>
 export const updatePackingEntry = async (id, payload) =>
   decorateEntry(await call(axiosInstance.put(`${BASE}/entries/${id}`, toPayload(payload))));
 
-export const setPackingEntryStatus = async (id, status) =>
-  decorateEntry(await call(axiosInstance.post(`${BASE}/entries/${id}/status`, { status })));
+const STATUS_COMMAND = { COMPLETED: 'complete', OPEN: 'reopen' };
+
+/** Completes (COMPLETED) or reopens (OPEN) an entry by its own command, sent the version the screen holds. */
+export const setPackingEntryStatus = async (id, status, version) => {
+  const command = STATUS_COMMAND[status];
+  if (!command) throw new Error(`A packing entry is completed or reopened, not set to ${status}`);
+  return decorateEntry(await call(axiosInstance.post(`${BASE}/entries/${id}/${command}`, { version })));
+};
 
 export const deletePackingEntry = (id) => call(axiosInstance.delete(`${BASE}/entries/${id}`));
 
