@@ -281,6 +281,8 @@ const NAV_GROUPS = [
     ],
   },
   {
+    // On a key of their own: a bill clerk holding inventory-bill-passing does not set the rules
+    // his bills are checked against
     groupKey: 'billPassing',
     label: 'Bill Passing',
     items: [
@@ -288,7 +290,7 @@ const NAV_GROUPS = [
         key: 'bp-debit-type',
         label: 'Debit Types',
         icon: <MinusCircleOutlined />,
-        moduleId: 'inventory-bill-passing',
+        moduleId: 'inventory-bill-passing-masters',
         Component: BpDebitTypeMaster,
         loadingKey: null,
         description: 'Reasons a supplier invoice can be debited, and whether each needs a QC reference',
@@ -297,7 +299,7 @@ const NAV_GROUPS = [
         key: 'bp-charge-type',
         label: 'Charge Types',
         icon: <PlusCircleOutlined />,
-        moduleId: 'inventory-bill-passing',
+        moduleId: 'inventory-bill-passing-masters',
         Component: BpChargeTypeMaster,
         loadingKey: null,
         description: 'Freight, insurance and other charges addable to a bill, with their default GST treatment',
@@ -306,7 +308,7 @@ const NAV_GROUPS = [
         key: 'bp-issue-type',
         label: 'Issue Types',
         icon: <IssuesCloseOutlined />,
-        moduleId: 'inventory-bill-passing',
+        moduleId: 'inventory-bill-passing-masters',
         Component: BpIssueTypeMaster,
         loadingKey: null,
         description: 'Query and hold reasons, and which of them block a bill from reaching approval',
@@ -315,7 +317,7 @@ const NAV_GROUPS = [
         key: 'bp-tolerance',
         label: 'Tolerance Settings',
         icon: <SlidersOutlined />,
-        moduleId: 'inventory-bill-passing',
+        moduleId: 'inventory-bill-passing-masters',
         Component: BpToleranceSettings,
         loadingKey: null,
         description: 'Quantity, rate and value variance limits used by the four-way match',

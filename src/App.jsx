@@ -420,7 +420,7 @@ const ThemedApp = () => {
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows" operation="view"><ApprovalFlowList /></PermissionRoute>} />
             <Route path="admin/company-profile" element={<PermissionRoute module="company-profile" operation="view"><CompanyProfile /></PermissionRoute>} />
             {/* Master Data — one shell screen shared by every master key; opens if any of them grants access */}
-            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'branches', 'inventory-qc', 'inventory-bill-passing']} operation="view"><MasterDashboard /></PermissionRoute>} />
+            <Route path="master" element={<PermissionRoute module={['master-data', 'buyer-info', 'supplier-info', 'items', 'style-master', 'size-presets', 'payment-terms', 'terms-conditions', 'process-master', 'parts-master', 'overhead-master', 'couriers', 'branches', 'inventory-qc', 'inventory-bill-passing-masters']} operation="view"><MasterDashboard /></PermissionRoute>} />
             {/* Profile */}
             <Route path="profile" element={<Profile />} />
             {/* HR & Payroll */}

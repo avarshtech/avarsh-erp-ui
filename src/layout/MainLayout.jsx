@@ -491,7 +491,7 @@ const MainLayoutInner = () => {
       moduleId: [
         "master-data", "buyer-info", "supplier-info", "items", "style-master",
         "size-presets", "payment-terms", "terms-conditions", "process-master", "branches",
-        "parts-master", "overhead-master", "couriers",
+        "parts-master", "overhead-master", "couriers", "inventory-bill-passing-masters",
       ],
     },
     {

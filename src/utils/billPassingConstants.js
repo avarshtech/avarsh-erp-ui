@@ -339,3 +339,10 @@ export const currentFinancialYear = (date = new Date()) => {
 
 /** Permission module id; one module with extra ops, like inventory-qc. */
 export const BP_MODULE_ID = 'inventory-bill-passing';
+
+/**
+ * The masters' own key: debit, charge and issue types and the tolerance, the rules a bill is
+ * checked against, so a bill clerk holding BP_MODULE_ID does not set them. Saving a type is
+ * add (an upsert by code, new or edited), the tolerance update, deleting a type delete.
+ */
+export const BP_MASTERS_MODULE_ID = 'inventory-bill-passing-masters';

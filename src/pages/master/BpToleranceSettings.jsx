@@ -5,8 +5,9 @@ import EmptyState from '../../components/EmptyState';
 import PermissionGuard from '../../components/PermissionGuard';
 import { numericInputProps, integerInputProps } from '../../utils/inputHelpers';
 import { getTolerance, saveTolerance } from '../../services/inventory/billPassingService';
-import { BP_MODULE_ID, DEFAULT_TOLERANCE } from '../../utils/billPassingConstants';
+import { BP_MASTERS_MODULE_ID, DEFAULT_TOLERANCE } from '../../utils/billPassingConstants';
 import { hasPermission } from '../../utils/permissions';
+import { toastUnlessHandled } from '../../utils/apiError';
 import { useMasterAssistant } from './genie/masterGenieContext';
 
 const BpToleranceSettings = ({ onDirtyChange }) => {
@@ -18,8 +19,11 @@ const BpToleranceSettings = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const savedValues = useRef(DEFAULT_TOLERANCE);
   const skipDirty = useRef(false);
+  // The version of the settings this screen loaded, sent back with the save: a stale one is a 409,
+  // which the app-wide conflict dialog explains
+  const version = useRef(null);
 
-  const canUpdate = hasPermission(BP_MODULE_ID, 'update');
+  const canUpdate = hasPermission(BP_MASTERS_MODULE_ID, 'update');
 
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
   // Laya AI on the Master Data page (see ./genie): one settings form, always open.
@@ -33,18 +37,24 @@ const BpToleranceSettings = ({ onDirtyChange }) => {
     setTimeout(() => { skipDirty.current = false; }, 300);
   }, [form, markDirty]);
 
+  /** Shows the settings as the server holds them, and keeps the version they were read at. */
+  const adopt = useCallback((record) => {
+    const { version: read, ...figures } = record || {};
+    version.current = read ?? null;
+    applyValues({ ...DEFAULT_TOLERANCE, ...figures });
+  }, [applyValues]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const values = await getTolerance();
-      applyValues({ ...DEFAULT_TOLERANCE, ...values });
+      adopt(await getTolerance());
     } catch (e) {
       setLoadError(e.message || 'Failed to load tolerance settings');
     } finally {
       setLoading(false);
     }
-  }, [applyValues]);
+  }, [adopt]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -52,15 +62,17 @@ const BpToleranceSettings = ({ onDirtyChange }) => {
     if (!canUpdate) { message.warning('You do not have permission to change tolerance settings'); return; }
     setSaving(true);
     try {
-      const saved = await saveTolerance(values);
-      applyValues({ ...DEFAULT_TOLERANCE, ...saved });
+      // The answer carries the new version, so a second save in a row is not stale
+      adopt(await saveTolerance(version.current == null ? values : { ...values, version: version.current }));
       message.success('Tolerance settings saved');
     } catch (e) {
-      message.error(e.message || 'Failed to save tolerance settings');
+      // The interceptor already said why: a stale version raised the conflict dialog, any
+      // other refusal the server's own message
+      toastUnlessHandled(message, e, 'Failed to save tolerance settings');
     } finally {
       setSaving(false);
     }
-  }, [canUpdate, applyValues, message]);
+  }, [canUpdate, adopt, message]);
 
   const handleReset = useCallback(() => {
     applyValues(savedValues.current);
@@ -110,7 +122,7 @@ const BpToleranceSettings = ({ onDirtyChange }) => {
             <Button icon={<UndoOutlined />} onClick={handleReset} disabled={!unsavedChanges || saving}>
               Reset
             </Button>
-            <PermissionGuard module={BP_MODULE_ID} operation="update">
+            <PermissionGuard module={BP_MASTERS_MODULE_ID} operation="update">
               <Button type="primary" icon={<SaveOutlined />} onClick={() => form.submit()} loading={saving} disabled={!unsavedChanges}>
                 Save
               </Button>

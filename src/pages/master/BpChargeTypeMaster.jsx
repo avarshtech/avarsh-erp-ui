@@ -4,7 +4,7 @@ import { Form, Input, Button, Space, Switch, App, Tag, InputNumber } from 'antd'
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { integerInputProps } from '../../utils/inputHelpers';
 import { listChargeTypes, saveChargeType, deleteChargeType } from '../../services/inventory/billPassingService';
-import { BP_MODULE_ID } from '../../utils/billPassingConstants';
+import { BP_MASTERS_MODULE_ID } from '../../utils/billPassingConstants';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 
@@ -20,9 +20,9 @@ const BpChargeTypeMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const canAdd = hasPermission(BP_MODULE_ID, 'add');
-  const canUpdate = hasPermission(BP_MODULE_ID, 'update');
-  const canDelete = hasPermission(BP_MODULE_ID, 'delete');
+  // Saving a type is an upsert by code, so the API checks add whether it is new or edited
+  const canAdd = hasPermission(BP_MASTERS_MODULE_ID, 'add');
+  const canDelete = hasPermission(BP_MASTERS_MODULE_ID, 'delete');
 
   const markDirty = useCallback((dirty) => { setUnsavedChanges(dirty); onDirtyChange?.(dirty); }, [onDirtyChange]);
 
@@ -128,7 +128,7 @@ const BpChargeTypeMaster = ({ onDirtyChange }) => {
     setFilteredData(data.filter((r) => (r.name || '').toLowerCase().includes(lower) || (r.code || '').toLowerCase().includes(lower)));
   }, [data]);
 
-  const isReadOnly = !!selectedId && !canUpdate;
+  const isReadOnly = !!selectedId && !canAdd;
 
   return (
     <MasterSplitView
@@ -154,7 +154,7 @@ const BpChargeTypeMaster = ({ onDirtyChange }) => {
               {selectedId && canDelete && <Button danger onClick={handleDelete} icon={<DeleteOutlined />}>Delete</Button>}
               <Button onClick={handleCancel} icon={<CloseOutlined />}>{isReadOnly ? 'Close' : 'Cancel'}</Button>
               {!isReadOnly && (
-                <PermissionGuard module={BP_MODULE_ID} operation={selectedId ? 'update' : 'add'}>
+                <PermissionGuard module={BP_MASTERS_MODULE_ID} operation="add">
                   <Button type="primary" onClick={() => form.submit()} icon={<SaveOutlined />} loading={submitting} disabled={!!selectedId && !unsavedChanges}>
                     Save Changes
                   </Button>
