@@ -52,7 +52,7 @@ test.beforeAll(async () => {
   // Submit, then approve each level of the flow: a save can no longer jump a PO straight to
   // Sent_To_Supplier. With no flow, the submit itself approves it.
   const current = await getPo();
-  po = ok(await api.post('/purchase-orders', { ...current, id: po.id, status: 'Pending_Approval' }), 'submit po');
+  po = ok(await api.post(`/purchase-orders/${po.id}/submit`, { version: current.version }), 'submit po');
   for (let level = 0; po.status === 'Pending_Approval' && level < 5; level++) {
     po = ok(await api.put(`/purchase-orders/${po.id}/approve`, { comment: 'e2e: send to supplier' }), 'approve po');
   }

@@ -44,6 +44,7 @@ import {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
+  submitPurchaseOrder,
   createActivity,
 } from '../../services/po/purchaseOrderService';
 import { getAllTermsConditions } from '../../services/master/termsConditionsService';
@@ -1567,12 +1568,15 @@ const POForm = () => {
   const doSubmit = async () => {
     setSubmitting(true);
     try {
-      const payload = buildPayload(PO_STATUS.PENDING_APPROVAL);
       let result;
       if (isEditMode) {
-        result = await updatePurchaseOrder(id, payload);
+        // The save keeps the PO's status; the submit command sends it for approval with the version
+        // the save answered, and moves its draft lines in progress. A new PO is still created submitted.
+        const saved = await updatePurchaseOrder(id, buildPayload(originalPO?.status ?? PO_STATUS.DRAFT));
+        if (saved?.version != null) setEntityVersion(saved.version);
+        result = await submitPurchaseOrder(id, saved.version);
       } else {
-        result = await createPurchaseOrder(payload);
+        result = await createPurchaseOrder(buildPayload(PO_STATUS.PENDING_APPROVAL));
       }
       if (result?.version != null) setEntityVersion(result.version);
 

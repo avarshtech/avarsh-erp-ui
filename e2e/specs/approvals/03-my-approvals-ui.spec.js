@@ -29,7 +29,7 @@ async function submitFreshPo() {
   const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
   const created = await api.post('/purchase-orders', po);
   const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
-  await api.post('/purchase-orders', { ...cur, id: created.data.id, status: 'Pending_Approval' });
+  await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });
   return created.data;
 }
 

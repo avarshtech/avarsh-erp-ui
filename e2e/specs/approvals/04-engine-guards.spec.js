@@ -37,7 +37,7 @@ test.describe('Approval engine — guards', () => {
     const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
     const created = await api.post('/purchase-orders', po);
     const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
-    await api.post('/purchase-orders', { ...cur, id: created.data.id, status: 'Pending_Approval' });
+    await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });
 
     const req = await findPendingRequest(api, 'PURCHASE_ORDER', created.data.id);
     expect(req, 'seeded PO flow must have raised a request').toBeTruthy();
@@ -119,7 +119,7 @@ test.describe('Approval engine — guards', () => {
       const po = buildGeneralPo(refs.localSupplier, refs.item, refs.terms);
       const created = await api.post('/purchase-orders', po);
       const { data: cur } = await api.get(`/purchase-orders/${created.data.id}`);
-      await api.post('/purchase-orders', { ...cur, id: created.data.id, status: 'Pending_Approval' });
+      await api.post(`/purchase-orders/${created.data.id}/submit`, { version: cur.version });
 
       const req = await findPendingRequest(api, 'PURCHASE_ORDER', created.data.id);
       expect(req).toBeTruthy();

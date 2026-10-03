@@ -39,7 +39,7 @@ async function createDraftPo(api, { unitPrice }) {
 
 async function submitPo(api, poId) {
   const { data: cur } = await api.get(`/purchase-orders/${poId}`);
-  const res = await api.post('/purchase-orders', { ...cur, id: poId, status: 'Pending_Approval' });
+  const res = await api.post(`/purchase-orders/${poId}/submit`, { version: cur.version });
   expect(res.status).toBeLessThan(300);
   return res.data;
 }

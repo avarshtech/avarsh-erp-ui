@@ -8,8 +8,9 @@
  *
  * IMPORTANT (e2e): unlike costing/orders, the PURCHASE_ORDER module HAS a
  * configured approval flow in the e2e seed. So:
- *   - submitting (status Pending_Approval) creates a PENDING approval request and
- *     the PO stays Pending_Approval (it does NOT auto-approve).
+ *   - submitting (POST /purchase-orders/{id}/submit with the PO's version) creates a
+ *     PENDING approval request and the PO stays Pending_Approval (it does NOT
+ *     auto-approve).
  *   - approve/reject/refer-back route through the engine's processAction, which
  *     validates the approver ROLE. The e2e superadmin is not the configured
  *     approver for the PO flow level, so those decisions are correctly REFUSED
@@ -50,7 +51,7 @@ const get = async (id) => (await api.get(`/purchase-orders/${id}`)).data;
 
 async function submit(po) {
   const cur = await get(po.id);
-  const res = await api.post('/purchase-orders', { ...cur, id: po.id, status: 'Pending_Approval' });
+  const res = await api.post(`/purchase-orders/${po.id}/submit`, { version: cur.version });
   expect(res.status).toBeGreaterThanOrEqual(200);
   expect(res.status).toBeLessThan(300);
   return get(po.id);

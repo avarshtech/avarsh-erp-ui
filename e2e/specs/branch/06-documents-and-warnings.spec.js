@@ -144,7 +144,9 @@ test.describe('Approval flows can route by branch', () => {
     test.skip(!candidate, 'no draft purchase order left to submit');
 
     const { data: full } = await api.get(`/purchase-orders/${candidate.id}`);
-    await api.put(`/purchase-orders/${candidate.id}`, { ...full, deliveryBranchId: second.id, status: 'Pending_Approval' });
+    // Saved at the second branch as it is, then submitted by its own command with the saved version
+    const { data: atSecond } = await api.put(`/purchase-orders/${candidate.id}`, { ...full, deliveryBranchId: second.id });
+    await api.post(`/purchase-orders/${candidate.id}/submit`, { version: atSecond.version });
 
     const { data: requests } = await api.get(`/approval-requests/entity/PURCHASE_ORDER/${candidate.id}`);
     expect(rowsOf(requests).some((r) => r.approvalFlowId === flow.id)).toBe(true);

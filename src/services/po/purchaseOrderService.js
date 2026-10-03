@@ -105,6 +105,19 @@ export const updatePurchaseOrder = async (id, poData) => {
 };
 
 /**
+ * Submit an existing Draft, Referred_Back or Rejected PO for approval, as it was last saved;
+ * its draft lines go in progress. Approved at once when no approval flow is configured.
+ * POST /purchase-orders/{id}/submit
+ * @param {number} id - Purchase order ID
+ * @param {number} version - The version the screen last read (a stale one is a 409)
+ * @returns {Promise<Object>} Updated purchase order
+ */
+export const submitPurchaseOrder = async (id, version) => {
+  const response = await axiosInstance.post(`${ENDPOINTS.PURCHASE_ORDERS}/${id}/submit`, { version });
+  return response.data;
+};
+
+/**
  * Delete a purchase order
  * @param {number} id - Purchase order ID
  * @returns {Promise<void>}
@@ -298,6 +311,7 @@ export default {
   getPurchaseOrderById,
   createPurchaseOrder,
   updatePurchaseOrder,
+  submitPurchaseOrder,
   deletePurchaseOrder,
   createActivity,
   getPoVersionHistory,
