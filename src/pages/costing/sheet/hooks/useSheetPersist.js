@@ -17,7 +17,8 @@ const REVISE_REASON = 'Changed in the cost sheet editor after it was submitted';
  * An existing sheet changes status by its own commands, not by the save: Submit saves the edits
  * with the status the sheet has, then sends it for approval with the version the save answered;
  * Save Draft on a submitted sheet first takes it back to Draft (the withdraw), then saves the
- * edits. A new sheet is still created as Draft or Final.
+ * edits. A draft's save beside a command goes as an autosave, so the people told about cost
+ * sheets get the command's one message, as before. A new sheet is still created as Draft or Final.
  */
 export default function useSheetPersist({ form, sheet, dispatch, totals, meta, setMeta, todaysRate, labelsOf }) {
   const metaRef = useRef(meta);
@@ -40,16 +41,22 @@ export default function useSheetPersist({ form, sheet, dispatch, totals, meta, s
       let current = metaRef.current;
       const existing = !!current.id && !autosave;
       const submitting = existing && status === COSTING_STATUS.FINAL && current.status !== COSTING_STATUS.FINAL;
+      let withdrawn = false;
       if (existing && status === COSTING_STATUS.DRAFT && current.status === COSTING_STATUS.FINAL) {
         current = adopt(current, await withdrawCostSheet(current.id, current.version, REVISE_REASON));
+        withdrawn = true;
       }
+      // Beside a command, a draft's edits are saved the way autosave saves them: no WhatsApp
+      // message and no feed row of their own, so the command's are the only ones, as when the
+      // save itself carried the move. A rejected sheet cannot autosave and is saved as usual.
+      const silent = autosave || ((submitting || withdrawn) && current.status === COSTING_STATUS.DRAFT);
 
       const values = form.getFieldsValue(true);
       const payload = toPayload({
         values, sheet, totals, meta: current, todaysRate, labels: labelsOf(values),
         status: submitting ? current.status : status,
       });
-      const saved = autosave
+      const saved = silent
         ? await autosaveCostSheet(current.id, payload)
         : current.id ? await updateCostSheet(current.id, payload) : await createCostSheet(payload);
       current = adopt(current, saved);
