@@ -141,13 +141,13 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
 - **Branch scoping**: header `X-Branch-Id` (`BranchContext.java:16`) is a hint, read explicitly by branch-aware services
   (`OrderService.java:60`, `shared/branch/BranchSpecs.at()` `:20`); UI stores the working branch in `context/BranchContext.jsx:44-49`,
   `axiosInstance.js:49` skips the header when it is `'all'`; `components/branch/BranchSwitcher.jsx`, `BranchField.jsx`.
-- **Approval engine**: `erp/approval/domain/EntityType.java` lists the 17 document types that can carry a flow
+- **Approval engine**: `erp/approval/domain/EntityType.java` lists the 19 document types that can carry a flow
   (PURCHASE_ORDER, COST_SHEET, ORDER, GRN, GRN_REVERSAL, QC, LEAVE, GATE_PASS, MISS_PUNCH, PAYROLL_RUN, BONUS_RUN, FNF_SETTLEMENT,
-  EL_ENCASHMENT, CUTTING_PO, WORK_ORDER, FINISHING_PO, BILL_PASSING); 10 `*ApprovalListener.java` classes consume
+  EL_ENCASHMENT, CUTTING_PO, WORK_ORDER, FINISHING_PO, BILL_PASSING, CUT_PANEL_PO, GARMENT_PROCESS_PO); 12 `*ApprovalListener.java` classes consume
   `ApprovalOutcomeEvent` (`grep -rl ApprovalOutcomeEvent erp/ --include='*Listener.java'`): costing, hr, billpassing, grn, qc,
-  order, cutting, finishing, workorder, purchaseorder.
+  order, cutting, finishing, workorder, purchaseorder, jobwork (`CppApprovalListener`, `GpoApprovalListener`; verified 2026-10-06).
 
-## 5. Mock vs API status, as of 2026-09-24
+## 5. Mock vs API status, as of 2026-10-06
 
 Recipe: `grep -rn "USE_MOCK" src/services` — every switch is a `USE_MOCK_*` export in a `…Env.js` or at the top of the service.
 
@@ -160,6 +160,13 @@ Recipe: `grep -rn "USE_MOCK" src/services` — every switch is a `USE_MOCK_*` ex
 | Inventory | `services/inventory/inventoryService.js:26`, `openingStockService.js:33`, `returnToSupplierService.js:42` | all false (real API); `*MockData.js` files retained | `pages/inventory/*` |
 
 Everything else calls the API with no switch. `services/production/sewingService.js` and `cuttingService.js` have no mock flag.
+
+Job work — Cut Panel / Garment Process Requirements (`pages/bom/cutPanel`, `garmentProcess`) and Cut Panel / Garment Process POs
+(`pages/po/cutPanelPo`, `garmentProcessPo`) — moved onto the API on 2026-10-06 (package `erp/jobwork`: `common`, `cutpanel`,
+`garmentprocess`, `receipt`); the localStorage mocks and their `requirementEnv.js` / `jobWorkEnv.js` switches are deleted.
+The lists page on the server (`hooks/useServerList.js`, `useFilterOptions.js`); PO approval is the engine (`JobWorkApprovalPanel`).
+In-house cutting POs and work orders issue against an approved Cut Panel / Garment Process PO
+(`pages/production/cutting/PanelIssueFromPo.jsx`, `finishing/GarmentIssueFromPo.jsx`); e2e fixtures: `e2e/helpers/job-work-api.js`.
 
 Carton Packing (`pages/production/packing/`) calls the real API through `services/production/packingService.js` (`/api/v1/packing`, package `production.packing`, tables `prd_pack_*`) since 2026-09-26 — it no longer goes through `expDocService`. Export Documentation is still a mock, so its packing lists, invoices and reports bind the entries **seeded into the expdoc mock store**, never the live ones; `expDocMockPacking.js` keeps only `listBindablePackingEntries` plus a re-export of `utils/packingEntryIssues.js`, which both sides share.
 

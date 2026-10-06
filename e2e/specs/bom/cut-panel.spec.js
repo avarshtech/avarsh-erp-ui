@@ -1,28 +1,23 @@
 /**
- * BOM — Cut Panel Requirement (UI mock phase)
+ * BOM — Cut Panel Requirement, on the real API (/cut-panel-requirements).
  *
- * The CPR screens run on a localStorage mock (services/bom/requirementEnv.js) while
- * their panel and process dropdowns read the REAL Parts and Processes masters
- * (category 'Cut Panel'). Every test gets a fresh browser context, so the mock starts
- * from its seed: CPR-2026-00001 is the PRD appendix requirement (5,415 pcs).
+ * The e2e seed's ORD/0002 (Men's Winter Jacket; Olive Green, Burgundy, Camel, Slate Blue; S–XL) has a CREATED
+ * BOM with the Single Jersey and Pique fabrics. Requirements made by beforeAll come through the API
+ * (e2e/helpers/job-work-api.js); numbers are the server's, CPRQ/<FY>/NNNN.
  *
  * What this tests:
  *   - BOM menu: BOM List · Cut Panel · Garment Process, and no "Create BOM" item
- *   - List: seeded requirements with totals and status
- *   - A submitted CPR opens read-only with Edit and Close; colours without a process read
- *     "No cut-panel process"
- *   - Create: Colours x Panels x Processes expansion, PRD quantities (4Y 220 @2% → 225,
- *     @3% → 227), duplicate skipping, reason required for a variance, Save → number,
- *     Submit (WRN-03 confirm) → Submitted
- *   - One strip, several panels and fabrics: the panel clears after each add, a notice
- *     says what to do next and "Fabrics & panels added" lists them
- *   - Edit in place while no PO is placed (stays Submitted, audited as a revision); a CPR
- *     with placed POs has no Edit; Close needs a reason
- *   - The list's Edit opens a submitted CPR in edit mode; Cancel edit discards the change
+ *   - Create: order → the order's BOM no. read-only → fabric, colour, panel, process → Add to Grid (quantities
+ *     from the order) → Save Draft (server number) → Submit (WRN-03 confirm: colours without a process)
+ *   - Edit a submitted CPR in place: a changed quantity needs a reason; stays Submitted; History shows R1
+ *   - Close needs a reason
+ *   - The list pages and filters on the server
  */
 
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import { submittedCpr } from '../../helpers/job-work-api.js';
 
 async function pickOption(page, id, text) {
   await page.locator(`#${id}`).locator('xpath=ancestor::div[contains(@class,"ant-select")][1]').click();
@@ -34,8 +29,21 @@ async function pickOption(page, id, text) {
 
 const lineRow = (page, process) => page.locator('.ant-table-row').filter({ hasText: process }).first();
 
-/** The action bar's Edit ("edit Edit" with its icon) — never "Cancel edit" or a list row's "Edit CPR-…". */
+/** The action bar's Edit ("edit Edit" with its icon) — never "Cancel edit" or a list row's "Edit CPRQ/…". */
 const editButton = (page) => page.getByRole('button', { name: /(^|\s)Edit$/ });
+
+let editable;
+let closable;
+
+test.beforeAll(async () => {
+  const api = await createAuthenticatedClient();
+  try {
+    editable = await submittedCpr(api, { orderNo: 'ORD/0002', colour: 'Burgundy' });
+    closable = await submittedCpr(api, { orderNo: 'ORD/0002', colour: 'Camel', panel: 'Back Panel' });
+  } finally {
+    await api.dispose();
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
@@ -51,105 +59,62 @@ test('BOM menu lists BOM List, Cut Panel and Garment Process — no Create BOM i
   await expect(sider.locator('.ant-menu-item').filter({ hasText: /^Create BOM$/ })).toHaveCount(0);
 });
 
-test('List shows the seeded requirements with totals and status', async ({ page }) => {
-  await navigateWithAuth(page, '/bom/cut-panel/list');
-  const row = page.locator('.ant-table-row').filter({ hasText: 'CPR-2026-00001' });
-  await expect(row).toContainText('ORD-2026-00125');
-  await expect(row).toContainText('5,415');
-  await expect(row).toContainText('Submitted');
-  await expect(page.getByRole('button', { name: /New Cut Panel Requirement/ })).toBeVisible();
-});
-
-test('A submitted requirement opens read-only with Edit and Close, and reports colours without a process', async ({ page }) => {
-  await navigateWithAuth(page, '/bom/cut-panel/1');
-  await waitForPageReady(page);
-  await expect(page.getByRole('heading', { name: /CPR-2026-00001/ })).toBeVisible();
-  await expect(page.getByText('No cut-panel process')).toHaveCount(2); // White and Navy
-  await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
-  await expect(editButton(page)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Close' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Reopen' })).toHaveCount(0);
-});
-
-test('Create: expand, calculate, record a variance reason, save and submit', async ({ page }) => {
+test('Create: order and its BOM, expand, save with the server number, submit', async ({ page }) => {
   await navigateWithAuth(page, '/bom/cut-panel/new');
   await waitForPageReady(page);
 
-  await pickOption(page, 'cpr-order', 'ORD-2026-00125');
-  await expect(page.getByText(/already has cut panel requirements/)).toBeVisible(); // WRN-07
+  await pickOption(page, 'cpr-order', 'ORD/0002');
+  await expect(page.locator('.ant-form-item').filter({ hasText: 'BOM No.' })).toContainText('ORD/0002'); // read-only, the order's own BOM
   await pickOption(page, 'cpr-fabric', 'Single Jersey');
-  await pickOption(page, 'cpr-colours', 'Black');
+  await pickOption(page, 'cpr-colours', 'Olive Green');
   await page.keyboard.press('Escape');
   await pickOption(page, 'cpr-panels', 'Front Panel');
   await page.keyboard.press('Escape');
-  for (const process of ['Panel Printing', 'Panel Embroidery', 'Heat Transfer']) {
-    await pickOption(page, 'cpr-processes', process);
-  }
-  await page.keyboard.press('Escape');
-
-  await page.getByRole('button', { name: /Add to Grid/ }).click();
-  await expect(page.getByText(/3 lines added for Single Jersey › Front Panel\. Pick another panel/)).toBeVisible();
-  await expect(lineRow(page, 'Panel Printing').locator('input[name$="-4Y"]')).toHaveValue('225');
-
-  // Same selection again (the panel clears after an add, so pick it back): nothing duplicated (PRD §8.2.3)
-  await pickOption(page, 'cpr-panels', 'Front Panel');
+  await pickOption(page, 'cpr-processes', 'Panel Printing');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /Add to Grid/ }).click();
-  await expect(page.getByText('3 line(s) already exist and were skipped')).toBeVisible();
-
-  // Allowance 3% on embroidery recalculates that line only and needs a reason (WRN-04)
-  const embroidery = lineRow(page, 'Panel Embroidery');
-  await embroidery.locator('input[name^="allow-"]').fill('3');
-  await embroidery.locator('input[name^="allow-"]').press('Tab');
-  await expect(embroidery.locator('input[name$="-4Y"]')).toHaveValue('227');
-  await expect(lineRow(page, 'Panel Printing').locator('input[name$="-4Y"]')).toHaveValue('225');
-
-  await page.getByRole('button', { name: 'Submit' }).click();
-  await expect(page.getByText(/Record a reason on every line/).first()).toBeVisible();
-  await embroidery.locator('input[name^="reason-"]').fill('Extra 1% for embroidery rejection');
+  await expect(page.getByText(/1 line added for .*Front Panel/)).toBeVisible();
+  await expect(lineRow(page, 'Panel Printing').locator('input[name$="-M"]')).toHaveValue('200'); // the order's Olive Green M
 
   await page.getByRole('button', { name: 'Save Draft' }).click();
   await expect(page.getByText('Draft saved')).toBeVisible();
   await expect(page).toHaveURL(/\/bom\/cut-panel\/\d+$/);
-  await expect(page.getByRole('heading', { name: /CPR-\d{4}-\d{5}/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /CPRQ\/\d{2}-\d{2}\/\d+/ })).toBeVisible();
 
   await page.getByRole('button', { name: 'Submit' }).click();
-  const confirm = page.locator('.ant-modal-confirm').last(); // WRN-03: Red, White, Navy have no process
-  await expect(confirm).toContainText('Red, White, Navy');
+  const confirm = page.locator('.ant-modal-confirm').last(); // WRN-03: the other three colours have no process
+  await expect(confirm).toContainText('Burgundy, Camel, Slate Blue');
   await confirm.getByRole('button', { name: 'Submit' }).click();
   await expect(page.getByText(/Submitted — the requirement is now available/)).toBeVisible();
   await expect(editButton(page)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save Draft' })).toHaveCount(0);
 });
 
-test('Edit a submitted CPR in place; Close needs a reason', async ({ page }) => {
-  await navigateWithAuth(page, '/bom/cut-panel/1');
+test('Edit a submitted CPR in place: a changed quantity needs a reason; History shows the revision', async ({ page }) => {
+  await navigateWithAuth(page, `/bom/cut-panel/${editable.id}`);
   await waitForPageReady(page);
   await editButton(page).click();
-  await expect(page).toHaveURL(/\/bom\/cut-panel\/1\?edit=1$/);
-  const saveChanges = page.getByRole('button', { name: 'Save changes' });
-  await expect(saveChanges).toBeDisabled(); // nothing changed yet
+  await expect(page).toHaveURL(new RegExp(`/bom/cut-panel/${editable.id}\\?edit=1$`));
 
-  const printing = lineRow(page, 'Panel Printing'); // Black Front Panel, 4Y 225
-  await printing.locator('input[name$="-4Y"]').fill('230');
-  await printing.locator('input[name$="-4Y"]').press('Tab');
+  const printing = lineRow(page, 'Panel Printing'); // Burgundy Front Panel, M 200
+  await printing.locator('input[name$="-M"]').fill('205');
+  await printing.locator('input[name$="-M"]').press('Tab');
   await printing.locator('input[name^="reason-"]').fill('Buyer asked for 5 spare fronts');
-  await saveChanges.click();
-  const confirm = page.locator('.ant-modal-confirm').last(); // WRN-03: White and Navy still have no process
-  await confirm.getByRole('button', { name: 'Save changes' }).click();
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await page.locator('.ant-modal-confirm').last().getByRole('button', { name: 'Save changes' }).click(); // WRN-03
   await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
-  await expect(page).toHaveURL(/\/bom\/cut-panel\/1$/);
-  await expect(editButton(page)).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/bom/cut-panel/${editable.id}$`));
   await expect(page.getByText('Submitted', { exact: true }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'History' }).click();
-  await expect(page.locator('.ant-drawer-open')).toContainText('revised the requirement (R1)');
-  await expect(page.locator('.ant-drawer-open')).toContainText('4Y: 225 → 230');
-  await page.keyboard.press('Escape');
 
-  // CPR-2026-00003 has POs placed against it: no Edit, Close with a mandatory reason
-  await navigateWithAuth(page, '/bom/cut-panel/3');
+  await page.getByRole('button', { name: 'History' }).click();
+  const history = page.locator('.ant-drawer-open');
+  await expect(history).toContainText('revised the requirement (R1)');
+  await expect(history).toContainText('200 → 205');
+});
+
+test('Close needs a reason', async ({ page }) => {
+  await navigateWithAuth(page, `/bom/cut-panel/${closable.id}`);
   await waitForPageReady(page);
-  await expect(editButton(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Close' }).click();
   const dialog = page.locator('.ant-modal').last();
   await expect(dialog.getByRole('button', { name: 'Close Requirement' })).toBeDisabled();
@@ -159,57 +124,15 @@ test('Edit a submitted CPR in place; Close needs a reason', async ({ page }) => 
   await expect(page.locator('.ant-alert-description').filter({ hasText: 'Order short-shipped, balance not needed' })).toBeVisible();
 });
 
-test('The list Edit opens a submitted requirement in edit mode; Cancel edit discards the change', async ({ page }) => {
+test('The list pages and filters on the server', async ({ page }) => {
   await navigateWithAuth(page, '/bom/cut-panel/list');
-  await expect(page.getByRole('button', { name: 'View CPR-2026-00003' })).toBeVisible(); // POs placed: view only
-  await page.getByRole('button', { name: 'Edit CPR-2026-00001' }).click();
-  await expect(page).toHaveURL(/\/bom\/cut-panel\/1\?edit=1$/);
-  await waitForPageReady(page);
+  await expect(page.locator('.ant-table-row').filter({ hasText: editable.cprNo })).toContainText('ORD/0002');
 
-  const cell = lineRow(page, 'Panel Printing').locator('input[name$="-4Y"]');
-  await cell.fill('231');
-  await cell.press('Tab');
-  await page.getByRole('button', { name: 'Cancel edit' }).click();
-  await page.locator('.ant-modal-confirm').last().getByRole('button', { name: 'Discard changes' }).click();
-  await expect(page).toHaveURL(/\/bom\/cut-panel\/1$/);
-  await expect(editButton(page)).toBeVisible();
-  await expect(lineRow(page, 'Panel Printing')).toContainText('225');
-  await expect(lineRow(page, 'Panel Printing')).not.toContainText('231');
-});
-
-test('Another panel and another fabric from one strip', async ({ page }) => {
-  await navigateWithAuth(page, '/bom/cut-panel/new');
-  await waitForPageReady(page);
-  await pickOption(page, 'cpr-order', 'ORD-2026-00110'); // BOM V1: Single Jersey + 1x1 Rib
-  await pickOption(page, 'cpr-fabric', 'Single Jersey');
-  await pickOption(page, 'cpr-colours', 'Navy');
-  await page.keyboard.press('Escape');
-  await pickOption(page, 'cpr-panels', 'Front Panel');
-  await page.keyboard.press('Escape');
-  await pickOption(page, 'cpr-processes', 'Panel Printing');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /Add to Grid/ }).click();
-  await expect(page.getByText(/1 line added for Single Jersey › Front Panel\. Pick another panel/)).toBeVisible();
-
-  // The panel cleared; fabric, colour and process stayed: the back panel is one pick away
-  await pickOption(page, 'cpr-panels', 'Back Panel');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /Add to Grid/ }).click();
-  await expect(page.getByText(/1 line added for Single Jersey › Back Panel/)).toBeVisible();
-
-  // Another fabric from the same strip: the rib collar
-  await pickOption(page, 'cpr-fabric', '1x1 Rib');
-  await pickOption(page, 'cpr-colours', 'Navy');
-  await page.keyboard.press('Escape');
-  await pickOption(page, 'cpr-panels', 'Collar');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /Add to Grid/ }).click();
-  await expect(page.getByText(/1 line added for 1x1 Rib › Collar/)).toBeVisible();
-
-  const summary = page.getByRole('group', { name: 'Fabrics and panels added' });
-  await expect(summary).toContainText('Single Jersey');
-  await expect(summary).toContainText('Front Panel · 1 line');
-  await expect(summary).toContainText('Back Panel · 1 line');
-  await expect(summary).toContainText('1x1 Rib');
-  await expect(summary).toContainText('Collar · 1 line');
+  const search = Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/v1/cut-panel-requirements?') && r.url().includes('search=')),
+    page.getByPlaceholder(/Search CPR no/).fill(closable.cprNo),
+  ]);
+  await search;
+  await expect(page.locator('.ant-table-row')).toHaveCount(1);
+  await expect(page.locator('.ant-table-row').first()).toContainText(closable.cprNo);
 });

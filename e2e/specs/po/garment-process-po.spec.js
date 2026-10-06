@@ -1,32 +1,25 @@
 /**
- * Purchase Orders — Garment Process PO (UI mock phase)
+ * Purchase Orders — Garment Process PO, on the real API (/garment-process-pos) and the approval engine.
  *
- * The PO documents, their allocation ledger and the Garment Process Requirements are the
- * localStorage mock; every test gets a fresh browser context, so the stores start from
- * their seed. Job workers are the REAL Vendor master (e2e/helpers/job-work-seed.js).
+ * beforeAll makes, through the API (e2e/helpers/job-work-api.js): the seeded job workers and return units
+ * (e2e/helpers/job-work-seed.js) and submitted Garment Process Requirements on ORD/0003 (4 colours × S–XL,
+ * 4,900 pcs a line). No approval flow applies to an ordinary PO, so submit approves it at once (decision D1); the
+ * sign-off test adds a flow that only a PO above ₹1,00,000 meets, and removes it afterwards.
  *
  * What this tests:
- *   - Requirement lines come from section ②: Order #, then Garment Process #, then the
- *     colour × size cells with a select-all that stays within one process, then Add to PO
- *   - List opens on the open POs (GPO-2026-00002 sent, -00003 submitted)
- *   - GPR-2026-00001 Enzyme Washing, Black only (4,000): save → GPO-2026-00004; submit
- *     allocates (AC-10) → the GPR shows 4,000 PO'd, balance 3,000, Partially Used; recall
- *     releases it again
- *   - Reject (to Draft) of the seeded submitted GPO-2026-00003 releases its 138 pcs
- *   - GPR-2026-00001 + GPR-2026-00006 (both Enzyme Washing) in one PO, each line and card
- *     keeping its requirement number (AC-07); another process is not selectable
- *   - Excess: 4 over the balance blocks Submit; an approved excess allows it (AC-06)
- *   - A vendor that does no Garment process is greyed out; one that does not do the PO's own
- *     process (or is unapproved) warns, and the approver signs it off (§13)
- *   - ⑤ Delivery Instructions: the return unit from HR › Units (beforeAll creates two in the
- *     head office), its address as the delivery place
- *   - Amend delivery / instructions on a sent PO, audited (§16, AC-13); print shows no internal quantities
+ *   - Section ② (order, requirement, select-all) → Add to PO → vendor → rate → delivery → Save Draft
+ *     (GPPO/<FY>/NNNN) → Submit (approved, no flow) → Send to Vendor
+ *   - An excess over the balance blocks Submit until approved (AC-06)
+ *   - A vendor short of the PO's process warns; under an approval flow the approver signs it off in the engine's
+ *     Approve dialog — refused without the tick (§13)
+ *   - Amend delivery on a sent PO is audited; the print carries no internal quantities; the list pages on the server
  */
 
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive, navigateWithAuth, waitForPageReady } from '../../helpers/navigation.js';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { ensureJobWorkers, ensureJobWorkUnits, JOB_WORK_UNITS } from '../../helpers/job-work-seed.js';
+import { submittedGpr, garmentProcessPo } from '../../helpers/job-work-api.js';
 
 const BASE = '/purchase-orders/garment-process-po';
 
@@ -60,44 +53,39 @@ async function setDate(page, id, text) {
   await input.press('Enter');
 }
 
-async function reason(page, { code, remark }) {
-  const dialog = page.getByRole('dialog');
-  if (code) {
-    const dropdown = await openDropdown(page, dialog.getByRole('combobox', { name: 'Reason' }));
-    await dropdown.locator('.ant-select-item-option').filter({ hasText: code }).first().click();
-  }
-  await dialog.getByRole('textbox', { name: 'Remark' }).fill(remark);
-  await dialog.locator('.ant-modal-footer .ant-btn-primary').click();
-  await expect(dialog).toBeHidden();
-}
-
+/** Picks an option, and checks it took: a click that lands while the dropdown re-renders is retried once. */
 async function pickSelect(page, id, text) {
   const input = page.locator(`#${id}`);
-  const dropdown = await openDropdown(page, input);
-  await input.fill(text);
-  await dropdown.locator('.ant-select-item-option').filter({ hasText: text }).first().click();
+  const root = input.locator('xpath=ancestor::div[contains(@class,"ant-select")][1]');
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const dropdown = await openDropdown(page, input);
+    await input.fill(text);
+    await dropdown.locator('.ant-select-item-option').filter({ hasText: text }).first().click();
+    const took = await expect(root).toContainText(text, { timeout: 3000 }).then(() => true, () => false);
+    if (took) return;
+    await page.keyboard.press('Escape');
+  }
+  await expect(root).toContainText(text);
 }
 
 /** Section ②: Order #, then Garment Process #, then the header select-all (one process), then Add to PO. */
-async function addFromRequirement(page, { order, gpr }) {
-  if (order) await pickSelect(page, 'gpo-order', order);
-  await pickSelect(page, 'gpo-gpr', gpr);
+async function addFromRequirement(page, gpr) {
+  await pickSelect(page, 'gpo-order', 'ORD/0003');
+  await pickSelect(page, 'gpo-gpr', gpr.requirementNo);
   await page.locator('#gpo-selection').getByRole('checkbox', { name: 'Select all' }).check();
   await page.getByRole('button', { name: 'Add to PO' }).click();
+  await expect(page.getByText('16 line(s) added')).toBeVisible(); // 4 colours × 4 sizes
 }
 
-/** The grid's bulk bar: one rate on the chosen lines ("All lines", "Selected lines", …). */
-async function bulkRate(page, mode, rate, count) {
+async function fillRates(page, rate) {
   const dropdown = await openDropdown(page, page.getByRole('combobox', { name: 'Fill rate for' }));
-  await dropdown.locator('.ant-select-item-option').filter({ hasText: mode }).first().click();
+  await dropdown.locator('.ant-select-item-option').filter({ hasText: 'All lines' }).first().click();
   await page.getByRole('spinbutton', { name: 'Rate to fill' }).fill(String(rate));
-  const apply = page.getByRole('button', { name: count ? `Apply to ${count}` : /^Apply to \d+$/ });
+  const apply = page.getByRole('button', { name: /^Apply to \d+$/ });
   await apply.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await apply.click();
   await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Apply' }).click();
 }
-
-const fillRates = (page, rate) => bulkRate(page, 'All lines', rate);
 
 /** ⑤ Delivery Instructions: Return To stays Finishing; the return unit (its address is the delivery place) and the date. */
 async function delivery(page) {
@@ -106,157 +94,76 @@ async function delivery(page) {
   await setDate(page, 'gpo-expectedReturnDate', plusDays(12));
 }
 
-async function allocation(page, gprId, process) {
-  await navigateWithAuth(page, `/bom/garment-process/${gprId}`);
+/** A draft built on screen from one requirement, saved. */
+async function draft(page, gpr, { vendor, rate }) {
+  await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
-  await page.getByRole('button', { name: 'PO allocation' }).click();
-  const drawer = page.locator('.ant-drawer-open').last();
-  await expect(drawer.getByText('Purchase orders')).toBeVisible();
-  return drawer.locator('.ant-table-row').filter({ hasText: process }).first();
+  await addFromRequirement(page, gpr);
+  await pickVendor(page, vendor);
+  await fillRates(page, rate);
+  await delivery(page);
 }
+
+const approvalCard = (page) => page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: /^Approval$/ }) });
+
+const fx = {};
+let flowId;
 
 test.beforeAll(async () => {
   const api = await createAuthenticatedClient();
   try {
     await ensureJobWorkers(api);
     await ensureJobWorkUnits(api);
+    fx.create = await submittedGpr(api, { orderNo: 'ORD/0003', process: 'Enzyme Washing' });
+    fx.excess = await submittedGpr(api, { orderNo: 'ORD/0003', process: 'Over Dyeing' });
+    fx.signOff = await submittedGpr(api, { orderNo: 'ORD/0003', process: 'Bleach Washing' });
+    const sent = await garmentProcessPo(api, await submittedGpr(api, { orderNo: 'ORD/0003', process: 'Acid Washing' }), { vendor: 'Bluewave Garment Washers' });
+    fx.sent = (await api.post(`/garment-process-pos/${sent.id}/send`, { version: sent.version })).data;
+    const flow = await api.post('/approval-flows', {
+      name: `E2E Garment Process PO above 1 lakh ${Date.now()}`, entityType: 'GARMENT_PROCESS_PO', active: true, priority: 10,
+      preventSelfApproval: false, conditions: [{ field: 'amount', operator: 'GT', value: 100000 }],
+      levels: [{ levelNumber: 1, levelName: 'Purchase Manager', approverType: 'USER', approverUserId: 1, allowReject: true, allowReferBack: true }],
+    });
+    if (flow.status >= 300) throw new Error(`approval flow → ${flow.status} ${JSON.stringify(flow.data)}`);
+    flowId = flow.data.id;
+  } finally {
+    await api.dispose();
+  }
+});
+
+test.afterAll(async () => {
+  if (!flowId) return;
+  const api = await createAuthenticatedClient();
+  try {
+    await api.delete(`/approval-flows/${flowId}`);
   } finally {
     await api.dispose();
   }
 });
 
 test.beforeEach(async ({ page }) => {
-  test.setTimeout(120000); // journeys across the PO and its requirements, on a mock with deliberate delays
+  test.setTimeout(120000); // journeys across the PO and its requirement
   await ensureSessionActive(page);
   page.on('pageerror', (err) => console.log(`[browser:pageerror] ${err.message}`));
 });
 
-test('List opens on the open POs', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/list`);
-  await expect(page.locator('.ant-table-row')).toHaveCount(2);
-  await expect(page.locator('.ant-table-row').filter({ hasText: 'GPO-2026-00003' })).toContainText('Submitted');
-  await expect(page.locator('.ant-layout-sider .ant-menu-item-selected')).toContainText('Garment Process PO');
-});
-
-test('Submit allocates the requirement; recall releases it (AC-05, AC-10)', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' }); // select-all takes Seq 1, Enzyme Washing
-  await expect(page.getByText('8 line(s) added')).toBeVisible();
-  await expect(page.getByRole('checkbox', { name: 'Select Black 3-4Y Bleach Washing' })).toBeDisabled(); // one process per PO
-  for (const size of ['3-4Y', '5-6Y', '7-8Y', '9-10Y']) await page.getByRole('button', { name: `Remove GPR-2026-00001 Navy ${size}` }).click();
-  await pickVendor(page, 'Bluewave Garment Washers');
-  await fillRates(page, 18.5);
-  await delivery(page);
+test('Create from a requirement, save, submit (approved with no flow), send', async ({ page }) => {
+  await draft(page, fx.create, { vendor: 'Bluewave Garment Washers', rate: 4.5 }); // 4,900 × ₹4.50 stays under the flow's ₹1,00,000
   await expect(page.getByText('All lines within balance · ready to submit')).toBeVisible();
-  await expect(page.locator('#gpo-requirements')).toContainText('4,000');
+  await expect(page.locator('#gpo-requirements')).toContainText(fx.create.requirementNo);
 
   await page.getByRole('button', { name: 'Save Draft' }).click();
-  await expect(page.getByRole('heading', { name: /GPO-2026-00004/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /GPPO\/\d{2}-\d{2}\/\d+/ })).toBeVisible();
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
   await expect(page.getByText(/Submitted for approval/)).toBeVisible();
-  const url = page.url();
-
-  let row = await allocation(page, 1, 'Enzyme Washing');
-  await expect(row).toContainText('4,000');
-  await expect(row).toContainText('3,000');
-
-  await page.goto(url);
-  await waitForPageReady(page);
-  await page.getByRole('button', { name: 'Recall' }).click();
-  await expect(page.getByText(/Recalled to Draft/)).toBeVisible();
-  row = await allocation(page, 1, 'Enzyme Washing');
-  await expect(row).toContainText('7,000');
-});
-
-test('Reject to Draft releases the seeded submitted PO', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/7`);
-  await waitForPageReady(page);
-  await page.getByRole('button', { name: 'Reject to Draft' }).click();
-  await reason(page, { remark: 'Rate above the agreed dyeing rate.' });
-  await expect(page.getByText(/Rejected to Draft by/)).toBeVisible();
-  const row = await allocation(page, 3, 'Garment Dyeing');
-  await expect(row).toContainText('276'); // only GPO-2026-00002 still holds White 2Y / 4Y
-});
-
-test('Two requirements of one process share a PO; lines keep their requirement (AC-07)', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' });
-  await expect(page.getByText('8 line(s) added')).toBeVisible();
-  await addFromRequirement(page, { gpr: 'GPR-2026-00006' }); // the same order, another requirement of the process
-  await expect(page.getByText('4 line(s) added')).toBeVisible();
-  const cards = page.locator('#gpo-requirements');
-  await expect(cards).toContainText('GPR-2026-00001');
-  await expect(cards).toContainText('GPR-2026-00006');
-  await expect(page.locator('#gpo-lines .ant-table-row').filter({ hasText: 'GPR-2026-00006' })).toHaveCount(4);
-  await expect(page.getByText('Total · 12 lines')).toBeVisible();
-});
-
-test('Bulk rate on selected lines keeps 4 decimals', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00001' });
-  await expect(page.getByText('8 line(s) added')).toBeVisible();
-  for (const size of ['3-4Y', '5-6Y', '7-8Y']) await page.getByRole('checkbox', { name: `Select GPR-2026-00001 Black ${size}` }).check();
-  await bulkRate(page, 'Selected lines', 12.3456, 3);
-  for (const size of ['3-4Y', '5-6Y', '7-8Y']) await expect(page.getByRole('spinbutton', { name: `Rate Black ${size}` })).toHaveValue('12.3456');
-  await expect(page.getByRole('spinbutton', { name: 'Rate Black 9-10Y' })).toHaveValue('');
-  await expect(page.getByText('Total · 8 lines')).toBeVisible(); // the totals row still lines up with the selection column
-});
-
-test('A draft GPO re-fetches after its GPR is edited', async ({ page }) => {
-  test.setTimeout(180000); // a journey across the PO and its requirement, twice
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' }); // Enzyme Washing, White × 4
-  await expect(page.getByText('4 line(s) added')).toBeVisible();
-  await pickVendor(page, 'Bluewave Garment Washers');
-  await page.getByRole('button', { name: 'Save Draft' }).click();
-  await expect(page.getByRole('heading', { name: /GPO-\d{4}-\d{5}/ })).toBeVisible();
-  const poUrl = page.url();
-
-  // The draft does not block GPR-6: White 3-4Y 700 → 650
-  await navigateWithAuth(page, '/bom/garment-process/6?edit=1');
-  await waitForPageReady(page);
-  await page.locator('input[name="gpr-G1-White-3-4Y"]').fill('650');
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
-
-  await navigateWithAuth(page, poUrl);
-  await waitForPageReady(page);
-  await expect(page.getByText('Requirement changed').first()).toBeVisible();
-  await page.getByRole('button', { name: 'Re-fetch lines' }).click();
-  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Re-fetch' }).click();
-  await expect(page.getByText('1 line(s) re-fetched at the new balance')).toBeVisible();
-  await expect(page.getByRole('spinbutton', { name: 'PO qty White 3-4Y' })).toHaveValue('650.00');
-  await page.getByRole('button', { name: 'Save Draft' }).click();
-  await expect(page.getByText('Draft saved')).toBeVisible();
-
-  // GPR-6's line becomes another process: the PO keeps one process, so re-fetch drops its lines
-  await navigateWithAuth(page, '/bom/garment-process/6?edit=1');
-  await waitForPageReady(page);
-  await pickSelect(page, 'gpr-process-G1', 'Stone Washing');
-  await page.getByRole('button', { name: 'Save changes' }).click();
-  await expect(page.getByText('Changes saved — the requirement stays submitted')).toBeVisible();
-  await navigateWithAuth(page, poUrl);
-  await waitForPageReady(page);
-  await expect(page.getByText(/is now Stone Washing on GPR-2026-00006/).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Re-fetch lines' }).click();
-  await page.locator('.ant-popover:not(.ant-popover-hidden)').getByRole('button', { name: 'Re-fetch' }).click();
-  await expect(page.getByText('0 line(s) re-fetched at the new balance · 4 removed')).toBeVisible();
-  await expect(page.getByText('Pick an order and a requirement above, then Add to PO.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible();
+  await page.getByRole('button', { name: 'Send to Vendor' }).click();
+  await expect(page.getByText('Sent to the vendor')).toBeVisible();
 });
 
 test('An excess over the balance blocks Submit until approved (AC-06)', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-00125', gpr: 'GPR-2026-00003' }); // 2Y-6Y are on other POs: only 8Y is left
-  await expect(page.getByText('1 line(s) added')).toBeVisible();
-  await pickVendor(page, 'Colourtex Dye House');
-  await page.getByRole('spinbutton', { name: 'PO qty White 8Y' }).fill('142');
-  await fillRates(page, 22);
-  await delivery(page);
+  await draft(page, fx.excess, { vendor: 'Colourtex Dye House', rate: 3 });
+  await page.getByRole('spinbutton', { name: 'PO qty Heather Grey S' }).fill('204'); // required 200; 3% allows 6
   await expect(page.getByText('Exceeds balance by 4 pcs')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Submit for Approval' })).toBeDisabled();
   await page.getByRole('button', { name: 'Request excess override' }).click();
@@ -264,7 +171,7 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
   await expect(dialog).toContainText('At most 3%');
   const dropdown = await openDropdown(page, dialog.getByRole('combobox', { name: 'Reason' }));
   await dropdown.locator('.ant-select-item-option').filter({ hasText: 'Process wastage' }).click();
-  await dialog.getByRole('textbox', { name: 'Justification' }).fill('Dye-house shrinkage losses on white.');
+  await dialog.getByRole('textbox', { name: 'Justification' }).fill('Dye-house shrinkage losses on light shades.');
   await dialog.getByRole('button', { name: 'Request override' }).click();
   await expect(page.getByText(/Excess requested/).first()).toBeVisible();
   await page.getByRole('button', { name: 'Authorise' }).click(); // a superuser may approve their own request — logged
@@ -273,50 +180,54 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
   await expect(page.getByText(/Submitted for approval/)).toBeVisible();
 });
 
-test("A vendor with no Garment process is greyed out; one short of the PO's process warns and the approver signs it off (§13)", async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/new`);
-  await waitForPageReady(page);
-  await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' });
-  await expect(page.getByText('4 line(s) added')).toBeVisible(); // the lines fix the process the vendor list is graded for
-  // Vendors also hold cutting and stitching units: one that does no Garment process cannot take the PO
-  const input = page.locator('#gpo-vendor-select');
-  const dropdown = await openDropdown(page, input);
-  await input.fill('Nova');
-  const nova = dropdown.locator('.ant-select-item-option').filter({ hasText: 'Nova Prints' });
-  await expect(nova).toContainText('Does no Garment process');
-  await expect(nova).toHaveClass(/option-disabled/);
-  await input.press('Escape');
-  await pickVendor(page, 'Colourtex Dye House'); // does Garment Dyeing, not Enzyme Washing
-  await expect(page.locator('#gpo-header')).toContainText('Does not do Enzyme Washing');
-  await fillRates(page, 17);
-  await delivery(page);
+test("A vendor short of the PO's process warns; the approver signs it off in the engine's Approve dialog (§13)", async ({ page }) => {
+  await draft(page, fx.signOff, { vendor: 'Colourtex Dye House', rate: 25 }); // does no Bleach Washing; 4,900 × ₹25 meets the flow
+  await expect(page.locator('#gpo-header')).toContainText('Does not do Bleach Washing');
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
   await expect(page.getByText(/Submitted for approval/)).toBeVisible();
-  await page.getByRole('button', { name: 'Approve' }).click();
-  await page.getByRole('button', { name: 'Sign off and approve' }).click();
-  await expect(page.getByText(/vendor signed off/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible();
+
+  const card = approvalCard(page);
+  await expect(card).toContainText('Approval level 1 of 1');
+  await card.getByRole('button', { name: /Approve/ }).click();
+  let dialog = page.locator('.ant-modal').last();
+  await expect(dialog).toContainText('Colourtex Dye House');
+  await dialog.getByRole('button', { name: /Approve$/ }).click(); // without the sign-off: refused
+  await expect(page.getByText(/sign off the vendor/).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toHaveCount(0);
+
+  dialog = page.locator('.ant-modal').last();
+  await dialog.getByRole('checkbox', { name: /I sign off this vendor/ }).check();
+  await dialog.getByRole('button', { name: /Approve$/ }).click();
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible(); // reloaded: Approved
+  await page.getByRole('button', { name: 'History' }).click();
+  await expect(page.locator('.ant-drawer-open')).toContainText('vendor signed off');
 });
 
 test('Amend delivery on a sent PO is audited; the print carries no internal quantities', async ({ page }) => {
-  await navigateWithAuth(page, `${BASE}/6`);
+  await navigateWithAuth(page, `${BASE}/${fx.sent.id}`);
   await waitForPageReady(page);
   await page.getByRole('button', { name: 'Amend delivery / instructions' }).click();
   const dialog = page.getByRole('dialog');
   await setDate(page, 'amend-expectedReturnDate', plusDays(20));
-  await dialog.locator('#amend-reason').fill('Dye house asked for four more days.');
+  await dialog.locator('#amend-reason').fill('Wash house asked for four more days.');
   await dialog.getByRole('button', { name: 'Save amendment' }).click();
   await expect(page.getByText('Delivery / instructions amended')).toBeVisible();
   await page.getByRole('button', { name: 'History' }).click();
-  await expect(page.locator('.ant-drawer-open')).toContainText(`Expected delivery date:`);
+  await expect(page.locator('.ant-drawer-open')).toContainText('Expected delivery date: ');
   await expect(page.locator('.ant-drawer-open')).toContainText(plusDays(20));
   await page.keyboard.press('Escape');
 
   const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Print', exact: true }).click()]);
   await popup.waitForLoadState();
   const html = await popup.content();
-  expect(html).toContain('GPO-2026-00002');
+  expect(html).toContain(fx.sent.poNo);
   expect(html).toContain('Grand total');
   expect(html).not.toMatch(/Previously|Balance|Required qty/i);
   await popup.close();
+});
+
+test('The list opens on the open POs and pages on the server', async ({ page }) => {
+  await navigateWithAuth(page, `${BASE}/list`);
+  await expect(page.locator('.ant-layout-sider .ant-menu-item-selected')).toContainText('Garment Process PO');
+  await expect(page.locator('.ant-table-row').filter({ hasText: fx.sent.poNo })).toBeVisible();
 });

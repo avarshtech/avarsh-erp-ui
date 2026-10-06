@@ -3,10 +3,10 @@
  *
  * The PO documents live in the localStorage mock, but their vendors are the real Vendor
  * master. This creates the job workers the seeded POs name
- * (src/services/po/jobWork/jobWorkSeedVendors.js), or puts them back into their seeded
+ * (./jobWorkSeedVendors.js), or puts them back into their seeded
  * state, matched by GSTIN: approval validity relative to today, processes, active flag.
  */
-import { SEED_JOB_WORKERS, seedDay } from '../../src/services/po/jobWork/jobWorkSeedVendors.js';
+import { SEED_JOB_WORKERS, seedDay } from './jobWorkSeedVendors.js';
 import { headOffice, ensureUnit } from './branch-seed.js';
 
 /**

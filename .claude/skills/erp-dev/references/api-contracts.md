@@ -38,6 +38,18 @@
 | materialIssueService.js | MaterialIssueController | `/api/v1/material-issues` (incl. `POST /{id}/cancel`) |
 | openingStockService.js | OpeningStockController | `/api/v1/opening-stock` |
 | returnToSupplierService.js | ReturnToSupplierController, DebitNoteController | `/api/v1/inventory/returns-to-supplier`, `/api/v1/inventory/debit-notes` |
+| bom/cutPanel/cutPanelService.js | CprController, CprCommandController | `/api/v1/cut-panel-requirements` (`/filter-options`, `/eligible-orders`, `/order-context/{orderId}`, `/by-order/{orderId}`, `/{id}/allocation`, `/{id}/history`; `/{id}/submit`, `/revise`, `/close`) |
+| bom/garmentProcess/garmentProcessService.js | GprController, GprCommandController | `/api/v1/garment-process-requirements` (the same set, no DELETE) |
+| po/cutPanelPo/cutPanelPoService.js (+ `cutPanelPoLookupService.js`) | CppController, CppCommandController, CppAmendmentController, CppLookupController | `/api/v1/cut-panel-pos` (`/filter-options`, `/{id}/issued-details`, `/{id}/submit|recall|send|cancel|short-close`, `/{id}/overrides`, `/{id}/amendment[/submit|/discard]`, `/lookups/processes|requirements|context`) |
+| po/garmentProcessPo/garmentProcessPoService.js (+ `garmentProcessPoLookupService.js`) | GpoController, GpoCommandController | `/api/v1/garment-process-pos` (`/filter-options`, `/{id}/delivery`, `/{id}/submit|recall|send|cancel|short-close`, `/{id}/excess[/{oid}/approve]`, `/lookups/requirement-rows`, `/lookups/requirements/{gprId}/cells`, `/lookups/context`) |
+| production/cuttingApi.js `listIssuableCutPanelPos` · finishingProcessApi.js `getProcessJobWorkPos` | CutExternalProcessController · GarmentProcessController | `GET /api/v1/cutting/panel-issues/job-work-pos?cuttingPoId=` · `GET /api/v1/finishing/process-lookups/job-work-pos?workOrderId=` |
+
+> Job work (2026-10-06): every command body carries the `version` the screen read and answers with the saved
+> document; the screen adopts it. A refused submit is a 422 with `errors[]` (the services send those with
+> `silent: true` and `useActionRunner` shows the list). PO approve / reject / send back are the approval engine's
+> (`EntityType` CUT_PANEL_PO, GARMENT_PROCESS_PO via `POST /approval-requests/{id}/action`); a Garment Process PO's
+> vendor sign-off is the action's `actionData { signOff, acknowledged }`, `acknowledged` = the server's warn-only
+> eligibility texts. History rows carry `changes[{field, from, to}]`, folded into `details` by `toHistory`.
 
 > Backend package note (2026-08-17): all inventory controllers/services/domain live under
 > `com.avarsh.erp.inventory.{grn,qc,stock,openingstock,returns,issue,adjustment,dashboard}` —
