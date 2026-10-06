@@ -39,6 +39,12 @@ nested `style={{ }}` is never mistaken for a top-level prop.
   rewrite. `suffix` / `prefix` are supported, warning-free, and already the
   convention here — prefer them for units (`%`, `PCS`, `MTR`).
 - **Inline style props fold into `styles`**, not into `style`.
+- **`Divider orientation="left"` warns, but not as a deprecation.** In 6.2.2
+  `orientation` means horizontal/vertical; a placement value (`left`, `right`,
+  `center`, `start`, `end`) still positions the title but raises a `usage` warning
+  (`divider/index.js:103`), which the `.deprecated(` grep above does not find.
+  Use `titlePlacement="start"` (the repo convention). On 2026-10-05, 9 usages
+  in 3 files were still outstanding: `grep -rnE '<Divider[^>]*orientation="(left|right|center|start|end)"' src`.
 
 ## Pure renames
 

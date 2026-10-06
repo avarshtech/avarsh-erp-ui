@@ -7,6 +7,11 @@ source of truth — run them; when prose and grep disagree, the grep wins.
 Repos: UI `avarsh-erp-ui` (paths under `src/`), API `erp-purchase` (paths under
 `src/main/java/com/avarsh/erp/`, written `erp/` below), owner app `avarsh-erp-apk` (Flutter).
 
+**The "Prove:" lines say where the covering tests live, not what to run.** Run only the narrowest
+check for the changed code (SKILL.md Rule 7): the affected gradle test classes and the spec file(s)
+of the changed screen. A whole Playwright project, several projects, the full suite or the full
+`./gradlew test` run only when the user asks.
+
 ## 1. Permission key (both repos + JWT)
 - Lives: UI `src/utils/permissions.js` — permission JSON keys (`orders`, `po-approval`,
   `inventory-qc`, …) and `SECTIONS` (sidebar groups; `assertRegistryIntegrity` validates icon
@@ -30,8 +35,15 @@ Repos: UI `avarsh-erp-ui` (paths under `src/`), API `erp-purchase` (paths under
 
 ## 2. Master-data cache (UI)
 - Lives: `src/context/StoreContext.jsx`. Keys: categories, subCategories, itemTypes, attributes,
-  uoms, variants, suppliers, buyers, styles, termsConditions, paymentTerms, sizePresets, users,
-  roles, sampleOrderNos, cuttingMasters, sewingMasters, sampleMasters, billPassingMasters.
+  uoms, variants, suppliers, vendors, buyers, styles, termsConditions, paymentTerms, sizePresets,
+  users, roles, sampleOrderNos, cuttingMasters, sewingMasters, sampleMasters, billPassingMasters.
+- Two party masters, never interchangeable: `suppliers` (Fabric/Trims mills; every material flow —
+  General PO, GRN/QC, RTS, debit note, bill passing, costing fabric rows) and `vendors` (job
+  workers / processing units, `erp/masterdata/vendor/`, since 2026-10-05). `vendors` holds the
+  pickers' **options** (`GET /vendors/options`, no PAN/bank, readable under the costing /
+  cut-panel / garment-process keys); only Vendor Master loads full records, and only its single
+  `GET /vendors/{id}` carries the private fields. A migrated vendor kept its supplier id; new ones
+  start at 1,000,001.
 - Breaks: a master's DTO shape or endpoint change reaches every screen reading that key; an
   edited master is invisible until the key is invalidated; transactional documents hold frozen
   snapshots of master values, so a master edit does not (and must not) rewrite history — FK and
@@ -126,4 +138,5 @@ Repos: UI `avarsh-erp-ui` (paths under `src/`), API `erp-purchase` (paths under
 master-data · costing · orders · bom · po · production-po · cutting · sewing · sample-requests ·
 hr · admin · approvals · inventory · grn-qc · reports · branch · validation · journey ·
 full-flow · rbac-soak-{merch,store,costing}. Config: `playwright.config.js` (`setup` runs first).
-Run one: `npx playwright test --project=<name>`.
+Default: one spec file — `npx playwright test e2e/specs/<module>/<file>.spec.js --project=<name>`.
+A whole project (`--project=<name>` alone) or more only when the user asks.

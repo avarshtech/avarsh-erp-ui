@@ -32,7 +32,8 @@ disagree, the code wins — re-run the `ls`/`grep` shown rather than trusting a 
 - Two sub-layouts coexist. Masters are **flat**: `erp/masterdata/buyer/` = `Buyer.java BuyerDTO.java
   BuyerMapper.java BuyerRepository.java BuyerService.java BuyerController.java` + child entity/DTO/repo
   (`BuyerShippingLocation*`, `BuyerApprovedUnit*`) + `BuyerUnitApprovalService.java`; `masterdata/supplier/`
-  is the same six files. Transactional modules are **layered**: `erp/order/` = `controller/ domain/ dto/
+  is the same six files; `masterdata/vendor/` adds `VendorOption` (the pickers' record) and
+  `VendorPrivateDetails*` (PAN/bank in their own encrypted table). Transactional modules are **layered**: `erp/order/` = `controller/ domain/ dto/
   repository/ service/` (no `mapper/`; mapping is hand-written at `order/service/OrderService.java:551`);
   `erp/purchaseorder/` adds `mapper/` and a nested sub-feature `ordermapping/` with the same five dirs;
   `inventory/grn`, `hr`, `production/cutting`, `costing` follow the layered form (+ `specification/`, `util/`).

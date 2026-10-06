@@ -69,8 +69,8 @@ These banners ensure the user always knows what the agent is doing. Never skip t
 
 | Repo | Stack | Verify / build |
 |------|-------|----------------|
-| **avarsh-erp-ui** (UI) | React 19.2, Vite 7, Ant Design 6.2, JavaScript/JSX — there is no TypeScript and no type check | `npm run lint` · `npm run build` · `npx playwright test --project=<name>` |
-| **erp-purchase** (API) | Spring Boot 4.1.1, Java 25, Gradle 9, PostgreSQL + Flyway (H2 for e2e), Jackson 3 (`tools.jackson`), MapStruct 1.6.3, Lombok | `./gradlew compileJava -q` · `./gradlew test` (unit tests; integration tests need Docker and are excluded) |
+| **avarsh-erp-ui** (UI) | React 19.2, Vite 7, Ant Design 6.2, JavaScript/JSX — there is no TypeScript and no type check | `npx eslint <changed files>` · `npm run build` · `npx playwright test <spec file>` — targeted, see Rule 7 |
+| **erp-purchase** (API) | Spring Boot 4.1.1, Java 25, Gradle 9, PostgreSQL + Flyway (H2 for e2e), Jackson 3 (`tools.jackson`), MapStruct 1.6.3, Lombok | `./gradlew compileJava -q` · `./gradlew test --tests "*<Affected>Test"` (the full suite runs in CI on push; locally only on demand — Rule 7) |
 
 The two checkouts sit side by side: `../erp-purchase` from the UI repo, `../avarsh-erp-ui` from the API repo. Confirm with `ls ..` before any cross-repo edit; never assume a drive letter or an absolute path. There is no Maven wrapper — `mvnw` / `mvn` commands do not exist.
 
@@ -143,7 +143,7 @@ Apply these to every task — they compound across a session.
 
 You have full tool access. Execute everything yourself:
 - File reads, searches, edits, writes — use Read, Grep, Glob, Edit, Write
-- Build verification — run `npm run lint && npm run build`, `./gradlew compileJava -q` via Bash
+- Build verification — the targeted checks of Rule 7 (`npx eslint <changed files>`, `./gradlew compileJava -q`, the affected test classes) via Bash
 - File creation — use Write tool
 - Progress tracking — use TodoWrite
 
@@ -176,7 +176,7 @@ Before editing:
 2. For each symbol run the seam's grep in BOTH repos (and in `avarsh-erp-apk` for `mobile/`, `notification/`, `approval/` DTOs). Scope every grep under `src/`; never list a whole repo.
 3. Classify each consumer: **BREAKS** (compile, runtime or contract), **CHANGES BEHAVIOUR** (filters, labels, totals, cache, feed, dispatch dates), **COSMETIC**.
 4. Record the result as one table — `symbol | consumer file:line | impact | action` — in the plan (Large/XL) or the TodoWrite list (Medium), and repeat it in the completion report. Zero consumers is a finding too: write "no consumers (`grep <pattern>`)".
-5. Name the Playwright project(s) and gradle checks that prove the consumers still work, and run them in the post-implementation pipeline.
+5. Name the narrowest checks that prove the changed code and its BREAKS consumers still work — the gradle test classes and the spec file(s) of the affected module (Rule 7) — and run only those in the post-implementation pipeline. Whole Playwright projects and full suites are on demand.
 
 A consumer left unchanged needs a reason in the table. Never rely on memory of the codebase for step 2 — the greps are the source of truth.
 
@@ -193,7 +193,7 @@ When implementing full-stack features, ALWAYS follow this order:
 6. Constants (UI)             → src/utils/<module>Constants.js mirrors the API enum; statusConfig.js / liveFeedModuleConfig.js when a status is new
 7. Page + components (UI)     → src/pages/<module>/<Entity>List.jsx | <Entity>Form.jsx | <Entity>View.jsx
 8. Registration (UI)          → permission key + SCREENS/SECTIONS entry in permissions.js, <PermissionRoute module operation> in App.jsx, menu in MainLayout.jsx, StoreContext key if master data
-9. Verification               → npm run lint && npm run build; ./gradlew compileJava -q; the Playwright projects named in the impact table
+9. Verification               → Rule 7: eslint on changed files; compileJava + the affected test classes; the module's own spec file(s) only
 ```
 
 ### 5. Auto-Execute Without Permission
@@ -202,8 +202,10 @@ When implementing full-stack features, ALWAYS follow this order:
 |--------|-----------|
 | Read/search/grep any file in either repo | Always execute |
 | Create/edit files in either repo | Always execute |
-| `npm run lint`, `npm run build` (UI repo) | Always execute |
-| `./gradlew compileJava -q`, `./gradlew test` (API repo) | Always execute |
+| `npx eslint <changed files>`, `npm run build` (UI repo) | Always execute |
+| `./gradlew compileJava -q`, `./gradlew test --tests "<affected test classes>"` (API repo) | Always execute |
+| The affected module's spec file(s) on the local e2e stack | Execute when the change alters a screen a spec covers |
+| Full `./gradlew test`, `integrationTest`, whole Playwright projects, the full suite | **Only when the user asks** (Rule 7) |
 | TodoWrite for progress | Always execute |
 | EnterPlanMode / ExitPlanMode | Always execute |
 | Pull skills from skills.sh | Always execute (notify user in chat) |
@@ -216,6 +218,30 @@ When implementing full-stack features, ALWAYS follow this order:
 - Ambiguous garment industry terminology
 - `npm install <new-package>` — new dependency addition
 - `git commit` / `git push` — user decides when
+
+### 7. Test Only What the Change Touches (owner's rule, 2026-10-06)
+
+Verification is targeted, like unit testing: prove the code you changed, not the whole ERP. Broad runs
+cost hours on this machine (the full Playwright run took 2.2 h, the full `./gradlew test` 18 min, an
+e2e API boot 2–20 min from F:), and CI already runs the full API suite on every push.
+
+| Change | Run | Do not run |
+|--------|-----|------------|
+| UI files only | `npx eslint <changed files>` (gate on the per-file delta; the repo baseline is not clean); `npm run build` once, when a file is added, removed or renamed or an export changes | any Playwright run, unless the change alters a screen's behaviour that a spec covers |
+| API files only | `./gradlew compileJava -q`; `./gradlew test --tests "*<AffectedClass>Test"` for each test class that covers the changed classes. Add the guard tests only when their area changed: migrations → `FlywayMigrationConsistencyTest`, `H2SchemaCoverageTest`; entities/columns → `H2SchemaCoverageTest`; permission keys or controllers → `PermissionRegistryTest`, `ControllerPermissionMappingTest` | the full `./gradlew test` |
+| One module, UI + API | both of the above, plus that module's own spec file(s): `npx playwright test e2e/specs/<module>/<file>.spec.js --project=<project>` | other modules' specs, whole projects, multi-project runs |
+
+- **On demand only:** the full `./gradlew test`, `./gradlew integrationTest`, whole Playwright projects and
+  the full Playwright suite run only when the user asks for them. Name them as optional in a plan's
+  Verification section; never schedule them by default.
+- **Boot the e2e stack only when a spec must run**, then reuse it for every iteration; stop it
+  (ports 8088 and the vite port) when done.
+- **A failure outside the changed area** is reported, not investigated, unless the user asks; check
+  `project_known_e2e_failures` first.
+- **Choosing the narrowest test:** the test class named after the changed class (`VendorService` →
+  `VendorServiceTest`), then `grep -rl "<ChangedClass>" src/test`; for UI, the spec under
+  `e2e/specs/<module>/` that opens the changed screen (`grep -rl "<route or screen title>" e2e/specs`).
+  No spec covers it → a quick `curl`/script smoke against the booted API, or say it is untested.
 
 ---
 
@@ -260,9 +286,10 @@ When entering plan mode, present this structure:
 | symbol | consumer file:line | impact | action |
 |--------|--------------------|--------|--------|
 
-### Verification
-- UI: `npm run lint && npm run build`; Playwright projects: [names]
-- API: `./gradlew compileJava -q`; `./gradlew test`
+### Verification (targeted — Rule 7)
+- UI: `npx eslint [changed files]`; `npm run build` if files were added/removed/renamed; spec file(s): [e2e/specs/<module>/<file>.spec.js]
+- API: `./gradlew compileJava -q`; `./gradlew test --tests "[affected test classes]"` (+ the guard tests whose area changed)
+- On demand only, if the user wants them: full `./gradlew test`, Playwright projects / full suite
 
 ### Execution Order
 1. [Numbered steps in the order they'll be implemented]
@@ -335,13 +362,14 @@ Before writing ANY code, verify:
 
 After completing implementation, run these automatically:
 
-### Step 1: Build Verification
+### Step 1: Build Verification (targeted — Rule 7)
 ```bash
-# UI repo (working directory)
-npm run lint && npm run build
+# UI repo (working directory) — the changed files only; build when files were added/removed/renamed
+npx eslint <changed files>
+npm run build
 
-# API repo (sibling checkout) — when API files changed
-(cd ../erp-purchase && ./gradlew compileJava -q)
+# API repo (sibling checkout) — when API files changed: compile, then only the affected test classes
+(cd ../erp-purchase && ./gradlew compileJava -q && ./gradlew test --tests "*<Affected>Test")
 ```
 **If a build fails → fix the errors before reporting done. Do NOT ask the user to fix.**
 
@@ -351,7 +379,7 @@ npm run lint && npm run build
 3. Verify enum/status values are consistent across repos
 4. Re-run every grep from the impact table — every consumer is updated or has a recorded reason
 5. Search for any broken imports or references caused by the change
-6. Run the Playwright project(s) named in the impact table
+6. Run the affected module's spec file(s) named in the impact table — not whole projects or the full suite unless the user asks (Rule 7)
 
 ### Step 3: Deprecated Pattern Scan
 Run the Deprecated Props & CSS Verification Gate (below) on every file you created or modified. ZERO findings allowed.

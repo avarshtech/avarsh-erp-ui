@@ -202,12 +202,20 @@ expect(response.status()).toBeLessThan(300);
 
 ## Phase 2: Running Tests
 
+### Scope: the affected spec file(s) only (owner's rule, 2026-10-06)
+
+Run only the spec file(s) that cover the screen or flow you changed — like a unit test. A whole module
+folder, a whole project, several projects or the full suite run **only when the user asks** for them
+(the full suite took 2.2 h on this machine). Boot the local e2e stack only when a spec must run, reuse
+it across iterations, and stop it when done. A failure in a spec you did not touch is reported, not
+investigated, unless the user asks. Same rule as erp-dev SKILL.md Rule 7.
+
 ### Headed + SlowMo + Video (Default)
 
-Always run tests with this command so the user can watch:
+Run the affected spec file with this command so the user can watch:
 
 ```bash
-E2E_HEADED=1 npx playwright test e2e/specs/{module}/ \
+E2E_HEADED=1 npx playwright test e2e/specs/{module}/{file}.spec.js \
   --headed \
   --project={project-name} \
   --reporter=list \
@@ -246,13 +254,13 @@ After a test run, inform the user where videos are stored and how to view them:
 - **HTML report:** `npx playwright show-report e2e-report`
 - **Test results:** `test-results/{test-name}/video.webm`
 
-### Running All Tests
+### Running All Tests (only when the user asks)
 
 ```bash
 E2E_HEADED=1 npx playwright test --headed --reporter=list
 ```
 
-### Running a Specific Module
+### Running a Specific Module (only when the user asks)
 
 ```bash
 E2E_HEADED=1 npx playwright test e2e/specs/{module}/ --headed --project={project-name} --reporter=list
