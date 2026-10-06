@@ -42,5 +42,8 @@ export const toSupplierOptions = (suppliers) => (suppliers || [])
   .filter((s) => s.active !== false && s.isActive !== false)
   .map((s) => ({ value: s.id, label: s.name }));
 
+/** Vendors pick the same way: the active ones, by name. */
+export const toVendorOptions = toSupplierOptions;
+
 export const toCostMasterOptions = (list, nameField) =>
   (list || []).map((x) => ({ value: x.id, label: x[nameField], defaultCost: x.defaultCost || 0 }));

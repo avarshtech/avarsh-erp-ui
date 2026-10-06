@@ -541,7 +541,7 @@ const buildCostingHtml = (cs, org) => {
             <th style="width:55px;">Price (${getCurrencySymbol(currency)})</th>
             <th style="width:42px;">Width Std</th>
             <th style="width:48px;">Width Vend</th>
-            <th>Vendor</th>
+            <th>Supplier</th>
             <th style="width:42px;">Allow %</th>
             <th style="width:65px;">Net Cost (${getCurrencySymbol(currency)})</th>
           </tr>

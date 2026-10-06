@@ -11,16 +11,16 @@ const matches = (input, o) => [o.label, o.vendor.gstin, String(o.vendor.id), o.v
  * Job worker lookup (CPP FR-19, GPO §13): every job worker, the ineligible ones greyed with
  * the reason — never hidden. The Cut Panel PO blocks on any issue; with `allowWarnings`
  * (Garment Process PO) an unapproved or untagged vendor stays selectable with a warning.
- * Search by name, GSTIN, city or code (the supplier id — deviation D29).
+ * Search by name, GSTIN, city or code (the vendor id — deviation D29).
  */
 const JobWorkVendorSelect = memo(function JobWorkVendorSelect({
-  id, vendors, value, onChange, processId, processLabel, onDate, allowWarnings = false, disabled, loading,
+  id, vendors, value, onChange, processId, processLabel, category, onDate, allowWarnings = false, disabled, loading,
 }) {
   const options = useMemo(() => vendors.map((v) => {
-    const check = vendorEligibility(v, { processId, processLabel, onDate });
+    const check = vendorEligibility(v, { processId, processLabel, category, onDate });
     const blocked = check.issues.some((i) => !allowWarnings || !i.warnOnly);
     return { value: v.id, label: v.name, disabled: blocked, vendor: v, check };
-  }).sort((a, b) => Number(a.disabled) - Number(b.disabled) || a.label.localeCompare(b.label)), [vendors, processId, processLabel, onDate, allowWarnings]);
+  }).sort((a, b) => Number(a.disabled) - Number(b.disabled) || a.label.localeCompare(b.label)), [vendors, processId, processLabel, category, onDate, allowWarnings]);
 
   return (
     <Select

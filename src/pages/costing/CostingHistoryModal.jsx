@@ -70,7 +70,7 @@ const OVERHEAD_COMPARE_FIELDS = ['description', 'cost', 'comments'];
 const FABRIC_FIELD_LABELS = {
   fabricType: 'Fabric Type', classification: 'Classification', description: 'Description',
   consumption: 'Consumption', uom: 'UOM', fabricPrice: 'Price', fabricWidthStd: 'Width (Std)',
-  fabricWidthVendor: 'Width (Vendor)', vendorName: 'Vendor', allowancePct: 'Allowance %', netCost: 'Net Cost',
+  fabricWidthVendor: 'Width (Vendor)', vendorName: 'Supplier', allowancePct: 'Allowance %', netCost: 'Net Cost',
 };
 const LOCAL_TRIM_FIELD_LABELS = {
   item: 'Item', code: 'Code', size: 'Size', consumption: 'Consumption', uom: 'UOM', cost: 'Cost', price: 'Price',
@@ -278,7 +278,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
 
     return (
       <>
-        <Divider orientation="left" style={{ margin: '16px 0 8px' }}>
+        <Divider titlePlacement="start" style={{ margin: '16px 0 8px' }}>
           <Text strong style={{ color: titleColor, fontSize: 13 }}>{title}</Text>
           {changedCount > 0 ? (
             <Tag color="orange" style={{ marginLeft: 8, fontSize: 11 }}>{changedCount} changed</Tag>
@@ -338,7 +338,7 @@ const CostingHistoryModal = ({ open, onClose, costingId, recordId }) => {
 
     return (
       <>
-        <Divider orientation="left" style={{ margin: '16px 0 8px' }}>
+        <Divider titlePlacement="start" style={{ margin: '16px 0 8px' }}>
           <Text strong style={{ color: titleColor, fontSize: 13 }}>{title}</Text>
           {totalChanges > 0 ? (
             <Tag color="orange" style={{ marginLeft: 8, fontSize: 11 }}>

@@ -21,7 +21,7 @@ export default function GridCell({ sectionKey, spec, record }) {
     case 'rate':
       return <RateCell sectionKey={sectionKey} spec={spec} record={record} />;
     case 'vendor':
-      return <VendorCell sectionKey={sectionKey} record={record} />;
+      return <VendorCell sectionKey={sectionKey} spec={spec} record={record} />;
     case 'amount':
       return (
         <Typography.Text strong style={{ color: 'var(--success-color)' }}>

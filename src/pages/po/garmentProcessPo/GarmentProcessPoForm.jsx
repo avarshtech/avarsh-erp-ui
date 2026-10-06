@@ -44,7 +44,7 @@ const LIST = `${JOB_WORK_PO_PATH.GPO}/list`;
 /**
  * Garment Process PO — one scrolling screen, wireframe sections ①–⑦ and a sticky action
  * bar (PRD §19). UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; suppliers, processes, payment terms, branches and units are the real API.
+ * localStorage mock; vendors, processes, payment terms, branches and units are the real API.
  */
 const GarmentProcessPoForm = () => {
   const { id } = useParams();

@@ -1,5 +1,5 @@
 /**
- * Job-work vocabulary shared by the Supplier and Process masters and the two job-work
+ * Job-work vocabulary shared by the Vendor and Process masters and the two job-work
  * purchase orders (Cut Panel PO, Garment Process PO).
  *
  * The UOM codes mirror the API enum masterdata/process/JobWorkUom.java and the CHECK

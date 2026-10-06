@@ -20,6 +20,9 @@ const initialState = {
   
   // Suppliers
   suppliers: [],
+
+  // Vendors (job workers): the pickers' options from GET /vendors/options, never PAN or bank details
+  vendors: [],
   
   // Buyers
   buyers: [],
@@ -59,6 +62,7 @@ const initialState = {
     uoms: false,
     variants: false,
     suppliers: false,
+    vendors: false,
     buyers: false,
     styles: false,
     termsConditions: false,
@@ -82,6 +86,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    vendors: null,
     buyers: null,
     styles: null,
     termsConditions: null,
@@ -105,6 +110,7 @@ const initialState = {
     uoms: null,
     variants: null,
     suppliers: null,
+    vendors: null,
     buyers: null,
     styles: null,
     termsConditions: null,

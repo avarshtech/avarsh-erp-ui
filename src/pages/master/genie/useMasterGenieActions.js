@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useQuickCreate } from '../../../components/quickcreate/QuickCreateProvider';
 import { canQuickCreate } from '../../../components/quickcreate/quickCreateTypes';
-import { fieldValue } from './masterGenieSnapshot';
+import { PRIVATE_FIELDS, fieldValue } from './masterGenieSnapshot';
 
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 async function waitFor(check, timeout = 2500) {
@@ -81,7 +81,9 @@ export default function useMasterGenieActions({ items, select, screen }) {
       });
       if (!s) throw new Error('The form did not open');
       await wait(150); // the screen resets or loads the form as it opens; fill after that
-      const values = Object.fromEntries(fields.filter((f) => f?.field).map((f) => [f.field, fieldValue(f)]));
+      // PAN and bank details are the user's to type, never Laya's (masterGenieSnapshot PRIVATE_FIELDS)
+      const values = Object.fromEntries(fields.filter((f) => f?.field && !PRIVATE_FIELDS.has(f.field))
+        .map((f) => [f.field, fieldValue(f)]));
       s.form.setFieldsValue(values);
       s.markDirty?.();
       undoRef.current = before;

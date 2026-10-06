@@ -28,7 +28,7 @@ export const cppContext = async (doc, { ownAllocation = null } = {}) => {
     state: await cppRequirementState(cprIds),
     orderDue: Object.fromEntries(orders.filter(Boolean).map((o) => [o.id, o.deliveryDate])),
     orderStatus: Object.fromEntries(orders.filter(Boolean).map((o) => [o.id, o.status])),
-    eligibility: vendor ? vendorEligibility(vendor, { processId: doc.process?.id ?? null, processLabel: label, onDate: dayjs() }) : null,
+    eligibility: vendor ? vendorEligibility(vendor, { processId: doc.process?.id ?? null, processLabel: label, category: 'Cut Panel', onDate: dayjs() }) : null,
     lastRates: rates.byKey,
     recentRates: rates.recent,
     duplicates: vendor ? await duplicatePos({ type: T.CPP, gstin: vendor.gstin, processLabel: label, reqIds: cprIds, poDate: doc.poDate, exceptId: doc.id }) : [],

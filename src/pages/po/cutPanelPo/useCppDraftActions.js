@@ -10,7 +10,7 @@ const BASE = JOB_WORK_PO_PATH.CPP;
 
 /**
  * Draft actions of a Cut Panel PO: save (number on first save), submit (saving first — also
- * when the live supplier changed since the snapshot), delete, and the over-allocation
+ * when the live vendor changed since the snapshot), delete, and the over-allocation
  * override — requested on the saved draft, authorised by someone else. `unit` (the working
  * branch) fills the PO's branch when the draft has none yet; the return unit is always picked.
  */

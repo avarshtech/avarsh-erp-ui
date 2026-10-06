@@ -40,13 +40,13 @@ const GpoHeaderSection = memo(function GpoHeaderSection({ doc, editable, masters
         </Col>
         <Col xs={24} md={12}>
           <Label required>Vendor / Job Worker</Label>
-          {editable && !masters.denied.includes('Suppliers') ? (
+          {editable ? (
             <JobWorkVendorSelect
               id="gpo-vendor-select" vendors={masters.jobWorkers} loading={masters.loading} value={vendorId} allowWarnings
+              category="Garment"
               processId={doc.process?.id ?? null} processLabel={processLabel} onDate={doc.poDate} onChange={(v) => v && onVendor(v)}
             />
           ) : <Input id="gpo-vendor-name" aria-label="Vendor / Job Worker" value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
-          {editable && masters.denied.includes('Suppliers') && <Text type="warning" style={{ fontSize: 12 }}>Picking a vendor needs Suppliers (view) permission.</Text>}
         </Col>
       </Row>
       {doc.vendor && (

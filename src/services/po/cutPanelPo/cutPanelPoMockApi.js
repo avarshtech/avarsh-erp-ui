@@ -129,7 +129,7 @@ export const updateCppDetails = async (id, patch) => {
   const changes = changesOf(doc, clean);
   // A swapped job worker is re-checked (BR-14); `changes` carries labels, so compare the raw value.
   if (clean.vendor && !same(doc.vendor, clean.vendor)) {
-    const check = vendorEligibility(clean.vendor, { processId: doc.process?.id ?? null, processLabel: doc.process?.label ?? doc.process?.name });
+    const check = vendorEligibility(clean.vendor, { processId: doc.process?.id ?? null, processLabel: doc.process?.label ?? doc.process?.name, category: 'Cut Panel' });
     if (!check.eligible) throw mockError(`${clean.vendor.name}: ${check.reason}`, 422);
   }
   Object.assign(doc, clean, { version: doc.version + 1, modifiedBy: actor().name, modifiedOn: now() });

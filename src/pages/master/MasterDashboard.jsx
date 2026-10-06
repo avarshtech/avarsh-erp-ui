@@ -16,6 +16,7 @@ import {
   SlidersOutlined,
   CarOutlined,
   BankOutlined,
+  ClusterOutlined,
 } from '@ant-design/icons';
 import CategoryMaster from './CategoryMaster';
 import SubCategoryMaster from './SubCategoryMaster';
@@ -25,6 +26,7 @@ import UomMaster from './UomMaster';
 import ItemMaster from './ItemMaster';
 import BuyerMaster from './BuyerMaster';
 import SupplierMaster from './SupplierMaster';
+import VendorMaster from './VendorMaster';
 import TermsConditionsMaster from './TermsConditionsMaster';
 import StyleMaster from './StyleMaster';
 import PaymentTermsMaster from './PaymentTermsMaster';
@@ -102,7 +104,16 @@ const NAV_GROUPS = [
         moduleId: 'supplier-info',
         Component: SupplierMaster,
         loadingKey: null,
-        description: 'Fabric, trims and accessories vendors',
+        description: 'Fabric, trims and accessories suppliers',
+      },
+      {
+        key: 'vendor',
+        label: 'Vendors',
+        icon: <ClusterOutlined />,
+        moduleId: 'vendor-info',
+        Component: VendorMaster,
+        loadingKey: null,
+        description: 'Job workers and outside processing units',
       },
     ],
   },

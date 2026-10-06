@@ -47,7 +47,7 @@ const AMENDABLE = new Set(REVISION_FIELDS);
 /**
  * Cut Panel PO — one scrolling screen, six numbered sections and a sticky action bar
  * (PRD §18.1); no wizard. UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; suppliers, processes, payment terms, branches and units are the real API.
+ * localStorage mock; vendors, processes, payment terms, branches and units are the real API.
  */
 const CutPanelPoForm = () => {
   const { id } = useParams();

@@ -55,16 +55,30 @@ export const processSnapshot = (option, masterProcesses, category) => {
   };
 };
 
-/** The PO with its vendor snapshot re-taken from the live supplier, when the screen has one (FR-20). */
+/** The PO with its vendor snapshot re-taken from the live vendor, when the screen has one (FR-20). */
+/**
+ * The live vendor a PO's snapshot names: by id (a job worker kept its supplier id as its vendor id),
+ * else by GSTIN for a seeded snapshot that has no id.
+ */
+export const liveVendorOf = (vendors, snapshot) => {
+  if (!snapshot) return null;
+  return (snapshot.id != null && vendors.find((v) => v.id === snapshot.id))
+    || vendors.find((v) => v.gstin && v.gstin === snapshot.gstin) || null;
+};
+
 export const withLiveVendor = (doc, liveVendor) => (liveVendor ? { ...doc, vendor: vendorSnapshot(liveVendor) } : doc);
 
-/** The live supplier no longer matches the PO's snapshot (approval renewed, processes changed…). */
+/** The live vendor no longer matches the PO's snapshot (approval renewed, processes changed…). */
 export const vendorChanged = (doc, liveVendor) => Boolean(liveVendor) && JSON.stringify(vendorSnapshot(liveVendor)) !== JSON.stringify(doc.vendor);
 
-/** The snapshot a PO keeps of its supplier (CPP FR-20), refreshed on every save until approval. */
+/**
+ * The snapshot a PO keeps of its vendor (CPP FR-20), refreshed on every save until approval. Its shape
+ * is the one snapshots had when job workers were suppliers, `jobWorker: true` included (every vendor is
+ * one), so a PO stored then still compares equal and never reads as "vendor changed".
+ */
 export const vendorSnapshot = (v) => ({
   id: v.id, name: v.name, gstin: v.gstin, stateCode: v.stateCode, igstApplicable: Boolean(v.igstApplicable),
   address: v.address, city: v.city, state: v.state, pincode: v.pincode, contactPerson: v.contactPerson,
-  phone: v.phone, email: v.email, paymentTerms: v.paymentTerms, jobWorker: v.jobWorker, active: v.active !== false,
+  phone: v.phone, email: v.email, paymentTerms: v.paymentTerms, jobWorker: true, active: v.active !== false,
   processIds: v.processIds || [], jobWorkApprovedUntil: v.jobWorkApprovedUntil || null,
 });

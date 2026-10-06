@@ -7,6 +7,13 @@ import { hasPermission } from '../../../utils/permissions';
 const MAX_ROWS = 25;
 const MAX_TEXT = 120;
 const HIDDEN = /image|file|url|photo|logo|password/i;
+/**
+ * Personal identifiers never reach the model, in a list row or an open form, and Laya never fills
+ * them (the API's MasterDirectory withholds the same names). Exact names: a pattern like /pan/ would
+ * also hide "company…".
+ */
+export const PRIVATE_FIELDS = new Set(['pan', 'panNumber', 'bankAccountNumber', 'accountNumber', 'ifscCode',
+  'swiftCode', 'aadharNumber', 'aadhaarNumber']);
 
 const short = (v) => {
   if (v == null || v === '') return undefined;
@@ -18,7 +25,7 @@ const short = (v) => {
 };
 
 const pick = (source, fields) => Object.fromEntries(fields
-  .filter((f) => !HIDDEN.test(f))
+  .filter((f) => !HIDDEN.test(f) && !PRIVATE_FIELDS.has(f))
   .map((f) => [f, short(source?.[f])])
   .filter(([, v]) => v !== undefined));
 

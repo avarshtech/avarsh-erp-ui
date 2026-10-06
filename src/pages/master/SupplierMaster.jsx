@@ -35,19 +35,10 @@ import {
 } from '../../services/master/supplierService';
 import { hasPermission } from '../../utils/permissions';
 import { useStore } from '../../context/StoreContext';
-import SupplierJobWorkFields from './jobWork/SupplierJobWorkFields';
-import SupplierJobWorkDetails from './jobWork/SupplierJobWorkDetails';
-import useJobWorkProcesses from './jobWork/useJobWorkProcesses';
 import { useMasterAssistant } from './genie/masterGenieContext';
+import { EMAIL_REGEX, GSTIN_REGEX, IFSC_REGEX, PAN_REGEX, SWIFT_REGEX } from '../../utils/partyValidation';
 
 const { Text, Title } = Typography;
-
-// Validation patterns
-const PAN_REGEX = /^[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z]$/;
-const GSTIN_REGEX = /^[0-9]{2}[A-Z]{3}[PCAFHTBLJG][A-Z][0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const IFSC_REGEX = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-const SWIFT_REGEX = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
 
 const SupplierMaster = () => {
   const { message, modal } = App.useApp();
@@ -75,7 +66,6 @@ const SupplierMaster = () => {
   const [viewingSupplier, setViewingSupplier] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [form] = Form.useForm();
-  const jobWorkProcesses = useJobWorkProcesses();
 
   // Permissions
   const canView = hasPermission('supplier-info', 'view');
@@ -155,7 +145,6 @@ const SupplierMaster = () => {
       suppliesFabric: false,
       suppliesTrims: false,
       igstApplicable: false,
-      jobWorker: false,
     });
     setModalVisible(true);
     setSupplierUnsaved(false);
@@ -208,10 +197,9 @@ const SupplierMaster = () => {
     try {
       const values = await form.validateFields();
 
-      // Additional custom validations. A job worker may supply neither: it is paid for
-      // work on the buyer's own panels or garments.
-      if (!values.suppliesFabric && !values.suppliesTrims && !values.jobWorker) {
-        message.error('At least one supply product (Fabric or Trims) must be selected, or tick Job worker');
+      // A supplier supplies material; job workers are in the Vendor master.
+      if (!values.suppliesFabric && !values.suppliesTrims) {
+        message.error('At least one supply product (Fabric or Trims) must be selected');
         return;
       }
 
@@ -374,8 +362,7 @@ const SupplierMaster = () => {
         <Space size={4} wrap>
           {record.suppliesFabric && <Tag color="success">Fabric</Tag>}
           {record.suppliesTrims && <Tag color="processing">Trims</Tag>}
-          {record.jobWorker && <Tag color="purple">Job work</Tag>}
-          {!record.suppliesFabric && !record.suppliesTrims && !record.jobWorker && (
+          {!record.suppliesFabric && !record.suppliesTrims && (
             <Text type="secondary">-</Text>
           )}
         </Space>
@@ -518,7 +505,6 @@ const SupplierMaster = () => {
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Supplies:</span>
                 {viewingSupplier.suppliesFabric && <Tag color="success">Fabric</Tag>}
                 {viewingSupplier.suppliesTrims && <Tag color="processing">Trims</Tag>}
-                {viewingSupplier.jobWorker && <Tag color="purple">Job work</Tag>}
               </div>
             </div>
 
@@ -553,8 +539,6 @@ const SupplierMaster = () => {
                 ),
               },
             ]} />
-
-            <SupplierJobWorkDetails supplier={viewingSupplier} processes={jobWorkProcesses} />
 
             <Divider titlePlacement="start"><BankOutlined style={{ marginRight: 6 }} />Bank Details</Divider>
             {hasBankDetails(viewingSupplier) ? (
@@ -626,12 +610,11 @@ const SupplierMaster = () => {
             suppliesFabric: false,
             suppliesTrims: false,
             igstApplicable: false,
-            jobWorker: false,
           }}
           onValuesChange={() => setSupplierUnsaved(true)}
         >
           {/* --- Supplier Information --- */}
-          <Divider orientation="left" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Supplier Information</Divider>
+          <Divider titlePlacement="start" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Supplier Information</Divider>
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item
@@ -778,7 +761,7 @@ const SupplierMaster = () => {
           </Row>
 
           {/* --- Tax & Compliance --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>Tax & Compliance</Divider>
+          <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>Tax & Compliance</Divider>
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item
@@ -835,12 +818,8 @@ const SupplierMaster = () => {
             </Col>
           </Row>
 
-          {/* --- Job Work --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>Job Work</Divider>
-          <SupplierJobWorkFields form={form} processes={jobWorkProcesses} />
-
           {/* --- Bank Details --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
+          <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>
             <BankOutlined style={{ marginRight: 6 }} />Bank Details
           </Divider>
           <Row gutter={16}>

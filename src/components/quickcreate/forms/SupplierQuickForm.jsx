@@ -4,8 +4,9 @@ import { createSupplier } from '../../../services/master/supplierService';
 import QuickFormFooter from './QuickFormFooter';
 
 /**
- * Enough to name a job-work vendor on a costing row. Address, PAN and GSTIN are needed before a
- * purchase order is raised to them, and are completed in Supplier Master.
+ * Enough to name a fabric supplier on a costing row, which is the only place this opens (a
+ * manufacturing row's job worker is a Vendor). It is created as a fabric supplier; address, PAN
+ * and GSTIN are needed before a purchase order is raised to it, and are completed in Supplier Master.
  */
 export default function SupplierQuickForm({ prefill, onDone, onCancel }) {
   const { message } = App.useApp();
@@ -14,9 +15,9 @@ export default function SupplierQuickForm({ prefill, onDone, onCancel }) {
   const handleFinish = async (values) => {
     setSaving(true);
     try {
-      const res = await createSupplier(values);
+      const res = await createSupplier({ ...values, suppliesFabric: true });
       const supplier = res?.data || res;
-      message.success(`Vendor "${supplier.name}" created`);
+      message.success(`Supplier "${supplier.name}" created`);
       onDone(supplier);
     } catch {
       // The axios interceptor has already shown the server's message.
@@ -28,8 +29,8 @@ export default function SupplierQuickForm({ prefill, onDone, onCancel }) {
   return (
     <Form name="quickSupplier" layout="vertical" initialValues={{ name: prefill.text }} onFinish={handleFinish}>
       <Alert type="info" showIcon style={{ marginBottom: 16 }}
-        title="Complete the address, PAN and GSTIN in Supplier Master before raising a PO to this vendor." />
-      <Form.Item name="name" label="Vendor Name" rules={[{ required: true, message: 'Vendor name is required' }]}>
+        title="Complete the address, PAN and GSTIN in Supplier Master before raising a PO to this supplier." />
+      <Form.Item name="name" label="Supplier Name" rules={[{ required: true, message: 'Supplier name is required' }]}>
         <Input autoFocus maxLength={200} />
       </Form.Item>
       <Form.Item name="contactPerson" label="Contact Person">

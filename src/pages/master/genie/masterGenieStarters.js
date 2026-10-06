@@ -2,7 +2,8 @@
 const STARTERS = {
   branch: ['What is the head office branch used for?', 'Add a branch for our Tiruppur unit'],
   buyer: ['Add a buyer for me', 'Does Zara exist already?', 'How do I add a shipping location?'],
-  supplier: ['Which suppliers are job workers?', 'Add a fabric supplier from Tiruppur', 'What must a supplier have?'],
+  supplier: ['Which suppliers supply trims?', 'Add a fabric supplier from Tiruppur', 'What must a supplier have?'],
+  vendor: ['Which vendors do panel printing?', 'Add a job worker for garment washing', 'Whose job-work approval has expired?'],
   category: ['How are items classified?', 'Which categories does costing use?'],
   subcategory: ['Add a sub-category under Fabric', 'What is a sub-category for?'],
   type: ['Why does an item type need attributes?', 'Add an item type for rib fabric'],

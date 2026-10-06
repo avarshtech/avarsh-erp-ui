@@ -25,8 +25,8 @@ const useGpoHandlers = ({ doc, dispatch, masters, ctx, value, flow }) => {
   }, [doc, dispatch, masters.paymentTerms]);
 
   const approve = useCallback(() => {
-    // Warnings on the live supplier and on the PO's own vendor snapshot both need the sign-off.
-    const snapshot = doc.vendor ? vendorEligibility(doc.vendor, { processId: doc.process?.id ?? null, processLabel: doc.lines[0]?.processLabel, onDate: dayjs() }) : null;
+    // Warnings on the live vendor and on the PO's own vendor snapshot both need the sign-off.
+    const snapshot = doc.vendor ? vendorEligibility(doc.vendor, { processId: doc.process?.id ?? null, processLabel: doc.lines[0]?.processLabel, category: 'Garment', onDate: dayjs() }) : null;
     const warnings = [...new Set([...(ctx?.eligibility?.issues || []), ...(snapshot?.issues || [])].filter((i) => i.warnOnly).map((i) => i.text))];
     if (!warnings.length) return flow.approve(false);
     return modal.confirm({

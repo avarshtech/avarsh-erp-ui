@@ -38,7 +38,8 @@ export const SECTION_CONFIG = {
       { type: 'text', field: 'description', title: 'Description', placeholder: 'Fabric desc' },
       { type: 'text', field: 'fabricWidthStd', title: 'Width (Std)', placeholder: 'e.g. 58"' },
       { type: 'text', field: 'fabricWidthVendor', title: 'Width (Vendor)', placeholder: 'e.g. 58"' },
-      { type: 'vendor', title: 'Vendor' },
+      // A fabric row names the mill that supplies it: the Supplier master
+      { type: 'vendor', source: 'supplier', title: 'Supplier' },
     ],
   },
   localTrim: {
@@ -83,7 +84,8 @@ export const SECTION_CONFIG = {
     total: { key: 'manufacturing', label: 'Total Manufacturing Cost' },
     main: [
       { type: 'master', width: 220 },
-      { type: 'vendor', title: 'Vendor', width: 180 },
+      // A manufacturing row names the job worker or CMT unit: the Vendor master
+      { type: 'vendor', source: 'vendor', title: 'Vendor', width: 180 },
       { type: 'money', field: 'cost', title: 'Cost', currency: 'costing', width: 130 },
       { type: 'text', field: 'comments', title: 'Comments', placeholder: 'Notes' },
     ],

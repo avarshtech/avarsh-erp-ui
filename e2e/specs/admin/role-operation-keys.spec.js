@@ -3,9 +3,10 @@ import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import { ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
 
 /**
- * Role & Access offers the operations decisions and payments got of their own (review F093) and the
- * bill-passing masters' own key (F266): each is a checkbox that can be ticked, is saved as ticked,
- * and comes back ticked after a reload, apart from the operation it was copied from.
+ * Role & Access offers the operations decisions and payments got of their own (review F093), the
+ * bill-passing masters' own key (F266) and the Vendor master's key: each is a checkbox that can be
+ * ticked, is saved as ticked, and comes back ticked after a reload, apart from the operation it was
+ * copied from.
  *
  * RBAC is OFF in e2e, so what the API refuses a role without them is proven by the API's tests.
  */
@@ -24,6 +25,8 @@ const NEW_RIGHTS = [
   { section: 'Master Data', label: 'Add on Bill Passing Masters', key: 'inventory-bill-passing-masters', op: 'add' },
   { section: 'Master Data', label: 'Update on Bill Passing Masters', key: 'inventory-bill-passing-masters', op: 'update' },
   { section: 'Master Data', label: 'Delete on Bill Passing Masters', key: 'inventory-bill-passing-masters', op: 'delete' },
+  { section: 'Master Data', label: 'View on Vendors', key: 'vendor-info', op: 'view' },
+  { section: 'Master Data', label: 'Add on Vendors', key: 'vendor-info', op: 'add' },
   { section: 'HR & Payroll', label: 'Pay on Payroll', key: 'hr-payroll', op: 'pay', source: 'add' },
   { section: 'HR & Payroll', label: 'Write off on Loans & Advances', key: 'hr-loans', op: 'approve', source: 'update' },
   { section: 'HR & Payroll', label: 'Pay on Bonus', key: 'hr-bonus', op: 'pay', source: 'add' },

@@ -29,7 +29,7 @@ export const gpoContext = async (doc) => {
   return {
     state: await gpoRequirementState(gprIds),
     orders: Object.fromEntries(orders.filter(Boolean).map((o) => [o.id, { deliveryDate: o.deliveryDate, status: o.status, garment: o.garmentDescription }])),
-    eligibility: vendor ? vendorEligibility(vendor, { processId: doc.process?.id ?? null, processLabel: label ?? undefined, onDate: dayjs() }) : null,
+    eligibility: vendor ? vendorEligibility(vendor, { processId: doc.process?.id ?? null, processLabel: label ?? undefined, category: 'Garment', onDate: dayjs() }) : null,
     lastRates: rates.byKey,
     recentRates: rates.recent,
   };
@@ -105,7 +105,7 @@ export const approveGpo = async (id, { signOff = false, acknowledged = [], remar
   if (blocked.length) throw mockError(`${doc.vendor.name}: ${blocked[0].text} — the PO cannot be approved to this vendor.`, 422);
   const own = issues.filter((i) => i.warnOnly).map((i) => i.text);
   if (own.length && !signOff) throw mockError(`${doc.vendor.name}: ${own.join('; ')} — sign off the vendor to approve.`, 422);
-  // What the approver signed off: the warnings on the PO's vendor and any the screen saw on the live supplier.
+  // What the approver signed off: the warnings on the PO's vendor and any the screen saw on the live vendor.
   const warnings = [...new Set([...own, ...(signOff ? acknowledged : [])])];
   doc.approvals = [{ level: 1, name: GPO_LEVELS[0], by: who.name, byUser: who.username, at: now(), remark, selfApproved: self, vendorSignOff: warnings }];
   Object.assign(doc, { status: S.APPROVED, approvedBy: who.name, approvedOn: now() });

@@ -325,7 +325,7 @@ const CostingView = () => {
     { title: `Price (${getCurrencySymbol(data.currency)})`, dataIndex: 'fabricPrice', width: 130, align: 'center', render: (v, record) => rateWithUom(v, record, data.currency) },
     { title: 'Width (Std)', dataIndex: 'fabricWidthStd', width: 100, align: 'center' },
     { title: 'Width (Vendor)', dataIndex: 'fabricWidthVendor', width: 110, align: 'center' },
-    { title: 'Vendor', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
+    { title: 'Supplier', dataIndex: 'vendorName', width: 150, align: 'center', ellipsis: true },
     { title: 'Allowance %', dataIndex: 'allowancePct', width: 100, align: 'center', render: (v) => `${v || 0}%` },
     { title: 'Wastage %', dataIndex: 'wastagePct', width: 100, align: 'center', render: (v) => `${v || 0}%` },
     { title: 'Net Cost', dataIndex: 'netCost', width: 120, align: 'center', render: (v) => <Text strong style={{ color: 'var(--success-color)' }}>{formatCurrency(v, data.currency)}</Text> },

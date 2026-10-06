@@ -11,7 +11,7 @@ const byNewest = (a, b) => String(b.approvedOn || b.poDate).localeCompare(String
 /**
  * The vendor's last rates for a process (CPP FR-14 / §20, GPO §14): per style × size
  * (CPP) or per UOM (GPO) from its latest approved PO, and its last three rates overall.
- * Vendors are matched by GSTIN, as seeded POs carry no live supplier id.
+ * Vendors are matched by GSTIN, as seeded POs carry no live vendor id.
  */
 export const lastRates = async ({ type, gstin, processLabel }) => {
   const docs = loadJobWorkDb().docs

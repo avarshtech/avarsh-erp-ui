@@ -21,23 +21,21 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
     const fromVendor = !masters.paymentTerms.length || masters.paymentTerms.some((t) => t.name === v.paymentTerms);
     onPatch({ vendor: vendorSnapshot(v), paymentTerms: (fromVendor && v.paymentTerms) || doc.paymentTerms || null });
   };
-  // A seeded PO's snapshot has no supplier id: the live supplier with its GSTIN stands in.
+  // A seeded PO's snapshot has no vendor id: the live vendor with its GSTIN stands in.
   const vendorId = doc.vendor?.id ?? masters.jobWorkers.find((v) => v.gstin && v.gstin === doc.vendor?.gstin)?.id;
   const issue = eligibility?.issues?.[0];
-  const deniedSuppliers = masters.denied.includes('Suppliers');
   return (
     <Card id="cpp-vendor" size="small" title="③ Job Worker" style={{ marginBottom: 16 }}>
       <Row gutter={[16, 12]}>
         <Col xs={24} md={12}>
           <Label required>Job worker</Label>
-          {editable.vendor && !deniedSuppliers ? (
+          {editable.vendor ? (
             <JobWorkVendorSelect
-              id="cpp-vendor-select" vendors={masters.jobWorkers} loading={masters.loading} value={vendorId}
+              id="cpp-vendor-select" vendors={masters.jobWorkers} loading={masters.loading} value={vendorId} category="Cut Panel"
               processId={doc.process?.id ?? null} processLabel={doc.process?.label ?? doc.process?.name} onDate={doc.poDate}
               onChange={(v) => v && pickVendor(v)} disabled={!doc.process}
             />
           ) : <Input id="cpp-vendor-name" aria-label="Job worker" value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
-          {editable.vendor && deniedSuppliers && <Text type="warning" style={{ fontSize: 12 }}>Picking a job worker needs Suppliers (view) permission.</Text>}
         </Col>
         <Col xs={24} md={6}>
           <Label required>Payment terms</Label>

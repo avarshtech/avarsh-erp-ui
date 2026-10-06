@@ -78,7 +78,7 @@ registerRoute(
   ({ url, request }) =>
     !isStreamingRequest({ url, request })
     && url.pathname.match(
-      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
+      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|vendors|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
     ),
   new NetworkFirst({
     cacheName: 'erp-master-data',

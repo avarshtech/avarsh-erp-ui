@@ -18,8 +18,7 @@ const r2 = (n) => parseFloat(Number(n).toFixed(2));
 export async function loadPoRefs(api) {
   const suppliers = (await api.get('/suppliers')).data;
   const sArr = suppliers.content || suppliers;
-  const materialSuppliers = sArr.filter((s) => !s.jobWorker);
-  const localSupplier = materialSuppliers.find((s) => !s.igstApplicable) || materialSuppliers[0];
+  const localSupplier = sArr.find((s) => !s.igstApplicable) || sArr[0];
 
   const itemsData = (await api.get('/items', { search: 'Cotton', size: 5 })).data;
   const items = itemsData.content || itemsData || [];
@@ -43,8 +42,7 @@ export async function loadPoRefs(api) {
 export async function ensureIgstSupplier(api) {
   const suppliers = (await api.get('/suppliers')).data;
   const sArr = suppliers.content || suppliers;
-  // Job workers are sold job work, not materials: the Supplier PO specs must never pick one.
-  const existing = sArr.find((s) => s.igstApplicable && !s.jobWorker);
+  const existing = sArr.find((s) => s.igstApplicable);
   if (existing) return existing;
 
   const stamp = Date.now().toString().slice(-6);

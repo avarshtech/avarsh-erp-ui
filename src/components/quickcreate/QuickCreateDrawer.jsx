@@ -4,6 +4,7 @@ import ItemVariantQuickForm from './forms/ItemVariantQuickForm';
 import BuyerQuickForm from './forms/BuyerQuickForm';
 import StyleQuickForm from './forms/StyleQuickForm';
 import SupplierQuickForm from './forms/SupplierQuickForm';
+import VendorQuickForm from './forms/VendorQuickForm';
 import SizePresetQuickForm from './forms/SizePresetQuickForm';
 import { OverheadQuickForm, ProcessQuickForm } from './forms/CostMasterQuickForms';
 
@@ -12,6 +13,7 @@ const FORMS = {
   buyer: BuyerQuickForm,
   style: StyleQuickForm,
   supplier: SupplierQuickForm,
+  vendor: VendorQuickForm,
   sizePreset: SizePresetQuickForm,
   process: ProcessQuickForm,
   overhead: OverheadQuickForm,

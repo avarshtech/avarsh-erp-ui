@@ -1,10 +1,10 @@
 /**
  * The job workers the demo POs are raised on (UI mock phase).
  *
- * Suppliers are real API data, so the seeded POs carry only a vendor snapshot and find
- * the live supplier by GSTIN when they are read. These rows are that contract: the e2e
- * helper (e2e/helpers/job-work-seed.js) creates exactly these suppliers, and anyone can
- * key them in through Master Data › Suppliers for a manual walkthrough.
+ * Vendors are real API data, so the seeded POs carry only a vendor snapshot and find
+ * the live vendor by GSTIN when they are read. These rows are that contract: the e2e
+ * helper (e2e/helpers/job-work-seed.js) creates exactly these vendors, and anyone can
+ * key them in through Master Data › Vendors for a manual walkthrough.
  *
  * `approvedDays` is the approval's validity from today: null = not approved, negative =
  * expired. `processes` are 'Category|Process name' pairs from the process master seeds.
@@ -72,7 +72,7 @@ export const seedDay = (offset) => {
 
 /**
  * The snapshot a seeded PO carries for one of these job workers — the same shape the PO
- * screens take from a live supplier, so eligibility can be re-checked on it. Process ids
+ * screens take from a live vendor, so eligibility can be re-checked on it. Process ids
  * are unknown here (they are the live master's); a seeded PO's process has none either,
  * so the capability check is skipped for it.
  */

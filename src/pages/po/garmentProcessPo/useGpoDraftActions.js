@@ -8,8 +8,8 @@ const BASE = JOB_WORK_PO_PATH.GPO;
 
 /**
  * Draft actions of a Garment Process PO: save (number on first save; a vendor and a line
- * needed, V1/V2; the vendor snapshot re-taken from the live supplier), submit (saving first,
- * also when the live supplier changed; the quantity is allocated from here, §10), and the
+ * needed, V1/V2; the vendor snapshot re-taken from the live vendor), submit (saving first,
+ * also when the live vendor changed; the quantity is allocated from here, §10), and the
  * excess override — requested on the saved draft, approved by someone else (§11).
  */
 const useGpoDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, liveVendor }) => {

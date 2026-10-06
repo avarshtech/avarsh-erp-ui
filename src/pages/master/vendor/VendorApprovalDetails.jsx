@@ -3,11 +3,10 @@ import { jobWorkApproval } from '../../../utils/vendorEligibility';
 
 const { Text } = Typography;
 
-/** The job-work section of the supplier view drawer; nothing for a supplier that is not a job worker. */
-const SupplierJobWorkDetails = ({ supplier, processes }) => {
-  if (!supplier?.jobWorker) return null;
-  const approval = jobWorkApproval(supplier.jobWorkApprovedUntil);
-  const ids = supplier.processIds || [];
+/** The job-work section of the vendor drawer: the approval and the processes it does. */
+const VendorApprovalDetails = ({ vendor, nameOf }) => {
+  const approval = jobWorkApproval(vendor.jobWorkApprovedUntil);
+  const ids = vendor.processIds || [];
 
   return (
     <>
@@ -18,12 +17,12 @@ const SupplierJobWorkDetails = ({ supplier, processes }) => {
           key: 'processes',
           label: 'Processes',
           children: ids.length
-            ? <Space size={4} wrap>{ids.map((id) => <Tag key={id}>{processes.nameOf(id)}</Tag>)}</Space>
-            : <Text type="secondary">None</Text>,
+            ? <Space size={4} wrap>{ids.map((id) => <Tag key={id}>{nameOf(id)}</Tag>)}</Space>
+            : <Text type="secondary">None yet: pick at least one on the next edit</Text>,
         },
       ]} />
     </>
   );
 };
 
-export default SupplierJobWorkDetails;
+export default VendorApprovalDetails;

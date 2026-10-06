@@ -3,7 +3,7 @@
  *
  * The PO documents, their allocation ledger and the Garment Process Requirements are the
  * localStorage mock; every test gets a fresh browser context, so the stores start from
- * their seed. Job workers are the REAL Supplier master (e2e/helpers/job-work-seed.js).
+ * their seed. Job workers are the REAL Vendor master (e2e/helpers/job-work-seed.js).
  *
  * What this tests:
  *   - Requirement lines come from section ②: Order #, then Garment Process #, then the
@@ -16,7 +16,8 @@
  *   - GPR-2026-00001 + GPR-2026-00006 (both Enzyme Washing) in one PO, each line and card
  *     keeping its requirement number (AC-07); another process is not selectable
  *   - Excess: 4 over the balance blocks Submit; an approved excess allows it (AC-06)
- *   - An unapproved job worker warns; the approver signs it off (§13)
+ *   - A vendor that does no Garment process is greyed out; one that does not do the PO's own
+ *     process (or is unapproved) warns, and the approver signs it off (§13)
  *   - ⑤ Delivery Instructions: the return unit from HR › Units (beforeAll creates two in the
  *     head office), its address as the delivery place
  *   - Amend delivery / instructions on a sent PO, audited (§16, AC-13); print shows no internal quantities
@@ -272,13 +273,21 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
   await expect(page.getByText(/Submitted for approval/)).toBeVisible();
 });
 
-test('An unapproved job worker warns; the approver signs it off (§13)', async ({ page }) => {
+test("A vendor with no Garment process is greyed out; one short of the PO's process warns and the approver signs it off (§13)", async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/new`);
   await waitForPageReady(page);
   await addFromRequirement(page, { order: 'ORD-2026-0418', gpr: 'GPR-2026-00006' });
   await expect(page.getByText('4 line(s) added')).toBeVisible(); // the lines fix the process the vendor list is graded for
-  await pickVendor(page, 'Nova Prints');
-  await expect(page.locator('#gpo-header')).toContainText(/Job-work approval missing|Does not do Enzyme Washing/);
+  // Vendors also hold cutting and stitching units: one that does no Garment process cannot take the PO
+  const input = page.locator('#gpo-vendor-select');
+  const dropdown = await openDropdown(page, input);
+  await input.fill('Nova');
+  const nova = dropdown.locator('.ant-select-item-option').filter({ hasText: 'Nova Prints' });
+  await expect(nova).toContainText('Does no Garment process');
+  await expect(nova).toHaveClass(/option-disabled/);
+  await input.press('Escape');
+  await pickVendor(page, 'Colourtex Dye House'); // does Garment Dyeing, not Enzyme Washing
+  await expect(page.locator('#gpo-header')).toContainText('Does not do Enzyme Washing');
   await fillRates(page, 17);
   await delivery(page);
   await page.getByRole('button', { name: 'Submit for Approval' }).click();

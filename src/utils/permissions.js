@@ -409,6 +409,10 @@ export const SCREENS = [
     path: '/master', description: 'Order Entry', ops: STANDARD_OPERATIONS },
   { id: 'supplier-info', name: 'Suppliers', section: 'master', kind: 'tab',
     path: '/master', description: 'Purchase Order', ops: STANDARD_OPERATIONS },
+  // Job workers and outside processing units. The pickers (costing, Cut Panel / Garment Process
+  // POs, production POs) read vendors under their own keys; this key is for the master screen.
+  { id: 'vendor-info', name: 'Vendors', section: 'master', kind: 'tab',
+    path: '/master', description: 'Job-work POs, Production POs, Costing', ops: STANDARD_OPERATIONS },
   // `delete` has no control on Item Master — the API endpoint is a maintenance back door for
   // a Super Admin correcting a bad entry, and their superuser flag bypasses this matrix
   // anyway. It is declared so the endpoint stops riding on `update`, which silently gave
