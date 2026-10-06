@@ -2,13 +2,14 @@
  * Which actions the Garment Process PO action bar offers (PRD §16, §19): by status and
  * permission. Pure — the bar renders the list in order.
  *
- * `s` = { doc, can, isMaker, superuser, username, received, blocked }
+ * `s` = { doc, can, superuser, userId, issued, withVendor, blocked }
  * Each item: { key, label, primary?, danger?, dialog?, disabledReason? } — `dialog` names
- * the reason dialog the action needs; the bar calls on[key] otherwise.
+ * the reason dialog the action needs; the bar calls on[key] otherwise. Approve and reject are
+ * the approval engine's, in the Approval panel (decision D1).
  */
 import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
-export const gpoActionButtons = ({ doc, can, isMaker, superuser, username, received, blocked }) => {
+export const gpoActionButtons = ({ doc, can, superuser, userId, issued, withVendor, blocked }) => {
   const out = [];
   const add = (show, item) => { if (show) out.push(item); };
   const st = doc.status;
@@ -21,15 +22,15 @@ export const gpoActionButtons = ({ doc, can, isMaker, superuser, username, recei
     return out;
   }
   if (st === S.SUBMITTED) {
-    add(can.edit && (doc.createdByUser === username || superuser), { key: 'recall', label: 'Recall' });
-    add(can.reject, { key: 'reject', label: 'Reject to Draft', danger: true, dialog: 'reject' });
-    add(can.approve, { key: 'approve', label: 'Approve', primary: true, disabledReason: isMaker && !superuser ? 'You raised, edited or submitted this PO — someone else approves it.' : null });
+    add(can.edit && (String(doc.createdById) === String(userId) || superuser), { key: 'recall', label: 'Recall' });
     return out;
   }
   add([S.APPROVED, S.SENT_TO_VENDOR].includes(st) && can.edit, { key: 'amend', label: 'Amend delivery / instructions' });
-  add(st === S.APPROVED && can.cancel && !received, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
-  add([S.SENT_TO_VENDOR, S.PARTIALLY_COMPLETED, S.COMPLETED].includes(st) && can.cancel,
-    { key: 'shortClose', label: st === S.COMPLETED ? 'Close' : 'Close short', danger: st !== S.COMPLETED, dialog: 'shortClose' });
+  add(st === S.APPROVED && can.cancel && !issued, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
+  add([S.SENT_TO_VENDOR, S.PARTIALLY_COMPLETED, S.COMPLETED].includes(st) && can.cancel, {
+    key: 'shortClose', label: st === S.COMPLETED ? 'Close' : 'Close short', danger: st !== S.COMPLETED, dialog: 'shortClose',
+    disabledReason: withVendor ? 'Garments are still with the vendor — receive them back first.' : null,
+  });
   add(st === S.APPROVED && can.approve, { key: 'send', label: 'Send to Vendor', primary: true });
   return out;
 };

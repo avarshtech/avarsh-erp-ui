@@ -35,22 +35,22 @@ const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
 
   const submit = useCallback(() => run('submit', async () => {
     const saved = await savedDoc();
-    dispatch({ type: 'SAVED', doc: await submitCpp(saved.id) });
+    dispatch({ type: 'SAVED', doc: await submitCpp(saved) });
   }, 'Submitted for approval'), [run, savedDoc, dispatch]);
 
   const remove = useCallback(() => run('delete', async () => {
-    await deleteCpp(doc.id);
+    await deleteCpp(doc);
     clearDirty();
     navigate(`${BASE}/list`, { replace: true });
   }, 'Draft deleted'), [run, doc, clearDirty, navigate]);
 
   const requestOverride = useCallback((payload) => run('override', async () => {
     const saved = await savedDoc();
-    dispatch({ type: 'SAVED', doc: await requestCppOverride(saved.id, payload) });
+    dispatch({ type: 'SAVED', doc: await requestCppOverride(saved, payload) });
   }, 'Override requested — an authoriser must approve it before you submit'), [run, savedDoc, dispatch]);
 
   const authorise = useCallback((o) => run('authorise', async () => {
-    dispatch({ type: 'SAVED', doc: await authoriseCppOverride(doc.id, o.id) });
+    dispatch({ type: 'SAVED', doc: await authoriseCppOverride(doc, o.id) });
   }, 'Override authorised'), [run, doc, dispatch]);
 
   return { save, submit, remove, requestOverride, authorise };

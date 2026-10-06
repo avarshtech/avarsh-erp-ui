@@ -32,7 +32,7 @@ export const printCprStatement = (cpr, order) => {
   const meta = [
     ['CPR No.', cpr.cprNo || 'Not saved'], ['Status', getRequirementStatusLabel(cpr.status)],
     ['Order No.', cpr.orderNo], ['Buyer', cpr.buyer], ['Style', cpr.styleNo],
-    ['Garment', order.garmentDescription], ['BOM Version', cpr.bomVersion], ['Delivery', formatDate(order.deliveryDate)],
+    ['Garment', order.garmentDescription], ['BOM No.', cpr.bomNo || order.bomNo], ['Delivery', formatDate(order.deliveryDate)],
   ].map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('');
   const sizeHead = order.sizes.map((s) => `<th class="num">${esc(s)}</th>`).join('');
   const rows = lines.map((l) => `<tr><td>${esc(l.fabricName)}</td><td>${esc(l.colorName)}</td><td>${esc(l.panelName)}</td>

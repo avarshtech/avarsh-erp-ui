@@ -60,5 +60,5 @@ export {
 // External Process (garments to washing / printing / embroidery and back) is on the real API
 export {
   listProcessIssues, createProcessIssue, cancelProcessIssue,
-  listProcessReturns, createProcessReturn, getProcessWorkOrders, getProcessVendors,
+  listProcessReturns, createProcessReturn, getProcessWorkOrders, getProcessVendors, getProcessJobWorkPos,
 } from './finishingProcessApi';

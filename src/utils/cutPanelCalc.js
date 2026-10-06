@@ -203,7 +203,7 @@ export const hasInvalidNumbers = (line) => Number.isNaN(Number(line.allowancePct
 /** Save Draft checks only what would corrupt the draft: an order with an approved BOM, sane numbers. */
 export const draftSaveErrors = (doc, order) => {
   if (!doc?.orderId || !order) return [CPR_VAL.VAL_01];
-  if (!order.approvedBoms?.length || !doc.bomVersion) return [CPR_VAL.VAL_02];
+  if (!order.bomId) return [CPR_VAL.VAL_02];
   return doc.lines.some(hasInvalidNumbers) ? [CPR_VAL.VAL_07] : [];
 };
 

@@ -48,24 +48,9 @@ export const jobWorkPoStatusOptions = (type) => Object.keys(LABELS)
   .filter((s) => type !== JOB_WORK_PO_TYPE.GPO || s !== S.REJECTED)
   .map((value) => ({ value, label: LABELS[value] }));
 
-const ISSUED = [S.APPROVED, S.SENT_TO_VENDOR, S.PARTIALLY_COMPLETED, S.COMPLETED, S.CLOSED];
-
-/** Statuses whose lines hold allocation in the ledger. */
-export const allocatingStatuses = (type) => (type === JOB_WORK_PO_TYPE.GPO ? [S.SUBMITTED, ...ISSUED] : ISSUED);
-
-/** A PO whose quantities show as "in draft PO" on the requirement — visible, never reserved. */
-export const holdsDraftQty = (type, status) => (type === JOB_WORK_PO_TYPE.GPO
-  ? status === S.DRAFT
-  : status === S.DRAFT || status === S.SUBMITTED);
-
 const FINISHED = [S.COMPLETED, S.CLOSED, S.REJECTED, S.CANCELLED];
 
 export const isOpenPo = (status) => !FINISHED.includes(status);
-
-const PLACED = [S.SUBMITTED, ...ISSUED];
-
-/** Submitted or beyond, and not rejected or cancelled: a placed PO ends in-place editing of its requirement. */
-export const isPlacedPo = (status) => PLACED.includes(status);
 
 /** The date a PO is due back: required delivery (CPP), expected return (GPO). */
 export const poDueDate = (doc) => (doc.type === JOB_WORK_PO_TYPE.GPO ? doc.expectedReturnDate : doc.requiredDeliveryDate);

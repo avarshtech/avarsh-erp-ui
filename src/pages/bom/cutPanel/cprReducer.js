@@ -7,11 +7,11 @@ import { REQUIREMENT_STATUS } from '../../../utils/requirementStatus';
 
 export const initialCprState = { doc: null, order: null, dirty: false };
 
-/** A fresh Draft for an order: header snapshot, latest approved BOM version, no lines. */
+/** A fresh Draft for an order: header snapshot, the order's BOM (no. and the version it was read at), no lines. */
 export const newCprDoc = (order) => ({
   id: null, cprNo: null, revisionNo: 0, status: REQUIREMENT_STATUS.DRAFT,
   orderId: order?.id ?? null, orderNo: order?.orderNo ?? null, buyer: order?.buyer ?? null, styleNo: order?.styleNo ?? null,
-  bomVersion: order?.latestBomVersion ?? null,
+  bomId: order?.bomId ?? null, bomNo: order?.bomNo ?? null, bomVersion: order?.bomVersion ?? null,
   orderQtySnapshot: order?.totalQty ?? null,
   orderAllowancePct: order?.allowancePercent ?? null,
   remarks: '', lines: [], consumedQty: 0,
@@ -31,8 +31,6 @@ export const cprReducer = (state, action) => {
       return initialCprState;
     case 'ORDER_SELECTED':
       return { doc: newCprDoc(action.order), order: action.order, dirty: true };
-    case 'BOM_SELECTED':
-      return { ...state, dirty: true, doc: { ...state.doc, bomVersion: action.bomVersion } };
     case 'LINES_ADDED':
       return { ...state, dirty: true, doc: { ...state.doc, lines: [...state.doc.lines, ...action.lines] } };
     case 'LINES_REMOVED': { // lastLineNo remembers the removed keys, so they are never reissued

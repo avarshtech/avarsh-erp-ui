@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Alert, Button, Card, Col, Form, Row, Select, Space, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Button, Card, Col, Form, Row, Space, Tag, Tooltip, Typography } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import RequirementOrderSelect from '../shared/RequirementOrderSelect';
 import StatusTag from '../../../components/StatusTag';
@@ -11,16 +11,16 @@ import CprOrderFacts from './CprOrderFacts';
 const { Text } = Typography;
 
 /**
- * Section 1 — Order and Header (PRD §8.1). Order and BOM version are the only inputs
- * and lock once the first line is added; everything else is fetched and read-only.
+ * Section 1 — Order and Header (PRD §8.1). The order is the only input; the BOM is the order's own (one per
+ * order, shown by number). The order locks once the first line is added; everything else is read-only.
  */
 const CprHeaderSection = memo(function CprHeaderSection({
-  doc, order, orders, siblings, editable, onSelectOrder, onSelectBom, onRecalculate,
+  doc, order, orders, siblings, editable, onSelectOrder, onRecalculate,
 }) {
   const locked = !editable || doc.lines.length > 0 || Boolean(doc.id);
-  const bomRevised = Boolean(doc.id && order && doc.bomVersion !== order.latestBomVersion);
+  // WRN-05: the BOM changed after this requirement last read it (its version is snapshotted on every save)
+  const bomRevised = Boolean(doc.id && order?.bomVersion != null && doc.bomVersion != null && doc.bomVersion !== order.bomVersion);
   const orderRevised = Boolean(doc.id && order && doc.orderQtySnapshot !== order.totalQty);
-  const bomOptions = (order?.approvedBoms || []).map((b) => ({ value: b.version, label: `${b.version} (approved)` }));
 
   return (
     <Card title="Order and Header" size="small" style={{ marginBottom: 16 }}>
@@ -34,8 +34,8 @@ const CprHeaderSection = memo(function CprHeaderSection({
             </Form.Item>
           </Col>
           <Col xs={12} md={6} lg={4}>
-            <Form.Item label="BOM Version" required htmlFor="cpr-bom">
-              <Select id="cpr-bom" value={doc.bomVersion ?? undefined} options={bomOptions} onChange={onSelectBom} disabled={locked || !order} placeholder="Version" />
+            <Form.Item label="BOM No.">
+              <Text strong style={{ fontFamily: 'monospace' }}>{doc.bomNo || order?.bomNo || '—'}</Text>
             </Form.Item>
           </Col>
           <Col xs={12} md={8} lg={6}>
@@ -55,7 +55,7 @@ const CprHeaderSection = memo(function CprHeaderSection({
           </Col>
         </Row>
       </Form>
-      {order && !order.approvedBoms.length && <Alert type="error" showIcon title={CPR_VAL.VAL_02} style={{ marginBottom: 12 }} />}
+      {order && !order.bomId && <Alert type="error" showIcon title={CPR_VAL.VAL_02} style={{ marginBottom: 12 }} />}
       {siblings.length > 0 && (
         <Alert
           type="info"

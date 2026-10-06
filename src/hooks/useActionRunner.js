@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App } from 'antd';
 import useBusyAction from './useBusyAction';
-import { toastUnlessHandled } from '../utils/apiError';
+import { errorText, toastUnlessHandled } from '../utils/apiError';
 
 const NONE = [];
 
@@ -32,8 +32,14 @@ const useActionRunner = (scope = null) => {
       return out ?? true;
     } catch (e) {
       const list = e?.response?.data?.errors;
-      if (Array.isArray(list) && list.length) setErrors(list);
-      toastUnlessHandled(message, e, 'The action could not be completed');
+      const listed = Array.isArray(list) && list.length > 0;
+      if (listed) setErrors(list);
+      // A `silent` request left the toast to us: the action bar shows a list, anything else is toasted here
+      if (e?.config?.silent) {
+        if (!listed) message.error(errorText(e, 'The action could not be completed'));
+      } else {
+        toastUnlessHandled(message, e, 'The action could not be completed');
+      }
       return false;
     } finally {
       setBusy(null);

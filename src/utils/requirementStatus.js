@@ -56,17 +56,3 @@ export const requirementBarMode = (status, placedPos, editing) => {
   if (!isRequirementEditableInPlace(status, placedPos)) return REQUIREMENT_BAR_MODE.VIEW;
   return editing ? REQUIREMENT_BAR_MODE.EDITING : REQUIREMENT_BAR_MODE.IN_PLACE;
 };
-
-/**
- * Next number in a `<PREFIX>-<YYYY>-NNNNN` series. The year is the financial year's
- * start year; numbers are never reused, so the serial continues from the highest ever
- * issued (deleted drafts included — callers pass every number they have issued).
- */
-export const nextRequirementNumber = (prefix, fyStartYear, issuedNumbers = []) => {
-  const re = new RegExp(`^${prefix}-${fyStartYear}-(\\d{5})`);
-  const max = issuedNumbers.reduce((m, n) => {
-    const hit = re.exec(String(n || ''));
-    return hit ? Math.max(m, Number(hit[1])) : m;
-  }, 0);
-  return `${prefix}-${fyStartYear}-${String(max + 1).padStart(5, '0')}`;
-};

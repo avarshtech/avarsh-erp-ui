@@ -13,9 +13,6 @@ export const CPP_DIALOGS = {
     title: 'Close short', okText: 'Close', danger: true, codes: CLOSE_REASONS,
     intro: 'The PO closes at the quantity received; the unreceived balance goes back to the requirement for a fresh PO.',
   },
-  sendBack: { title: 'Send back for correction', okText: 'Send back', intro: 'The PO returns to Draft with your note. Nothing was allocated, so nothing is lost.' },
-  reject: { title: 'Reject PO', okText: 'Reject', danger: true, intro: 'Rejection is final: a fresh PO has to be raised.' },
   amend: { title: 'Amend PO', okText: 'Open amendment', intro: 'Opens the next revision as a draft. The live PO and its allocation stay in force until the amendment is approved.' },
-  dropRev: { title: 'Drop amendment', okText: 'Drop amendment', danger: true, intro: 'The amendment is discarded; the live PO stays exactly as it is.' },
-  sendBackRev: { title: 'Send back amendment', okText: 'Send back', intro: 'The amendment returns to its author as a draft.' },
+  dropRev: { title: 'Discard amendment', okText: 'Discard amendment', danger: true, intro: 'The amendment is discarded (a pending approval is withdrawn); the live PO stays exactly as it is.' },
 };

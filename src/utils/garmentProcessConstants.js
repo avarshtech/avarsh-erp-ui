@@ -4,7 +4,6 @@
  * lifecycle is shared with the Cut Panel Requirement (utils/requirementStatus.js).
  */
 export const GPR_MODULE_ID = 'garment-process';
-export const GPR_PREFIX = 'GPR';
 export const GPR_PROCESS_CATEGORY = 'Garment';
 export const GPR_OTHER_PROCESS_NAME = 'Other';
 export const GPR_REMARKS_MAX = 500;

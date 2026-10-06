@@ -30,7 +30,7 @@ const useGpoLineHandlers = ({ doc, dispatch, masters }) => {
       const first = cells[0];
       const process = current ? doc.process : processSnapshot({ label: first.processLabel, processName: first.processName, otherName: first.processOtherName }, masters.processes, 'Garment');
       const { lines, onPo, noBalance } = await gpoFetchLines({ cellKeys: cells.map((c) => c.key), existing: doc.lines, firstKeyNo: nextLineNo(doc), uom: process.defaultUom });
-      const rates = doc.vendor ? (await lastRates({ type: 'GPO', gstin: doc.vendor.gstin, processLabel: first.processLabel })).byKey : {};
+      const rates = doc.vendor ? (await lastRates({ vendor: doc.vendor, lines: doc.lines.length ? doc.lines : lines })).byKey : {};
       const due = cells.map((c) => c.requiredBy).filter(Boolean).sort()[0];
       if (lines.length) dispatch({ type: 'LINES_ADDED', lines: withLastRates(lines, rates), process, header: doc.requiredDate || !due ? {} : { requiredDate: due } });
       const skipped = [onPo && `${onPo} already on the PO (V9)`, noBalance && `${noBalance} fully allocated`].filter(Boolean).join(' · ');

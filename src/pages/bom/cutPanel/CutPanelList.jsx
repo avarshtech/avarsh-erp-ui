@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Table } from 'antd';
+import { useCallback, useMemo } from 'react';
+import { Card, Table } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
@@ -7,14 +7,14 @@ import SearchFilterBar from '../../../components/SearchFilterBar';
 import EmptyState from '../../../components/EmptyState';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { ActionButton } from '../../../components/buttons';
-import useDebouncedSearch from '../../../hooks/useDebouncedSearch';
+import useServerList from '../../../hooks/useServerList';
+import useFilterOptions, { textOptions } from '../../../hooks/useFilterOptions';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { hasPermission } from '../../../utils/permissions';
 import { REQUIREMENT_STATUS_OPTIONS } from '../../../utils/requirementStatus';
 import { getCurrentFinancialYear } from '../../../utils/numbering';
-import { toastUnlessHandled } from '../../../utils/apiError';
 import { CPR_MODULE_ID } from '../../../utils/cutPanelConstants';
-import { listCprs } from '../../../services/bom/cutPanel/cutPanelService';
+import { listCprs, getCprFilterOptions } from '../../../services/bom/cutPanel/cutPanelService';
 import { buildCutPanelListColumns } from './cutPanelListColumns';
 
 /** Current financial year, 1 April – 31 March — the list's default created-date range (PRD §7.2). */
@@ -23,58 +23,25 @@ const currentFyRange = () => {
   return [dayjs(`${start}-04-01`), dayjs(`${start + 1}-03-31`)];
 };
 
-const uniqueOptions = (rows, field) =>
-  [...new Set(rows.map((r) => r[field]))].sort().map((v) => ({ value: v, label: v }));
+const fetchPage = ({ created, ...rest }) => listCprs({ ...rest, createdFrom: created?.[0], createdTo: created?.[1] });
 
-/** Cut Panel Requirement register — the landing screen of BOM → Cut Panel (PRD §7). */
+/** Cut Panel Requirement register — the landing screen of BOM → Cut Panel (PRD §7); pages and filters on the server. */
 const CutPanelList = () => {
-  const { message } = App.useApp();
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const { searchText, setSearchText, debouncedSearch } = useDebouncedSearch();
-  const [filters, setFilters] = useState({ orderNo: undefined, buyer: undefined, styleNo: undefined, status: undefined, created: currentFyRange() });
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+  const list = useServerList(fetchPage,
+    { orderNo: undefined, buyer: undefined, styleNo: undefined, status: undefined, created: currentFyRange() },
+    'Could not load cut panel requirements');
+  const options = useFilterOptions(getCprFilterOptions);
   const canUpdate = hasPermission(CPR_MODULE_ID, 'update');
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setRows(await listCprs());
-    } catch (e) {
-      toastUnlessHandled(message, e, 'Could not load cut panel requirements');
-    } finally {
-      setLoading(false);
-    }
-  }, [message]);
-
-  useEffect(() => { load(); }, [load]);
-
-  const setFilter = useCallback((key) => (value) => {
-    setFilters((f) => ({ ...f, [key]: value }));
-    setPagination((p) => ({ ...p, current: 1 }));
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    const [from, to] = filters.created || [];
-    return rows.filter((r) => (!q || [r.cprNo, r.orderNo, r.buyer, r.styleNo].some((v) => String(v).toLowerCase().includes(q)))
-      && (!filters.orderNo || r.orderNo === filters.orderNo)
-      && (!filters.buyer || r.buyer === filters.buyer)
-      && (!filters.styleNo || r.styleNo === filters.styleNo)
-      && (!filters.status || r.status === filters.status)
-      && (!from || !dayjs(r.createdOn).isBefore(from, 'day'))
-      && (!to || !dayjs(r.createdOn).isAfter(to, 'day')));
-  }, [rows, debouncedSearch, filters]);
 
   const openRow = useCallback((r) => navigate(`/bom/cut-panel/${r.id}`), [navigate]);
   const editRow = useCallback((r) => navigate(`/bom/cut-panel/${r.id}?edit=1`), [navigate]);
   const columns = useMemo(() => buildCutPanelListColumns({ onOpen: openRow, onEdit: editRow, canUpdate }), [openRow, editRow, canUpdate]);
 
-  const selectFilter = (key, placeholder, options) => ({
+  const selectFilter = (key, placeholder, opts) => ({
     type: 'select',
     span: { xs: 12, sm: 8, md: 4, lg: 3 },
-    props: { placeholder, value: filters[key], onChange: setFilter(key), options, 'aria-label': placeholder },
+    props: { placeholder, value: list.filters[key], onChange: list.setFilter(key), options: opts, allowClear: true, 'aria-label': placeholder },
   });
 
   return (
@@ -87,32 +54,32 @@ const CutPanelList = () => {
 
       <Card>
         <SearchFilterBar
-          searchText={searchText}
-          onSearchChange={(e) => setSearchText(e.target.value)}
+          searchText={list.searchText}
+          onSearchChange={(e) => list.setSearchText(e.target.value)}
           searchPlaceholder="Search CPR no, order, buyer, style..."
           filters={[
-            selectFilter('orderNo', 'Order No.', uniqueOptions(rows, 'orderNo')),
-            selectFilter('buyer', 'Buyer', uniqueOptions(rows, 'buyer')),
-            selectFilter('styleNo', 'Style', uniqueOptions(rows, 'styleNo')),
+            selectFilter('orderNo', 'Order No.', textOptions(options.orderNos)),
+            selectFilter('buyer', 'Buyer', textOptions(options.buyers)),
+            selectFilter('styleNo', 'Style', textOptions(options.styleNos)),
             selectFilter('status', 'Status', REQUIREMENT_STATUS_OPTIONS),
             {
               type: 'rangePicker',
               span: { xs: 24, sm: 12, md: 6, lg: 5 },
-              props: { placeholder: ['Created from', 'Created to'], value: filters.created, onChange: setFilter('created') },
+              props: { placeholder: ['Created from', 'Created to'], value: list.filters.created, onChange: list.setFilter('created') },
             },
           ]}
-          onRefresh={load}
+          onRefresh={list.load}
           style={{ marginBottom: 16 }}
         />
         <Table
           columns={columns}
-          dataSource={filtered}
-          loading={loading}
+          dataSource={list.rows}
+          loading={list.loading}
           rowKey="id"
           size="middle"
           scroll={{ x: 1400 }}
-          pagination={getTablePagination({ ...pagination, total: filtered.length }, 'requirements')}
-          onChange={(p) => setPagination({ current: p.current, pageSize: p.pageSize })}
+          pagination={getTablePagination({ ...list.pagination, total: list.total }, 'requirements')}
+          onChange={list.onTableChange}
           locale={{ emptyText: <EmptyState title="No cut panel requirements" description="Adjust the filters, or create one from an order with an approved BOM." /> }}
         />
       </Card>

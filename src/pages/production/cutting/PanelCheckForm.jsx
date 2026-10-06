@@ -8,6 +8,7 @@ import { ActionButton } from '../../../components/buttons';
 import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { listPanelChecks, listPanelIssues, savePanelCheck, getCutPos } from '../../../services/production/cuttingService';
+import { toastUnlessHandled } from '../../../utils/apiError';
 
 /** FR-09 — QC on panels returning from an external process, per bundle range. */
 const PanelCheckForm = () => {
@@ -32,13 +33,13 @@ const PanelCheckForm = () => {
         setIssues(iss); setCutPos(pos);
         setCheck(isEdit
           ? checks.find((c) => c.id === Number(id))
-          : { panelIssueId: null, cutPoId: null, process: null, date: dayjs().format('YYYY-MM-DD'), correspondence: '', status: 'PENDING', rows: [] });
+          : { panelIssueId: null, cuttingPoId: null, processName: null, checkDate: dayjs().format('YYYY-MM-DD'), correspondence: '', status: 'PENDING', rows: [] });
       })
       .catch(() => message.error('Failed to load panel check'))
       .finally(() => setLoading(false));
   }, [id, isEdit, message]);
 
-  const po = useMemo(() => cutPos.find((p) => p.id === check?.cutPoId), [cutPos, check]);
+  const po = useMemo(() => cutPos.find((p) => p.id === check?.cuttingPoId), [cutPos, check]);
   const patch = useCallback((p) => setCheck((prev) => ({ ...prev, ...p })), []);
   const setRow = useCallback((idx, field, val) => {
     setCheck((prev) => ({ ...prev, rows: prev.rows.map((r, i) => (i === idx ? { ...r, [field]: val } : r)) }));
@@ -59,7 +60,7 @@ const PanelCheckForm = () => {
   const handleIssueSelect = useCallback((panelIssueId) => {
     const issue = issues.find((i) => i.id === panelIssueId);
     patch({
-      panelIssueId, cutPoId: issue?.cutPoId, process: issue?.process,
+      panelIssueId, cuttingPoId: issue?.cuttingPoId, processName: issue?.processName,
       rows: (issue?.lines || []).map((l, i) => ({
         size: l.size, orderRange: `1-${l.issueQty}`, bundleRange: `Lot-${i + 1}`,
         verified: false, quality: null, comments: '', action: null, qcSign: '',
@@ -119,7 +120,7 @@ const PanelCheckForm = () => {
       message.success(`Panel check saved as ${saved.status.toLowerCase()}`);
       navigate('/production/cutting?tab=external');
     } catch (e) {
-      message.error(e?.response?.data?.message || 'Failed to save panel check');
+      toastUnlessHandled(message, e, 'Failed to save panel check');
     } finally { setSaving(false); }
   };
 

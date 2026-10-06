@@ -11,7 +11,7 @@ import { useBranch } from '../../../context/BranchContext';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
-import { validateGpo, requirementCards, gpoLineLabel, GPO_LEVELS } from '../../../utils/garmentProcessPoCalc';
+import { validateGpo, requirementCards, gpoLineLabel } from '../../../utils/garmentProcessPoCalc';
 import { refetchGpoLines } from '../../../utils/jobWorkRefetch';
 import { getGpoAudit } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 import JobWorkTypeSwitch from '../jobWork/JobWorkTypeSwitch';
@@ -29,6 +29,7 @@ import useGpoDraftActions from './useGpoDraftActions';
 import useGpoFlowActions from './useGpoFlowActions';
 import useGpoLineHandlers from './useGpoLineHandlers';
 import useGpoHandlers from './useGpoHandlers';
+import useGpoSignOff from './useGpoSignOff';
 import { GPO_DIALOGS } from './gpoDialogs';
 import GpoTraceLine from './GpoTraceLine';
 import GpoHeaderSection from './GpoHeaderSection';
@@ -43,8 +44,8 @@ const LIST = `${JOB_WORK_PO_PATH.GPO}/list`;
 
 /**
  * Garment Process PO — one scrolling screen, wireframe sections ①–⑦ and a sticky action
- * bar (PRD §19). UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; vendors, processes, payment terms, branches and units are the real API.
+ * bar (PRD §19). Everything is the API: the PO, its ledger and approval (the approval engine, with the
+ * vendor sign-off), the requirements, vendors, processes, payment terms, branches and units.
  */
 const GarmentProcessPoForm = () => {
   const { id } = useParams();
@@ -62,7 +63,8 @@ const GarmentProcessPoForm = () => {
   const draft = useGpoDraftActions({ ...po, clearDirty, runner, unit: activeBranch || defaultBranch, liveVendor: ctx?.liveVendor });
   const flow = useGpoFlowActions({ ...po, clearDirty, runner });
   const lines = useGpoLineHandlers({ ...po, masters });
-  const h = useGpoHandlers({ ...po, masters, ctx, value: view?.value, flow });
+  const h = useGpoHandlers({ ...po, masters, value: view?.value });
+  const signOff = useGpoSignOff(po.doc || {}, ctx);
   const refetch = useJobWorkRefetch({ lines: po.doc?.lines, ctx, dispatch: po.dispatch, rebuild: refetchGpoLines, enabled: Boolean(view?.draft) });
   const [dialog, setDialog] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -74,7 +76,7 @@ const GarmentProcessPoForm = () => {
   const { doc, dispatch } = po;
   const patch = (p) => dispatch({ type: 'PATCH', patch: p });
   const on = {
-    ...flow, back: () => navigate(LIST), print: h.print, save: draft.save, approve: h.approve, amend: () => setAmendOpen(true),
+    ...flow, back: () => navigate(LIST), print: h.print, save: draft.save, amend: () => setAmendOpen(true),
     submit: () => (checks?.blocking.length ? runner.setErrors(checks.blocking) : draft.submit()),
   };
 
@@ -100,11 +102,13 @@ const GarmentProcessPoForm = () => {
       <GpoRequirementCards cards={cards} orders={ctx?.orders} onOpenGpr={(gprId) => navigate(`/bom/garment-process/${gprId}`)} />
       <GpoLinesSection doc={doc} ctx={ctx} editable={view.draft} canRequest={view.draft} selectedKeys={po.selectedKeys} h={lines.grid} />
       <GpoBottomRow doc={doc} value={view.value} units={units} editable={{ delivery: view.draft, commercial: view.draft }} onPatch={patch} />
-      {(doc.status !== 'DRAFT' || doc.overrides.length > 0) && (
+      {(doc.status !== 'DRAFT' || doc.overrides.length > 0 || doc.rejectNote || doc.sendBackNote) && (
         <JobWorkApprovalPanel
-          levels={doc.levelNames || GPO_LEVELS} approvals={doc.approvals} overrides={doc.overrides} busy={runner.busy === 'excessApprove'} onAuthorise={draft.approveExcess}
+          entityType="GARMENT_PROCESS_PO" doc={doc} docLabel="Garment Process PO" onDecided={po.reload}
+          buildActionData={signOff.buildActionData} extraContent={signOff.extraContent}
+          overrides={doc.overrides} busy={runner.busy === 'excessApprove'} onAuthorise={draft.approveExcess}
           lineLabel={(k) => { const l = doc.lines.find((x) => x.key === k); return l ? gpoLineLabel(l) : k; }}
-          canAuthorise={(o) => o.status === 'REQUESTED' && doc.status === 'DRAFT' && view.can.override && (o.requestedByUser !== view.username || view.superuser)}
+          canAuthorise={(o) => o.status === 'REQUESTED' && doc.status === 'DRAFT' && view.can.override && (String(o.requestedById) !== String(view.userId) || view.superuser)}
         />
       )}
       <GpoActionBar doc={doc} value={view.value} checks={checks} buttons={view.buttons} busy={runner.busy} errors={runner.errors} on={on} openDialog={setDialog} />

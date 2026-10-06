@@ -1,5 +1,7 @@
 import { memo } from 'react';
-import { Button, Card, Space, Steps, Table, Tag, Typography } from 'antd';
+import { Button, Card, Space, Table, Tag, Typography } from 'antd';
+import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
+import ProductionEngineHistory from '../components/ProductionEngineHistory';
 import { optionLabel, OVERRIDE_REASONS } from '../../../utils/jobWorkConstants';
 import { formatDate } from '../../../utils/formatters';
 import { DATE_TIME_FORMAT } from '../../../utils/uiConstants';
@@ -9,24 +11,15 @@ const STATUS_COLOR = { REQUESTED: 'warning', AUTHORISED: 'success' };
 const formatDateTime = (v) => formatDate(v, DATE_TIME_FORMAT);
 
 /**
- * Approval levels as they stand (CPP §16) and the override log (§10.4, report R-7).
- * `levels` are the level names, `approvals` the recorded ones; `canAuthorise(o)` decides
- * the Authorise button per override, `onAuthorise(o)` runs it.
+ * A job-work PO's approval: the approval engine's history and its level-aware Approve / Reject / Refer Back
+ * (decision D1 — the levels are the Approval Flow configured for `entityType`; with none, submit approves at
+ * once), and the override / excess log, whose authorisation stays the module's (§10.4, report R-7). Both
+ * engine parts re-read whenever the PO's version moves. `buildActionData` / `extraContent` carry a module's
+ * own approval input (the Garment Process PO's vendor sign-off); `onDecided` reloads the PO after a decision.
  */
-const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({ levels = [], approvals = [], overrides = [], lineLabel, canAuthorise, onAuthorise, busy }) {
-  const steps = levels.map((name, i) => {
-    const a = approvals[i];
-    return {
-      title: name,
-      status: a ? 'finish' : i === approvals.length ? 'process' : 'wait',
-      description: a ? (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {a.by} · {formatDateTime(a.at)}{a.selfApproved ? ' · self-approved (superuser)' : ''}{a.remark ? ` · ${a.remark}` : ''}
-          {a.vendorSignOff?.length ? ` · vendor signed off: ${a.vendorSignOff.join('; ')}` : ''}
-        </Text>
-      ) : null,
-    };
-  });
+const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({
+  entityType, doc, docLabel, overrides = [], lineLabel, canAuthorise, onAuthorise, busy, buildActionData, extraContent, onDecided,
+}) {
   const columns = [
     { title: 'Line', dataIndex: 'lineKey', render: (k) => lineLabel(k) },
     { title: 'Excess', dataIndex: 'excessQty', align: 'right', width: 80 },
@@ -44,11 +37,20 @@ const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({ levels = [], a
       ),
     },
   ];
+  const engine = `${doc.id}-${doc.version}`;
   return (
-    <Card size="small" title="Approval" style={{ marginBottom: 16 }}>
-      {steps.length > 0
-        ? <Steps size="small" items={steps} style={{ marginBottom: overrides.length ? 16 : 0 }} />
-        : <Text type="secondary">The approval levels are fixed from the PO value when it is submitted.</Text>}
+    <Card
+      size="small" title="Approval" style={{ marginBottom: 16 }}
+      extra={doc.id ? (
+        <ApprovalActionBar
+          key={engine} entityType={entityType} entityId={doc.id} docLabel={docLabel} docNumber={doc.poNo}
+          buildActionData={buildActionData} extraContent={extraContent} onActionComplete={onDecided}
+        />
+      ) : null}
+    >
+      {doc.id
+        ? <ProductionEngineHistory key={engine} entityType={entityType} entityId={doc.id} />
+        : <Text type="secondary">Submitting sends the PO through its approval flow; with no flow configured it is approved at once.</Text>}
       {overrides.length > 0 && (
         <Table size="small" rowKey="id" pagination={false} dataSource={overrides} columns={columns} scroll={{ x: 900 }} style={{ marginTop: 12 }} />
       )}

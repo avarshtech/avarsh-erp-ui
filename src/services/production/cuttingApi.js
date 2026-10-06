@@ -241,6 +241,12 @@ export const savePanelIssue = async (payload) => {
   return data;
 };
 
+/** The approved Cut Panel POs an in-house Cut PO may send panels out against, with what each line has left to send. */
+export const listIssuableCutPanelPos = async (cuttingPoId) => {
+  const { data } = await axiosInstance.get(`${BASE}/panel-issues/job-work-pos`, { params: { cuttingPoId } });
+  return data || [];
+};
+
 export const listProcessReturns = async (params = {}) => {
   const { data } = await axiosInstance.get(`${BASE}/process-returns`, { params: { size: 200, ...params } });
   return data.content;

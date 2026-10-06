@@ -26,7 +26,7 @@ const useGpoListActions = (reload) => {
 
   const cancel = useCallback(async (reason) => {
     try {
-      await cancelGpo(cancelling.id, reason);
+      await cancelGpo(cancelling, reason);
       message.success(`${cancelling.poNo} cancelled`);
       reload();
       return true;

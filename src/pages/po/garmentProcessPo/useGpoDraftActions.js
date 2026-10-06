@@ -30,16 +30,16 @@ const useGpoDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
 
   const submit = useCallback(() => run('submit', async () => {
     const saved = await savedDoc();
-    dispatch({ type: 'SAVED', doc: await submitGpo(saved.id) });
+    dispatch({ type: 'SAVED', doc: await submitGpo(saved) });
   }, 'Submitted for approval — the quantity now counts against the requirement'), [run, savedDoc, dispatch]);
 
   const requestExcess = useCallback((payload) => run('excess', async () => {
     const saved = await savedDoc();
-    dispatch({ type: 'SAVED', doc: await requestGpoExcess(saved.id, payload) });
+    dispatch({ type: 'SAVED', doc: await requestGpoExcess(saved, payload) });
   }, 'Excess requested — an authorised approver must approve it before you submit'), [run, savedDoc, dispatch]);
 
   const approveExcess = useCallback((o) => run('excessApprove', async () => {
-    dispatch({ type: 'SAVED', doc: await approveGpoExcess(doc.id, o.id) });
+    dispatch({ type: 'SAVED', doc: await approveGpoExcess(doc, o.id) });
   }, 'Excess approved'), [run, doc, dispatch]);
 
   return { save, submit, requestExcess, approveExcess };

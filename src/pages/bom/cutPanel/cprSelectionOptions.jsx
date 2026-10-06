@@ -35,7 +35,7 @@ export const renderColourOption = (opt) => (opt.data.color ? (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
     <ColorDot hex={opt.data.color.hex} name={opt.data.color.name} />
     <span>{opt.data.color.name}</span>
-    <span style={muted}>{opt.data.color.code} · {opt.data.color.qty.toLocaleString('en-IN')} pcs</span>
+    <span style={muted}>{opt.data.color.qty.toLocaleString('en-IN')} pcs</span>
   </span>
 ) : <strong>{opt.data.label}</strong>);
 

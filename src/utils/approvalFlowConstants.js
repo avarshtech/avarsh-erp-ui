@@ -16,6 +16,8 @@ export const ENTITY_TYPES = [
   { value: 'WORK_ORDER', label: 'Work Order (Sewing)' },
   { value: 'FINISHING_PO', label: 'Finishing PO' },
   { value: 'BILL_PASSING', label: 'Bill Passing' },
+  { value: 'CUT_PANEL_PO', label: 'Cut Panel PO' },
+  { value: 'GARMENT_PROCESS_PO', label: 'Garment Process PO' },
 ];
 
 /**
@@ -51,6 +53,8 @@ export const ENTITY_TYPE_COLORS = {
   WORK_ORDER: 'purple',
   FINISHING_PO: 'cyan',
   BILL_PASSING: 'gold',
+  CUT_PANEL_PO: 'geekblue',
+  GARMENT_PROCESS_PO: 'magenta',
 };
 
 /** Deep link to the entity behind an approval request (mirrors backend buildActionUrl). */
@@ -73,6 +77,8 @@ export const entityActionUrl = (entityType, entityId) => {
     case 'WORK_ORDER': return `/purchase-orders/work-order/list?viewId=${entityId}`;
     case 'FINISHING_PO': return `/purchase-orders/finishing-po/list?viewId=${entityId}`;
     case 'BILL_PASSING': return `/inventory/bill-passing?viewId=${entityId}`;
+    case 'CUT_PANEL_PO': return `/purchase-orders/cut-panel-po/${entityId}`;
+    case 'GARMENT_PROCESS_PO': return `/purchase-orders/garment-process-po/${entityId}`;
     default: return '/';
   }
 };
@@ -166,6 +172,19 @@ export const CONDITION_FIELDS = {
   ],
   FINISHING_PO: [
     { value: 'totalPlannedQty', label: 'Planned Quantity', type: 'number' },
+    { value: 'branchId', label: 'Branch', type: 'branch' },
+  ],
+  // The job-work POs route on their server-computed value (decision D1). A Cut Panel PO's reviewed tiers add a
+  // level for an authorised override, a zero rate or a duplicate (needsAdditionalLevel) and can treat an
+  // amendment apart (isAmendment).
+  CUT_PANEL_PO: [
+    { value: 'amount', label: 'PO Value', type: 'number' },
+    { value: 'branchId', label: 'Branch', type: 'branch' },
+    { value: 'needsAdditionalLevel', label: 'Override, zero rate or duplicate', type: 'select', options: ['true', 'false'] },
+    { value: 'isAmendment', label: 'Is an amendment', type: 'select', options: ['true', 'false'] },
+  ],
+  GARMENT_PROCESS_PO: [
+    { value: 'amount', label: 'PO Value', type: 'number' },
     { value: 'branchId', label: 'Branch', type: 'branch' },
   ],
 };

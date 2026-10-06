@@ -20,15 +20,16 @@ const useGpoView = ({ doc }, ctx, checks) => useMemo(() => {
     edit: hasPermission(KEY, doc.id ? 'update' : 'add'), submit: canSubmitRequirement(KEY), approve: hasPermission(KEY, 'approve'),
     reject: hasPermission(KEY, 'reject'), cancel: hasPermission(KEY, 'cancel'), override: hasPermission(KEY, 'override'),
   };
-  const isMaker = [doc.createdByUser, doc.modifiedByUser, doc.submittedByUser].includes(user.username);
-  const received = doc.lines.some((l) => Number(l.receivedQty) > 0);
+  // Garments out with the vendor stop a cancel and a short close (decision D6)
+  const issued = doc.lines.some((l) => Number(l.issuedQty) > 0);
+  const withVendor = doc.lines.some((l) => Number(l.issuedQty) - Number(l.receivedQty) - Number(l.rejectedQty) > 0);
   const flags = poFlags(doc, {
     orderCancelled: Boolean(ctx) && doc.lines.some((l) => ctx.orders?.[l.orderId]?.status === 'CANCELLED'),
     requirementChanged: Boolean(ctx?.state) && doc.lines.some((l) => gpoRequirementChange(l, ctx.state)),
   });
   return {
-    can, draft: doc.status === S.DRAFT && can.edit, value: gpoValue(doc), flags, isMaker, superuser, username: user.username,
-    buttons: gpoActionButtons({ doc, can, isMaker, superuser, username: user.username, received, blocked: Boolean(checks?.blocking.length) }),
+    can, draft: doc.status === S.DRAFT && can.edit, value: gpoValue(doc), flags, superuser, userId: user.id,
+    buttons: gpoActionButtons({ doc, can, superuser, userId: user.id, issued, withVendor, blocked: Boolean(checks?.blocking.length) }),
   };
 }, [doc, ctx, checks]);
 

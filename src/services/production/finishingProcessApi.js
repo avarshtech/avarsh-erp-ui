@@ -1,7 +1,8 @@
 /**
  * Finishing › External Process — garments issued to a process vendor (washing,
  * printing, embroidery) against an approved Work Order and received back.
- * Real API (/api/v1/finishing); the rest of Finishing is still the design mock.
+ * Real API (/api/v1/finishing); the rest of Finishing is still the design mock. An in-house Work Order
+ * issues against an approved Garment Process PO (getProcessJobWorkPos); an outsourced one free text.
  */
 import axiosInstance from '../core/axiosInstance';
 
@@ -41,5 +42,11 @@ export const getProcessWorkOrders = async () => {
 
 export const getProcessVendors = async () => {
   const { data } = await axiosInstance.get(`${BASE}/process-lookups/vendors`);
+  return data || [];
+};
+
+/** The approved Garment Process POs an in-house Work Order may issue against, with what each line has left. */
+export const getProcessJobWorkPos = async (workOrderId) => {
+  const { data } = await axiosInstance.get(`${BASE}/process-lookups/job-work-pos`, { params: { workOrderId } });
   return data || [];
 };

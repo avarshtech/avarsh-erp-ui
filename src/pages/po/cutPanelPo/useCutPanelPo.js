@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { App } from 'antd';
 import { toastUnlessHandled } from '../../../utils/apiError';
 import { getCpp } from '../../../services/po/cutPanelPo/cutPanelPoService';
@@ -33,7 +33,13 @@ const useCutPanelPo = (id) => {
     return () => { alive = false; };
   }, [id, message]);
 
-  return { ...state, dispatch, loading };
+  /** Re-reads the saved PO in place — after an approval decision taken through the engine. */
+  const docId = state.doc?.id;
+  const reload = useCallback(() => (docId ? getCpp(docId)
+    .then((doc) => dispatch({ type: 'LOADED', doc }))
+    .catch((e) => toastUnlessHandled(message, e, 'Could not reload the Cut Panel PO')) : Promise.resolve()), [docId, message]);
+
+  return { ...state, dispatch, loading, reload };
 };
 
 export default useCutPanelPo;

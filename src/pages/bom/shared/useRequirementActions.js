@@ -4,7 +4,7 @@ import useRequirementRunner from './useRequirementRunner';
 
 /**
  * The lifecycle actions the Cut Panel and Garment Process requirements share (no
- * approval). `api` ({ save, submit, revise, close, remove }) must be a module-level
+ * approval). `api` ({ save, submit, revise, close, remove }, each taking the document for its version) must be a module-level
  * constant, since every callback depends on it. `onRevised` ends edit mode after a revision.
  */
 const useRequirementActions = ({ doc, dirty, dispatch, clearDirty, api, basePath, closedText, reload, onRevised }) => {
@@ -21,7 +21,7 @@ const useRequirementActions = ({ doc, dirty, dispatch, clearDirty, api, basePath
     const saved = alsoSubmit && doc.id && !dirty ? doc : await api.save(doc);
     let next = saved;
     try {
-      if (alsoSubmit) next = await api.submit(saved.id);
+      if (alsoSubmit) next = await api.submit(saved);
     } finally {
       dispatch({ type: 'SAVED', doc: next });
       clearDirty();
@@ -38,11 +38,11 @@ const useRequirementActions = ({ doc, dirty, dispatch, clearDirty, api, basePath
   }, 'Changes saved — the requirement stays submitted'), [doc, run, dispatch, clearDirty, api, reload, onRevised]);
 
   const close = useCallback((reason) => run('close', async () => {
-    dispatch({ type: 'SAVED', doc: await api.close(doc.id, reason) });
+    dispatch({ type: 'SAVED', doc: await api.close(doc, reason) });
   }, closedText), [doc, run, dispatch, api, closedText]);
 
   const remove = useCallback(() => run('delete', async () => {
-    await api.remove(doc.id);
+    await api.remove(doc);
     clearDirty();
     navigate(`${basePath}/list`);
   }, 'Draft deleted'), [doc, run, clearDirty, navigate, api, basePath]);

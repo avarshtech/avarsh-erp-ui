@@ -57,9 +57,8 @@ const CutPanelForm = () => {
 
   const editable = Boolean(doc) && can.edit && (isRequirementEditable(doc.status) || mode.editing);
   const masters = useRequirementMasters(CPR_PROCESS_CATEGORY, { enabled: editable && Boolean(order), withParts: true });
-  const bomVersion = doc?.bomVersion;
   const lines = doc?.lines;
-  const fabrics = useMemo(() => order?.approvedBoms.find((b) => b.version === bomVersion)?.fabrics || [], [order, bomVersion]);
+  const fabrics = useMemo(() => order?.fabrics || [], [order]);
   const totals = useMemo(() => cprTotals(lines || [], order?.sizes || []), [lines, order]);
 
   const { save, submit, saveChanges, remove } = actions;
@@ -93,12 +92,11 @@ const CutPanelForm = () => {
       <CprHeaderSection
         doc={doc} order={order} orders={orders} siblings={siblings} editable={editable}
         onSelectOrder={selectOrder}
-        onSelectBom={(bomVersion) => dispatch({ type: 'BOM_SELECTED', bomVersion })}
         onRecalculate={gridHandlers.onRecalcAll}
       />
       {editable && order && (
         <CprSelectionStrip
-          key={`${doc.orderId}-${doc.bomVersion}`}
+          key={doc.orderId}
           order={order} fabrics={fabrics} processes={masters.processes} parts={masters.parts} masters={masters}
           defaultAllowance={doc.orderAllowancePct} onAdd={addLines}
         />

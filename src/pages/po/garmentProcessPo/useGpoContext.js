@@ -36,7 +36,8 @@ const useGpoContext = (doc, jobWorkers) => {
     const eligibility = liveVendor
       ? vendorEligibility(liveVendor, { processId, processLabel, category: 'Garment', onDate: dayjs() })
       : ctx.eligibility;
-    return { ...ctx, eligibility, liveVendor };
+    // The server's own eligibility stays beside the live one: the approver's sign-off must echo its warnings
+    return { ...ctx, eligibility, serverEligibility: ctx.eligibility, liveVendor };
   }, [result, key, liveVendor, processId, processLabel]);
 };
 

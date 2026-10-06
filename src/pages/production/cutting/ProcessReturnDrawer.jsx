@@ -4,10 +4,14 @@ import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { saveProcessReturn } from '../../../services/production/cuttingService';
 
-/** FR-10 — Receive from Vendor: receive processed panels back; shortfalls need a reason. */
-const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
+/**
+ * FR-10 — Receive from Vendor: processed panels back, good or rejected — both close the line (D6) and an
+ * in-house issue posts them to its Cut Panel PO. Whatever is still short needs a reason.
+ */
+const ProcessReturnDrawer = ({ open, issues, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [panelIssueId, setPanelIssueId] = useState(null);
+  const [vendorDcNo, setVendorDcNo] = useState('');
   const [lines, setLines] = useState([]);
   const { options } = useCuttingMasters();
   const shortfallReasons = options('RETURN_SHORTFALL_REASON');
@@ -19,9 +23,9 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
   const handleIssueSelect = useCallback((id, list) => {
     setPanelIssueId(id);
     const src = list.find((i) => i.id === id);
-    setLines((src?.lines || []).map((l) => ({
-      panelIssueLineId: l.id, process: src.processName, panel: l.panel, size: l.size,
-      issuedQty: l.pendingQty ?? l.issueQty, returnQty: null, shortfallReason: null, remarks: '',
+    setLines((src?.lines || []).filter((l) => (l.pendingQty ?? l.issueQty) > 0).map((l) => ({
+      panelIssueLineId: l.id, color: l.color, panel: l.panel, size: l.size,
+      issuedQty: l.pendingQty ?? l.issueQty, returnQty: null, rejectedQty: null, shortfallReason: null, remarks: '',
     })));
   }, []);
 
@@ -29,70 +33,69 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
     setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: val } : l)));
   }, []);
 
+  const shortOf = (r) => r.issuedQty - (r.returnQty || 0) - (r.rejectedQty || 0);
+  const entered = (r) => r.returnQty != null || r.rejectedQty != null;
+
   const columns = useMemo(() => [
+    ...(issue?.jobWorkPoId ? [{ title: 'Colour', dataIndex: 'color', width: 100, ellipsis: true }] : []),
     { title: 'Panel', dataIndex: 'panel', width: 100 },
     { title: 'Size', dataIndex: 'size', width: 70, align: 'center' },
-    { title: 'Issued', dataIndex: 'issuedQty', width: 80, align: 'right' },
+    { title: 'With Vendor', dataIndex: 'issuedQty', width: 95, align: 'right' },
     {
-      title: 'Return Qty', dataIndex: 'returnQty', width: 110, align: 'center',
+      title: 'Good', dataIndex: 'returnQty', width: 100, align: 'center',
       render: (v, r, idx) => (
-        <InputNumber size="small" min={0} max={r.issuedQty} value={v} style={{ width: 90 }}
+        <InputNumber name={`good-${r.panelIssueLineId}`} size="small" min={0} max={r.issuedQty - (r.rejectedQty || 0)} value={v} style={{ width: 85 }}
           onChange={(val) => setLine(idx, 'returnQty', val)} />
       ),
     },
     {
-      title: 'Difference', key: 'diff', width: 100, align: 'center',
-      render: (_, r) => {
-        const diff = r.issuedQty - (r.returnQty || 0);
-        return <span style={{ color: diff > 0 ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>{diff}</span>;
-      },
+      title: 'Rejected', dataIndex: 'rejectedQty', width: 100, align: 'center',
+      render: (v, r, idx) => (
+        <InputNumber name={`rejected-${r.panelIssueLineId}`} size="small" min={0} max={r.issuedQty - (r.returnQty || 0)} value={v} style={{ width: 85 }}
+          onChange={(val) => setLine(idx, 'rejectedQty', val)} />
+      ),
     },
     {
-      title: 'Shortfall Reason', dataIndex: 'shortfallReason', width: 190,
-      render: (v, r, idx) => {
-        const diff = r.issuedQty - (r.returnQty || 0);
-        if (diff <= 0 || r.returnQty == null) return null;
-        return (
-          <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Why short?"
-            options={shortfallReasons} onChange={(val) => setLine(idx, 'shortfallReason', val)} />
-        );
-      },
+      title: 'Still Short', key: 'diff', width: 95, align: 'center',
+      render: (_, r) => <span style={{ color: shortOf(r) > 0 ? 'var(--error-color)' : 'var(--success-color)', fontWeight: 600 }}>{shortOf(r)}</span>,
     },
     {
-      title: 'Remarks', dataIndex: 'remarks', width: 170,
-      render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setLine(idx, 'remarks', e.target.value)} />,
+      title: 'Shortfall Reason', dataIndex: 'shortfallReason', width: 180,
+      render: (v, r, idx) => (shortOf(r) > 0 && entered(r) ? (
+        <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Why short?"
+          options={shortfallReasons} onChange={(val) => setLine(idx, 'shortfallReason', val)} />
+      ) : null),
     },
-  ], [setLine, shortfallReasons]);
+    {
+      title: 'Remarks', dataIndex: 'remarks', width: 160,
+      render: (v, r, idx) => <Input name={`remarks-${r.panelIssueLineId}`} size="small" value={v} onChange={(e) => setLine(idx, 'remarks', e.target.value)} />,
+    },
+  ], [issue, setLine, shortfallReasons]);
 
-  const totalReturn = lines.reduce((s, l) => s + (l.returnQty || 0), 0);
+  const totalReturn = lines.reduce((s, l) => s + (l.returnQty || 0) + (l.rejectedQty || 0), 0);
 
   const handleSave = async () => {
     if (!issue) return message.warning('Select the panel issue being returned');
-    const entered = lines.filter((l) => l.returnQty != null);
-    if (!entered.length) return message.warning('Enter the returned quantity for at least one panel');
-    const missingReason = entered.some((l) => l.issuedQty - l.returnQty > 0 && !l.shortfallReason);
-    if (missingReason) return message.error('Every shortfall needs a reason (Lost / Damaged / Retained / Pending)');
+    const rows = lines.filter(entered);
+    if (!rows.length) return message.warning('Enter the good or rejected quantity for at least one panel');
+    if (rows.some((l) => shortOf(l) > 0 && !l.shortfallReason)) return message.error('Every shortfall needs a reason (Lost / Damaged / Retained / Pending)');
     setSaving(true);
     try {
       const saved = await saveProcessReturn({
-        panelIssueId, returnDate: new Date().toISOString().slice(0, 10),
-        lines: entered.map((l) => ({ ...l, returnQty: l.returnQty || 0 })),
+        panelIssueId, returnDate: new Date().toISOString().slice(0, 10), vendorDcNo: vendorDcNo.trim() || null,
+        lines: rows.map((l) => ({ ...l, returnQty: l.returnQty || 0, rejectedQty: l.rejectedQty || 0 })),
       });
       message.success(`${saved.returnDcNo} saved — returned panels go to Panel Check before bundling`);
-      setLines([]); setPanelIssueId(null);
+      setLines([]); setPanelIssueId(null); setVendorDcNo('');
       onSaved();
-    } catch (e) {
-      message.error(e?.response?.data?.message || 'Failed to save return DC');
+    } catch {
+      // the API's own message has been shown
     } finally { setSaving(false); }
   };
 
   return (
     <Drawer
-      title="Receive from Vendor"
-      size={720}
-      open={open}
-      onClose={onClose}
-      destroyOnHidden
+      title="Receive from Vendor" size={820} open={open} onClose={onClose} destroyOnHidden
       footer={(
         <Space style={{ float: 'right' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Returning: <strong>{totalReturn}</strong> pcs</span>
@@ -101,16 +104,23 @@ const ProcessReturnDrawer = ({ open, issues, cutPos, onClose, onSaved }) => {
         </Space>
       )}
     >
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Panel Issue with pending returns</div>
-        <FormSelect value={panelIssueId} style={{ width: 360 }} placeholder="Select panel issue"
-          options={openIssues.map((i) => ({
-            value: i.id,
-            label: `${i.panelPoNo} · ${i.process} · ${cutPos.find((p) => p.id === i.cutPoId)?.cutPoNo || ''}`,
-          }))}
-          onChange={(id) => handleIssueSelect(id, issues)} />
-      </div>
-      <Table rowKey={(r) => lines.indexOf(r)} size="small" columns={columns} dataSource={lines} pagination={false} scroll={{ x: 800 }}
+      <Space size="middle" wrap align="end" style={{ marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Panel Issue with pending returns</div>
+          <FormSelect value={panelIssueId} style={{ width: 360 }} placeholder="Select panel issue" aria-label="Panel issue"
+            options={openIssues.map((i) => ({
+              value: i.id,
+              label: [i.panelPoNo, i.processName, i.cuttingPoNo, i.jobWorkPoNo].filter(Boolean).join(' · '),
+            }))}
+            onChange={(id) => handleIssueSelect(id, issues)} />
+        </div>
+        <div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Vendor DC No.</div>
+          <Input name="vendorDcNo" aria-label="Vendor DC No." style={{ width: 180 }} maxLength={50} value={vendorDcNo}
+            onChange={(e) => setVendorDcNo(e.target.value)} placeholder="The vendor's challan" />
+        </div>
+      </Space>
+      <Table rowKey="panelIssueLineId" size="small" columns={columns} dataSource={lines} pagination={false} scroll={{ x: 900 }}
         locale={{ emptyText: 'Partial receipts allowed — multiple vendor receipts can be raised against one issue' }} />
     </Drawer>
   );

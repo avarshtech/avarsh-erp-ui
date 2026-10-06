@@ -1,110 +1,69 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Drawer, Button, Space, Table, InputNumber } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useEffect, useState } from 'react';
+import { App, Drawer, Button, Space, Tag } from 'antd';
 import { FormSelect } from '../../../components/form';
 import useModuleSelection from '../../../hooks/useModuleSelection';
-import { getActiveParts } from '../../../services/master/partsService';
-import { getActiveProcesses } from '../../../services/master/processService';
 import { savePanelIssue } from '../../../services/production/cuttingService';
+import PanelIssueFromPo from './PanelIssueFromPo';
+import PanelIssueFreeText from './PanelIssueFreeText';
 
-/** FR-08 — send cut panels out for printing / embroidery / washing with a DC. */
+const EMPTY_PO = { jobWorkPoId: null, processId: null, qty: {} };
+const EMPTY_FREE = { processId: null, lines: [] };
+
+/**
+ * FR-08 — send cut panels out for printing / embroidery / washing with a DC. An in-house Cut PO issues against
+ * an approved Cut Panel PO for its order, which fixes the process, job worker and dates (D4); an outsourced one
+ * keeps the free-text issue.
+ */
 const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
   const { message } = App.useApp();
   const { selectCutPo, defaultCutPoId } = useModuleSelection('cutting');
   const [cutPoId, setCutPoId] = useState(null);
-  const [processId, setProcessId] = useState(null);
-  const [lines, setLines] = useState([]);
+  const [fromPo, setFromPo] = useState(EMPTY_PO);
+  const [free, setFree] = useState(EMPTY_FREE);
   const [saving, setSaving] = useState(false);
-
-  // Panels are the shared parts master; processes are the shared process master.
-  const [parts, setParts] = useState([]);
-  const [processes, setProcesses] = useState([]);
-  useEffect(() => { if (open) setCutPoId(defaultCutPoId(cutPos)); }, [open, cutPos, defaultCutPoId]);
-
+  // Every opening starts clean: a PO picked or quantities typed before a Cancel are not carried over
   useEffect(() => {
     if (!open) return;
-    getActiveParts().then(setParts).catch(() => setParts([]));
-    // Only the 'Cut Panel' category — the process master also holds Garment processes
-    // (washing, dyeing on sewn garments) that never apply to cut panels.
-    getActiveProcesses('Cut Panel').then(setProcesses).catch(() => setProcesses([]));
-  }, [open]);
-  const partOptions = useMemo(() => parts.map((p) => ({ value: p.partName, label: p.partName })), [parts]);
-  const processOptions = useMemo(
-    () => processes.map((p) => ({ value: p.id, label: p.processName })), [processes],
-  );
+    setCutPoId(defaultCutPoId(cutPos));
+    setFromPo(EMPTY_PO);
+    setFree(EMPTY_FREE);
+  }, [open, cutPos, defaultCutPoId]);
 
-  const po = useMemo(() => cutPos.find((p) => p.id === cutPoId), [cutPos, cutPoId]);
+  const po = cutPos.find((p) => p.id === cutPoId);
+  const inHouse = po?.processingUnitType === 'UNIT';
+  const total = inHouse
+    ? Object.values(fromPo.qty).reduce((s, q) => s + (q || 0), 0)
+    : free.lines.reduce((s, l) => s + (l.issueQty || 0), 0);
 
-  const setLine = useCallback((idx, field, val) => {
-    setLines((prev) => prev.map((l, i) => {
-      if (i !== idx) return l;
-      const next = { ...l, [field]: val };
-      if (field === 'size' && po) next.orderQty = po.sizeQty[val] || 0;
-      return next;
-    }));
-  }, [po]);
-
-  const columns = useMemo(() => [
-    {
-      title: 'Panel', dataIndex: 'panel', width: 130,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 115 }} placeholder="Panel"
-          options={partOptions} onChange={(val) => setLine(idx, 'panel', val)} />
-      ),
-    },
-    {
-      title: 'Size', dataIndex: 'size', width: 100,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 84 }} placeholder="Size"
-          options={(po?.sizes || []).map((s) => ({ value: s, label: s }))} onChange={(val) => setLine(idx, 'size', val)} />
-      ),
-    },
-    { title: 'Ord Qty', dataIndex: 'orderQty', width: 90, align: 'right', render: (v) => v ?? '—' },
-    {
-      title: 'Issue Qty', dataIndex: 'issueQty', width: 110, align: 'center',
-      render: (v, r, idx) => (
-        <InputNumber size="small" min={0} max={r.orderQty || undefined} value={v} style={{ width: 90 }}
-          status={v > (r.orderQty || Infinity) ? 'error' : undefined} onChange={(val) => setLine(idx, 'issueQty', val)} />
-      ),
-    },
-    {
-      title: '', key: 'del', width: 46, align: 'center',
-      render: (_, __, idx) => (
-        <Button size="small" type="text" danger icon={<DeleteOutlined />}
-          onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))} />
-      ),
-    },
-  ], [po, setLine, partOptions]);
-
-  const total = lines.reduce((s, l) => s + (l.issueQty || 0), 0);
+  const body = () => {
+    if (inHouse) {
+      const lines = Object.entries(fromPo.qty).filter(([, q]) => q > 0).map(([id, q]) => ({ jobWorkPoLineId: Number(id), issueQty: q }));
+      if (!fromPo.jobWorkPoId) return 'Pick the approved Cut Panel PO these panels go out against';
+      return lines.length ? { jobWorkPoId: fromPo.jobWorkPoId, processId: fromPo.processId, lines } : 'Enter the quantity to send on at least one line';
+    }
+    const lines = free.lines.filter((l) => l.panel && l.size && l.issueQty > 0);
+    if (!free.processId) return 'Select the external process';
+    return lines.length ? { processId: free.processId, lines } : 'Add at least one panel line with quantity';
+  };
 
   const handleSave = async () => {
-    if (!cutPoId || !processId) return message.warning('Select the Cut PO and the external process');
-    const valid = lines.filter((l) => l.panel && l.size && l.issueQty > 0);
-    if (!valid.length) return message.warning('Add at least one panel line with quantity');
+    if (!cutPoId) return message.warning('Select the Cut PO');
+    const ready = body();
+    if (typeof ready === 'string') return message.warning(ready);
     setSaving(true);
     try {
-      const saved = await savePanelIssue({
-        cuttingPoId: cutPoId,
-        processId,
-        issueDate: new Date().toISOString().slice(0, 10),
-        lines: valid,
-      });
+      const saved = await savePanelIssue({ cuttingPoId: cutPoId, issueDate: new Date().toISOString().slice(0, 10), ...ready });
       message.success(`${saved.panelPoNo} issued to ${saved.processName} — DC ready to print`);
-      setLines([]); setProcessId(null);
+      setFromPo(EMPTY_PO); setFree(EMPTY_FREE);
       onSaved();
-    } catch (e) {
-      message.error(e?.response?.data?.message || 'Failed to issue panels');
+    } catch {
+      // the API's own message has been shown
     } finally { setSaving(false); }
   };
 
   return (
     <Drawer
-      title="Issue Cut Panels to External Process"
-      size={620}
-      open={open}
-      onClose={onClose}
-      destroyOnHidden
+      title="Issue Cut Panels to External Process" size={inHouse ? 860 : 620} open={open} onClose={onClose} destroyOnHidden
       footer={(
         <Space style={{ float: 'right' }}>
           <span style={{ color: 'var(--text-secondary)' }}>Total: <strong>{total}</strong> pcs</span>
@@ -114,22 +73,18 @@ const PanelIssueDrawer = ({ open, cutPos, onClose, onSaved }) => {
       )}
     >
       <Space size="middle" wrap style={{ marginBottom: 16 }}>
-        <FormSelect value={cutPoId} style={{ width: 230 }} placeholder="Cut PO"
+        <FormSelect value={cutPoId} style={{ width: 230 }} placeholder="Cut PO" aria-label="Cut PO"
           options={cutPos.map((p) => ({ value: p.id, label: `${p.cutPoNo} · ${p.styleNo}` }))}
           onChange={(v) => {
             selectCutPo(cutPos.find((p) => p.id === v));
             setCutPoId(v);
-            setLines([]);
+            setFromPo(EMPTY_PO); setFree(EMPTY_FREE);
           }} />
-        <FormSelect value={processId} style={{ width: 190 }} placeholder="Process"
-          options={processOptions} onChange={setProcessId} />
-        <Button icon={<PlusOutlined />} size="small" disabled={!cutPoId}
-          onClick={() => setLines((prev) => [...prev, { panel: null, size: null, orderQty: null, issueQty: null }])}>
-          Add Panel
-        </Button>
+        {po && <Tag color={inHouse ? 'blue' : 'orange'}>{inHouse ? 'In-house — against a Cut Panel PO' : 'Outsourced unit'}</Tag>}
       </Space>
-      <Table rowKey={(r) => lines.indexOf(r)} size="small" columns={columns} dataSource={lines} pagination={false}
-        locale={{ emptyText: 'Issued panels are excluded from bundling until they return and pass the panel check' }} />
+      {po && (inHouse
+        ? <PanelIssueFromPo key={po.id} cutPo={po} value={fromPo} onChange={setFromPo} />
+        : <PanelIssueFreeText key={po.id} po={po} value={free} onChange={setFree} />)}
     </Drawer>
   );
 };

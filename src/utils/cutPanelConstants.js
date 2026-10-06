@@ -5,7 +5,6 @@
  * changes it in place until a PO against it is placed, Close ends it.
  */
 export const CPR_MODULE_ID = 'cut-panel';
-export const CPR_PREFIX = 'CPR';
 export const CPR_PROCESS_CATEGORY = 'Cut Panel';
 export const OTHER_PROCESS_NAME = 'Other';
 export const NO_PROCESS_LABEL = 'No cut-panel process';

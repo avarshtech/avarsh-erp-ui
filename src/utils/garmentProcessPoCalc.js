@@ -19,9 +19,6 @@ const dp = (v, places) => Math.abs(Math.round(Number(v) * 10 ** places) - Number
 /** Requirements a PO may draw on (§9, deviation D13): released and not closed. */
 export const GPO_VISIBLE = [R.SUBMITTED, R.PARTIALLY_USED, R.FULLY_USED];
 
-/** The single approval level of a Garment Process PO (§5: the Purchase Manager approves). */
-export const GPO_LEVELS = ['Purchase Manager'];
-
 export const gpoLineLabel = (l) => `${l.gprNo} ${l.color} ${l.size}`;
 
 /** A PO line's requirement cell as it stands now (`state` from gpoRequirementState). */

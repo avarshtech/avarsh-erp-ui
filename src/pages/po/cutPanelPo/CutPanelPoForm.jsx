@@ -46,8 +46,8 @@ const AMENDABLE = new Set(REVISION_FIELDS);
 
 /**
  * Cut Panel PO — one scrolling screen, six numbered sections and a sticky action bar
- * (PRD §18.1); no wizard. UI mock phase: the PO, its ledger and the requirements are the
- * localStorage mock; vendors, processes, payment terms, branches and units are the real API.
+ * (PRD §18.1); no wizard. Everything is the API: the PO, its ledger and approval (the approval engine), the
+ * requirements, vendors, processes, payment terms, branches and units.
  */
 const CutPanelPoForm = () => {
   const { id } = useParams();
@@ -107,12 +107,12 @@ const CutPanelPoForm = () => {
         can={{ delivery: view.edit.delivery, terms: view.edit.terms, notes: view.edit.notes, commercial: view.edit.commercial }}
         onCommercial={(p) => dispatch({ type: 'COMMERCIAL', patch: p })} />
       <CppAdvisories doc={working} advisories={checks?.advisories.filter((a) => a.code !== 'RATE_VARIANCE' || !a.resolved)} editable={view.edit.draft || view.edit.commercial} onPatch={patch} />
-      {(doc.status !== 'DRAFT' || doc.overrides.length > 0) && (
+      {(doc.status !== 'DRAFT' || doc.overrides.length > 0 || doc.revisionNo > 0) && (
         <JobWorkApprovalPanel
-          levels={doc.pendingRevision?.levelNames || doc.levelNames} approvals={doc.pendingRevision?.approvals || doc.approvals}
+          entityType="CUT_PANEL_PO" doc={doc} docLabel="Cut Panel PO" onDecided={po.reload}
           overrides={doc.overrides} busy={runner.busy === 'authorise'} onAuthorise={draft.authorise}
           lineLabel={(k) => { const l = doc.lines.find((x) => x.key === k); return l ? `${l.cprNo} ${l.colorName} ${l.size}` : k; }}
-          canAuthorise={(o) => o.status === 'REQUESTED' && doc.status === 'DRAFT' && view.can.override && (o.requestedByUser !== view.username || view.superuser)}
+          canAuthorise={(o) => o.status === 'REQUESTED' && doc.status === 'DRAFT' && view.can.override && (String(o.requestedById) !== String(view.userId) || view.superuser)}
         />
       )}
       <CppRevisionHistory revisions={doc.revisions} pending={doc.pendingRevision && { ...doc.pendingRevision, changes: revisionChanges(doc, po.rev || doc.pendingRevision) }} />

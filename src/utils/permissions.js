@@ -204,7 +204,7 @@ export const SCREENS = [
       override: 'Submit above order qty · Approve PO excess',
       approve: 'Approve / send PO',
       reject: 'Reject PO (back to draft)',
-      refer_back: 'Refer back (not used yet)',
+      refer_back: 'Send back PO',
       cancel: 'Close requirement · Cancel / short close PO',
     },
     description: 'Processes (washing, dyeing…) needed on sewn garments, and the Garment Process POs that give them to job workers.' },

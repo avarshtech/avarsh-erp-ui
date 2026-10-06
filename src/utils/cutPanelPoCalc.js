@@ -61,22 +61,6 @@ export const requirementChange = (line, state) => {
 export const coveringOverride = (doc, line, excess) => (doc.overrides || []).find((o) => o.type === 'OVER_ALLOCATION'
   && o.lineKey === line.key && o.status === 'AUTHORISED' && Number(o.excessQty) >= excess);
 
-/**
- * Approval levels (PRD §16.2, OP-6): up to ₹50,000 one level; ₹50,001–₹2,00,000 two;
- * above two (GM Operations, Director); plus one for an over-allocation, zero-rate or
- * duplicate-PO override. Role per level comes with the approval engine (deviation D22).
- */
-export const approvalLevels = (doc) => {
-  const { total } = cppValue(doc);
-  const base = total <= 50000
-    ? ['Merchandising Head']
-    : total <= 200000 ? ['Merchandising Head', 'GM Operations'] : ['GM Operations', 'Director'];
-  const extra = (doc.overrides || []).some((o) => o.type === 'OVER_ALLOCATION' && o.status === 'AUTHORISED')
-    || doc.lines.some((l) => Number(l.poQty) > 0 && hasValue(l.rate) && Number(l.rate) === 0)
-    || Boolean(doc.duplicateReason);
-  return extra ? [...base, 'Additional level (override)'] : base;
-};
-
 export const cppValue = (doc) => poValue({
   lines: doc.lines.filter((l) => Number(l.poQty) > 0), otherCharges: doc.otherCharges,
   gstRatePercent: doc.process?.gstRatePercent, igst: Boolean(doc.vendor?.igstApplicable),

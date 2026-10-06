@@ -38,10 +38,12 @@ const ExternalProcessTab = () => {
     { title: 'Panel PO #', dataIndex: 'panelPoNo', width: 160, render: (v) => <code>{v}</code> },
     { title: 'Process', dataIndex: 'processName', width: 140, render: (v) => <Tag color="geekblue">{v}</Tag> },
     { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 150 },
+    { title: 'Cut Panel PO', dataIndex: 'jobWorkPoNo', width: 150, render: (v) => v || '—' },
+    { title: 'Vendor', dataIndex: 'vendorName', width: 160, ellipsis: true, render: (v) => v || '—' },
     { title: 'Date', dataIndex: 'issueDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY') },
     {
-      title: 'Panels', dataIndex: 'lines', width: 240,
-      render: (lines) => lines.map((l, i) => <Tag key={i}>{l.panel} {l.size} × {l.issueQty}</Tag>),
+      title: 'Panels', dataIndex: 'lines', width: 260,
+      render: (lines) => lines.map((l) => <Tag key={l.id}>{[l.color, l.panel, l.size].filter(Boolean).join(' ')} × {l.issueQty}</Tag>),
     },
     { title: 'Issued Qty', dataIndex: 'totalIssuedQty', width: 100, align: 'center', render: (v) => <strong>{v}</strong> },
     { title: 'Pending', dataIndex: 'totalPendingQty', width: 100, align: 'center', render: (v) => (v > 0 ? <strong style={{ color: 'var(--warning-color)' }}>{v}</strong> : 0) },
@@ -73,6 +75,8 @@ const ExternalProcessTab = () => {
       title: 'Returned', key: 'ret', width: 100, align: 'center',
       render: (_, r) => <strong>{r.totalReturnQty}</strong>,
     },
+    { title: 'Rejected', dataIndex: 'totalRejectedQty', width: 90, align: 'center', render: (v) => (v > 0 ? <span style={{ color: 'var(--error-color)' }}>{v}</span> : 0) },
+    { title: 'Vendor DC', dataIndex: 'vendorDcNo', width: 130, render: (v) => v || '—' },
     {
       title: 'Outstanding', key: 'diff', width: 110, align: 'center',
       render: (_, r) => {
@@ -105,7 +109,7 @@ const ExternalProcessTab = () => {
         locale={{ emptyText: <EmptyState title={active.empty} description="Panels must be checked (FR-09) before they re-enter bundling" /> }} />
       <PanelIssueDrawer open={issueOpen} cutPos={cutPos}
         onClose={() => setIssueOpen(false)} onSaved={() => { setIssueOpen(false); load(); }} />
-      <ProcessReturnDrawer open={returnOpen} issues={issues} cutPos={cutPos}
+      <ProcessReturnDrawer open={returnOpen} issues={issues}
         onClose={() => setReturnOpen(false)} onSaved={() => { setReturnOpen(false); load(); }} />
     </Card>
   );
