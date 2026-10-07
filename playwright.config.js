@@ -30,6 +30,12 @@ export default defineConfig({
       testMatch: /global-setup\.js/,
     },
 
+    // ── Unit (Node only: pure calculators, no browser, no login) ──
+    {
+      name: 'unit',
+      testDir: './e2e/unit',
+    },
+
     // ── Legacy (existing costing tests) ────────────────────
     {
       name: 'legacy',
