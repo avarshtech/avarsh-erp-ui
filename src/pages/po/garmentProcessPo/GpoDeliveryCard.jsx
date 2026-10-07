@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Card } from 'antd';
+import { CarOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import JobWorkDeliveryFields from '../jobWork/JobWorkDeliveryFields';
 import { GPO_RETURN_TO } from '../../../utils/jobWorkConstants';
 import { deliveryDateNote } from '../../../utils/jobWorkDelivery';
@@ -12,13 +13,13 @@ import { deliveryDateNote } from '../../../utils/jobWorkDelivery';
  */
 const GpoDeliveryCard = memo(function GpoDeliveryCard({ doc, editable, units, onPatch }) {
   return (
-    <Card id="gpo-delivery" size="small" title="Delivery Instructions" style={{ height: '100%' }}>
+    <DetailCard id="gpo-delivery" bare icon={<CarOutlined />} title="Delivery Instructions" style={{ height: '100%' }}>
       <JobWorkDeliveryFields
         value={doc} dateKey="expectedReturnDate" idPrefix="gpo" returnToOptions={GPO_RETURN_TO} units={units}
         editable={{ place: editable, date: editable, instructions: editable }} onChange={onPatch} minDate={doc.poDate}
         dateNote={deliveryDateNote(doc.expectedReturnDate, { notBefore: doc.poDate, warnAfter: doc.requiredDate })}
       />
-    </Card>
+    </DetailCard>
   );
 });
 

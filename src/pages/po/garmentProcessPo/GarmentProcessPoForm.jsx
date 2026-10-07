@@ -1,21 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Button, Card, Result, Skeleton } from 'antd';
-import { HistoryOutlined, PrinterOutlined } from '@ant-design/icons';
+import { Button, Result, Skeleton } from 'antd';
+import { FileSearchOutlined, HistoryOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import PageHeader from '../../../components/PageHeader';
-import StatusTag from '../../../components/StatusTag';
+import DetailCard from '../../../components/DetailCard';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useActionRunner from '../../../hooks/useActionRunner';
 import useEditParam from '../../../hooks/useEditParam';
 import { useBranch } from '../../../context/BranchContext';
-import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { validateGpo, requirementCards, gpoLineLabel } from '../../../utils/garmentProcessPoCalc';
 import { refetchGpoLines } from '../../../utils/jobWorkRefetch';
 import { getGpoAudit } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 import JobWorkStatusBanner from '../jobWork/JobWorkStatusBanner';
+import JobWorkPoHero from '../jobWork/JobWorkPoHero';
 import JobWorkApprovalPanel from '../jobWork/JobWorkApprovalPanel';
 import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
 import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
@@ -43,7 +41,7 @@ import GpoAmendDialog from './GpoAmendDialog';
 const LIST = `${JOB_WORK_PO_PATH.GPO}/list`;
 
 /**
- * Garment Process PO — one scrolling screen, titled sections and a sticky action
+ * Garment Process PO — one scrolling screen in the Supplier PO view's look (a hero, titled sections) and a sticky action
  * bar (PRD §19). Everything is the API: the PO, its ledger and approval (the approval engine, with the
  * vendor sign-off), the requirements, vendors, processes, payment terms, branches and units.
  */
@@ -83,24 +81,23 @@ const GarmentProcessPoForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader
-        title={doc.poNo ? `Garment Process PO ${doc.poNo}` : 'New Garment Process PO'} backPath={LIST} subtitle={<GpoTraceLine doc={doc} />}
-        status={<StatusTag status={doc.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />}
-      >
-        {doc.id && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <JobWorkPoHero
+        doc={doc} typeLabel="Garment Process PO" total={view.value.total} totalLabel="Grand total" dueDate={doc.expectedReturnDate}
+        subtitle={<GpoTraceLine doc={doc} />} onBack={() => navigate(LIST)}
+        actions={doc.id && (
+          <>
             {doc.status !== 'DRAFT' && <Button icon={<PrinterOutlined />} loading={h.printing} onClick={h.print}>Print</Button>}
             <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>
-          </div>
+          </>
         )}
-      </PageHeader>
+      />
       <JobWorkStatusBanner doc={doc} flags={view.flags} refetch={refetch} />
       <GpoHeaderSection doc={doc} editable={view.draft} masters={masters} eligibility={ctx?.eligibility} onPatch={patch} onVendor={h.pickVendor} />
       {view.draft && (
-        <Card id="gpo-selection" size="small" title="Select Garment Process Requirement" style={{ marginBottom: 16 }}
+        <DetailCard id="gpo-selection" bare icon={<FileSearchOutlined />} title="Select Garment Process Requirement" style={{ marginBottom: 16 }}
           extra={<span style={{ fontSize: 12, opacity: 0.65 }}>Only submitted requirements with balance are selectable</span>}>
           <GpoRequirementPicker lines={doc.lines} refresh={`${doc.version}|${doc.lines.length}`} adding={lines.adding} onAdd={lines.addCells} />
-        </Card>
+        </DetailCard>
       )}
       <GpoRequirementCards cards={cards} orders={ctx?.orders} onOpenGpr={(gprId) => navigate(`/bom/garment-process/${gprId}`)} />
       <GpoLinesSection doc={doc} ctx={ctx} editable={view.draft} canRequest={view.draft} selectedKeys={po.selectedKeys} h={lines.grid} />

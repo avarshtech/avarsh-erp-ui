@@ -1,5 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Card, Empty, Table, Typography } from 'antd';
+import { Empty, Table, Typography } from 'antd';
+import { TableOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import JobWorkBulkFillBar from '../jobWork/JobWorkBulkFillBar';
 import { BULK_MODE } from '../../../utils/jobWorkBulkFill';
 import { gpoLineColumns } from './gpoLineColumns';
@@ -39,13 +41,13 @@ const GpoLinesSection = memo(function GpoLinesSection({ doc, ctx, editable, canR
   const offset = ticking ? 1 : 0; // the selection column
   const scroll = gridScroll('max-content', doc.lines.length);
   return (
-    <Card id="gpo-lines" size="small" title="PO Line Items" style={{ marginBottom: 16 }}
+    <DetailCard id="gpo-lines" bare icon={<TableOutlined />} title="PO Line Items" count={doc.lines.length || null} style={{ marginBottom: 16 }}
       extra={editable && doc.lines.length > 0
         ? <JobWorkBulkFillBar lines={doc.lines} selectedKeys={selectedKeys} colourKey="color" precision={4} rateOf={rateOf} onApply={h.onLines} mode={fillMode} onMode={onFillMode} />
         : <Text type="secondary" style={{ fontSize: 12 }}>Tinted columns come from the requirement (locked)</Text>}>
       {doc.lines.length ? (
         <Table
-          size="small" rowKey="key" pagination={false} dataSource={doc.lines} columns={columns} scroll={scroll}
+          size="small" rowKey="key" pagination={false} dataSource={doc.lines} columns={columns} scroll={scroll} className="table-nowrap"
           rowSelection={ticking ? {
             selectedRowKeys: selectedKeys, onChange: h.onSelectRows,
             getCheckboxProps: (l) => ({ name: `select-${l.key}`, 'aria-label': `Select ${l.gprNo} ${l.color} ${l.size}` }),
@@ -69,7 +71,7 @@ const GpoLinesSection = memo(function GpoLinesSection({ doc, ctx, editable, canR
           Tinted columns come from the requirement (locked). Different processes stay on separate lines. Amount = PO Qty × Rate.
         </Text>
       )}
-    </Card>
+    </DetailCard>
   );
 });
 

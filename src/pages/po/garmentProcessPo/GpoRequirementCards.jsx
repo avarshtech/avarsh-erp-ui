@@ -1,6 +1,7 @@
 import { memo } from 'react';
-import { Card, Col, Progress, Row, Space, Tag, Typography } from 'antd';
-import { LockOutlined } from '@ant-design/icons';
+import { Col, Progress, Row, Space, Tag, Typography } from 'antd';
+import { LockOutlined, ProfileOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import RecordLink from '../../../components/RecordLink';
 import FactSheet from '../../../components/FactSheet';
 import { formatDate } from '../../../utils/formatters';
@@ -18,14 +19,14 @@ const pct = (v, of) => (of > 0 ? Math.max(0, Math.min(100, (v / of) * 100)) : 0)
 const GpoRequirementCards = memo(function GpoRequirementCards({ cards, orders, onOpenGpr }) {
   if (!cards.length) return null;
   return (
-    <Card id="gpo-requirements" size="small" style={{ marginBottom: 16 }}
+    <DetailCard id="gpo-requirements" bare icon={<ProfileOutlined />} count={cards.length} style={{ marginBottom: 16 }}
       title={<Space>Process Requirement Details<Tag icon={<LockOutlined />}>Read-only · from requirement</Tag></Space>}
       extra={<Text type="secondary" style={{ fontSize: 12 }}>To change, edit the Garment Process Requirement</Text>}>
       <Row gutter={[12, 12]}>
         {cards.map((c) => (
           // Full width up to xxl: in a half-width card the four figure tiles would wrap
           <Col key={c.key} xs={24} xxl={cards.length > 1 ? 12 : 24}>
-            <Card size="small" type="inner"
+            <DetailCard bare
               title={<Space><RecordLink text={c.gprNo} onClick={() => onOpenGpr(c.gprId)} /><Tag>Seq {c.seqNo} · {c.processLabel}</Tag></Space>}
               extra={<Text type="secondary" style={{ fontSize: 12 }}>Required by {formatDate(orders?.[c.orderId]?.deliveryDate)}</Text>}>
               <FactSheet
@@ -47,11 +48,11 @@ const GpoRequirementCards = memo(function GpoRequirementCards({ cards, orders, o
                 { label: 'This PO', value: n(c.thisPo), accent: true },
                 { label: 'Balance after', value: n(c.balanceAfter), danger: c.balanceAfter < 0 },
               ]} />
-            </Card>
+            </DetailCard>
           </Col>
         ))}
       </Row>
-    </Card>
+    </DetailCard>
   );
 });
 

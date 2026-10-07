@@ -1,5 +1,7 @@
 import { memo } from 'react';
-import { Card, Col, Row, Typography } from 'antd';
+import { Col, Row, Typography } from 'antd';
+import { CalculatorOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import GpoDeliveryCard from './GpoDeliveryCard';
 import JobWorkValueSummary from '../jobWork/JobWorkValueSummary';
 
@@ -17,10 +19,10 @@ const GpoBottomRow = memo(function GpoBottomRow({ doc, value, units, editable, o
     <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
       <Col xs={24} lg={14}><GpoDeliveryCard doc={doc} editable={editable.delivery} units={units} onPatch={onPatch} /></Col>
       <Col xs={24} lg={10}>
-        <Card id="gpo-commercial" size="small" title="Commercial Summary" extra={<Text type="secondary" style={{ fontSize: 12 }}>GST from the vendor&apos;s state</Text>} style={{ height: '100%' }}>
+        <DetailCard id="gpo-commercial" bare icon={<CalculatorOutlined />} title="Commercial Summary" extra={<Text type="secondary" style={{ fontSize: 12 }}>GST from the vendor&apos;s state</Text>} style={{ height: '100%' }}>
           <JobWorkValueSummary value={value} qty={qty} sacCode={doc.process?.sacCode} commercial={doc} editable={editable.commercial}
             onChange={onPatch} labels={LABELS} rounding={false} />
-        </Card>
+        </DetailCard>
       </Col>
     </Row>
   );
