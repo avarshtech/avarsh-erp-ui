@@ -1,12 +1,12 @@
 import { memo } from 'react';
-import { Alert, Card, Col, Input, Row, Typography } from 'antd';
+import { Alert, Col, Row } from 'antd';
+import { ShopOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
+import PoField from '../jobWork/PoField';
 import JobWorkVendorSelect from '../jobWork/JobWorkVendorSelect';
 import JobWorkVendorCard from '../jobWork/JobWorkVendorCard';
 import PaymentTermsField from '../jobWork/PaymentTermsField';
 import { vendorSnapshot } from '../../../utils/jobWorkPoLines';
-
-const { Text } = Typography;
-const Label = ({ children, required }) => <Text type="secondary" style={{ fontSize: 12 }}>{children}{required && <Text type="danger"> *</Text>}</Text>;
 
 /**
  * Job Worker (PRD §8.4): approved job workers for the PO's process, the ineligible ones
@@ -25,21 +25,21 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
   const vendorId = doc.vendor?.id ?? masters.jobWorkers.find((v) => v.gstin && v.gstin === doc.vendor?.gstin)?.id;
   const issue = eligibility?.issues?.[0];
   return (
-    <Card id="cpp-vendor" size="small" title="Job Worker" style={{ marginBottom: 16 }}>
-      <Row gutter={[16, 12]}>
+    <DetailCard id="cpp-vendor" bare icon={<ShopOutlined />} title="Job Worker" style={{ marginBottom: 16 }}>
+      <Row gutter={[16, 16]}>
         <Col xs={24} md={12}>
-          <Label required>Job worker</Label>
-          {editable.vendor ? (
+          <PoField label="Job worker" required editing={editable.vendor} htmlFor="cpp-vendor-select" text={doc.vendor?.name}>
             <JobWorkVendorSelect
               id="cpp-vendor-select" vendors={masters.jobWorkers} loading={masters.loading} value={vendorId} category="Cut Panel"
               processId={doc.process?.id ?? null} processLabel={doc.process?.label ?? doc.process?.name} onDate={doc.poDate}
               onChange={(v) => v && pickVendor(v)} disabled={!doc.process}
             />
-          ) : <Input id="cpp-vendor-name" aria-label="Job worker" value={doc.vendor?.name ?? ''} disabled placeholder="—" />}
+          </PoField>
         </Col>
         <Col xs={24} md={6}>
-          <Label required>Payment terms</Label>
-          <PaymentTermsField id="cpp-paymentTerms" terms={masters.paymentTerms} value={doc.paymentTerms} disabled={!editable.terms} onChange={(paymentTerms) => onPatch({ paymentTerms })} />
+          <PoField label="Payment terms" required editing={editable.terms} htmlFor="cpp-paymentTerms" text={doc.paymentTerms}>
+            <PaymentTermsField id="cpp-paymentTerms" terms={masters.paymentTerms} value={doc.paymentTerms} onChange={(paymentTerms) => onPatch({ paymentTerms })} />
+          </PoField>
         </Col>
       </Row>
       {doc.vendor && (
@@ -48,7 +48,7 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
         </div>
       )}
       {!doc.process && editable.vendor && <Alert type="info" showIcon title="Choose the panel process first — job workers are listed for it." style={{ marginTop: 12 }} />}
-    </Card>
+    </DetailCard>
   );
 });
 

@@ -1,5 +1,7 @@
 import { memo } from 'react';
-import { Card, Collapse, Table } from 'antd';
+import { Collapse, Table } from 'antd';
+import { DiffOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import { formatDate } from '../../../utils/formatters';
 
 const shown = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? formatDate(v) : v);
@@ -30,9 +32,9 @@ const CppRevisionHistory = memo(function CppRevisionHistory({ revisions = [], pe
     })),
   ];
   return (
-    <Card id="cpp-amendments" size="small" title="Amendments" style={{ marginBottom: 16 }}>
+    <DetailCard id="cpp-amendments" bare icon={<DiffOutlined />} title="Amendments" count={items.length} style={{ marginBottom: 16 }}>
       <Collapse size="small" defaultActiveKey={pending ? ['pending'] : []} items={items} />
-    </Card>
+    </DetailCard>
   );
 });
 

@@ -1,5 +1,7 @@
 import { memo } from 'react';
-import { Button, Card, Space, Table, Tag, Typography } from 'antd';
+import { Button, Space, Table, Tag, Typography } from 'antd';
+import { AuditOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
 import ProductionEngineHistory from '../components/ProductionEngineHistory';
 import { optionLabel, OVERRIDE_REASONS } from '../../../utils/jobWorkConstants';
@@ -39,8 +41,8 @@ const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({
   ];
   const engine = `${doc.id}-${doc.version}`;
   return (
-    <Card
-      size="small" title="Approval" style={{ marginBottom: 16 }}
+    <DetailCard
+      id="jw-approval" bare icon={<AuditOutlined />} title="Approval" style={{ marginBottom: 16 }}
       extra={doc.id ? (
         <ApprovalActionBar
           key={engine} entityType={entityType} entityId={doc.id} docLabel={docLabel} docNumber={doc.poNo}
@@ -54,7 +56,7 @@ const JobWorkApprovalPanel = memo(function JobWorkApprovalPanel({
       {overrides.length > 0 && (
         <Table size="small" rowKey="id" pagination={false} dataSource={overrides} columns={columns} scroll={{ x: 900 }} style={{ marginTop: 12 }} />
       )}
-    </Card>
+    </DetailCard>
   );
 });
 

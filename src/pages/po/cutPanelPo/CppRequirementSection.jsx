@@ -1,6 +1,8 @@
 import { memo, useMemo } from 'react';
-import { Alert, Button, Card, Col, Row, Select, Space, Typography } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Alert, Button, Col, Row, Select, Space, Typography } from 'antd';
+import { ApartmentOutlined, PlusOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
+import PoField from '../jobWork/PoField';
 import CppRequirementLookup from './CppRequirementLookup';
 import CppProcessSteps from './CppProcessSteps';
 
@@ -26,17 +28,18 @@ const CppRequirementSection = memo(function CppRequirementSection({
   const cprIds = [...new Set(doc.lines.map((l) => l.cprId))];
 
   return (
-    <Card id="cpp-requirement" size="small" title="Panel Process & Requirement" style={{ marginBottom: 16 }}>
+    <DetailCard id="cpp-requirement" bare icon={<ApartmentOutlined />} title="Panel Process & Requirement" style={{ marginBottom: 16 }}>
       <Row gutter={[16, 12]} align="bottom">
         <Col xs={24} md={10}>
-          <Text type="secondary" style={{ fontSize: 12 }}>Panel process — one per PO</Text>
-          <Select
-            id="cpp-process" showSearch style={{ width: '100%' }} placeholder="Choose the panel process first"
-            disabled={!editable || locked} value={label ?? undefined} options={processOptions}
-            onChange={(v) => onProcess(processOptions.find((o) => o.value === v).option)}
-          />
+          <PoField label="Panel process — one per PO" editing={editable && !locked} htmlFor="cpp-process" text={label}>
+            <Select
+              id="cpp-process" showSearch style={{ width: '100%' }} placeholder="Choose the panel process first"
+              value={label ?? undefined} options={processOptions}
+              onChange={(v) => onProcess(processOptions.find((o) => o.value === v).option)}
+            />
+          </PoField>
         </Col>
-        {locked && <Col xs={24} md={14}><Text type="secondary">Locked: the PO has lines for {label}. A different process needs its own PO.</Text></Col>}
+        {locked && editable && <Col xs={24} md={14}><Text type="secondary">Locked: the PO has lines for {label}. A different process needs its own PO.</Text></Col>}
       </Row>
       {masterNote && <Alert type="warning" showIcon title={masterNote} style={{ marginTop: 12 }} />}
       {editable && label && (
@@ -54,7 +57,7 @@ const CppRequirementSection = memo(function CppRequirementSection({
         </>
       )}
       {cprIds.length > 0 && <CppProcessSteps cprIds={cprIds} processLabel={label} />}
-    </Card>
+    </DetailCard>
   );
 });
 

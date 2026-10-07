@@ -104,7 +104,7 @@ async function draft(page, gpr, { vendor, rate }) {
   await delivery(page);
 }
 
-const approvalCard = (page) => page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: /^Approval$/ }) });
+const approvalCard = (page) => page.locator('#jw-approval');
 
 const fx = {};
 let flowId;

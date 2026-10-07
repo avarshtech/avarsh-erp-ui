@@ -75,7 +75,7 @@ async function reason(page, { code, remark }) {
 }
 
 const valueRow = (page, label) => page.locator('#cpp-delivery div').filter({ hasText: new RegExp(`^${label}`) }).last();
-const approvalCard = (page) => page.locator('.ant-card').filter({ has: page.locator('.ant-card-head-title', { hasText: /^Approval$/ }) });
+const approvalCard = (page) => page.locator('#jw-approval');
 
 const fx = {};
 let flowId;
@@ -174,7 +174,7 @@ test('Ineligible job workers stay listed, greyed, with the reason', async ({ pag
 test('An approved PO changes its terms before it is sent, audited', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/${fx.terms.id}`);
   await waitForPageReady(page);
-  await expect(page.locator('#cpp-requiredDeliveryDate')).toBeDisabled(); // opened read-only
+  await expect(page.locator('#cpp-requiredDeliveryDate')).toHaveCount(0); // opened read-only: values as text, no inputs
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await setDate(page, 'cpp-requiredDeliveryDate', plusDays(25));
   // Edit mode offers only its save: sending now would send the stored terms.

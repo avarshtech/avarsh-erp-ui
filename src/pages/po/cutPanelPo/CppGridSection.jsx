@@ -1,5 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-import { Card, Empty, Table } from 'antd';
+import { Empty, Table } from 'antd';
+import { TableOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
 import JobWorkBulkFillBar from '../jobWork/JobWorkBulkFillBar';
 import { BULK_MODE } from '../../../utils/jobWorkBulkFill';
 import { cppGridColumns, gridRows } from './cppGridColumns';
@@ -30,15 +32,15 @@ const CppGridSection = memo(function CppGridSection({ doc, editable, ctx, rates,
     overrideOf: (l) => (doc.overrides || []).find((o) => o.lineKey === l.key),
   }), [h, editable, ctx, rates, doc.overrides, doc.held]);
   return (
-    <Card
-      id="cpp-grid" size="small" title="PO Grid" style={{ marginBottom: 16 }}
+    <DetailCard
+      id="cpp-grid" bare icon={<TableOutlined />} title="PO Grid" count={doc.lines.length || null} style={{ marginBottom: 16 }}
       extra={editable && doc.lines.length > 0 && (
         <JobWorkBulkFillBar lines={doc.lines} selectedKeys={selectedKeys} rateOf={rateOf} recent={rates.recent} onApply={h.onLines} mode={fillMode} onMode={onFillMode} />
       )}
     >
       {doc.lines.length ? (
         <Table
-          size="small" rowKey="key" pagination={false} dataSource={rows} columns={columns} scroll={gridScroll('max-content', rows.length + doc.lines.length)}
+          size="small" rowKey="key" pagination={false} dataSource={rows} columns={columns} scroll={gridScroll('max-content', rows.length + doc.lines.length)} className="table-nowrap"
           expandable={{ expandedRowKeys: rows.map((r) => r.key), showExpandColumn: false }}
           onRow={(r) => ({ style: !r.isGroup && !(Number(r.poQty) > 0) ? { opacity: 0.55 } : r.isGroup ? { background: 'var(--bg-secondary, #fafafa)' } : undefined })}
           rowSelection={editable && selecting ? {
@@ -47,7 +49,7 @@ const CppGridSection = memo(function CppGridSection({ doc, editable, ctx, rates,
           } : undefined}
         />
       ) : <Empty description="Choose the process and requirements above, then Add to Grid." />}
-    </Card>
+    </DetailCard>
   );
 });
 

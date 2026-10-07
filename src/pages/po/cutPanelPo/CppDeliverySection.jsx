@@ -1,11 +1,13 @@
 import { memo } from 'react';
-import { Card, Col, Row, Table, Typography } from 'antd';
+import { Col, Row, Table } from 'antd';
+import { CarOutlined } from '@ant-design/icons';
+import DetailCard from '../../../components/DetailCard';
+import { FIELD_LABEL } from '../jobWork/poFieldStyles';
 import JobWorkDeliveryFields from '../jobWork/JobWorkDeliveryFields';
 import JobWorkValueSummary from '../jobWork/JobWorkValueSummary';
 import { CPP_RETURN_TO } from '../../../utils/jobWorkConstants';
 import { balanceBlock } from '../../../utils/cutPanelPoCalc';
 
-const { Text } = Typography;
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const BALANCE_COLUMNS = [
   { title: 'CPR', dataIndex: 'cprNo' },
@@ -25,22 +27,23 @@ const BALANCE_COLUMNS = [
 const CppDeliverySection = memo(function CppDeliverySection({ doc, ctx, value, can, units, onPatch, onCommercial }) {
   const qty = doc.lines.reduce((s, l) => s + (Number(l.poQty) || 0), 0);
   return (
-    <Card id="cpp-delivery" size="small" title="Delivery Instructions & Value" style={{ marginBottom: 16 }}>
+    <DetailCard id="cpp-delivery" bare icon={<CarOutlined />} title="Delivery Instructions & Value" style={{ marginBottom: 16 }}>
       <JobWorkDeliveryFields
         value={doc} dateKey="requiredDeliveryDate" idPrefix="cpp" returnToOptions={CPP_RETURN_TO} units={units}
         editable={{ place: can.delivery, date: can.terms, instructions: can.notes }} onChange={onPatch}
       />
-      <Row gutter={[16, 12]} style={{ marginTop: 12 }}>
+      <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
         <Col xs={24} lg={12}>
-          <Text strong>PO value</Text>
+          <div style={FIELD_LABEL}>PO value</div>
           <JobWorkValueSummary value={value} qty={qty} sacCode={doc.process?.sacCode} commercial={doc} editable={can.commercial} onChange={onCommercial} />
         </Col>
         <Col xs={24} lg={12}>
-          <Text strong>Balance</Text>
-          <Table size="small" rowKey="cprNo" pagination={false} dataSource={balanceBlock(doc, ctx)} columns={BALANCE_COLUMNS} style={{ marginTop: 4 }} />
+          <div style={FIELD_LABEL}>Balance</div>
+          <Table size="small" rowKey="cprNo" pagination={false} dataSource={balanceBlock(doc, ctx)} columns={BALANCE_COLUMNS}
+            scroll={{ x: 'max-content' }} className="table-nowrap" />
         </Col>
       </Row>
-    </Card>
+    </DetailCard>
   );
 });
 

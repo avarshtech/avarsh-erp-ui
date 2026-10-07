@@ -2,21 +2,18 @@ import { useMemo, useState } from 'react';
 import { Button, Result, Skeleton } from 'antd';
 import { HistoryOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import PageHeader from '../../../components/PageHeader';
-import StatusTag from '../../../components/StatusTag';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useActionRunner from '../../../hooks/useActionRunner';
 import useEditParam from '../../../hooks/useEditParam';
 import { useBranch } from '../../../context/BranchContext';
-import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { validateCpp } from '../../../utils/cutPanelPoCalc';
 import { revisionChanges, ISSUED_FIELDS, REVISION_FIELDS } from '../../../utils/cutPanelPoRevision';
 import { refetchCppLines } from '../../../utils/jobWorkRefetch';
 import { getCppAudit } from '../../../services/po/cutPanelPo/cutPanelPoService';
 import JobWorkStatusBanner from '../jobWork/JobWorkStatusBanner';
+import JobWorkPoHero from '../jobWork/JobWorkPoHero';
 import JobWorkApprovalPanel from '../jobWork/JobWorkApprovalPanel';
 import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
 import OverrideRequestDialog from '../jobWork/OverrideRequestDialog';
@@ -45,7 +42,7 @@ const pick = (src, fields) => Object.fromEntries(fields.map((f) => [f, src[f]]))
 const AMENDABLE = new Set(REVISION_FIELDS);
 
 /**
- * Cut Panel PO — one scrolling screen, six titled sections and a sticky action bar
+ * Cut Panel PO — one scrolling screen in the Supplier PO view's look (a hero, titled sections) and a sticky action bar
  * (PRD §18.1); no wizard. Everything is the API: the PO, its ledger and approval (the approval engine), the
  * requirements, vendors, processes, payment terms, branches and units.
  */
@@ -88,18 +85,17 @@ const CutPanelPoForm = () => {
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader
-        title={doc.poNo ? `Cut Panel PO ${doc.poNo}` : 'New Cut Panel PO'} backPath={LIST}
+      <JobWorkPoHero
+        doc={working} typeLabel="Cut Panel PO" total={view.value.rounded} totalLabel="PO value" dueDate={working.requiredDeliveryDate}
         subtitle="Job work on cut panels against a submitted Cut Panel Requirement — who does it, how much, at what rate"
-        status={<StatusTag status={doc.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />}
-      >
-        {doc.id && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        onBack={() => navigate(LIST)}
+        actions={doc.id && (
+          <>
             {doc.status !== 'DRAFT' && <Button icon={<PrinterOutlined />} loading={h.printing} onClick={h.print}>Print vendor copy</Button>}
             <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>
-          </div>
+          </>
         )}
-      </PageHeader>
+      />
       <JobWorkStatusBanner doc={doc} flags={view.flags} refetch={refetch} />
       <CppHeaderSection doc={working} editable={view.edit.draft} branches={allowedBranches} unit={activeBranch || defaultBranch} onPatch={patch} />
       <CppRequirementSection
