@@ -167,6 +167,11 @@ export const SCREENS = [
   // ── Dashboard ──
   { id: 'dashboard', name: 'Dashboard', section: 'dashboard', kind: 'dashboard',
     path: '/', ops: DASHBOARD_OPERATIONS },
+  // Admins only for now: this key lives only in the web app (admins see every SCREENS key), so a
+  // grant to another role is dropped by the API until its registry learns the key.
+  { id: 'virtual-factory', name: 'Virtual Factory', section: 'dashboard', kind: 'dashboard',
+    path: '/virtual-factory', ops: DASHBOARD_OPERATIONS,
+    description: 'Admins only for now — the 3D factory twin of live orders, materials and production' },
 
   // ── Orders ──
   { id: 'orders', name: 'Orders', section: 'orders', kind: 'screen',

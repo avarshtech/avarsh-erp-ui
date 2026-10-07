@@ -124,6 +124,18 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Virtual factory — the 3D twin; SwiftShader lets headless Chromium draw WebGL.
+      name: 'virtual-factory',
+      testDir: './e2e/specs/virtual-factory',
+      timeout: 180000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+        launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
+      },
+      dependencies: ['setup'],
+    },
+    {
       // Sewing floor — the module runs entirely on the API, so these specs
       // assert the screens load from it, records survive a reload and the
       // server-derived rules reach the screen.

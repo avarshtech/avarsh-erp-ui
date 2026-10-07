@@ -87,6 +87,7 @@ const GarmentCheckForm = lazy(() => import('./pages/production/finishing/Garment
 const CartonPackingList = lazy(() => import('./pages/production/packing/CartonPackingList'));
 const CartonPackingForm = lazy(() => import('./pages/production/packing/CartonPackingForm'));
 const JobWorkWorkspace = lazy(() => import('./pages/production/jobwork/JobWorkWorkspace'));
+const VirtualFactoryPage = lazy(() => import('./pages/virtual-factory/VirtualFactoryPage'));
 import CostingList from './pages/costing/CostingList';
 import CostingSheetPage from './pages/costing/sheet/CostingSheetPage';
 import CostingView from './pages/costing/CostingView';
@@ -256,6 +257,7 @@ const ThemedApp = () => {
             }
           >
             <Route index element={<Dashboard />} />
+            <Route path="virtual-factory" element={<PermissionRoute module="virtual-factory" operation="view"><Suspense fallback={<PageSkeleton />}><VirtualFactoryPage /></Suspense></PermissionRoute>} />
             {/* My Approvals — server-scoped to the current user, no module permission needed */}
             <Route path="approvals" element={<Suspense fallback={<PageSkeleton />}><MyApprovals /></Suspense>} />
             {/* Orders */}

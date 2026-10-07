@@ -39,6 +39,7 @@ import {
   ExperimentOutlined,
   FieldTimeOutlined,
   ContainerOutlined,
+  DeploymentUnitOutlined,
 } from "@ant-design/icons";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
@@ -329,6 +330,12 @@ const MainLayoutInner = () => {
       icon: <DashboardOutlined />,
       label: "Dashboard",
       moduleId: "dashboard",
+    },
+    {
+      key: "/virtual-factory",
+      icon: <DeploymentUnitOutlined />,
+      label: "Virtual Factory",
+      moduleId: "virtual-factory",
     },
     {
       key: "/approvals",

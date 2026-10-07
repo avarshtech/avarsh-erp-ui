@@ -36,6 +36,9 @@ export default defineConfig({
       injectRegister: null,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // The Virtual Factory page carries three.js (only it imports it), so only the people who open
+        // that screen download it.
+        globIgnores: ['**/node_modules/**/*', '**/VirtualFactoryPage-*.{js,css}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
       },
       manifest: {
