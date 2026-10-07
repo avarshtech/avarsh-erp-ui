@@ -13,6 +13,7 @@ const BASE = JOB_WORK_PO_PATH.CPP;
  * when the live vendor changed since the snapshot), delete, and the over-allocation
  * override — requested on the saved draft, authorised by someone else. `unit` (the working
  * branch) fills the PO's branch when the draft has none yet; the return unit is always picked.
+ * A first save stays in edit mode (?edit=1); a submitted PO is shown read-only.
  */
 const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, liveVendor }) => {
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
     });
     dispatch({ type: 'SAVED', doc: saved });
     clearDirty();
-    if (!doc.id) navigate(`${BASE}/${saved.id}`, { replace: true });
+    if (!doc.id) navigate(`${BASE}/${saved.id}?edit=1`, { replace: true });
     return saved;
   }, [doc, unit, liveVendor, dispatch, clearDirty, navigate]);
 
@@ -36,9 +37,10 @@ const useCppDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
   const submit = useCallback(() => run('submit', async () => {
     const saved = await savedDoc();
     dispatch({ type: 'SAVED', doc: await submitCpp(saved) });
-  }, 'Submitted for approval'), [run, savedDoc, dispatch]);
+    navigate(`${BASE}/${saved.id}`, { replace: true });
+  }, 'Submitted for approval'), [run, savedDoc, dispatch, navigate]);
 
-  const remove = useCallback(() => run('delete', async () => {
+  const remove = useCallback(() => run('remove', async () => {
     await deleteCpp(doc);
     clearDirty();
     navigate(`${BASE}/list`, { replace: true });

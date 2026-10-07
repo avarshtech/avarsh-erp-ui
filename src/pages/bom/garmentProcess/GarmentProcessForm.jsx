@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Button, Card, Col, Input, Row, Skeleton, Space } from 'antd';
-import { CloseCircleOutlined, HistoryOutlined, PartitionOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { HistoryOutlined, PartitionOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
@@ -10,7 +10,7 @@ import {
   hasPermission, canCloseRequirement, canSubmitRequirement, canSubmitGarmentProcessOverQty,
 } from '../../../utils/permissions';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getRequirementStatusLabel, isRequirementClosable, isRequirementEditable } from '../../../utils/requirementStatus';
+import { getRequirementStatusLabel, isRequirementEditable } from '../../../utils/requirementStatus';
 import { GPR_MODULE_ID, GPR_PROCESS_CATEGORY, GPR_REMARKS_MAX } from '../../../utils/garmentProcessConstants';
 import { getGprAudit, getGprAllocation } from '../../../services/bom/garmentProcess/garmentProcessService';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
@@ -73,12 +73,8 @@ const GarmentProcessForm = () => {
         status={<StatusTag status={doc.status} config={REQUIREMENT_STATUS_CONFIG} getLabel={getRequirementStatusLabel} />}
       >
         <Space wrap>
-          <Button icon={<UnorderedListOutlined />} onClick={() => navigate(LIST_PATH)}>View all requirements</Button>
           {doc.id && !editable && <Button icon={<PartitionOutlined />} onClick={() => setAllocationOpen(true)}>PO allocation</Button>}
           {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
-          {canCloseRequirement(GPR_MODULE_ID) && isRequirementClosable(doc.status) && !mode.editing && (
-            <Button danger icon={<CloseCircleOutlined />} onClick={() => setCloseOpen(true)}>Close</Button>
-          )}
         </Space>
       </PageHeader>
 
@@ -115,7 +111,9 @@ const GarmentProcessForm = () => {
       )}
 
       {order && (
-        <Card title="C. Remarks" size="small" style={{ marginBottom: 16 }}>
+        // The body keeps room for the "0 / 500" counter, which antd hangs one line below the textarea: outside the
+        // body's padding it overflowed, and card bodies scroll (styles/overrides.css).
+        <Card title="C. Remarks" size="small" style={{ marginBottom: 16 }} styles={{ body: { paddingBottom: 34 } }}>
           <Input.TextArea
             name="gpr-remarks" aria-label="Remarks" rows={2} maxLength={GPR_REMARKS_MAX} showCount disabled={!editable}
             placeholder='e.g. "Process only Black colour." or "Required for shipment lot 1."'
@@ -125,11 +123,11 @@ const GarmentProcessForm = () => {
       )}
 
       <GprActionBar
-        doc={doc} can={{ edit: canEdit, submit: canSubmitRequirement(GPR_MODULE_ID) }} editing={mode.editing} dirty={dirty}
+        doc={doc} can={{ edit: canEdit, submit: canSubmitRequirement(GPR_MODULE_ID), close: canCloseRequirement(GPR_MODULE_ID) }} editing={mode.editing} dirty={dirty}
         busy={actions.busy} errors={actions.errors}
         on={{
           cancel: () => navigate(LIST_PATH), save: actions.save, submit: actions.submit,
-          edit: mode.startEdit, cancelEdit: mode.cancelEdit, saveChanges: actions.saveChanges,
+          edit: mode.startEdit, cancelEdit: mode.cancelEdit, saveChanges: actions.saveChanges, close: () => setCloseOpen(true),
         }}
       />
       <RequirementTransitionDialog

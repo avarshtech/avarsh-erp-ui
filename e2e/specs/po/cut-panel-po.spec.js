@@ -8,7 +8,7 @@
  *
  * What this tests:
  *   - Create on a released requirement: process → requirement → Add to Grid → job worker → return unit → date →
- *     one rate on all lines → value → Save Draft (CPPO/<FY>/NNNN) → Submit (approved, no flow) → Send to Vendor
+ *     one rate on all lines → value → Save Draft (CPPO/<FY>/NNNN, still in edit mode) → Submit for Approval (approved, no flow) → Send to Vendor
  *   - Ineligible job workers stay listed, greyed, with the reason (BR-14)
  *   - An approved PO's terms change before it is sent, audited field by field (BR-16)
  *   - A PO an approval flow applies to waits for its approver, who approves it from the PO's Approval panel
@@ -141,11 +141,11 @@ test('Create on a released requirement: fetch, rate, value, save, submit (approv
   await expect(valueRow(page, 'Basic amount')).toContainText('₹3,000.00'); // 600 pcs × ₹5
 
   await page.getByRole('button', { name: 'Save Draft' }).click();
-  await expect(page).toHaveURL(new RegExp(`${BASE}/\\d+$`));
+  await expect(page).toHaveURL(new RegExp(`${BASE}/\\d+\\?edit=1$`)); // a saved draft stays in edit mode
   await expect(page.getByRole('heading', { name: /CPPO\/\d{2}-\d{2}\/\d+/ })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Submit' }).click();
-  await expect(page.getByText('Submitted for approval')).toBeVisible();
+  await page.getByRole('button', { name: 'Submit for Approval' }).click();
+  await expect(page.getByText('Submitted for approval').first()).toBeVisible(); // the toast, and the approval panel's entry
   await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible(); // no flow: approved at once
   await page.getByRole('button', { name: 'Send to Vendor' }).click();
   await expect(page.getByText('Sent to the vendor')).toBeVisible();
@@ -174,9 +174,11 @@ test('Ineligible job workers stay listed, greyed, with the reason', async ({ pag
 test('An approved PO changes its terms before it is sent, audited', async ({ page }) => {
   await navigateWithAuth(page, `${BASE}/${fx.terms.id}`);
   await waitForPageReady(page);
+  await expect(page.locator('#cpp-requiredDeliveryDate')).toBeDisabled(); // opened read-only
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await setDate(page, 'cpp-requiredDeliveryDate', plusDays(25));
-  // Unsaved changes block the workflow: sending now would send the stored terms.
-  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeDisabled();
+  // Edit mode offers only its save: sending now would send the stored terms.
+  await expect(page.getByRole('button', { name: 'Send to Vendor' })).toHaveCount(0);
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByText('Changes saved')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeEnabled();

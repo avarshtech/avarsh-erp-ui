@@ -8,19 +8,24 @@ import { toastUnlessHandled } from '../../../utils/apiError';
 
 /**
  * Row actions of the Garment Process PO list (PRD §22): Print loads the PO and opens its
- * print; Cancel asks for the reason, then reloads the list. `reload` refreshes the rows.
+ * print (`printingId` spins that row's Print meanwhile); Cancel asks for the reason, then reloads the list.
+ * `reload` refreshes the rows.
  */
 const useGpoListActions = (reload) => {
   const { message } = App.useApp();
   const [cancelling, setCancelling] = useState(null);
+  const [printingId, setPrintingId] = useState(null);
 
   const print = useCallback(async (row) => {
+    setPrintingId(row.id);
     try {
       const doc = await getGpo(row.id);
       const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
       if (!printJobWorkPo(doc, gpoValue(doc), org)) message.warning('Allow pop-ups to print the PO.');
     } catch (e) {
       toastUnlessHandled(message, e, 'Could not print the PO');
+    } finally {
+      setPrintingId(null);
     }
   }, [message]);
 
@@ -36,7 +41,7 @@ const useGpoListActions = (reload) => {
     }
   }, [cancelling, message, reload]);
 
-  return { print, cancelling, askCancel: setCancelling, cancel, closeCancel: () => setCancelling(null) };
+  return { print, printingId, cancelling, askCancel: setCancelling, cancel, closeCancel: () => setCancelling(null) };
 };
 
 export default useGpoListActions;

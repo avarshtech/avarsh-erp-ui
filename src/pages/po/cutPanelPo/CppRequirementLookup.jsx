@@ -3,6 +3,7 @@ import { Table, Tooltip } from 'antd';
 import StatusTag from '../../../components/StatusTag';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getRequirementStatusLabel } from '../../../utils/requirementStatus';
+import { gridScroll } from '../../../utils/gridScroll';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const num = (title, dataIndex) => ({ title, dataIndex, align: 'right', width: 96, render: n });
@@ -30,7 +31,7 @@ const COLUMNS = [
 const CppRequirementLookup = memo(function CppRequirementLookup({ rows, loading, selectedIds, onSelect }) {
   return (
     <Table
-      size="small" rowKey="id" pagination={false} loading={loading} dataSource={rows} columns={COLUMNS} scroll={{ x: 1000 }}
+      size="small" rowKey="id" pagination={false} loading={loading} dataSource={rows} columns={COLUMNS} scroll={gridScroll('max-content', rows.length)} className="table-nowrap"
       locale={{ emptyText: 'No submitted cut panel requirement carries this process.' }}
       rowSelection={{
         selectedRowKeys: selectedIds,

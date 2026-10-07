@@ -11,9 +11,11 @@ const KEY = 'cut-panel';
 /**
  * What the Cut Panel PO screen may do and show: permissions (the reused cut-panel key,
  * decision 4), which parts are editable in this status (BR-16), the document on screen —
- * the open amendment merged over the live PO — its value, flags and action buttons.
+ * the open amendment merged over the live PO — its value, flags and action buttons. A saved PO
+ * is read-only until Edit (`editing`, the screen's ?edit=1) — a draft entirely, past Draft its
+ * details and notes; a new PO is always edited. An open amendment draft is its own edit mode.
  */
-const useCppView = ({ doc, rev, dirty, docDirty }, ctx) => useMemo(() => {
+const useCppView = ({ doc, rev, dirty }, ctx, editing) => useMemo(() => {
   if (!doc) return null;
   const user = getCurrentUser() || {};
   const superuser = isSuperuser();
@@ -22,14 +24,18 @@ const useCppView = ({ doc, rev, dirty, docDirty }, ctx) => useMemo(() => {
     approve: hasPermission(KEY, 'approve'), reject: hasPermission(KEY, 'reject'), referBack: hasPermission(KEY, 'refer_back'),
     cancel: hasPermission(KEY, 'cancel'), override: hasPermission(KEY, 'override'),
   };
-  const draft = doc.status === S.DRAFT && can.edit;
+  const editMode = !doc.id || editing;
+  const draft = doc.status === S.DRAFT && can.edit && editMode;
   const amending = Boolean(rev) && can.edit;
+  // Past Draft: the issued details until the PO is sent, and the notes — which belong to the live PO; while an
+  // amendment draft is open, it owns the save buttons.
+  const details = doc.status === S.APPROVED && !doc.pendingRevision && can.edit;
+  const notes = doc.status !== S.DRAFT && ![S.CANCELLED, S.REJECTED].includes(doc.status) && doc.pendingRevision?.status !== S.DRAFT && can.edit;
   const edit = {
     draft, lines: draft || amending, commercial: draft || amending,
-    delivery: draft || (doc.status === S.APPROVED && !doc.pendingRevision && can.edit),
-    terms: draft || amending || (doc.status === S.APPROVED && !doc.pendingRevision && can.edit),
-    // Notes belong to the live PO; while an amendment draft is open, it owns the save buttons.
-    notes: ![S.CANCELLED, S.REJECTED].includes(doc.status) && doc.pendingRevision?.status !== S.DRAFT && can.edit,
+    delivery: draft || (editMode && details),
+    terms: draft || amending || (editMode && details),
+    notes: draft || (editMode && notes),
   };
   // An open amendment is shown as the PO would stand: editable while drafted, read-only while awaiting approval.
   const shownRev = rev || doc.pendingRevision;
@@ -44,8 +50,10 @@ const useCppView = ({ doc, rev, dirty, docDirty }, ctx) => useMemo(() => {
   });
   return {
     can, edit, working, value: cppValue(working), flags, superuser, userId: user.id,
-    buttons: cppActionButtons({ doc, rev, dirty, docDirty, can, superuser, issued, received, withVendor, userId: user.id }),
+    buttons: cppActionButtons({
+      doc, rev, dirty, can, superuser, issued, received, withVendor, userId: user.id, editing: editMode, detailsEditable: details || notes,
+    }),
   };
-}, [doc, rev, dirty, docDirty, ctx]);
+}, [doc, rev, dirty, ctx, editing]);
 
 export default useCppView;

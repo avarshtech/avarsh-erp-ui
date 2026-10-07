@@ -6,7 +6,7 @@
  * (e2e/helpers/job-work-api.js); numbers are the server's, CPRQ/<FY>/NNNN.
  *
  * What this tests:
- *   - BOM menu: BOM List · Cut Panel · Garment Process, and no "Create BOM" item
+ *   - BOM menu: BOM · Cut Panel · Garment Process, and no "Create BOM" item
  *   - Create: order → the order's BOM no. read-only → fabric, colour, panel, process → Add to Grid (quantities
  *     from the order) → Save Draft (server number) → Submit (WRN-03 confirm: colours without a process)
  *   - Edit a submitted CPR in place: a changed quantity needs a reason; stays Submitted; History shows R1
@@ -50,10 +50,10 @@ test.beforeEach(async ({ page }) => {
   page.on('pageerror', (err) => console.log(`[browser:pageerror] ${err.message}`));
 });
 
-test('BOM menu lists BOM List, Cut Panel and Garment Process — no Create BOM item', async ({ page }) => {
+test('BOM menu lists BOM, Cut Panel and Garment Process — no Create BOM item', async ({ page }) => {
   await navigateWithAuth(page, '/bom/cut-panel/list');
   const sider = page.locator('.ant-layout-sider');
-  for (const item of ['BOM List', 'Cut Panel', 'Garment Process']) {
+  for (const item of [/^BOM$/, /^Cut Panel$/, /^Garment Process$/]) {
     await expect(sider.locator('.ant-menu-item').filter({ hasText: item })).toBeVisible();
   }
   await expect(sider.locator('.ant-menu-item').filter({ hasText: /^Create BOM$/ })).toHaveCount(0);

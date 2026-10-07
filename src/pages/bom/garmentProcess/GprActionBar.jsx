@@ -1,10 +1,10 @@
 import { memo } from 'react';
 import { Button, Typography } from 'antd';
-import { EditOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
+import { CloseCircleOutlined, EditOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons';
 import StickyActionBar from '../../../components/StickyActionBar';
 import StatusTag from '../../../components/StatusTag';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { getRequirementStatusLabel, requirementBarMode, REQUIREMENT_BAR_MODE as MODE } from '../../../utils/requirementStatus';
+import { getRequirementStatusLabel, isRequirementClosable, requirementBarMode, REQUIREMENT_BAR_MODE as MODE } from '../../../utils/requirementStatus';
 import { gprFlowLabel } from '../../../utils/garmentProcessCalc';
 
 const { Text } = Typography;
@@ -13,7 +13,8 @@ const { Text } = Typography;
  * Sticky action bar (PRD §6/§13): message area, then Draft: Cancel · Save draft · Submit;
  * Submitted with no PO placed: Back to list · Edit; while edited in place: Cancel edit · Save
  * changes (it stays Submitted); otherwise Back to list. Line totals are never combined (PRD
- * §11), so the bar shows the process count and the flow. Close is a page-head action.
+ * §11), so the bar shows the process count and the flow. Close sits here while the requirement is
+ * closable, as on the Cut Panel Requirement.
  * Submit needs add or update (an add-only user submits their saved draft as it is).
  */
 const GprActionBar = memo(function GprActionBar({ doc, can, editing, dirty, busy, errors, on }) {
@@ -44,6 +45,9 @@ const GprActionBar = memo(function GprActionBar({ doc, can, editing, dirty, busy
             <Button type="primary" icon={<SendOutlined />} onClick={on.submit} loading={busy === 'submit'} disabled={Boolean(busy)}>Submit</Button>
           )}
           {mode === MODE.IN_PLACE && can.edit && <Button icon={<EditOutlined />} onClick={on.edit} disabled={Boolean(busy)}>Edit</Button>}
+          {can.close && isRequirementClosable(doc.status) && (
+            <Button danger icon={<CloseCircleOutlined />} onClick={on.close} disabled={Boolean(busy)}>Close</Button>
+          )}
         </>
       )}
     </StickyActionBar>

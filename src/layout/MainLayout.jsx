@@ -366,9 +366,9 @@ const MainLayoutInner = () => {
       icon: <FileTextOutlined />,
       label: "Bill of Materials",
       moduleId: ["bom", "cut-panel", "garment-process"],
-      // Creation happens via the BOM List page button — no "Create BOM" menu item.
+      // Creation happens via the BOM page button — no "Create BOM" menu item.
       children: [
-        { key: "/bom/list", label: "BOM List", moduleId: "bom" },
+        { key: "/bom/list", label: "BOM", moduleId: "bom" },
         { key: "/bom/cut-panel/list", label: "Cut Panel", moduleId: "cut-panel" },
         { key: "/bom/garment-process/list", label: "Garment Process", moduleId: "garment-process" },
       ],

@@ -3,7 +3,7 @@ import { expandSelection } from '../../../utils/cutPanelCalc';
 
 /**
  * Line handlers of the Cut Panel Requirement screen: the grid's sequence, allowance,
- * quantity and reason edits, removals and recalculation, and Add to Grid, which expands a
+ * quantity and reason edits (one reason for every deviating line too), removals and recalculation, and Add to Grid, which expands a
  * selection into lines and reports { added, skipped } to the selection strip.
  */
 const useCprLineHandlers = ({ doc, order, dispatch }) => {
@@ -16,6 +16,7 @@ const useCprLineHandlers = ({ doc, order, dispatch }) => {
     onRemoveMany: (keys) => dispatch({ type: 'LINES_REMOVED', keys }),
     onRecalcAll: () => dispatch({ type: 'RECALC_ALL' }),
     onApplyAllowance: (pct, includeOverridden) => dispatch({ type: 'APPLY_ALLOWANCE_ALL', pct, includeOverridden }),
+    onApplyReason: (reason, replace) => dispatch({ type: 'REASON_ALL', reason, replace }),
   }), [dispatch]);
 
   const lines = doc?.lines;

@@ -3,7 +3,7 @@ import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
 /**
  * Screen state of a Garment Process PO: the document, whether it has unsaved changes, and
- * the line rows ticked for "apply to selected lines". The requirement picker (section ②)
+ * the line rows ticked for "apply to selected lines". The requirement picker (Select Garment Process Requirement)
  * keeps its own ticks.
  */
 export const initialGpoState = { doc: null, dirty: false, selectedKeys: [] };

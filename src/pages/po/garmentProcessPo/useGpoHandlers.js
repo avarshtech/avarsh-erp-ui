@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { App } from 'antd';
 import { lastRates } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 import { getCachedOrganisation, fetchAndCacheOrganisation } from '../../../services/admin/organisationService';
@@ -22,12 +22,19 @@ const useGpoHandlers = ({ doc, dispatch, masters, value }) => {
     dispatch({ type: 'PATCH', patch: { vendor: vendorSnapshot(v), paymentTerms: (fromVendor && v.paymentTerms) || doc.paymentTerms || null, lines: withLastRates(doc.lines, rates) } });
   }, [doc, dispatch, masters.paymentTerms]);
 
+  // `printing` spins Print while the organisation (letterhead) is fetched on first use
+  const [printing, setPrinting] = useState(false);
   const print = useCallback(async () => {
-    const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
-    if (!printJobWorkPo(doc, value, org)) message.warning('Allow pop-ups to print the PO.');
+    setPrinting(true);
+    try {
+      const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
+      if (!printJobWorkPo(doc, value, org)) message.warning('Allow pop-ups to print the PO.');
+    } finally {
+      setPrinting(false);
+    }
   }, [doc, value, message]);
 
-  return { pickVendor, print };
+  return { pickVendor, print, printing };
 };
 
 export default useGpoHandlers;

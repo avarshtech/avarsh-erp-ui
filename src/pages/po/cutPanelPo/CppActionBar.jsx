@@ -12,7 +12,7 @@ const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const Stat = ({ label, value }) => <span><Text type="secondary">{label}</Text> <strong>{value}</strong></span>;
 
 /**
- * ⑥ Sticky action bar (PRD §18.1/18.2): process, lines, PO qty, balance after this PO,
+ * Sticky action bar (PRD §18.1/18.2): process, lines, PO qty, balance after this PO,
  * PO value and status, always visible; then the actions `buttons` lists (cppActionButtons).
  */
 const CppActionBar = memo(function CppActionBar({ doc, ctx, value, buttons, busy, errors, on, openDialog }) {

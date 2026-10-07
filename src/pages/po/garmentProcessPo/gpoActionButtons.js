@@ -2,23 +2,27 @@
  * Which actions the Garment Process PO action bar offers (PRD §16, §19): by status and
  * permission. Pure — the bar renders the list in order.
  *
- * `s` = { doc, can, superuser, userId, issued, withVendor, blocked }
+ * `s` = { doc, can, superuser, userId, issued, withVendor, editing, blocked }
+ * A draft in edit mode offers only Save Draft and Submit for Approval; viewed, it offers Cancel PO and Edit.
+ * Back is the page header's arrow and Print sits in the page header.
  * Each item: { key, label, primary?, danger?, dialog?, disabledReason? } — `dialog` names
  * the reason dialog the action needs; the bar calls on[key] otherwise. Approve and reject are
  * the approval engine's, in the Approval panel (decision D1).
  */
 import { JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 
-export const gpoActionButtons = ({ doc, can, superuser, userId, issued, withVendor, blocked }) => {
+export const gpoActionButtons = ({ doc, can, superuser, userId, issued, withVendor, editing, blocked }) => {
   const out = [];
   const add = (show, item) => { if (show) out.push(item); };
   const st = doc.status;
-  add(true, { key: 'back', label: st === S.DRAFT && can.edit ? 'Cancel' : 'Back to list' });
-  add(doc.id, { key: 'print', label: 'Print' });
-  if (st === S.DRAFT) {
-    add(doc.id && can.cancel, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
+  if (st === S.DRAFT && editing) {
     add(can.edit, { key: 'save', label: 'Save Draft' });
     add(can.submit, { key: 'submit', label: 'Submit for Approval', primary: true, disabledReason: blocked ? 'Fix the issues in the action bar first (§19).' : null });
+    return out;
+  }
+  if (st === S.DRAFT) {
+    add(doc.id && can.cancel, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
+    add(can.edit, { key: 'edit', label: 'Edit', primary: true });
     return out;
   }
   if (st === S.SUBMITTED) {

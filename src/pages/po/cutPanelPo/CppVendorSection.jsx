@@ -9,10 +9,10 @@ const { Text } = Typography;
 const Label = ({ children, required }) => <Text type="secondary" style={{ fontSize: 12 }}>{children}{required && <Text type="danger"> *</Text>}</Text>;
 
 /**
- * ③ Job Worker (PRD §8.4): approved job workers for the PO's process, the ineligible ones
+ * Job Worker (PRD §8.4): approved job workers for the PO's process, the ineligible ones
  * greyed with the reason (FR-19, BR-14); the vendor card; payment terms from the Payment
  * Terms master (D5). The vendor is editable in Draft and while Approved until sent (BR-16);
- * payment terms also in an open amendment. `editable` = { vendor, terms }. Delivery lives in ⑤.
+ * payment terms also in an open amendment. `editable` = { vendor, terms }. Delivery lives in Delivery Instructions & Value.
  */
 const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters, eligibility, onPatch }) {
   // The vendor's payment terms become the PO's only when they name a Payment Terms master
@@ -25,7 +25,7 @@ const CppVendorSection = memo(function CppVendorSection({ doc, editable, masters
   const vendorId = doc.vendor?.id ?? masters.jobWorkers.find((v) => v.gstin && v.gstin === doc.vendor?.gstin)?.id;
   const issue = eligibility?.issues?.[0];
   return (
-    <Card id="cpp-vendor" size="small" title="③ Job Worker" style={{ marginBottom: 16 }}>
+    <Card id="cpp-vendor" size="small" title="Job Worker" style={{ marginBottom: 16 }}>
       <Row gutter={[16, 12]}>
         <Col xs={24} md={12}>
           <Label required>Job worker</Label>

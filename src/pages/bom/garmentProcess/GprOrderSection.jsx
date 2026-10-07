@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
-import { Alert, App, Card, Col, Descriptions, Form, Row, Typography } from 'antd';
+import { Alert, App, Card, Col, Form, Row, Typography } from 'antd';
 import RequirementOrderSelect from '../shared/RequirementOrderSelect';
+import FactSheet from '../../../components/FactSheet';
 import { requestedByProcess } from '../../../utils/garmentProcessCalc';
 import { formatDate } from '../../../utils/formatters';
 
@@ -27,12 +28,14 @@ const GprOrderSection = memo(function GprOrderSection({ doc, order, orders, sibl
     });
   };
 
-  const items = order ? [
-    { key: 'buyer', label: 'Buyer', children: order.buyer },
-    { key: 'style', label: 'Style No.', children: order.styleNo },
-    { key: 'garment', label: 'Garment description', children: order.garmentDescription },
-    { key: 'qty', label: 'Order qty', children: n(order.totalQty) },
-    { key: 'delivery', label: 'Delivery date', children: formatDate(order.deliveryDate, 'DD-MM-YYYY') },
+  const fields = order ? [
+    { label: 'Buyer', value: order.buyer },
+    { label: 'Style No.', value: order.styleNo },
+    { label: 'Garment', value: order.garmentDescription },
+  ] : [];
+  const tiles = order ? [
+    { label: 'Order Qty', value: n(order.totalQty), accent: true },
+    { label: 'Delivery Date', value: formatDate(order.deliveryDate, 'DD-MM-YYYY') },
   ] : [];
 
   return (
@@ -49,7 +52,7 @@ const GprOrderSection = memo(function GprOrderSection({ doc, order, orders, sibl
         </Row>
       </Form>
       {order
-        ? <Descriptions bordered size="small" column={{ xs: 1, sm: 2, lg: 5 }} items={items} />
+        ? <FactSheet fields={fields} tiles={tiles} />
         : <Text type="secondary">Select a confirmed order to begin.</Text>}
       {requested.length > 0 && (
         <Alert

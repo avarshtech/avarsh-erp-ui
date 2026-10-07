@@ -251,6 +251,13 @@ textarea.ant-input:active {
   overflow: auto;
 }
 
+/* A register whose rows read on one line: no cell or header wraps; with scroll.x 'max-content' the columns
+   grow to their content and the table scrolls sideways instead */
+.table-nowrap .ant-table-thead > tr > th,
+.table-nowrap .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}
+
 /* Nested tables inside cards should not add extra border/radius */
 .ant-card .ant-table {
   border: none !important;

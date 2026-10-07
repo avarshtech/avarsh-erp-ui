@@ -9,6 +9,7 @@ import { lineTotal, processLabel, buildColourSummary, buildProcessRollup, cprTot
 import { NO_PROCESS_LABEL } from './cutPanelConstants';
 import { getRequirementStatusLabel } from './requirementStatus';
 import { formatDate } from './formatters';
+import companyLogo from '../assets/images/sristi_logo.jpeg';
 
 const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
@@ -18,7 +19,7 @@ const sortedLines = (lines) => [...lines].sort((a, b) =>
 
 const CSS = `
   body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 18px; }
-  h1 { font-size: 16px; margin: 0 0 2px; } h2 { font-size: 12px; margin: 16px 0 6px; }
+  h1 { font-size: 16px; margin: 0 0 2px; } .brand { display: flex; gap: 10px; align-items: center; margin-bottom: 6px; } .brand img { max-width: 48px; max-height: 48px; object-fit: contain; } h2 { font-size: 12px; margin: 16px 0 6px; }
   .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 16px; margin: 10px 0; }
   .meta b { display: block; font-size: 9px; color: #666; text-transform: uppercase; }
   table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #bbb; padding: 3px 5px; }
@@ -45,7 +46,7 @@ export const printCprStatement = (cpr, order) => {
   const rollup = buildProcessRollup(lines).map((r) => `<tr><td>${esc(r.process)}</td><td>${esc(r.colors.join(', '))}</td>
     <td>${esc(r.panels.join(', '))}</td><td class="num">${n(r.totalQty)}</td></tr>`).join('');
 
-  const body = `<h1>Cut Panel Requirement</h1><div class="meta">${meta}</div>
+  const body = `<div class="brand"><img src="${companyLogo}" alt="Logo" /><h1>Cut Panel Requirement</h1></div><div class="meta">${meta}</div>
     <h2>Requirement lines</h2><table><thead><tr><th>Fabric</th><th>Colour</th><th>Panel</th><th>Process</th><th class="num">Seq</th><th class="num">Allow %</th>${sizeHead}<th class="num">Total</th></tr></thead>
     <tbody>${rows}</tbody><tfoot>${foot}</tfoot></table>
     <h2>Colour-wise summary</h2><table><thead><tr><th>Colour</th><th>Panels and process chain [pcs]</th></tr></thead><tbody>${colours}</tbody></table>

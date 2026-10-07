@@ -4,6 +4,7 @@ import StatusSteps from '../../../components/StatusSteps';
 import { JOB_WORK_PO_STATUS_CONFIG, JOB_WORK_PO_STATUS_FLOW } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 import { CLOSE_REASONS, optionLabel } from '../../../utils/jobWorkConstants';
+import { afterPaint } from '../../../hooks/usePaintedWork';
 
 const RefetchAlert = ({ refetch }) => (
   <Alert
@@ -16,7 +17,8 @@ const RefetchAlert = ({ refetch }) => (
     )}
     action={(
       <Popconfirm
-        title="Re-fetch lines?" okText="Re-fetch" onConfirm={refetch.onConfirm}
+        // A returned promise spins the OK button until the rebuilt grid has rendered
+        title="Re-fetch lines?" okText="Re-fetch" onConfirm={() => afterPaint().then(refetch.onConfirm)}
         description={`${refetch.rebuilt} reset to the new balance, rates kept${refetch.dropped ? `; ${refetch.dropped} removed` : ''}.`}
       >
         <Button size="small">Re-fetch lines</Button>

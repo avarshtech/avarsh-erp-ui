@@ -42,11 +42,11 @@ export const gridRows = (lines) => {
  */
 export const cppGridColumns = (h) => [
   {
-    title: 'Colour · panel / size', key: 'label', width: 200, fixed: 'left',
+    title: 'Colour · panel / size', key: 'label', width: 280, fixed: 'left',
     render: (_, r) => (r.isGroup ? (
       <Space size={6} align="start">
         <ColorDot hex={r.colorHex} />
-        <span><strong>{r.colorName}</strong><br /><Text type="secondary" style={{ fontSize: 12 }}>{r.panelName} · {r.cprNo} · step {r.sequenceNo} of {r.stepCount}</Text></span>
+        <span><strong>{r.colorName}</strong><br /><Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>{r.panelName} · {r.cprNo} · step {r.sequenceNo} of {r.stepCount}</Text></span>
       </Space>
     ) : <span style={{ paddingLeft: 8 }}>{r.size}</span>),
   },

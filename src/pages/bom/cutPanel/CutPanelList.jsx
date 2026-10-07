@@ -77,7 +77,8 @@ const CutPanelList = () => {
           loading={list.loading}
           rowKey="id"
           size="middle"
-          scroll={{ x: 1400 }}
+          scroll={{ x: 'max-content' }}
+          className="table-nowrap"
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'requirements')}
           onChange={list.onTableChange}
           locale={{ emptyText: <EmptyState title="No cut panel requirements" description="Adjust the filters, or create one from an order with an approved BOM." /> }}

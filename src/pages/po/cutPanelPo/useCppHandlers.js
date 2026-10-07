@@ -46,12 +46,19 @@ const useCppHandlers = ({ doc, selection, dispatch, view, masters }) => {
     }
   }, [doc, selection, dispatch, message]);
 
+  // `printing` spins Print while the organisation (letterhead) is fetched on first use
+  const [printing, setPrinting] = useState(false);
   const print = useCallback(async () => {
-    const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
-    if (!printJobWorkPo(view.working, view.value, org)) message.warning('Allow pop-ups to print the vendor copy.');
+    setPrinting(true);
+    try {
+      const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
+      if (!printJobWorkPo(view.working, view.value, org)) message.warning('Allow pop-ups to print the vendor copy.');
+    } finally {
+      setPrinting(false);
+    }
   }, [view, message]);
 
-  return { grid, chooseProcess, addToGrid, adding, print, overrideRequest, closeOverride: () => setOverrideRequest(null) };
+  return { grid, chooseProcess, addToGrid, adding, print, printing, overrideRequest, closeOverride: () => setOverrideRequest(null) };
 };
 
 export default useCppHandlers;

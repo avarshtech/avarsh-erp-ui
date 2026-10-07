@@ -7,7 +7,7 @@ import CppProcessSteps from './CppProcessSteps';
 const { Text } = Typography;
 
 /**
- * ② Panel Process & Approved Requirement (PRD §8.2): one process per PO, chosen first and
+ * Panel Process & Approved Requirement (PRD §8.2): one process per PO, chosen first and
  * locked once lines exist (FR-06, BR-03); the requirement lookup, colour and size filters
  * (default all) and Add to Grid, which appends and never clears (FR-12). The process-step
  * table shows which steps of these requirements other POs already cover (§13.2).
@@ -26,7 +26,7 @@ const CppRequirementSection = memo(function CppRequirementSection({
   const cprIds = [...new Set(doc.lines.map((l) => l.cprId))];
 
   return (
-    <Card id="cpp-requirement" size="small" title="② Panel Process & Requirement" style={{ marginBottom: 16 }}>
+    <Card id="cpp-requirement" size="small" title="Panel Process & Requirement" style={{ marginBottom: 16 }}>
       <Row gutter={[16, 12]} align="bottom">
         <Col xs={24} md={10}>
           <Text type="secondary" style={{ fontSize: 12 }}>Panel process — one per PO</Text>

@@ -20,7 +20,7 @@ const COLUMNS = [
 ];
 
 /**
- * ② Select Garment Process Requirement (PRD §9, S3): Order #, then Garment Process #, then
+ * Select Garment Process Requirement (PRD §9, S3): Order #, then Garment Process #, then
  * its colour × size cells, with a select-all that stays within one process; Add to PO adds
  * the ticked cells. It stays open on a draft, so more orders or requirements can be added.
  */

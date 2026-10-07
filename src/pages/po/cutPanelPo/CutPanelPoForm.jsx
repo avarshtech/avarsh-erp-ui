@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Button, Result, Skeleton, Space } from 'antd';
-import { HistoryOutlined } from '@ant-design/icons';
+import { Button, Result, Skeleton } from 'antd';
+import { HistoryOutlined, PrinterOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import useActionRunner from '../../../hooks/useActionRunner';
+import useEditParam from '../../../hooks/useEditParam';
 import { useBranch } from '../../../context/BranchContext';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
@@ -15,7 +16,6 @@ import { validateCpp } from '../../../utils/cutPanelPoCalc';
 import { revisionChanges, ISSUED_FIELDS, REVISION_FIELDS } from '../../../utils/cutPanelPoRevision';
 import { refetchCppLines } from '../../../utils/jobWorkRefetch';
 import { getCppAudit } from '../../../services/po/cutPanelPo/cutPanelPoService';
-import JobWorkTypeSwitch from '../jobWork/JobWorkTypeSwitch';
 import JobWorkStatusBanner from '../jobWork/JobWorkStatusBanner';
 import JobWorkApprovalPanel from '../jobWork/JobWorkApprovalPanel';
 import JobWorkReasonDialog from '../jobWork/JobWorkReasonDialog';
@@ -45,7 +45,7 @@ const pick = (src, fields) => Object.fromEntries(fields.map((f) => [f, src[f]]))
 const AMENDABLE = new Set(REVISION_FIELDS);
 
 /**
- * Cut Panel PO — one scrolling screen, six numbered sections and a sticky action bar
+ * Cut Panel PO — one scrolling screen, six titled sections and a sticky action bar
  * (PRD §18.1); no wizard. Everything is the API: the PO, its ledger and approval (the approval engine), the
  * requirements, vendors, processes, payment terms, branches and units.
  */
@@ -55,12 +55,13 @@ const CutPanelPoForm = () => {
   const po = useCutPanelPo(id);
   const { clearDirty } = useUnsavedChanges(po.dirty);
   const { allowedBranches, activeBranch, defaultBranch } = useBranch();
-  const baseView = useCppView(po, null);
+  const [editing, setEditing] = useEditParam();
+  const baseView = useCppView(po, null, editing);
   const working = baseView?.working ?? null;
   const masters = useJobWorkMasters('Cut Panel', { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery || baseView?.edit.terms) });
   const units = useJobWorkUnits(po.doc?.branchId ?? (activeBranch || defaultBranch)?.id, { enabled: Boolean(baseView?.edit.draft || baseView?.edit.delivery) });
   const ctx = useCppContext(working, masters.jobWorkers);
-  const view = useCppView(po, ctx);
+  const view = useCppView(po, ctx, editing);
   const checks = useMemo(() => (ctx && working ? validateCpp(working, ctx) : null), [working, ctx]);
   const lookup = useCppRequirementLookup({ enabled: Boolean(view?.edit.draft), label: po.doc?.process?.label, refresh: po.doc?.lines.length });
   const runner = useActionRunner(id ?? 'new');
@@ -77,9 +78,12 @@ const CutPanelPoForm = () => {
   // While an amendment is open, its fields go to the amendment, never to the live PO.
   const patch = (p) => dispatch({ type: po.rev && Object.keys(p).every((k) => AMENDABLE.has(k)) ? 'COMMERCIAL' : 'PATCH', patch: p });
   const on = {
-    ...flow, back: () => navigate(LIST), print: h.print, save: draft.save, remove: draft.remove,
+    ...flow, edit: () => setEditing(true), save: draft.save, remove: draft.remove,
     submit: () => (checks?.blocking.length ? runner.setErrors(checks.blocking) : draft.submit()),
-    saveDetails: () => flow.saveDetails(pick(doc, [...ISSUED_FIELDS, 'instructions'])),
+    // Nothing changed: Save changes just leaves edit mode; saved, it leaves it too
+    saveDetails: async () => {
+      if (!po.docDirty || await flow.saveDetails(pick(doc, [...ISSUED_FIELDS, 'instructions']))) setEditing(false);
+    },
   };
 
   return (
@@ -89,10 +93,12 @@ const CutPanelPoForm = () => {
         subtitle="Job work on cut panels against a submitted Cut Panel Requirement — who does it, how much, at what rate"
         status={<StatusTag status={doc.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />}
       >
-        <Space wrap>
-          <JobWorkTypeSwitch type="CPP" locked={Boolean(doc.id || doc.lines.length)} />
-          {doc.id && <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>}
-        </Space>
+        {doc.id && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {doc.status !== 'DRAFT' && <Button icon={<PrinterOutlined />} loading={h.printing} onClick={h.print}>Print vendor copy</Button>}
+            <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>History</Button>
+          </div>
+        )}
       </PageHeader>
       <JobWorkStatusBanner doc={doc} flags={view.flags} refetch={refetch} />
       <CppHeaderSection doc={working} editable={view.edit.draft} branches={allowedBranches} unit={activeBranch || defaultBranch} onPatch={patch} />

@@ -24,7 +24,7 @@ export const buildCutPanelListColumns = ({ onOpen, onEdit, canUpdate }) => [
     render: (v, r) => <RecordLink text={v} onClick={() => onOpen(r)} />,
   },
   { title: 'Order No.', dataIndex: 'orderNo', key: 'orderNo', width: 140 },
-  { title: 'Buyer', dataIndex: 'buyer', key: 'buyer', width: 140, ellipsis: true },
+  { title: 'Buyer', dataIndex: 'buyer', key: 'buyer', width: 140 },
   { title: 'Style', dataIndex: 'styleNo', key: 'styleNo', width: 110 },
   {
     title: 'Fabric', dataIndex: 'fabrics', key: 'fabrics', width: 170,

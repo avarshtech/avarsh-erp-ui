@@ -1,7 +1,8 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Card, Table, Typography } from 'antd';
 import EmptyState from '../../../components/EmptyState';
-import { cprTotals } from '../../../utils/cutPanelCalc';
+import { cprTotals, needsReason } from '../../../utils/cutPanelCalc';
+import { gridScroll } from '../../../utils/gridScroll';
 import { buildGridColumns } from './cprGridColumns';
 import { buildGridRows } from './cprGridRows';
 import CprGridToolbar from './CprGridToolbar';
@@ -12,8 +13,9 @@ const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * Section 3 — Cut Panel Requirement grid (PRD §8.3). Size columns come from the order's
- * size set, never hard-coded; a totals row sums every size and the whole CPR. No sticky
- * header: .ant-card-body scrolls (styles/overrides.css), so it would stick inside the card.
+ * size set, never hard-coded; a totals row sums every size and the whole CPR. A long grid
+ * scrolls inside a viewport-high body (utils/gridScroll) with the header and the totals row
+ * pinned, and Panel and Process frozen on the left while the sizes scroll sideways.
  */
 const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editable, handlers }) {
   const [collapsed, setCollapsed] = useState(() => new Set());
@@ -45,7 +47,9 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
   }), [order, editable, doc.orderAllowancePct, collapsed, focusNext, handlers, toggleGroup]);
 
   const totals = useMemo(() => cprTotals(doc.lines, order.sizes), [doc.lines, order.sizes]);
+  const deviating = useMemo(() => doc.lines.filter((l) => needsReason(l, doc.orderAllowancePct)), [doc.lines, doc.orderAllowancePct]);
   const offset = editable ? 1 : 0; // selection column
+  const scroll = gridScroll(760 + order.sizes.length * 90, rows.length);
 
   return (
     <Card title="Cut Panel Requirement" size="small" style={{ marginBottom: 16 }} extra={<Text type="secondary">{doc.lines.length} line(s)</Text>}>
@@ -55,8 +59,10 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
           defaultAllowance={doc.orderAllowancePct}
           overriddenCount={doc.lines.filter((l) => l.isManualOverride).length}
           selectedCount={selected.length}
+          deviation={{ count: deviating.length, withReason: deviating.filter((l) => l.varianceReason?.trim()).length }}
           onRecalcAll={handlers.onRecalcAll}
           onApplyAllowance={handlers.onApplyAllowance}
+          onApplyReason={handlers.onApplyReason}
           onRemoveSelected={() => { handlers.onRemoveMany(selected); setSelectedKeys([]); }}
         />
       )}
@@ -67,7 +73,7 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
         columns={columns}
         dataSource={rows}
         pagination={false}
-        scroll={{ x: 760 + order.sizes.length * 90 }}
+        scroll={scroll}
         onRow={(r) => ({ style: r.type === 'group' ? { background: 'var(--bg-secondary, #fafafa)' } : undefined })}
         rowSelection={editable ? {
           selectedRowKeys: selected,
@@ -77,7 +83,7 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
         } : undefined}
         locale={{ emptyText: <EmptyState title="No requirement lines yet" description="Pick a fabric, colours, panels and processes above, then Add to Grid." /> }}
         summary={() => (doc.lines.length ? (
-          <Table.Summary>
+          <Table.Summary fixed={scroll.y ? 'bottom' : false}>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={4 + offset}><strong>Total cut panel requirement</strong></Table.Summary.Cell>
               {order.sizes.map((s, i) => (

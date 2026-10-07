@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Select, Space } from 'antd';
+import { Alert, Button, Card, Col, Form, Input, InputNumber, Row, Select } from 'antd';
 import { PlusOutlined, UndoOutlined } from '@ant-design/icons';
 import { OTHER_PROCESS_NAME } from '../../../utils/cutPanelConstants';
 import ProcessChips from './ProcessChips';
@@ -9,6 +9,8 @@ import {
   panelOptions, processOptions, renderProcessOption,
 } from './cprSelectionOptions';
 
+const ACTIONS = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 4 };
+
 /**
  * Section 2 — Cut Panel Selection (PRD §8.2). One combined selection; "+ Add to Grid"
  * expands it into Colours x Panels x Processes lines. `onAdd(selection)` returns
@@ -17,7 +19,7 @@ import {
  */
 const CprSelectionStrip = memo(function CprSelectionStrip({ order, fabrics, processes, parts, masters, defaultAllowance, onAdd }) {
   const {
-    sel, set, allowance, setAllowance, fabric, chosenProcesses, needsOther, onColours, reset, add, notice, clearNotice,
+    sel, set, allowance, setAllowance, fabric, chosenProcesses, needsOther, onColours, reset, add, adding, notice, clearNotice,
   } = useCprSelection({ order, fabrics, processes, parts, defaultAllowance, onAdd });
 
   if (masters.forbidden || masters.failed) {
@@ -52,7 +54,7 @@ const CprSelectionStrip = memo(function CprSelectionStrip({ order, fabrics, proc
                 notFoundContent={masters.loading ? 'Loading…' : 'No active parts — add them in Master Data › Parts'} />
             </Form.Item>
           </Col>
-          <Col xs={24} md={12} xl={5}>
+          <Col xs={24} md={12} xl={6}>
             <Form.Item label="Panel Process (in sequence)" htmlFor="cpr-processes">
               <Select id="cpr-processes" mode="multiple" showSearch optionFilterProp="label" loading={masters.loading}
                 placeholder="Tick in the order they happen" value={sel.processIds} options={processOptions(processes)}
@@ -61,20 +63,17 @@ const CprSelectionStrip = memo(function CprSelectionStrip({ order, fabrics, proc
                 notFoundContent={masters.loading ? 'Loading…' : "No active 'Cut Panel' processes — add them in Master Data › Processes"} />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6} xl={2}>
+          <Col xs={24} md={12} xl={3}>
             <Form.Item label="Allowance %" htmlFor="cpr-allowance">
               <InputNumber id="cpr-allowance" min={0} max={100} precision={2} value={allowance} onChange={setAllowance} suffix="%" style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col xs={12} md={6} xl={2}>
-            <Form.Item label=" ">
-              <Space>
-                <Button type="primary" icon={<PlusOutlined />} onClick={add}>Add to Grid</Button>
-                <Button icon={<UndoOutlined />} onClick={reset} aria-label="Reset selection" />
-              </Space>
-            </Form.Item>
-          </Col>
         </Row>
+        {/* The actions take their own full-width row, two equal halves: squeezed into the field row they overflowed it */}
+        <div style={ACTIONS}>
+          <Button type="primary" block icon={<PlusOutlined />} loading={adding} onClick={add}>Add to Grid</Button>
+          <Button block icon={<UndoOutlined />} disabled={adding} onClick={reset}>Reset selection</Button>
+        </div>
         {needsOther && (
           <Form.Item label="Name the “Other” process" required htmlFor="cpr-other" style={{ maxWidth: 360 }}>
             <Input id="cpr-other" maxLength={100} value={sel.otherName} onChange={(e) => set({ otherName: e.target.value })} placeholder="e.g. Rhinestone setting" />

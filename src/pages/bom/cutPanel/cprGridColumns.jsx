@@ -40,7 +40,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
       },
     },
     {
-      title: 'Process', key: 'process', width: 170, onCell: hideOn('group', 'ref'),
+      title: 'Process', key: 'process', width: 170, fixed: 'left', onCell: hideOn('group', 'ref'),
       render: (_, row) => (row.type !== 'line' ? null : (
         <span>{processLabel(row)} {row.isManualOverride && <Tag color="warning" style={{ marginLeft: 4 }}>Edited</Tag>}</span>
       )),

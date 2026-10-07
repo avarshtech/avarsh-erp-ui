@@ -52,7 +52,7 @@ const CppProcessSteps = memo(function CppProcessSteps({ cprIds, processLabel }) 
   return (
     <div style={{ marginTop: 16 }}>
       <Text strong>Process steps of these requirements</Text>
-      <Table size="small" rowKey="key" pagination={false} dataSource={data.rows} columns={columns} style={{ marginTop: 8 }} scroll={{ x: 800 }} />
+      <Table size="small" rowKey="key" pagination={false} dataSource={data.rows} columns={columns} style={{ marginTop: 8 }} scroll={{ x: 'max-content' }} className="table-nowrap" />
     </div>
   );
 });

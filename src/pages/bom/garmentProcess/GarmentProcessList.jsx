@@ -69,7 +69,8 @@ const GarmentProcessList = () => {
           loading={list.loading}
           rowKey="id"
           size="middle"
-          scroll={{ x: 1250 }}
+          scroll={{ x: 'max-content' }}
+          className="table-nowrap"
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'requirements')}
           onChange={list.onTableChange}
           locale={{ emptyText: <EmptyState title="No garment process requirements" description="Adjust the filters, or create one from a confirmed order." /> }}

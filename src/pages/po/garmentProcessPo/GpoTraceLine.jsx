@@ -17,8 +17,9 @@ const GpoTraceLine = memo(function GpoTraceLine({ doc }) {
       <Text>{orders.join(', ')}</Text>
       <Text type="secondary">→</Text>
       {gprs.map(([id, no], i) => <span key={id}><Link to={`/bom/garment-process/${id}`}>{no}</Link>{i < gprs.length - 1 ? ',' : ''}</span>)}
-      <Text type="secondary">→</Text>
-      <Text strong>{doc.poNo || 'GPO (numbered on save)'}</Text>
+      {/* An unsaved PO has no number yet, so the chain ends at its requirements */}
+      {doc.poNo && <Text type="secondary">→</Text>}
+      {doc.poNo && <Text strong>{doc.poNo}</Text>}
     </Space>
   );
 });

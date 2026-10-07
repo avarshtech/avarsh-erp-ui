@@ -6,7 +6,7 @@ import {
 } from '../../../utils/gpoRequirementPicker';
 
 /**
- * State of the Garment Process PO's requirement picker (section ②): the order and requirement
+ * State of the Garment Process PO's requirement picker (Select Garment Process Requirement): the order and requirement
  * picked, the ticked cells — one process per PO — and why any other cell cannot be ticked.
  * Picking a requirement fills its order; changing the order drops a requirement not on it.
  */

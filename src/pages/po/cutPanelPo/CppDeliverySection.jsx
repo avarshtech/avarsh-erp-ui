@@ -16,7 +16,7 @@ const BALANCE_COLUMNS = [
 ];
 
 /**
- * ⑤ Delivery Instructions & Value (PRD FR-21/22, §13.3, §15.4): Return To, the return unit
+ * Delivery Instructions & Value (PRD FR-21/22, §13.3, §15.4): Return To, the return unit
  * from the Unit master with its address as the delivery place, the expected delivery date and
  * the processing instructions (from the process, editable in any status); then the value block
  * and the live balance block (per requirement, from `ctx`). `can` = { delivery, terms, notes,
@@ -25,7 +25,7 @@ const BALANCE_COLUMNS = [
 const CppDeliverySection = memo(function CppDeliverySection({ doc, ctx, value, can, units, onPatch, onCommercial }) {
   const qty = doc.lines.reduce((s, l) => s + (Number(l.poQty) || 0), 0);
   return (
-    <Card id="cpp-delivery" size="small" title="⑤ Delivery Instructions & Value" style={{ marginBottom: 16 }}>
+    <Card id="cpp-delivery" size="small" title="Delivery Instructions & Value" style={{ marginBottom: 16 }}>
       <JobWorkDeliveryFields
         value={doc} dateKey="requiredDeliveryDate" idPrefix="cpp" returnToOptions={CPP_RETURN_TO} units={units}
         editable={{ place: can.delivery, date: can.terms, instructions: can.notes }} onChange={onPatch}

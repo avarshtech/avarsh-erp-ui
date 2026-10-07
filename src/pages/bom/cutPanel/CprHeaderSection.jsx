@@ -7,6 +7,7 @@ import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getRequirementStatusLabel } from '../../../utils/requirementStatus';
 import { CPR_VAL, CPR_WRN } from '../../../utils/cutPanelConstants';
 import CprOrderFacts from './CprOrderFacts';
+import usePaintedWork from '../../../hooks/usePaintedWork';
 
 const { Text } = Typography;
 
@@ -21,6 +22,7 @@ const CprHeaderSection = memo(function CprHeaderSection({
   // WRN-05: the BOM changed after this requirement last read it (its version is snapshotted on every save)
   const bomRevised = Boolean(doc.id && order?.bomVersion != null && doc.bomVersion != null && doc.bomVersion !== order.bomVersion);
   const orderRevised = Boolean(doc.id && order && doc.orderQtySnapshot !== order.totalQty);
+  const [recalculating, runRecalc] = usePaintedWork();
 
   return (
     <Card title="Order and Header" size="small" style={{ marginBottom: 16 }}>
@@ -35,21 +37,24 @@ const CprHeaderSection = memo(function CprHeaderSection({
           </Col>
           <Col xs={12} md={6} lg={4}>
             <Form.Item label="BOM No.">
-              <Text strong style={{ fontFamily: 'monospace' }}>{doc.bomNo || order?.bomNo || '—'}</Text>
+              <Text strong>{doc.bomNo || order?.bomNo || '—'}</Text>
             </Form.Item>
           </Col>
-          <Col xs={12} md={8} lg={6}>
-            <Form.Item label="Cut Panel Requirement No.">
-              <Text strong style={{ fontFamily: 'monospace' }}>{doc.cprNo || 'Generated on first save'}</Text>
-            </Form.Item>
-          </Col>
-          <Col xs={24} lg={6}>
+          {/* The number exists from the first save; an unsaved requirement shows none */}
+          {doc.cprNo && (
+            <Col xs={12} md={8} lg={6}>
+              <Form.Item label="Cut Panel Requirement No.">
+                <Text strong>{doc.cprNo}</Text>
+              </Form.Item>
+            </Col>
+          )}
+          <Col xs={24} md={doc.cprNo ? 24 : 8} lg={doc.cprNo ? 6 : 12}>
             <Form.Item label="Status">
               <Space wrap>
                 <StatusTag status={doc.status} config={REQUIREMENT_STATUS_CONFIG} getLabel={getRequirementStatusLabel} />
                 {bomRevised && <Tooltip title={CPR_WRN.WRN_05}><Tag color="warning" icon={<WarningOutlined />}>BOM revised</Tag></Tooltip>}
                 {orderRevised && <Tooltip title={CPR_WRN.WRN_06}><Tag color="warning" icon={<WarningOutlined />}>Order revised</Tag></Tooltip>}
-                {orderRevised && editable && <Button size="small" onClick={onRecalculate}>Recalculate</Button>}
+                {orderRevised && editable && <Button size="small" loading={recalculating} onClick={() => runRecalc(onRecalculate)}>Recalculate</Button>}
               </Space>
             </Form.Item>
           </Col>

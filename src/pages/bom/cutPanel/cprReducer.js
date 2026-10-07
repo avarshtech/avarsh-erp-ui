@@ -2,7 +2,7 @@
  * State of the Cut Panel Requirement screen: the CPR document being edited plus the
  * order context it was built from. Pure — every quantity rule lives in utils/cutPanelCalc.
  */
-import { highestLineNo, recalcLine, renumberSequences, setSizeQty } from '../../../utils/cutPanelCalc';
+import { highestLineNo, needsReason, recalcLine, renumberSequences, setSizeQty } from '../../../utils/cutPanelCalc';
 import { REQUIREMENT_STATUS } from '../../../utils/requirementStatus';
 
 export const initialCprState = { doc: null, order: null, dirty: false };
@@ -58,6 +58,16 @@ export const cprReducer = (state, action) => {
           ...state.doc,
           lines: state.doc.lines.map((l) => (l.isManualOverride && !action.includeOverridden
             ? l : recalcLine({ ...l, allowancePct: action.pct }, state.order))),
+        },
+      };
+    case 'REASON_ALL': // one reason for every line that deviates; lines with their own only when `replace`
+      return {
+        ...state,
+        dirty: true,
+        doc: {
+          ...state.doc,
+          lines: state.doc.lines.map((l) => (needsReason(l, state.doc.orderAllowancePct) && (action.replace || !l.varianceReason?.trim())
+            ? { ...l, varianceReason: action.reason } : l)),
         },
       };
     case 'SAVED':

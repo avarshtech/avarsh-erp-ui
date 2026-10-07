@@ -11,6 +11,7 @@ import { subtotalsByUom, lineAmount, billingQty } from './jobWorkPoCalc';
 import { jobWorkUomLabel, optionLabel, CPP_RETURN_TO, GPO_RETURN_TO } from './jobWorkConstants';
 import { JOB_WORK_PO_TYPE_LABEL, jobWorkPoStatusLabel, JW_PO_STATUS as S } from './jobWorkPoStatus';
 import { formatDate } from './formatters';
+import companyLogo from '../assets/images/sristi_logo.jpeg';
 
 const n = (v, dp = 0) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 const money = (v) => n(v, 2);
@@ -21,6 +22,7 @@ const CSS = `
   body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 18px; }
   h1 { font-size: 16px; margin: 0; } h2 { font-size: 12px; margin: 14px 0 6px; }
   .top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #333; padding-bottom: 8px; }
+  .brand { display: flex; gap: 10px; align-items: flex-start; } .brand img { max-width: 55px; max-height: 55px; object-fit: contain; }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 16px; margin: 10px 0; }
   .grid b, .party b { display: block; font-size: 9px; color: #666; text-transform: uppercase; }
   .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
@@ -68,7 +70,7 @@ export const printJobWorkPo = (doc, value, org = {}) => {
   const tax = value.igst ? `<tr><td>IGST @ ${value.gstRatePercent}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.igstAmount)}</td></tr>`
     : `<tr><td>CGST @ ${half}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.cgst)}</td></tr><tr><td>SGST @ ${half}%</td><td class="num">${money(value.sgst)}</td></tr>`;
   const body = `
-    <div class="top"><div><h1>${esc(org.organisationName || 'Company')}</h1>${esc([org.addressLine1, org.addressLine2, org.city, org.state, org.pincode].filter(Boolean).join(', '))}<br/>GSTIN ${esc(org.gstin || '—')}</div>
+    <div class="top"><div class="brand"><img src="${companyLogo}" alt="Logo" /><div><h1>${esc(org.organisationName || 'Company')}</h1>${esc([org.addressLine1, org.addressLine2, org.city, org.state, org.pincode].filter(Boolean).join(', '))}<br/>GSTIN ${esc(org.gstin || '—')}</div></div>
       <div style="text-align:right"><h1>Job Work Purchase Order</h1>${esc(JOB_WORK_PO_TYPE_LABEL[doc.type])}</div></div>
     <div class="parties">${party('Job worker', [doc.vendor?.name, doc.vendor?.address, [doc.vendor?.city, doc.vendor?.state, doc.vendor?.pincode].filter(Boolean).join(', '), `GSTIN ${doc.vendor?.gstin || '—'}`, [doc.vendor?.contactPerson, doc.vendor?.phone].filter(Boolean).join(' · ')])}
       ${party('Deliver processed goods to', [doc.returnUnitName, doc.returnUnitAddress, returnTo])}</div>

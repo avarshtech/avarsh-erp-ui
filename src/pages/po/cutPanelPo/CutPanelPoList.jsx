@@ -9,6 +9,7 @@ import EmptyState from '../../../components/EmptyState';
 import PermissionGuard from '../../../components/PermissionGuard';
 import { ActionButton } from '../../../components/buttons';
 import useServerList from '../../../hooks/useServerList';
+import useCppListActions from './useCppListActions';
 import useFilterOptions, { textOptions } from '../../../hooks/useFilterOptions';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import { hasPermission } from '../../../utils/permissions';
@@ -40,7 +41,12 @@ const CutPanelPoList = () => {
   const [exporting, setExporting] = useState(false);
 
   const openRow = useCallback((r) => navigate(`${BASE}/${r.id}`), [navigate]);
-  const columns = useMemo(() => buildCutPanelPoColumns({ onOpen: openRow, canUpdate: hasPermission('cut-panel', 'update') }), [openRow]);
+  const editRow = useCallback((r) => navigate(`${BASE}/${r.id}?edit=1`), [navigate]);
+  const actions = useCppListActions(list.load);
+  const columns = useMemo(() => buildCutPanelPoColumns({
+    onOpen: openRow, onEdit: editRow, onPrint: actions.print, onDelete: actions.remove, printingId: actions.printingId,
+    canUpdate: hasPermission('cut-panel', 'update'), canDelete: hasPermission('cut-panel', 'delete'),
+  }), [openRow, editRow, actions.print, actions.remove, actions.printingId]);
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -83,7 +89,7 @@ const CutPanelPoList = () => {
           ]}
         />
         <Table
-          columns={columns} dataSource={list.rows} loading={list.loading} rowKey="id" size="middle" scroll={{ x: 1800 }}
+          columns={columns} dataSource={list.rows} loading={list.loading} rowKey="id" size="middle" scroll={{ x: 'max-content' }} className="table-nowrap"
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'POs')}
           onChange={list.onTableChange}
           locale={{ emptyText: <EmptyState title="No Cut Panel POs" description="Adjust the filters, or raise one against a submitted Cut Panel Requirement." /> }}

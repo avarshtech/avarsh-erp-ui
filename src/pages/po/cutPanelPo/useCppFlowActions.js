@@ -18,7 +18,7 @@ const useCppFlowActions = ({ doc, rev, dirty, dispatch, clearDirty, runner }) =>
       send: () => act('send', () => svc.sendCppToVendor(doc), 'Sent to the vendor'),
       cancel: (reason) => act('cancel', () => svc.cancelCpp(doc, reason), 'PO cancelled — its allocation is released'),
       shortClose: (reason) => act('shortClose', () => svc.shortCloseCpp(doc, reason), 'PO closed short — the unreceived balance is released'),
-      saveDetails: (patch) => act('details', () => svc.updateCppDetails(doc, patch), 'Changes saved'),
+      saveDetails: (patch) => act('saveDetails', () => svc.updateCppDetails(doc, patch), 'Changes saved'),
       amend: ({ remark }) => act('amend', () => svc.amendCpp(doc, remark), 'Amendment opened'),
       saveRev: () => act('saveRev', () => svc.saveCppRevision(doc, rev), 'Amendment saved'),
       submitRev: () => act('submitRev', async () => {

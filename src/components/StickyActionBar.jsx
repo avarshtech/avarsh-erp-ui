@@ -4,8 +4,9 @@ import { Alert } from 'antd';
 /**
  * Bottom action bar that stays visible while a long document screen scrolls (process
  * requirements, job-work POs).
- * `summary` sits on the left (live totals), the buttons (children) on the right, and
- * `errors` — blocking messages from the last Save / Submit — above both.
+ * `summary` sits on the left (live totals), the buttons (children) on the right — still right-aligned
+ * when a narrow screen wraps them under the summary — and `errors` — blocking messages from the last
+ * Save / Submit — above both.
  */
 const StickyActionBar = memo(function StickyActionBar({ summary, errors = [], children }) {
   return (
@@ -41,7 +42,7 @@ const StickyActionBar = memo(function StickyActionBar({ summary, errors = [], ch
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', fontSize: 13 }}>
           {summary}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{children}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>{children}</div>
       </div>
     </div>
   );

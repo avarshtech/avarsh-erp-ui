@@ -10,7 +10,7 @@ import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 const { Text } = Typography;
 
 /**
- * ① PO Header (PRD §11.1): number (on first save), date (not future-dated, editable until
+ * PO Header (PRD §11.1): number (shown once the first save gives it one), date (not future-dated, editable until
  * approval), branch (deviation D8; locked once lines exist — changing it clears the return
  * unit, which belongs to a branch), INR (D11), status; then order, buyer, style, garment and
  * fabric read-only from the requirement lines.
@@ -18,18 +18,20 @@ const { Text } = Typography;
 const CppHeaderSection = memo(function CppHeaderSection({ doc, editable, branches, unit, onPatch }) {
   const lines = doc.lines;
   const unitId = doc.branchId ?? unit?.id ?? undefined;
+  // An unsaved PO has no number: its column goes and the rest widen to keep the row full
+  const numbered = Boolean(doc.poNo);
   return (
-    <Card id="cpp-header" size="small" title="① PO Header" style={{ marginBottom: 16 }}>
+    <Card id="cpp-header" size="small" title="PO Header" style={{ marginBottom: 16 }}>
       <Row gutter={[16, 12]}>
-        <Col xs={12} md={4}><ReadOnlyField label="PO No." value={doc.poNo || 'On first save'} /></Col>
-        <Col xs={12} md={4}>
+        {numbered && <Col xs={12} md={4}><ReadOnlyField label="PO No." value={doc.poNo} /></Col>}
+        <Col xs={12} md={numbered ? 4 : 5}>
           <Text type="secondary" style={{ fontSize: 12 }}>PO Date</Text>
           <IsoDatePicker
             id="cpp-poDate" allowClear={false} disabled={!editable} value={doc.poDate}
             disabledDate={(d) => d.isAfter(dayjs(), 'day')} onChange={(poDate) => onPatch({ poDate })}
           />
         </Col>
-        <Col xs={12} md={5}>
+        <Col xs={12} md={numbered ? 5 : 6}>
           <Text type="secondary" style={{ fontSize: 12 }}>Branch</Text>
           <Select
             id="cpp-unit" aria-label="Branch" style={{ width: '100%' }} disabled={!editable || lines.length > 0} value={unitId}
@@ -41,7 +43,7 @@ const CppHeaderSection = memo(function CppHeaderSection({ doc, editable, branche
             })}
           />
         </Col>
-        <Col xs={12} md={3}><ReadOnlyField label="Currency" value="INR" /></Col>
+        <Col xs={12} md={numbered ? 3 : 4}><ReadOnlyField label="Currency" value="INR" /></Col>
         <Col xs={12} md={4}>
           <Text type="secondary" style={{ fontSize: 12 }}>Status</Text>
           <div style={{ paddingTop: 4 }}>
@@ -49,7 +51,7 @@ const CppHeaderSection = memo(function CppHeaderSection({ doc, editable, branche
             {doc.revisionNo > 0 && <Text type="secondary"> R{doc.revisionNo}</Text>}
           </div>
         </Col>
-        <Col xs={12} md={4}><ReadOnlyField label="Created by" value={doc.createdBy || '—'} /></Col>
+        <Col xs={12} md={numbered ? 4 : 5}><ReadOnlyField label="Created by" value={doc.createdBy || '—'} /></Col>
         <Col xs={12} md={4}><ReadOnlyField label="Order No." values={lines.map((l) => l.orderNo)} /></Col>
         <Col xs={12} md={4}><ReadOnlyField label="Buyer" values={lines.map((l) => l.buyer)} /></Col>
         <Col xs={12} md={4}><ReadOnlyField label="Style" values={lines.map((l) => l.styleNo)} /></Col>

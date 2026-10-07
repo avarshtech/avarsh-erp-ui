@@ -22,7 +22,7 @@ export const buildGpoListColumns = (a) => [
   { title: 'Requirement No.', dataIndex: 'gprNos', width: 190, render: firstPlus },
   { title: 'Order', dataIndex: 'orderNos', width: 160, render: firstPlus },
   { title: 'Style', dataIndex: 'styleNos', width: 110, render: firstPlus },
-  { title: 'Vendor', dataIndex: 'vendorName', width: 190, ellipsis: true },
+  { title: 'Vendor', dataIndex: 'vendorName', width: 190 },
   { title: 'Process', dataIndex: 'processLabel', width: 150 },
   { title: 'Qty', dataIndex: 'poQty', width: 90, align: 'right', render: n },
   { title: 'Grand Total', dataIndex: 'poValue', width: 130, align: 'right', render: money },
@@ -31,15 +31,17 @@ export const buildGpoListColumns = (a) => [
   {
     title: 'Status', key: 'status', width: 160, align: 'center', fixed: 'right',
     render: (_, r) => (r.flags.length
-      ? <Space size={2} wrap>{r.flags.map((f) => <Tag key={f.key} color={f.color}>{f.label}</Tag>)}</Space>
+      ? <Space size={2}>{r.flags.map((f) => <Tag key={f.key} color={f.color}>{f.label}</Tag>)}</Space>
       : <StatusTag status={r.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />),
   },
   {
     title: 'Actions', key: 'actions', width: 130, fixed: 'right',
     render: (_, r) => (
       <Space size={2}>
-        <ActionButton action={r.status === S.DRAFT && a.canUpdate ? 'edit' : 'view'} size="small" aria-label={`Open ${r.poNo}`} onClick={() => a.onOpen(r)} />
-        <ActionButton action="print" size="small" aria-label={`Print ${r.poNo}`} onClick={() => a.onPrint(r)} />
+        {r.status === S.DRAFT && a.canUpdate
+          ? <ActionButton action="edit" size="small" aria-label={`Edit ${r.poNo}`} onClick={() => a.onEdit(r)} />
+          : <ActionButton action="view" size="small" aria-label={`Open ${r.poNo}`} onClick={() => a.onOpen(r)} />}
+        {r.status !== S.DRAFT && <ActionButton action="print" size="small" aria-label={`Print ${r.poNo}`} loading={a.printingId === r.id} onClick={() => a.onPrint(r)} />}
         {a.canCancel && [S.DRAFT, S.APPROVED].includes(r.status) && <ActionButton action="cancel" size="small" aria-label={`Cancel ${r.poNo}`} onClick={() => a.onCancel(r)} />}
       </Space>
     ),

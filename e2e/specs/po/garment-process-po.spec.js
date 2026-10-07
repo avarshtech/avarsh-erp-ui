@@ -155,7 +155,7 @@ test('Create from a requirement, save, submit (approved with no flow), send', as
   await page.getByRole('button', { name: 'Save Draft' }).click();
   await expect(page.getByRole('heading', { name: /GPPO\/\d{2}-\d{2}\/\d+/ })).toBeVisible();
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
-  await expect(page.getByText(/Submitted for approval/)).toBeVisible();
+  await expect(page.getByText(/Submitted for approval/).first()).toBeVisible(); // the toast, and the approval panel's entry
   await expect(page.getByRole('button', { name: 'Send to Vendor' })).toBeVisible();
   await page.getByRole('button', { name: 'Send to Vendor' }).click();
   await expect(page.getByText('Sent to the vendor')).toBeVisible();
@@ -177,14 +177,14 @@ test('An excess over the balance blocks Submit until approved (AC-06)', async ({
   await page.getByRole('button', { name: 'Authorise' }).click(); // a superuser may approve their own request — logged
   await expect(page.getByText('Excess approved').first()).toBeVisible();
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
-  await expect(page.getByText(/Submitted for approval/)).toBeVisible();
+  await expect(page.getByText(/Submitted for approval/).first()).toBeVisible(); // the toast, and the approval panel's entry
 });
 
 test("A vendor short of the PO's process warns; the approver signs it off in the engine's Approve dialog (§13)", async ({ page }) => {
   await draft(page, fx.signOff, { vendor: 'Colourtex Dye House', rate: 25 }); // does no Bleach Washing; 4,900 × ₹25 meets the flow
   await expect(page.locator('#gpo-header')).toContainText('Does not do Bleach Washing');
   await page.getByRole('button', { name: 'Submit for Approval' }).click();
-  await expect(page.getByText(/Submitted for approval/)).toBeVisible();
+  await expect(page.getByText(/Submitted for approval/).first()).toBeVisible(); // the toast, and the approval panel's entry
 
   const card = approvalCard(page);
   await expect(card).toContainText('Approval level 1 of 1');
@@ -217,7 +217,7 @@ test('Amend delivery on a sent PO is audited; the print carries no internal quan
   await expect(page.locator('.ant-drawer-open')).toContainText(plusDays(20));
   await page.keyboard.press('Escape');
 
-  const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: 'Print', exact: true }).click()]);
+  const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByRole('button', { name: /Print$/ }).click()]);
   await popup.waitForLoadState();
   const html = await popup.content();
   expect(html).toContain(fx.sent.poNo);

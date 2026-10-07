@@ -45,10 +45,11 @@ const GarmentProcessPoList = () => {
   const [exporting, setExporting] = useState(false);
 
   const openRow = useCallback((r) => navigate(`${BASE}/${r.id}`), [navigate]);
+  const editRow = useCallback((r) => navigate(`${BASE}/${r.id}?edit=1`), [navigate]);
   const columns = useMemo(() => buildGpoListColumns({
-    onOpen: openRow, onPrint: actions.print, onCancel: actions.askCancel,
+    onOpen: openRow, onEdit: editRow, onPrint: actions.print, onCancel: actions.askCancel, printingId: actions.printingId,
     canUpdate: hasPermission('garment-process', 'update'), canCancel: hasPermission('garment-process', 'cancel'),
-  }), [openRow, actions.print, actions.askCancel]);
+  }), [openRow, editRow, actions.print, actions.askCancel, actions.printingId]);
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -91,7 +92,7 @@ const GarmentProcessPoList = () => {
           ]}
         />
         <Table
-          columns={columns} dataSource={list.rows} loading={list.loading} rowKey="id" size="middle" scroll={{ x: 1700 }}
+          columns={columns} dataSource={list.rows} loading={list.loading} rowKey="id" size="middle" scroll={{ x: 'max-content' }} className="table-nowrap"
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'POs')}
           onChange={list.onTableChange}
           locale={{ emptyText: <EmptyState title="No Garment Process POs" description="Adjust the filters, or raise one against a submitted Garment Process Requirement." /> }}

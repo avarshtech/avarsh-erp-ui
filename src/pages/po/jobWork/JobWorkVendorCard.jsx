@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Alert, Descriptions, Tag } from 'antd';
+import { Alert, Space, Tag } from 'antd';
+import FactSheet from '../../../components/FactSheet';
 import { jobWorkApproval } from '../../../utils/vendorEligibility';
 
 /**
@@ -13,16 +14,16 @@ const JobWorkVendorCard = memo(function JobWorkVendorCard({ vendor, issue, froze
   return (
     <>
       {issue && <Alert type={issue.warnOnly ? 'warning' : 'error'} showIcon title={issue.text} style={{ marginBottom: 8 }} />}
-      <Descriptions size="small" bordered column={{ xs: 1, md: 2 }} items={[
-        { key: 'code', label: 'Code', children: vendor.id ?? '—' },
-        { key: 'gstin', label: 'GSTIN', children: vendor.gstin || '—' },
-        { key: 'addr', label: 'Address', span: 2, children: [vendor.address, vendor.city, vendor.state, vendor.pincode].filter(Boolean).join(', ') || '—' },
-        { key: 'contact', label: 'Contact', children: [vendor.contactPerson, vendor.phone].filter(Boolean).join(' · ') || '—' },
-        { key: 'email', label: 'Email', children: vendor.email || '—' },
-        { key: 'tax', label: 'GST', children: vendor.igstApplicable ? 'IGST (inter-state)' : 'CGST + SGST (intra-state)' },
+      <FactSheet fields={[
+        { label: 'Code', value: vendor.id },
+        { label: 'GSTIN', value: vendor.gstin },
+        { label: 'GST', value: vendor.igstApplicable ? 'IGST (inter-state)' : 'CGST + SGST (intra-state)' },
+        { label: 'Contact', value: [vendor.contactPerson, vendor.phone].filter(Boolean).join(' · ') },
+        { label: 'Email', value: vendor.email },
+        { label: 'Address', wide: true, value: [vendor.address, vendor.city, vendor.state, vendor.pincode].filter(Boolean).join(', ') },
         {
-          key: 'approval', label: 'Job-work approval',
-          children: <><Tag color={approval.color}>{approval.label}</Tag>{frozen && <Tag>Snapshot frozen on approval</Tag>}</>,
+          label: 'Job-work approval',
+          value: <Space size={4} wrap><Tag color={approval.color}>{approval.label}</Tag>{frozen && <Tag>Snapshot frozen on approval</Tag>}</Space>,
         },
       ]} />
     </>

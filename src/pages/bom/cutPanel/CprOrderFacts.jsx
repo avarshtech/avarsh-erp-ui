@@ -1,37 +1,43 @@
 import { memo, useMemo } from 'react';
-import { Descriptions } from 'antd';
 import { formatDate } from '../../../utils/formatters';
 import { calcRequiredQty } from '../../../utils/cutPanelCalc';
+import FactSheet from '../../../components/FactSheet';
 
 const qty = (v) => (v == null ? '—' : Number(v).toLocaleString('en-IN'));
+const date = (v) => formatDate(v, 'DD-MM-YYYY');
 
-/** Read-only order facts of the CPR header (PRD §8.1) — fetched, never edited here. */
+/**
+ * Read-only order facts of the CPR header (PRD §8.1) — fetched, never edited here. Qty incl. Allowance is the
+ * accent: the grid's calculated quantities start from it. Created by / on appears once the requirement is saved.
+ */
 const CprOrderFacts = memo(function CprOrderFacts({ order, doc }) {
-  const items = useMemo(() => {
-    if (!order) return [];
+  const facts = useMemo(() => {
+    if (!order) return null;
     const allowance = Number(doc?.orderAllowancePct ?? order.allowancePercent) || 0;
-    return [
-      { key: 'buyer', label: 'Buyer', children: order.buyer },
-      { key: 'style', label: 'Style No.', children: order.styleNo },
-      { key: 'garment', label: 'Garment Description', children: order.garmentDescription },
-      { key: 'season', label: 'Season', children: order.season },
-      { key: 'orderDate', label: 'Order Date', children: formatDate(order.orderDate, 'DD-MM-YYYY') },
-      { key: 'delivery', label: 'Delivery Date', children: formatDate(order.deliveryDate, 'DD-MM-YYYY') },
-      { key: 'qty', label: 'Order Quantity', children: qty(order.totalQty) },
-      { key: 'allow', label: 'Order Allowance %', children: `${allowance.toFixed(2)}%` },
-      { key: 'qtyAllow', label: 'Qty incl. Allowance', children: qty(calcRequiredQty(order.totalQty, 1, allowance)) },
-      { key: 'colours', label: 'Colours in Order', children: order.colors.length },
-      { key: 'sizes', label: 'Size Set', children: order.sizes.join(' · ') },
-      {
-        key: 'created',
-        label: 'Created By / On',
-        children: doc?.createdBy ? `${doc.createdBy} · ${formatDate(doc.createdOn, 'DD-MM-YYYY')}` : 'On first save',
-      },
-    ];
+    return {
+      fields: [
+        { label: 'Buyer', value: order.buyer },
+        { label: 'Style No.', value: order.styleNo },
+        { label: 'Garment', value: order.garmentDescription },
+        { label: 'Season', value: order.season },
+      ],
+      tiles: [
+        { label: 'Order Qty', value: qty(order.totalQty) },
+        { label: 'Allowance', value: `${allowance.toFixed(2)}%` },
+        { label: 'Qty incl. Allowance', value: qty(calcRequiredQty(order.totalQty, 1, allowance)), accent: true },
+        { label: 'Order Date', value: date(order.orderDate) },
+        { label: 'Delivery Date', value: date(order.deliveryDate) },
+      ],
+      chips: [
+        { label: `Colours · ${order.colors.length}`, items: order.colors.map((c) => ({ key: c.name, text: c.name, swatch: c.hex })) },
+        { label: `Sizes · ${order.sizes.length}`, items: order.sizes.map((s) => ({ key: s, text: s })) },
+      ],
+      footer: doc?.createdBy ? `Created by ${doc.createdBy} on ${date(doc.createdOn)}` : null,
+    };
   }, [order, doc]);
 
-  if (!order) return null;
-  return <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3, xl: 4 }} items={items} />;
+  if (!facts) return null;
+  return <FactSheet {...facts} />;
 });
 
 export default CprOrderFacts;
