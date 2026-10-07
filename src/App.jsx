@@ -83,6 +83,7 @@ const TopseForm = lazy(() => import('./pages/production/sewing/TopseForm'));
 const FinishingWorkspace = lazy(() => import('./pages/production/finishing/FinishingWorkspace'));
 const ProductionMastersPage = lazy(() => import('./pages/production/masters/ProductionMastersPage'));
 const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
+const GarmentCheckForm = lazy(() => import('./pages/production/finishing/GarmentCheckForm'));
 const CartonPackingList = lazy(() => import('./pages/production/packing/CartonPackingList'));
 const CartonPackingForm = lazy(() => import('./pages/production/packing/CartonPackingForm'));
 const JobWorkWorkspace = lazy(() => import('./pages/production/jobwork/JobWorkWorkspace'));
@@ -342,6 +343,8 @@ const ThemedApp = () => {
             <Route path="production/masters" element={<PermissionRoute module="production-masters" operation="view"><Suspense fallback={<PageSkeleton />}><ProductionMastersPage /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
             <Route path="production/finishing/checking/:id" element={<PermissionRoute module="production-finishing" operation="view"><Suspense fallback={<PageSkeleton />}><CheckingForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/garment-check/new" element={<PermissionRoute module="production-finishing" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentCheckForm /></Suspense></PermissionRoute>} />
+            <Route path="production/finishing/garment-check/:id" element={<PermissionRoute module="production-finishing" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentCheckForm /></Suspense></PermissionRoute>} />
 
             {/* Production — Packing (UI mock phase; shares the export-docs carton store) */}
             <Route path="production/packing/list" element={<PermissionRoute module="production-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingList /></Suspense></PermissionRoute>} />

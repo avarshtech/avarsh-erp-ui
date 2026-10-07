@@ -2,15 +2,20 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Card, Segmented, Table, Space, Tag } from 'antd';
 import { ImportOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { useNavigate } from 'react-router-dom';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
 import { getTablePagination } from '../../../utils/paginationConfig';
-import { listProcessIssues, listProcessReturns, cancelProcessIssue } from '../../../services/production/finishingService';
+import {
+  listProcessIssues, listProcessReturns, cancelProcessIssue, listGarmentChecks,
+} from '../../../services/production/finishingService';
 import FinishingStatusTag from './FinishingStatusTag';
 import GarmentIssueDrawer from './GarmentIssueDrawer';
 import GarmentReceiveDrawer from './GarmentReceiveDrawer';
+import { buildGarmentCheckListColumns } from './garmentCheckColumns';
 
 const ISSUE_VIEW = 'Garment Issue to Process';
+const CHECK_VIEW = 'Garment Checks';
 const RECEIVE_VIEW = 'Garment Receive from Process';
 const OPEN = ['ISSUED', 'PARTIALLY_RETURNED'];
 const fmtDate = (v) => (v ? dayjs(v).format('DD-MMM-YYYY') : '—');
@@ -18,11 +23,13 @@ const lineTags = (lines, qtyKey) => (lines || []).map((l) => (
   <Tag key={`${l.color}-${l.size}`}>{l.color} {l.size} × {l[qtyKey]}</Tag>
 ));
 
-/** External Process — garments sent out for washing, printing or embroidery against a Work Order, and received back. */
+/** External Process — garments sent out for washing, printing or embroidery against a Work Order, checked, and received back. */
 const GarmentProcessTab = () => {
   const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const [view, setView] = useState(ISSUE_VIEW);
   const [issues, setIssues] = useState([]);
+  const [checks, setChecks] = useState([]);
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [issueOpen, setIssueOpen] = useState(false);
@@ -31,8 +38,8 @@ const GarmentProcessTab = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [i, r] = await Promise.all([listProcessIssues(), listProcessReturns()]);
-      setIssues(i); setReturns(r);
+      const [i, c, r] = await Promise.all([listProcessIssues(), listGarmentChecks(), listProcessReturns()]);
+      setIssues(i); setChecks(c); setReturns(r);
     } catch { message.error('Failed to load external process records'); } finally { setLoading(false); }
   }, [message]);
 
@@ -93,31 +100,53 @@ const GarmentProcessTab = () => {
       render: (v) => (v > 0 ? <span style={{ color: 'var(--error-color)' }}>{v}</span> : 0) },
   ], []);
 
-  const isIssue = view === ISSUE_VIEW;
+  const checkColumns = useMemo(
+    () => buildGarmentCheckListColumns((id) => navigate(`/production/finishing/garment-check/${id}`)),
+    [navigate],
+  );
+
   const openIssues = useMemo(() => issues.filter((i) => OPEN.includes(i.status)), [issues]);
+
+  // Each tab carries its own create button, so only the one for the records on screen shows.
+  const views = {
+    [ISSUE_VIEW]: {
+      columns: issueColumns, data: issues, scrollX: 1950, key: 'garment-process-issues',
+      empty: 'No garments issued to a process',
+      hint: 'Issue an approved Work Order\'s garments for washing, printing or embroidery',
+      action: <ActionButton action="create" text="Issue Garments" onClick={() => setIssueOpen(true)} />,
+    },
+    [CHECK_VIEW]: {
+      columns: checkColumns, data: checks, scrollX: 1450, key: 'garment-checks',
+      empty: 'No garment checks yet',
+      hint: 'Check garments back from the vendor before they rejoin finishing',
+      action: <ActionButton action="create" text="Garment Check" onClick={() => navigate('/production/finishing/garment-check/new')} />,
+    },
+    [RECEIVE_VIEW]: {
+      columns: returnColumns, data: returns, scrollX: 1560, key: 'garment-process-returns',
+      empty: 'Nothing received back yet',
+      hint: 'Record what comes back from the vendor against its Process PO',
+      action: <ActionButton action="create" text="Receive Garments" disabled={!openIssues.length}
+        tooltip={openIssues.length ? undefined : 'No garments are out with a process vendor'}
+        onClick={() => setReceive({ open: true, issueId: null })} />,
+    },
+  };
+  const active = views[view];
 
   return (
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }} wrap>
-        <Segmented options={[ISSUE_VIEW, RECEIVE_VIEW]} value={view} onChange={setView} />
-        {isIssue
-          ? <ActionButton action="create" text="Issue Garments" onClick={() => setIssueOpen(true)} />
-          : <ActionButton action="create" text="Receive Garments" disabled={!openIssues.length}
-              tooltip={openIssues.length ? undefined : 'No garments are out with a process vendor'}
-              onClick={() => setReceive({ open: true, issueId: null })} />}
+        <Segmented options={Object.keys(views)} value={view} onChange={setView} />
+        {active.action}
       </Space>
       <Table
         rowKey="id"
         size="small"
         loading={loading}
-        columns={isIssue ? issueColumns : returnColumns}
-        dataSource={isIssue ? issues : returns}
-        scroll={{ x: isIssue ? 1950 : 1560 }}
-        pagination={getTablePagination({ pageSize: 10 }, isIssue ? 'garment-process-issues' : 'garment-process-returns')}
-        locale={{ emptyText: <EmptyState
-          title={isIssue ? 'No garments issued to a process' : 'Nothing received back yet'}
-          description={isIssue ? 'Issue an approved Work Order\'s garments for washing, printing or embroidery'
-            : 'Record what comes back from the vendor against its Process PO'} /> }}
+        columns={active.columns}
+        dataSource={active.data}
+        scroll={{ x: active.scrollX }}
+        pagination={getTablePagination({ pageSize: 10 }, active.key)}
+        locale={{ emptyText: <EmptyState title={active.empty} description={active.hint} /> }}
       />
       <GarmentIssueDrawer open={issueOpen} onClose={() => setIssueOpen(false)}
         onSaved={() => { setIssueOpen(false); load(); }} />

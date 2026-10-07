@@ -30,6 +30,10 @@ export const FINISHING_STATUS_COLORS = {
   PARTIALLY_RETURNED: 'processing',
   FULLY_RETURNED: 'success',
   CANCELLED: 'default',
+  // garment checks (External Process) - mirror the API's GarmentCheckStatus; PENDING is above
+  PARTIAL: 'warning',
+  PASSED: 'success',
+  FAILED: 'error',
 };
 
 export const finishingStatusLabel = (s) => String(s || '').replaceAll('_', ' ')

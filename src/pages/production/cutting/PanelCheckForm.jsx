@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, Spin, Table, Checkbox, Input, Alert, Button, Descriptions, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { App, Card, Space, Spin, Table, Input, Alert, Button, Descriptions, Tag } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
@@ -9,6 +9,7 @@ import { FormSelect } from '../../../components/form';
 import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { listPanelChecks, listPanelIssues, savePanelCheck, getCutPos } from '../../../services/production/cuttingService';
 import { toastUnlessHandled } from '../../../utils/apiError';
+import { buildPanelCheckColumns } from './panelCheckColumns';
 
 /** FR-09 — QC on panels returning from an external process, per bundle range. */
 const PanelCheckForm = () => {
@@ -53,6 +54,7 @@ const PanelCheckForm = () => {
       verified: rows.filter((r) => r.verified).length,
       failed,
       pending: rows.filter((r) => !r.verified).length,
+      qty: rows.reduce((sum, r) => sum + (r.qty || 0), 0),
       defectPct: rows.length ? Math.round((failed / rows.length) * 100) : 0,
     };
   }, [check]);
@@ -62,53 +64,20 @@ const PanelCheckForm = () => {
     patch({
       panelIssueId, cuttingPoId: issue?.cuttingPoId, processName: issue?.processName,
       rows: (issue?.lines || []).map((l, i) => ({
-        size: l.size, orderRange: `1-${l.issueQty}`, bundleRange: `Lot-${i + 1}`,
+        size: l.size, orderRange: `1-${l.issueQty}`, bundleRange: `Lot-${i + 1}`, qty: l.issueQty,
         verified: false, quality: null, comments: '', action: null, qcSign: '',
       })),
     });
   }, [issues, patch]);
 
-  const columns = useMemo(() => [
-    { title: 'Size', dataIndex: 'size', width: 80, align: 'center' },
-    { title: 'Order Range', dataIndex: 'orderRange', width: 110, align: 'center', render: (v) => <code>{v}</code> },
-    {
-      title: 'Bundle Range', dataIndex: 'bundleRange', width: 130,
-      render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setRow(idx, 'bundleRange', e.target.value)} />,
-    },
-    {
-      title: 'Verified', dataIndex: 'verified', width: 80, align: 'center',
-      render: (v, _, idx) => <Checkbox checked={v} onChange={(e) => setRow(idx, 'verified', e.target.checked)} />,
-    },
-    {
-      title: 'Print / Process Quality', dataIndex: 'quality', width: 170,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 155 }} placeholder="Quality"
-          options={qualityOptions} onChange={(val) => setRow(idx, 'quality', val)} />
-      ),
-    },
-    {
-      title: 'Comments', dataIndex: 'comments', width: 180,
-      render: (v, _, idx) => <Input size="small" value={v} onChange={(e) => setRow(idx, 'comments', e.target.value)} />,
-    },
-    {
-      title: 'Corrective Action', dataIndex: 'action', width: 200,
-      render: (v, _, idx) => (
-        <FormSelect size="small" value={v} style={{ width: 185 }} placeholder="Action"
-          options={actionOptions} onChange={(val) => setRow(idx, 'action', val)} />
-      ),
-    },
-    {
-      title: 'QC Sign', dataIndex: 'qcSign', width: 130,
-      render: (v, _, idx) => <Input size="small" value={v} placeholder="Inspector" onChange={(e) => setRow(idx, 'qcSign', e.target.value)} />,
-    },
-    {
-      title: '', key: 'del', width: 46, align: 'center',
-      render: (_, __, idx) => (
-        <Button size="small" type="text" danger icon={<DeleteOutlined />}
-          onClick={() => setCheck((prev) => ({ ...prev, rows: prev.rows.filter((_, i) => i !== idx) }))} />
-      ),
-    },
-  ], [setRow, qualityOptions, actionOptions]);
+  const removeRow = useCallback((idx) => {
+    setCheck((prev) => ({ ...prev, rows: prev.rows.filter((_, i) => i !== idx) }));
+  }, []);
+
+  const columns = useMemo(
+    () => buildPanelCheckColumns({ setRow, removeRow, qualityOptions, actionOptions }),
+    [setRow, removeRow, qualityOptions, actionOptions],
+  );
 
   const handleSave = async () => {
     if (!check.panelIssueId) return message.warning('Select the panel issue being checked');
@@ -171,18 +140,19 @@ const PanelCheckForm = () => {
           <Space size="large">
             <span>Bundle-range Verification</span>
             <Tag>Checked {stats.verified}/{stats.total}</Tag>
+            <Tag color="blue">Qty {stats.qty}</Tag>
             <Tag color="red">Issues {stats.failed}</Tag>
             <Tag color="orange">Pending {stats.pending}</Tag>
           </Space>
         )}
         extra={(
           <Button icon={<PlusOutlined />} size="small"
-            onClick={() => patch({ rows: [...check.rows, { size: po?.sizes?.[0], orderRange: '', bundleRange: '', verified: false, quality: null, comments: '', action: null, qcSign: '' }] })}>
+            onClick={() => patch({ rows: [...check.rows, { size: po?.sizes?.[0], orderRange: '', bundleRange: '', qty: null, verified: false, quality: null, comments: '', action: null, qcSign: '' }] })}>
             Add Range
           </Button>
         )}
       >
-        <Table rowKey={(r) => check.rows.indexOf(r)} size="small" columns={columns} dataSource={check.rows} pagination={false} scroll={{ x: 1150 }}
+        <Table rowKey={(r) => check.rows.indexOf(r)} size="small" columns={columns} dataSource={check.rows} pagination={false} scroll={{ x: 1250 }}
           rowClassName={(r) => (r.quality && r.quality !== 'OK' ? 'row-shortage' : '')}
           locale={{ emptyText: 'Select a panel issue to load its size ranges' }} />
       </Card>

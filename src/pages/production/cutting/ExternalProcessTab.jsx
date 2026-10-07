@@ -87,10 +87,20 @@ const ExternalProcessTab = () => {
     { title: 'Issue Status', dataIndex: 'issueStatus', width: 160, render: (v) => <CuttingStatusTag status={v} /> },
   ], []);
 
+  // Each tab carries its own create button, so only the one for the records on screen shows.
   const tables = {
-    'Issue to Other Vendor': { columns: issueColumns, data: issues, empty: 'No panels issued to other vendors yet' },
-    'Panel Checks': { columns: checkColumns, data: checks, empty: 'No post-process panel checks yet' },
-    'Receive from Vendor': { columns: returnColumns, data: returns, empty: 'No receipts back from vendors yet' },
+    'Issue to Other Vendor': {
+      columns: issueColumns, data: issues, empty: 'No panels issued to other vendors yet',
+      action: <ActionButton action="create" text="Issue to Other Vendor" onClick={() => setIssueOpen(true)} />,
+    },
+    'Panel Checks': {
+      columns: checkColumns, data: checks, empty: 'No post-process panel checks yet',
+      action: <ActionButton action="create" text="Panel Check" onClick={() => navigate('/production/cutting/panel-check/new')} />,
+    },
+    'Receive from Vendor': {
+      columns: returnColumns, data: returns, empty: 'No receipts back from vendors yet',
+      action: <ActionButton action="create" text="Receive from Vendor" onClick={() => setReturnOpen(true)} />,
+    },
   };
   const active = tables[view];
 
@@ -98,11 +108,7 @@ const ExternalProcessTab = () => {
     <Card>
       <Space style={{ marginBottom: 16, justifyContent: 'space-between', width: '100%' }}>
         <Segmented options={Object.keys(tables)} value={view} onChange={setView} />
-        <Space>
-          <ActionButton action="create" text="Issue to Other Vendor" onClick={() => setIssueOpen(true)} />
-          <ActionButton action="create" text="Panel Check" onClick={() => navigate('/production/cutting/panel-check/new')} />
-          <ActionButton action="create" text="Receive from Vendor" onClick={() => setReturnOpen(true)} />
-        </Space>
+        {active.action}
       </Space>
       <Table rowKey="id" size="small" columns={active.columns} dataSource={active.data} loading={loading}
         scroll={{ x: 1000 }} pagination={getTablePagination({ pageSize: 10 }, 'records')}

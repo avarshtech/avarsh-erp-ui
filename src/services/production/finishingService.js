@@ -61,4 +61,5 @@ export {
 export {
   listProcessIssues, createProcessIssue, cancelProcessIssue,
   listProcessReturns, createProcessReturn, getProcessWorkOrders, getProcessVendors, getProcessJobWorkPos,
+  listGarmentChecks, getGarmentCheck, saveGarmentCheck,
 } from './finishingProcessApi';

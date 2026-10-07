@@ -50,3 +50,22 @@ export const getProcessJobWorkPos = async (workOrderId) => {
   const { data } = await axiosInstance.get(`${BASE}/process-lookups/job-work-pos`, { params: { workOrderId } });
   return data || [];
 };
+
+/* ── Garment checks: QC on garments back from the process vendor ─────────── */
+
+export const listGarmentChecks = async (params = {}) => {
+  const { data } = await axiosInstance.get(`${BASE}/garment-checks`, { params: { ...PAGE, ...params } });
+  return data?.content || [];
+};
+
+export const getGarmentCheck = async (id) => {
+  const { data } = await axiosInstance.get(`${BASE}/garment-checks/${id}`);
+  return data;
+};
+
+export const saveGarmentCheck = async (payload) => {
+  const { data } = payload.id
+    ? await axiosInstance.put(`${BASE}/garment-checks/${payload.id}`, payload)
+    : await axiosInstance.post(`${BASE}/garment-checks`, payload);
+  return data;
+};

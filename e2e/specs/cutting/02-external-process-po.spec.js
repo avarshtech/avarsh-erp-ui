@@ -91,7 +91,9 @@ test('An in-house Cut PO issues against the approved Cut Panel PO; the first DC 
 
 test('Receive from Vendor: good and rejected panels and the vendor DC close the PO lines', async ({ page }) => {
   await openTab(page);
-  await page.getByRole('button', { name: /Receive from Vendor/ }).first().click();
+  // Each tab shows only its own create button, so open the Receive tab first
+  await page.locator('.ant-segmented').getByText('Receive from Vendor').click();
+  await page.getByRole('button', { name: /Receive from Vendor/ }).click();
   const drawer = page.locator('.ant-drawer-open');
   await pick(page, 'Panel issue', fx.cpp.poNo);
   await expect(drawer.locator('.ant-table-row')).toHaveCount(4);
