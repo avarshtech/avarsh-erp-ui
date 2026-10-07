@@ -57,6 +57,13 @@ nested `style={{ }}` is never mistaken for a top-level prop.
 | Steps | `direction` | `orientation` |
 | Steps | `labelPlacement` | `titlePlacement` |
 | Steps | `progressDot` | `type="dot"` |
+| Steps (items) | `description` | `content` |
+| Timeline (items) | `label` | `title` |
+| Timeline (items) | `children` | `content` |
+| Timeline (items) | `dot` | `icon` |
+| Timeline (items) | `position` | `placement` |
+| Timeline | `mode="left"` / `mode="right"` | `mode="start"` / `mode="end"` |
+| Timeline | `pending`, `pendingDot` | a pending node in `items` |
 | Drawer | `width`, `height` | `size` |
 | Modal | `destroyOnClose` | `destroyOnHidden` |
 | Modal | `autoFocusButton` | `focusable.autoFocusButton` |

@@ -30,6 +30,9 @@ import {
 import { MAPPING_STATUS } from './poOrderMappingConstants';
 import { REQUIREMENT_STATUS } from './requirementStatus';
 import { JW_PO_STATUS } from './jobWorkPoStatus';
+import {
+  FLAG, JOB_STATUS, PULLBACK_STATUS, RECEIPT_STATUS, RETURN_STATUS, RISK,
+} from './jobWorkTracker/constants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -101,6 +104,49 @@ export const JOB_WORK_PO_STATUS_CONFIG = {
   [JW_PO_STATUS.CLOSED]:              { color: 'default',    icon: StopOutlined },
   [JW_PO_STATUS.REJECTED]:            { color: 'red',        icon: CloseCircleOutlined },
   [JW_PO_STATUS.CANCELLED]:           { color: 'volcano',    icon: StopOutlined },
+};
+
+// ==================== JOB WORK TRACKER (outsourced jobs, UI mock round 1) ====================
+export const JOB_WORK_JOB_STATUS_CONFIG = {
+  [JOB_STATUS.OPEN]:        { color: 'default',    icon: FileTextOutlined },
+  [JOB_STATUS.IN_PROGRESS]: { color: 'processing', icon: ClockCircleOutlined },
+  [JOB_STATUS.COMPLETED]:   { color: 'green',      icon: CheckCircleOutlined },
+  [JOB_STATUS.CLOSED]:      { color: 'default',    icon: StopOutlined },
+  [JOB_STATUS.CANCELLED]:   { color: 'volcano',    icon: StopOutlined },
+};
+
+export const JOB_WORK_RISK_CONFIG = {
+  [RISK.OVERDUE]:  { color: 'red',    icon: ExclamationCircleOutlined },
+  [RISK.AT_RISK]:  { color: 'orange', icon: WarningOutlined },
+  [RISK.ON_TRACK]: { color: 'green',  icon: CheckCircleOutlined },
+};
+
+export const JOB_WORK_FLAG_CONFIG = {
+  [FLAG.ON_TRACK]: { color: 'green' },
+  [FLAG.AT_RISK]:  { color: 'orange' },
+  [FLAG.DELAYED]:  { color: 'red' },
+  [FLAG.ON_HOLD]:  { color: 'default' },
+};
+
+export const JOB_WORK_RECEIPT_STATUS_CONFIG = {
+  [RECEIPT_STATUS.POSTED]:    { color: 'green',   icon: InboxOutlined },
+  [RECEIPT_STATUS.CANCELLED]: { color: 'volcano', icon: StopOutlined },
+};
+
+export const JOB_WORK_PULLBACK_STATUS_CONFIG = {
+  [PULLBACK_STATUS.DRAFT]:            { color: 'default',    icon: FileTextOutlined },
+  [PULLBACK_STATUS.PENDING_APPROVAL]: { color: 'processing', icon: ClockCircleOutlined },
+  [PULLBACK_STATUS.APPROVED]:         { color: 'blue',       icon: SwapOutlined },
+  [PULLBACK_STATUS.SETTLED]:          { color: 'green',      icon: CheckCircleOutlined },
+  [PULLBACK_STATUS.REJECTED]:         { color: 'red',        icon: CloseCircleOutlined },
+  [PULLBACK_STATUS.REFERRED_BACK]:    { color: 'orange',     icon: UndoOutlined },
+  [PULLBACK_STATUS.CANCELLED]:        { color: 'volcano',    icon: StopOutlined },
+};
+
+export const JOB_WORK_RETURN_STATUS_CONFIG = {
+  [RETURN_STATUS.DRAFT]:     { color: 'default', icon: FileTextOutlined },
+  [RETURN_STATUS.POSTED]:    { color: 'green',   icon: InboxOutlined },
+  [RETURN_STATUS.CANCELLED]: { color: 'volcano', icon: StopOutlined },
 };
 
 // ==================== GRN STATUS CONFIG ====================

@@ -432,12 +432,13 @@ const MainLayoutInner = () => {
       key: "/production",
       icon: <ScissorOutlined />,
       label: "Production",
-      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-packing", "production-masters"],
+      moduleId: ["production-cutting", "production-sewing", "production-finishing", "production-packing", "production-job-work", "production-masters"],
       children: [
         { key: "/production/cutting", label: "Cutting", moduleId: "production-cutting" },
         { key: "/production/sewing", label: "Sewing", moduleId: "production-sewing" },
         { key: "/production/finishing", label: "Finishing", moduleId: "production-finishing" },
         { key: "/production/packing/list", label: "Packing", moduleId: "production-packing" },
+        { key: "/production/job-work", label: "Job Work", moduleId: "production-job-work" },
         // Moved here from the Export Documentation children, where it sat while this group
         // already claimed its permission key above — so the menu and the RBAC matrix disagreed
         // about which module it belonged to.
@@ -642,6 +643,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/production/sewing')) return ['/production/sewing'];
     if (path.startsWith('/production/finishing')) return ['/production/finishing'];
     if (path.startsWith('/production/packing')) return ['/production/packing/list'];
+    if (path.startsWith('/production/job-work')) return ['/production/job-work'];
     if (path.startsWith('/production/masters')) return ['/production/masters'];
     if (path.startsWith('/bom/cut-panel')) return ['/bom/cut-panel/list'];
     if (path.startsWith('/bom/garment-process')) return ['/bom/garment-process/list'];

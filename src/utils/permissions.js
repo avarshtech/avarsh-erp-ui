@@ -291,6 +291,20 @@ export const SCREENS = [
     path: '/production/packing/list',
     routes: ['/production/packing/list', '/production/packing/new', '/production/packing/edit/:id'],
     ops: STANDARD_OPERATIONS },
+  // UI mock round 1: this key lives only in the web app (admins see every SCREENS key); the API key
+  // and its grant migration come with the backend once the screens are signed off.
+  { id: 'production-job-work', name: 'Production — Job Work', section: 'production', kind: 'screen',
+    path: '/production/job-work',
+    routes: ['/production/job-work'],
+    ops: ['view', 'add', 'delete', 'receive', 'cancel', 'approve'],
+    opLabels: {
+      add: 'Enter daily progress · Raise pull-back',
+      delete: 'Delete latest progress entry',
+      receive: 'Receive from vendor · Pull-back returns',
+      cancel: 'Short-close job · Cancel receipt / pull-back',
+      approve: 'Approve pull-back',
+    },
+    description: 'Outsourced jobs at vendors: daily status per colour and stage, receipts, pull-backs to in-house and the order split.' },
 
   // ── Export Documentation ──
   { id: 'export-shipments', name: 'Shipments', section: 'expdoc', kind: 'screen',

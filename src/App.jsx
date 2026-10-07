@@ -85,6 +85,7 @@ const ProductionMastersPage = lazy(() => import('./pages/production/masters/Prod
 const CheckingForm = lazy(() => import('./pages/production/finishing/CheckingForm'));
 const CartonPackingList = lazy(() => import('./pages/production/packing/CartonPackingList'));
 const CartonPackingForm = lazy(() => import('./pages/production/packing/CartonPackingForm'));
+const JobWorkWorkspace = lazy(() => import('./pages/production/jobwork/JobWorkWorkspace'));
 import CostingList from './pages/costing/CostingList';
 import CostingSheetPage from './pages/costing/sheet/CostingSheetPage';
 import CostingView from './pages/costing/CostingView';
@@ -345,6 +346,9 @@ const ThemedApp = () => {
             <Route path="production/packing/list" element={<PermissionRoute module="production-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingList /></Suspense></PermissionRoute>} />
             <Route path="production/packing/new" element={<PermissionRoute module="production-packing" operation="add"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
             <Route path="production/packing/edit/:id" element={<PermissionRoute module="production-packing" operation="view"><Suspense fallback={<PageSkeleton />}><CartonPackingForm /></Suspense></PermissionRoute>} />
+
+            {/* Production — Job Work (UI mock round 1: in-browser demo data, no backend yet) */}
+            <Route path="production/job-work" element={<PermissionRoute module="production-job-work" operation="view"><Suspense fallback={<PageSkeleton />}><JobWorkWorkspace /></Suspense></PermissionRoute>} />
 
             {/* Export Documentation (UI mock phase) — packing entry -> packing list -> stickers / invoice.
                 One RBAC module per screen. Following the sample-requests precedent, edit/:id routes carry
