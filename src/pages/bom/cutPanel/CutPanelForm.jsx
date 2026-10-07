@@ -13,6 +13,7 @@ import { CPR_MODULE_ID, CPR_PROCESS_CATEGORY } from '../../../utils/cutPanelCons
 import { cprTotals } from '../../../utils/cutPanelCalc';
 import { exportCprCsv, printCprStatement } from '../../../utils/cutPanelStatementPrint';
 import { getCprAudit, getCprAllocation } from '../../../services/bom/cutPanel/cutPanelService';
+import { getCachedOrganisation, fetchAndCacheOrganisation } from '../../../services/admin/organisationService';
 import DocumentHistoryDrawer from '../../../components/DocumentHistoryDrawer';
 import RequirementAllocationDrawer from '../shared/RequirementAllocationDrawer';
 import RequirementNotFound from '../shared/RequirementNotFound';
@@ -68,7 +69,10 @@ const CutPanelForm = () => {
     edit: startEdit, cancelEdit, close: () => setCloseOpen(true),
   }), [navigate, save, submit, remove, saveChanges, startEdit, cancelEdit]);
 
-  const print = () => { if (!printCprStatement(doc, order)) message.warning('Allow pop-ups to print the statement.'); };
+  const print = async () => {
+    const org = getCachedOrganisation() || (await fetchAndCacheOrganisation()) || {};
+    if (!printCprStatement(doc, order, org)) message.warning('Allow pop-ups to print the statement.');
+  };
 
   if (loading) return <Skeleton active paragraph={{ rows: 12 }} />;
   if (!doc) return <RequirementNotFound listPath={LIST_PATH} />;

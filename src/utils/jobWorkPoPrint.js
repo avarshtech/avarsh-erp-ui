@@ -4,6 +4,7 @@
  * acts on, taxes, value and amount in words, instructions, delivery / return, signatures.
  * NEVER printed: required qty, previously PO'd, balance, internal remarks (OP-8).
  * Mixed UOMs show a subtotal per UOM instead of one quantity total (EC-12).
+ * It wears the Supplier PO print's design (utils/print/poPrintTheme), with its own sections.
  */
 import { esc, documentShell, openPrintWindow, documentFileName } from './printDoc';
 import { amountInWordsIndian } from './amountInWords';
@@ -11,34 +12,21 @@ import { subtotalsByUom, lineAmount, billingQty } from './jobWorkPoCalc';
 import { jobWorkUomLabel, optionLabel, CPP_RETURN_TO, GPO_RETURN_TO } from './jobWorkConstants';
 import { JOB_WORK_PO_TYPE_LABEL, jobWorkPoStatusLabel, JW_PO_STATUS as S } from './jobWorkPoStatus';
 import { formatDate } from './formatters';
-import companyLogo from '../assets/images/sristi_logo.jpeg';
+import {
+  PO_PRINT_CSS, companyWatermark, headerBand, infoCards, detailsGrid, itemsSection, totalsBox, summarySection,
+  amountInWords, notesSection, noteStrip, signatures, printFooter,
+} from './print/poPrintTheme';
 
 const n = (v, dp = 0) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 const money = (v) => n(v, 2);
+const inr = (v) => `₹ ${money(v)}`;
 const rate = (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 const uniq = (vals) => [...new Set(vals.filter(Boolean))].join(', ') || '—';
-
-const CSS = `
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #222; margin: 18px; }
-  h1 { font-size: 16px; margin: 0; } h2 { font-size: 12px; margin: 14px 0 6px; }
-  .top { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #333; padding-bottom: 8px; }
-  .brand { display: flex; gap: 10px; align-items: flex-start; } .brand img { max-width: 55px; max-height: 55px; object-fit: contain; }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 16px; margin: 10px 0; }
-  .grid b, .party b { display: block; font-size: 9px; color: #666; text-transform: uppercase; }
-  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
-  table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid #bbb; padding: 3px 5px; }
-  th { background: #f0f0f0; } .num { text-align: right; } tfoot td { font-weight: bold; }
-  .value { width: 45%; margin-left: auto; margin-top: 8px; } .value td:first-child { border-right: 0; }
-  .signs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 40px; text-align: center; }
-  .signs div { border-top: 1px solid #333; padding-top: 4px; }
-`;
 
 const LINE_COLUMNS = {
   CPP: [['Panel', (l) => l.panelName], ['Process', (l) => l.processLabel], ['Colour', (l) => l.colorName], ['Size', (l) => l.size]],
   GPO: [['GPR', (l) => l.gprNo], ['Process', (l) => `${l.seqNo}. ${l.processLabel}`], ['Colour', (l) => l.color], ['Size', (l) => l.size]],
 };
-
-const party = (title, lines) => `<div class="party"><b>${esc(title)}</b>${lines.filter(Boolean).map(esc).join('<br/>')}</div>`;
 
 /** Opens the vendor copy; false when the browser blocked the pop-up. `value` is poValue(); `org` the cached organisation. */
 export const printJobWorkPo = (doc, value, org = {}) => {
@@ -46,49 +34,59 @@ export const printJobWorkPo = (doc, value, org = {}) => {
   const cols = LINE_COLUMNS[doc.type];
   const byUom = subtotalsByUom(lines);
   const returnTo = doc.returnTo === 'OTHER' ? doc.returnToOther : optionLabel(doc.type === 'CPP' ? CPP_RETURN_TO : GPO_RETURN_TO, doc.returnTo);
+  const poNo = `${doc.poNo || 'Not saved'}${doc.revisionNo ? ` · R${doc.revisionNo}` : ''}`;
   const meta = [
-    ['PO No.', `${doc.poNo || 'Not saved'}${doc.revisionNo ? ` · R${doc.revisionNo}` : ''}`], ['PO Date', formatDate(doc.poDate)],
+    ['PO No.', poNo], ['PO Date', formatDate(doc.poDate)],
     ['Status', jobWorkPoStatusLabel(doc.status)], ['Payment terms', doc.paymentTerms || '—'],
     ['Order', uniq(lines.map((l) => l.orderNo))], ['Style', uniq(lines.map((l) => l.styleNo))],
     [doc.type === 'CPP' ? 'Fabric' : 'Buyer', uniq(lines.map((l) => (doc.type === 'CPP' ? l.fabricName : l.buyer)))],
     ['Requirement', uniq(lines.map((l) => l.cprNo || l.gprNo))],
     ['Expected delivery date', formatDate(doc.type === 'CPP' ? doc.requiredDeliveryDate : doc.expectedReturnDate)],
     ['Return to', returnTo || '—'], ['Return unit', doc.returnUnitName || '—'],
-  ].map(([k, v]) => `<div><b>${esc(k)}</b>${esc(v)}</div>`).join('');
-  const head = `${cols.map(([t]) => `<th>${esc(t)}</th>`).join('')}<th class="num">Qty</th><th>UOM</th><th class="num">Billing qty</th><th class="num">Rate ₹</th><th class="num">Amount ₹</th>`;
-  const rows = lines.map((l) => `<tr>${cols.map(([, f]) => `<td>${esc(f(l))}</td>`).join('')}<td class="num">${n(l.poQty)}</td>
-    <td>${esc(jobWorkUomLabel(l.uom))}</td><td class="num">${n(billingQty(l), 3)}</td><td class="num">${rate(l.rate)}</td><td class="num">${money(lineAmount(l))}</td></tr>`).join('');
-  const foot = byUom.map((t) => `<tr><td colspan="${cols.length}">Subtotal — ${esc(jobWorkUomLabel(t.uom))}</td><td class="num">${n(t.poQty)}</td>
-    <td></td><td class="num">${n(t.billingQty, 3)}</td><td></td><td class="num">${money(t.amount)}</td></tr>`).join('');
+  ];
+  const head = `${cols.map(([t]) => `<th class="left">${esc(t)}</th>`).join('')}<th>Qty</th><th>UOM</th>`
+    + '<th>Billing qty</th><th>Rate ₹</th><th>Amount ₹</th>';
+  const rows = lines.map((l) => `<tr>${cols.map(([, f]) => `<td class="left">${esc(f(l))}</td>`).join('')}
+    <td class="num">${n(l.poQty)}</td><td>${esc(jobWorkUomLabel(l.uom))}</td><td class="num">${n(billingQty(l), 3)}</td>
+    <td class="num">${rate(l.rate)}</td><td class="num total-col">${money(lineAmount(l))}</td></tr>`).join('');
+  const foot = byUom.map((t) => `<tr><td colspan="${cols.length}" class="left">Subtotal — ${esc(jobWorkUomLabel(t.uom))}</td>
+    <td class="num">${n(t.poQty)}</td><td></td><td class="num">${n(t.billingQty, 3)}</td><td></td><td class="num">${money(t.amount)}</td></tr>`).join('');
   const half = value.gstRatePercent / 2;
+  const sac = doc.process?.sacCode;
+  const tax = value.igst
+    ? [{ label: `IGST @ ${value.gstRatePercent}% (SAC ${sac ?? '—'})`, value: inr(value.igstAmount), kind: 'tax' }]
+    : [{ label: `CGST @ ${half}% (SAC ${sac ?? '—'})`, value: inr(value.cgst), kind: 'tax' },
+      { label: `SGST @ ${half}%`, value: inr(value.sgst), kind: 'tax' }];
   // The Garment Process PO states a grand total, unrounded (GPO §8.4); the Cut Panel PO rounds (CPP §13.3).
   const total = doc.type === 'CPP'
-    ? `<tr><td><b>PO value (INR)</b></td><td class="num"><b>${money(value.total)}</b></td></tr>
-      <tr><td>Rounding</td><td class="num">${money(value.roundOff)}</td></tr>
-      <tr><td><b>Rounded</b></td><td class="num"><b>${money(value.rounded)}</b></td></tr>`
-    : `<tr><td><b>Grand total (INR)</b></td><td class="num"><b>${money(value.total)}</b></td></tr>`;
-  const tax = value.igst ? `<tr><td>IGST @ ${value.gstRatePercent}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.igstAmount)}</td></tr>`
-    : `<tr><td>CGST @ ${half}% (SAC ${esc(doc.process?.sacCode)})</td><td class="num">${money(value.cgst)}</td></tr><tr><td>SGST @ ${half}%</td><td class="num">${money(value.sgst)}</td></tr>`;
-  const body = `
-    <div class="top"><div class="brand"><img src="${companyLogo}" alt="Logo" /><div><h1>${esc(org.organisationName || 'Company')}</h1>${esc([org.addressLine1, org.addressLine2, org.city, org.state, org.pincode].filter(Boolean).join(', '))}<br/>GSTIN ${esc(org.gstin || '—')}</div></div>
-      <div style="text-align:right"><h1>Job Work Purchase Order</h1>${esc(JOB_WORK_PO_TYPE_LABEL[doc.type])}</div></div>
-    <div class="parties">${party('Job worker', [doc.vendor?.name, doc.vendor?.address, [doc.vendor?.city, doc.vendor?.state, doc.vendor?.pincode].filter(Boolean).join(', '), `GSTIN ${doc.vendor?.gstin || '—'}`, [doc.vendor?.contactPerson, doc.vendor?.phone].filter(Boolean).join(' · ')])}
-      ${party('Deliver processed goods to', [doc.returnUnitName, doc.returnUnitAddress, returnTo])}</div>
-    <div class="grid">${meta}</div>
-    <table><thead><tr>${head}</tr></thead><tbody>${rows}</tbody><tfoot>${foot}</tfoot></table>
-    <table class="value"><tbody>
-      <tr><td>${doc.type === 'CPP' ? 'Basic amount' : 'Subtotal'}</td><td class="num">${money(value.basic)}</td></tr>
-      ${value.otherCharges ? `<tr><td>Other charges</td><td class="num">${money(value.otherCharges)}</td></tr>` : ''}
-      <tr><td>Taxable value</td><td class="num">${money(value.taxable)}</td></tr>${tax}
-      ${total}
-    </tbody></table>
-    <p><b>Amount in words:</b> ${esc(amountInWordsIndian(doc.type === 'CPP' ? value.rounded : value.total))}</p>
-    <h2>Processing instructions</h2><p>${esc(doc.instructions || '—')}</p>
-    <p>${esc(doc.type === 'CPP' ? 'Panels are issued against a delivery challan quoting this PO number; return every panel with the challan reference.'
-      : 'Garments are sent against a delivery challan quoting this PO number; return them with the challan reference.')}</p>
-    <div class="signs"><div>Prepared by<br/>${esc(doc.createdBy || '')}</div><div>Approved by<br/>${esc(doc.approvedBy || '')}</div><div>Vendor acknowledgement</div></div>`;
+    ? [{ label: 'PO value (INR)', value: inr(value.total), kind: 'subtotal' }, { label: 'Rounding', value: inr(value.roundOff) },
+      { label: 'Rounded', value: inr(value.rounded), kind: 'highlight' }]
+    : [{ label: 'Grand total (INR)', value: inr(value.total), kind: 'highlight' }];
+  const totals = totalsBox([
+    { label: doc.type === 'CPP' ? 'Basic amount' : 'Subtotal', value: inr(value.basic) },
+    ...(value.otherCharges ? [{ label: 'Other charges', value: inr(value.otherCharges) }] : []),
+    { label: 'Taxable value', value: inr(value.taxable), kind: 'subtotal' }, ...tax, ...total,
+  ]);
+  const vendor = doc.vendor || {};
+  const body = `${companyWatermark(org)}<div class="page-content">
+    ${headerBand({ org, docLabel: `Job Work Purchase Order · ${JOB_WORK_PO_TYPE_LABEL[doc.type]}`, docNo: poNo, status: jobWorkPoStatusLabel(doc.status) })}
+    ${infoCards([
+    { title: 'Job worker', name: vendor.name, gstin: vendor.gstin || '—',
+      details: [vendor.address, [vendor.city, vendor.state, vendor.pincode].filter(Boolean).join(', '), [vendor.contactPerson, vendor.phone].filter(Boolean).join(' · ')] },
+    { title: 'Deliver processed goods to', name: doc.returnUnitName, details: [doc.returnUnitAddress, returnTo] },
+  ])}
+    ${detailsGrid(meta)}
+    ${itemsSection({ title: 'PO lines', head, body: rows, foot })}
+    ${summarySection({ label: 'Total quantity', value: byUom.map((t) => `${n(t.poQty)} ${jobWorkUomLabel(t.uom)}`).join(' · '), totals })}
+    ${amountInWords(amountInWordsIndian(doc.type === 'CPP' ? value.rounded : value.total))}
+    ${notesSection('Processing instructions', doc.instructions)}
+    ${noteStrip('Note', doc.type === 'CPP' ? 'Panels are issued against a delivery challan quoting this PO number; return every panel with the challan reference.'
+    : 'Garments are sent against a delivery challan quoting this PO number; return them with the challan reference.')}
+    ${signatures([{ name: doc.createdBy, role: 'Prepared by' }, { name: doc.approvedBy, role: 'Approved by' }, { role: 'Vendor acknowledgement' }])}
+    ${printFooter(org)}
+  </div>`;
   const title = documentFileName({ docType: doc.type === 'CPP' ? 'CutPanelPO' : 'GarmentProcessPO', buyer: doc.vendor?.name, docNo: doc.poNo || 'draft' }).replace(/\.pdf$/, '');
   const draft = [S.DRAFT, S.SUBMITTED].includes(doc.status);
   const watermark = [S.CANCELLED, S.REJECTED].includes(doc.status) ? jobWorkPoStatusLabel(doc.status).toUpperCase() : undefined;
-  return openPrintWindow(documentShell({ title, bodyCss: CSS, draft, watermark, body }));
+  return openPrintWindow(documentShell({ title, bodyCss: PO_PRINT_CSS, draft, watermark, body }));
 };
