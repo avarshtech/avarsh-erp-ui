@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { EXCEPTION_SEVERITY as SEV, DEFAULT_TOLERANCE, areDebitsEditable } from './billPassingConstants.js';
-import { BILLABLE_PO_STATUSES, JW_DEDUCTION_TYPES } from './jobWorkBillConstants.js';
+import { BILLABLE_PO_STATUSES, JW_DEDUCTION_TYPES, uomShort } from './jobWorkBillConstants.js';
 
 /**
  * Job-work bill arithmetic — garment-industry practice for a job worker's invoice (owner, 2026-10-07):
@@ -28,7 +28,11 @@ export const toPcs = (units, l) => Math.round((units * l.unitPieces) / l.unitUni
  *   rejection     = invoice amount − m × invoice rate           (≥ 0)
  * so invoice amount − rejection − rate diff = passed amount, exactly.
  */
-export const deriveLine = (l, poStatus) => {
+export const deriveLine = (line, poStatus) => {
+  // What was keyed stays apart from the effective figures, so a decorated line derives again unchanged and a
+  // save sends only what the user keyed (an unkeyed figure keeps following the DCs).
+  const keyed = line.keyed || { invoiceUnits: line.invoiceUnits ?? null, invoiceRate: line.invoiceRate ?? null, passedUnits: line.passedUnits ?? null };
+  const l = { ...line, ...keyed };
   const returnedQty = l.goodQty + l.rejectedReceiptQty;
   const acceptedQty = Math.max(0, l.goodQty - l.rejectedQcQty);
   const rejectedQty = l.rejectedReceiptQty + l.rejectedQcQty;
@@ -47,6 +51,7 @@ export const deriveLine = (l, poStatus) => {
   const allowanceLeft = Math.max(0, allowance - unpaidRejects);
   return {
     ...l,
+    keyed,
     returnedQty, acceptedQty, rejectedQty, shortQty, invoiceUnits, invoiceRate, passedUnits, passedPcs,
     billedUnits: r3(m),
     invoiceAmount,
@@ -118,7 +123,7 @@ export const proposeDeductions = (bill, lines, existing, nextId) => {
     const what = [l.color, l.panel, l.size].filter(Boolean).join(' · ');
     if (l.rejectionAmount > 0) {
       const qty = r3(l.invoiceUnits - l.billedUnits);
-      add('REJECTION_CHARGE', l, qty, l.invoiceRate, l.rejectionAmount, `${what}: invoiced ${qty} ${l.uom} he is not paid for`);
+      add('REJECTION_CHARGE', l, qty, l.invoiceRate, l.rejectionAmount, `${what}: invoiced ${qty} ${uomShort(l.uom)} he is not paid for`);
     }
     if (l.rateDiffAmount > 0) {
       add('RATE_DIFFERENCE', l, l.billedUnits, r4(l.invoiceRate - l.poRate), l.rateDiffAmount, `${what}: invoiced at ${l.invoiceRate} against PO ${l.poRate}`);

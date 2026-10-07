@@ -408,7 +408,7 @@ export const SCREENS = [
   // verify = the Accounts Executive check; approve = the value-band approver.
   { id: 'inventory-bill-passing', name: 'Bill Passing', section: 'inventory', kind: 'screen',
     path: '/inventory/bill-passing',
-    routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id'],
+    routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id', '/inventory/bill-passing/job-work/:id'],
     ops: BILL_PASSING_OPERATIONS },
   // `post` commits a batch to stock. It is checked by the screens
   // (OpeningStockBatchForm:54) but the old if-ladder never returned it, so the

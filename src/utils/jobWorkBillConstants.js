@@ -45,5 +45,9 @@ export const JW_DEDUCTION_TYPES = {
 export const JW_DEDUCTION_TYPE_OPTIONS = Object.entries(JW_DEDUCTION_TYPES)
   .map(([value, t]) => ({ value, label: t.label }));
 
+/** A billing unit as a quantity reads it: `14 pcs`, `8.333 doz`, `25 kg`. */
+const UOM_SHORT = { PIECE: 'pcs', DOZEN: 'doz', KG: 'kg', METRE: 'm', LOT: 'lot' };
+export const uomShort = (uom) => UOM_SHORT[uom] || (uom || '').toLowerCase();
+
 /** A DC's check verdict, as the panel and garment checks report it. */
 export const CHECK_STATUS_COLOR = { PASSED: 'success', PARTIAL: 'warning', FAILED: 'error', PENDING: 'default' };

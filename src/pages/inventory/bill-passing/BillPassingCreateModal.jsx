@@ -1,114 +1,107 @@
-import { useState, useEffect, useCallback } from 'react';
-import { App, Modal, Form, Select, Row, Col, Typography, Alert } from 'antd';
+import { useState, useCallback } from 'react';
+import { App, Modal, Form, Select, Row, Col, Typography, Alert, Radio } from 'antd';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import { formatCurrency, formatNumber } from '../../../utils/formatters';
 import { currentFinancialYear } from '../../../utils/billPassingConstants';
-import { listBpSuppliers, listBillablePos, createBill } from '../../../services/inventory/billPassingService';
+import { BILL_SOURCE, BILL_SOURCES, billSourceOf, isJobWorkSource, JW_DOC_PREFIX } from '../../../utils/jobWorkBillConstants';
+import { createBill } from '../../../services/inventory/billPassingService';
+import { createJobWorkBill } from '../../../services/inventory/jobWorkBill/jobWorkBillService';
+import useBillCreateSources from './useBillCreateSources';
 
 const { Text } = Typography;
 
+const STATUS_LABEL = { COMPLETED: 'Completed', CLOSED: 'Short-closed' };
+
+const poLabel = (p, jobWork) => (jobWork
+  ? [p.poNumber, p.processName, `${p.dcCount} DC`, STATUS_LABEL[p.status] || p.status,
+    p.uncheckedDcCount ? `${p.uncheckedDcCount} DC not checked` : null].filter(Boolean).join(' · ')
+  : `${p.poNumber} · ${formatCurrency(p.poValue)} · ${p.grnCount} GRN · ${formatNumber(p.pendingQty, 3)} pending`);
+
 /**
- * Step one of a bill: pick the supplier and the PO to bill against. That is the
- * whole of it — everything else needs the reserved BP number to hang off, so the
- * draft is created here and the workspace opens on the real record.
+ * Step one of a bill: what kind, which party, which PO. That is the whole of it — everything else needs the
+ * reserved number to hang off, so the draft is created here and the workspace opens on the real record.
+ * A job-work bill (Cut Panel PO / Garment Process PO) is offered only for a PO that is complete or short-closed.
  */
-const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
+const BillPassingCreateModal = ({ open, initialSource = BILL_SOURCE.SUPPLIER_PO, onClose, onCreated }) => {
   const { message } = App.useApp();
-
-  const [suppliers, setSuppliers] = useState([]);
-  const [pos, setPos] = useState([]);
-  const [supplierId, setSupplierId] = useState(null);
+  // The list remounts this dialog on every open, so a cancelled attempt never pre-fills the next one.
+  const [source, setSource] = useState(initialSource);
+  const [partyId, setPartyId] = useState(null);
   const [poId, setPoId] = useState(null);
-  const [posLoading, setPosLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-
-  // Reset on every open so a cancelled attempt never pre-fills the next one.
-  useEffect(() => {
-    if (!open) return;
-    setSupplierId(null);
-    setPoId(null);
-    setPos([]);
-    listBpSuppliers()
-      .then(setSuppliers)
-      // The interceptor already toasts anything the server answered.
-      .catch((e) => { if (!e.response) message.error(e.message || 'Failed to load suppliers'); });
-  }, [open, message]);
-
-  useEffect(() => {
-    if (!open || !supplierId) { setPos([]); return undefined; }
-    let alive = true;
-    setPosLoading(true);
-    listBillablePos({ supplierId })
-      .then((res) => { if (alive) setPos(res || []); })
-      .catch((e) => {
-        if (alive && !e.response) message.error(e.message || 'Failed to load billable purchase orders');
-      })
-      .finally(() => { if (alive) setPosLoading(false); });
-    return () => { alive = false; };
-  }, [open, supplierId, message]);
+  const jobWork = isJobWorkSource(source);
+  const kind = billSourceOf(source);
+  const { parties, pos, posLoading } = useBillCreateSources({ open, source, partyId });
+  const pickSource = (value) => { setSource(value); setPartyId(null); setPoId(null); };
 
   const handleCreate = useCallback(async () => {
-    if (!supplierId || !poId) return;
+    if (!partyId || !poId) return;
     setCreating(true);
     try {
-      const created = await createBill({
-        supplierId,
-        poId,
-        supplierInvoiceNo: '',
-        // The server derives the financial year from this date, because that is
-        // what the duplicate-invoice rule keys on.
-        invoiceDate: dayjs().format('YYYY-MM-DD'),
-      });
-      message.success(`${created.bpNumber} created as draft`);
-      onCreated?.(created);
+      const created = jobWork
+        ? await createJobWorkBill({ source, vendorId: partyId, poId })
+        : await createBill({
+          supplierId: partyId,
+          poId,
+          supplierInvoiceNo: '',
+          // The server derives the financial year from this date, because that is what the duplicate-invoice rule keys on.
+          invoiceDate: dayjs().format('YYYY-MM-DD'),
+        });
+      message.success(`${created.jwbNumber || created.bpNumber} created as draft`);
+      onCreated?.(created, source);
     } catch (e) {
       if (!e.response) message.error(e.message || 'Failed to create the bill');
     } finally {
       setCreating(false);
     }
-  }, [supplierId, poId, onCreated, message]);
+  }, [jobWork, source, partyId, poId, onCreated, message]);
 
   const selectedPo = pos.find((p) => p.id === poId);
+  const prefix = jobWork ? JW_DOC_PREFIX : 'BP';
 
   return (
     <Modal
       open={open}
       title="New Bill Passing"
-      width={640}
+      width={680}
       destroyOnHidden
       onCancel={onClose}
       footer={(
         <>
           <ActionButton action="cancel" text="Cancel" onClick={onClose} disabled={creating} />
-          <ActionButton
-            action="create"
-            text="Create Draft Bill"
-            loading={creating}
-            disabled={!supplierId || !poId}
-            onClick={handleCreate}
-          />
+          <ActionButton action="create" text="Create Draft Bill" loading={creating} disabled={!partyId || !poId} onClick={handleCreate} />
         </>
       )}
     >
       <Text type="secondary" style={{ color: 'var(--text-secondary)' }}>
-        Pick the supplier and the purchase order to bill against. A draft{' '}
-        {`BP/${currentFinancialYear()}/…`} number is reserved as soon as you create it.
+        Pick what is being billed, the {kind.party.toLowerCase()} and the purchase order. A draft{' '}
+        {`${prefix}/${currentFinancialYear()}/…`} number is reserved as soon as you create it.
       </Text>
 
       <Form layout="vertical" style={{ marginTop: 16 }}>
+        <Form.Item label="Bill type" required>
+          <Radio.Group
+            id="billType"
+            optionType="button"
+            buttonStyle="solid"
+            value={source}
+            onChange={(e) => pickSource(e.target.value)}
+            options={BILL_SOURCES.map((s) => ({ value: s.value, label: s.label }))}
+          />
+        </Form.Item>
         <Row gutter={16}>
           <Col xs={24} md={10}>
-            <Form.Item label="Supplier" required>
+            <Form.Item label={kind.party} required>
               <Select
                 showSearch
                 autoFocus
                 optionFilterProp="label"
-                placeholder="Select supplier"
-                value={supplierId}
-                onChange={(v) => { setSupplierId(v); setPoId(null); }}
-                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-                notFoundContent="No active suppliers"
+                placeholder={`Select ${kind.party.toLowerCase()}`}
+                value={partyId}
+                onChange={(v) => { setPartyId(v); setPoId(null); }}
+                options={parties.map((s) => ({ value: s.id, label: s.name }))}
+                notFoundContent={jobWork ? 'No vendor has a completed PO waiting for a bill' : 'No active suppliers'}
               />
             </Form.Item>
           </Col>
@@ -117,28 +110,35 @@ const BillPassingCreateModal = ({ open, onClose, onCreated }) => {
               <Select
                 showSearch
                 optionFilterProp="label"
-                placeholder={supplierId ? 'Select a billable PO' : 'Select a supplier first'}
-                disabled={!supplierId}
+                placeholder={partyId ? 'Select a billable PO' : `Select a ${kind.party.toLowerCase()} first`}
+                // The label carries the PO's process, DCs and state: let the list be as wide as it needs.
+                popupMatchSelectWidth={false}
+                disabled={!partyId}
                 loading={posLoading}
                 value={poId}
                 onChange={setPoId}
-                options={pos.map((p) => ({
-                  value: p.id,
-                  label: `${p.poNumber} · ${formatCurrency(p.poValue)} · ${p.grnCount} GRN · ${formatNumber(p.pendingQty, 3)} pending`,
-                }))}
-                notFoundContent={posLoading ? 'Loading…' : 'Nothing left to bill for this supplier'}
+                options={pos.map((p) => ({ value: p.id, label: poLabel(p, jobWork) }))}
+                notFoundContent={posLoading ? 'Loading…' : `Nothing left to bill for this ${kind.party.toLowerCase()}`}
               />
             </Form.Item>
           </Col>
         </Row>
       </Form>
 
+      {jobWork && !selectedPo && (
+        <Alert type="info" showIcon title="Only a completed or short-closed PO can be billed"
+          description="A job-work bill is passed once every line is back from the vendor (or the PO is short-closed), so the whole PO is checked and billed once." />
+      )}
       {selectedPo && (
         <Alert
-          type="info"
+          type={selectedPo.uncheckedDcCount ? 'warning' : 'info'}
           showIcon
-          title={`${selectedPo.grnCount} GRN(s) will be pulled in automatically`}
-          description={`${formatNumber(selectedPo.pendingQty, 3)} still unbilled on ${selectedPo.poNumber}. You can narrow the GRNs and quantities once the draft opens.`}
+          title={jobWork ? `${selectedPo.dcCount} vendor DC(s) will be pulled in` : `${selectedPo.grnCount} GRN(s) will be pulled in automatically`}
+          description={jobWork
+            ? (selectedPo.uncheckedDcCount
+              ? `${selectedPo.uncheckedDcCount} DC(s) have no ${kind.check.toLowerCase()} yet — the bill cannot be passed until they are checked.`
+              : `Everything that came back on ${selectedPo.poNumber}, with its ${kind.check.toLowerCase()}s, is on the bill.`)
+            : `${formatNumber(selectedPo.pendingQty, 3)} still unbilled on ${selectedPo.poNumber}. You can narrow the GRNs and quantities once the draft opens.`}
         />
       )}
     </Modal>

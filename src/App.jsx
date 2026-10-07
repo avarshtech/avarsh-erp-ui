@@ -47,6 +47,7 @@ const StockTransferList = lazy(() => import('./pages/inventory/transfer/StockTra
 const StockTransferForm = lazy(() => import('./pages/inventory/transfer/StockTransferForm'));
 const BillPassingList = lazy(() => import('./pages/inventory/bill-passing/BillPassingList'));
 const BillPassingForm = lazy(() => import('./pages/inventory/bill-passing/BillPassingForm'));
+const JobWorkBillForm = lazy(() => import('./pages/inventory/bill-passing/jobwork/JobWorkBillForm'));
 // BOM — process requirements (UI mock phase, lazy-loaded)
 const CutPanelList = lazy(() => import('./pages/bom/cutPanel/CutPanelList'));
 const CutPanelForm = lazy(() => import('./pages/bom/cutPanel/CutPanelForm'));
@@ -414,6 +415,7 @@ const ThemedApp = () => {
             <Route path="inventory/transfer/new" element={<PermissionRoute module="inventory-transfer" operation="add"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/transfer/:id" element={<PermissionRoute module="inventory-transfer" operation="view"><Suspense fallback={<PageSkeleton />}><StockTransferForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingList /></Suspense></PermissionRoute>} />
+            <Route path="inventory/bill-passing/job-work/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><JobWorkBillForm /></Suspense></PermissionRoute>} />
             <Route path="inventory/bill-passing/:id" element={<PermissionRoute module="inventory-bill-passing" operation="view"><Suspense fallback={<PageSkeleton />}><BillPassingForm /></Suspense></PermissionRoute>} />
             {/* Costing */}
             <Route path="costing/list" element={<PermissionRoute module="costing" operation="view"><CostingList /></PermissionRoute>} />
