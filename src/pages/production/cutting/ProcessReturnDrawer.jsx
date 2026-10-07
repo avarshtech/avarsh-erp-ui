@@ -12,6 +12,7 @@ const ProcessReturnDrawer = ({ open, issues, onClose, onSaved }) => {
   const { message } = App.useApp();
   const [panelIssueId, setPanelIssueId] = useState(null);
   const [vendorDcNo, setVendorDcNo] = useState('');
+  const [dcMissing, setDcMissing] = useState(false);
   const [lines, setLines] = useState([]);
   const { options } = useCuttingMasters();
   const shortfallReasons = options('RETURN_SHORTFALL_REASON');
@@ -76,17 +77,22 @@ const ProcessReturnDrawer = ({ open, issues, onClose, onSaved }) => {
 
   const handleSave = async () => {
     if (!issue) return message.warning('Select the panel issue being returned');
+    const dcNo = vendorDcNo.trim();
+    if (!dcNo) {
+      setDcMissing(true);
+      return message.warning("Enter the vendor's DC number — every receipt from a vendor comes on his challan");
+    }
     const rows = lines.filter(entered);
     if (!rows.length) return message.warning('Enter the good or rejected quantity for at least one panel');
     if (rows.some((l) => shortOf(l) > 0 && !l.shortfallReason)) return message.error('Every shortfall needs a reason (Lost / Damaged / Retained / Pending)');
     setSaving(true);
     try {
       const saved = await saveProcessReturn({
-        panelIssueId, returnDate: new Date().toISOString().slice(0, 10), vendorDcNo: vendorDcNo.trim() || null,
+        panelIssueId, returnDate: new Date().toISOString().slice(0, 10), vendorDcNo: dcNo,
         lines: rows.map((l) => ({ ...l, returnQty: l.returnQty || 0, rejectedQty: l.rejectedQty || 0 })),
       });
       message.success(`${saved.returnDcNo} saved — returned panels go to Panel Check before bundling`);
-      setLines([]); setPanelIssueId(null); setVendorDcNo('');
+      setLines([]); setPanelIssueId(null); setVendorDcNo(''); setDcMissing(false);
       onSaved();
     } catch {
       // the API's own message has been shown
@@ -115,8 +121,11 @@ const ProcessReturnDrawer = ({ open, issues, onClose, onSaved }) => {
             onChange={(id) => handleIssueSelect(id, issues)} />
         </div>
         <div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Vendor DC No.</div>
-          <Input name="vendorDcNo" aria-label="Vendor DC No." style={{ width: 180 }} maxLength={50} value={vendorDcNo}
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+            <span style={{ color: 'var(--error-color)' }}>* </span>Vendor DC No.
+          </div>
+          <Input name="vendorDcNo" aria-label="Vendor DC No." aria-required="true" style={{ width: 180 }} maxLength={50}
+            value={vendorDcNo} status={dcMissing && !vendorDcNo.trim() ? 'error' : undefined}
             onChange={(e) => setVendorDcNo(e.target.value)} placeholder="The vendor's challan" />
         </div>
       </Space>

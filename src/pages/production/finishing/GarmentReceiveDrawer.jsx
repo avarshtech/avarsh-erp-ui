@@ -58,7 +58,7 @@ const GarmentReceiveDrawer = ({ open, issues, issueId, onClose, onSaved }) => {
       const saved = await createProcessReturn({
         processIssueId: values.processIssueId,
         returnDate: values.returnDate.format('YYYY-MM-DD'),
-        vendorDcNo: values.vendorDcNo || null,
+        vendorDcNo: values.vendorDcNo.trim(),
         remarks: values.remarks || null,
         lines: payloadLines,
       });
@@ -91,8 +91,9 @@ const GarmentReceiveDrawer = ({ open, issues, issueId, onClose, onSaved }) => {
           <Form.Item name="returnDate" label="Receipt Date" rules={[{ required: true, message: 'Receipt date is required' }]}>
             <DatePicker format="DD-MMM-YYYY" />
           </Form.Item>
-          <Form.Item name="vendorDcNo" label="Vendor DC #">
-            <Input maxLength={50} style={{ width: 160 }} />
+          <Form.Item name="vendorDcNo" label="Vendor DC #"
+            rules={[{ required: true, whitespace: true, message: "Enter the vendor's DC number" }]}>
+            <Input maxLength={50} style={{ width: 160 }} placeholder="The vendor's challan" />
           </Form.Item>
         </Space>
         <Table rowKey="id" size="small" columns={columns} dataSource={lines} pagination={false}

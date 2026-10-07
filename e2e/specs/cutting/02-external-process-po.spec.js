@@ -97,7 +97,8 @@ test('Receive from Vendor: good and rejected panels and the vendor DC close the 
   const drawer = page.locator('.ant-drawer-open');
   await pick(page, 'Panel issue', fx.cpp.poNo);
   await expect(drawer.locator('.ant-table-row')).toHaveCount(4);
-  await drawer.getByRole('textbox', { name: 'Vendor DC No.' }).fill('APP-DC-77');
+  // Unique per run: the vendor DC no. is mandatory and will be refused as a duplicate for the same vendor
+  await drawer.getByRole('textbox', { name: 'Vendor DC No.' }).fill(`APP-DC-${Date.now().toString(36)}`);
   const rows = drawer.locator('.ant-table-row');
   for (let i = 0; i < 4; i += 1) {
     const out = Number((await rows.nth(i).locator('td').nth(3).innerText()).replace(/,/g, ''));

@@ -102,6 +102,8 @@ test('Receiving the garments back posts to the PO, which completes', async ({ pa
   await page.getByRole('button', { name: `Receive ${fx.issueNo}` }).click();
   const drawer = page.locator('.ant-drawer-open');
   await expect(drawer.locator('.ant-table-row').first()).toBeVisible();
+  // The vendor's DC no. is mandatory on every receipt
+  await drawer.getByLabel('Vendor DC #').fill(`GRD-DC-${Date.now().toString(36)}`);
   const inputs = drawer.locator('input[name^="received-"]');
   const count = await inputs.count();
   for (let i = 0; i < count; i += 1) {
