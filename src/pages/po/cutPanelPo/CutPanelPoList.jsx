@@ -45,7 +45,7 @@ const CutPanelPoList = () => {
   const actions = useCppListActions(list.load);
   const columns = useMemo(() => buildCutPanelPoColumns({
     onOpen: openRow, onEdit: editRow, onPrint: actions.print, onDelete: actions.remove, printingId: actions.printingId,
-    canUpdate: hasPermission('cut-panel', 'update'), canDelete: hasPermission('cut-panel', 'delete'),
+    canUpdate: hasPermission('cut-panel-po', 'update'), canDelete: hasPermission('cut-panel-po', 'delete'),
   }), [openRow, editRow, actions.print, actions.remove, actions.printingId]);
   const exportCsv = async () => {
     setExporting(true);
@@ -72,7 +72,7 @@ const CutPanelPoList = () => {
     <div className="animate-fade-in-up">
       <PageHeader title="Cut Panel POs" subtitle="Job work on cut panels — printing, embroidery, washing… — against submitted Cut Panel Requirements">
         <Button icon={<DownloadOutlined />} onClick={exportCsv} loading={exporting} disabled={!list.total}>Export CSV</Button>
-        <PermissionGuard module="cut-panel" operation="add">
+        <PermissionGuard module="cut-panel-po" operation="add">
           <ActionButton action="create" text="New Cut Panel PO" onClick={() => navigate(`${BASE}/new`)} />
         </PermissionGuard>
       </PageHeader>

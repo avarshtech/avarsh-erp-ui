@@ -40,7 +40,7 @@ export const buildCutPanelPoColumns = ({ onOpen, onEdit, onPrint, onDelete, prin
       : <StatusTag status={r.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />),
   },
   {
-    title: 'Actions', key: 'actions', width: 130, fixed: 'right',
+    title: 'Actions', key: 'actions', width: 130, fixed: 'right', align: 'center',
     render: (_, r) => (
       <Space size={2}>
         {r.status === S.DRAFT && canUpdate

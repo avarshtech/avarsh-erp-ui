@@ -1,7 +1,7 @@
 import { Space, Tag, Tooltip } from 'antd';
 import StatusTag from '../../../components/StatusTag';
 import RecordLink from '../../../components/RecordLink';
-import { ActionButton } from '../../../components/buttons';
+import { ActionButton, DeleteConfirm } from '../../../components/buttons';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 import { formatDate } from '../../../utils/formatters';
@@ -35,7 +35,7 @@ export const buildGpoListColumns = (a) => [
       : <StatusTag status={r.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />),
   },
   {
-    title: 'Actions', key: 'actions', width: 130, fixed: 'right',
+    title: 'Actions', key: 'actions', width: 150, fixed: 'right', align: 'center',
     render: (_, r) => (
       <Space size={2}>
         {r.status === S.DRAFT && a.canUpdate
@@ -43,6 +43,11 @@ export const buildGpoListColumns = (a) => [
           : <ActionButton action="view" size="small" aria-label={`Open ${r.poNo}`} onClick={() => a.onOpen(r)} />}
         {r.status !== S.DRAFT && <ActionButton action="print" size="small" aria-label={`Print ${r.poNo}`} loading={a.printingId === r.id} onClick={() => a.onPrint(r)} />}
         {a.canCancel && [S.DRAFT, S.APPROVED].includes(r.status) && <ActionButton action="cancel" size="small" aria-label={`Cancel ${r.poNo}`} onClick={() => a.onCancel(r)} />}
+        {r.status === S.DRAFT && a.canDelete && (
+          <DeleteConfirm title="Delete this draft?" recordLabel={r.poNo} onConfirm={() => a.onDelete(r)}>
+            <ActionButton action="delete" size="small" aria-label={`Delete ${r.poNo}`} />
+          </DeleteConfirm>
+        )}
       </Space>
     ),
   },

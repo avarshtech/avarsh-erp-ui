@@ -377,14 +377,14 @@ const MainLayoutInner = () => {
       key: "/purchase-orders",
       icon: <ShoppingOutlined />,
       label: "Purchase Orders",
-      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po", "cut-panel", "garment-process"],
+      moduleId: ["purchase-orders", "cutting-po", "work-order", "finishing-po", "cut-panel-po", "garment-process-po"],
       children: [
         { key: "/purchase-orders/supplier-po/list", label: "Supplier PO", moduleId: "purchase-orders" },
         { key: "/purchase-orders/cutting-po/list", label: "Cutting PO", moduleId: "cutting-po" },
         { key: "/purchase-orders/work-order/list", label: "Work Orders", moduleId: "work-order" },
         { key: "/purchase-orders/finishing-po/list", label: "Finishing PO", moduleId: "finishing-po" },
-        { key: "/purchase-orders/cut-panel-po/list", label: "Cut Panel PO", moduleId: "cut-panel" },
-        { key: "/purchase-orders/garment-process-po/list", label: "Garment Process PO", moduleId: "garment-process" },
+        { key: "/purchase-orders/cut-panel-po/list", label: "Cut Panel PO", moduleId: "cut-panel-po" },
+        { key: "/purchase-orders/garment-process-po/list", label: "Garment Process PO", moduleId: "garment-process-po" },
       ],
     },
     {

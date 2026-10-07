@@ -2,14 +2,14 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { withLiveVendor, vendorChanged } from '../../../utils/jobWorkPoLines';
-import { saveGpo, submitGpo, requestGpoExcess, approveGpoExcess } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
+import { saveGpo, submitGpo, deleteGpo, requestGpoExcess, approveGpoExcess } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 
 const BASE = JOB_WORK_PO_PATH.GPO;
 
 /**
  * Draft actions of a Garment Process PO: save (number on first save; a vendor and a line
  * needed, V1/V2; the vendor snapshot re-taken from the live vendor), submit (saving first,
- * also when the live vendor changed; the quantity is allocated from here, §10), and the
+ * also when the live vendor changed; the quantity is allocated from here, §10), delete (a draft), and the
  * excess override — requested on the saved draft, approved by someone else (§11). A first save stays in edit
  * mode (?edit=1); a submitted PO is shown read-only.
  */
@@ -35,6 +35,12 @@ const useGpoDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
     navigate(`${BASE}/${saved.id}`, { replace: true });
   }, 'Submitted for approval — the quantity now counts against the requirement'), [run, savedDoc, dispatch, navigate]);
 
+  const remove = useCallback(() => run('remove', async () => {
+    await deleteGpo(doc);
+    clearDirty();
+    navigate(`${BASE}/list`, { replace: true });
+  }, 'Draft deleted'), [run, doc, clearDirty, navigate]);
+
   const requestExcess = useCallback((payload) => run('excess', async () => {
     const saved = await savedDoc();
     dispatch({ type: 'SAVED', doc: await requestGpoExcess(saved, payload) });
@@ -44,7 +50,7 @@ const useGpoDraftActions = ({ doc, dirty, dispatch, clearDirty, runner, unit, li
     dispatch({ type: 'SAVED', doc: await approveGpoExcess(doc, o.id) });
   }, 'Excess approved'), [run, doc, dispatch]);
 
-  return { save, submit, requestExcess, approveExcess };
+  return { save, submit, remove, requestExcess, approveExcess };
 };
 
 export default useGpoDraftActions;

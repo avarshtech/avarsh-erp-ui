@@ -5,11 +5,11 @@ import { gpoValue, gpoRequirementChange } from '../../../utils/garmentProcessPoC
 import { poFlags, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 import { gpoActionButtons } from './gpoActionButtons';
 
-const KEY = 'garment-process';
+const KEY = 'garment-process-po';
 
 /**
- * What the Garment Process PO screen may do and show: permissions (the reused
- * garment-process key, decision 4), whether it is an editable draft, its value, flags
+ * What the Garment Process PO screen may do and show: permissions (its own key,
+ * garment-process-po), whether it is an editable draft, its value, flags
  * and action buttons. `checks` = validateGpo() — Submit stays disabled while it blocks.
  * A saved draft is editable only in edit mode (`editing`, the screen's ?edit=1); a new one always is.
  */
@@ -20,6 +20,7 @@ const useGpoView = ({ doc }, ctx, checks, editing) => useMemo(() => {
   const can = {
     edit: hasPermission(KEY, doc.id ? 'update' : 'add'), submit: canSubmitRequirement(KEY), approve: hasPermission(KEY, 'approve'),
     reject: hasPermission(KEY, 'reject'), cancel: hasPermission(KEY, 'cancel'), override: hasPermission(KEY, 'override'),
+    delete: hasPermission(KEY, 'delete'),
   };
   const editMode = !doc.id || editing;
   // Garments out with the vendor stop a cancel and a short close (decision D6)

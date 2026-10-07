@@ -300,14 +300,14 @@ const ThemedApp = () => {
             <Route path="purchase-orders/finishing-po/list" element={<PermissionRoute module="finishing-po" operation="view"><Suspense fallback={<PageSkeleton />}><FinishingPoList /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/new" element={<PermissionRoute module="finishing-po" operation="add"><Suspense fallback={<PageSkeleton />}><FinishingPoGenerateWizard /></Suspense></PermissionRoute>} />
             <Route path="purchase-orders/finishing-po/edit/:id" element={<PermissionRoute module="finishing-po" operation="update"><Suspense fallback={<PageSkeleton />}><FinishingPoForm /></Suspense></PermissionRoute>} />
-            {/* Cut Panel PO (UI mock phase) — reuses the cut-panel key; :id needs view only, so approvers can open it */}
-            <Route path="purchase-orders/cut-panel-po/list" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoList /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/cut-panel-po/new" element={<PermissionRoute module="cut-panel" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/cut-panel-po/:id" element={<PermissionRoute module="cut-panel" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
-            {/* Garment Process PO (UI mock phase) — reuses the garment-process key; :id needs view only, so approvers can open it */}
-            <Route path="purchase-orders/garment-process-po/list" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoList /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/garment-process-po/new" element={<PermissionRoute module="garment-process" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
-            <Route path="purchase-orders/garment-process-po/:id" element={<PermissionRoute module="garment-process" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
+            {/* Cut Panel PO — its own key, cut-panel-po; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/cut-panel-po/list" element={<PermissionRoute module="cut-panel-po" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/new" element={<PermissionRoute module="cut-panel-po" operation="add"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/cut-panel-po/:id" element={<PermissionRoute module="cut-panel-po" operation="view"><Suspense fallback={<PageSkeleton />}><CutPanelPoForm /></Suspense></PermissionRoute>} />
+            {/* Garment Process PO — its own key, garment-process-po; :id needs view only, so approvers can open it */}
+            <Route path="purchase-orders/garment-process-po/list" element={<PermissionRoute module="garment-process-po" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoList /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/new" element={<PermissionRoute module="garment-process-po" operation="add"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
+            <Route path="purchase-orders/garment-process-po/:id" element={<PermissionRoute module="garment-process-po" operation="view"><Suspense fallback={<PageSkeleton />}><GarmentProcessPoForm /></Suspense></PermissionRoute>} />
             {/* Production — Cutting (UI mock phase) */}
             {/* TNA (Time & Action) module */}
             <Route path="tna/control-tower" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />

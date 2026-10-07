@@ -3,7 +3,8 @@
  * permission. Pure — the bar renders the list in order.
  *
  * `s` = { doc, can, superuser, userId, issued, withVendor, editing, blocked }
- * A draft in edit mode offers only Save Draft and Submit for Approval; viewed, it offers Cancel PO and Edit.
+ * A draft in edit mode offers only Save Draft and Submit for Approval; viewed, it offers Delete draft, Cancel PO and
+ * Edit (as on the Cut Panel PO).
  * Back is the page header's arrow and Print sits in the page header.
  * Each item: { key, label, primary?, danger?, dialog?, disabledReason? } — `dialog` names
  * the reason dialog the action needs; the bar calls on[key] otherwise. Approve and reject are
@@ -21,6 +22,7 @@ export const gpoActionButtons = ({ doc, can, superuser, userId, issued, withVend
     return out;
   }
   if (st === S.DRAFT) {
+    add(doc.id && can.delete, { key: 'remove', label: 'Delete draft', danger: true, confirm: true });
     add(doc.id && can.cancel, { key: 'cancel', label: 'Cancel PO', danger: true, dialog: 'cancel' });
     add(can.edit, { key: 'edit', label: 'Edit', primary: true });
     return out;

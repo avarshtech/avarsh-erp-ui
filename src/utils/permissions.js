@@ -177,37 +177,21 @@ export const SCREENS = [
   { id: 'bom', name: 'Bill of Materials', section: 'bom', kind: 'screen',
     path: '/bom/list', routes: ['/bom/list', '/bom/new', '/bom/edit/:id'],
     ops: STANDARD_OPERATIONS },
-  // Process requirements (UI mock phase). No approval step: Submit is add || update, update
-  // also edits a submitted requirement in place until a PO is placed, cancel closes it.
-  // The job-work POs raised against them (Cut Panel PO, Garment Process PO) reuse these
-  // keys, so one operation can cover both documents: the labels name both uses.
-  { id: 'cut-panel', name: 'Cut Panel Requirement & PO', section: 'bom', kind: 'screen',
+  // Process requirements. No approval step: Submit is add || update, update also edits a submitted requirement in
+  // place until a PO is placed, cancel closes it; garment-process override submits a line above the order quantity.
+  // Their job-work POs have keys of their own (cut-panel-po, garment-process-po, under Purchase Orders).
+  { id: 'cut-panel', name: 'Cut Panel Requirement', section: 'bom', kind: 'screen',
     path: '/bom/cut-panel/list',
-    routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id',
-      '/purchase-orders/cut-panel-po/list', '/purchase-orders/cut-panel-po/new', '/purchase-orders/cut-panel-po/:id'],
-    ops: ['view', 'add', 'update', 'delete', 'approve', 'reject', 'override', 'refer_back', 'cancel'],
-    opLabels: {
-      delete: 'Delete draft',
-      approve: 'Approve PO',
-      reject: 'Reject PO',
-      override: 'Authorise PO over-allocation',
-      refer_back: 'Send back PO',
-      cancel: 'Close requirement · Cancel / short close PO',
-    },
-    description: 'Processes (printing, embroidery…) needed on cut panels before sewing, and the Cut Panel POs that give them to job workers.' },
-  { id: 'garment-process', name: 'Garment Process Requirement & PO', section: 'bom', kind: 'screen',
+    routes: ['/bom/cut-panel/list', '/bom/cut-panel/new', '/bom/cut-panel/:id'],
+    ops: ['view', 'add', 'update', 'delete', 'cancel'],
+    opLabels: { delete: 'Delete draft', cancel: 'Close requirement' },
+    description: 'Processes (printing, embroidery…) needed on cut panels before sewing.' },
+  { id: 'garment-process', name: 'Garment Process Requirement', section: 'bom', kind: 'screen',
     path: '/bom/garment-process/list',
-    routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id',
-      '/purchase-orders/garment-process-po/list', '/purchase-orders/garment-process-po/new', '/purchase-orders/garment-process-po/:id'],
-    ops: ['view', 'add', 'update', 'override', 'approve', 'reject', 'refer_back', 'cancel'],
-    opLabels: {
-      override: 'Submit above order qty · Approve PO excess',
-      approve: 'Approve / send PO',
-      reject: 'Reject PO (back to draft)',
-      refer_back: 'Send back PO',
-      cancel: 'Close requirement · Cancel / short close PO',
-    },
-    description: 'Processes (washing, dyeing…) needed on sewn garments, and the Garment Process POs that give them to job workers.' },
+    routes: ['/bom/garment-process/list', '/bom/garment-process/new', '/bom/garment-process/:id'],
+    ops: ['view', 'add', 'update', 'cancel', 'override'],
+    opLabels: { cancel: 'Close requirement', override: 'Submit above order qty' },
+    description: 'Processes (washing, dyeing…) needed on sewn garments.' },
 
   // ── Sample Requests ──
   { id: 'sample-requests', name: 'Sample Requests', section: 'samples', kind: 'screen',
@@ -257,6 +241,35 @@ export const SCREENS = [
     path: '/purchase-orders/finishing-po/list',
     routes: ['/purchase-orders/finishing-po/list', '/purchase-orders/finishing-po/new', '/purchase-orders/finishing-po/edit/:id'],
     ops: [...STANDARD_OPERATIONS, 'approve'] },
+  // Job-work POs, against the BOM's process requirements. Approval is the engine's (approve, reject, send back);
+  // cancel covers cancel and short close; override authorises a Cut Panel PO over-allocation / approves a
+  // Garment Process PO excess. Submit is add || update.
+  { id: 'cut-panel-po', name: 'Cut Panel PO', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/cut-panel-po/list',
+    routes: ['/purchase-orders/cut-panel-po/list', '/purchase-orders/cut-panel-po/new', '/purchase-orders/cut-panel-po/:id'],
+    ops: ['view', 'add', 'update', 'delete', 'approve', 'reject', 'refer_back', 'cancel', 'override'],
+    opLabels: {
+      delete: 'Delete draft',
+      approve: 'Approve / send PO',
+      reject: 'Reject PO',
+      refer_back: 'Send back PO',
+      cancel: 'Cancel / short close PO',
+      override: 'Authorise over-allocation',
+    },
+    description: 'Cut panel job work given to job workers against submitted Cut Panel Requirements.' },
+  { id: 'garment-process-po', name: 'Garment Process PO', section: 'purchase', kind: 'screen',
+    path: '/purchase-orders/garment-process-po/list',
+    routes: ['/purchase-orders/garment-process-po/list', '/purchase-orders/garment-process-po/new', '/purchase-orders/garment-process-po/:id'],
+    ops: ['view', 'add', 'update', 'delete', 'approve', 'reject', 'refer_back', 'cancel', 'override'],
+    opLabels: {
+      delete: 'Delete draft',
+      approve: 'Approve / send PO',
+      reject: 'Reject PO (back to draft)',
+      refer_back: 'Send back PO',
+      cancel: 'Cancel / short close PO',
+      override: 'Approve PO excess',
+    },
+    description: 'Garment processing given to job workers against submitted Garment Process Requirements.' },
 
   // ── Time & Action ──
   { id: 'tna', name: 'Time & Action', section: 'tna', kind: 'screen',

@@ -52,7 +52,7 @@ export const buildCutPanelListColumns = ({ onOpen, onEdit, canUpdate }) => [
     render: (v, r) => <Tooltip title={`by ${r.createdBy}`}>{formatDate(v)}</Tooltip>,
   },
   {
-    title: 'Actions', key: 'actions', width: 90, fixed: 'right',
+    title: 'Actions', key: 'actions', width: 90, fixed: 'right', align: 'center',
     render: (_, r) => rowAction(r, { onOpen, onEdit, canUpdate }),
   },
 ];

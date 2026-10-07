@@ -2,6 +2,7 @@
  * Garment Process PO API client — the screens import only from here. Approve and reject are the approval
  * engine's (ApprovalActionBar, with the vendor sign-off as its actionData); the excess stays the module's own.
  */
+import axiosInstance from '../../core/axiosInstance';
 import { get, post, put, patch, checked, toPage, listParams, toHistory, withSwatches } from '../jobWork/jobWorkApi';
 
 export * from './garmentProcessPoLookupService';
@@ -22,6 +23,7 @@ export const listGpos = async (filters) => toPage(await get(BASE, listParams(fil
 export const getGpoFilterOptions = () => get(`${BASE}/filter-options`);
 export const getGpo = (id) => po(get(`${BASE}/${id}`));
 export const getGpoAudit = async (id) => toHistory(await get(`${BASE}/${id}/history`));
+export const deleteGpo = async (doc) => { await axiosInstance.delete(`${BASE}/${doc.id}`, { params: v(doc) }); };
 export const saveGpo = (doc) => po(doc.id ? put(`${BASE}/${doc.id}`, body(doc)) : post(BASE, body(doc)));
 
 /** Amend delivery / instructions on an approved or sent PO (§16), with a reason. */

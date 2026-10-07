@@ -77,7 +77,7 @@ const GarmentProcessPoForm = () => {
   const { doc, dispatch } = po;
   const patch = (p) => dispatch({ type: 'PATCH', patch: p });
   const on = {
-    ...flow, edit: () => setEditing(true), save: draft.save, amend: () => setAmendOpen(true),
+    ...flow, edit: () => setEditing(true), save: draft.save, remove: draft.remove, amend: () => setAmendOpen(true),
     submit: () => (checks?.blocking.length ? runner.setErrors(checks.blocking) : draft.submit()),
   };
 

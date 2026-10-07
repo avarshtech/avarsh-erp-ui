@@ -44,7 +44,7 @@ export const buildGarmentProcessListColumns = ({ onOpen, onEdit, canUpdate }) =>
     render: (s) => <StatusTag status={s} config={REQUIREMENT_STATUS_CONFIG} getLabel={getRequirementStatusLabel} />,
   },
   {
-    title: 'Actions', key: 'actions', width: 90, fixed: 'right',
+    title: 'Actions', key: 'actions', width: 90, fixed: 'right', align: 'center',
     render: (_, r) => rowAction(r, { onOpen, onEdit, canUpdate }),
   },
 ];

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { App } from 'antd';
-import { getGpo, cancelGpo } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
+import { getGpo, cancelGpo, deleteGpo } from '../../../services/po/garmentProcessPo/garmentProcessPoService';
 import { getCachedOrganisation, fetchAndCacheOrganisation } from '../../../services/admin/organisationService';
 import { printJobWorkPo } from '../../../utils/jobWorkPoPrint';
 import { gpoValue } from '../../../utils/garmentProcessPoCalc';
@@ -8,7 +8,8 @@ import { toastUnlessHandled } from '../../../utils/apiError';
 
 /**
  * Row actions of the Garment Process PO list (PRD §22): Print loads the PO and opens its
- * print (`printingId` spins that row's Print meanwhile); Cancel asks for the reason, then reloads the list.
+ * print (`printingId` spins that row's Print meanwhile); Cancel asks for the reason, then reloads the list; Delete
+ * removes a draft (the row carries its version), then reloads.
  * `reload` refreshes the rows.
  */
 const useGpoListActions = (reload) => {
@@ -29,6 +30,16 @@ const useGpoListActions = (reload) => {
     }
   }, [message]);
 
+  const remove = useCallback(async (row) => {
+    try {
+      await deleteGpo(row);
+      message.success(`${row.poNo} deleted`);
+      reload();
+    } catch (e) {
+      toastUnlessHandled(message, e, 'Could not delete the draft');
+    }
+  }, [message, reload]);
+
   const cancel = useCallback(async (reason) => {
     try {
       await cancelGpo(cancelling, reason);
@@ -41,7 +52,7 @@ const useGpoListActions = (reload) => {
     }
   }, [cancelling, message, reload]);
 
-  return { print, printingId, cancelling, askCancel: setCancelling, cancel, closeCancel: () => setCancelling(null) };
+  return { print, printingId, remove, cancelling, askCancel: setCancelling, cancel, closeCancel: () => setCancelling(null) };
 };
 
 export default useGpoListActions;

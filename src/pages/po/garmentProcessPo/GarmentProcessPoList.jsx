@@ -47,9 +47,10 @@ const GarmentProcessPoList = () => {
   const openRow = useCallback((r) => navigate(`${BASE}/${r.id}`), [navigate]);
   const editRow = useCallback((r) => navigate(`${BASE}/${r.id}?edit=1`), [navigate]);
   const columns = useMemo(() => buildGpoListColumns({
-    onOpen: openRow, onEdit: editRow, onPrint: actions.print, onCancel: actions.askCancel, printingId: actions.printingId,
-    canUpdate: hasPermission('garment-process', 'update'), canCancel: hasPermission('garment-process', 'cancel'),
-  }), [openRow, editRow, actions.print, actions.askCancel, actions.printingId]);
+    onOpen: openRow, onEdit: editRow, onPrint: actions.print, onCancel: actions.askCancel, onDelete: actions.remove,
+    printingId: actions.printingId, canDelete: hasPermission('garment-process-po', 'delete'),
+    canUpdate: hasPermission('garment-process-po', 'update'), canCancel: hasPermission('garment-process-po', 'cancel'),
+  }), [openRow, editRow, actions.print, actions.askCancel, actions.remove, actions.printingId]);
   const exportCsv = async () => {
     setExporting(true);
     try {
@@ -75,7 +76,7 @@ const GarmentProcessPoList = () => {
     <div className="animate-fade-in-up">
       <PageHeader title="Garment Process POs" subtitle="Washing, dyeing and finishing by job workers — against submitted Garment Process Requirements">
         <Button icon={<DownloadOutlined />} onClick={exportCsv} loading={exporting} disabled={!list.total}>Export CSV</Button>
-        <PermissionGuard module="garment-process" operation="add">
+        <PermissionGuard module="garment-process-po" operation="add">
           <ActionButton action="create" text="New Garment Process PO" onClick={() => navigate(`${BASE}/new`)} />
         </PermissionGuard>
       </PageHeader>

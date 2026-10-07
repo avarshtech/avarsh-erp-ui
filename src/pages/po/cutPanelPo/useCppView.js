@@ -6,11 +6,11 @@ import { mergedRevision } from '../../../utils/cutPanelPoRevision';
 import { poFlags, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
 import { cppActionButtons } from './cppActionButtons';
 
-const KEY = 'cut-panel';
+const KEY = 'cut-panel-po';
 
 /**
- * What the Cut Panel PO screen may do and show: permissions (the reused cut-panel key,
- * decision 4), which parts are editable in this status (BR-16), the document on screen —
+ * What the Cut Panel PO screen may do and show: permissions (its own key, cut-panel-po),
+ * which parts are editable in this status (BR-16), the document on screen —
  * the open amendment merged over the live PO — its value, flags and action buttons. A saved PO
  * is read-only until Edit (`editing`, the screen's ?edit=1) — a draft entirely, past Draft its
  * details and notes; a new PO is always edited. An open amendment draft is its own edit mode.
