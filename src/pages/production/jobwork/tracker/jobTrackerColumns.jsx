@@ -19,6 +19,11 @@ export const jobTrackerColumns = ({ onOpenPullBack }) => [
         <Text strong style={mono}>{r.jobNo}</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>{r.orderNo} · {r.styleNo}</Text>
         <Text type="secondary" style={{ fontSize: 12 }}>{r.styleName}</Text>
+        {r.principal && (
+          <Tooltip title="Work we do for this principal; the panels at the vendor are their goods (Inward side).">
+            <Tag color="purple" style={{ marginTop: 2 }}>Principal&apos;s goods · {r.principal}</Tag>
+          </Tooltip>
+        )}
       </Space>
     ),
   },

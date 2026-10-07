@@ -17,3 +17,6 @@ export const cellId = (jobId, colour, stage) => `jw-cell-${jobId}-${String(colou
 
 /** Key of a pull-back request line: colour × stage reached. */
 export const lineKey = (colour, stage) => `${colour}|${stage}`;
+
+/** Key of a colour × size cell in the return grids. */
+export const sizeKey = (colour, size) => `${colour}|${size}`;

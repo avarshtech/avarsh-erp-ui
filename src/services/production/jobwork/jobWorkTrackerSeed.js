@@ -5,7 +5,8 @@
  * Ten jobs cover every tracker state: at risk with an approved pull-back (J1), on track (J3, J8),
  * stale with an expired vendor approval (J4), stalled (J5), no due date (J6), completed (J7),
  * overdue with a pending pull-back (J9), ready to close (J10) and short-closed with a settled
- * pull-back (J11). Order O1 is split between in-house and a CMT vendor.
+ * pull-back (J11). Order O1 is split between in-house and a CMT vendor. Order O6 is work we do for a
+ * principal (mock round 2); its Pink panels are printed by Bright Prints (J12, "principal's goods").
  */
 import dayjs from 'dayjs';
 import {
@@ -15,8 +16,9 @@ import {
 import { colourTotals, docPlan, jobStages, netPlan } from '../../../utils/jobWorkTracker/planRules';
 import { addWorkingDays, iso, subtractWorkingDays } from '../../../utils/jobWorkTracker/workingDays';
 import { defaultShares } from '../../../utils/jobWorkTracker/earnings';
+import { SHARED_ORDER } from './principalOrderShared';
 
-export const TRACKER_SEED_VERSION = 1;
+export const TRACKER_SEED_VERSION = 2;
 export const COORDINATOR = 'Priya S (coordinator)';
 export const MANAGER = 'Ramesh K (production manager)';
 const STORES = 'Arun (stores)';
@@ -113,6 +115,9 @@ export const buildTrackerSeed = (todayInput) => {
       colours: [{ colour: 'Red', qty: { S: 150, M: 250, L: 250, XL: 150 } }, { colour: 'Grey', qty: { S: 120, M: 230, L: 220, XL: 130 } }] },
     { id: 5, orderNo: no('SG', 1004), buyer: 'Alpine Sports', styleNo: 'AS-JOG-12', styleName: 'Fleece jogger', shipDate: fwd(3), branchId: 1, sizes: S4,
       colours: [{ colour: 'Black', qty: { S: 300, M: 400, L: 350, XL: 150 } }] },
+    { id: SHARED_ORDER.outwardOrderId, orderNo: no('SG', SHARED_ORDER.orderN), buyer: `${SHARED_ORDER.principal} (job work)`, type: 'JOB_WORK',
+      principal: SHARED_ORDER.principal, styleNo: SHARED_ORDER.styleNo, styleName: SHARED_ORDER.styleName,
+      shipDate: fwd(SHARED_ORDER.dueInWorkingDays), branchId: 1, sizes: SHARED_ORDER.sizes, colours: SHARED_ORDER.colours },
   ];
   const O = Object.fromEntries(orders.map((o) => [o.id, o]));
 
@@ -139,6 +144,10 @@ export const buildTrackerSeed = (todayInput) => {
     doc(DOC_TYPE.WORK_ORDER, 1058, 5, 501, { allowancePct: 3, rate: 58, approvedOn: wd(12), plannedStart: wd(11), plannedDelivery: wd(1), lines: linesFor(O[5], all, 3) }),
     doc(DOC_TYPE.CUT_PANEL_PO, 1001, 5, 505, { processName: 'Panel Printing', rate: 6.5, approvedOn: wd(10), plannedStart: wd(8), plannedDelivery: wd(2), lines: linesFor(O[5], all, 3) }),
     doc(DOC_TYPE.CUTTING_PO, 1031, 3, 504, { allowancePct: 3, rate: 4.5, approvedOn: wd(20), plannedStart: wd(18), plannedDelivery: wd(12), lines: linesFor(O[3], all, 3) }),
+    doc(DOC_TYPE.CUT_PANEL_PO, SHARED_ORDER.printingDocN, SHARED_ORDER.outwardOrderId, 505, {
+      processName: 'Panel Printing', rate: 6, approvedOn: wd(10), plannedStart: wd(9), plannedDelivery: fwd(3),
+      lines: Object.entries(SHARED_ORDER.printSent).map(([size, plannedQty]) => ({ colour: 'Pink', size, plannedQty })),
+    }),
   ];
   const D = (n) => docs.find((d) => d.docNo.endsWith(`/${n}`));
   // Work Order stage shares: a CMT vendor (also holds the Cutting PO) 15/60/25, a sewing-only vendor rescaled.
@@ -170,6 +179,7 @@ export const buildTrackerSeed = (todayInput) => {
     { id: 9, n: 1009, orderId: 5, vendorId: 501, branchId: 1, docs: [1047, 1058], scope: FINISHING_STAGES, status: JOB_STATUS.IN_PROGRESS },
     { id: 10, n: 1010, orderId: 5, vendorId: 505, branchId: 1, docs: [1001], status: JOB_STATUS.IN_PROGRESS },
     { id: 11, n: 1011, orderId: 3, vendorId: 504, branchId: 2, docs: [1031], status: JOB_STATUS.CLOSED, closedAt: wd(10), closedReason: 'Vendor ran one roll short; the balance 67 pcs were cut in-house.' },
+    { id: SHARED_ORDER.outwardJobId, n: 1012, orderId: SHARED_ORDER.outwardOrderId, vendorId: 505, branchId: 1, docs: [SHARED_ORDER.printingDocN], status: JOB_STATUS.IN_PROGRESS },
   ];
   const jobs = jobDefs.map((j) => {
     const jd = j.docs.map(D);
@@ -241,6 +251,7 @@ export const buildTrackerSeed = (todayInput) => {
       notes: [{ from: wd(2), flag: FLAG.DELAYED, issue: ISSUE_CATEGORY.VENDOR_CAPACITY, remarks: 'Vendor moved two lines to another buyer.' }] }),
     entriesFor(10, { from: wd(8), to: wd(1), rate: { PANEL_PROCESSED: 160 } }),
     entriesFor(11, { from: wd(18), to: wd(11), rate: { CUT: 200 } }),
+    entriesFor(SHARED_ORDER.outwardJobId, { from: wd(9), to: today, rate: { PANEL_PROCESSED: 130 } }),
   ];
   let entrySeq = 0;
   const entries = entryLists.flat().map((e) => { entrySeq += 1; return { id: entrySeq, version: 0, ...e }; });
@@ -272,6 +283,8 @@ export const buildTrackerSeed = (todayInput) => {
     // 1,202 of the 1,237 planned panels are back: past the 1,200 share (ready to close), short of the plan.
     receipt(10, STAGE.PANEL_PROCESSED, wd(1), 'BP/DC/0429', [ln('Black', 'L', 79, 3), ln('Black', 'XL', 120, 0)]),
     receipt(11, STAGE.CUT, wd(11), 'VCW/DC/0880', [ln('Indigo', 'S', 200), ln('Indigo', 'M', 290), ln('Indigo', 'L', 245), ln('Indigo', 'XL', 145), ln('Stone', 'S', 120), ln('Stone', 'M', 190), ln('Stone', 'L', 190), ln('Stone', 'XL', 100)]),
+    ...SHARED_ORDER.printBackTrips.map((trip, i) => receipt(SHARED_ORDER.outwardJobId, STAGE.PANEL_PROCESSED, wd([5, 2][i]), ['BP/DC/0441', 'BP/DC/0452'][i],
+      Object.entries(trip).map(([size, q]) => ln('Pink', size, q)))),
   ];
 
   // ── Pull-backs ──
@@ -370,7 +383,7 @@ export const buildTrackerSeed = (todayInput) => {
   return {
     seedVersion: TRACKER_SEED_VERSION,
     seededOn: today,
-    seq: { job: 11, entry: entrySeq, receipt: receiptSeq, pullBack: 3, pullBackLine: 6, pullBackReturn: 2, vendorReturn: 2, material: misSeq, doc: docSeq },
+    seq: { job: 12, entry: entrySeq, receipt: receiptSeq, pullBack: 3, pullBackLine: 6, pullBackReturn: 2, vendorReturn: 2, material: misSeq, doc: docSeq },
     counters: { JWR: 1000 + receiptSeq, JPB: 1003, JPR: 1001, VMR: 1001, MIS: 2100 + misSeq, CPO: 1060, WO: 1070, FPO: 1030 },
     branches,
     vendors,

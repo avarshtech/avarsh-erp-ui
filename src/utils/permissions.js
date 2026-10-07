@@ -298,13 +298,13 @@ export const SCREENS = [
     routes: ['/production/job-work'],
     ops: ['view', 'add', 'delete', 'receive', 'cancel', 'approve'],
     opLabels: {
-      add: 'Enter daily progress · Raise pull-back',
+      add: 'Enter daily progress · Raise pull-back · Inward job orders, principals, issues',
       delete: 'Delete latest progress entry',
-      receive: 'Receive from vendor · Pull-back returns',
-      cancel: 'Short-close job · Cancel receipt / pull-back',
+      receive: 'Receive from vendor · Pull-back returns · Material in from principals · Returns to principals',
+      cancel: 'Short-close job · Cancel receipt / pull-back · Close or cancel inward job orders',
       approve: 'Approve pull-back',
     },
-    description: 'Outsourced jobs at vendors: daily status per colour and stage, receipts, pull-backs to in-house and the order split.' },
+    description: 'Job work both ways: outsourced jobs at vendors (daily status, receipts, pull-backs, order split) and work we do for principals on their material (job orders, party stock, returns, statements).' },
 
   // ── Export Documentation ──
   { id: 'export-shipments', name: 'Shipments', section: 'expdoc', kind: 'screen',

@@ -14,11 +14,11 @@ const CARDS = [
   { key: 'readyToClose', title: 'Ready to close', icon: <SafetyCertificateOutlined />, color: '#08979c', filter: { readyToClose: true } },
 ];
 
-/** KPI strip; a card with a filter applies it to the table when clicked. */
-const JobKpiCards = memo(function JobKpiCards({ kpis, loading, onFilter }) {
+/** KPI strip; a card with a filter applies it to the table when clicked. `cards` defaults to the tracker's. */
+const JobKpiCards = memo(function JobKpiCards({ kpis, loading, onFilter, cards = CARDS }) {
   return (
     <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-      {CARDS.map((c) => (
+      {cards.map((c) => (
         <Col key={c.key} xs={12} sm={8} lg={4}>
           <StatCard
             title={c.title}

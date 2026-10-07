@@ -41,6 +41,7 @@ export const toRow = (db, ctx, today) => {
     orderId: order.id,
     orderNo: order.orderNo,
     buyer: order.buyer,
+    principal: order.principal || null,
     styleNo: order.styleNo,
     styleName: order.styleName,
     shipDate: order.shipDate,

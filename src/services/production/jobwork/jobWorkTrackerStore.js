@@ -5,54 +5,18 @@
  */
 import dayjs from 'dayjs';
 import { buildTrackerSeed, TRACKER_SEED_VERSION } from './jobWorkTrackerSeed';
+import { createDemoStore } from './demoStore';
 import { iso } from '../../../utils/jobWorkTracker/workingDays';
 
 export const TRACKER_STORAGE_KEY = 'avarsh.production.jobWorkTracker.mockStore.v1';
 
-let memory = null;
+const store = createDemoStore({ storageKey: TRACKER_STORAGE_KEY, seedVersion: TRACKER_SEED_VERSION, buildSeed: buildTrackerSeed });
 
-const persist = (db) => {
-  memory = db;
-  try {
-    localStorage.setItem(TRACKER_STORAGE_KEY, JSON.stringify(db));
-  } catch { /* storage full or blocked: keep it in memory for this tab */ }
-};
-
-export const loadTrackerDb = () => {
-  if (memory?.seedVersion === TRACKER_SEED_VERSION) return memory;
-  try {
-    const raw = localStorage.getItem(TRACKER_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?.seedVersion === TRACKER_SEED_VERSION) {
-        memory = parsed;
-        return memory;
-      }
-    }
-  } catch { /* unreadable: fall through to a fresh seed */ }
-  const fresh = buildTrackerSeed(iso(dayjs()));
-  persist(fresh);
-  return fresh;
-};
-
-export const saveTrackerDb = (db) => persist(db);
-
-export const resetTrackerDb = () => {
-  const fresh = buildTrackerSeed(iso(dayjs()));
-  persist(fresh);
-  return fresh;
-};
-
-/**
- * Run `fn(db)` against a copy of the demo and commit it only if `fn` returns, so a refused write
- * (fn throws) leaves nothing half-applied — the way a rolled-back transaction would.
- */
-export const mutateTrackerDb = (fn) => {
-  const db = JSON.parse(JSON.stringify(loadTrackerDb()));
-  const result = fn(db);
-  persist(db);
-  return result;
-};
+export const loadTrackerDb = store.load;
+export const saveTrackerDb = store.save;
+export const resetTrackerDb = store.reset;
+/** Run `fn(db)` against a copy and commit only if it returns (see createDemoStore). */
+export const mutateTrackerDb = store.mutate;
 
 /** Next number in a demo series: `JPB/26-27/1004`. */
 export const nextDocNo = (db, prefix) => {

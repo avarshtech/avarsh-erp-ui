@@ -33,6 +33,9 @@ import { JW_PO_STATUS } from './jobWorkPoStatus';
 import {
   FLAG, JOB_STATUS, PULLBACK_STATUS, RECEIPT_STATUS, RETURN_STATUS, RISK,
 } from './jobWorkTracker/constants';
+import {
+  INWARD_STATUS, JO_STATUS, RETURN_STATUS as INWARD_RETURN_STATUS, TALLY_STATUS,
+} from './jobWorkInward/inwardConstants';
 
 // ==================== ORDER STATUS CONFIG ====================
 export const ORDER_STATUS_CONFIG = {
@@ -147,6 +150,28 @@ export const JOB_WORK_RETURN_STATUS_CONFIG = {
   [RETURN_STATUS.DRAFT]:     { color: 'default', icon: FileTextOutlined },
   [RETURN_STATUS.POSTED]:    { color: 'green',   icon: InboxOutlined },
   [RETURN_STATUS.CANCELLED]: { color: 'volcano', icon: StopOutlined },
+};
+
+// ── Inward job work (we work for principals; UI mock round 2) ──
+export const JOB_WORK_IN_ORDER_STATUS_CONFIG = {
+  [JO_STATUS.AWAITING_MATERIAL]: { color: 'gold',       icon: ClockCircleOutlined },
+  [JO_STATUS.IN_PRODUCTION]:     { color: 'processing', icon: ExperimentOutlined },
+  [JO_STATUS.PARTLY_RETURNED]:   { color: 'cyan',       icon: SendOutlined },
+  [JO_STATUS.RETURNED]:          { color: 'green',      icon: CheckCircleOutlined },
+  [JO_STATUS.CLOSED]:            { color: 'default',    icon: StopOutlined },
+  [JO_STATUS.CANCELLED]:         { color: 'volcano',    icon: CloseCircleOutlined },
+};
+
+/** Material In and Return to Principal documents (both cancel to CANCELLED). */
+export const JOB_WORK_IN_DOC_STATUS_CONFIG = {
+  [INWARD_STATUS.POSTED]:            { color: 'green',   icon: InboxOutlined },
+  [INWARD_RETURN_STATUS.DISPATCHED]: { color: 'green',   icon: SendOutlined },
+  [INWARD_STATUS.CANCELLED]:         { color: 'volcano', icon: StopOutlined },
+};
+
+export const JOB_WORK_IN_TALLY_STATUS_CONFIG = {
+  [TALLY_STATUS.PENDING]:  { color: 'orange', icon: ClockCircleOutlined },
+  [TALLY_STATUS.RECORDED]: { color: 'green',  icon: AuditOutlined },
 };
 
 // ==================== GRN STATUS CONFIG ====================
