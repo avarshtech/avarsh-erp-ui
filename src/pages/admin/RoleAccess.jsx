@@ -19,8 +19,9 @@ const asList = (res) => (Array.isArray(res) ? res : (res?.content || res?.data |
 
 /**
  * Role & Access: the roles register. A role opens read-only in the view dialog (the Supplier PO
- * view's design); Edit and Add go to the editor page, which comes back here with ?viewId so the
- * dialog shows what was saved. API errors are toasted by axiosInstance, never again here.
+ * view's design); Edit and Add go to the editor page. An editor opened from the dialog comes back
+ * to it with ?viewId on Save or Cancel; one opened from the list comes back to the list. API errors
+ * are toasted by axiosInstance, never again here.
  */
 const RoleAccess = () => {
   const { message } = App.useApp();
@@ -127,8 +128,8 @@ const RoleAccess = () => {
         viewer={viewer}
         deleting={viewing != null && deletingId === viewing.id}
         onDelete={() => handleDelete(viewing)}
-        onEdit={() => { close(); navigate(`/admin/roles/edit/${viewing.id}`); }}
-        onDuplicate={() => { close(); navigate(`/admin/roles/new?from=${viewing.id}`); }}
+        onEdit={() => { close(); navigate(`/admin/roles/edit/${viewing.id}`, { state: { from: 'dialog' } }); }}
+        onDuplicate={() => { close(); navigate(`/admin/roles/new?from=${viewing.id}`, { state: { from: 'dialog' } }); }}
       />
     </div>
   );

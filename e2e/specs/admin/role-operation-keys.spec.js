@@ -130,9 +130,8 @@ test('the new operations and the bill-passing masters key are ticked, saved and 
     const saved = page.waitForResponse((r) => r.url().includes(`/roles/${roleId}`) && r.request().method() === 'PUT');
     await page.getByRole('button', { name: /Save changes/ }).click();
     expect((await saved).status()).toBe(200);
-    // Back on the list with the role's view dialog open, read-only: no boxes
-    const dialog = await viewDialog(page);
-    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
+    // Opened from the list row's Edit, the editor returns to the list
+    await expect(page).toHaveURL(/\/admin\/roles$/);
   });
 
   await test.step('the API stored each one on its own, apart from the operation it was copied from', async () => {
@@ -149,6 +148,7 @@ test('the new operations and the bill-passing masters key are ticked, saved and 
 
   await test.step('after a reload the view dialog ticks every new right and not its source', async () => {
     const dialog = await openDialog(page);
+    await expect(dialog.getByRole('checkbox')).toHaveCount(0); // read-only: ticks, never boxes
     for (const right of NEW_RIGHTS) {
       await expect(tick(dialog, right.label), right.label).toBeVisible();
       if (right.source) await expect(tick(dialog, sourceLabel(right)), sourceLabel(right)).toHaveCount(0);

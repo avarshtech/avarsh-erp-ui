@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Form } from 'antd';
 import DocumentHero from '../../../../components/DocumentHero';
 import useUnsavedChanges from '../../../../hooks/useUnsavedChanges';
@@ -24,7 +23,6 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
  * role is loaded and keyed by it (RoleForm), so every piece of state starts from the loaded role.
  */
 const RoleEditor = ({ role, source, isNew }) => {
-  const navigate = useNavigate();
   const [form] = Form.useForm();
   const sections = useMemo(() => getPermissionSections(), []);
   const screensAll = useMemo(() => sections.flatMap((s) => s.screens), [sections]);
@@ -49,9 +47,8 @@ const RoleEditor = ({ role, source, isNew }) => {
   const changedKeys = useMemo(() => new Set(draft.changes.map((c) => changeKey(c.screen.id, c.op))), [draft.changes]);
   const groups = useMemo(() => groupChanges(draft.changes, sections), [draft.changes, sections]);
 
-  const backTo = isNew ? '/admin/roles' : `/admin/roles?viewId=${role.id}`;
-  const { saving, save } = useRoleActions({ role, isNew, form, permissions: draft.permissions, dirty, clearDirty, backTo });
-  const leave = () => navigate(backTo, { replace: true });
+  // Save, Cancel and the back arrow, and where each one leaves to
+  const actions = useRoleActions({ role, source, isNew, form, permissions: draft.permissions, dirty, clearDirty });
 
   const screens = screenCount(draft.permissions, screensAll);
   const rights = rightsCount(draft.permissions, screensAll);
@@ -62,7 +59,7 @@ const RoleEditor = ({ role, source, isNew }) => {
 
   return (
     <div className="animate-fade-in-up">
-      <DocumentHero page hero={buildRoleHero(role, { screens, subtitle, showMeta: !isNew })} onBack={leave} />
+      <DocumentHero page hero={buildRoleHero(role, { screens, subtitle, showMeta: !isNew })} onBack={actions.back} />
       <RoleBanners role={role} />
       <RoleDetailsCard
         form={form}
@@ -84,10 +81,10 @@ const RoleEditor = ({ role, source, isNew }) => {
         groups={groups}
         rightsText={`${plural(rights, 'right')} on ${plural(screens.granted, 'screen')}`}
         onOpenSection={access.jumpTo}
-        saving={saving}
+        saving={actions.saving}
         saveReason={noRights ? 'Tick at least one right' : null}
-        onCancel={leave}
-        onSave={save}
+        onCancel={actions.cancel}
+        onSave={actions.save}
       />
     </div>
   );

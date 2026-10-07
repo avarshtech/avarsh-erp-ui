@@ -136,5 +136,14 @@ test.describe('Role Management — UI Tests', () => {
     const reopened = page.locator('.ant-modal').filter({ hasText: UI_ROLE });
     await expect(reopened).toBeVisible({ timeout: 20000 });
     await expect(reopened.getByRole('img', { name: 'View on Orders', exact: true })).toHaveCount(0);
+
+    // The hero's back arrow goes to the list and leaves the dialog closed
+    await reopened.getByRole('button', { name: /Edit$/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/roles/edit/${uiRoleId}$`));
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/roles$/);
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 20000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.ant-modal').filter({ hasText: UI_ROLE })).toHaveCount(0);
   });
 });

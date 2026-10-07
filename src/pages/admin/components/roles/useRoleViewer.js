@@ -9,7 +9,7 @@ const holderName = (u) => `${u.name || u.username}${u.isActive === false ? ' (in
 
 /**
  * The view dialog's state on the roles list: the role it shows, opened from a row or from
- * ?viewId=<id> (the editor coming back after Save or Cancel, or a shared link) — read once and
+ * ?viewId=<id> (the editor returning to the dialog it was opened from, or a shared link) — read once and
  * removed, as OrderList's deep link is. Who holds the role: names when the viewer may read users,
  * fetched once; otherwise null, and the dialog shows the count.
  */
