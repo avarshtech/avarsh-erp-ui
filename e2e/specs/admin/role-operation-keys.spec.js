@@ -4,9 +4,9 @@ import { ensureSessionActive, goToListPage } from '../../helpers/navigation.js';
 
 /**
  * Role & Access offers the operations decisions and payments got of their own (review F093), the
- * bill-passing masters' own key (F266) and the Vendor master's key: each is a checkbox that can be
- * ticked, is saved as ticked, and comes back ticked after a reload, apart from the operation it was
- * copied from.
+ * bill-passing masters' own key (F266) and the Vendor master's key: each is a checkbox in the role
+ * editor that can be ticked, is saved as ticked, and shows as granted in the view dialog after a
+ * reload, apart from the operation it was copied from.
  *
  * RBAC is OFF in e2e, so what the API refuses a role without them is proven by the API's tests.
  */
@@ -64,25 +64,46 @@ test.beforeEach(async ({ page }) => {
   await ensureSessionActive(page);
 });
 
-/** Opens the role's editor from a freshly loaded list page. */
-const openRole = async (page) => {
+/** The role's row on a freshly loaded list page. */
+const findRole = async (page) => {
   await goToListPage(page, '/admin/roles');
   await page.getByPlaceholder('Search by role name or description...').fill(ROLE_NAME);
   const row = page.locator('.ant-table-row').filter({ hasText: ROLE_NAME });
   await expect(row).toHaveCount(1, { timeout: 20000 });
-  await row.locator('button:has(.anticon-edit)').click();
-  const dialog = page.locator('.ant-modal').filter({ hasText: `Edit Role — ${ROLE_NAME}` });
-  await expect(dialog).toBeVisible();
+  return row;
+};
+
+/** The row's Edit opens the editor page. */
+const openEditor = async (page) => {
+  await (await findRole(page)).locator('button:has(.anticon-edit)').click();
+  await expect(page).toHaveURL(new RegExp(`/admin/roles/edit/${roleId}$`));
+  await expect(page.getByRole('navigation', { name: 'Sections' })).toBeVisible({ timeout: 20000 });
+};
+
+/** The role's name opens the read-only view dialog. */
+const openDialog = async (page) => {
+  await (await findRole(page)).getByRole('button', { name: ROLE_NAME }).click();
+  return viewDialog(page);
+};
+
+const viewDialog = async (page) => {
+  const dialog = page.locator('.ant-modal').filter({ hasText: ROLE_NAME });
+  await expect(dialog).toBeVisible({ timeout: 20000 });
   return dialog;
 };
 
-/** Shows one section of the matrix: the rail on the left picks which section the pane lists. */
-const showSection = async (dialog, section) => {
-  await dialog.locator('.perm-rail-item').filter({ hasText: section }).click();
-  await expect(dialog.locator('.perm-panel-head')).toContainText(section);
+/** Opens one section in the editor: the nav on the left picks which section the table lists. */
+const showSection = async (page, section) => {
+  await page.getByRole('navigation', { name: 'Sections' })
+    .getByRole('button', { name: new RegExp(`^${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')},`) })
+    .click();
+  await expect(page.locator('.ag-panel-title')).toHaveText(section);
 };
 
-const box = (dialog, label) => dialog.getByRole('checkbox', { name: label, exact: true });
+const box = (page, label) => page.getByRole('checkbox', { name: label, exact: true });
+
+/** A granted right in the view dialog: a tick carrying the same name the editor's box has. */
+const tick = (dialog, label) => dialog.getByRole('img', { name: label, exact: true });
 
 /** "Add on Payroll" for hr-payroll's add: the CRUD boxes are labelled by the screen's name. */
 const sourceLabel = (right) => {
@@ -94,11 +115,11 @@ test('the new operations and the bill-passing masters key are ticked, saved and 
   test.setTimeout(120000);
 
   await test.step('every new checkbox renders unticked and can be ticked', async () => {
-    const dialog = await openRole(page);
+    await openEditor(page);
     for (const section of SECTIONS) {
-      await showSection(dialog, section);
+      await showSection(page, section);
       for (const right of NEW_RIGHTS.filter((r) => r.section === section)) {
-        const checkbox = box(dialog, right.label);
+        const checkbox = box(page, right.label);
         await expect(checkbox, right.label).toBeVisible();
         await expect(checkbox, right.label).not.toBeChecked();
         await checkbox.check();
@@ -107,9 +128,11 @@ test('the new operations and the bill-passing masters key are ticked, saved and 
     }
 
     const saved = page.waitForResponse((r) => r.url().includes(`/roles/${roleId}`) && r.request().method() === 'PUT');
-    await dialog.getByRole('button', { name: /Update Role/ }).click();
+    await page.getByRole('button', { name: /Save changes/ }).click();
     expect((await saved).status()).toBe(200);
-    await expect(dialog).toBeHidden({ timeout: 15000 });
+    // Back on the list with the role's view dialog open, read-only: no boxes
+    const dialog = await viewDialog(page);
+    await expect(dialog.getByRole('checkbox')).toHaveCount(0);
   });
 
   await test.step('the API stored each one on its own, apart from the operation it was copied from', async () => {
@@ -124,14 +147,11 @@ test('the new operations and the bill-passing masters key are ticked, saved and 
     expect(data.permissions?.['inventory-bill-passing']?.operations?.view, 'inventory-bill-passing:view').not.toBe(true);
   });
 
-  await test.step('after a reload every new checkbox is still ticked and its source is not', async () => {
-    const dialog = await openRole(page);
-    for (const section of SECTIONS) {
-      await showSection(dialog, section);
-      for (const right of NEW_RIGHTS.filter((r) => r.section === section)) {
-        await expect(box(dialog, right.label), right.label).toBeChecked();
-        if (right.source) await expect(box(dialog, sourceLabel(right)), sourceLabel(right)).not.toBeChecked();
-      }
+  await test.step('after a reload the view dialog ticks every new right and not its source', async () => {
+    const dialog = await openDialog(page);
+    for (const right of NEW_RIGHTS) {
+      await expect(tick(dialog, right.label), right.label).toBeVisible();
+      if (right.source) await expect(tick(dialog, sourceLabel(right)), sourceLabel(right)).toHaveCount(0);
     }
   });
 });

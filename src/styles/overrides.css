@@ -681,6 +681,19 @@ textarea.ant-input:active {
   transition: all 0.2s cubic-bezier(0.12, 0.4, 0.29, 1.46) 0.1s;
 }
 
+/* The rule above hides ::after on every unchecked box, which also hid antd's indeterminate
+   square: a half-ticked "select all" drew as empty. Restore antd 6's own geometry for it. */
+.ant-checkbox-indeterminate .ant-checkbox-inner::after {
+  top: 50%;
+  inset-inline-start: 50%;
+  width: 8px;
+  height: 8px;
+  border: 0;
+  background-color: var(--primary-color);
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
 /* Radio */
 [data-theme="dark"] .ant-radio-inner {
   background-color: var(--input-bg);

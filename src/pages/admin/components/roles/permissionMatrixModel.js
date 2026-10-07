@@ -1,20 +1,16 @@
 /**
- * Pure logic behind the permission matrix. No React, no Ant Design — so the
+ * Pure logic behind the permission editor. No React, no Ant Design — so the
  * toggle rules can be reasoned about (and fixed) without touching the UI.
  *
  * Everything here takes a permissions object and returns a NEW one; nothing
  * mutates its input.
  */
-import { applyDependencies, getBlockedReason } from '../../../../utils/permissions';
+import { applyDependencies, getBlockedReason, getEmptyPermissions } from '../../../../utils/permissions';
 
 /** The four operations that get their own aligned column. */
 export const CRUD_OPS = ['view', 'add', 'update', 'delete'];
 
-/**
- * Every operation any screen can declare must appear in BOTH maps. A missing
- * OP_COLORS entry used to produce "undefined40" — invalid CSS the browser drops,
- * leaving the chip unstyled with no error anywhere.
- */
+/** Every operation any screen can declare needs a label here, or it renders as its raw key. */
 export const OP_LABELS = {
   view: 'View',
   add: 'Add',
@@ -37,28 +33,6 @@ export const OP_LABELS = {
   pay: 'Pay',
 };
 
-export const OP_COLORS = {
-  view: '#6366f1',
-  add: '#22c55e',
-  update: '#f59e0b',
-  delete: '#ef4444',
-  approve: '#10b981',
-  reject: '#f43f5e',
-  cancel: '#64748b',
-  refer_back: '#8b5cf6',
-  verify: '#14b8a6',
-  post: '#eab308',
-  revise: '#0ea5e9',
-  override: '#a855f7',
-  print: '#0891b2',
-  reprint: '#7c3aed',
-  publish: '#059669',
-  lock: '#475569',
-  dispatch: '#2563eb',
-  receive: '#0d9488',
-  pay: '#db2777',
-};
-
 /** A screen may rename an operation for itself, e.g. delete → "Cancel GRN". */
 export const opLabel = (screen, op) => screen?.opLabels?.[op] ?? OP_LABELS[op] ?? op;
 
@@ -77,16 +51,43 @@ const withAccess = (operations) => ({
   operations,
 });
 
+/**
+ * Screens whose `requires` parent must be granted first come after every other
+ * screen. The registry lists some approval bundles BEFORE their parent (GRN's
+ * two bundles precede `inventory`, Costing's precedes `costing`), so a section
+ * granted in registry order skipped them as still blocked.
+ */
+const parentsFirst = (screens) => [
+  ...screens.filter((s) => !s.requires),
+  ...screens.filter((s) => s.requires),
+];
+
 export const isGranted = (permissions, screenId, op) =>
   permissions?.[screenId]?.operations?.[op] === true;
+
+/**
+ * A stored role on a fresh template: every registry key present, each operation
+ * taken from the stored map as a strict boolean, access derived from them — the
+ * stored flag is free-form jsonb and can disagree. Keys this version does not
+ * list are left out; a save would drop them anyway.
+ */
+export const fromStored = (stored) => {
+  const merged = getEmptyPermissions();
+  Object.keys(stored ?? {}).forEach((id) => {
+    if (!merged[id]) return;
+    const ops = { ...merged[id].operations };
+    Object.keys(ops).forEach((op) => { ops[op] = stored[id]?.operations?.[op] === true; });
+    merged[id] = withAccess(ops);
+  });
+  return applyDependencies(merged);
+};
 
 /**
  * Toggle one operation.
  *
  * `view` is the right to open the screen, so it cascades: turning it off clears
  * the screen, and turning anything else on turns it on. Screens with no view
- * operation — the approval bundles — opt out. That used to be a hardcoded list
- * of three ids, which silently mishandled the four other view-less screens.
+ * operation — the approval bundles — opt out.
  */
 export const toggleOp = (permissions, screen, op, checked) => {
   const current = entryFor(permissions, screen);
@@ -111,18 +112,30 @@ export const toggleScreen = (permissions, screen, checked) =>
   });
 
 /**
- * Grant or revoke a whole section. Screens blocked by a dependency are skipped
- * on grant rather than set and immediately cleared, so "select all" cannot leave
- * a row looking granted when applyDependencies is about to revoke it.
+ * Grant or revoke a whole section, parents first. Screens still blocked by a
+ * dependency are skipped on grant rather than set and immediately cleared, so
+ * "all" cannot leave a row looking granted when applyDependencies revokes it.
  */
 export const toggleSection = (permissions, screens, checked) => {
-  let next = { ...permissions };
-  screens.forEach((screen) => {
+  const next = { ...permissions };
+  parentsFirst(screens).forEach((screen) => {
     if (checked && getBlockedReason(screen.id, next)) return;
     next[screen.id] = withAccess(blankOps(screen, checked));
   });
   return applyDependencies(next);
 };
+
+/**
+ * One operation across a section's screens — a column header's box. Screens
+ * without the operation are untouched; it cascades through `view` as one box would.
+ */
+export const toggleColumn = (permissions, screens, op, checked) =>
+  parentsFirst(screens)
+    .filter((screen) => screen.ops.includes(op))
+    .reduce((next, screen) => (checked && getBlockedReason(screen.id, next) ? next : toggleOp(next, screen, op, checked)), permissions);
+
+/** View on every screen that has it, keeping every right already granted. */
+export const addViewEverywhere = (permissions, screens) => toggleColumn(permissions, screens, 'view', true);
 
 /** granted/total for one screen, plus its tri-state checkbox flags. */
 export const screenState = (permissions, screen) => {
@@ -137,12 +150,8 @@ export const screenState = (permissions, screen) => {
 };
 
 /**
- * granted/total across a section.
- *
- * Both flags come from the same count. They used to be computed differently —
- * "all" compared every operation while "some" read the stored access flag — so a
- * role whose access flag disagreed with its operations rendered an indeterminate
- * section header above rows with nothing ticked.
+ * granted/total across a set of screens. Both flags come from the same count,
+ * so a header can never read indeterminate above rows with nothing ticked.
  */
 export const sectionState = (permissions, screens) => {
   const granted = screens.reduce((n, s) => n + screenState(permissions, s).granted, 0);
@@ -155,13 +164,20 @@ export const sectionState = (permissions, screens) => {
   };
 };
 
-export const countGranted = (permissions, screens) => sectionState(permissions, screens);
+/**
+ * Every operation whose value differs between two permission maps, in the
+ * order the screens are listed: `{ screen, op, granted }`, granted being the new value.
+ */
+export const diffPermissions = (before, after, screens) =>
+  screens.flatMap((screen) => screen.ops
+    .filter((op) => isGranted(before, screen.id, op) !== isGranted(after, screen.id, op))
+    .map((op) => ({ screen, op, granted: isGranted(after, screen.id, op) })));
 
 export const SHOW_FILTERS = [
   { value: 'all', label: 'All screens' },
   { value: 'granted', label: 'Granted only' },
   { value: 'denied', label: 'Not granted' },
-  { value: 'special', label: 'Approvals & special' },
+  { value: 'special', label: 'With other rights' },
 ];
 
 /**
@@ -187,10 +203,4 @@ export const filterScreens = (screens, permissions, query, filter) => {
     ].filter(Boolean).join(' ').toLowerCase();
     return haystack.includes(q);
   });
-};
-
-/** Keys the frontend no longer knows, carried through a save untouched. */
-export const unknownKeys = (permissions, screens) => {
-  const known = new Set(screens.map((s) => s.id));
-  return Object.keys(permissions ?? {}).filter((k) => !known.has(k));
 };

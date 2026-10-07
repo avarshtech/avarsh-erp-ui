@@ -672,6 +672,7 @@ const MainLayoutInner = () => {
     if (path.startsWith('/hr/statutory/el')) return ['/hr/statutory/el'];
     if (path.startsWith('/hr/statutory')) return ['/hr/statutory/pt'];
     if (path.startsWith('/hr/fnf')) return ['/hr/fnf'];
+    if (path.startsWith('/admin/roles')) return ['/admin/roles'];
     return [path];
   };
 

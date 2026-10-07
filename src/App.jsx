@@ -93,6 +93,7 @@ import CostComparison from './pages/costing/CostComparison';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
 import RoleAccess from './pages/admin/RoleAccess';
+const RoleForm = lazy(() => import('./pages/admin/RoleForm'));
 import ApprovalFlowList from './pages/admin/ApprovalFlowList';
 import CompanyProfile from './pages/admin/CompanyProfile';
 import MasterDashboard from './pages/master/MasterDashboard';
@@ -421,6 +422,8 @@ const ThemedApp = () => {
             <Route path="admin/dashboard" element={<PermissionRoute module={['users', 'roles', 'approval-flows', 'company-profile']} operation="view"><AdminDashboard /></PermissionRoute>} />
             <Route path="admin/users" element={<PermissionRoute module="users" operation="view"><UserManagement /></PermissionRoute>} />
             <Route path="admin/roles" element={<PermissionRoute module="roles" operation="view"><RoleAccess /></PermissionRoute>} />
+            <Route path="admin/roles/new" element={<PermissionRoute module="roles" operation="add"><Suspense fallback={<PageSkeleton />}><RoleForm /></Suspense></PermissionRoute>} />
+            <Route path="admin/roles/edit/:id" element={<PermissionRoute module="roles" operation="update"><Suspense fallback={<PageSkeleton />}><RoleForm /></Suspense></PermissionRoute>} />
             <Route path="admin/approval-flows" element={<PermissionRoute module="approval-flows" operation="view"><ApprovalFlowList /></PermissionRoute>} />
             <Route path="admin/company-profile" element={<PermissionRoute module="company-profile" operation="view"><CompanyProfile /></PermissionRoute>} />
             {/* Master Data — one shell screen shared by every master key; opens if any of them grants access */}

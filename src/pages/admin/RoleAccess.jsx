@@ -1,289 +1,99 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import {
-  Alert, App, Card, Table, Space, Input, Tag, Modal, Form, Typography, Row, Col, Switch, Divider,
-} from 'antd';
-import { SearchOutlined, ExclamationCircleOutlined, SafetyOutlined } from '@ant-design/icons';
-import { getRoles, createRole, updateRole, deleteRole } from '../../services/admin/roleService';
-import {
-  getEmptyPermissions,
-  applyDependencies,
-  validatePermissions,
-  normalizePermissionsForSave,
-  getCurrentUser,
-  setCurrentUser,
-  isAdminRole,
-} from '../../utils/permissions';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { App, Card, Col, Input, Row, Table } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
+import { deleteRole, getRoles } from '../../services/admin/roleService';
+import { getCurrentRoleId, getPermissionSections, isSuperuser } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
-import { ActionButton, DeleteConfirm } from '../../components/buttons';
-import StatusBadge from '../../components/StatusBadge';
+import { ActionButton } from '../../components/buttons';
 import PageHeader from '../../components/PageHeader';
 import EmptyState from '../../components/EmptyState';
-import { formatDate } from '../../utils/formatters';
 import { getTablePagination } from '../../utils/paginationConfig';
-import { MODAL_WIDTHS } from '../../utils/uiConstants';
-import PermissionMatrix from './components/roles/PermissionMatrix';
+import RoleViewDialog from './components/roles/RoleViewDialog';
+import useRoleViewer from './components/roles/useRoleViewer';
+import { buildRoleColumns } from './components/roles/roleListColumns';
+import { fromStored } from './components/roles/permissionMatrixModel';
+import { screenCount } from './components/roles/accessGridModel';
 
-const { Text } = Typography;
+const asList = (res) => (Array.isArray(res) ? res : (res?.content || res?.data || []));
 
-const countPermissions = (role) =>
-  Object.values(role?.permissions ?? {})
-    .reduce((n, mod) => n + Object.values(mod?.operations ?? {}).filter(Boolean).length, 0);
-
+/**
+ * Role & Access: the roles register. A role opens read-only in the view dialog (the Supplier PO
+ * view's design); Edit and Add go to the editor page, which comes back here with ?viewId so the
+ * dialog shows what was saved. API errors are toasted by axiosInstance, never again here.
+ */
 const RoleAccess = () => {
-  const { message, modal } = App.useApp();
-  const [loading, setLoading] = useState(false);
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const dialog = useRoleViewer();
   const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState(null);
-  const [form] = Form.useForm();
-  const [permissions, setPermissions] = useState(getEmptyPermissions);
-  const [initialPermissions, setInitialPermissions] = useState('');
   const [deletingId, setDeletingId] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const initialFormValuesRef = useRef(null);
+  const viewer = useMemo(() => ({ roleId: getCurrentRoleId(), superuser: isSuperuser() }), []);
+  const screensAll = useMemo(() => getPermissionSections().flatMap((s) => s.screens), []);
 
   const fetchRoles = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getRoles();
-      setRoles(Array.isArray(response) ? response : (response.content || response.data || []));
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      message.error('Failed to load roles');
+      setRoles(asList(await getRoles()));
+    } catch {
+      // axiosInstance has already shown the server's message
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
-  const filteredRoles = roles.filter((role) =>
-    !searchText ||
-    role.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-    role.description?.toLowerCase().includes(searchText.toLowerCase()));
-
-  // Dirty state is derived, not stored. It used to be set from inside a
-  // setPermissions updater — impure, and run twice under StrictMode.
-  const formValues = Form.useWatch([], form);
-  const permsJson = useMemo(() => JSON.stringify(permissions), [permissions]);
-  const formDirty = useMemo(() => {
-    const initial = initialFormValuesRef.current;
-    if (!initial) return false;
-    return (formValues?.name ?? '') !== (initial.name ?? '')
-      || (formValues?.description || '') !== (initial.description || '')
-      || (formValues?.active ?? true) !== initial.active
-      || permsJson !== initialPermissions;
-  }, [formValues, permsJson, initialPermissions]);
-
-  const openModal = (role = null) => {
-    setEditingRole(role);
-    if (role) {
-      const formVals = { name: role.name, description: role.description, active: role.status !== 'INACTIVE' };
-      form.setFieldsValue(formVals);
-      initialFormValuesRef.current = { ...formVals };
-
-      // Merge onto a fresh template so a newly added screen has a key, then
-      // derive access from the operations rather than trusting the stored flag,
-      // which is free-form jsonb and can disagree with them. Unknown keys are
-      // carried through untouched instead of being dropped on the floor.
-      const empty = getEmptyPermissions();
-      const stored = role.permissions || {};
-      const merged = { ...empty };
-      Object.keys(stored).forEach((moduleId) => {
-        if (!merged[moduleId]) { merged[moduleId] = stored[moduleId]; return; }
-        const operations = { ...merged[moduleId].operations };
-        Object.keys(operations).forEach((op) => {
-          operations[op] = stored[moduleId]?.operations?.[op] === true;
-        });
-        merged[moduleId] = { access: Object.values(operations).some(Boolean), operations };
-      });
-      const resolved = applyDependencies(merged);
-      setPermissions(resolved);
-      setInitialPermissions(JSON.stringify(resolved));
-    } else {
-      form.resetFields();
-      form.setFieldsValue({ active: true });
-      const empty = getEmptyPermissions();
-      setPermissions(empty);
-      setInitialPermissions(JSON.stringify(empty));
-      initialFormValuesRef.current = { name: '', description: '', active: true };
-    }
-    setModalVisible(true);
-  };
-
-  const handleSubmit = async (values) => {
-    const validation = validatePermissions(permissions);
-    if (!validation.valid) { message.warning(validation.message); return; }
-
-    setSaving(true);
+  const { close } = dialog;
+  const handleDelete = useCallback(async (role) => {
+    setDeletingId(role.id);
     try {
-      const normalizedPermissions = normalizePermissionsForSave(permissions);
-      const roleData = {
-        name: values.name,
-        description: values.description,
-        status: values.active !== false ? 'ACTIVE' : 'INACTIVE',
-        permissions: normalizedPermissions,
-      };
-
-      if (editingRole) {
-        await updateRole(editingRole.id, { ...roleData, version: editingRole.version });
-        message.success('Role updated successfully');
-        // Refresh the current user's session permissions immediately so UI
-        // guards reflect the change without requiring a re-login.
-        const currentUser = getCurrentUser();
-        if (currentUser && currentUser.role?.toLowerCase() === editingRole.name?.toLowerCase()) {
-          setCurrentUser({ ...currentUser, permissions: normalizedPermissions });
-        }
-      } else {
-        await createRole(roleData);
-        message.success('Role created successfully');
-      }
-      setModalVisible(false);
+      await deleteRole(role.id);
+      message.success('Role deleted');
+      close();
       fetchRoles();
-    } catch (error) {
-      message.error(error.errorMessage || 'Failed to save role');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleModalClose = () => {
-    if (!formDirty) { setModalVisible(false); return; }
-    modal.confirm({
-      title: 'Unsaved Changes',
-      icon: <ExclamationCircleOutlined />,
-      content: 'You have unsaved changes. Are you sure you want to discard them?',
-      okText: 'Discard',
-      okType: 'danger',
-      cancelText: 'Keep Editing',
-      onOk: () => setModalVisible(false),
-    });
-  };
-
-  const handleModalAfterClose = () => {
-    form.resetFields();
-    setPermissions(getEmptyPermissions());
-    initialFormValuesRef.current = null;
-  };
-
-  const handleDelete = async (roleId) => {
-    setDeletingId(roleId);
-    try {
-      await deleteRole(roleId);
-      message.success('Role deleted successfully');
-      fetchRoles();
-    } catch (error) {
-      message.error(error.errorMessage || 'Failed to delete role');
+    } catch {
+      // axiosInstance has already shown the server's message
     } finally {
       setDeletingId(null);
     }
-  };
+  }, [fetchRoles, message, close]);
 
-  // `isSystem` is not a field on RoleDTO, so the old record.isSystem was always
-  // undefined and both guards silently did nothing. Making them fire is right
-  // for DELETE - removing Admin or Super Admin would strand every user on them -
-  // but it must not extend to EDIT. Blocking edit locked the screen entirely
-  // while Admin and Super Admin were the only two roles that existed.
-  const isProtected = (record) => isAdminRole(record.name);
+  const accessById = useMemo(
+    () => new Map(roles.map((r) => [r.id, screenCount(fromStored(r.permissions), screensAll)])),
+    [roles, screensAll],
+  );
 
-  const columns = useMemo(() => [
-    {
-      title: 'Role Name',
-      dataIndex: 'name',
-      key: 'name',
-      fixed: 'left',
-      width: 200,
-      render: (name, record) => (
-        <Space>
-          <SafetyOutlined style={{ color: 'var(--primary-color)' }} />
-          <Text strong style={{ whiteSpace: 'nowrap' }}>{name}</Text>
-          {isProtected(record) && <Tag color="orange">System</Tag>}
-        </Space>
-      ),
-    },
-    {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      width: 220,
-      ellipsis: true,
-      render: (desc) => <Text type="secondary">{desc || '-'}</Text>,
-    },
-    {
-      title: 'Permissions',
-      key: 'permissions',
-      align: 'center',
-      width: 140,
-      render: (_, record) => {
-        const count = countPermissions(record);
-        return <Tag color={count > 20 ? 'green' : count > 10 ? 'blue' : 'default'}>{count} rights</Tag>;
-      },
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      align: 'center',
-      width: 90,
-      render: (status) => <StatusBadge status={status !== 'INACTIVE' ? 'active' : 'inactive'} />,
-    },
-    {
-      title: 'Created',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 120,
-      render: (date) => formatDate(date, 'DD MMM YYYY'),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      align: 'center',
-      width: 100,
-      fixed: 'right',
-      render: (_, record) => (
-        <Space size="small">
-          <PermissionGuard module="roles" operation="update">
-            <ActionButton action="edit" size="small" onClick={() => openModal(record)} />
-          </PermissionGuard>
-          <PermissionGuard module="roles" operation="delete">
-            <DeleteConfirm
-              title="Delete Role"
-              recordLabel={record.name}
-              onConfirm={() => handleDelete(record.id)}
-              loading={deletingId === record.id}
-              disabled={isProtected(record)}
-            >
-              <ActionButton
-                action="delete"
-                size="small"
-                tooltip={isProtected(record) ? 'System roles cannot be deleted' : 'Delete'}
-                disabled={isProtected(record)}
-              />
-            </DeleteConfirm>
-          </PermissionGuard>
-        </Space>
-      ),
-    },
-    // openModal and handleDelete are stable enough for this table; deletingId is
-    // what actually changes between renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [deletingId]);
+  const columns = useMemo(() => buildRoleColumns({
+    access: (role) => accessById.get(role.id),
+    viewer,
+    deletingId,
+    onView: dialog.view,
+    onEdit: (role) => navigate(`/admin/roles/edit/${role.id}`),
+    onDelete: handleDelete,
+  }), [accessById, viewer, deletingId, dialog.view, navigate, handleDelete]);
 
-  const noRightsYet = !validatePermissions(permissions).valid;
+  const query = searchText.trim().toLowerCase();
+  const filteredRoles = query
+    ? roles.filter((r) => r.name?.toLowerCase().includes(query) || r.description?.toLowerCase().includes(query))
+    : roles;
+  const { viewing } = dialog;
 
   return (
     <div>
       <Card>
-        <PageHeader title="Role & Access Management" subtitle="Define roles and configure permissions">
+        <PageHeader title="Role & Access Management" subtitle="Define roles and what each one can open and do">
           <PermissionGuard module="roles" operation="add">
-            <ActionButton action="create" text="Add Role" onClick={() => openModal()} />
+            <ActionButton action="create" text="Add Role" onClick={() => navigate('/admin/roles/new')} />
           </PermissionGuard>
         </PageHeader>
 
         <Row gutter={[12, 12]} style={{ marginBottom: 16 }} align="middle">
           <Col xs={20} sm={12} md={8}>
             <Input
+              name="roleSearch"
               placeholder="Search by role name or description..."
               prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
               value={searchText}
@@ -297,91 +107,29 @@ const RoleAccess = () => {
         </Row>
 
         <Table
+          className="table-nowrap"
           columns={columns}
           dataSource={filteredRoles}
           rowKey="id"
           loading={loading}
-          scroll={{ x: 900 }}
+          scroll={{ x: 'max-content' }}
           pagination={getTablePagination(undefined, 'roles')}
           locale={{ emptyText: <EmptyState description="No roles found" /> }}
         />
       </Card>
 
-      <Modal
-        title={editingRole ? `Edit Role — ${editingRole.name}` : 'Add New Role'}
-        open={modalVisible}
-        onCancel={handleModalClose}
-        afterClose={handleModalAfterClose}
-        width={MODAL_WIDTHS.XLARGE}
-        centered
-        style={{ maxWidth: 'calc(100vw - 32px)' }}
-        styles={{ body: { maxHeight: '76vh', overflowY: 'auto', paddingBottom: 0 } }}
-        footer={
-          <div style={{ textAlign: 'right' }}>
-            <Space>
-              <ActionButton action="cancel" text="Cancel" onClick={handleModalClose} />
-              <ActionButton
-                action="save"
-                text={editingRole ? 'Update Role' : 'Create Role'}
-                onClick={() => form.submit()}
-                disabled={(editingRole && !formDirty) || noRightsYet}
-                tooltip={noRightsYet ? 'A role needs at least one right' : undefined}
-                loading={saving}
-              />
-            </Space>
-          </div>
-        }
-      >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ width: '99%' }}>
-          <Row gutter={16}>
-            <Col xs={24} sm={12}>
-              <Form.Item
-                name="name"
-                label="Role Name"
-                rules={[
-                  { required: true, message: 'Please enter role name' },
-                  { pattern: /^[a-zA-Z\s]+$/, message: 'Role name can only contain letters and spaces' },
-                  { min: 2, message: 'Role name must be at least 2 characters' },
-                  { max: 50, message: 'Role name cannot exceed 50 characters' },
-                ]}
-              >
-                <Input placeholder="Enter role name (e.g., Manager, Approver)" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="active" label="Status" valuePropName="checked">
-                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Form.Item name="description" label="Description">
-            <Input.TextArea placeholder="Enter role description" rows={2} />
-          </Form.Item>
-
-          <Divider style={{ margin: '12px 0' }} />
-
-          {/* An admin role never reads its stored permissions: getCurrentUserPermissions
-              short-circuits on the role NAME and hands back every right. Without saying
-              so, this matrix looks like it configures something it does not. */}
-          {editingRole && isAdminRole(editingRole.name) && (
-            <Alert
-              type="warning"
-              showIcon
-              style={{ marginBottom: 12 }}
-              title="This role bypasses the permission matrix"
-              description={`Anyone signed in as "${editingRole.name}" receives every right, whatever is ticked below. Access is granted on the role name, so changes here have no effect until the role is renamed to something that is not Admin or Super Admin.`}
-            />
-          )}
-
-          <PermissionMatrix
-            value={permissions}
-            onChange={setPermissions}
-            roles={roles}
-            currentRoleId={editingRole?.id}
-          />
-        </Form>
-      </Modal>
+      <RoleViewDialog
+        role={viewing}
+        open={dialog.open}
+        onClose={close}
+        afterClose={dialog.clear}
+        holders={dialog.holders}
+        viewer={viewer}
+        deleting={viewing != null && deletingId === viewing.id}
+        onDelete={() => handleDelete(viewing)}
+        onEdit={() => { close(); navigate(`/admin/roles/edit/${viewing.id}`); }}
+        onDuplicate={() => { close(); navigate(`/admin/roles/new?from=${viewing.id}`); }}
+      />
     </div>
   );
 };
