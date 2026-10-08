@@ -6,7 +6,7 @@ import TabHeader from './TabHeader';
 import TabColumns from './TabColumns';
 import TabInvoice from './TabInvoice';
 import TabTextBlocks from './TabTextBlocks';
-import TabSticker from './TabSticker';
+import StickerTab from './sticker/StickerTab';
 import TabRules from './TabRules';
 
 /**
@@ -53,7 +53,7 @@ const TemplateEditor = ({
     columns: <TabColumns {...props} />,
     invoice: <TabInvoice {...props} />,
     text: <TabTextBlocks {...props} />,
-    sticker: <TabSticker tpl={tpl} patch={patch} locked={locked} />,
+    sticker: <StickerTab {...props} />,
     rules: <TabRules tpl={tpl} patch={patch} locked={locked} />,
   };
 

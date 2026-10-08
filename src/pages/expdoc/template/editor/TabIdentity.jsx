@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import {
-  Alert, Card, Col, Input, Row, Space, Switch, Typography,
+  Alert, Card, Col, Input, Row, Space, Typography,
 } from 'antd';
 import { FormSelect } from '../../../../components/form';
 import { DOC_TYPE, DOC_TYPE_LABELS } from '../../../../utils/expDocConstants';
+import IdentityPageCard from './IdentityPageCard';
 
 const { Text } = Typography;
 
@@ -12,7 +13,6 @@ const { Text } = Typography;
  * none (tenant-wide).
  */
 const TabIdentity = ({ tpl, patch, locked, buyers = [], codeEditable = false }) => {
-  const identity = tpl.identity || {};
   const isSticker = tpl.docType === DOC_TYPE.STICKER;
 
   const buyerOptions = useMemo(
@@ -65,47 +65,14 @@ const TabIdentity = ({ tpl, patch, locked, buyers = [], codeEditable = false }) 
               showIcon
               title="How this template gets used"
               description={isSticker
-                ? 'A buyer may keep several sticker layouts. With one it is used automatically; with several, staff pick one when they print, and later runs of the same packing list keep it.'
+                ? 'A buyer may keep several sticker templates; staff pick one for each print run.'
                 : 'A buyer may keep several active templates. A new document takes the buyer\'s only one automatically; when there are several, staff pick one by name.'}
             />
           </Space>
         </Card>
       </Col>
       <Col xs={24} lg={12}>
-        <Card size="small" title="Page and title">
-          <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-            <div>
-              <Text type="secondary">Printed title</Text>
-              <Input
-                name="titleText" value={identity.titleText || ''} disabled={locked} placeholder="e.g. PACKING LIST"
-                onChange={(e) => patch({ identity: { ...identity, titleText: e.target.value } })}
-              />
-            </div>
-            <Space>
-              <Switch checked={identity.showLogo !== false} disabled={locked}
-                onChange={(v) => patch({ identity: { ...identity, showLogo: v } })} />
-              <Text>Show the exporter logo</Text>
-            </Space>
-            <Row gutter={8}>
-              <Col span={12}>
-                <Text type="secondary">Paper</Text>
-                <FormSelect
-                  variant="default" allowClear={false} style={{ width: '100%' }} disabled={locked}
-                  value={identity.paper || 'A4'} onChange={(v) => patch({ identity: { ...identity, paper: v } })}
-                  options={[{ value: 'A4', label: 'A4' }, { value: 'A3', label: 'A3' }, { value: 'LETTER', label: 'Letter' }]}
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">Orientation</Text>
-                <FormSelect
-                  variant="default" allowClear={false} style={{ width: '100%' }} disabled={locked}
-                  value={identity.orientation || 'PORTRAIT'} onChange={(v) => patch({ identity: { ...identity, orientation: v } })}
-                  options={[{ value: 'PORTRAIT', label: 'Portrait' }, { value: 'LANDSCAPE', label: 'Landscape' }]}
-                />
-              </Col>
-            </Row>
-          </Space>
-        </Card>
+        <IdentityPageCard tpl={tpl} patch={patch} locked={locked} isSticker={isSticker} />
       </Col>
     </Row>
   );

@@ -224,6 +224,36 @@ export const isBindable = (path) => {
   return Boolean(CATALOGUE_BY_PATH[raw]) || raw.startsWith('fixed:');
 };
 
+/** Whether a binding is a value asked once per print run (`ask:<key>`). */
+export const isAskBinding = (binding) => typeof binding === 'string' && binding.startsWith('ask:');
+
+/**
+ * The key a per-run answer is kept under, made from its line's label so it fits ASK_KEY:
+ * the label's words in camelCase ("CUSTOMER ORDER NO." → customerOrderNo; "#" reads as
+ * "No", so "BATCH #" → batchNo), "q" before a leading digit, at most 40 characters, and
+ * unique among `taken` — a second "ORDER #" becomes orderNo2, so two questions never share
+ * one answer. A line with no label asks "headline".
+ */
+export const askKeyFor = (label, taken = []) => {
+  const words = String(label ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss')
+    .replace(/#/g, ' No ')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
+  const camel = words.map((w, i) => (i === 0 ? w.toLowerCase() : `${w[0].toUpperCase()}${w.slice(1).toLowerCase()}`)).join('');
+  const base = (/^[0-9]/.test(camel) ? `q${camel}` : camel || 'headline').slice(0, 40);
+  const used = new Set(taken);
+  let key = base;
+  for (let n = 2; used.has(key); n += 1) key = `${base.slice(0, 40 - String(n).length)}${n}`;
+  return key;
+};
+
+/** The `ask:` keys of every line of a sticker layout's faces but one (that line's face and position). */
+export const askKeysExcept = (faces, faceIndex, lineIndex) => (faces || []).flatMap((face, fi) => (face?.lines || [])
+  .filter((_, li) => fi !== faceIndex || li !== lineIndex)
+  .map((line) => line?.binding)
+  .filter(isAskBinding)
+  .map((binding) => binding.slice('ask:'.length)));
+
 // ─── Resolution ─────────────────────────────────────────────────────────────────
 
 /**
@@ -297,8 +327,10 @@ export const templateBindings = (t = {}) => {
   columns(t.invoiceColumns);
   Object.values(t.invoiceHeader?.boxes || {}).forEach((b) => { if (b?.binding) add(b.label, b.binding); });
   // A sticker line of any kind — a field, a size grid, a barcode — is bound by its own
-  // binding; `ask:` and `fixed:` count as bound.
-  (t.stickerLayout?.faces || []).forEach((face) => (face.lines || []).forEach((l) => add(l.label, l.binding)));
+  // binding; `ask:` and `fixed:` count as bound. A labelled line with no binding is left
+  // blank for hand-writing on purpose (§3), so it never counts as unbound; a binding the
+  // catalogue does not know is still reported.
+  (t.stickerLayout?.faces || []).forEach((face) => (face.lines || []).forEach((l) => add(l.label, l.binding, false)));
   return out;
 };
 
@@ -312,8 +344,11 @@ export const unboundLabelsOf = (t) => templateBindings(t)
   .filter((e) => e.bindable && e.label && !e.binding)
   .map((e) => e.label);
 
-/** What a carton sticker may print: the carton, its style, and the document's own fields. */
-const STICKER_READER_CATEGORIES = ['CARTON', 'STYLE', 'PL', 'SHIPMENT', 'BUYER', 'EXPORTER'];
+/**
+ * What a carton sticker may print: the carton, its style, and the document's own fields.
+ * The AI reader is sent these, and the sticker editor's field picker offers the same.
+ */
+export const STICKER_READER_CATEGORIES = ['CARTON', 'STYLE', 'PL', 'SHIPMENT', 'BUYER', 'EXPORTER'];
 
 /**
  * The catalogue as the AI reader of uploaded documents is sent it. Packing lists and

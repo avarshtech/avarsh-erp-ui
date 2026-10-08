@@ -137,7 +137,7 @@ const BuyerTemplateBuilder = () => {
               onClick={() => modal.confirm({
                 title: `Publish ${working.templateCode} v${working.version}?`,
                 content: working.docType === DOC_TYPE.STICKER
-                  ? 'Sticker runs can then print with it. An earlier active version of THIS template is retired in the same step; the buyer\'s other sticker templates are not touched, and a packing list that printed with the earlier version prints its next run with this one.'
+                  ? 'New sticker runs can then pick it. The previous version of THIS template is retired in the same step, and a packing list that printed with it moves to this version on its next run; the buyer\'s other sticker templates stay as they are.'
                   : 'New packing lists / invoices can then use it. An earlier active version of THIS template is retired in the same step; the buyer\'s other templates are not touched, and documents already made keep the layout they were made with.',
                 okText: 'Publish',
                 onOk: () => run(() => publishTemplate(working), 'Published'),

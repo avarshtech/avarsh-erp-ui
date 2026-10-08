@@ -7,6 +7,7 @@ import { MODAL_WIDTHS } from '../../../utils/uiConstants';
 import { DOC_TYPE, DOC_TYPE_LABELS, PAPER, SECTION_KEY } from '../../../utils/expDocConstants';
 import { SYSTEM_TEMPLATES, completeLayout } from '../../../utils/expDocSystemTemplates';
 import { createTemplate, cloneTemplate } from '../../../services/expdoc/expDocService';
+import { newFace } from './editor/sticker/stickerEditorModel';
 
 const { Text } = Typography;
 
@@ -23,8 +24,11 @@ const blankLayout = (docType) => completeLayout(docType, {
     { key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN], showSectionTotals: true },
     { key: 'EXTRA', title: 'EXTRA CARTONS', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
   ] : [],
-  // Given explicitly, or the standard carton marking's faces would be copied in.
-  stickerLayout: docType === DOC_TYPE.STICKER ? { paperDefault: PAPER.A4_1UP, faces: [], mandatoryFields: [] } : undefined,
+  // Given explicitly, or the standard carton marking's faces would be copied in: one
+  // empty main face to start from.
+  stickerLayout: docType === DOC_TYPE.STICKER
+    ? { paperDefault: PAPER.A4_1UP, faces: [newFace('MAIN')], mandatoryFields: [] }
+    : undefined,
 });
 
 /** "PRENATAL" from "Prénatal Moeder en Kind BV" — the start of a suggested code. */
@@ -115,7 +119,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
             <FormSelect variant="default" style={{ width: '100%' }} value={sourceId} onChange={setSourceId}
               options={cloneOptions} placeholder="Pick the nearest existing layout" />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Every block comes across — header, columns, sheets, declarations. Change only what differs.
+              Every block comes across — header, columns, sheets, declarations, sticker faces. Change only what differs.
             </Text>
           </div>
         )}
@@ -146,7 +150,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
             onChange={(e) => setName(e.target.value)} />
         </div>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          The draft is not offered on any document until it is published.
+          The draft is not offered on any document or sticker run until it is published.
         </Text>
       </Space>
     </Modal>
