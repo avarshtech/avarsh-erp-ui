@@ -1,11 +1,10 @@
 import { useMemo } from 'react';
 import {
-  Alert, AutoComplete, Card, Col, Input, Row, Space, Switch, Typography,
+  Alert, Card, Col, Input, Row, Space, Switch, Typography,
 } from 'antd';
 import { FormSelect } from '../../../../components/form';
 import { DOC_TYPE_LABELS } from '../../../../utils/expDocConstants';
 import { TEMPLATE_SOURCE } from '../../../../utils/expDocSystemTemplates';
-import { getBuyerCommercial } from '../../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
 
@@ -22,13 +21,6 @@ const TabIdentity = ({ tpl, patch, locked, buyers = [], stickerBuyers = [], code
     ? stickerBuyers
     : buyers.filter((b) => b.active !== false || b.id === tpl.buyerId).map((b) => ({ value: b.id, label: b.name }))),
   [isSticker, stickerBuyers, buyers, tpl.buyerId]);
-
-  // Sub-clients have no master; the buyer's commercial profile suggests the known ones.
-  const subClientOptions = useMemo(() => {
-    if (isSticker) return stickerBuyers.find((b) => b.value === tpl.buyerCode)?.subClients || [];
-    return (getBuyerCommercial({ buyerName: tpl.buyerName }).subClients || [])
-      .map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` }));
-  }, [isSticker, stickerBuyers, tpl.buyerCode, tpl.buyerName]);
 
   return (
     <Row gutter={[16, 16]}>
@@ -58,45 +50,27 @@ const TabIdentity = ({ tpl, patch, locked, buyers = [], stickerBuyers = [], code
               <Text type="secondary">Document type</Text>
               <Input name="templateDocType" value={DOC_TYPE_LABELS[tpl.docType] || tpl.docType} disabled />
             </div>
-            <Row gutter={8}>
-              <Col span={12}>
-                <Text type="secondary">Buyer</Text>
-                <FormSelect
-                  variant="default"
-                  style={{ width: '100%' }}
-                  disabled={locked}
-                  value={(isSticker ? tpl.buyerCode : tpl.buyerId) ?? undefined}
-                  onChange={(v) => (isSticker
-                    ? patch({ buyerCode: v || null, subClientCode: null })
-                    : patch({ buyerId: v ?? null, buyerName: buyers.find((b) => b.id === v)?.name || null }))}
-                  options={buyerOptions}
-                  placeholder="Any buyer (tenant-wide)"
-                />
-              </Col>
-              <Col span={12}>
-                <Text type="secondary">Sub-client</Text>
-                {isSticker ? (
-                  <FormSelect
-                    variant="default" style={{ width: '100%' }} disabled={locked || !subClientOptions.length}
-                    value={tpl.subClientCode || undefined} onChange={(v) => patch({ subClientCode: v || null })}
-                    options={subClientOptions} placeholder={subClientOptions.length ? 'Optional' : 'None'}
-                  />
-                ) : (
-                  <AutoComplete
-                    style={{ width: '100%' }} disabled={locked} value={tpl.subClientCode || ''}
-                    options={subClientOptions} placeholder="Optional, e.g. AMG"
-                    onChange={(v) => patch({ subClientCode: v ? String(v).toUpperCase() : null })}
-                  />
-                )}
-              </Col>
-            </Row>
+            <div>
+              <Text type="secondary">Buyer</Text>
+              <FormSelect
+                variant="default"
+                style={{ width: '100%' }}
+                disabled={locked}
+                value={(isSticker ? tpl.buyerCode : tpl.buyerId) ?? undefined}
+                onChange={(v) => (isSticker
+                  ? patch({ buyerCode: v || null })
+                  : patch({ buyerId: v ?? null, buyerName: buyers.find((b) => b.id === v)?.name || null }))}
+                options={buyerOptions}
+                placeholder="Any buyer (tenant-wide)"
+              />
+            </div>
             <Alert
               type="info"
               showIcon
               title="How this template gets used"
               description={isSticker
-                ? 'A carton sticker resolves its template by buyer, then sub-client. The active version wins.'
-                : 'A buyer may keep several active templates. A new document takes the buyer\'s only one automatically; when there are several, staff pick one by name. A matching sub-client is listed first.'}
+                ? 'A buyer may keep several sticker layouts. With one it is used automatically; with several, staff pick one when they print, and later runs of the same packing list keep it.'
+                : 'A buyer may keep several active templates. A new document takes the buyer\'s only one automatically; when there are several, staff pick one by name.'}
             />
           </Space>
         </Card>

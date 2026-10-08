@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Button, Form, Space, Typography } from 'antd';
 import dayjs from 'dayjs';
-import { FormSection, FormInput, FormSelect, FormDatePicker } from '../../../components/form';
+import { FormSection, FormInput, FormDatePicker } from '../../../components/form';
 import { ClassifiedLabel } from '../shared/FieldClassBadge';
 import { FIELD_CLASS } from '../../../utils/expDocConstants';
 
@@ -10,10 +10,12 @@ const { Text } = Typography;
 /**
  * The header fields a packing list owns (§12.1).
  *
- * Four of the seven are OVERRIDES of a shipment value, which is the §11.3
+ * The container no. is an OVERRIDE of a shipment value, which is the §11.3
  * "auto-editable" class: the inherited value shows as the placeholder, clearing the
  * field returns to it, and once overridden the field is tagged so a reader can see
- * at a glance that this document no longer follows its shipment.
+ * at a glance that this document no longer follows its shipment. The seal no. is
+ * the document's own — the shipment no longer carries one. The consignee is always
+ * the shipment's (the buyer), so there is nothing to override.
  */
 const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
   const [form] = Form.useForm();
@@ -23,8 +25,6 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
     plDate: pl.plDate ? dayjs(pl.plDate) : null,
     descriptionOfGoods: pl.descriptionOfGoods || undefined,
     marksAndNos: pl.marksAndNos || undefined,
-    consigneeProfileId: pl.consigneeProfileId || undefined,
-    deliveryCentre: pl.deliveryCentre || undefined,
     containerNo: pl.containerNo || undefined,
     sealNo: pl.sealNo || undefined,
     remarks: pl.remarks || undefined,
@@ -37,12 +37,10 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
   // mount too, which is what clears the flag after a save remounts this.
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
 
-  const consigneeOptions = (pl.consigneeOptions || []).map((c) => ({ value: c.id, label: c.name }));
-
   /**
-   * §11.3: these four are AUTO_EDITABLE — the shipment supplies them and this
-   * document may override them. The badge says which, and the Modified marker says
-   * whether this document has actually diverged.
+   * §11.3: AUTO_EDITABLE — the shipment supplies the value and this document may
+   * override it. The badge says which, and the Modified marker says whether this
+   * document has actually diverged.
    */
   const inherited = (key, label, inheritedValue) => (
     <ClassifiedLabel
@@ -86,27 +84,12 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
         </Form.Item>
       </FormSection>
 
-      <FormSection title="Overrides for this document" columns={4}>
-        <Form.Item
-          name="consigneeProfileId"
-          label={inherited('consignee', 'Consignee', pl.resolved?.consignee?.name)}
-          tooltip="Only for this packing list. Leave blank to use the shipment's consignee."
-        >
-          <FormSelect
-            allowClear
-            options={consigneeOptions}
-            placeholder={pl.resolved?.consignee?.name || (consigneeOptions.length ? 'Use the shipment consignee' : 'None configured for this buyer')}
-            disabled={!consigneeOptions.length}
-          />
-        </Form.Item>
-        <Form.Item name="deliveryCentre" label={inherited('deliveryCentre', 'Delivery centre', pl.resolved?.deliveryCentre)}>
-          <FormInput allowClear placeholder={pl.resolved?.deliveryCentre || 'From the shipment'} />
-        </Form.Item>
+      <FormSection title="Container" columns={4}>
         <Form.Item name="containerNo" label={inherited('containerNo', 'Container no.', pl.resolved?.containerNo)}>
           <FormInput allowClear placeholder={pl.resolved?.containerNo || 'From the shipment'} />
         </Form.Item>
-        <Form.Item name="sealNo" label={inherited('sealNo', 'Seal no.', pl.resolved?.sealNo)}>
-          <FormInput allowClear placeholder={pl.resolved?.sealNo || 'From the shipment'} />
+        <Form.Item name="sealNo" label={<ClassifiedLabel fieldClass={FIELD_CLASS.MANUAL}>Seal no.</ClassifiedLabel>}>
+          <FormInput allowClear />
         </Form.Item>
       </FormSection>
 

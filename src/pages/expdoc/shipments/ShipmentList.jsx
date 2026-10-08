@@ -135,7 +135,7 @@ const ShipmentList = () => {
         <SearchFilterBar
           searchText={searchText}
           onSearchChange={setSearchText}
-          searchPlaceholder="Search shipment no, buyer, vessel or container"
+          searchPlaceholder="Search shipment no, consignee, order, vessel or container"
           filters={filters}
           style={{ marginBottom: 16 }}
         />
@@ -145,7 +145,7 @@ const ShipmentList = () => {
           loading={loading}
           rowKey="id"
           size="small"
-          scroll={{ x: 1500 }}
+          scroll={{ x: 1690 }}
           onRow={(record) => ({
             onClick: () => setViewId(record.id),
             style: { cursor: 'pointer' },

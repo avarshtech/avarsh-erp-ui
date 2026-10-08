@@ -2,8 +2,8 @@
  * Master-data lookups for the Export Documentation mock.
  *
  * Everything here is a data gap the API phase owes (see the plan's data-gap
- * ledger): ports, incoterms, garment HS codes, buyer commercial profiles,
- * sub-clients and a date-addressable FX master do not exist in the ERP today.
+ * ledger): ports, incoterms, garment HS codes, buyer commercial profiles and a
+ * date-addressable FX master do not exist in the ERP today.
  * The one exception is the FX rate for TODAY, which has a real endpoint.
  */
 import { loadDb } from './expDocMockStore';
@@ -50,14 +50,8 @@ export const getBuyerCommercial = (buyer) => {
   return clone(hit || DEFAULT_BUYER_COMMERCIAL);
 };
 
-export const listSubClients = (buyer) => getBuyerCommercial(buyer).subClients || [];
-
 export const getTolerancePercent = (buyer) =>
   Number(getBuyerCommercial(buyer).tolerancePercent) || 0;
-
-export const listConsigneeProfiles = (buyer) => getBuyerCommercial(buyer).consigneeProfiles || [];
-
-export const listNotifyProfiles = (buyer) => getBuyerCommercial(buyer).notifyProfiles || [];
 
 export const getExporterProfileExtra = () => clone(loadDb().masters.exporterProfileExtra);
 

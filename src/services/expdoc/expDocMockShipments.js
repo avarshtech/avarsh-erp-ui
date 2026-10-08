@@ -11,43 +11,22 @@ import { loadDb, saveDb, nextShipmentNo } from './expDocMockStore';
 import {
   delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp, currentUserName,
 } from './expDocMockCommon';
-import { getBuyerCommercial } from './expDocMockMasters';
-
 const find = (db, id) => db.shipments.find((s) => s.id === Number(id));
 
 /**
- * A party as a printable address block: name, then address lines, then city /
- * postcode / country. Documents bind `shipment.consignee.block`, so the shape has
- * to be resolved here rather than in every renderer.
- */
-export const partyBlock = (party) => {
-  if (!party) return null;
-  const tail = [party.postalCode, party.city].filter(Boolean).join(' ');
-  return {
-    ...party,
-    block: [party.name, ...(party.addressLines || []), tail, party.country]
-      .filter(Boolean)
-      .join('\n'),
-  };
-};
-
-/** Derived, read-only decoration — never persisted. */
-/**
- * Adds the resolved consignee and notify address blocks. Exported because the
- * invoice header prints them and must not re-derive them — `getStickerContext`
- * deliberately does not decorate, and copying that would give the invoice a
- * shipment with no consignee.
+ * Derived, read-only decoration — never persisted. Exported because the invoice
+ * header prints the consignee and notify blocks and must not re-derive them.
+ *
+ * The consignee (the buyer) and the notify party are stored on the shipment as
+ * { name, block } snapshots, built from the real buyer master when the shipment is
+ * saved (pages/expdoc/shipments/shipmentParties.js): this layer is synchronous
+ * and cannot reach the buyer API.
  */
 export const decorate = (shipment, db) => {
   const out = clone(shipment);
-  // The shipment stores profile ids; documents need the resolved party.
-  const commercial = getBuyerCommercial({ buyerCode: shipment.buyerCode, buyerName: shipment.buyerName });
-  out.consignee = partyBlock(
-    (commercial.consigneeProfiles || []).find((c) => c.id === shipment.consigneeProfileId),
-  );
-  out.notify = partyBlock(
-    (commercial.notifyProfiles || []).find((n) => n.id === shipment.notifyProfileId),
-  );
+  out.consignee = shipment.consignee || null;
+  out.notify = shipment.notify || null;
+  out.orderNos = (shipment.orders || []).map((o) => o.orderNo).filter(Boolean);
   const entries = (db.packingEntries || []).filter((e) => e.shipmentId === shipment.id);
   const lists = (db.packingLists || []).filter((p) => p.shipmentId === shipment.id);
   out.packingEntryCount = entries.length;
@@ -70,7 +49,8 @@ export const searchShipments = async (params = {}) => {
           || matchesText(s.buyerName, params.search)
           || matchesText(s.vesselFlightNo, params.search)
           || matchesText(s.portOfDischarge, params.search)
-          || (s.containerNos || []).some((c) => matchesText(c, params.search));
+          || (s.containerNos || []).some((c) => matchesText(c, params.search))
+          || (s.orders || []).some((o) => matchesText(o.orderNo, params.search));
         if (!hit) return false;
       }
       return true;
@@ -102,7 +82,6 @@ export const listShipmentOptions = async (buyerCode) => {
       // What the packing-list template picker matches buyer templates on.
       buyerId: s.buyerId ?? null,
       buyerName: s.buyerName ?? null,
-      subClientCode: s.subClientCode ?? null,
     }));
 };
 

@@ -18,7 +18,7 @@ import {
 } from './expDocMockCommon';
 import { getBuyerCommercial } from './expDocMockMasters';
 import { decorateEntry } from './expDocMockPacking';
-import { decorate as decorateShipment, partyBlock, syncShipmentStatus } from './expDocMockShipments';
+import { decorate as decorateShipment, syncShipmentStatus } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
   PL_STATUS, PL_TRANSITIONS, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
@@ -159,12 +159,11 @@ const stalenessOf = (db, pl) => {
  * The header fields a document owns (§12.1).
  *
  * Everything else on a packing list is either carton data (owned by the entry) or
- * shipment data (owned by the shipment). These are the document's own, and each is
- * an OVERRIDE where an inherited value exists — null means "take the shipment's".
+ * shipment data (owned by the shipment). These are the document's own; the
+ * container no. is an OVERRIDE of the shipment's — null means "take the shipment's".
  */
 export const PL_EDITABLE_FIELDS = [
-  'plDate', 'descriptionOfGoods', 'marksAndNos', 'consigneeProfileId',
-  'deliveryCentre', 'containerNo', 'sealNo', 'remarks',
+  'plDate', 'descriptionOfGoods', 'marksAndNos', 'containerNo', 'sealNo', 'remarks',
 ];
 
 /** Resolve a document field to its own value, else the shipment's. */
@@ -188,23 +187,20 @@ export const decoratePl = (pl, db, options = {}) => {
 
   // §12.1 header overrides resolved once, here, so the screen and the printed
   // document can never disagree about which value won.
-  const shipment = (db.shipments || []).find((sh) => sh.id === out.shipmentId) || null;
-  const commercial = getBuyerCommercial({ buyerCode: out.buyerCode, buyerName: out.buyerName });
-  const ownConsignee = (commercial.consigneeProfiles || []).find((c) => c.id === out.consigneeProfileId);
+  // Decorated, as the print receives it: V-12 below must see the same fields the
+  // renderer binds (shipment.orderNos exists only on the decorated shipment).
+  const shipmentRow = (db.shipments || []).find((sh) => sh.id === out.shipmentId) || null;
+  const shipment = shipmentRow ? decorateShipment(shipmentRow, db) : null;
   out.resolved = {
-    consignee: ownConsignee ? partyBlock(ownConsignee) : (shipment ? decorateShipment(shipment, db).consignee : null),
-    deliveryCentre: inherited(out.deliveryCentre, shipment?.deliveryCentre),
+    // The consignee is the shipment's buyer — a document has no consignee of its own.
+    consignee: shipment?.consignee ?? null,
     containerNo: inherited(out.containerNo, (shipment?.containerNos || []).join(', ') || null),
-    sealNo: inherited(out.sealNo, shipment?.sealNo),
+    sealNo: out.sealNo || null,
   };
-  // Which of them the document overrode — the §11.3 "modified" marker needs to know.
+  // Whether the document overrode the container — the §11.3 "modified" marker needs to know.
   out.overridden = {
-    consignee: Boolean(out.consigneeProfileId),
-    deliveryCentre: Boolean(out.deliveryCentre),
     containerNo: Boolean(out.containerNo),
-    sealNo: Boolean(out.sealNo),
   };
-  out.consigneeOptions = (commercial.consigneeProfiles || []).map((c) => ({ id: c.id, name: c.name }));
   // §17: every revision of this number, so the history panel can offer a comparison
   // between any two — not only between consecutive ones.
   out.revisions = revisionChain(db, out);
@@ -315,10 +311,6 @@ export const createPackingList = async (payload) => {
   const shipment = db.shipments.find((s) => s.id === Number(payload.shipmentId));
 
   const buyerCode = payload.buyerCode ?? shipment?.buyerCode ?? entries[0]?.buyerCode ?? null;
-  const subClientCode = payload.subClientCode
-    ?? shipment?.subClientCode
-    ?? entries[0]?.subClientCode
-    ?? null;
 
   /*
    * The template was chosen by the user (a buyer may have several) and arrives as a
@@ -343,8 +335,6 @@ export const createPackingList = async (payload) => {
     plDate: payload.plDate || todayStr(),
     descriptionOfGoods: payload.descriptionOfGoods ?? null,
     marksAndNos: payload.marksAndNos ?? null,
-    consigneeProfileId: null,
-    deliveryCentre: null,
     containerNo: null,
     sealNo: null,
     remarks: null,
@@ -353,7 +343,6 @@ export const createPackingList = async (payload) => {
     buyerId: payload.buyerId ?? shipment?.buyerId ?? null,
     buyerCode,
     buyerName: payload.buyerName ?? shipment?.buyerName ?? entries[0]?.buyerName ?? null,
-    subClientCode,
     orderIds: payload.orderIds || [],
     orderNos: [...new Set(entries.map((e) => e.orderNo).filter(Boolean))],
     // Frozen from the entries, so a later size-preset edit cannot reorder columns.
@@ -665,8 +654,8 @@ export const changeStatus = async (id, target, reason) => {
         orderBreakdown: pl.orderBreakdown,
         totals: decorated.totals,
         // BR-08: the header is snapshotted too. `resolved` in particular, because
-        // it resolves a consignee profile that master data can change afterwards —
-        // reprinting a final document must not silently pick up the new address.
+        // it carries the shipment's consignee, which a later shipment edit can
+        // change — reprinting a final document must not silently pick up the new address.
         plDate: pl.plDate,
         descriptionOfGoods: pl.descriptionOfGoods,
         marksAndNos: pl.marksAndNos,
@@ -833,15 +822,15 @@ export const listBindableForShipment = async (shipmentId) => {
 
 /** Header fields worth diffing between two revisions of the same document. */
 const COMPARE_HEADER = [
-  'plDate', 'descriptionOfGoods', 'marksAndNos', 'remarks', 'deliveryCentre',
-  'containerNo', 'sealNo', 'consigneeProfileId', 'templateId', 'templateVersion',
-  'subClientCode', 'shipmentNo',
+  'plDate', 'descriptionOfGoods', 'marksAndNos', 'remarks',
+  'containerNo', 'sealNo', 'templateId', 'templateVersion',
+  'shipmentNo',
 ];
 
 /** Carton-row fields that change what the document says. */
 const COMPARE_ROW = [
   'cartonFrom', 'cartonTo', 'packingType', 'styleNo', 'colorName', 'buyerPoNo',
-  'destination', 'danNo', 'endCustomer', 'netWeightKg', 'grossWeightKg',
+  'destination', 'danNo', 'netWeightKg', 'grossWeightKg',
   'lengthCm', 'breadthCm', 'heightCm', 'sizeQty', 'ratio', 'assortmentsPerCarton',
   'pcsPerMpb', 'mpbPerCarton', 'mixedRows', 'remarks',
 ];

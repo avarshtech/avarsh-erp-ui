@@ -76,7 +76,6 @@ const SYSTEM_ROW = {
   buyerId: null,
   buyerName: null,
   buyerCode: null,
-  subClientCode: null,
   version: 1,
   status: TEMPLATE_STATUS.ACTIVE,
   effectiveFrom: null,

@@ -63,6 +63,8 @@ const StickerWorkspace = () => {
   const [scopeMode, setScopeMode] = useState(SCOPE.ALL);
   const [from, setFrom] = useState(null);
   const [to, setTo] = useState(null);
+  // The layout the user picked; undefined lets the service choose (the latest run's, or the only one).
+  const [templateId, setTemplateId] = useState();
   const [paper, setPaper] = useState();
   const [faceKeys, setFaceKeys] = useState([]);
   const [barcodeOn, setBarcodeOn] = useState(false);
@@ -87,17 +89,25 @@ const StickerWorkspace = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const c = await getStickerContext(plId, { scope });
+      const c = await getStickerContext(plId, { scope, templateId });
       setCtx(c);
       setPaper((p) => p || c.layout?.stickerLayout?.paperDefault || 'A4_1UP');
       setFaceKeys((f) => (f.length ? f : (c.layout?.stickerLayout?.faces || []).map((x) => x.key)));
-      setCheck(await checkStickerGeneration(plId, { scope }));
+      setCheck(await checkStickerGeneration(plId, { scope, templateId }));
     } catch (e) {
       setLoadError(e.message || 'Failed to load');
     } finally {
       setLoading(false);
     }
-  }, [plId, scope]);
+  }, [plId, scope, templateId]);
+
+  /** A different layout brings its own paper and faces, so both return to its defaults. */
+  const pickLayout = useCallback((id) => {
+    setTemplateId(id);
+    setPaper(undefined);
+    setFaceKeys([]);
+    setSheetIndex(0);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -181,7 +191,7 @@ const StickerWorkspace = () => {
   const stickerCtx = useMemo(() => ({
     exporter: exporter || {},
     shipment: ctx?.shipment || {},
-    buyer: { name: ctx?.pl?.buyerName, subClient: ctx?.pl?.subClientCode },
+    buyer: { name: ctx?.pl?.buyerName },
     pl: ctx?.pl || {},
     // The sticker template's own logo switch, not the packing list's.
     showLogo: ctx?.layout?.identity?.showLogo === true,
@@ -211,7 +221,8 @@ const StickerWorkspace = () => {
   const doGenerate = useCallback(async (extra = {}) => {
     setBusy(true);
     try {
-      const run = await generateStickerRun(plId, { scope, paper, faceKeys, ...extra });
+      // The layout on screen is the one recorded — not whatever the service would pick now.
+      const run = await generateStickerRun(plId, { scope, paper, faceKeys, templateId: ctx?.layout?.id, ...extra });
       // The whole scope is built here, off the render path, and handed straight to
       // the print window as one document.
       const all = await previewCartons(plId, { scope, page: 0, pageSize: run.cartonCount });
@@ -337,6 +348,8 @@ const StickerWorkspace = () => {
   }
 
   const noLayout = !ctx.layout;
+  const layoutOptions = ctx.layoutOptions || [];
+  const mustPickLayout = noLayout && layoutOptions.length > 1;
   const blockedByPermission = ctx.pl.status === PL_STATUS.DRAFT ? !canOverride : !canPrint;
   const reprintBlocked = printedOverlap.length > 0 && !canReprint;
 
@@ -344,13 +357,13 @@ const StickerWorkspace = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title={`Stickers — ${ctx.pl.plNo}`}
-        subtitle={`${ctx.pl.buyerName} · ${num(ctx.pl.totals.cartons)} cartons · ${ctx.layout ? ctx.layout.name : 'no layout'}`}
+        subtitle={`${ctx.pl.buyerName} · ${num(ctx.pl.totals.cartons)} cartons · ${ctx.layout ? ctx.layout.name : (mustPickLayout ? 'layout not chosen' : 'no layout')}`}
         onBack={() => navigate('/export-docs/stickers')}
         status={ctx.pl.status === PL_STATUS.DRAFT ? <Tag color="gold">Draft packing list</Tag> : <Tag color="green">{ctx.pl.status}</Tag>}
         style={STICKY_HEADER}
       >
         <Tooltip title={
-          noLayout ? 'No sticker layout is configured for this buyer.'
+          noLayout ? (mustPickLayout ? 'Pick the sticker layout to print with.' : 'No sticker layout is configured for this buyer.')
             : blockedByPermission ? 'You do not hold the right to print these labels.'
               : reprintBlocked ? 'These cartons were printed already and you do not hold the reprint right.'
                 : check?.blockedReason || undefined
@@ -368,11 +381,18 @@ const StickerWorkspace = () => {
         </Tooltip>
       </PageHeader>
 
-      {noLayout && (
+      {mustPickLayout && (
+        <Alert
+          type="info" showIcon style={{ marginBottom: 16 }}
+          title="Pick the sticker layout"
+          description={`This buyer has ${layoutOptions.length} sticker layouts. Choose one under "What to print"; the next run of this packing list starts from it.`}
+        />
+      )}
+      {noLayout && !mustPickLayout && (
         <Alert
           type="warning" showIcon style={{ marginBottom: 16 }}
           title="No sticker layout configured for this buyer"
-          description="Configure a sticker template for this buyer and sub-client before generating labels."
+          description="Configure a sticker template for this buyer before generating labels."
         />
       )}
 
@@ -412,6 +432,22 @@ const StickerWorkspace = () => {
         <Col xs={24} lg={9}>
           <Card title="What to print" size="small">
             <Space orientation="vertical" size={14} style={{ width: '100%' }}>
+              {layoutOptions.length > 1 && (
+                <div>
+                  <Text strong style={{ display: 'block', marginBottom: 6 }}>Layout</Text>
+                  <FormSelect
+                    variant="default"
+                    allowClear={false}
+                    id="sticker-layout"
+                    style={{ width: '100%' }}
+                    options={layoutOptions}
+                    value={ctx.layout?.id}
+                    placeholder="Pick a sticker layout"
+                    onChange={pickLayout}
+                  />
+                </div>
+              )}
+
               <div>
                 <Text strong style={{ display: 'block', marginBottom: 6 }}>Scope</Text>
                 <Segmented

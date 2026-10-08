@@ -341,7 +341,6 @@ export const listInvoiceablePls = async (params = {}) => {
         buyerId: pl.buyerId ?? null,
         buyerCode: pl.buyerCode,
         buyerName: pl.buyerName,
-        subClientCode: pl.subClientCode,
         shipmentId: pl.shipmentId,
         shipmentNo: pl.shipmentNo,
         totals: decorated.totals,
@@ -408,7 +407,6 @@ export const createInvoice = async (payload = {}) => {
     buyerId: first.buyerId ?? null,
     buyerCode: first.buyerCode,
     buyerName: first.buyerName,
-    subClientCode: first.subClientCode ?? null,
     shipmentId: first.shipmentId,
     shipmentNo: first.shipmentNo,
 
@@ -430,7 +428,11 @@ export const createInvoice = async (payload = {}) => {
 
     // Header (§8.2). Every value has a source; none is typed at create.
     exporterRef: extra?.iecNumber ? `IEC ${extra.iecNumber}` : null,
-    buyerOrderNo: [...new Set(pls.flatMap((p) => p.orderNos || []))].join(', ') || null,
+    // The packed orders first; a shipment's own order list stands in when the packing
+    // lists carry none.
+    buyerOrderNo: [...new Set(pls.flatMap((p) => p.orderNos || []))].join(', ')
+      || (shipment?.orderNos || []).join(', ')
+      || null,
     buyerOrderDate: null,
     consignee: shipment?.consignee ?? null,
     notify: shipment?.notify ?? null,

@@ -28,7 +28,9 @@ import {
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
 
-export const SEED_VERSION = 11;
+// 12 (2026-10-08): shipments take the consignee from the buyer master and carry
+// their orders; sub-client, end customer, seal, pallets and delivery centre removed.
+export const SEED_VERSION = 12;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -73,8 +75,10 @@ const SEED_HS_CODES = [
  * buyer master supplies ids we cannot know at seed time. Lookup falls back to a
  * neutral default so an unseeded buyer still produces a usable document.
  *
- * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms,
- * tolerance and consignee/notify profiles do not exist on mst_buyers today.
+ * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms and
+ * tolerance do not exist on mst_buyers today. The consignee and notify party are
+ * NOT here — a shipment takes them from the real buyer master (the buyer, its
+ * shipping locations and its bank).
  */
 const SEED_BUYER_COMMERCIAL = [
   {
@@ -85,44 +89,6 @@ const SEED_BUYER_COMMERCIAL = [
     paymentTerms: 'TT 60 DAYS FROM BL DATE',
     tolerancePercent: 2,
     allowMultiInvoicePerPl: false,
-    // The sub-client concept exists nowhere in the ERP — this is the whole of it.
-    subClients: [
-      { code: 'AMG', name: 'AMG Retail BV' },
-      { code: 'PP', name: 'PP Fashion' },
-      { code: 'DM', name: 'DM Drogerie Markt' },
-      { code: 'CHARLIE_GRS', name: 'Charlie GRS' },
-    ],
-    consigneeProfiles: [
-      {
-        id: 'jomo-nl',
-        name: 'JOMO BV',
-        addressLines: ['Handelsweg 24'],
-        city: 'Valkenswaard', state: '', country: 'Netherlands', postalCode: '5555 XT',
-        taxId: 'NL812345678B01',
-      },
-      {
-        id: 'dm-karlsruhe',
-        name: 'DM Verteilzentrum Karlsruhe',
-        addressLines: ['Am Dm-Platz 1'],
-        city: 'Karlsruhe', state: 'Baden-Wurttemberg', country: 'Germany', postalCode: '76227',
-        taxId: 'DE143585121',
-      },
-      {
-        id: 'dm-bor',
-        name: 'DM Online-VZ Bor',
-        addressLines: ['Prumyslova 1', 'CTPark Bor'],
-        city: 'Bor', state: '', country: 'Czech Republic', postalCode: '34802',
-        taxId: 'CZ26482941',
-      },
-    ],
-    notifyProfiles: [
-      {
-        id: 'jomo-bank',
-        name: 'ABN AMRO Bank N.V.',
-        addressLines: ['Gustav Mahlerlaan 10'],
-        city: 'Amsterdam', state: '', country: 'Netherlands', postalCode: '1082 PP', taxId: null,
-      },
-    ],
   },
   {
     buyerCode: 'VGT',
@@ -132,17 +98,6 @@ const SEED_BUYER_COMMERCIAL = [
     paymentTerms: 'TT 45 DAYS',
     tolerancePercent: 0,
     allowMultiInvoicePerPl: false,
-    subClients: [],
-    consigneeProfiles: [
-      {
-        id: 'vgt-nl',
-        name: 'Van Gennip Textiles BV',
-        addressLines: ['Nijverheidsweg 12'],
-        city: 'Uden', state: '', country: 'Netherlands', postalCode: '5405 NL',
-        taxId: 'NL009876543B01',
-      },
-    ],
-    notifyProfiles: [],
   },
   {
     buyerCode: 'PRENATAL',
@@ -153,25 +108,6 @@ const SEED_BUYER_COMMERCIAL = [
     tolerancePercent: 0,
     allowMultiInvoicePerPl: false,
     discountPercent: 3, // the Prénatal 3% discount line (PRD §8.4)
-    subClients: [],
-    // D/A terms put the BANK on the invoice as consignee, not the buyer (PRD §8.2).
-    consigneeProfiles: [
-      {
-        id: 'prenatal-bank',
-        name: 'Deutsche Bank AG',
-        addressLines: ['Taunusanlage 12'],
-        city: 'Frankfurt am Main', state: '', country: 'Germany', postalCode: '60325',
-        taxId: null,
-      },
-      {
-        id: 'prenatal-nl',
-        name: 'Prénatal Moeder en Kind BV',
-        addressLines: ['Sterrenbergweg 6'],
-        city: 'Amersfoort', state: '', country: 'Netherlands', postalCode: '3821 AT',
-        taxId: 'NL004455667B01',
-      },
-    ],
-    notifyProfiles: [],
   },
 ];
 
@@ -183,9 +119,6 @@ export const DEFAULT_BUYER_COMMERCIAL = {
   paymentTerms: 'TT 30 DAYS',
   tolerancePercent: DEFAULT_TENANT_CONFIG.defaultTolerancePercent,
   allowMultiInvoicePerPl: false,
-  subClients: [],
-  consigneeProfiles: [],
-  notifyProfiles: [],
 };
 
 /**
@@ -237,7 +170,6 @@ const buildTemplates = () => [
     name: 'JOMO — AMG — Carton Sticker',
     buyerId: null,
     buyerCode: 'JOMO',
-    subClientCode: 'AMG',
     docType: DOC_TYPE.STICKER,
     version: 1,
     status: TEMPLATE_STATUS.ACTIVE,
@@ -263,7 +195,6 @@ const buildTemplates = () => [
           border: { style: 'solid', widthPt: 1.5 },
           lines: [
             { key: 'buyer', label: null, binding: 'buyer.name', fontPt: 22, bold: true, align: 'CENTER' },
-            { key: 'endCustomer', label: null, binding: 'carton.endCustomer', fontPt: 16, align: 'CENTER' },
             { key: 'po', label: 'ORDER NO', binding: 'carton.buyerPoNo', fontPt: 12 },
             { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
             { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
@@ -292,7 +223,7 @@ const buildTemplates = () => [
       ],
       // Drives V-08 at sticker generation: these must be present or the affected
       // cartons are named and generation is blocked.
-      mandatoryFields: ['carton.danNo', 'carton.endCustomer', 'carton.netWeightKg', 'carton.grossWeightKg'],
+      mandatoryFields: ['carton.danNo', 'carton.netWeightKg', 'carton.grossWeightKg'],
     },
     formatting: { font: 'Arial' },
     printWeights: true,
@@ -306,7 +237,7 @@ const buildTemplates = () => [
     id: 'STK-5',
     templateCode: 'JOMO-SCA-STICKER',
     name: 'JOMO — SCA — Carton Sticker',
-    buyerId: null, buyerCode: 'JOMO', subClientCode: 'SCA',
+    buyerId: null, buyerCode: 'JOMO',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
     effectiveFrom: d(-180), effectiveTo: null, clonedFromId: 'STK-3',
     publishedAt: ts(-180), publishedBy: 'R. Kumar',
@@ -332,7 +263,6 @@ const buildTemplates = () => [
             { key: 'po', label: 'PO No', binding: 'pl.orderNos', fontPt: 12 },
             { key: 'article', label: 'CLIENT ARTICLE No', binding: 'carton.articleNo', fontPt: 12 },
             { key: 'style', label: 'STYLE No', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'division', label: 'ASSORTMENT DIVISION, CUSTOMER', binding: 'carton.endCustomer', fontPt: 12 },
             { key: 'ctn', label: 'CARTON No', binding: 'carton.nOfN', fontPt: 12 },
             { key: 'port', label: 'PORT OF DESTINATION', binding: 'carton.destination', fontPt: 12 },
             { key: 'colour', label: 'COLOR', binding: 'carton.colorName', fontPt: 12 },
@@ -359,7 +289,7 @@ const buildTemplates = () => [
       // or a carton ships with a blank line where the customer looks for its article.
       mandatoryFields: [
         'carton.netWeightKg', 'carton.grossWeightKg', 'carton.buyerPoNo',
-        'carton.articleNo', 'carton.endCustomer', 'carton.destination',
+        'carton.articleNo', 'carton.destination',
       ],
     },
     formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
@@ -370,7 +300,7 @@ const buildTemplates = () => [
     id: 'STK-6',
     templateCode: 'PRENATAL-SOLID-STICKER',
     name: 'Prénatal — Solid Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL', subClientCode: null,
+    buyerId: null, buyerCode: 'PRENATAL',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
     effectiveFrom: d(-120), effectiveTo: null, clonedFromId: null,
     publishedAt: ts(-120), publishedBy: 'R. Kumar',
@@ -407,7 +337,7 @@ const buildTemplates = () => [
     id: 'STK-7',
     templateCode: 'PRENATAL-RATIO-STICKER',
     name: 'Prénatal — Ratio Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL', subClientCode: 'RATIO',
+    buyerId: null, buyerCode: 'PRENATAL',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
     effectiveFrom: d(-120), effectiveTo: null, clonedFromId: 'STK-6',
     publishedAt: ts(-120), publishedBy: 'R. Kumar',
@@ -442,7 +372,7 @@ const buildTemplates = () => [
     id: 'STK-8',
     templateCode: 'VINGINO-STICKER',
     name: 'Vingino — Carton Sticker',
-    buyerId: null, buyerCode: 'VINGINO', subClientCode: null,
+    buyerId: null, buyerCode: 'VINGINO',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
     effectiveFrom: d(-90), effectiveTo: null, clonedFromId: null,
     publishedAt: ts(-90), publishedBy: 'R. Kumar',
@@ -482,7 +412,7 @@ const buildTemplates = () => [
     id: 'STK-9',
     templateCode: 'VGT-STICKER',
     name: 'Van Gennip — Carton Sticker',
-    buyerId: null, buyerCode: 'VGT', subClientCode: null,
+    buyerId: null, buyerCode: 'VGT',
     docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
     effectiveFrom: d(-150), effectiveTo: null, clonedFromId: null,
     publishedAt: ts(-150), publishedBy: 'R. Kumar',
@@ -520,6 +450,11 @@ const buildTemplates = () => [
 // ─── Shipments ──────────────────────────────────────────────────────────────────
 // A minimal entity invented by this module: no shipment record exists anywhere in
 // the ERP, yet V-01 is shipment-scoped and the invoice header needs ports/vessel.
+//
+// The consignee is the buyer and the notify party its bank or a shipping location,
+// stored as the { name, block } snapshots a saved shipment carries. A seed cannot
+// know the real buyer master's location ids, so `notifyParty` is left empty: the
+// user picks it on the first edit, which rebuilds both blocks from the master.
 
 const buildShipments = () => [
   {
@@ -528,7 +463,6 @@ const buildShipments = () => [
     status: 'OPEN',
     buyerCode: 'JOMO',
     buyerName: 'JOMO BV',
-    subClientCode: 'AMG',
     mode: 'SEA',
     incoterm: 'FOB',
     preCarriageBy: 'ROAD',
@@ -539,16 +473,16 @@ const buildShipments = () => [
     finalDestination: 'Valkenswaard, Netherlands',
     countryOfFinalDestination: 'Netherlands',
     containerNos: ['MSKU7712345'],
-    sealNo: 'IN884213',
     blAwbNo: null,
     blAwbDate: null,
     etd: d(12),
     eta: d(38),
     forwarder: 'Kuehne + Nagel',
-    deliveryCentre: 'DM Verteilzentrum Karlsruhe',
-    consigneeProfileId: 'jomo-nl',
-    notifyProfileId: 'jomo-bank',
-    totalPallets: 12,
+    notifyParty: null,
+    consigneeLocationId: null,
+    consignee: { name: 'JOMO BV', locationId: null, block: 'JOMO BV\nHandelsweg 24\nValkenswaard\n5555 XT Netherlands' },
+    notify: { name: 'ABN AMRO Bank N.V.', block: 'ABN AMRO Bank N.V.\nSWIFT: ABNANL2A' },
+    orders: [{ orderId: null, orderNo: orderNo(1042), styleNo: 'ST-2026-0441' }],
     version: 0,
     createdAt: ts(-6),
     createdBy: 'Priya S.',
@@ -559,7 +493,6 @@ const buildShipments = () => [
     status: 'OPEN',
     buyerCode: 'VGT',
     buyerName: 'Van Gennip Textiles BV',
-    subClientCode: null,
     mode: 'SEA',
     incoterm: 'CIF',
     preCarriageBy: 'ROAD',
@@ -570,28 +503,28 @@ const buildShipments = () => [
     finalDestination: 'Uden, Netherlands',
     countryOfFinalDestination: 'Netherlands',
     containerNos: ['CMAU4451209', 'CMAU4451210'],
-    sealNo: 'IN884990',
     blAwbNo: null,
     blAwbDate: null,
     etd: d(25),
     eta: d(52),
     forwarder: 'DSV Air & Sea',
-    deliveryCentre: null,
-    consigneeProfileId: 'vgt-nl',
-    notifyProfileId: null,
-    totalPallets: 24,
+    // Notify = a shipping location, so its address is the consignee's too.
+    notifyParty: null,
+    consigneeLocationId: null,
+    consignee: { name: 'Van Gennip Textiles BV', locationId: null, block: 'Van Gennip Textiles BV\nNijverheidsweg 12\nUden\n5405 NL Netherlands' },
+    notify: { name: 'Uden DC', block: 'Uden DC\nNijverheidsweg 12\nUden\n5405 NL Netherlands' },
+    orders: [{ orderId: null, orderNo: orderNo(1055), styleNo: 'ST-2026-0512' }],
     version: 0,
     createdAt: ts(-3),
     createdBy: 'Priya S.',
   },
   {
-    // D/A terms — the bank is the consignee, not the buyer (PRD §24.9).
+    // D/A terms — the bank is the notify party; the buyer stays the consignee.
     id: 3,
     shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1003, FY),
     status: 'OPEN',
     buyerCode: 'PRENATAL',
     buyerName: 'Prénatal Moeder en Kind BV',
-    subClientCode: null,
     mode: 'SEA',
     incoterm: 'FOB',
     preCarriageBy: 'ROAD',
@@ -602,16 +535,16 @@ const buildShipments = () => [
     finalDestination: 'Amersfoort, Netherlands',
     countryOfFinalDestination: 'Netherlands',
     containerNos: [],
-    sealNo: null,
     blAwbNo: null,
     blAwbDate: null,
     etd: d(40),
     eta: d(66),
     forwarder: null,
-    deliveryCentre: null,
-    consigneeProfileId: 'prenatal-bank',
-    notifyProfileId: null,
-    totalPallets: 0,
+    notifyParty: null,
+    consigneeLocationId: null,
+    consignee: { name: 'Prénatal Moeder en Kind BV', locationId: null, block: 'Prénatal Moeder en Kind BV\nSterrenbergweg 6\nAmersfoort\n3821 AT Netherlands' },
+    notify: { name: 'Deutsche Bank AG', block: 'Deutsche Bank AG\nSWIFT: DEUTDEFF' },
+    orders: [{ orderId: null, orderNo: orderNo(1061), styleNo: 'ST-2026-0588' }],
     version: 0,
     createdAt: ts(-1),
     createdBy: 'Priya S.',
@@ -661,7 +594,6 @@ const g = (over) => {
     cartonFrom: 1,
     cartonTo: 1,
     packingCode: null,
-    endCustomer: null,
     danNo: null,
     // Every seeded entry binds a single order line (lineNo 1), mirroring its
     // orderLineRefs. Left null, the per-order-line invoice grain would collapse
@@ -702,7 +634,6 @@ const buildPackingEntries = () => [
     orderNo: orderNo(1042),
     buyerCode: 'JOMO',
     buyerName: 'JOMO BV',
-    subClientCode: 'AMG',
     styleNo: 'ST-2026-0441',
     garmentName: "Men's Slim Fit Polo",
     // Drives the HS-code default. No such field exists on the real style master —
@@ -723,7 +654,7 @@ const buildPackingEntries = () => [
     groups: [
       g({
         packingType: PACKING_TYPE.SOLID, cartonFrom: 1, cartonTo: 47,
-        danNo: 'DAN-4471', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4471', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
         // The buyer's own article number, one per size — what JOMO's SCA carton
         // marking prints as CLIENT ARTICLE No.
@@ -733,7 +664,7 @@ const buildPackingEntries = () => [
       }),
       g({
         packingType: PACKING_TYPE.RATIO, cartonFrom: 48, cartonTo: 57,
-        danNo: 'DAN-4472', endCustomer: 'Jensen', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4472', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Flame Scarlet 18-1662 TCX',
         articleNos: { M: 'ART-99130', L: 'ART-99131', XL: 'ART-99132', XXL: 'ART-99133' },
         ratio: { M: 1, L: 2, XL: 2, XXL: 1 }, assortmentsPerCarton: 4,
@@ -741,7 +672,7 @@ const buildPackingEntries = () => [
       }),
       g({
         packingType: PACKING_TYPE.MIXED, cartonFrom: 58, cartonTo: 60,
-        danNo: 'DAN-4473', endCustomer: 'Marja', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4473', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: null,
         articleNos: { M: 'ART-99120', L: 'ART-99121' },
         mixedRows: [
@@ -754,7 +685,7 @@ const buildPackingEntries = () => [
         // Leftover odd carton with its own smaller dimensions (PRD §24.4).
         sectionKey: SECTION_KEY.EXTRA, packingType: PACKING_TYPE.EXTRA,
         cartonFrom: 61, cartonTo: 61,
-        danNo: 'DAN-4474', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4474', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
         articleNos: { M: 'ART-99120', L: 'ART-99121' },
         sizeQty: { M: 3, L: 4 },
@@ -777,7 +708,6 @@ const buildPackingEntries = () => [
     orderNo: orderNo(1055),
     buyerCode: 'VGT',
     buyerName: 'Van Gennip Textiles BV',
-    subClientCode: null,
     styleNo: 'ST-2026-0512',
     garmentName: "Girls' Printed Tee",
     garmentCategory: 'Knit',
@@ -836,7 +766,6 @@ const buildPackingEntries = () => [
     orderNo: orderNo(1061),
     buyerCode: 'PRENATAL',
     buyerName: 'Prénatal Moeder en Kind BV',
-    subClientCode: null,
     styleNo: 'ST-2026-0588',
     garmentName: 'Baby 3-pack Bodysuit',
     garmentCategory: 'Baby',

@@ -122,9 +122,9 @@ export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise
 // exception), `override` to print from a still-Draft PL.
 export const EXPORT_STICKER_OPERATIONS = ['view', 'print', 'reprint', 'override'];
 
-// `publish` moves a Draft template to Active and retires the previous Active — the
-// only act that can break the "exactly one Active per buyer/sub-client/doc-type"
-// invariant, so it is separated from ordinary draft editing.
+// `publish` moves a Draft template to Active and retires the template's previous
+// Active revision — the act that changes what new documents print, so it is
+// separated from ordinary draft editing.
 export const EXPORT_TEMPLATE_OPERATIONS = ['view', 'add', 'update', 'delete', 'publish'];
 
 // Dashboard only has view

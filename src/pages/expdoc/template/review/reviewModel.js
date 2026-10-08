@@ -9,7 +9,7 @@ import { TEMPLATE_SOURCE, completeLayout } from '../../../../utils/expDocSystemT
 import { newRowKey } from '../editor/editorKit';
 
 /** One editable template per document the reader found, filled out to a full layout. */
-export const draftsFromResult = (result, { buyerId, buyerName, subClientCode } = {}) =>
+export const draftsFromResult = (result, { buyerId, buyerName } = {}) =>
   (result?.documents || []).map((doc, i) => ({
     uid: `doc-${i}`,
     index: i,
@@ -25,7 +25,6 @@ export const draftsFromResult = (result, { buyerId, buyerName, subClientCode } =
       name: doc.suggestedName || '',
       buyerId: buyerId ?? null,
       buyerName: buyerName ?? null,
-      subClientCode: subClientCode || null,
       version: 1,
       status: TEMPLATE_STATUS.DRAFT,
     },

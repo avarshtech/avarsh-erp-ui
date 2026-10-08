@@ -64,7 +64,6 @@ const CartonPackingView = ({ open, entryId, onClose, onEdit, canUpdate }) => {
       },
       { title: 'Ctns', dataIndex: 'cartonCount', width: 64, align: 'right' },
       { title: 'DAN', dataIndex: 'danNo', width: 100, render: (v) => v || '—' },
-      { title: 'End customer', dataIndex: 'endCustomer', width: 130, ellipsis: true, render: (v) => v || '—' },
       {
         title: 'Colour',
         dataIndex: 'colorName',

@@ -9,25 +9,24 @@
  *
  * A template row is IMMUTABLE ONCE PUBLISHED. A new version is a new row sharing the
  * template code, so a sticker run that stored `templateId` keeps rendering exactly
- * the layout it was printed with (§10 opening paragraph, BR-08). Stickers still
- * resolve automatically — exactly one ACTIVE per (buyer, sub-client) — and
- * publishing retires the previous active in the same operation.
+ * the layout it was printed with (§10 opening paragraph, BR-08). A buyer may keep
+ * several active sticker layouts — staff pick one per sticker run — and publishing a
+ * version retires the previous active version of the same template code.
  */
 import { loadDb, saveDb } from './expDocMockStore';
 import {
   delay, clone, fail, failConflict, pushAudit, nowStamp, todayStr, currentUserName,
 } from './expDocMockCommon';
 import { getBuyerCommercial } from './expDocMockMasters';
+import { decorate as decorateShipment } from './expDocMockShipments';
 import { TEMPLATE_STATUS, DOC_TYPE } from '../../utils/expDocConstants';
-import { findActiveConflicts, isBindable } from '../../utils/expDocTemplateSchema';
+import { isBindable } from '../../utils/expDocTemplateSchema';
 import { TEMPLATE_SOURCE } from '../../utils/expDocSystemTemplates';
 
 export const isMockTemplateId = (id) => String(id ?? '').startsWith('STK-');
 
 const stickers = (db) => (db.templates || []).filter((t) => t.docType === DOC_TYPE.STICKER);
 const find = (db, id) => stickers(db).find((t) => String(t.id) === String(id));
-
-const keyOf = (t) => `${t.buyerCode || '*'}|${t.subClientCode || '*'}|${t.docType}`;
 
 const nextId = (db) => `STK-${Math.max(0, ...(db.templates || [])
   .map((t) => Number(String(t.id).replace(/^STK-/, '')) || 0)) + 1}`;
@@ -97,13 +96,6 @@ export const getStickerTemplate = async (id) => {
 export const listStickerBuyers = () => (loadDb().masters?.buyerCommercial || []).map((b) => ({
   value: b.buyerCode,
   label: b.buyerName,
-  subClients: (b.subClients || []).map((s) => ({ value: s.code, label: s.name })),
-}));
-
-/** Two active sticker layouts for one buyer / sub-client: the one rule stickers keep. */
-export const stickerConflicts = () => findActiveConflicts(stickers(loadDb())).map((c) => ({
-  key: c.key,
-  templates: c.templates.map((t) => ({ id: t.id, templateCode: t.templateCode, version: t.version })),
 }));
 
 // ─── Writes ─────────────────────────────────────────────────────────────────────
@@ -138,7 +130,6 @@ export const createStickerTemplate = async (payload = {}) => {
     name: payload.name || payload.templateCode,
     buyerId: null,
     buyerCode: payload.buyerCode || null,
-    subClientCode: payload.subClientCode || null,
     docType: DOC_TYPE.STICKER,
     version: 1,
     status: TEMPLATE_STATUS.DRAFT,
@@ -183,7 +174,7 @@ export const newStickerTemplateVersion = async (id) => {
 };
 
 const EDITABLE_FIELDS = [
-  'name', 'buyerCode', 'subClientCode', 'identity', 'stickerLayout', 'formatting',
+  'name', 'buyerCode', 'identity', 'stickerLayout', 'formatting',
   'printWeights', 'printDimensions', 'mandatoryForSubmit', 'mandatoryForDocGen',
 ];
 
@@ -205,7 +196,10 @@ export const updateStickerTemplate = async (id, payload = {}) => {
   return decorate(t, db);
 };
 
-/** Publishing retires the previous active sticker for the same buyer / sub-client. */
+/**
+ * Publishing retires the previous active version of the same template code — never
+ * another layout of the same buyer, which stays available to pick per run.
+ */
 export const publishStickerTemplate = async (id, options = {}) => {
   await delay();
   const db = loadDb();
@@ -215,7 +209,7 @@ export const publishStickerTemplate = async (id, options = {}) => {
 
   const from = options.effectiveFrom || todayStr();
   const superseded = stickers(db).filter(
-    (x) => x.id !== t.id && x.status === TEMPLATE_STATUS.ACTIVE && keyOf(x) === keyOf(t),
+    (x) => x.id !== t.id && x.status === TEMPLATE_STATUS.ACTIVE && x.templateCode === t.templateCode,
   );
   superseded.forEach((x) => {
     x.status = TEMPLATE_STATUS.RETIRED;
@@ -228,7 +222,9 @@ export const publishStickerTemplate = async (id, options = {}) => {
     publishedAt: nowStamp(), publishedBy: currentUserName(), updatedAt: nowStamp(), updatedBy: currentUserName(),
   });
   audit(db, t, `Published v${t.version}`, {
-    details: superseded.length ? `Retired ${superseded.map((x) => `v${x.version}`).join(', ')}` : `Active for ${keyOf(t)}`,
+    details: superseded.length
+      ? `Retired ${superseded.map((x) => `v${x.version}`).join(', ')}`
+      : `Active for ${t.buyerCode || 'every buyer'}`,
     reason: options.reason || null,
   });
   saveDb(db);
@@ -298,7 +294,6 @@ export const getTemplateSample = async (template) => {
     status: 'DRAFT',
     buyerCode: entry.buyerCode,
     buyerName: entry.buyerName,
-    subClientCode: entry.subClientCode,
     shipmentNo: shipment?.shipmentNo || null,
     shipmentId: shipment?.id ?? null,
     sizes: entry.sizes || [],
@@ -320,7 +315,8 @@ export const getTemplateSample = async (template) => {
     docType: t.docType,
     template: t,
     pl: samplePl,
-    shipment: shipment ? clone(shipment) : null,
+    // Decorated, so the preview prints the consignee, notify party and orders.
+    shipment: shipment ? decorateShipment(shipment, db) : null,
     entry: { garmentName: entry.garmentName, compositionText: entry.compositionText, orderNo: entry.orderNo },
     empty: false,
   };

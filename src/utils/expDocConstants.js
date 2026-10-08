@@ -169,7 +169,7 @@ export const INVOICE_BOXES = [
   { key: 'exporterRef', label: "Exporter's Ref. (IEC No.)", content: 'IEC number' },
   { key: 'consignee', label: 'Consignee', content: "The invoice's consignee" },
   { key: 'buyerOrder', label: "Buyer's Order No. & Date", content: 'Order numbers and date' },
-  { key: 'buyerOther', label: 'Buyer (if other than Consignee)', content: 'Buyer name' },
+  { key: 'buyerOther', label: 'Buyer (if other than Consignee)', content: 'SAME AS CONSIGNEE, or the buyer when it differs' },
   { key: 'otherRefs', label: 'Other References', content: 'AD code, GST state, PAN, LUT, AEPC, REX, star house' },
   { key: 'notify', label: 'Notify Party', content: "The invoice's notify party" },
   { key: 'preCarriage', label: 'Pre-Carriage by', content: 'Shipment pre-carriage' },
@@ -181,7 +181,8 @@ export const INVOICE_BOXES = [
   { key: 'terms', label: 'Terms of Delivery & Payment', content: 'Incoterm and payment terms' },
   { key: 'portOfDischarge', label: 'Port of Discharge', content: 'Shipment port of discharge' },
   { key: 'finalDestination', label: 'Final Destination', content: 'Shipment final destination' },
-  { key: 'containerSeal', label: 'Container / Seal No.', content: 'Container and seal numbers' },
+  // The key keeps its old name: the API's invoice reader and saved templates use it.
+  { key: 'containerSeal', label: 'Container No(s).', content: 'Container numbers' },
 ];
 
 // ─── Template layout vocabulary (sheets, text blocks) ───────────────────────────
@@ -205,7 +206,6 @@ export const BLOCK_FIELD_LABELS = {
   styleNo: 'Style',
   colorName: 'Colour',
   packingCode: 'Packing code',
-  endCustomer: 'End customer',
   destination: 'Destination',
 };
 

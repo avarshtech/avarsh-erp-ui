@@ -12,8 +12,8 @@ const { Title, Text } = Typography;
 const SECTIONS = [DOC_TYPE.PACKING_LIST, DOC_TYPE.INVOICE, DOC_TYPE.STICKER];
 
 /**
- * One buyer's templates, by document. A buyer may keep several packing-list and
- * invoice templates (sea / air, one per end customer); staff pick one per document.
+ * One buyer's templates, by document. A buyer may keep several packing-list, invoice
+ * and sticker templates (sea / air, say); staff pick one per document or sticker run.
  */
 const TemplateBuyerPanel = ({
   group, highlightIds, canAdd, canDelete, onUpload, onNew, onOpen, onPreview, onCopy, onDelete,

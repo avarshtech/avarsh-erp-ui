@@ -443,7 +443,6 @@ const ExportInvoiceForm = () => {
           docType={DOC_TYPE.INVOICE}
           buyerId={working.buyerId}
           buyerName={working.buyerName}
-          subClientCode={working.subClientCode}
           current={working.templateId ? {
             id: working.templateId, templateCode: working.template?.templateCode,
             version: working.templateVersion, name: working.template?.name,

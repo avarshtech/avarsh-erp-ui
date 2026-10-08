@@ -38,12 +38,6 @@ export const buildInvoiceColumns = ({ onView, onDelete, canDelete }) => [
     key: 'buyerName',
     width: 190,
     ellipsis: true,
-    render: (name, record) => (
-      <Space size={4} wrap={false}>
-        <Text ellipsis>{name || '—'}</Text>
-        {record.subClientCode && <Tag>{record.subClientCode}</Tag>}
-      </Space>
-    ),
   },
   { title: 'Shipment', dataIndex: 'shipmentNo', key: 'shipmentNo', width: 155, render: nowrap },
   { title: 'Packing lists', dataIndex: 'plNos', key: 'plNos', width: 190, ellipsis: true, render: nowrap },

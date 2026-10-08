@@ -115,8 +115,9 @@ test.describe.serial('Buyer templates', () => {
     await expect(page.getByText('JOMO BV - Packing List (Sea)').first()).toBeVisible();
     await expect(page.getByText('JOMO BV - AMG Packing List').first()).toBeVisible();
     await expect(page.getByText('Draft v2 in progress')).toBeVisible();
-    // The AMG packing list is scoped to the sub-client (the AMG sticker is too).
-    await expect(familyCard(page, 'JOMO-PL-AMG').getByText('Sub-client AMG')).toBeVisible();
+    // There is no sub-client concept: a sub-client code still stored on the API row
+    // never reaches the screen.
+    await expect(familyCard(page, 'JOMO-PL-AMG').getByText(/Sub-client/)).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Standard & any-buyer templates' }).click();
     await expect(page.getByText('Standard Indian Export — Packing List')).toBeVisible();

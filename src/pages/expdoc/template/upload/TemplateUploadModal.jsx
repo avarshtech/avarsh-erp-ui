@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import {
-  Alert, App, AutoComplete, Button, Modal, Segmented, Space, Spin, Typography, Upload,
+  Alert, App, Button, Modal, Segmented, Space, Spin, Typography, Upload,
 } from 'antd';
 import { InboxOutlined } from '@ant-design/icons';
 import { FormSelect } from '../../../../components/form';
 import { MODAL_WIDTHS } from '../../../../utils/uiConstants';
 import { DOC_TYPE } from '../../../../utils/expDocConstants';
-import { getBuyerCommercial } from '../../../../services/expdoc/expDocService';
 import { setImportDraft } from '../review/importDraftStore';
 import useTemplateExtraction, { READ_FAILURE } from './useTemplateExtraction';
 
@@ -41,15 +40,12 @@ const TemplateUploadModal = ({
 }) => {
   const { message } = App.useApp();
   const [buyerId, setBuyerId] = useState(defaultBuyerId ?? undefined);
-  const [subClientCode, setSubClientCode] = useState('');
   const [contains, setContains] = useState(defaultDocType || 'AUTO');
   const [fileList, setFileList] = useState([]);
   const { busy, failure, read, cancel, clearError } = useTemplateExtraction();
   const failureAlert = failure && FAILURE_ALERT[failure.kind];
 
   const buyer = buyers.find((b) => b.id === buyerId);
-  const subClients = (getBuyerCommercial({ buyerName: buyer?.name }).subClients || [])
-    .map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` }));
 
   const addFile = (file) => {
     const ext = String(file.name).toLowerCase().split('.').pop();
@@ -71,8 +67,7 @@ const TemplateUploadModal = ({
     const result = await read(file, { buyerId, docTypeHint: contains });
     if (!result) return;
     setImportDraft({
-      result, file, buyerId, buyerName: buyer?.name || null,
-      subClientCode: subClientCode.trim() || null, docTypeHint: contains,
+      result, file, buyerId, buyerName: buyer?.name || null, docTypeHint: contains,
     });
     onRead(result);
   };
@@ -114,17 +109,10 @@ const TemplateUploadModal = ({
               placeholder="Whose document is this?"
             />
           </div>
-          <Space size={12} wrap style={{ width: '100%' }}>
-            <div style={{ minWidth: 220 }}>
-              <Text type="secondary">Sub-client</Text>
-              <AutoComplete style={{ width: '100%' }} value={subClientCode} options={subClients}
-                placeholder="Optional, e.g. AMG" onChange={(v) => setSubClientCode(String(v || '').toUpperCase())} />
-            </div>
-            <div>
-              <Text type="secondary" style={{ display: 'block' }}>The file contains</Text>
-              <Segmented options={CONTAINS} value={contains} onChange={setContains} />
-            </div>
-          </Space>
+          <div>
+            <Text type="secondary" style={{ display: 'block' }}>The file contains</Text>
+            <Segmented options={CONTAINS} value={contains} onChange={setContains} />
+          </div>
           <Dragger accept={ACCEPT} multiple={false} fileList={fileList} beforeUpload={addFile}
             onRemove={() => setFileList([])} aria-label="Buyer document file">
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>

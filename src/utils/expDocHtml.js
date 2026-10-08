@@ -429,7 +429,7 @@ export const buildPackingListHtml = (pl, options = {}) => {
   const ctx = {
     pl: source,
     exporter: options.exporter || {},
-    buyer: { name: source.buyerName, subClient: source.subClientCode },
+    buyer: { name: source.buyerName },
     shipment: options.shipment || {},
     style: {},
     row: {},
@@ -829,7 +829,7 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     invoice: { ...source, totals, plTotals, igst },
     exporter,
     shipment,
-    buyer: { name: source.buyerName, subClient: source.subClientCode },
+    buyer: { name: source.buyerName },
     pl: {},
   };
   const box = invoiceBoxPrinter(template, bindCtx);
@@ -851,7 +851,9 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     <tr>
       ${box('consignee', 'Consignee', source.consignee?.block || '', { colspan: 2, bold: true })}
       ${box('buyerOrder', "Buyer's Order No. & Date", [source.buyerOrderNo, source.buyerOrderDate].filter(Boolean).join('   Dt. '))}
-      ${box('buyerOther', 'Buyer (if other than Consignee)', source.buyerName || '')}
+      ${box('buyerOther', 'Buyer (if other than Consignee)', source.consignee?.name && source.consignee.name === source.buyerName
+    ? 'SAME AS CONSIGNEE'
+    : source.buyerName || '')}
     </tr>
     <tr>
       ${box('otherRefs', 'Other References', [
@@ -882,10 +884,7 @@ export const buildExportInvoiceHtml = (inv, options = {}) => {
     <tr>
       ${box('portOfDischarge', 'Port of Discharge', shipment.portOfDischarge || '')}
       ${box('finalDestination', 'Final Destination', shipment.finalDestination || source.countryOfFinalDestination || '')}
-      ${box('containerSeal', 'Container / Seal No.', [
-    (shipment.containerNos || []).join(', '),
-    shipment.sealNo ? `SEAL: ${shipment.sealNo}` : null,
-  ].filter(Boolean).join('\n'), { colspan: 2 })}
+      ${box('containerSeal', 'Container No(s).', (shipment.containerNos || []).join(', '), { colspan: 2 })}
     </tr>
   </table>`;
 

@@ -15,7 +15,9 @@ import { TEMPLATE_SOURCE, pickLayout } from '../../utils/expDocSystemTemplates';
 
 export const fromApi = (dto) => {
   if (!dto) return dto;
-  const { layout, revision, version, revisions, ...rest } = dto;
+  // The API still stores a sub-client code; the business has no such concept, so no
+  // screen is handed one (the column goes in the API phase).
+  const { layout, revision, version, revisions, subClientCode: _subClient, ...rest } = dto;
   return {
     ...(layout || {}),
     ...rest,
@@ -40,7 +42,6 @@ export const toApi = (template) => ({
   name: (template.name || '').trim(),
   docType: template.docType,
   buyerId: template.buyerId ?? null,
-  subClientCode: template.subClientCode || null,
   layout: pickLayout(template),
   extractionMeta: template.extractionMeta ?? undefined,
   version: template.lockVersion ?? undefined,

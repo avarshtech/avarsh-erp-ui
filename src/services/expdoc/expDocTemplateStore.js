@@ -80,8 +80,6 @@ export const compareTemplates = async (idA, idB) =>
 
 export const getTemplateSample = (template) => mock.getTemplateSample(template);
 
-export const stickerTemplateConflicts = () => mock.stickerConflicts();
-
 export const listStickerBuyers = () => mock.listStickerBuyers();
 
 // ─── Writes ─────────────────────────────────────────────────────────────────────
@@ -90,7 +88,6 @@ const stickerPayload = (t) => ({
   templateCode: t.templateCode,
   name: t.name,
   buyerCode: t.buyerCode || null,
-  subClientCode: t.subClientCode || null,
   layout: pickLayout(t),
   stickerLayout: t.stickerLayout,
   clonedFromId: t.clonedFromId ?? null,
@@ -132,7 +129,7 @@ export const updateTemplate = (template) => write(async () => (template.source =
 export const cloneTemplate = (source, target) => write(async () => {
   const identity = {
     templateCode: target.templateCode, name: target.name,
-    buyerId: target.buyerId ?? null, subClientCode: target.subClientCode || null,
+    buyerId: target.buyerId ?? null,
   };
   if (source.source === TEMPLATE_SOURCE.API) return decorateApi(await api.cloneApiTemplate(source.id, identity));
   if (source.source === TEMPLATE_SOURCE.MOCK) {

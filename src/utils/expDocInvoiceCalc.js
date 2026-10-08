@@ -63,7 +63,6 @@ export const packedAtoms = (rows, options = {}) => {
         orderNo: row.orderNo ?? null,
         buyerPoNo: row.buyerPoNo ?? null,
         destination: row.destination ?? null,
-        endCustomer: row.endCustomer ?? null,
         packingCode: row.packingCode ?? null,
         danNo: row.danNo ?? null,
         articleNo: (row.articleNos || {})[size] ?? null,
@@ -149,7 +148,7 @@ export const DEFAULT_GROUP_BY = {
 /** The atom properties a template may group by. Anything else is derived. */
 export const GROUPABLE_KEYS = new Set([
   'styleNo', 'colourKey', 'colorName', 'size', 'buyerPoNo', 'orderLineId',
-  'destination', 'endCustomer', 'packingCode', 'danNo', 'sectionKey', 'articleNo',
+  'destination', 'packingCode', 'danNo', 'sectionKey', 'articleNo',
   'sourceEntryId', 'sourceEntryNo', 'orderNo',
 ]);
 
@@ -238,7 +237,6 @@ export const buildInvoiceLines = (rows, options = {}) => {
       sourceEntryId: first.sourceEntryId,
       orderNo: first.orderNo,
       destination: first.destination,
-      endCustomer: first.endCustomer,
       packingCode: first.packingCode,
       danNo: first.danNo,
       quantity,
@@ -277,7 +275,7 @@ export const buildInvoiceLines = (rows, options = {}) => {
       // Prénatal's with/without-hanger column is packaging metadata the template
       // opts into; it is carried, never invented.
       packagingAttributes: grain.showPackagingAttributes
-        ? { packingCode: group.packingCode, danNo: group.danNo, endCustomer: group.endCustomer }
+        ? { packingCode: group.packingCode, danNo: group.danNo }
         : null,
       quantity,
       rate: rateFor(group),

@@ -217,7 +217,7 @@ const BuyerTemplateBuilder = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title={`${working.templateCode} v${working.version}`}
-        subtitle={`${working.name} · ${DOC_TYPE_LABELS[working.docType]} · ${buyerLabel}${working.subClientCode ? ` / ${working.subClientCode}` : ''}`}
+        subtitle={`${working.name} · ${DOC_TYPE_LABELS[working.docType]} · ${buyerLabel}`}
         onBack={() => navigate(LIST_PATH)}
         status={(
           <Space size={6} wrap>

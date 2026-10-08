@@ -319,7 +319,6 @@ const PackingListWorkspace = () => {
           <DetailCard.Field label="Revision" value={pl.revision || 0} />
           <DetailCard.Field label="Shipment" value={pl.shipmentNo} />
           <DetailCard.Field label="Buyer" value={pl.buyerName} />
-          <DetailCard.Field label="Sub-client" value={pl.subClientCode} />
           <DetailCard.Field label="Orders" value={(pl.orderNos || []).join(', ')} />
           <DetailCard.Field
             label="Template"
@@ -378,7 +377,6 @@ const PackingListWorkspace = () => {
             <DetailCard.Field label="Description of goods" value={pl.descriptionOfGoods} />
             <DetailCard.Field label="Marks & numbers" value={pl.marksAndNos || pl.cartonRangeLabel} />
             <DetailCard.Field label="Consignee" value={pl.resolved?.consignee?.name} />
-            <DetailCard.Field label="Delivery centre" value={pl.resolved?.deliveryCentre} />
             <DetailCard.Field label="Container no." value={pl.resolved?.containerNo} />
             <DetailCard.Field label="Seal no." value={pl.resolved?.sealNo} />
             <DetailCard.Field label="Remarks" value={pl.remarks} span={16} />
@@ -611,7 +609,6 @@ const PackingListWorkspace = () => {
           docType={DOC_TYPE.PACKING_LIST}
           buyerId={pl.buyerId}
           buyerName={pl.buyerName}
-          subClientCode={pl.subClientCode}
           current={pl.templateId ? {
             id: pl.templateId, templateCode: pl.template?.templateCode, version: pl.templateVersion, name: pl.template?.name,
           } : null}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Alert, App, Col, Row, Skeleton, Space, Typography,
+  App, Col, Row, Skeleton,
 } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PageHeader from '../../../components/PageHeader';
@@ -8,7 +8,7 @@ import { hasPermission } from '../../../utils/permissions';
 import { EXPDOC_MODULE } from '../../../utils/expDocConstants';
 import { TEMPLATE_SOURCE } from '../../../utils/expDocSystemTemplates';
 import {
-  listAllTemplates, getTemplate, deleteTemplate, getTemplateSample, stickerTemplateConflicts,
+  listAllTemplates, getTemplate, deleteTemplate, getTemplateSample,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
 import TemplateCreateModal from './TemplateCreateModal';
@@ -20,14 +20,12 @@ import TemplateUploadModal from './upload/TemplateUploadModal';
 import useExportBuyers from './useExportBuyers';
 import { groupTemplatesByBuyer, RAIL_KEY } from './registerModel';
 
-const { Text } = Typography;
-
 /**
  * Buyer document templates, by buyer.
  *
  * A buyer's packing list and invoice are uploaded (PDF or Excel) and read into drafts,
  * or built by copying the nearest layout. A buyer may keep several of each — sea and
- * air, one per end customer — and staff pick one when they make a document. A template
+ * air, say — and staff pick one when they make a document. A template
  * for any buyer starts from "New buyer template" in the header; the buyer's own panel
  * keeps its upload and new-template buttons for the buyer on screen.
  */
@@ -40,7 +38,6 @@ const BuyerTemplateList = () => {
 
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [conflicts, setConflicts] = useState([]);
   const [createCfg, setCreateCfg] = useState(null);
   const [uploadCfg, setUploadCfg] = useState(null);
   const [newBuyer, setNewBuyer] = useState({ open: false, seq: 0 });
@@ -53,7 +50,6 @@ const BuyerTemplateList = () => {
     setLoading(true);
     try {
       setTemplates(await listAllTemplates({ force }));
-      setConflicts(stickerTemplateConflicts());
     } catch (e) {
       message.error(e.message || 'Failed to load templates');
     } finally {
@@ -116,21 +112,6 @@ const BuyerTemplateList = () => {
         onAdd={canAdd ? () => setNewBuyer((s) => ({ open: true, seq: s.seq + 1 })) : undefined}
         addLabel="New buyer template"
       />
-
-      {conflicts.length > 0 && (
-        <Alert
-          type="error" showIcon style={{ marginBottom: 16 }}
-          title={`${conflicts.length} buyer(s) have more than one active carton-sticker template`}
-          description={(
-            <Space orientation="vertical" size={2}>
-              {conflicts.map((c) => (
-                <Text key={c.key}>{`${c.key.replace(/\|/g, ' · ')} — ${c.templates.map((t) => `${t.templateCode} v${t.version}`).join(' and ')}`}</Text>
-              ))}
-              <Text type="secondary" style={{ fontSize: 12 }}>Stickers still resolve automatically; retire all but one.</Text>
-            </Space>
-          )}
-        />
-      )}
 
       {loading && !templates.length ? <Skeleton active paragraph={{ rows: 8 }} /> : (
         <Row gutter={[16, 16]}>

@@ -21,21 +21,10 @@ import {
   expandCartonRange, expandCartonNos, toRanges, countCartons, mergeRanges,
   intersectRanges, formatRanges, cartonHash,
 } from '../../utils/expDocCalc';
-import { resolveTemplate } from '../../utils/expDocTemplateSchema';
+import { templateTier, templateLabel } from '../../utils/expDocTemplateSchema';
 import { validate } from '../../utils/expDocValidation';
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
-
-/** The sticker template for a packing list's buyer — resolved, never chosen. */
-export const stickerLayoutFor = (db, pl) => {
-  const { template } = resolveTemplate(db.templates, {
-    buyerCode: pl.buyerCode,
-    subClientCode: pl.subClientCode,
-    docType: DOC_TYPE.STICKER,
-    onDate: pl.plDate,
-  });
-  return template || null;
-};
 
 /** Total cartons across the whole shipment — what "n of N" counts (PRD §9.1). */
 const shipmentCartonTotal = (db, pl) => {
@@ -117,13 +106,53 @@ const runsForDocument = (db, pl) => {
   return (db.stickerRuns || []).filter((r) => chain.has(r.plId));
 };
 
+/**
+ * The sticker layouts a packing list may print with: its buyer's active ones, else
+ * the tenant-wide ones. A buyer may keep several (a solid and a ratio pack, its own
+ * marking sheet), so the user picks one per run — the rule packing-list and invoice
+ * templates already follow per document.
+ */
+const stickerCandidates = (db, pl) => templateTier(db.templates, {
+  buyerCode: pl.buyerCode, docType: DOC_TYPE.STICKER, onDate: pl.plDate,
+}).templates;
+
+/**
+ * The template family (code) a run printed with. A run stores the version's id, and
+ * publishing a new version issues a new id — the code is what stays the same. Not the
+ * layoutId: a template cloned from another carries its source's layoutId.
+ */
+const familyOf = (db, templateId) => (templateId == null
+  ? null
+  : (db.templates || []).find((t) => String(t.id) === String(templateId))?.templateCode ?? null);
+
+/**
+ * The layout a run prints with, or null while the user still has to choose:
+ *   1. the one asked for, while it is still a candidate;
+ *   2. the current version of the one this document's latest run used — a reprint
+ *      keeps its layout;
+ *   3. the only candidate.
+ */
+export const stickerLayoutFor = (db, pl, templateId) => {
+  const candidates = stickerCandidates(db, pl);
+  const asked = templateId == null ? null : candidates.find((t) => String(t.id) === String(templateId));
+  const latestRun = [...runsForDocument(db, pl)].sort((a, b) => b.id - a.id)[0];
+  const latestFamily = familyOf(db, latestRun?.templateId);
+  const previous = latestFamily ? candidates.find((t) => t.templateCode === latestFamily) : null;
+  return asked || previous || (candidates.length === 1 ? candidates[0] : null);
+};
+
+const noLayoutReason = (db, pl) => (stickerCandidates(db, pl).length > 1
+  ? 'Pick the sticker layout to print with.'
+  : 'No sticker layout is configured for this buyer.');
+
 export const getStickerContext = async (plId, options = {}) => {
   await delay(80);
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const pl = decoratePl(raw, db);
-  const layout = stickerLayoutFor(db, raw);
+  const layout = stickerLayoutFor(db, raw, options.templateId);
+  const layoutOptions = stickerCandidates(db, raw).map((t) => ({ value: t.id, label: templateLabel(t) }));
   const shipment = (db.shipments || []).find((s) => s.id === raw.shipmentId) || null;
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
 
@@ -144,6 +173,7 @@ export const getStickerContext = async (plId, options = {}) => {
   return {
     pl,
     layout: layout ? clone(layout) : null,
+    layoutOptions,
     shipment: shipment ? clone(shipment) : null,
     totalCartonsInShipment,
     selectedCount,
@@ -213,7 +243,7 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const pl = decoratePl(raw, db);
-  const layout = stickerLayoutFor(db, raw);
+  const layout = stickerLayoutFor(db, raw, options.templateId);
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
   const cartons = expandScope(raw, scope, { totalCartonsInShipment });
@@ -241,8 +271,14 @@ export const checkStickerGeneration = async (plId, options = {}) => {
    * The printed fields all come from the row, so one hash per row answers the same
    * question as one per carton — and it does so in O(rows) rather than expanding
    * every printed carton of a shipment whose carton count has no ceiling.
+   *
+   * Only runs of the layout family being printed now are compared: a run printed with
+   * another of the buyer's layouts hashed other fields, and comparing across them
+   * would call every carton "changed".
    */
-  const runs = runsForDocument(db, raw);
+  const runs = layout
+    ? runsForDocument(db, raw).filter((run) => familyOf(db, run.templateId) === layout.templateCode)
+    : [];
   const reprintRanges = [];
   runs.forEach((run) => {
     Object.entries(run.rowHashes || {}).forEach(([rowId, previous]) => {
@@ -280,7 +316,7 @@ export const checkStickerGeneration = async (plId, options = {}) => {
       && findings.errors.length === 0
       && Boolean(layout),
     blockedReason: !layout
-      ? 'No sticker layout is configured for this buyer.'
+      ? noLayoutReason(db, raw)
       : (!cartons.length ? 'The selected range contains no cartons.'
         : (blocked.length
           ? `${blocked.length} carton(s) are missing a field this layout prints.`
@@ -294,8 +330,8 @@ export const generateStickerRun = async (plId, options = {}) => {
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
-  const layout = stickerLayoutFor(db, raw);
-  if (!layout) fail('CONFLICT', 'No sticker layout is configured for this buyer.');
+  const layout = stickerLayoutFor(db, raw, options.templateId);
+  if (!layout) fail('CONFLICT', noLayoutReason(db, raw));
 
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };

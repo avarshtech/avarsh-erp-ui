@@ -35,12 +35,6 @@ export const buildPlColumns = ({ onView, onOpen, onDelete, canUpdate, canDelete 
     key: 'buyerName',
     width: 200,
     ellipsis: true,
-    render: (name, record) => (
-      <Space size={4} wrap={false}>
-        <Text ellipsis>{name || '—'}</Text>
-        {record.subClientCode && <Tag color="geekblue">{record.subClientCode}</Tag>}
-      </Space>
-    ),
   },
   {
     title: 'Orders',

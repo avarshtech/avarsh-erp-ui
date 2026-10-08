@@ -23,17 +23,28 @@ export const buildShipmentColumns = ({ onView, onEdit, onDocuments, onDelete, ca
     render: (text, record) => <RecordLink text={text} onClick={() => onView(record)} />,
   },
   {
-    title: 'Buyer',
+    title: 'Consignee',
     dataIndex: 'buyerName',
     key: 'buyerName',
     width: 220,
     ellipsis: true,
-    render: (name, record) => (
+  },
+  {
+    title: 'Orders',
+    dataIndex: 'orderNos',
+    key: 'orderNos',
+    width: 190,
+    // One line however many orders: the first, then "+N" naming the rest on hover.
+    render: (nos) => (nos?.length ? (
       <Space size={4} wrap={false}>
-        <Text ellipsis>{name || '—'}</Text>
-        {record.subClientCode && <Tag color="geekblue">{record.subClientCode}</Tag>}
+        {nowrap(nos[0])}
+        {nos.length > 1 && (
+          <Tooltip title={nos.join(', ')}>
+            <Tag style={{ marginInlineEnd: 0 }}>{`+${nos.length - 1}`}</Tag>
+          </Tooltip>
+        )}
       </Space>
-    ),
+    ) : <Text type="secondary">—</Text>),
   },
   { title: 'Mode', dataIndex: 'mode', key: 'mode', width: 80, align: 'center' },
   { title: 'Incoterm', dataIndex: 'incoterm', key: 'incoterm', width: 96, align: 'center' },
@@ -85,12 +96,9 @@ export const buildShipmentColumns = ({ onView, onEdit, onDocuments, onDelete, ca
     render: (_, record) => (
       <Space size="small">
         <ActionButton action="view" size="small" onClick={() => onView(record)} />
-        {/* §18: the whole consignment’s paperwork, from the row that owns it. */}
-        <Tooltip title="Document set">
-          <span>
-            <ActionButton action="print" size="small" onClick={() => onDocuments(record)} />
-          </span>
-        </Tooltip>
+        {/* §18: the whole consignment’s paperwork, from the row that owns it. ActionButton
+            renders its own tooltip — wrapping it in another showed two popovers. */}
+        <ActionButton action="print" size="small" tooltip="Document set" onClick={() => onDocuments(record)} />
         {canUpdate && <ActionButton action="edit" size="small" onClick={() => onEdit(record)} />}
         {canDelete && (
           <DeleteConfirm

@@ -70,7 +70,6 @@ export const InvStepSource = ({ inv, onChangeTemplate }) => (
     />
     <Descriptions bordered size="small" column={{ xs: 1, sm: 2, md: 3 }}>
       <Descriptions.Item label="Buyer">{inv.buyerName || '—'}</Descriptions.Item>
-      <Descriptions.Item label="Sub-client">{inv.subClientCode || '—'}</Descriptions.Item>
       <Descriptions.Item label="Shipment">{inv.shipmentNo || '—'}</Descriptions.Item>
       <Descriptions.Item label="Marks &amp; Nos">{inv.marksAndNos || '—'}</Descriptions.Item>
       <Descriptions.Item label="Cartons">{int(inv.plTotals?.cartons)}</Descriptions.Item>
@@ -148,9 +147,9 @@ export const InvStepHeader = ({ inv, patch, locked, incoterms, exporter }) => (
         <Space orientation="vertical" size={12} style={{ width: '100%' }}>
           <div>
             <Text type="secondary">Consignee</Text>
-            <div><ReadCell value={inv.consignee?.name} source="the shipment's consignee profile" /></div>
+            <div><ReadCell value={inv.consignee?.name} source="the shipment's consignee (Buyer Master)" /></div>
             <Paragraph type="secondary" style={{ fontSize: 12, whiteSpace: 'pre-wrap', marginBottom: 0 }}>
-              {inv.consignee?.block || 'Not set — pick a consignee on the shipment.'}
+              {inv.consignee?.block || 'Not set — save the shipment with its consignee and notify party.'}
             </Paragraph>
           </div>
           <div>
@@ -206,7 +205,7 @@ export const InvStepHeader = ({ inv, patch, locked, incoterms, exporter }) => (
         </Row>
         <Divider style={{ margin: '12px 0' }} />
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Transport details — vessel, ports, container and seal — print from the shipment record and are edited there.
+          Transport details — vessel, ports and containers — print from the shipment record and are edited there.
         </Text>
       </Card>
     </Col>

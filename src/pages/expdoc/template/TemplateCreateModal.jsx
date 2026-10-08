@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  App, AutoComplete, Input, Modal, Segmented, Space, Typography,
+  App, Input, Modal, Segmented, Space, Typography,
 } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
@@ -46,7 +46,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const [docType, setDocType] = useState(DOC_TYPE.PACKING_LIST);
   const [buyerId, setBuyerId] = useState();
   const [buyerCode, setBuyerCode] = useState();
-  const [subClientCode, setSubClientCode] = useState('');
   const [busy, setBusy] = useState(false);
   const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
@@ -60,7 +59,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     setDocType(source?.docType || DOC_TYPE.PACKING_LIST);
     setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
     setBuyerCode(source?.buyerCode || undefined);
-    setSubClientCode('');
   }, [open, source, defaultBuyerId]);
 
   const pool = useMemo(() => {
@@ -94,7 +92,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
       const identity = {
         templateCode: effectiveCode.trim(), name: name.trim(),
         buyerId: isSticker ? null : buyerId ?? null, buyerName: isSticker ? null : buyerName ?? null,
-        buyerCode: isSticker ? buyerCode ?? null : null, subClientCode: subClientCode.trim() || null,
+        buyerCode: isSticker ? buyerCode ?? null : null,
       };
       const created = mode === MODE.CLONE
         ? await cloneTemplate(chosen, identity)
@@ -142,18 +140,11 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
             options={buyerOptions} placeholder="Leave blank for a tenant-wide template"
           />
         </div>
-        <Space size={12} style={{ width: '100%' }} wrap>
-          <div style={{ minWidth: 200 }}>
-            <Text type="secondary">Template code</Text>
-            <Input name="newTemplateCode" value={effectiveCode} placeholder="e.g. PRENATAL-PL"
-              onChange={(e) => { setCodeTouched(true); setTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); }} />
-          </div>
-          <div style={{ minWidth: 160 }}>
-            <Text type="secondary">Sub-client</Text>
-            <AutoComplete style={{ width: '100%' }} value={subClientCode} placeholder="Optional"
-              onChange={(v) => setSubClientCode(String(v || '').toUpperCase())} options={[]} />
-          </div>
-        </Space>
+        <div>
+          <Text type="secondary">Template code</Text>
+          <Input name="newTemplateCode" value={effectiveCode} placeholder="e.g. PRENATAL-PL"
+            onChange={(e) => { setCodeTouched(true); setTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); }} />
+        </div>
         <div>
           <Text type="secondary">Name</Text>
           <Input name="newTemplateName" value={name} placeholder="Shown when staff pick a template, e.g. Packing list — sea"

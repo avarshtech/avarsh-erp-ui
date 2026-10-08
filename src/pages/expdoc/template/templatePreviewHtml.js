@@ -77,7 +77,7 @@ const renderSample = (sample, exporter) => {
         exporter: ctxExporter,
         shipment,
         pl: sample.pl,
-        buyer: { name: sample.pl.buyerName, subClient: sample.pl.subClientCode },
+        buyer: { name: sample.pl.buyerName },
         showLogo: tpl.identity?.showLogo === true,
       },
     });

@@ -189,7 +189,7 @@ const NewBuyerTemplateModal = ({
               <Radio value={NEXT.ANOTHER}>
                 <Choice
                   title={`Add another template for ${buyerName}`}
-                  hint="For a different document or shipment — say a separate packing list for air, or for a sub-client."
+                  hint="For a different document or shipment — say a separate packing list for air."
                 />
               </Radio>
             </Space>

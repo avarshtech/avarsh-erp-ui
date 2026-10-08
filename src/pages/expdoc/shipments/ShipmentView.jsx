@@ -8,6 +8,7 @@ import { ActionButton } from '../../../components/buttons';
 import { getShipment } from '../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
+const PRE_LINE = { whiteSpace: 'pre-line' };
 
 const SHIPMENT_STATUS_CONFIG = {
   OPEN: { color: 'processing' },
@@ -45,7 +46,7 @@ const ShipmentView = ({ open, shipmentId, onClose, onEdit, canUpdate }) => {
       hero={fresh ? {
         title: fresh.shipmentNo,
         status: <StatusTag status={fresh.status} config={SHIPMENT_STATUS_CONFIG} />,
-        tags: fresh.subClientCode ? [<Tag key="sc" color="geekblue">{fresh.subClientCode}</Tag>] : [],
+        tags: (fresh.orderNos || []).map((no) => <Tag key={no} color="blue">{no}</Tag>),
         subtitle: [fresh.buyerName, fresh.mode, fresh.incoterm].filter(Boolean).join(' • '),
         meta: [
           { icon: <CalendarOutlined />, text: `ETD ${fresh.etd || '—'}` },
@@ -69,7 +70,19 @@ const ShipmentView = ({ open, shipmentId, onClose, onEdit, canUpdate }) => {
         <Skeleton active paragraph={{ rows: 8 }} />
       ) : (
         <>
-          <DetailCard title="Routing">
+          <DetailCard title="Consignee & Notify">
+            <DetailCard.Field span={12} label="Consignee" value={fresh.consignee?.block ? <span style={PRE_LINE}>{fresh.consignee.block}</span> : null} />
+            <DetailCard.Field span={12} label="Notify party" value={fresh.notify?.block ? <span style={PRE_LINE}>{fresh.notify.block}</span> : null} />
+            <DetailCard.Field
+              span={24}
+              label="Orders"
+              value={fresh.orders?.length
+                ? <Space size={4} wrap>{fresh.orders.map((o) => <Tag key={o.orderNo}>{[o.orderNo, o.styleNo].filter(Boolean).join(' — ')}</Tag>)}</Space>
+                : null}
+            />
+          </DetailCard>
+
+          <DetailCard title="Routing" style={{ marginTop: 16 }}>
             <DetailCard.Field label="Pre-carriage by" value={fresh.preCarriageBy} />
             <DetailCard.Field label="Place of receipt" value={fresh.placeOfReceipt} />
             <DetailCard.Field label="Vessel / Flight" value={fresh.vesselFlightNo} />
@@ -88,11 +101,8 @@ const ShipmentView = ({ open, shipmentId, onClose, onEdit, canUpdate }) => {
                 ? <Space size={4} wrap>{fresh.containerNos.map((c) => <Tag key={c}>{c}</Tag>)}</Space>
                 : null}
             />
-            <DetailCard.Field label="Seal No." value={fresh.sealNo} />
-            <DetailCard.Field label="Total pallets" value={fresh.totalPallets || null} />
             <DetailCard.Field label="BL / AWB No." value={fresh.blAwbNo} />
             <DetailCard.Field label="BL / AWB date" value={fresh.blAwbDate} />
-            <DetailCard.Field label="Delivery centre" value={fresh.deliveryCentre} />
           </DetailCard>
 
           <DetailCard title="Usage" style={{ marginTop: 16 }}>

@@ -25,7 +25,6 @@ export const snapshotOf = (t) => (t ? {
   status: t.status,
   buyerId: t.buyerId ?? null,
   buyerName: t.buyerName ?? null,
-  subClientCode: t.subClientCode ?? null,
   isSystem: Boolean(t.isSystem),
   ...pickLayout(t),
 } : null);
