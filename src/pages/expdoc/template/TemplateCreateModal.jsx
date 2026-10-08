@@ -12,6 +12,7 @@ import { newFace } from './editor/sticker/stickerEditorModel';
 const { Text } = Typography;
 
 const MODE = { CLONE: 'Copy an existing', BLANK: 'Start blank' };
+const DOC_TYPES = Object.values(DOC_TYPE);
 
 /** A layout with nothing buyer-specific in it yet, but sections that print every carton. */
 const blankLayout = (docType) => completeLayout(docType, {
@@ -41,8 +42,14 @@ const SUFFIX = { [DOC_TYPE.PACKING_LIST]: 'PL', [DOC_TYPE.INVOICE]: 'INV', [DOC_
  * The ways a template comes into being besides uploading the buyer's document: copy
  * the nearest one and change the deltas (the PRD's primary path), or start blank.
  * Either lands as a draft.
+ *
+ * It opens on copying, unless `mode` is 'BLANK': "Build it by hand" after an upload opens
+ * a blank template of the `docType` the user said the file holds — a packing list when
+ * they let the reader decide.
  */
-const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaultBuyerId, onCancel, onCreated }) => {
+const TemplateCreateModal = ({
+  open, source, templates = [], buyers = [], defaultBuyerId, mode: startMode, docType: startType, onCancel, onCreated,
+}) => {
   const { message } = App.useApp();
   const [mode, setMode] = useState(MODE.CLONE);
   const [sourceId, setSourceId] = useState();
@@ -55,14 +62,14 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
 
   useEffect(() => {
     if (!open) return;
-    setMode(MODE.CLONE);
+    setMode(MODE[startMode] || MODE.CLONE);
     setSourceId(source?.id);
     setTemplateCode('');
     setCodeTouched(false);
     setName(source ? `${source.name} (copy)` : '');
-    setDocType(source?.docType || DOC_TYPE.PACKING_LIST);
+    setDocType(source?.docType || (DOC_TYPES.includes(startType) ? startType : DOC_TYPE.PACKING_LIST));
     setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
-  }, [open, source, defaultBuyerId]);
+  }, [open, source, defaultBuyerId, startMode, startType]);
 
   const pool = useMemo(() => {
     const seen = new Set(templates.map((t) => t.id));

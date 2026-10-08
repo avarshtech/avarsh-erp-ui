@@ -5,12 +5,16 @@
  * not use.
  *
  * Elements are named by the ids the reader's notes use ("headerFields:licenceNo",
- * "sheets:SOLID.columns:qty", "invoiceHeader.boxes:consignee"), so a note and the row
- * it is about always meet.
+ * "sheets:SOLID.columns:qty", "invoiceHeader.boxes:consignee", "faces:MAIN.lines:batch"),
+ * so a note and the row it is about always meet.
  */
 import { DOC_TYPE, INVOICE_BOXES } from '../../../../utils/expDocConstants';
+import { plural } from '../../../../utils/plural';
 import { blockingIssues, missedKey } from './reviewModel';
 import { parseEvidence } from './sourceRefs';
+import {
+  bindStickerLinePatch, parseStickerLineId, removeStickerLinePatch, stickerLineElements, stickerReadParts,
+} from './stickerReviewModel';
 
 export const ATTENTION = {
   BLOCKER: 'BLOCKER',
@@ -23,7 +27,7 @@ export const ATTENTION = {
 const BOX_LABEL = Object.fromEntries(INVOICE_BOXES.map((b) => [b.key, b.label]));
 const NOT_FOUND_CODES = new Set(['NOT_IN_DOCUMENT', 'FIXED_NOT_IN_DOCUMENT']);
 /** Reader notes the list asks about itself, or that the template now answers live. */
-const ASKED_CODES = new Set([...NOT_FOUND_CODES, 'UNBOUND', 'UNKNOWN_BINDING', 'NO_TABLE']);
+const ASKED_CODES = new Set([...NOT_FOUND_CODES, 'UNBOUND', 'UNKNOWN_BINDING', 'NO_TABLE', 'NO_FACES']);
 
 /** Which ERP data suits a field, by where it prints — the same split the layout editor offers. */
 const HEADER_DATA = ['EXPORTER', 'BUYER', 'INVOICE', 'SHIPMENT', 'PL'];
@@ -53,10 +57,13 @@ export const elementsOf = (t = {}) => {
   });
   (t.textBlocks || []).forEach((b) => add(`textBlocks:${b.key}`, b.title || b.text));
   (t.declarations || []).forEach((d) => add(`declarations:${d.code}`, d.text));
+  stickerLineElements(t).forEach(({ id, label, ...rest }) => add(id, label, rest));
   return out;
 };
 
 const parseId = (id) => {
+  const stickerLine = parseStickerLineId(id);
+  if (stickerLine) return { list: 'faceLines', ...stickerLine };
   const sheetColumn = /^sheets:([^.]+)\.columns:(.+)$/.exec(id);
   if (sheetColumn) return { list: 'sheetColumns', sheet: sheetColumn[1], key: sheetColumn[2] };
   const at = id.indexOf(':');
@@ -69,8 +76,11 @@ const mapSheet = (t, sheetKey, fn) => ({
 
 /** The template patch that takes one element out of what prints. */
 export const removeElementPatch = (t, id) => {
-  const { list, sheet, key } = parseId(id);
+  const parsed = parseId(id);
+  const { list, sheet, key } = parsed;
   switch (list) {
+    case 'faceLines':
+      return removeStickerLinePatch(t, parsed);
     case 'headerFields':
     case 'addressBlocks':
     case 'columns':
@@ -104,9 +114,12 @@ export const removeElementPatch = (t, id) => {
 
 /** The template patch that makes one field or column print `binding`. */
 export const bindElementPatch = (t, id, binding) => {
-  const { list, sheet, key } = parseId(id);
+  const parsed = parseId(id);
+  const { list, sheet, key } = parsed;
   const bind = (rows) => (rows || []).map((x) => (x.key === key ? { ...x, binding } : x));
   switch (list) {
+    case 'faceLines':
+      return bindStickerLinePatch(t, parsed, binding);
     case 'headerFields':
     case 'addressBlocks':
     case 'columns':
@@ -186,6 +199,8 @@ export const attentionItems = ({ draft, result, dismissed = new Set() }) => {
     .forEach((e) => add({
       kind: ATTENTION.UNBOUND, elementId: e.id, label: e.label, data: e.data, removable: e.removable,
       evidence: meta[e.id]?.evidence, sample: meta[e.id]?.sample, suggested: meta[e.id]?.suggestedBinding,
+      // A sticker line's: it may also be asked once per print run, under this key.
+      askKey: e.askKey,
     }));
 
   Object.entries(meta)
@@ -206,24 +221,24 @@ export const readerNotes = (draft, result) => (result?.findings || [])
   .filter((f) => f.document === draft.index && !ASKED_CODES.has(f.code))
   .map((f) => f.message);
 
-const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-
-/** "6 fields at the top · 14 table columns · 3 carton sections · 2 notes" */
+/** "6 fields at the top · 14 table columns · 3 carton sections · 2 notes"; "2 faces · 12 lines · size grid · 1 barcode" */
 export const whatWasRead = (t) => {
   const parts = [];
   const fields = (t.headerFields || []).length + (t.addressBlocks || []).length;
-  if (fields) parts.push(count(fields, 'field at the top', 'fields at the top'));
+  if (fields) parts.push(plural(fields, 'field at the top', 'fields at the top'));
   if (t.docType === DOC_TYPE.PACKING_LIST) {
-    parts.push(count((t.columns || []).length, 'table column', 'table columns'));
+    parts.push(plural((t.columns || []).length, 'table column', 'table columns'));
     const sections = (t.sheets || []).filter((s) => s.type !== 'SUMMARY').length;
-    if (sections) parts.push(count(sections, 'carton section', 'carton sections'));
+    if (sections) parts.push(plural(sections, 'carton section', 'carton sections'));
   } else if (t.docType === DOC_TYPE.INVOICE) {
     const columns = (t.invoiceColumns || []).length;
-    parts.push(columns ? count(columns, 'goods column', 'goods columns') : 'the standard goods columns');
+    parts.push(columns ? plural(columns, 'goods column', 'goods columns') : 'the standard goods columns');
     const boxes = Object.keys(t.invoiceHeader?.boxes || {}).length;
-    if (boxes) parts.push(count(boxes, 'header box changed', 'header boxes changed'));
+    if (boxes) parts.push(plural(boxes, 'header box changed', 'header boxes changed'));
+  } else if (t.docType === DOC_TYPE.STICKER) {
+    parts.push(...stickerReadParts(t));
   }
   const notes = (t.textBlocks || []).length + (t.declarations || []).length;
-  if (notes) parts.push(count(notes, 'note', 'notes'));
+  if (notes) parts.push(plural(notes, 'note', 'notes'));
   return parts.join(' · ');
 };

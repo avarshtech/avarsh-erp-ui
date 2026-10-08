@@ -6,7 +6,8 @@
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from '../../../../utils/expDocConstants';
 import { TEMPLATE_SOURCE, completeLayout } from '../../../../utils/expDocSystemTemplates';
-import { newRowKey } from '../editor/editorKit';
+import { newRowKey } from '../editor/rowKeys';
+import { appendStickerLinePatch, hasStickerLine } from './stickerReviewModel';
 
 /** One editable template per document the reader found, filled out to a full layout. */
 export const draftsFromResult = (result, { buyerId, buyerName } = {}) =>
@@ -44,6 +45,9 @@ export const blockingIssues = (draft) => {
   if (t.docType === DOC_TYPE.PACKING_LIST && !hasAnyColumn(t)) {
     out.push({ text: 'A packing list needs at least one table column.', tab: 'columns' });
   }
+  if (t.docType === DOC_TYPE.STICKER && !hasStickerLine(t)) {
+    out.push({ text: 'A carton sticker needs at least one face with a line.', tab: 'sticker' });
+  }
   return out;
 };
 
@@ -65,6 +69,8 @@ export const ADD_AS = {
   TEXT_BLOCK: 'Fixed text',
   DECLARATION: 'Declaration',
   COLUMN: 'Column',
+  STICKER_LINE: 'Sticker line',
+  STICKER_TEXT: 'Sticker text',
 };
 
 /** How the review offers each choice, in the user's words rather than the layout's. */
@@ -73,6 +79,8 @@ export const ADD_AS_LABEL = {
   [ADD_AS.TEXT_BLOCK]: 'As a note (the same text on every document)',
   [ADD_AS.DECLARATION]: 'As a declaration',
   [ADD_AS.COLUMN]: 'As a table column',
+  [ADD_AS.STICKER_LINE]: 'As a sticker line (a label with a value)',
+  [ADD_AS.STICKER_TEXT]: 'As fixed text on the sticker',
 };
 
 export const addMissedPatch = (template, text, as) => {
@@ -91,6 +99,12 @@ export const addMissedPatch = (template, text, as) => {
         return { invoiceColumns: [...(template.invoiceColumns || []), { key: newRowKey('c'), label: clean, type: 'TEXT', width: 100 }] };
       }
       return { columns: [...(template.columns || []), { key: newRowKey('c'), label: clean, type: 'TEXT', width: 100 }] };
+    // On the first face, as the sticker editor adds a line: a label with nothing filling it
+    // yet (the review then asks what does), or the text itself, printed as it is.
+    case ADD_AS.STICKER_LINE:
+      return appendStickerLinePatch(template, { label: clean, binding: null });
+    case ADD_AS.STICKER_TEXT:
+      return appendStickerLinePatch(template, { label: null, binding: `fixed:${String(text).trim()}` });
     default:
       return {};
   }
@@ -100,6 +114,9 @@ export const addMissedPatch = (template, text, as) => {
 export const missedKey = (m) => `missed|${m.location}|${m.text}`;
 
 /** Which "add as" choices make sense for a document type. */
-export const addChoicesFor = (docType) => (docType === DOC_TYPE.INVOICE
-  ? [ADD_AS.HEADER_FIELD, ADD_AS.TEXT_BLOCK, ADD_AS.DECLARATION, ADD_AS.COLUMN]
-  : [ADD_AS.HEADER_FIELD, ADD_AS.TEXT_BLOCK, ADD_AS.COLUMN]);
+export const addChoicesFor = (docType) => {
+  if (docType === DOC_TYPE.STICKER) return [ADD_AS.STICKER_LINE, ADD_AS.STICKER_TEXT];
+  return docType === DOC_TYPE.INVOICE
+    ? [ADD_AS.HEADER_FIELD, ADD_AS.TEXT_BLOCK, ADD_AS.DECLARATION, ADD_AS.COLUMN]
+    : [ADD_AS.HEADER_FIELD, ADD_AS.TEXT_BLOCK, ADD_AS.COLUMN];
+};

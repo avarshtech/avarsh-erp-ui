@@ -48,7 +48,7 @@ const TemplateBuyerPanel = ({
       {SECTIONS.map((docType) => {
         const list = families.filter((f) => f.docType === docType);
         return (
-          <div key={docType} style={{ marginBottom: 16 }}>
+          <div key={docType} role="group" aria-label={`${DOC_TYPE_LABELS[docType]} templates`} style={{ marginBottom: 16 }}>
             <Text strong style={{ display: 'block', marginBottom: 8 }}>
               {`${DOC_TYPE_LABELS[docType]}${list.length ? ` (${list.length})` : ''}`}
             </Text>

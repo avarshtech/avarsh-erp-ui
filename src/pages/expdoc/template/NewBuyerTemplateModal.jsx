@@ -207,7 +207,7 @@ const NewBuyerTemplateModal = ({
                   icon={<CloudUploadOutlined />}
                   title="Upload the buyer's packing list, invoice or carton sticker"
                   tag={<Tag color="green" style={{ marginInlineEnd: 0 }}>Recommended</Tag>}
-                  hint="PDF or Excel, blank or filled in. It is read for you, and you check it before anything is saved."
+                  hint="PDF, Excel or Word (.pdf, .xlsx, .xls or .docx), blank or filled in. It is read for you, and you check it before anything is saved."
                 />
               </Radio>
               <Radio value={HOW.COPY}>

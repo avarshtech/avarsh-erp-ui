@@ -18,66 +18,18 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { test, expect } from '@playwright/test';
 import { ensureSessionActive } from '../../helpers/navigation.js';
+import {
+  TEMPLATE_LIST as LIST, attentionItem, familyCard, fixtureForRun, openBuyer, textPdf, uploadForReading,
+} from '../../helpers/export-templates.js';
 import { goTo, settle } from '../sample-requests/helpers.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(here, '../../fixtures/ai/template-extraction-prenatal.json'), 'utf8'));
-const LIST = '/export-docs/templates/list';
 const XLSX = { name: 'prenatal-template.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from('PK\u0003\u0004 e2e') };
 
 const run = Date.now().toString(36).toUpperCase();
 const PL_NAME = `E2E Prenatal PL ${run}`;
 const PL_CODE = `E2E-PRENATAL-PL-${run}`;
-
-/** The fixture, with codes and names no earlier run has used. */
-const fixtureForRun = () => {
-  const result = JSON.parse(JSON.stringify(FIXTURE));
-  result.documents.forEach((d) => {
-    d.suggestedCode = `${d.suggestedCode}-${run}`;
-    d.suggestedName = `${d.suggestedName} ${run}`;
-  });
-  return result;
-};
-
-/**
- * A one-page PDF with a real text layer, written out here because no PDF library is a
- * dependency. The API reads its text before any AI is asked, so this is a genuine file.
- */
-const textPdf = (name, lines) => {
-  const text = lines.map((l, i) => `BT /F1 12 Tf 72 ${760 - i * 18} Td (${l.replace(/[()\\]/g, '\\$&')}) Tj ET`).join('\n');
-  const objects = [
-    '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
-    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
-    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
-  ];
-  let body = '%PDF-1.4\n';
-  const offsets = objects.map((o, i) => {
-    const at = body.length;
-    body += `${i + 1} 0 obj\n${o}\nendobj\n`;
-    return at;
-  });
-  const xref = body.length;
-  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  body += offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
-  body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return { name, mimeType: 'application/pdf', buffer: Buffer.from(body, 'latin1') };
-};
-
-/** Opens the upload dialog for a buyer, puts the file in and asks for the reading. */
-const uploadForReading = async (page, file) => {
-  await goTo(page, LIST);
-  await openBuyer(page, 'JOMO BV');
-  await page.getByRole('button', { name: /Upload buyer document/ }).click();
-  const dialog = page.getByRole('dialog', { name: "Upload a buyer's document" });
-  await dialog.locator('input[type=file]').setInputFiles(file);
-  await dialog.getByRole('button', { name: 'Read the document' }).click();
-  return dialog;
-};
-
-/** One template family's card on the register, by its template code. */
-const familyCard = (page, code) => page.locator(`[data-template-code="${code}"]`);
 
 /** Picks an option in the open select dropdown. */
 const pickOption = async (page, select, text) => {
@@ -86,10 +38,6 @@ const pickOption = async (page, select, text) => {
     .filter({ hasText: text }).first().click();
 };
 
-/** The review's "Needs your attention" item whose text includes `text`. */
-const attentionItem = (page, text) => page.getByRole('list', { name: 'Needs your attention' })
-  .getByRole('listitem').filter({ hasText: text });
-
 /** Answers a "nothing fills it yet" item with text printed on every document. */
 const fillWithFixedText = async (page, label, text) => {
   await attentionItem(page, `“${label}” — nothing fills it yet`).getByRole('button', { name: 'Choose what fills it' }).click();
@@ -97,11 +45,6 @@ const fillWithFixedText = async (page, label, text) => {
   await chooser.getByText('Fixed text').click();
   await chooser.getByPlaceholder('Text printed verbatim, e.g. a licence number').fill(text);
   await chooser.getByRole('button', { name: 'Apply' }).click();
-};
-
-const openBuyer = async (page, name) => {
-  await page.getByRole('button', { name: `${name} templates` }).click();
-  await expect(page.getByRole('heading', { name, level: 4 })).toBeVisible();
 };
 
 test.describe.serial('Buyer templates', () => {
@@ -130,7 +73,7 @@ test.describe.serial('Buyer templates', () => {
 
   test('an uploaded document is checked on one page and saved as two drafts', async ({ page }) => {
     await page.route('**/export-docs/templates/extract', (route) => route.fulfill({
-      status: 200, contentType: 'application/json', body: JSON.stringify(fixtureForRun()),
+      status: 200, contentType: 'application/json', body: JSON.stringify(fixtureForRun(FIXTURE, run)),
     }));
     // The e2e stack has no working file storage (its GCS bucket answers 403 after ~15 s);
     // the source file is stored first, so it is answered here to keep the spec fast.

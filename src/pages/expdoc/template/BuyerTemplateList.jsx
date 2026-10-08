@@ -151,6 +151,8 @@ const BuyerTemplateList = () => {
         open={Boolean(createCfg)}
         source={createCfg?.source || null}
         defaultBuyerId={createCfg?.defaultBuyerId}
+        mode={createCfg?.mode}
+        docType={createCfg?.docType}
         templates={templates}
         buyers={buyers}
         onCancel={() => setCreateCfg(null)}
@@ -164,7 +166,7 @@ const BuyerTemplateList = () => {
         defaultDocType={uploadCfg?.docTypeHint}
         onCancel={() => setUploadCfg(null)}
         onRead={() => { setUploadCfg(null); navigate('/export-docs/templates/import'); }}
-        onManual={(buyerId) => setCreateCfg({ source: null, defaultBuyerId: buyerId })}
+        onManual={(buyerId, docType) => setCreateCfg({ source: null, defaultBuyerId: buyerId, mode: 'BLANK', docType })}
       />
       <TplPreviewOverlay open={Boolean(sample)} sample={sample} exporter={exporter} onClose={() => setSample(null)} />
     </div>

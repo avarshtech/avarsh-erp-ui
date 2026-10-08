@@ -6,9 +6,12 @@ import {
   CheckCircleFilled, CloseCircleOutlined, DownOutlined, FileAddOutlined, FileSearchOutlined,
   QuestionCircleOutlined, WarningOutlined,
 } from '@ant-design/icons';
+import { DOC_TYPE } from '../../../../utils/expDocConstants';
 import FieldBindingPicker from '../FieldBindingPicker';
 import { ATTENTION } from './attentionModel';
 import { ADD_AS_LABEL, addChoicesFor } from './reviewModel';
+import { STICKER_UNBOUND_HINT } from './stickerReviewModel';
+import StickerLineAnswers from './StickerLineAnswers';
 
 const { Text } = Typography;
 
@@ -47,7 +50,7 @@ const ICON = {
 };
 
 /** An item as the user reads it: what is wrong, then why it matters. */
-const describe = (item) => {
+const describe = (item, sticker) => {
   switch (item.kind) {
     case ATTENTION.BLOCKER:
       return { title: item.text, detail: 'Needed before this template can be saved.' };
@@ -63,7 +66,8 @@ const describe = (item) => {
         title: `${quote(item.label)} — nothing fills it yet`,
         detail: [
           item.sample && `Your file shows ${quote(item.sample)} here.`,
-          'Choose the data to print, or text that is the same on every document. Left like this, only the label prints.',
+          sticker ? STICKER_UNBOUND_HINT
+            : 'Choose the data to print, or text that is the same on every document. Left like this, only the label prints.',
           item.suggested && `(The reader suggested ${quote(item.suggested)}, which the ERP does not have.)`,
         ].filter(Boolean).join(' '),
       };
@@ -89,6 +93,7 @@ const AttentionList = ({
   const [choosing, setChoosing] = useState(null);
   const leftOvers = items.filter((i) => i.kind === ATTENTION.LEFT_OVER);
   const addChoices = addChoicesFor(docType).map((c) => ({ key: c, label: ADD_AS_LABEL[c] }));
+  const sticker = docType === DOC_TYPE.STICKER;
 
   const actionsFor = (item) => {
     const remove = item.removable && (
@@ -117,7 +122,9 @@ const AttentionList = ({
         >
           <Button size="small" type="primary">Choose what fills it</Button>
         </Popover>,
-        <Button key="blank" size="small" onClick={() => onDismiss(item)}>Leave blank</Button>,
+        sticker
+          ? <StickerLineAnswers key="sticker" item={item} onBind={onBind} onDismiss={onDismiss} />
+          : <Button key="blank" size="small" onClick={() => onDismiss(item)}>Leave blank</Button>,
         remove,
       ],
       [ATTENTION.UNSURE]: [
@@ -167,7 +174,7 @@ const AttentionList = ({
       ) : (
         <div role="list" aria-label="Needs your attention">
           {items.map((item, i) => {
-            const { title, detail } = describe(item);
+            const { title, detail } = describe(item, sticker);
             return (
               <div
                 key={item.key}

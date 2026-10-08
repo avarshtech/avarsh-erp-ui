@@ -1,0 +1,85 @@
+{
+  "fileName": "vgt-carton-sticker.pdf",
+  "sourceKind": "PDF",
+  "pageCount": 1,
+  "sheets": [],
+  "buyerId": null,
+  "buyerName": "JOMO BV",
+  "detectedBuyerName": null,
+  "documents": [
+    {
+      "docType": "STICKER",
+      "suggestedName": "E2E VGT carton sticker",
+      "suggestedCode": "E2E-VGT-STK",
+      "where": "p1",
+      "layout": {
+        "identity": {
+          "titleText": "CARTON STICKER",
+          "showLogo": false
+        },
+        "stickerLayout": {
+          "paperDefault": "A4_2UP",
+          "faces": [
+            {
+              "key": "MAIN",
+              "title": null,
+              "render": "COLON_LIST",
+              "border": true,
+              "caption": null,
+              "symbol": null,
+              "logo": false,
+              "lines": [
+                { "key": "articleNumber", "kind": "FIELD", "label": "Article Number", "binding": "carton.articleNo", "bold": false, "caps": false },
+                { "key": "size", "kind": "FIELD", "label": "Size", "binding": "carton.sizes", "bold": false, "caps": false, "join": "," },
+                { "key": "quantity", "kind": "FIELD", "label": "Quantity", "binding": "carton.piecesSum", "bold": false, "caps": false },
+                { "key": "cartonNumber", "kind": "FIELD", "label": "Carton Number", "binding": "carton.cartonNo", "pattern": "{n}/{N}", "bold": false, "caps": false },
+                { "key": "weightOfCarton", "kind": "FIELD", "label": "Weight of Carton", "binding": "carton.grossWeightKg", "bold": false, "caps": false, "suffix": " KGS", "decimals": 3 },
+                { "key": "measurementOfTheCarton", "kind": "FIELD", "label": "Measurement of the Carton", "binding": "carton.dimensions", "pattern": "{L}X{B}X{H} CMS", "bold": false, "caps": false },
+                { "key": "madeIn", "kind": "FIELD", "label": "Made In", "binding": "exporter.country", "bold": false, "caps": false },
+                { "key": "orderNo", "kind": "FIELD", "label": "ORDER #", "binding": "carton.buyerPoNo", "bold": false, "caps": false },
+                { "key": "batch", "kind": "FIELD", "label": "BATCH #", "binding": null, "bold": false, "caps": false }
+              ]
+            }
+          ],
+          "mandatoryFields": [
+            "carton.grossWeightKg",
+            "carton.dimensions"
+          ]
+        }
+      },
+      "elementMeta": {
+        "faces:MAIN.lines:articleNumber": { "evidence": "p1", "confidence": "HIGH", "sample": "M60980-37GOY", "found": true },
+        "faces:MAIN.lines:size": { "evidence": "p1", "confidence": "HIGH", "sample": "98, 104", "found": true },
+        "faces:MAIN.lines:quantity": { "evidence": "p1", "confidence": "HIGH", "sample": "30, 15+15=30", "found": true },
+        "faces:MAIN.lines:cartonNumber": { "evidence": "p1", "confidence": "MEDIUM", "found": true },
+        "faces:MAIN.lines:weightOfCarton": { "evidence": "p1", "confidence": "HIGH", "sample": "7.000 KGS", "found": true },
+        "faces:MAIN.lines:measurementOfTheCarton": { "evidence": "p1", "confidence": "HIGH", "sample": "60X40X30 CMS", "found": true },
+        "faces:MAIN.lines:madeIn": { "evidence": "p1", "confidence": "HIGH", "sample": "INDIA", "found": true },
+        "faces:MAIN.lines:orderNo": { "evidence": "p1", "confidence": "MEDIUM", "sample": "4500123456", "found": true },
+        "faces:MAIN.lines:batch": { "evidence": "p1", "confidence": "MEDIUM", "sample": "261505-SR", "found": true }
+      },
+      "bodyRanges": []
+    }
+  ],
+  "findings": [
+    {
+      "severity": "INFO",
+      "code": "CHECKED",
+      "message": "Checked first: this file was read as “carton sticker”. Shown by: Carton Number, Weight of Carton, Measurement of the Carton",
+      "document": null,
+      "element": null,
+      "evidence": null
+    },
+    {
+      "severity": "WARN",
+      "code": "UNBOUND",
+      "message": "“BATCH #” has no data source — it prints empty until you choose one.",
+      "document": 0,
+      "element": "faces:MAIN.lines:batch",
+      "evidence": null
+    }
+  ],
+  "missed": [],
+  "skipped": [],
+  "model": "gemini"
+}
