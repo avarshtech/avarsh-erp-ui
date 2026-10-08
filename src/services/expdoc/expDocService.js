@@ -1,7 +1,7 @@
 /**
  * Export Documentation API surface — the ONLY file screens import.
  *
- * Buyer templates for packing lists and invoices are on the real API
+ * Buyer templates for packing lists, invoices and carton stickers are on the real API
  * (/api/v1/export-docs/templates, via expDocTemplateStore); everything else is still
  * the mock, and every mock function keeps the signature the future real endpoints
  * will take, so integration swaps the delegate without touching a screen. The
@@ -24,6 +24,7 @@ import * as templateStore from './expDocTemplateStore';
 import {
   listTemplateCandidates as candidatesFor, loadTemplateSnapshot, findNewerTemplateRevision as newerRevision,
 } from './expDocTemplateBridge';
+import { resolveStickerTemplate } from './expDocStickerTemplates';
 
 const notReady = () => {
   throw new Error('Export Documentation backend not implemented yet — mock phase');
@@ -88,10 +89,19 @@ export const listBindableForShipment = (...a) => packingLists.listBindableForShi
 
 // ── Carton stickers ── GET /packing-lists/{id}/stickers/context · /preview ·
 //    /check · POST /sticker-runs · GET /sticker-runs · /cartons/{no}/history
-export const getStickerContext = (...a) => stickers.getStickerContext(...a);
+//    The sticker template is an API template: it is chosen here for the run's
+//    `templateId` and handed to the mock as `layout` with the choices (`layoutOptions`).
+const withStickerTemplate = async (plId, options = {}) => ({
+  ...options,
+  ...(await resolveStickerTemplate(stickers.stickerTemplateRequest(plId), options.templateId)),
+});
+export const getStickerContext = async (plId, options) =>
+  stickers.getStickerContext(plId, await withStickerTemplate(plId, options));
 export const previewCartons = (...a) => stickers.previewCartons(...a);
-export const checkStickerGeneration = (...a) => stickers.checkStickerGeneration(...a);
-export const generateStickerRun = (...a) => stickers.generateStickerRun(...a);
+export const checkStickerGeneration = async (plId, options) =>
+  stickers.checkStickerGeneration(plId, await withStickerTemplate(plId, options));
+export const generateStickerRun = async (plId, options) =>
+  stickers.generateStickerRun(plId, await withStickerTemplate(plId, options));
 export const searchStickerRuns = (...a) => stickers.searchStickerRuns(...a);
 export const cartonPrintHistory = (...a) => stickers.cartonPrintHistory(...a);
 
@@ -112,9 +122,8 @@ export const reviseInvoice = (...a) => invoices.reviseInvoice(...a);
 export const markInvoiceExported = (...a) => invoices.markInvoiceExported(...a);
 export const deleteInvoice = (...a) => invoices.deleteInvoice(...a);
 
-// ── Buyer document templates ── REAL API /export-docs/templates (packing list +
-//    invoice); carton-sticker templates still in the mock. Writes take the template
-//    object, whose `source` decides where they go.
+// ── Buyer document templates ── REAL API /export-docs/templates (packing list,
+//    invoice and carton sticker). Writes take the template object.
 export const listAllTemplates = (...a) => templateStore.listAllTemplates(...a);
 export const getTemplate = (...a) => templateStore.getTemplate(...a);
 export const createTemplate = (...a) => templateStore.createTemplate(...a);
@@ -127,7 +136,6 @@ export const retireTemplate = (...a) => templateStore.retireTemplate(...a);
 export const deleteTemplate = (...a) => templateStore.deleteTemplate(...a);
 export const compareTemplates = (...a) => templateStore.compareTemplates(...a);
 export const getTemplateSample = (...a) => templateStore.getTemplateSample(...a);
-export const listStickerBuyers = (...a) => templateStore.listStickerBuyers(...a);
 export const listTemplateCandidates = (...a) => candidatesFor(...a);
 export const findNewerTemplateRevision = (...a) => newerRevision(...a);
 export {

@@ -11,8 +11,8 @@ import { RowTools } from './EditorParts';
 const { Text } = Typography;
 
 /*
- * Carton-sticker faces. Moved unchanged from the old TemplateTabs: sticker templates
- * stay in the mock until the buyers' sticker layouts are shared, and are then revisited.
+ * Carton-sticker faces, as moved from the old TemplateTabs. Sticker templates are API
+ * templates now; this tab is replaced by the sticker editor in the next step.
  */
 const TabSticker = ({ tpl, patch, locked }) => {
   const layout = tpl.stickerLayout || { layoutId: tpl.templateCode, paperDefault: 'A4_1UP', faces: [] };

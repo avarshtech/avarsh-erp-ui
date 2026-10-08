@@ -4,17 +4,20 @@
  * Two jobs:
  *
  *  1. CHOICE. A buyer may keep several active packing-list, invoice and carton-sticker
- *     templates (sea / air, solid / ratio pack …). There is no default: a new document
- *     takes the buyer's only template, and when there are several the user picks one
- *     (`rankTemplateCandidates`; stickers per run, from `templateTier`). The chosen
- *     revision is recorded on the document with a snapshot of its layout, so
- *     re-rendering a year later reproduces the original — templates are immutable once
- *     active.
+ *     templates (sea / air, solid / ratio pack …). There is no default, for stickers
+ *     either: a new document or sticker run takes the buyer's only template, and when
+ *     there are several the user picks one (`rankTemplateCandidates`; stickers once per
+ *     print run). The chosen revision is recorded on the document with a snapshot of
+ *     its layout, and on a sticker run by its id, so re-rendering a year later
+ *     reproduces the original — templates are immutable once active.
  *
  *  2. BINDINGS. Everything printed is either a binding drawn from this catalogue or
  *     a fixed literal, so an admin cannot invent a field that would force manual
- *     entry downstream (PRD §10.3). The AI reader of uploaded buyer documents is sent
- *     this catalogue too, so it can only propose fields that exist.
+ *     entry downstream (PRD §10.3). The one exception is a sticker line bound
+ *     `ask:<key>`: a per-order value (season, batch no.) asked once per print run,
+ *     printed on every label of that run and kept on the run — never per carton. The
+ *     AI reader of uploaded buyer documents is sent this catalogue too, so it can only
+ *     propose fields that exist.
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from './expDocConstants';
 import { round } from './expDocCalc';
@@ -119,6 +122,10 @@ export const FIELD_CATALOGUE = [
   { path: 'carton.destination', label: 'Port of destination', category: 'CARTON', type: 'string', sample: 'Rotterdam' },
   { path: 'carton.cbm', label: 'Carton CBM', category: 'CARTON', type: 'number', decimals: 3, sample: 0.084 },
   { path: 'carton.eanBySize', label: 'EAN by size', category: 'CARTON', type: 'map', sample: '{ M: 8712345678901 }' },
+  { path: 'carton.sizes', label: 'Sizes in the carton, as a list', category: 'CARTON', type: 'list', sample: '4 / 8' },
+  { path: 'carton.piecesSum', label: 'Pieces per size, added up', category: 'CARTON', type: 'string', sample: '30+35=65' },
+  { path: 'carton.sizeQty', label: 'Quantity per size', category: 'CARTON', type: 'map', sample: '{ 4: 30, 8: 35 }' },
+  { path: 'carton.season', label: 'Season', category: 'CARTON', type: 'string', sample: '2026-WINTER' },
 
   // Computed — never enterable.
   { path: 'calc.piecesPerCarton', label: 'Pieces per carton', category: 'CALC', type: 'number', sample: 60 },
@@ -208,43 +215,16 @@ const CATALOGUE_BY_PATH = FIELD_CATALOGUE.reduce((acc, f) => {
 
 export const getFieldMeta = (path) => CATALOGUE_BY_PATH[path] || null;
 
-export const isBindable = (path) =>
-  Boolean(CATALOGUE_BY_PATH[path]) || String(path || '').startsWith('fixed:');
+/** A per-run question's key: `ask:batchNo`, `ask:customerOrderNo`. */
+const ASK_KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
+
+export const isBindable = (path) => {
+  const raw = String(path || '');
+  if (raw.startsWith('ask:')) return ASK_KEY.test(raw.slice(4));
+  return Boolean(CATALOGUE_BY_PATH[raw]) || raw.startsWith('fixed:');
+};
 
 // ─── Resolution ─────────────────────────────────────────────────────────────────
-
-const active = (tpl, onDate) => {
-  if (tpl.status !== TEMPLATE_STATUS.ACTIVE) return false;
-  if (tpl.effectiveFrom && onDate && tpl.effectiveFrom > onDate) return false;
-  if (tpl.effectiveTo && onDate && tpl.effectiveTo < onDate) return false;
-  return true;
-};
-
-/**
- * The active templates a document may use: the buyer's own, else the tenant-wide
- * ones, so a buyer with no template still gets a layout rather than failing (PRD §15:
- * offer the standard template and notify the admin). A buyer may keep several —
- * the caller decides whether one is used automatically or the user picks.
- */
-export const templateTier = (templates, { buyerCode, docType, onDate } = {}) => {
-  const candidates = (templates || []).filter((t) => t.docType === docType && active(t, onDate));
-  const own = buyerCode ? candidates.filter((t) => t.buyerCode === buyerCode) : [];
-  if (own.length) return { level: 'BUYER', templates: own };
-  const generic = candidates.filter((t) => !t.buyerCode);
-  return generic.length ? { level: 'GENERIC', templates: generic } : { level: 'NONE', templates: [] };
-};
-
-/**
- * One template for a buyer, for questions that need an answer rather than a choice
- * (the coverage report: "does this buyer have a layout at all?"). The newest
- * version of the tier wins.
- */
-export const resolveTemplate = (templates, { buyerCode, docType, onDate } = {}) => {
-  const { level, templates: hits } = templateTier(templates, { buyerCode, docType, onDate });
-  if (!hits.length) return { template: null, matchedOn: 'NONE', isFallback: true };
-  const template = [...hits].sort((a, b) => (b.version || 0) - (a.version || 0))[0];
-  return { template, matchedOn: level, isFallback: level === 'GENERIC' && Boolean(buyerCode) };
-};
 
 /**
  * A buyer name as the template matcher compares it: accents, case, punctuation and
@@ -261,8 +241,8 @@ export const normBuyerName = (name) => String(name || '')
 
 /**
  * Does a template belong to this buyer? By buyer id when both sides have one; by
- * name otherwise, because packing lists and invoices are still mock documents that
- * carry the buyer's NAME, while templates are keyed on the real buyer master.
+ * name otherwise, because packing lists, invoices and sticker runs are still mock
+ * records that carry the buyer's NAME, while templates are keyed on the real buyer master.
  */
 export const templateMatchesBuyer = (template, { buyerId, buyerName } = {}) => {
   if (template.buyerId != null && buyerId != null) return Number(template.buyerId) === Number(buyerId);
@@ -271,7 +251,8 @@ export const templateMatchesBuyer = (template, { buyerId, buyerName } = {}) => {
 };
 
 /**
- * The templates a new packing list or invoice may use, in the order they are offered.
+ * The templates a new packing list, invoice or sticker run may use, in the order they
+ * are offered.
  *
  *   1. the buyer's own active templates, by name;
  *   2. tenant-wide templates (no buyer);
@@ -303,7 +284,7 @@ export const rankTemplateCandidates = (templates, { buyerId, buyerName, docType 
 /**
  * Every bound element of a template, wherever it lives in the layout: header fields,
  * address blocks, the grid, each sheet's own columns, the invoice's columns and header
- * boxes, and sticker faces. `label` is what the builder names it by.
+ * boxes, and the lines of every sticker face. `label` is what the builder names it by.
  */
 export const templateBindings = (t = {}) => {
   const out = [];
@@ -315,10 +296,9 @@ export const templateBindings = (t = {}) => {
   (t.sheets || []).forEach((s) => columns(s.columns));
   columns(t.invoiceColumns);
   Object.values(t.invoiceHeader?.boxes || {}).forEach((b) => { if (b?.binding) add(b.label, b.binding); });
-  (t.stickerLayout?.faces || []).forEach((face) => {
-    (face.lines || []).forEach((l) => add(l.label, l.binding, false));
-    if (face.barcode?.binding) add('Barcode', face.barcode.binding, false);
-  });
+  // A sticker line of any kind — a field, a size grid, a barcode — is bound by its own
+  // binding; `ask:` and `fixed:` count as bound.
+  (t.stickerLayout?.faces || []).forEach((face) => (face.lines || []).forEach((l) => add(l.label, l.binding)));
   return out;
 };
 
@@ -332,9 +312,16 @@ export const unboundLabelsOf = (t) => templateBindings(t)
   .filter((e) => e.bindable && e.label && !e.binding)
   .map((e) => e.label);
 
-/** The catalogue as the AI reader of uploaded documents is sent it (no sticker-only fields). */
-export const catalogueForReader = () => FIELD_CATALOGUE
-  .filter((f) => f.category !== 'CARTON')
+/** What a carton sticker may print: the carton, its style, and the document's own fields. */
+const STICKER_READER_CATEGORIES = ['CARTON', 'STYLE', 'PL', 'SHIPMENT', 'BUYER', 'EXPORTER'];
+
+/**
+ * The catalogue as the AI reader of uploaded documents is sent it. Packing lists and
+ * invoices (the default) never see the sticker-only CARTON fields; a sticker sees the
+ * fields a carton mark can print.
+ */
+export const catalogueForReader = (kind) => FIELD_CATALOGUE
+  .filter((f) => (kind === DOC_TYPE.STICKER ? STICKER_READER_CATEGORIES.includes(f.category) : f.category !== 'CARTON'))
   .map(({ path, label, category }) => ({ path, label, category }));
 
 // ─── Binding resolution ─────────────────────────────────────────────────────────
@@ -347,6 +334,7 @@ const readPath = (source, path) =>
  *
  * `fixed:` literals pass through verbatim — that is how a template carries text the
  * ERP has no field for (a licence number, a regulatory line) without inventing one.
+ * `ask:<key>` is the value given for this print run (`ctx.ask`), null until answered.
  * Unknown paths return null rather than throwing: a document must still render when
  * a template references something the current data does not carry.
  */
@@ -354,6 +342,7 @@ export const resolveBinding = (path, ctx, options = {}) => {
   if (path == null) return null;
   const raw = String(path);
   if (raw.startsWith('fixed:')) return raw.slice(6);
+  if (raw.startsWith('ask:')) return ctx?.ask?.[raw.slice(4)] ?? null;
 
   const value = readPath(ctx, raw);
   if (value === undefined) return null;

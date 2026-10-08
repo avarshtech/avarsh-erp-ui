@@ -9,13 +9,14 @@ import StatusTag from '../../../components/StatusTag';
 import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../utils/permissions';
-import { EXPDOC_MODULE, DOC_TYPE_LABELS, TEMPLATE_STATUS, TEMPLATE_STATUS_LABELS } from '../../../utils/expDocConstants';
+import {
+  EXPDOC_MODULE, DOC_TYPE, DOC_TYPE_LABELS, TEMPLATE_STATUS, TEMPLATE_STATUS_LABELS,
+} from '../../../utils/expDocConstants';
 import { TEMPLATE_STATUS_CONFIG } from '../../../utils/statusConfig';
-import { TEMPLATE_SOURCE } from '../../../utils/expDocSystemTemplates';
 import { unknownBindingsOf, unboundLabelsOf } from '../../../utils/expDocTemplateSchema';
 import {
   getTemplate, updateTemplate, publishTemplate, retireTemplate, newTemplateVersion,
-  getTemplateSample, listStickerBuyers,
+  getTemplateSample,
 } from '../../../services/expdoc/expDocService';
 import { downloadStoredFile } from '../../../services/core/fileService';
 import AckReasonModal from '../shared/AckReasonModal';
@@ -35,8 +36,8 @@ const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
  *
  * The draft is edited locally and saved explicitly: a template is configuration, and
  * saving on every keystroke would make an accidental change indistinguishable from an
- * intended one. Packing-list and invoice templates are saved to the API; carton-sticker
- * templates still to the mock. A built-in standard layout opens read-only.
+ * intended one. Every template is saved to the API. A built-in standard layout opens
+ * read-only.
  */
 const BuyerTemplateBuilder = () => {
   const { id } = useParams();
@@ -55,7 +56,6 @@ const BuyerTemplateBuilder = () => {
   const [reasonCfg, setReasonCfg] = useState(null);
   const exporter = useExporterBlock();
   const { buyers } = useExportBuyers();
-  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
   const canAdd = hasPermission(EXPDOC_MODULE.TEMPLATES, 'add');
   const canUpdate = hasPermission(EXPDOC_MODULE.TEMPLATES, 'update');
@@ -121,7 +121,6 @@ const BuyerTemplateBuilder = () => {
     if (!working) return null;
     const list = [];
     const isDraft = working.status === TEMPLATE_STATUS.DRAFT;
-    const isApi = working.source === TEMPLATE_SOURCE.API;
 
     if (working.isSystem) {
       if (canAdd) list.push(<ActionButton key="clone" action="add" text="Use as a starting point" onClick={() => setCloneOpen(true)} />);
@@ -137,9 +136,9 @@ const BuyerTemplateBuilder = () => {
               action="approve" text="Publish" disabled={dirty}
               onClick={() => modal.confirm({
                 title: `Publish ${working.templateCode} v${working.version}?`,
-                content: isApi
-                  ? 'New packing lists / invoices can then use it. An earlier active version of THIS template is retired in the same step; the buyer\'s other templates are not touched, and documents already made keep the layout they were made with.'
-                  : 'Every new sticker for this buyer will use it. The previous active version is retired in the same step.',
+                content: working.docType === DOC_TYPE.STICKER
+                  ? 'Sticker runs can then print with it. An earlier active version of THIS template is retired in the same step; the buyer\'s other sticker templates are not touched, and a packing list that printed with the earlier version prints its next run with this one.'
+                  : 'New packing lists / invoices can then use it. An earlier active version of THIS template is retired in the same step; the buyer\'s other templates are not touched, and documents already made keep the layout they were made with.',
                 okText: 'Publish',
                 onOk: () => run(() => publishTemplate(working), 'Published'),
               })}
@@ -163,25 +162,21 @@ const BuyerTemplateBuilder = () => {
         </Tooltip>,
       );
       list.push(
-        <Tooltip key="retire" title={working.canRetire ? undefined : 'Sticker runs still print from this version.'}>
-          <span>
-            <ActionButton
-              action="cancel" text="Retire" disabled={!working.canRetire}
-              onClick={() => setReasonCfg({
-                key: 'retire',
-                title: `Retire ${working.templateCode} v${working.version}?`,
-                label: 'Why is it being retired?',
-                context: {
-                  title: 'New documents can no longer pick this version',
-                  message: 'Documents already made keep the layout they were made with. If this was the buyer\'s only template of this kind, new documents fall back to the standard layout.',
-                },
-                okText: 'Retire',
-                danger: true,
-                onSubmit: (reason) => run(() => retireTemplate(working, reason), 'Retired'),
-              })}
-            />
-          </span>
-        </Tooltip>,
+        <ActionButton
+          key="retire" action="cancel" text="Retire"
+          onClick={() => setReasonCfg({
+            key: 'retire',
+            title: `Retire ${working.templateCode} v${working.version}?`,
+            label: 'Why is it being retired?',
+            context: {
+              title: 'New documents can no longer pick this version',
+              message: 'Documents already made keep the layout they were made with. If this was the buyer\'s only template of this kind, new documents fall back to the standard layout.',
+            },
+            okText: 'Retire',
+            danger: true,
+            onSubmit: (reason) => run(() => retireTemplate(working, reason), 'Retired'),
+          })}
+        />,
       );
     }
     if ((working.versions || []).length > 1) {
@@ -211,7 +206,7 @@ const BuyerTemplateBuilder = () => {
   const locked = working.status !== TEMPLATE_STATUS.DRAFT || !canUpdate || working.isSystem;
   const unknown = unknownBindingsOf(working);
   const unbound = unboundLabelsOf(working);
-  const buyerLabel = working.buyerName || working.buyerCode || 'any buyer';
+  const buyerLabel = working.buyerName || 'any buyer';
 
   return (
     <div className="animate-fade-in-up">
@@ -283,7 +278,6 @@ const BuyerTemplateBuilder = () => {
           locked={locked}
           meta={working.extractionMeta?.elementMeta}
           buyers={buyers}
-          stickerBuyers={stickerBuyers}
         />
       </Card>
 

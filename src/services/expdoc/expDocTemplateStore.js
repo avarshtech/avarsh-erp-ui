@@ -1,21 +1,20 @@
 /**
- * Buyer document templates as the screens see them: one list and one set of actions
- * over two stores — packing-list and invoice templates in the API, carton-sticker
- * templates still in the export-docs mock — plus the built-in standard layouts.
+ * Buyer document templates as the screens see them: the API's packing-list, invoice and
+ * carton-sticker templates, plus the built-in standard layouts.
  *
- * Every write names the template it acts on (not just an id), because the template's
- * `source` decides where the write goes. Screens reach this through expDocService.
+ * Every write names the template it acts on (not just an id). Screens reach this
+ * through expDocService.
  */
 import * as api from './exportTemplateApi';
-import * as mock from './expDocMockTemplates';
 import { uploadFile } from '../core/fileService';
-import { isApiDocType } from './exportTemplateAdapter';
 import { loadDb } from './expDocMockStore';
 import { TEMPLATE_STATUS } from '../../utils/expDocConstants';
 import {
   SYSTEM_TEMPLATES, isSystemTemplateId, TEMPLATE_SOURCE, pickLayout,
 } from '../../utils/expDocSystemTemplates';
 import { diffTemplates } from '../../utils/expDocTemplateDiff';
+
+export { getTemplateSample } from './expDocMockSamples';
 
 const TTL_MS = 60 * 1000;
 let cache = { at: 0, rows: null, pending: null };
@@ -32,14 +31,19 @@ export const apiTemplateSummaries = ({ force } = {}) => {
   return cache.pending;
 };
 
-/** Documents that pinned this template revision — packing lists and invoices are still mock. */
+/** Packing lists, invoices and sticker runs that pinned this template revision — all still mock. */
 const usageOf = (db, id) => {
-  const pls = (db.packingLists || []).filter((d) => String(d.templateId) === String(id)).length;
-  const invoices = (db.invoices || []).filter((d) => String(d.templateId) === String(id)).length;
-  return { packingLists: pls, invoices, stickerRuns: 0, total: pls + invoices };
+  const count = (rows) => (rows || []).filter((d) => String(d.templateId) === String(id)).length;
+  const pls = count(db.packingLists);
+  const invoices = count(db.invoices);
+  const stickerRuns = count(db.stickerRuns);
+  return { packingLists: pls, invoices, stickerRuns, total: pls + invoices + stickerRuns };
 };
 
-/** Documents keep a snapshot of their layout, so an API template can always be retired. */
+/**
+ * Documents keep a snapshot of their layout and a sticker run names a revision that
+ * never changes, so an API template can always be retired.
+ */
 const decorateApi = (t, db = loadDb()) => ({
   ...t,
   usage: usageOf(db, t.id),
@@ -60,9 +64,9 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 // ─── Reads ──────────────────────────────────────────────────────────────────────
 
 export const listAllTemplates = async ({ force } = {}) => {
-  const [rows, stickers] = await Promise.all([apiTemplateSummaries({ force }), mock.listStickerTemplates()]);
+  const rows = await apiTemplateSummaries({ force });
   const db = loadDb();
-  return [...rows.map((t) => decorateApi(t, db)), ...stickers];
+  return rows.map((t) => decorateApi(t, db));
 };
 
 export const getTemplate = async (id) => {
@@ -71,31 +75,15 @@ export const getTemplate = async (id) => {
     if (!standard) throw new Error(`Template ${id} not found`);
     return { ...clone(standard), versions: [], usage: { total: 0 }, editable: false };
   }
-  if (mock.isMockTemplateId(id)) return mock.getStickerTemplate(id);
   return decorateApi(await api.getApiTemplate(id));
 };
 
 export const compareTemplates = async (idA, idB) =>
   diffTemplates(await getTemplate(idA), await getTemplate(idB));
 
-export const getTemplateSample = (template) => mock.getTemplateSample(template);
-
-export const listStickerBuyers = () => mock.listStickerBuyers();
-
 // ─── Writes ─────────────────────────────────────────────────────────────────────
 
-const stickerPayload = (t) => ({
-  templateCode: t.templateCode,
-  name: t.name,
-  buyerCode: t.buyerCode || null,
-  layout: pickLayout(t),
-  stickerLayout: t.stickerLayout,
-  clonedFromId: t.clonedFromId ?? null,
-});
-
-export const createTemplate = (template) => write(async () => (isApiDocType(template.docType)
-  ? decorateApi(await api.createApiTemplate(template))
-  : mock.createStickerTemplate(stickerPayload(template))));
+export const createTemplate = (template) => write(async () => decorateApi(await api.createApiTemplate(template)));
 
 /**
  * Save the reviewed templates read from one uploaded document. The file goes to
@@ -121,9 +109,8 @@ export const saveUploadedTemplates = (templates, file) => write(async () => {
   return { templates: saved.map((t) => decorateApi(t, db)), sourceStored: Boolean(stored) };
 });
 
-export const updateTemplate = (template) => write(async () => (template.source === TEMPLATE_SOURCE.API
-  ? decorateApi(await api.updateApiTemplate(template.id, template))
-  : mock.updateStickerTemplate(template.id, template)));
+export const updateTemplate = (template) => write(async () =>
+  decorateApi(await api.updateApiTemplate(template.id, template)));
 
 /** A new template from any existing one, including a built-in standard layout. */
 export const cloneTemplate = (source, target) => write(async () => {
@@ -132,27 +119,17 @@ export const cloneTemplate = (source, target) => write(async () => {
     buyerId: target.buyerId ?? null,
   };
   if (source.source === TEMPLATE_SOURCE.API) return decorateApi(await api.cloneApiTemplate(source.id, identity));
-  if (source.source === TEMPLATE_SOURCE.MOCK) {
-    return mock.createStickerTemplate(stickerPayload({ ...source, ...identity, buyerCode: target.buyerCode, clonedFromId: source.id }));
-  }
   // The standard layout has no API row to clone: its layout becomes a new template.
   return decorateApi(await api.createApiTemplate({ ...pickLayout(source), docType: source.docType, ...identity }));
 });
 
-export const newTemplateVersion = (template) => write(async () => (template.source === TEMPLATE_SOURCE.API
-  ? decorateApi(await api.reviseApiTemplate(template.id))
-  : mock.newStickerTemplateVersion(template.id)));
+export const newTemplateVersion = (template) => write(async () => decorateApi(await api.reviseApiTemplate(template.id)));
 
-export const publishTemplate = (template, options = {}) => write(async () => (template.source === TEMPLATE_SOURCE.API
-  ? decorateApi(await api.publishApiTemplate(template.id, {
-    version: template.lockVersion, effectiveFrom: options.effectiveFrom, reason: options.reason,
-  }))
-  : mock.publishStickerTemplate(template.id, options)));
+export const publishTemplate = (template, options = {}) => write(async () => decorateApi(await api.publishApiTemplate(
+  template.id, { version: template.lockVersion, effectiveFrom: options.effectiveFrom, reason: options.reason },
+)));
 
-export const retireTemplate = (template, reason) => write(async () => (template.source === TEMPLATE_SOURCE.API
-  ? decorateApi(await api.retireApiTemplate(template.id, { version: template.lockVersion, reason }))
-  : mock.retireStickerTemplate(template.id, reason)));
+export const retireTemplate = (template, reason) => write(async () =>
+  decorateApi(await api.retireApiTemplate(template.id, { version: template.lockVersion, reason })));
 
-export const deleteTemplate = (template) => write(() => (template.source === TEMPLATE_SOURCE.API
-  ? api.deleteApiTemplate(template.id)
-  : mock.deleteStickerTemplate(template.id)));
+export const deleteTemplate = (template) => write(() => api.deleteApiTemplate(template.id));

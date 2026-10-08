@@ -4,9 +4,9 @@ import {
 } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
-import { DOC_TYPE, DOC_TYPE_LABELS, SECTION_KEY } from '../../../utils/expDocConstants';
+import { DOC_TYPE, DOC_TYPE_LABELS, PAPER, SECTION_KEY } from '../../../utils/expDocConstants';
 import { SYSTEM_TEMPLATES, completeLayout } from '../../../utils/expDocSystemTemplates';
-import { createTemplate, cloneTemplate, listStickerBuyers } from '../../../services/expdoc/expDocService';
+import { createTemplate, cloneTemplate } from '../../../services/expdoc/expDocService';
 
 const { Text } = Typography;
 
@@ -23,6 +23,8 @@ const blankLayout = (docType) => completeLayout(docType, {
     { key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN], showSectionTotals: true },
     { key: 'EXTRA', title: 'EXTRA CARTONS', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
   ] : [],
+  // Given explicitly, or the standard carton marking's faces would be copied in.
+  stickerLayout: docType === DOC_TYPE.STICKER ? { paperDefault: PAPER.A4_1UP, faces: [], mandatoryFields: [] } : undefined,
 });
 
 /** "PRENATAL" from "Prénatal Moeder en Kind BV" — the start of a suggested code. */
@@ -45,9 +47,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const [name, setName] = useState('');
   const [docType, setDocType] = useState(DOC_TYPE.PACKING_LIST);
   const [buyerId, setBuyerId] = useState();
-  const [buyerCode, setBuyerCode] = useState();
   const [busy, setBusy] = useState(false);
-  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
   useEffect(() => {
     if (!open) return;
@@ -58,7 +58,6 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     setName(source ? `${source.name} (copy)` : '');
     setDocType(source?.docType || DOC_TYPE.PACKING_LIST);
     setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
-    setBuyerCode(source?.buyerCode || undefined);
   }, [open, source, defaultBuyerId]);
 
   const pool = useMemo(() => {
@@ -68,11 +67,10 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const chosen = pool.find((t) => t.id === sourceId) || (source?.id === sourceId ? source : null);
 
   const targetType = mode === MODE.CLONE ? chosen?.docType : docType;
-  const isSticker = targetType === DOC_TYPE.STICKER;
   const buyerName = buyers.find((b) => b.id === buyerId)?.name;
 
   // A code suggested from the buyer and document, until the user types their own.
-  const suggestedCode = targetType ? `${codeBase(isSticker ? buyerCode : buyerName)}-${SUFFIX[targetType]}` : '';
+  const suggestedCode = targetType ? `${codeBase(buyerName)}-${SUFFIX[targetType]}` : '';
   const effectiveCode = codeTouched ? templateCode : suggestedCode;
 
   const cloneOptions = useMemo(() => pool.map((t) => ({
@@ -80,9 +78,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     label: `${t.templateCode} v${t.version} — ${DOC_TYPE_LABELS[t.docType]}${t.isSystem ? ' (standard)' : ''}${t.buyerName ? ` · ${t.buyerName}` : ''}`,
   })), [pool]);
 
-  const buyerOptions = isSticker
-    ? stickerBuyers
-    : buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
+  const buyerOptions = buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
 
   const canSubmit = Boolean(effectiveCode.trim() && name.trim()) && (mode === MODE.CLONE ? Boolean(chosen) : Boolean(docType));
 
@@ -91,8 +87,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     try {
       const identity = {
         templateCode: effectiveCode.trim(), name: name.trim(),
-        buyerId: isSticker ? null : buyerId ?? null, buyerName: isSticker ? null : buyerName ?? null,
-        buyerCode: isSticker ? buyerCode ?? null : null,
+        buyerId: buyerId ?? null, buyerName: buyerName ?? null,
       };
       const created = mode === MODE.CLONE
         ? await cloneTemplate(chosen, identity)
@@ -135,8 +130,8 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
           <Text type="secondary">Buyer</Text>
           <FormSelect
             variant="default" style={{ width: '100%' }}
-            value={(isSticker ? buyerCode : buyerId) ?? undefined}
-            onChange={(v) => (isSticker ? setBuyerCode(v) : setBuyerId(v))}
+            value={buyerId ?? undefined}
+            onChange={setBuyerId}
             options={buyerOptions} placeholder="Leave blank for a tenant-wide template"
           />
         </div>

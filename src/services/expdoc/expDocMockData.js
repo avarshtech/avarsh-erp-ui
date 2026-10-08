@@ -20,17 +20,16 @@ import {
   PACKING_TYPE,
   SECTION_KEY,
   PACKING_ENTRY_STATUS,
-  TEMPLATE_STATUS,
-  DOC_TYPE,
-  FACE_RENDER,
-  PAPER,
   LINE_GRAIN,
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
 
 // 12 (2026-10-08): shipments take the consignee from the buyer master and carry
 // their orders; sub-client, end customer, seal, pallets and delivery centre removed.
-export const SEED_VERSION = 12;
+// 13 (2026-10-08): carton-sticker templates moved to the API, so the STK-n seeds are
+// gone (a stored run naming one would be looked up there); JOMO rows carry EANs for
+// some sizes, and every packing entry a season.
+export const SEED_VERSION = 13;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -156,296 +155,6 @@ const buildFxRates = () => {
   }
   return rows;
 };
-
-// ─── Templates ──────────────────────────────────────────────────────────────────
-// Carton-sticker templates only. Packing-list and invoice templates live in the API
-// (/export-docs/templates) and the standard layouts in utils/expDocSystemTemplates.js.
-// Sticker ids are strings so a sticker can never collide with an API template id.
-
-const buildTemplates = () => [
-  {
-    // Two-face sticker layout — the JOMO LONG SIDE / SHORT SIDE pattern (PRD §9.2).
-    id: 'STK-3',
-    templateCode: 'JOMO-AMG-STICKER',
-    name: 'JOMO — AMG — Carton Sticker',
-    buyerId: null,
-    buyerCode: 'JOMO',
-    docType: DOC_TYPE.STICKER,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180),
-    effectiveTo: null,
-    clonedFromId: null,
-    publishedAt: ts(-180),
-    publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [],
-    addressBlocks: [],
-    columns: [],
-    sheets: [],
-    invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'JOMO-AMG',
-      paperDefault: PAPER.A4_2UP,
-      faces: [
-        {
-          key: 'LONG',
-          title: 'LONG SIDE',
-          render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'buyer', label: null, binding: 'buyer.name', fontPt: 22, bold: true, align: 'CENTER' },
-            { key: 'po', label: 'ORDER NO', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'pieces', label: 'QTY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 16, bold: true },
-            { key: 'origin', label: 'MADE IN', binding: 'exporter.country', fontPt: 14, bold: true },
-          ],
-          sizeGrid: null,
-          barcode: null,
-        },
-        {
-          key: 'SHORT',
-          title: 'SHORT SIDE',
-          render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'dan', label: 'DAN', binding: 'carton.danNo', fontPt: 16, bold: true },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 16, bold: true },
-            { key: 'nw', label: 'N.W.', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3, fontPt: 12 },
-            { key: 'gw', label: 'G.W.', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3, fontPt: 12 },
-            { key: 'dims', label: 'MEAS.', binding: 'carton.dimensions', suffix: ' CM', fontPt: 11 },
-          ],
-          sizeGrid: null,
-          barcode: { type: 'CODE128', binding: 'carton.cartonNo', enabled: false, heightMm: 12 },
-        },
-      ],
-      // Drives V-08 at sticker generation: these must be present or the affected
-      // cartons are named and generation is blocked.
-      mandatoryFields: ['carton.danNo', 'carton.netWeightKg', 'carton.grossWeightKg'],
-    },
-    formatting: { font: 'Arial' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: [],
-    mandatoryForDocGen: [],
-  },
-  {
-    // JOMO SCA customer — two faces again, but a different field set: this is the
-    // variation the template engine has to absorb without new code (PRD 9.2).
-    id: 'STK-5',
-    templateCode: 'JOMO-SCA-STICKER',
-    name: 'JOMO — SCA — Carton Sticker',
-    buyerId: null, buyerCode: 'JOMO',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180), effectiveTo: null, clonedFromId: 'STK-3',
-    publishedAt: ts(-180), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'JOMO-SCA',
-      paperDefault: PAPER.A4_2UP,
-      faces: [
-        {
-          // The buyer's own carton-marking sheet: a THIS SIDE UP head, the shipping
-          // mark, then ten fields whose colons line up in a column. COLON_LIST is
-          // what holds that alignment however long a label runs.
-          key: 'LONG', title: 'LONG SIDE', render: FACE_RENDER.COLON_LIST,
-          border: { style: 'solid', widthPt: 1.5 },
-          caption: 'THIS SIDE UP',
-          symbol: 'THIS_SIDE_UP',
-          lines: [
-            // The shipping mark head. Fixed text: the ERP has no field for it, and
-            // §10 says a template carries what the data model does not.
-            { key: 'mark', label: null, binding: 'fixed:BJJI:', fontPt: 13, bold: true },
-            { key: 'clientOrder', label: 'CLIENT ORDER No', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'po', label: 'PO No', binding: 'pl.orderNos', fontPt: 12 },
-            { key: 'article', label: 'CLIENT ARTICLE No', binding: 'carton.articleNo', fontPt: 12 },
-            { key: 'style', label: 'STYLE No', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'ctn', label: 'CARTON No', binding: 'carton.nOfN', fontPt: 12 },
-            { key: 'port', label: 'PORT OF DESTINATION', binding: 'carton.destination', fontPt: 12 },
-            { key: 'colour', label: 'COLOR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'size', label: 'SIZE', binding: 'carton.sizeText', fontPt: 12 },
-            { key: 'qty', label: 'QUANTITY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-        {
-          // Three weights-and-measures lines only. The carton number and the port
-          // are NOT repeated here: the buyer's sheet puts both on the long side.
-          // Colons align the same way, so the two faces read as one document.
-          key: 'SHORT', title: 'SHORT SIDE', render: FACE_RENDER.COLON_LIST,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'nw', label: 'NET WEIGHT', binding: 'carton.netWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
-            { key: 'gw', label: 'GROSS WEIGHT', binding: 'carton.grossWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
-            { key: 'dims', label: 'CARTON MEASUREMENT', binding: 'carton.dimensions', suffix: ' CM', fontPt: 12 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      // Every field the buyer's sheet prints has to be there before the run goes out,
-      // or a carton ships with a blank line where the customer looks for its article.
-      mandatoryFields: [
-        'carton.netWeightKg', 'carton.grossWeightKg', 'carton.buyerPoNo',
-        'carton.articleNo', 'carton.destination',
-      ],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Prenatal solid pack — a single face, FROM/TO addressing.
-    id: 'STK-6',
-    templateCode: 'PRENATAL-SOLID-STICKER',
-    name: 'Prénatal — Solid Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-120), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'PRENATAL-SOLID',
-      paperDefault: PAPER.A5,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'from', label: 'FROM', binding: 'exporter.name', fontPt: 12 },
-            { key: 'to', label: 'TO', binding: 'fixed:PRENATAL / NETHERLAND', fontPt: 12, bold: true },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'qty', label: 'QTY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-            { key: 'ctn', label: 'C/NO', binding: 'carton.nOfN', fontPt: 14, bold: true },
-            { key: 'nw', label: 'N.W.', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3, fontPt: 11 },
-            { key: 'gw', label: 'G.W.', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3, fontPt: 11 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg', 'carton.grossWeightKg'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: false,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Prenatal ratio pack — the one layout that prints a colour x size table.
-    id: 'STK-7',
-    templateCode: 'PRENATAL-RATIO-STICKER',
-    name: 'Prénatal — Ratio Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: 'STK-6',
-    publishedAt: ts(-120), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'PRENATAL-RATIO',
-      paperDefault: PAPER.A5,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'to', label: 'TO', binding: 'fixed:PRENATAL / NETHERLAND', fontPt: 12, bold: true },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'ctn', label: 'C/NO', binding: 'carton.nOfN', fontPt: 14, bold: true },
-            { key: 'qty', label: 'TOTAL', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-          ],
-          sizeGrid: { enabled: true, rows: 'COLOUR', cols: 'SIZE' },
-          barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: false,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Vingino — a bordered key/value table, and the ONLY analysed buyer whose label
-    // carries a barcode (its EAN, printed as a number today). PRD 19.
-    id: 'STK-8',
-    templateCode: 'VINGINO-STICKER',
-    name: 'Vingino — Carton Sticker',
-    buyerId: null, buyerCode: 'VINGINO',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-90), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-90), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'VINGINO',
-      paperDefault: PAPER.A4_2X2,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.TABLE,
-          border: { style: 'solid', widthPt: 1 },
-          lines: [
-            { key: 'ctn', label: 'Carton no', binding: 'carton.nOfN' },
-            { key: 'supplier', label: 'Supplier number', binding: 'fixed:SUP-4471' },
-            { key: 'po', label: 'PO', binding: 'carton.buyerPoNo' },
-            { key: 'article', label: 'Article no', binding: 'carton.styleNo' },
-            { key: 'colour', label: 'Colour', binding: 'carton.colorName' },
-            { key: 'qty', label: 'Quantity', binding: 'carton.pieces' },
-            { key: 'dims', label: 'Carton dimension', binding: 'carton.dimensions', suffix: ' cm' },
-            { key: 'gw', label: 'Gross weight', binding: 'carton.grossWeightKg', suffix: ' kg', decimals: 3 },
-            { key: 'nw', label: 'Net weight', binding: 'carton.netWeightKg', suffix: ' kg', decimals: 3 },
-            { key: 'season', label: 'Season / run', binding: 'fixed:SS26 / R2' },
-          ],
-          sizeGrid: null,
-          barcode: { type: 'CODE128', binding: 'carton.cartonNo', enabled: true, heightMm: 14 },
-        },
-      ],
-      mandatoryFields: ['carton.grossWeightKg', 'carton.netWeightKg', 'carton.dimensions'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Van Gennip — the nine-line monospace block that is copy-pasted by hand
-    // hundreds of times today (PRD 2). One template row replaces all of it.
-    id: 'STK-9',
-    templateCode: 'VGT-STICKER',
-    name: 'Van Gennip — Carton Sticker',
-    buyerId: null, buyerCode: 'VGT',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-150), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-150), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'VGT',
-      paperDefault: PAPER.A4_2X2,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.TEXT_BLOCK,
-          border: { style: 'none' },
-          lines: [
-            { key: 'article', label: 'ARTICLE NUMBER', binding: 'carton.styleNo' },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName' },
-            { key: 'qty', label: 'QUANTITY', binding: 'carton.pieces' },
-            { key: 'ctn', label: 'CARTON NUMBER', binding: 'carton.nOfN' },
-            { key: 'nw', label: 'NET WEIGHT', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3 },
-            { key: 'gw', label: 'GROSS WEIGHT', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3 },
-            { key: 'meas', label: 'MEASUREMENT', binding: 'carton.dimensions', suffix: ' CM' },
-            { key: 'origin', label: 'MADE IN', binding: 'fixed:INDIA' },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo' },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg', 'carton.grossWeightKg', 'carton.dimensions'],
-    },
-    formatting: { font: 'Courier New' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-];
-
 
 // ─── Shipments ──────────────────────────────────────────────────────────────────
 // A minimal entity invented by this module: no shipment record exists anywhere in
@@ -640,6 +349,8 @@ const buildPackingEntries = () => [
     // see the data-gap ledger; the API phase owes stl_styles.hs_code.
     garmentCategory: 'Knit',
     compositionText: '95% COTTON 5% ELASTANE',
+    // What a sticker prints as `carton.season` for every carton of this entry.
+    season: 'AW26',
     sizePresetName: 'Men M–XXXL',
     sizes: MENS_SIZES,
     orderLineRefs: [
@@ -659,6 +370,10 @@ const buildPackingEntries = () => [
         // The buyer's own article number, one per size — what JOMO's SCA carton
         // marking prints as CLIENT ARTICLE No.
         articleNos: { M: 'ART-99120', L: 'ART-99121', XL: 'ART-99122' },
+        // One EAN-13 per size, for a template that prints a barcode per size. Only
+        // this row has them all: the next has some, the rest none — so a barcode run
+        // over the whole list shows the "no EAN" path as well as the printed one.
+        eanBySize: { M: '8712345001018', L: '8712345001025', XL: '8712345001032' },
         sizeQty: { M: 10, L: 20, XL: 30 },
         netWeightKg: 12.48, grossWeightKg: 13.5, lengthCm: 60, breadthCm: 40, heightCm: 35,
       }),
@@ -667,6 +382,8 @@ const buildPackingEntries = () => [
         danNo: 'DAN-4472', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Flame Scarlet 18-1662 TCX',
         articleNos: { M: 'ART-99130', L: 'ART-99131', XL: 'ART-99132', XXL: 'ART-99133' },
+        // XL and XXL deliberately have no EAN.
+        eanBySize: { M: '8712345002015', L: '8712345002022' },
         ratio: { M: 1, L: 2, XL: 2, XXL: 1 }, assortmentsPerCarton: 4,
         netWeightKg: 9.2, grossWeightKg: 10.0, lengthCm: 60, breadthCm: 40, heightCm: 30,
       }),
@@ -712,6 +429,7 @@ const buildPackingEntries = () => [
     garmentName: "Girls' Printed Tee",
     garmentCategory: 'Knit',
     compositionText: '100% ORGANIC COTTON',
+    season: '2026-WINTER',
     sizePresetName: 'Kids EU 74–140',
     sizes: KIDS_EU_SIZES,
     orderLineRefs: [
@@ -770,6 +488,7 @@ const buildPackingEntries = () => [
     garmentName: 'Baby 3-pack Bodysuit',
     garmentCategory: 'Baby',
     compositionText: '100% COTTON INTERLOCK',
+    season: 'SS27',
     sizePresetName: 'Baby 50/56–86/92',
     sizes: BABY_SIZES,
     orderLineRefs: [
@@ -813,7 +532,6 @@ export const buildSeedDb = () => {
   groupSeq = 0;
   const shipments = buildShipments();
   const packingEntries = buildPackingEntries();
-  const templates = buildTemplates();
 
   return {
     seedVersion: SEED_VERSION,
@@ -830,7 +548,6 @@ export const buildSeedDb = () => {
     packingLists: [],
     invoices: [],
     stickerRuns: [],
-    templates,
     audit: [],
     masters: {
       ports: SEED_PORTS,

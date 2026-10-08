@@ -3,24 +3,22 @@ import {
   Alert, Card, Col, Input, Row, Space, Switch, Typography,
 } from 'antd';
 import { FormSelect } from '../../../../components/form';
-import { DOC_TYPE_LABELS } from '../../../../utils/expDocConstants';
-import { TEMPLATE_SOURCE } from '../../../../utils/expDocSystemTemplates';
+import { DOC_TYPE, DOC_TYPE_LABELS } from '../../../../utils/expDocConstants';
 
 const { Text } = Typography;
 
 /**
- * Name, buyer and page. Packing-list and invoice templates belong to a buyer from the
- * buyer master; carton-sticker templates still name the mock's buyer codes until
- * they move to the API too.
+ * Name, buyer and page. Every template belongs to a buyer from the buyer master, or to
+ * none (tenant-wide).
  */
-const TabIdentity = ({ tpl, patch, locked, buyers = [], stickerBuyers = [], codeEditable = false }) => {
+const TabIdentity = ({ tpl, patch, locked, buyers = [], codeEditable = false }) => {
   const identity = tpl.identity || {};
-  const isSticker = tpl.source === TEMPLATE_SOURCE.MOCK;
+  const isSticker = tpl.docType === DOC_TYPE.STICKER;
 
-  const buyerOptions = useMemo(() => (isSticker
-    ? stickerBuyers
-    : buyers.filter((b) => b.active !== false || b.id === tpl.buyerId).map((b) => ({ value: b.id, label: b.name }))),
-  [isSticker, stickerBuyers, buyers, tpl.buyerId]);
+  const buyerOptions = useMemo(
+    () => buyers.filter((b) => b.active !== false || b.id === tpl.buyerId).map((b) => ({ value: b.id, label: b.name })),
+    [buyers, tpl.buyerId],
+  );
 
   return (
     <Row gutter={[16, 16]}>
@@ -56,10 +54,8 @@ const TabIdentity = ({ tpl, patch, locked, buyers = [], stickerBuyers = [], code
                 variant="default"
                 style={{ width: '100%' }}
                 disabled={locked}
-                value={(isSticker ? tpl.buyerCode : tpl.buyerId) ?? undefined}
-                onChange={(v) => (isSticker
-                  ? patch({ buyerCode: v || null })
-                  : patch({ buyerId: v ?? null, buyerName: buyers.find((b) => b.id === v)?.name || null }))}
+                value={tpl.buyerId ?? undefined}
+                onChange={(v) => patch({ buyerId: v ?? null, buyerName: buyers.find((b) => b.id === v)?.name || null })}
                 options={buyerOptions}
                 placeholder="Any buyer (tenant-wide)"
               />

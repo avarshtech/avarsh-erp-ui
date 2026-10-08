@@ -10,7 +10,6 @@
  * travels as `lockVersion`. The mock used one field for both, which is how a template
  * save could fail with a false conflict.
  */
-import { DOC_TYPE } from '../../utils/expDocConstants';
 import { TEMPLATE_SOURCE, pickLayout } from '../../utils/expDocSystemTemplates';
 
 export const fromApi = (dto) => {
@@ -46,6 +45,3 @@ export const toApi = (template) => ({
   extractionMeta: template.extractionMeta ?? undefined,
   version: template.lockVersion ?? undefined,
 });
-
-/** The documents the API stores; carton stickers still live in the mock. */
-export const isApiDocType = (docType) => docType === DOC_TYPE.PACKING_LIST || docType === DOC_TYPE.INVOICE;

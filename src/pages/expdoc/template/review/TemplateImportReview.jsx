@@ -12,7 +12,7 @@ import useUnsavedChanges from '../../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../../utils/permissions';
 import { DOC_TYPE_LABELS, EXPDOC_MODULE } from '../../../../utils/expDocConstants';
 import {
-  saveUploadedTemplates, publishTemplate, listStickerBuyers,
+  saveUploadedTemplates, publishTemplate,
 } from '../../../../services/expdoc/expDocService';
 import useExporterBlock from '../../shared/useExporterBlock';
 import TemplateEditor from '../editor/TemplateEditor';
@@ -68,7 +68,6 @@ const TemplateImportReview = () => {
   const [editorView, setEditorView] = useState(EDITOR_VIEW.SPLIT);
   const [saving, setSaving] = useState(null);
   const { buyers } = useExportBuyers();
-  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
   const exporter = useExporterBlock();
   const canPublish = hasPermission(EXPDOC_MODULE.TEMPLATES, 'publish');
   const { clearDirty } = useUnsavedChanges(Boolean(result));
@@ -272,7 +271,6 @@ const TemplateImportReview = () => {
                 meta={active.meta}
                 onEvidence={showInFile}
                 buyers={buyers}
-                stickerBuyers={stickerBuyers}
                 defaultTab={editor.tab || undefined}
               />
             </Col>

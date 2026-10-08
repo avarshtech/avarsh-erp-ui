@@ -80,7 +80,7 @@ const TemplateBuyerRail = ({ groups, selectedKey, onSelect }) => {
   const { pinned, withTemplates } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const match = (g) => !q || String(g.title).toLowerCase().includes(q);
-    const special = groups.filter((g) => g.key === RAIL_KEY.STANDARD || g.key === RAIL_KEY.DEMO_STICKERS);
+    const special = groups.filter((g) => g.key === RAIL_KEY.STANDARD);
     return {
       pinned: special.filter(match),
       withTemplates: groups

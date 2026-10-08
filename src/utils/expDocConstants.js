@@ -307,6 +307,7 @@ export const TEMPLATE_STATUS_LABELS = { DRAFT: 'Draft', ACTIVE: 'Active', RETIRE
 // pageMm is the @page size; cols × rows is the label grid printed on it.
 export const PAPER = {
   A4_1UP: 'A4_1UP',
+  A4_1UP_LANDSCAPE: 'A4_1UP_LANDSCAPE',
   A4_2UP: 'A4_2UP',
   A4_2X2: 'A4_2X2',
   A5: 'A5',
@@ -315,6 +316,7 @@ export const PAPER = {
 
 export const PAPER_SPECS = {
   A4_1UP: { label: 'A4 — 1 per page', pageMm: [210, 297], cols: 1, rows: 1 },
+  A4_1UP_LANDSCAPE: { label: 'A4 landscape — 1 per page', pageMm: [297, 210], cols: 1, rows: 1 },
   A4_2UP: { label: 'A4 — 2 per page', pageMm: [210, 297], cols: 1, rows: 2 },
   A4_2X2: { label: 'A4 — 4 per page (2×2)', pageMm: [210, 297], cols: 2, rows: 2 },
   A5: { label: 'A5 — 1 per page', pageMm: [148, 210], cols: 1, rows: 1 },
@@ -332,11 +334,27 @@ export const labelsPerSheet = (paper) => {
   return spec.cols * spec.rows;
 };
 
-// Sticker face render modes. These four cover every layout in PRD §9.2: STACK
-// (JOMO AMG, Prénatal), COLON_LIST (JOMO SCA's aligned LABEL : value block),
-// TABLE (Vingino), TEXT_BLOCK (Van Gennip).
+// Sticker face render modes: LINES (plain LABEL: value in the line's own font —
+// Dropy), STACK (JOMO AMG, Prénatal), COLON_LIST (an aligned LABEL : value block —
+// Van Gennip, JOMO SCA), TABLE (bordered label | value — Vingino), TEXT_BLOCK (LINES
+// in monospace).
 export const FACE_RENDER = {
-  STACK: 'STACK', COLON_LIST: 'COLON_LIST', TABLE: 'TABLE', TEXT_BLOCK: 'TEXT_BLOCK',
+  LINES: 'LINES', STACK: 'STACK', COLON_LIST: 'COLON_LIST', TABLE: 'TABLE', TEXT_BLOCK: 'TEXT_BLOCK',
+};
+
+// What one line of a sticker face prints: a field, a colour × size grid, or a barcode.
+export const STICKER_LINE_KIND = { FIELD: 'FIELD', SIZE_GRID: 'SIZE_GRID', BARCODE: 'BARCODE' };
+
+// Barcodes a sticker line may carry, keyed as a layout stores them. EAN-13, UPC-A and
+// Code 128 print; the others are recognised and recorded, and print a visible "not
+// printable yet" placeholder until they have encoders.
+export const BARCODE_SYMBOLOGY = {
+  EAN13: { label: 'EAN-13', printable: true },
+  UPCA: { label: 'UPC-A', printable: true },
+  CODE128: { label: 'Code 128', printable: true },
+  ITF14: { label: 'ITF-14', printable: false },
+  GS1_128: { label: 'GS1-128 (SSCC)', printable: false },
+  QR: { label: 'QR code', printable: false },
 };
 
 // ─── Validation vocabulary (PRD §14) ────────────────────────────────────────────

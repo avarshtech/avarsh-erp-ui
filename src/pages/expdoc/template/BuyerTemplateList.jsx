@@ -23,9 +23,9 @@ import { groupTemplatesByBuyer, RAIL_KEY } from './registerModel';
 /**
  * Buyer document templates, by buyer.
  *
- * A buyer's packing list and invoice are uploaded (PDF or Excel) and read into drafts,
+ * A buyer's packing list, invoice and carton sticker are uploaded and read into drafts,
  * or built by copying the nearest layout. A buyer may keep several of each — sea and
- * air, say — and staff pick one when they make a document. A template
+ * air, say — and staff pick one when they make a document or print stickers. A template
  * for any buyer starts from "New buyer template" in the header; the buyer's own panel
  * keeps its upload and new-template buttons for the buyer on screen.
  */
@@ -65,7 +65,7 @@ const BuyerTemplateList = () => {
   const selectedKey = useMemo(() => {
     const wanted = params.get('buyer');
     if (wanted && groups.some((g) => g.key === wanted)) return wanted;
-    return groups.find((g) => !g.standard && !g.demo && g.counts.total > 0)?.key || RAIL_KEY.STANDARD;
+    return groups.find((g) => !g.standard && g.counts.total > 0)?.key || RAIL_KEY.STANDARD;
   }, [params, groups]);
   const selected = groups.find((g) => g.key === selectedKey) || null;
 
@@ -108,7 +108,7 @@ const BuyerTemplateList = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title="Buyer Document Templates"
-        subtitle="The packing list and invoice layouts each buyer wants — made from the buyer's own document, checked by you"
+        subtitle="The packing list, invoice and carton sticker layouts each buyer wants — made from the buyer's own document, checked by you"
         onAdd={canAdd ? () => setNewBuyer((s) => ({ open: true, seq: s.seq + 1 })) : undefined}
         addLabel="New buyer template"
       />

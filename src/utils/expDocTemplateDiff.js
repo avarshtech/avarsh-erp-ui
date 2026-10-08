@@ -9,7 +9,7 @@
 import { LAYOUT_KEYS } from './expDocSystemTemplates';
 
 /** What a revision is compared on: its name and buyer scope plus every layout key. */
-const COMPARABLE = ['name', 'buyerName', 'buyerCode', 'stickerLayout', ...LAYOUT_KEYS];
+const COMPARABLE = ['name', 'buyerName', 'buyerCode', ...LAYOUT_KEYS];
 
 const flatten = (value, prefix, out) => {
   if (value === null || value === undefined) { out[prefix] = null; return; }
