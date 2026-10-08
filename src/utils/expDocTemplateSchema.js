@@ -342,7 +342,12 @@ export const resolveBinding = (path, ctx, options = {}) => {
   if (path == null) return null;
   const raw = String(path);
   if (raw.startsWith('fixed:')) return raw.slice(6);
-  if (raw.startsWith('ask:')) return ctx?.ask?.[raw.slice(4)] ?? null;
+  if (raw.startsWith('ask:')) {
+    // Own answers only: a key such as "constructor" must not read Object.prototype.
+    const answers = ctx?.ask;
+    const key = raw.slice(4);
+    return answers && Object.hasOwn(answers, key) ? answers[key] ?? null : null;
+  }
 
   const value = readPath(ctx, raw);
   if (value === undefined) return null;

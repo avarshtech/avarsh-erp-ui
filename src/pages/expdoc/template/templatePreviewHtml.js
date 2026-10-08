@@ -6,11 +6,11 @@
  * of it. A preview built by a second renderer would be free to be wrong in ways the real
  * one is not. Shared by the preview drawer and the upload review's inline preview.
  */
-import {
-  buildPackingListHtml, buildStickerSheetHtml, buildExportInvoiceHtml, templatePageMm,
-} from '../../../utils/expDocHtml';
+import { buildPackingListHtml, buildExportInvoiceHtml, templatePageMm } from '../../../utils/expDocHtml';
+import { buildStickerSheetHtml } from '../../../utils/expDocStickerHtml';
+import { labelOf } from '../../../utils/expDocStickerParts';
 import { expandCartonRange } from '../../../utils/expDocCalc';
-import { DOC_TYPE } from '../../../utils/expDocConstants';
+import { DOC_TYPE, STICKER_LINE_KIND } from '../../../utils/expDocConstants';
 
 const MM_TO_PX = 96 / 25.4;
 
@@ -44,9 +44,25 @@ export const PREVIEW_MODES = [
  * "Template only" hides the document's own values — every `.v` the renderer marks — and
  * keeps their space, so the page keeps its real shape. What belongs to the template
  * stays: labels and headings, text fixed in the layout, the exporter's organisation
- * details and the buyer.
+ * details and the buyer. A barcode is drawn with fills, which ignore `color`, so its
+ * SVG is hidden outright.
  */
-const TEMPLATE_ONLY_CSS = '<style>.v, .v * { color: transparent !important; }</style>';
+const TEMPLATE_ONLY_CSS = '<style>.v, .v * { color: transparent !important; } .v svg { visibility: hidden !important; }</style>';
+
+/**
+ * A sticker's once-per-run questions (`ask:` lines), each previewed as its own label in
+ * guillemets — "‹BATCH #›" — so the layout shows where the answer will print.
+ */
+const askPreview = (stickerLayout) => {
+  const out = Object.create(null);
+  (stickerLayout?.faces || []).forEach((face) => (face?.lines || []).forEach((line) => {
+    const binding = String(line?.binding ?? '');
+    if (!binding.startsWith('ask:') || (line.kind && line.kind !== STICKER_LINE_KIND.FIELD)) return;
+    const key = binding.slice(4);
+    if (!(key in out)) out[key] = `‹${labelOf(line, { bare: true }) || key}›`;
+  }));
+  return out;
+};
 
 const renderSample = (sample, exporter) => {
   if (!sample || sample.empty) return '';
@@ -62,22 +78,28 @@ const renderSample = (sample, exporter) => {
     const rows = (sample.pl.sections || []).flatMap((s) => s.rows || []);
     const first = rows[0];
     if (!first || !tpl.stickerLayout?.faces?.length) return '';
+    const styleByEntry = sample.styleByEntry || {};
     // Two cartons is enough to show the layout and the "n of N" counter without
-    // materialising a shipment's worth of labels.
+    // materialising a shipment's worth of labels. Each carries its entry's season, as
+    // the cartons of a print run do.
     const cartons = expandCartonRange(rows, first.cartonFrom, Math.min(first.cartonTo, first.cartonFrom + 1), {
       totalCartonsInShipment: sample.pl.totalCartons || 0,
-    });
+    }).map((c) => ({ ...c, season: styleByEntry[c.sourceEntryId]?.season ?? null }));
     return buildStickerSheetHtml(cartons, {
       layout: tpl.stickerLayout,
       paper: tpl.stickerLayout.paperDefault,
       draft: true,
+      printBarcodes: true,
       // `pl` is in the context because a sticker layout may bind document-level
-      // fields (the order number, say) alongside carton ones.
+      // fields (the order number, say) alongside carton ones; `style.*` is read per
+      // carton from its own entry.
       ctx: {
         exporter: ctxExporter,
         shipment,
         pl: sample.pl,
         buyer: { name: sample.pl.buyerName },
+        styleByEntry,
+        ask: askPreview(tpl.stickerLayout),
         showLogo: tpl.identity?.showLogo === true,
       },
     });

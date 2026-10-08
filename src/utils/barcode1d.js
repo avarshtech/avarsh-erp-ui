@@ -1,11 +1,12 @@
 /**
- * EAN-13 and Code 128-B rendered as inline SVG.
+ * EAN-13, UPC-A and Code 128-B rendered as inline SVG.
  *
- * Hand-rolled rather than pulled from a dependency: these two symbologies are the
- * only ones the analysed buyer formats need (PRD §19 — Vingino's EAN, plus an
- * internal carton identifier), and the encoders are small and stable. QR is a
- * different matter — a correct encoder needs Reed–Solomon and mask evaluation, so
- * it stays off until the API phase.
+ * Hand-rolled rather than pulled from a dependency: these symbologies are the only
+ * ones the analysed buyer formats need (PRD §19 — Vingino's EAN, plus an internal
+ * carton identifier), and the encoders are small and stable. UPC-A needs no encoder
+ * of its own: it is an EAN-13 whose first digit is 0. QR is a different matter — a
+ * correct encoder needs Reed–Solomon and mask evaluation, so it stays off until the
+ * API phase.
  *
  * SVG rather than canvas because these are printed: vectors stay crisp at any DPI,
  * and the thermal-label guidance is ≥203 dpi.
@@ -59,6 +60,28 @@ export const ean13Modules = (value) => {
   for (let i = 7; i <= 12; i += 1) bits += R_CODE[Number(code[i])];
   bits += '101'; // end guard
   return { code, bits };
+};
+
+// ─── UPC-A ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Normalise to 12 digits: accepts 11 (check digit appended) or 12 (verified). The
+ * check digit is the EAN-13 one of 0 followed by the first eleven digits — the same
+ * weights, because the leading 0 shifts nothing.
+ */
+export const normaliseUpcA = (value) => {
+  const d = String(value ?? '').replace(/\D/g, '');
+  if (d.length === 11) return d + ean13CheckDigit(`0${d}`);
+  if (d.length === 12) return ean13CheckDigit(`0${d.slice(0, 11)}`) === Number(d[11]) ? d : null;
+  return null;
+};
+
+/** Module pattern for a UPC-A: the bars of the EAN-13 "0" + its twelve digits; the text stays twelve digits. */
+export const upcaModules = (value) => {
+  const code = normaliseUpcA(value);
+  if (!code) return null;
+  const ean = ean13Modules(`0${code}`);
+  return ean ? { code, bits: ean.bits } : null;
 };
 
 // ─── Code 128-B ─────────────────────────────────────────────────────────────────
@@ -130,16 +153,23 @@ const runsToRects = (bits, moduleWidth, height) => {
   return out;
 };
 
+/** The human-readable line is text inside SVG: a Code 128 value may hold "<" or "&". */
+const xmlText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+const ENCODERS = { EAN13: ean13Modules, UPCA: upcaModules };
+
 /**
  * Render a barcode as an inline SVG string.
  *
- * `heightMm` is the bar height; the quiet zone either side is the symbology
- * minimum (10 modules for EAN-13, 10 for Code 128) so scanners have somewhere to
- * start. Returns null when the value cannot be encoded, which the caller should
- * surface rather than print a blank space.
+ * `type` is EAN13, UPCA or CODE128 (any other type encodes as Code 128).
+ * `heightMm` is the bar height. Ten modules of quiet zone are left on each side so
+ * scanners have somewhere to start: Code 128 asks for ten; GS1 asks for 11 left and
+ * 7 right on EAN-13, and 9 each side on UPC-A — ten each side is fine in practice.
+ * Returns null when the value cannot be encoded, which the caller should surface
+ * rather than print a blank space.
  */
 export const barcodeSvg = (type, value, { heightMm = 12, moduleMm = 0.33, showText = true } = {}) => {
-  const encoded = type === 'EAN13' ? ean13Modules(value) : code128Modules(value);
+  const encoded = (Object.hasOwn(ENCODERS, type) ? ENCODERS[type] : code128Modules)(value);
   if (!encoded) return null;
 
   const quiet = 10;
@@ -150,11 +180,9 @@ export const barcodeSvg = (type, value, { heightMm = 12, moduleMm = 0.33, showTe
 
   const bars = runsToRects(encoded.bits, moduleMm, barsMm);
   const label = showText
-    ? `<text x="${(widthMm / 2).toFixed(2)}" y="${(heightMm - 0.4).toFixed(2)}" font-family="monospace" font-size="2.6" text-anchor="middle" fill="#000">${encoded.code}</text>`
+    ? `<text x="${(widthMm / 2).toFixed(2)}" y="${(heightMm - 0.4).toFixed(2)}" font-family="monospace" font-size="2.6" text-anchor="middle" fill="#000">${xmlText(encoded.code)}</text>`
     : '';
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${widthMm.toFixed(2)}mm" height="${heightMm}mm" viewBox="0 0 ${widthMm.toFixed(2)} ${heightMm}" shape-rendering="crispEdges">`
     + `<g transform="translate(${(quiet * moduleMm).toFixed(3)},0)">${bars}</g>${label}</svg>`;
 };
-
-export const SUPPORTED_SYMBOLOGIES = ['EAN13', 'CODE128'];

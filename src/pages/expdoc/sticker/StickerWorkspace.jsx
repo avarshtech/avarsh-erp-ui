@@ -15,7 +15,7 @@ import { EXPDOC_MODULE, PAPER_LIST, PAPER_SPECS, PL_STATUS } from '../../../util
 
 /** A sticker prints clean only from a packing list that is actually final. */
 const FINAL_PL_STATUSES = [PL_STATUS.FINAL, PL_STATUS.EXPORTED];
-import { buildStickerSheetHtml, stickerCounts } from '../../../utils/expDocHtml';
+import { buildStickerSheetHtml, stickerCounts } from '../../../utils/expDocStickerHtml';
 import { intersectRanges, formatRanges } from '../../../utils/expDocCalc';
 import { openPrintWindow, documentFileName } from '../../../utils/printDoc';
 import {
@@ -193,6 +193,7 @@ const StickerWorkspace = () => {
     shipment: ctx?.shipment || {},
     buyer: { name: ctx?.pl?.buyerName },
     pl: ctx?.pl || {},
+    styleByEntry: ctx?.styleByEntry,
     // The sticker template's own logo switch, not the packing list's.
     showLogo: ctx?.layout?.identity?.showLogo === true,
   }), [exporter, ctx]);
