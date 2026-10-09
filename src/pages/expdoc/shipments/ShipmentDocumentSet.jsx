@@ -108,7 +108,8 @@ const ShipmentDocumentSet = ({ open, shipmentId, onClose }) => {
         message.success(`${jobs} document(s) sent to print.`);
       }
     } catch (e) {
-      message.error(e.message || 'Could not print the document set');
+      // The shipment comes from the API, whose errors the interceptor has already shown
+      if (!e?.isAxiosError) message.error(e?.message || 'Could not print the document set');
     } finally {
       setPrinting(false);
     }

@@ -103,7 +103,7 @@ const PackingListWorkspace = () => {
   // Preview never has to wait, and failures degrade to an em dash on the page.
   useEffect(() => {
     if (!pl?.shipmentId) return;
-    getShipment(pl.shipmentId).then(setShipment).catch(() => setShipment(null));
+    getShipment(pl.shipmentId, { silent: true }).then(setShipment).catch(() => setShipment(null));
   }, [pl?.shipmentId]);
 
   /*

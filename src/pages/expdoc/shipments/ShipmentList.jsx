@@ -19,12 +19,11 @@ const STATUS_OPTIONS = [
 ];
 
 /**
- * Shipment register.
+ * Shipment register, on the API (/export-docs/shipments).
  *
- * No shipment entity exists anywhere in the ERP, yet the packing list is
- * shipment-scoped (V-01 checks carton numbers across every packing list of one
- * shipment) and the invoice header needs ports, vessel and container. This screen
- * is deliberately thin so a real Shipment module can take it over.
+ * The packing list is shipment-scoped (V-01 checks carton numbers across every packing
+ * list of one shipment) and the invoice header prints the shipment's ports, vessel and
+ * containers. A shipment closes on its own once every live document on it is released.
  */
 const ShipmentList = () => {
   const navigate = useNavigate();
@@ -67,7 +66,8 @@ const ShipmentList = () => {
           total: res.totalElements || 0,
         }));
       } catch (e) {
-        message.error(e.message || 'Failed to load shipments');
+        // An API error was shown by the interceptor
+        if (!e?.isAxiosError) message.error(e?.message || 'Failed to load shipments');
         setRows([]);
       } finally {
         setLoading(false);
@@ -80,14 +80,16 @@ const ShipmentList = () => {
     fetchData(1);
   }, [fetchData]);
 
+  // Returns the promise, so the Popconfirm's OK spins until it settles.
   const handleDelete = useCallback(
     async (record) => {
       try {
-        await deleteShipment(record.id);
+        await deleteShipment(record);
         message.success(`${record.shipmentNo} deleted`);
         fetchData();
       } catch (e) {
-        message.error(e.message || 'Failed to delete shipment');
+        // An API error was shown by the interceptor; a refusal for this browser's documents was not
+        if (!e?.isAxiosError) message.error(e?.message || 'Failed to delete shipment');
       }
     },
     [message, fetchData],
@@ -134,7 +136,8 @@ const ShipmentList = () => {
       <Card>
         <SearchFilterBar
           searchText={searchText}
-          onSearchChange={setSearchText}
+          // SearchFilterBar hands over the input's change event, not its text
+          onSearchChange={(e) => setSearchText(e.target.value)}
           searchPlaceholder="Search shipment no, consignee, order, vessel or container"
           filters={filters}
           style={{ marginBottom: 16 }}
@@ -145,7 +148,8 @@ const ShipmentList = () => {
           loading={loading}
           rowKey="id"
           size="small"
-          scroll={{ x: 1690 }}
+          className="table-nowrap"
+          scroll={{ x: 'max-content' }}
           onRow={(record) => ({
             onClick: () => setViewId(record.id),
             style: { cursor: 'pointer' },

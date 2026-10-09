@@ -18,7 +18,7 @@ import {
 } from './expDocMockCommon';
 import { getBuyerCommercial } from './expDocMockMasters';
 import { decorateEntry } from './expDocMockPacking';
-import { decorate as decorateShipment, syncShipmentStatus } from './expDocMockShipments';
+import { decorate as decorateShipment, entriesOfShipment } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
   PL_STATUS, PL_TRANSITIONS, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
@@ -309,6 +309,10 @@ export const createPackingList = async (payload) => {
   if (!entries.length) fail('VALIDATION', 'Select at least one packing entry to bind.');
 
   const shipment = db.shipments.find((s) => s.id === Number(payload.shipmentId));
+  // The shipment is the API's, mirrored: unreadable now (deleted, offline) is a refusal, not a list without one
+  if (payload.shipmentId != null && !shipment) {
+    fail('NOT_FOUND', 'The shipment could not be read. Reload and pick it again.');
+  }
 
   const buyerCode = payload.buyerCode ?? shipment?.buyerCode ?? entries[0]?.buyerCode ?? null;
 
@@ -534,8 +538,7 @@ export const markPackingListExported = async (id, options = {}) => {
     actionUrl: `/export-docs/packing-lists/edit/${pl.id}`,
     entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
   });
-  // §11.1: the shipment reflects its documents.
-  syncShipmentStatus(db, pl.shipmentId);
+  // §11.1: the shipment reflects its documents; the facade closes it (expDocShipmentBridge).
   saveDb(db);
   return decoratePl(pl, db);
 };
@@ -784,7 +787,10 @@ export const deletePackingList = async (id) => {
   return { success: true };
 };
 
-/** Packing entries a new packing list may bind, with the reason when it may not. */
+/**
+ * Packing entries a new packing list may bind, with the reason when it may not: those
+ * of the shipment's buyer (seeded entries name no shipment, the shipment is the API's).
+ */
 export const listBindableForShipment = async (shipmentId) => {
   await delay(80);
   const db = loadDb();
@@ -793,8 +799,9 @@ export const listBindableForShipment = async (shipmentId) => {
     .filter((p) => LIVE_STATUSES.includes(p.status))
     .forEach((p) => (p.sourceRefs || []).forEach((r) => takenBy.set(r.packingEntryId, p.plNo)));
 
-  return (db.packingEntries || [])
-    .filter((e) => !shipmentId || e.shipmentId === Number(shipmentId))
+  const shipment = shipmentId ? (db.shipments || []).find((s) => s.id === Number(shipmentId)) : null;
+  if (shipmentId && !shipment) return [];
+  return (shipment ? entriesOfShipment(db, shipment) : db.packingEntries || [])
     .map((e) => {
       const dec = decorateEntry(e);
       const taken = takenBy.get(e.id);

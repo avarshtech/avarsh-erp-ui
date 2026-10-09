@@ -29,7 +29,9 @@ import {
 // 13 (2026-10-08): carton-sticker templates moved to the API, so the STK-n seeds are
 // gone (a stored run naming one would be looked up there); JOMO rows carry EANs for
 // some sizes, and every packing entry a season.
-export const SEED_VERSION = 13;
+// 14 (2026-10-08): shipments moved to the API. The seeded shipments, ports and
+// incoterms are gone, and packing entries bind to a shipment of their buyer.
+export const SEED_VERSION = 14;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -41,21 +43,7 @@ const KIDS_EU_SIZES = ['74', '80', '86', '92', '98', '104', '110', '116', '122',
 const BABY_SIZES = ['50/56', '62/68', '74/80', '86/92'];
 
 // ─── Masters ────────────────────────────────────────────────────────────────────
-
-const SEED_PORTS = [
-  { code: 'INMAA1', name: 'Chennai Sea', country: 'India', type: 'SEA' },
-  { code: 'INTUT1', name: 'Tuticorin Sea', country: 'India', type: 'SEA' },
-  { code: 'INMAA4', name: 'Chennai Air', country: 'India', type: 'AIR' },
-  { code: 'NLRTM', name: 'Rotterdam', country: 'Netherlands', type: 'SEA' },
-  { code: 'BEANR', name: 'Antwerp', country: 'Belgium', type: 'SEA' },
-  { code: 'DEHAM', name: 'Hamburg', country: 'Germany', type: 'SEA' },
-  { code: 'USNYC', name: 'New York', country: 'USA', type: 'SEA' },
-];
-
-// Incoterms 2020 — a fixed constant list, not a maintainable master.
-const SEED_INCOTERMS = [
-  'EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP',
-];
+// Ports and incoterms are fixed lists in utils/expDocConstants.js (EXPORT_PORTS, INCOTERMS).
 
 // Garment HS codes with their IGST rate. The rate is fiscal rather than stylistic,
 // which is why it lives on the code and not on the style.
@@ -110,6 +98,12 @@ const SEED_BUYER_COMMERCIAL = [
   },
 ];
 
+/** The demo buyer code a real buyer's name maps to, or null; the profiles are keyed by both. */
+export const buyerCodeOf = (buyerName) => {
+  const name = String(buyerName ?? '').trim().toLowerCase();
+  return SEED_BUYER_COMMERCIAL.find((b) => b.buyerName.toLowerCase() === name)?.buyerCode ?? null;
+};
+
 export const DEFAULT_BUYER_COMMERCIAL = {
   buyerCode: null,
   buyerName: null,
@@ -155,110 +149,6 @@ const buildFxRates = () => {
   }
   return rows;
 };
-
-// ─── Shipments ──────────────────────────────────────────────────────────────────
-// A minimal entity invented by this module: no shipment record exists anywhere in
-// the ERP, yet V-01 is shipment-scoped and the invoice header needs ports/vessel.
-//
-// The consignee is the buyer and the notify party its bank or a shipping location,
-// stored as the { name, block } snapshots a saved shipment carries. A seed cannot
-// know the real buyer master's location ids, so `notifyParty` is left empty: the
-// user picks it on the first edit, which rebuilds both blocks from the master.
-
-const buildShipments = () => [
-  {
-    id: 1,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1001, FY),
-    status: 'OPEN',
-    buyerCode: 'JOMO',
-    buyerName: 'JOMO BV',
-    mode: 'SEA',
-    incoterm: 'FOB',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'MAERSK CHENNAI V.214W',
-    portOfLoading: 'Chennai Sea',
-    portOfDischarge: 'Rotterdam',
-    finalDestination: 'Valkenswaard, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: ['MSKU7712345'],
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(12),
-    eta: d(38),
-    forwarder: 'Kuehne + Nagel',
-    notifyParty: null,
-    consigneeLocationId: null,
-    consignee: { name: 'JOMO BV', locationId: null, block: 'JOMO BV\nHandelsweg 24\nValkenswaard\n5555 XT Netherlands' },
-    notify: { name: 'ABN AMRO Bank N.V.', block: 'ABN AMRO Bank N.V.\nSWIFT: ABNANL2A' },
-    orders: [{ orderId: null, orderNo: orderNo(1042), styleNo: 'ST-2026-0441' }],
-    version: 0,
-    createdAt: ts(-6),
-    createdBy: 'Priya S.',
-  },
-  {
-    id: 2,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1002, FY),
-    status: 'OPEN',
-    buyerCode: 'VGT',
-    buyerName: 'Van Gennip Textiles BV',
-    mode: 'SEA',
-    incoterm: 'CIF',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'CMA CGM LOIRE V.0PA3RE1MA',
-    portOfLoading: 'Tuticorin Sea',
-    portOfDischarge: 'Antwerp',
-    finalDestination: 'Uden, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: ['CMAU4451209', 'CMAU4451210'],
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(25),
-    eta: d(52),
-    forwarder: 'DSV Air & Sea',
-    // Notify = a shipping location, so its address is the consignee's too.
-    notifyParty: null,
-    consigneeLocationId: null,
-    consignee: { name: 'Van Gennip Textiles BV', locationId: null, block: 'Van Gennip Textiles BV\nNijverheidsweg 12\nUden\n5405 NL Netherlands' },
-    notify: { name: 'Uden DC', block: 'Uden DC\nNijverheidsweg 12\nUden\n5405 NL Netherlands' },
-    orders: [{ orderId: null, orderNo: orderNo(1055), styleNo: 'ST-2026-0512' }],
-    version: 0,
-    createdAt: ts(-3),
-    createdBy: 'Priya S.',
-  },
-  {
-    // D/A terms — the bank is the notify party; the buyer stays the consignee.
-    id: 3,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1003, FY),
-    status: 'OPEN',
-    buyerCode: 'PRENATAL',
-    buyerName: 'Prénatal Moeder en Kind BV',
-    mode: 'SEA',
-    incoterm: 'FOB',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'HAPAG EXPRESS V.118E',
-    portOfLoading: 'Chennai Sea',
-    portOfDischarge: 'Rotterdam',
-    finalDestination: 'Amersfoort, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: [],
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(40),
-    eta: d(66),
-    forwarder: null,
-    notifyParty: null,
-    consigneeLocationId: null,
-    consignee: { name: 'Prénatal Moeder en Kind BV', locationId: null, block: 'Prénatal Moeder en Kind BV\nSterrenbergweg 6\nAmersfoort\n3821 AT Netherlands' },
-    notify: { name: 'Deutsche Bank AG', block: 'Deutsche Bank AG\nSWIFT: DEUTDEFF' },
-    orders: [{ orderId: null, orderNo: orderNo(1061), styleNo: 'ST-2026-0588' }],
-    version: 0,
-    createdAt: ts(-1),
-    createdBy: 'Priya S.',
-  },
-];
 
 // ─── Packing entries ────────────────────────────────────────────────────────────
 
@@ -339,7 +229,6 @@ const buildPackingEntries = () => [
     id: 1,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1001, FY),
     status: PACKING_ENTRY_STATUS.COMPLETED,
-    shipmentId: 1,
     orderNo: orderNo(1042),
     buyerCode: 'JOMO',
     buyerName: 'JOMO BV',
@@ -421,7 +310,6 @@ const buildPackingEntries = () => [
     id: 2,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1002, FY),
     status: PACKING_ENTRY_STATUS.COMPLETED,
-    shipmentId: 2,
     orderNo: orderNo(1055),
     buyerCode: 'VGT',
     buyerName: 'Van Gennip Textiles BV',
@@ -480,7 +368,6 @@ const buildPackingEntries = () => [
     id: 3,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1003, FY),
     status: PACKING_ENTRY_STATUS.OPEN,
-    shipmentId: 3,
     orderNo: orderNo(1061),
     buyerCode: 'PRENATAL',
     buyerName: 'Prénatal Moeder en Kind BV',
@@ -530,28 +417,24 @@ const buildPackingEntries = () => [
 
 export const buildSeedDb = () => {
   groupSeq = 0;
-  const shipments = buildShipments();
   const packingEntries = buildPackingEntries();
 
+  // No shipments: they are the API's, mirrored over every load (expDocMockStore).
   return {
     seedVersion: SEED_VERSION,
     // Explicit mirror of sys_doc_counters (prefix, fy_code): last number used.
     docSeq: {
-      [`${EXPDOC_PREFIX.SHIPMENT}/${FY}`]: FIRST_DOC_NUMBER - 1 + shipments.length,
       [`${EXPDOC_PREFIX.PACKING_ENTRY}/${FY}`]: FIRST_DOC_NUMBER - 1 + packingEntries.length,
       [`${EXPDOC_PREFIX.PACKING_LIST}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.INVOICE}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.STICKER_RUN}/${FY}`]: FIRST_DOC_NUMBER - 1,
     },
-    shipments,
     packingEntries,
     packingLists: [],
     invoices: [],
     stickerRuns: [],
     audit: [],
     masters: {
-      ports: SEED_PORTS,
-      incoterms: SEED_INCOTERMS,
       hsCodes: SEED_HS_CODES,
       buyerCommercial: SEED_BUYER_COMMERCIAL,
       fxRates: buildFxRates(),

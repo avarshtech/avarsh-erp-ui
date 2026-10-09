@@ -257,7 +257,11 @@ test.describe.serial('Buyer templates', () => {
     await goTo(page, '/export-docs/packing-lists/list');
     await page.getByRole('button', { name: /New Packing List/ }).first().click();
     const dialog = page.getByRole('dialog', { name: 'New Packing List' });
-    await dialog.locator('.ant-select').first().click();
+    // Shipments are the API's (the e2e seed's SHP/E2E/0001 is JOMO's), and on a stack that has
+    // run the shipment specs many are open: narrow the virtual list to JOMO's before picking.
+    const shipmentSelect = dialog.locator('.ant-select').first();
+    await shipmentSelect.click();
+    await shipmentSelect.locator('input').fill('JOMO');
     await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
       .filter({ hasText: 'JOMO BV' }).first().click();
     await settle(page);

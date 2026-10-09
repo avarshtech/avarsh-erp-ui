@@ -9,6 +9,7 @@
  * DOCUMENTS, never cartons, so a 40,000-carton shipment costs the same as a 40.
  */
 import { loadDb } from './expDocMockStore';
+import { entriesOfShipment } from './expDocMockShipments';
 import { delay, todayStr } from './expDocMockCommon';
 import { PL_STATUS, INVOICE_STATUS } from '../../utils/expDocConstants';
 
@@ -57,7 +58,8 @@ const readinessRows = (db) => {
   return (db.shipments || [])
     .filter((s) => s.status !== 'CLOSED')
     .map((s) => {
-      const entries = (db.packingEntries || []).filter((e) => e.shipmentId === s.id);
+      // The buyer's seeded entries: none names a shipment since shipments moved to the API.
+      const entries = entriesOfShipment(db, s);
       const pls = (db.packingLists || []).filter(
         (p) => p.shipmentId === s.id && ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(p.status),
       );

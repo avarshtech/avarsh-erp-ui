@@ -89,7 +89,8 @@ const ExportInvoiceForm = () => {
 
   useEffect(() => {
     if (!inv?.shipmentId) return;
-    getShipment(inv.shipmentId).then(setShipment).catch(() => setShipment(null));
+    // Silent: a shipment that cannot be read (deleted, another branch) prints as a dash
+    getShipment(inv.shipmentId, { silent: true }).then(setShipment).catch(() => setShipment(null));
   }, [inv?.shipmentId]);
 
   useEffect(() => {

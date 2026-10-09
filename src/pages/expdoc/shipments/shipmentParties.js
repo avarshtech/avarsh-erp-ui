@@ -9,26 +9,19 @@
  *   - notify = the bank → the location picked as "Consignee address", or the
  *     buyer's only location when there is just one.
  *
- * Both parties are snapshotted onto the shipment as { name, block } when it is
- * saved: the mock layer is synchronous and cannot reach the buyer API, and an
- * invoice raised against the shipment copies the blocks verbatim.
+ * The server builds both printed blocks from the buyer master when the shipment is
+ * saved (ShipmentPartyBuilder), to the same text as the preview built here; the form
+ * sends only ids. An invoice raised against the shipment copies the blocks verbatim.
+ *
+ * Buyer Master renews every shipping location's id each time the buyer is saved, so a
+ * saved choice is matched again by its label (rematchLocationId).
  */
 import {
   activeLocations, formatLocationAddress,
-} from '../../sample-request/invoice/consigneeAddress';
+} from '../../sample-request/invoice/consigneeAddress.js';
 
 export const NOTIFY_BANK = 'BANK';
 const LOC_PREFIX = 'LOC:';
-
-/**
- * The "Attn:" line. `GET /buyers` masks the phone for non-admin roles
- * (BuyerService.maskSensitiveFields), and a masked number must never be snapshotted
- * onto a document — so a phone carrying the mask is left off.
- */
-const contactLine = (buyer) => [
-  buyer?.contactPerson,
-  buyer?.phone && !String(buyer.phone).includes('*') ? buyer.phone : null,
-].filter(Boolean).join(' · ');
 
 const locationValue = (loc) => `${LOC_PREFIX}${loc.id}`;
 const locationLabel = (loc) => [loc.label, [loc.city, loc.country].filter(Boolean).join(', ')]
@@ -38,11 +31,22 @@ const locationById = (buyer, id) => (id == null
   ? null
   : activeLocations(buyer).find((l) => Number(l.id) === Number(id)) || null);
 
-/** The stored notify party → the Select value. */
-export const notifyValueOf = (party) => {
+/**
+ * A saved location id while the buyer still has it, else the active location with the
+ * saved label (Buyer Master renewed the ids), else null: pick it again.
+ */
+export const rematchLocationId = (buyer, id, label) => {
+  if (locationById(buyer, id)) return Number(id);
+  const byLabel = label ? activeLocations(buyer).find((l) => l.label === label) : null;
+  return byLabel ? byLabel.id : null;
+};
+
+/** The stored notify party → the Select value, matched against the buyer when it is known. */
+export const notifyValueOf = (party, buyer) => {
   if (party?.kind === 'BANK') return NOTIFY_BANK;
-  if (party?.kind === 'LOCATION' && party.locationId != null) return `${LOC_PREFIX}${party.locationId}`;
-  return undefined;
+  if (party?.kind !== 'LOCATION') return undefined;
+  const id = buyer ? rematchLocationId(buyer, party.locationId, party.locationLabel) : party.locationId;
+  return id != null ? `${LOC_PREFIX}${id}` : undefined;
 };
 
 /** The Select value → the stored notify party. */
@@ -98,14 +102,12 @@ export const consigneeLocationOf = (buyer, notifyValue, consigneeLocationId) => 
   return locations.length === 1 ? locations[0] : locationById(buyer, consigneeLocationId);
 };
 
-/** The consignee as it prints: buyer name, the shipping address, then the Attn line. */
+/** The consignee as it prints: buyer name, the shipping address, then "Attn:" and the contact person — never the phone. */
 export const consigneeOf = (buyer, location) => {
   if (!buyer) return null;
-  const contact = contactLine(buyer);
   return {
     name: buyer.name,
-    locationId: location?.id ?? null,
-    block: [buyer.name, formatLocationAddress(location), contact ? `Attn: ${contact}` : null]
+    block: [buyer.name, formatLocationAddress(location), buyer.contactPerson ? `Attn: ${buyer.contactPerson}` : null]
       .filter(Boolean)
       .join('\n'),
   };

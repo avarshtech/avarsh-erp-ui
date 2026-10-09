@@ -20,7 +20,7 @@ import {
 } from './expDocMockCommon';
 import { getBuyerCommercial, getHsDefault, getFxRate, getExporterProfileExtra } from './expDocMockMasters';
 import { decoratePl } from './expDocMockPackingLists';
-import { decorate as decorateShipment, syncShipmentStatus } from './expDocMockShipments';
+import { decorate as decorateShipment } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
   INVOICE_STATUS, INVOICE_TRANSITIONS, PL_STATUS, PHASE, DOC_TYPE,
@@ -381,6 +381,10 @@ export const createInvoice = async (payload = {}) => {
   const first = pls[0];
   const commercial = getBuyerCommercial(first);
   const shipmentRaw = (db.shipments || []).find((s) => s.id === first.shipmentId) || null;
+  // The invoice copies the shipment's parties: one that cannot be read now (deleted, offline) is a refusal
+  if (first.shipmentId != null && !shipmentRaw) {
+    fail('NOT_FOUND', `The shipment of ${first.plNo} could not be read. Reload and try again.`);
+  }
   const shipment = shipmentRaw ? decorateShipment(shipmentRaw, db) : null;
 
   // Chosen by the user (a buyer may have several) and handed in as a snapshot of that
@@ -738,7 +742,7 @@ export const markInvoiceExported = async (id, options = {}) => {
     actionUrl: `/export-docs/invoices/edit/${row.id}`,
     entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo,
   });
-  syncShipmentStatus(db, row.shipmentId);
+  // The shipment reflects its documents; the facade closes it (expDocShipmentBridge).
   saveDb(db);
   return decorateInvoice(row, db);
 };

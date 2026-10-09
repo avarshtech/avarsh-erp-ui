@@ -1,178 +1,63 @@
 /**
- * Shipment records — an entity this module invents.
- *
- * No shipment/booking/consignment table, entity, page or service exists anywhere
- * in either repo, yet V-01 is shipment-scoped ("duplicate carton number across all
- * packing lists of the shipment") and the whole invoice transport block reads from
- * one. Kept deliberately thin so a real Shipment module can replace it: every
- * consumer goes through expDocService.getShipment().
+ * What the mock documents know about shipments. The shipment itself is the API's
+ * (/export-docs/shipments, through expDocService); `db.shipments` here is the in-memory
+ * mirror of it (expDocShipmentMirror). What stays is the document side: the counts a
+ * shipment shows, the packing entries it can bind, and its document set (§18).
  */
-import { loadDb, saveDb, nextShipmentNo } from './expDocMockStore';
-import {
-  delay, clone, fail, failConflict, pageOf, matchesText, pushAudit, nowStamp, currentUserName,
-} from './expDocMockCommon';
-const find = (db, id) => db.shipments.find((s) => s.id === Number(id));
+import { loadDb } from './expDocMockStore';
+import { delay, clone, fail } from './expDocMockCommon';
+
+/** The same buyer: by demo code when both carry one, else by name. */
+const sameBuyer = (entry, shipment) => (entry.buyerCode && shipment.buyerCode
+  ? entry.buyerCode === shipment.buyerCode
+  : entry.buyerName === shipment.buyerName);
+
+/** The seeded packing entries a shipment can bind: its buyer's. No entry names a shipment. */
+export const entriesOfShipment = (db, shipment) => (db.packingEntries || []).filter((e) => sameBuyer(e, shipment));
+
+/** This browser's packing lists and invoices on one shipment, any status. */
+export const documentsOfShipment = (shipmentId) => {
+  const db = loadDb();
+  const id = Number(shipmentId);
+  return [...(db.packingLists || []), ...(db.invoices || [])].filter((d) => d.shipmentId === id);
+};
+
+/** The shipment one of this browser's packing lists ('packingLists') or invoices ('invoices') names. */
+export const shipmentOfDocument = (table, id) =>
+  (loadDb()[table] || []).find((d) => d.id === Number(id))?.shipmentId ?? null;
+
+/** Every shipment this browser's packing lists and invoices were raised against. */
+export const documentShipmentIds = () => {
+  const db = loadDb();
+  return [...new Set([...(db.packingLists || []), ...(db.invoices || [])]
+    .map((d) => d.shipmentId)
+    .filter((id) => id != null))];
+};
 
 /**
- * Derived, read-only decoration — never persisted. Exported because the invoice
- * header prints the consignee and notify blocks and must not re-derive them.
+ * Derived, read-only decoration, never persisted. Exported because the invoice header
+ * prints the consignee and notify blocks and must not re-derive them.
  *
- * The consignee (the buyer) and the notify party are stored on the shipment as
- * { name, block } snapshots, built from the real buyer master when the shipment is
- * saved (pages/expdoc/shipments/shipmentParties.js): this layer is synchronous
- * and cannot reach the buyer API.
+ * The counts are this browser's documents: packing lists and invoices still live here.
  */
 export const decorate = (shipment, db) => {
   const out = clone(shipment);
   out.consignee = shipment.consignee || null;
   out.notify = shipment.notify || null;
   out.orderNos = (shipment.orders || []).map((o) => o.orderNo).filter(Boolean);
-  const entries = (db.packingEntries || []).filter((e) => e.shipmentId === shipment.id);
-  const lists = (db.packingLists || []).filter((p) => p.shipmentId === shipment.id);
-  out.packingEntryCount = entries.length;
-  out.packingListCount = lists.length;
+  out.packingListCount = (db.packingLists || []).filter((p) => p.shipmentId === shipment.id).length;
+  out.invoiceCount = (db.invoices || []).filter((i) => i.shipmentId === shipment.id).length;
   out.containerCount = (shipment.containerNos || []).length;
   return out;
 };
 
-export const searchShipments = async (params = {}) => {
-  await delay();
-  const db = loadDb();
-  const rows = db.shipments
-    .filter((s) => {
-      if (params.status && s.status !== params.status) return false;
-      if (params.buyerCode && s.buyerCode !== params.buyerCode) return false;
-      if (params.etdFrom && s.etd < params.etdFrom) return false;
-      if (params.etdTo && s.etd > params.etdTo) return false;
-      if (params.search) {
-        const hit = matchesText(s.shipmentNo, params.search)
-          || matchesText(s.buyerName, params.search)
-          || matchesText(s.vesselFlightNo, params.search)
-          || matchesText(s.portOfDischarge, params.search)
-          || (s.containerNos || []).some((c) => matchesText(c, params.search))
-          || (s.orders || []).some((o) => matchesText(o.orderNo, params.search));
-        if (!hit) return false;
-      }
-      return true;
-    })
-    .map((s) => decorate(s, db))
-    .sort((a, b) => b.id - a.id);
-  return pageOf(rows, params);
-};
+/** An API shipment with this browser's document counts. */
+export const withLocalDocuments = (shipment) => (shipment ? decorate(shipment, loadDb()) : shipment);
 
-export const getShipment = async (id) => {
-  await delay(80);
+/** A page of them, reading the store once. */
+export const withLocalDocumentsAll = (shipments) => {
   const db = loadDb();
-  const s = find(db, id);
-  if (!s) fail('NOT_FOUND', `Shipment ${id} not found`);
-  return decorate(s, db);
-};
-
-/** Lightweight options for pickers — no pagination, no decoration. */
-export const listShipmentOptions = async (buyerCode) => {
-  await delay(60);
-  const db = loadDb();
-  return db.shipments
-    .filter((s) => s.status === 'OPEN' && (!buyerCode || s.buyerCode === buyerCode))
-    .map((s) => ({
-      value: s.id,
-      label: `${s.shipmentNo} — ${s.buyerName} — ETD ${s.etd}`,
-      shipmentNo: s.shipmentNo,
-      buyerCode: s.buyerCode,
-      // What the packing-list template picker matches buyer templates on.
-      buyerId: s.buyerId ?? null,
-      buyerName: s.buyerName ?? null,
-    }));
-};
-
-export const createShipment = async (payload) => {
-  await delay();
-  const db = loadDb();
-  const id = Math.max(0, ...db.shipments.map((s) => s.id)) + 1;
-  const record = {
-    id,
-    shipmentNo: nextShipmentNo(db),
-    status: 'OPEN',
-    containerNos: [],
-    ...clone(payload),
-    version: 0,
-    createdAt: nowStamp(),
-    createdBy: currentUserName(),
-  };
-  db.shipments.push(record);
-  pushAudit(db, {
-    entityType: 'SHIPMENT', entityId: id, entityNo: record.shipmentNo, action: 'Shipment created',
-  });
-  saveDb(db);
-  return decorate(record, db);
-};
-
-export const updateShipment = async (id, payload) => {
-  await delay();
-  const db = loadDb();
-  const s = find(db, id);
-  if (!s) fail('NOT_FOUND', `Shipment ${id} not found`);
-  // Optimistic locking in the shape axiosInstance already routes to ConflictDialog.
-  if (payload.version != null && Number(payload.version) !== Number(s.version)) {
-    failConflict(s.shipmentNo, payload.version, s.version);
-  }
-  const before = clone(s);
-  const { version: _v, id: _id, shipmentNo: _no, ...rest } = payload;
-  Object.assign(s, clone(rest), { version: (s.version || 0) + 1 });
-  pushAudit(db, {
-    entityType: 'SHIPMENT', entityId: s.id, entityNo: s.shipmentNo,
-    action: 'Shipment updated', before, after: clone(s),
-  });
-  saveDb(db);
-  return decorate(s, db);
-};
-
-/**
- * §11.1 write-back: a shipment closes when every live document on it is released.
- *
- * Called from the document side after a release, so the shipment reflects its
- * documents rather than needing a person to remember. A shipment with no documents
- * is left OPEN — nothing has been shipped.
- */
-export const syncShipmentStatus = (db, shipmentId) => {
-  const s = find(db, shipmentId);
-  if (!s) return null;
-  const live = ['DRAFT', 'FINAL', 'EXPORTED'];
-  const pls = (db.packingLists || []).filter((p) => p.shipmentId === s.id && live.includes(p.status));
-  const invoices = (db.invoices || []).filter((i) => i.shipmentId === s.id && live.includes(i.status));
-  const docs = [...pls, ...invoices];
-  const closed = docs.length > 0 && docs.every((d) => d.status === 'EXPORTED');
-  const next = closed ? 'CLOSED' : 'OPEN';
-  if (s.status === next) return s;
-  s.status = next;
-  s.closedAt = closed ? nowStamp() : null;
-  s.version = (s.version || 0) + 1;
-  pushAudit(db, {
-    entityType: 'SHIPMENT', entityId: s.id, entityNo: s.shipmentNo,
-    action: closed ? 'Shipment closed' : 'Shipment reopened',
-    details: closed
-      ? `All ${docs.length} document(s) released.`
-      : 'A document on this shipment is no longer released.',
-  });
-  return s;
-};
-
-export const deleteShipment = async (id) => {
-  await delay();
-  const db = loadDb();
-  const s = find(db, id);
-  if (!s) fail('NOT_FOUND', `Shipment ${id} not found`);
-  const usedByEntry = (db.packingEntries || []).some((e) => e.shipmentId === s.id);
-  const usedByList = (db.packingLists || []).some((p) => p.shipmentId === s.id);
-  if (usedByEntry || usedByList) {
-    fail('CONFLICT', `${s.shipmentNo} is referenced by packing data and cannot be deleted.`);
-  }
-  db.shipments = db.shipments.filter((x) => x.id !== s.id);
-  pushAudit(db, {
-    entityType: 'SHIPMENT', entityId: s.id, entityNo: s.shipmentNo, action: 'Shipment deleted',
-  });
-  saveDb(db);
-  return { success: true };
+  return shipments.map((s) => decorate(s, db));
 };
 
 /**

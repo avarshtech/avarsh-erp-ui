@@ -143,6 +143,28 @@ export const INVOICE_TRANSITIONS = {
 
 export const isInvoiceEditable = (status) => status === INVOICE_STATUS.DRAFT;
 
+// ─── Shipment (API /export-docs/shipments) ──────────────────────────────────────
+// OPEN until every live packing list and invoice on it is released, then CLOSED and
+// read-only until one of them is cancelled or revised. Nobody presses Close: the
+// documents decide (services/expdoc/expDocShipmentBridge.js).
+export const SHIPMENT_STATUS = { OPEN: 'OPEN', CLOSED: 'CLOSED' };
+
+export const SHIPMENT_STATUS_LABELS = { OPEN: 'Open', CLOSED: 'Closed' };
+
+/** The ports a shipment loads at or discharges to: a fixed list, not a master. The shipment stores the name. */
+export const EXPORT_PORTS = [
+  { code: 'INMAA1', name: 'Chennai Sea', country: 'India', type: 'SEA' },
+  { code: 'INTUT1', name: 'Tuticorin Sea', country: 'India', type: 'SEA' },
+  { code: 'INMAA4', name: 'Chennai Air', country: 'India', type: 'AIR' },
+  { code: 'NLRTM', name: 'Rotterdam', country: 'Netherlands', type: 'SEA' },
+  { code: 'BEANR', name: 'Antwerp', country: 'Belgium', type: 'SEA' },
+  { code: 'DEHAM', name: 'Hamburg', country: 'Germany', type: 'SEA' },
+  { code: 'USNYC', name: 'New York', country: 'USA', type: 'SEA' },
+];
+
+/** Incoterms 2020, the only values the API accepts. */
+export const INCOTERMS = ['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
+
 // ─── Invoice line grain (PRD §8.3) ──────────────────────────────────────────────
 export const LINE_GRAIN = {
   PER_STYLE_SIZE_RANGE: 'PER_STYLE_SIZE_RANGE',

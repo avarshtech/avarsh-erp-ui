@@ -12,18 +12,20 @@
  */
 import { loadDb } from './expDocMockStore';
 import { delay } from './expDocMockCommon';
+import { entriesOfShipment } from './expDocMockShipments';
 import { PACKING_ENTRY_STATUS } from '../../utils/expDocConstants';
 import { decorateEntry } from '../../utils/packingEntryIssues';
 
 // The packing-list mock imports decorateEntry from here.
 export { entryIssues, decorateEntry } from '../../utils/packingEntryIssues';
 
-/** Entries a packing list may bind for a shipment (PRD §7.1). */
+/** Entries a packing list may bind for a shipment (PRD §7.1): those of the shipment's buyer. */
 export const listBindablePackingEntries = async (shipmentId) => {
   await delay(80);
   const db = loadDb();
-  return db.packingEntries
-    .filter((e) => !shipmentId || e.shipmentId === Number(shipmentId))
+  const shipment = shipmentId ? (db.shipments || []).find((s) => s.id === Number(shipmentId)) : null;
+  if (shipmentId && !shipment) return [];
+  return (shipment ? entriesOfShipment(db, shipment) : db.packingEntries)
     .map((e) => {
       const dec = decorateEntry(e);
       return {

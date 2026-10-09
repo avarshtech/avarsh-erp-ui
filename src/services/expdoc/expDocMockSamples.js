@@ -23,9 +23,9 @@ export const getTemplateSample = async (template) => {
   const entry = entries.find((e) => e.buyerCode && e.buyerCode === t.buyerCode)
     || entries.find((e) => t.buyerName && e.buyerName === t.buyerName)
     || entries[0] || null;
-  const shipment = entry
-    ? (db.shipments || []).find((s) => s.id === entry.shipmentId) || null
-    : (db.shipments || [])[0] || null;
+  // A real shipment of the template's buyer, when one is open; the preview prints dashes without.
+  const shipment = (db.shipments || []).find((s) => (t.buyerId != null && s.buyerId === t.buyerId)
+    || (entry && s.buyerName === entry.buyerName)) || null;
 
   if (!entry) return { docType: t.docType, template: t, empty: true };
 

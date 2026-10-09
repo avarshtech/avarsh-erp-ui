@@ -13,33 +13,44 @@ const MODE_OPTIONS = [
 const ORDERS_TOOLTIP = 'Every order of this consignee except cancelled ones — a shipment can be booked before its order completes. '
   + 'Only orders of the working branch are listed.';
 
-const ordersEmptyText = (consigneeName, loading, error) => {
-  if (!consigneeName) return 'Pick a consignee first';
+const LOCKED_TOOLTIP = 'Packing lists or invoices have been raised against this shipment, so its consignee can no longer change.';
+
+const ordersEmptyText = (buyerId, loading, failed) => {
+  if (buyerId == null) return 'Pick a consignee first';
   if (loading) return <Spin size="small" />;
-  if (error === 'FORBIDDEN') return 'Listing orders needs access to Orders';
-  if (error) return 'Orders could not be loaded';
+  if (failed) return 'Orders could not be loaded';
   return 'No orders for this consignee in the working branch';
 };
 
 const printsAs = (block) => (block ? <span style={PRE_LINE}>{block}</span> : null);
 
+// An explicit `disabled={false}` beats the Form's own (antd: `customDisabled ?? context`), which
+// would leave a field editable on a read-only shipment: only ever disable, never enable.
+const onlyIf = (condition) => (condition ? true : undefined);
+
 /**
  * Consignee, orders, notify party and — only when the bank is notified and the buyer
  * has several shipping locations — the consignee address, with what each will print
  * as. `parties` is useShipmentParties; rendered inside the shipment Form.
+ * `consigneeLocked`: documents name the consignee, so it stays as it is.
  */
-const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions }) => {
+const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions, consigneeLocked }) => {
   const {
-    buyerName, orders, notifyOptions, addressOptions, askAddress, consigneePreview, notifyPreview,
+    buyerId, orders, notifyOptions, addressOptions, askAddress, consigneePreview, notifyPreview,
   } = parties;
 
   return (
     <FormSection title="Consignee & Orders" columns={4}>
-      <Form.Item name="buyerName" label="Consignee" rules={[{ required: true, message: 'Select the consignee' }]}>
-        <FormSelect options={buyerOptions} placeholder="Select consignee" />
+      <Form.Item
+        name="buyerId"
+        label="Consignee"
+        tooltip={consigneeLocked ? LOCKED_TOOLTIP : undefined}
+        rules={[{ required: true, message: 'Select the consignee' }]}
+      >
+        <FormSelect options={buyerOptions} placeholder="Select consignee" disabled={onlyIf(consigneeLocked)} />
       </Form.Item>
       <Form.Item
-        name="orderNos"
+        name="orderIds"
         label="Orders"
         tooltip={ORDERS_TOOLTIP}
         rules={[{ required: true, type: 'array', min: 1, message: 'Select the order(s) this shipment carries' }]}
@@ -49,9 +60,9 @@ const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions }) =>
           options={orders.options}
           loading={orders.loading}
           onSearch={orders.onSearch}
-          disabled={!buyerName}
+          disabled={onlyIf(buyerId == null)}
           placeholder="Select orders"
-          notFoundContent={ordersEmptyText(buyerName, orders.loading, orders.error)}
+          notFoundContent={ordersEmptyText(buyerId, orders.loading, orders.failed)}
         />
       </Form.Item>
       <Form.Item name="mode" label="Mode" rules={[{ required: true }]}>
@@ -68,8 +79,8 @@ const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions }) =>
       >
         <FormSelect
           options={notifyOptions}
-          disabled={!notifyOptions.length}
-          placeholder={notifyOptions.length || !buyerName ? 'Select notify party' : 'Add a shipping location in Buyer Master'}
+          disabled={onlyIf(!notifyOptions.length)}
+          placeholder={notifyOptions.length || buyerId == null ? 'Select notify party' : 'Add a shipping location in Buyer Master'}
         />
       </Form.Item>
       {askAddress && (
