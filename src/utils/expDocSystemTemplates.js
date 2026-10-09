@@ -171,13 +171,12 @@ export const SYSTEM_TEMPLATES = {
     templateCode: 'STD-STICKER',
     name: 'Standard export carton marking',
     docType: DOC_TYPE.STICKER,
-    // A carton mark carries no exporter letterhead, so no logo.
-    identity: { titleText: 'CARTON STICKER', showLogo: false },
+    identity: { titleText: 'CARTON STICKER' },
     stickerLayout: {
       paperDefault: PAPER.A4_2UP,
       faces: [
         {
-          key: 'MAIN', title: 'MAIN MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null, logo: false,
+          key: 'MAIN', title: 'MAIN MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null,
           lines: [
             markLine('buyer', null, 'buyer.name', { bold: true, fontPt: 16, align: 'CENTER' }),
             markLine('po', 'PO NO', 'carton.buyerPoNo'),
@@ -191,7 +190,7 @@ export const SYSTEM_TEMPLATES = {
           ],
         },
         {
-          key: 'SIDE', title: 'SIDE MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null, logo: false,
+          key: 'SIDE', title: 'SIDE MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null,
           lines: [
             markLine('netWeight', 'NET WEIGHT', 'carton.netWeightKg', { decimals: 3, suffix: ' KGS' }),
             markLine('grossWeight', 'GROSS WEIGHT', 'carton.grossWeightKg', { decimals: 3, suffix: ' KGS' }),

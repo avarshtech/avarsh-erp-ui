@@ -114,8 +114,6 @@ export const renderContext = (ctx, exporter, ask) => ({
   buyer: { name: ctx?.pl?.buyerName },
   pl: ctx?.pl || {},
   styleByEntry: ctx?.styleByEntry,
-  // The sticker template's own logo switch, not the packing list's.
-  showLogo: ctx?.layout?.identity?.showLogo === true,
   ask,
 });
 

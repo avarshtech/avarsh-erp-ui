@@ -22,7 +22,7 @@ const FIXED = 'fixed:';
  * Chooses what prints in a field. Nothing changes until "Apply" — typing fixed text
  * would otherwise resolve the item, and close this, after the first letter.
  */
-const BindingChooser = ({ label, data, onApply, onCancel }) => {
+const BindingChooser = ({ label, data, exclude, onApply, onCancel }) => {
   const [value, setValue] = useState();
   const fixed = typeof value === 'string' && value.startsWith(FIXED);
   const text = fixed ? value.slice(FIXED.length).trim() : '';
@@ -30,7 +30,7 @@ const BindingChooser = ({ label, data, onApply, onCancel }) => {
   return (
     <Space orientation="vertical" size={8} style={{ width: 340 }}>
       <Text strong>{`What should print for ${quote(label)}?`}</Text>
-      <FieldBindingPicker value={value} onChange={setValue} categories={data} placeholder="Choose the ERP data" />
+      <FieldBindingPicker value={value} onChange={setValue} categories={data} exclude={exclude} placeholder="Choose the ERP data" />
       <Space>
         <Button size="small" onClick={onCancel}>Cancel</Button>
         <Button size="small" type="primary" disabled={!ready} onClick={() => onApply(fixed ? `${FIXED}${text}` : value)}>
@@ -114,7 +114,7 @@ const AttentionList = ({
           onOpenChange={(open) => setChoosing(open ? item.key : null)}
           content={(
             <BindingChooser
-              label={item.label} data={item.data}
+              label={item.label} data={item.data} exclude={item.exclude}
               onCancel={() => setChoosing(null)}
               onApply={(binding) => { setChoosing(null); onBind(item, binding); }}
             />

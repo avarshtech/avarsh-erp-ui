@@ -15,12 +15,12 @@ const MODE = { FIELD: 'ERP field', FIXED: 'Fixed text', ASK: ASK_MODE };
  * field would push manual entry onto every document built from it, which is exactly
  * what this module exists to remove. A carton-sticker line may also be asked once per
  * print run: `ask` (its label, and the keys the template's other questions use) offers it.
- * `id` goes to the field select, for a row that needs its own.
+ * `id` goes to the field select; `exclude` hides the catalogue paths a caller never prints.
  *
  * A `fixed:` prefix is how a literal travels through the same single string the
  * renderer already resolves, so no caller needs to know which kind it got.
  */
-const FieldBindingPicker = ({ value, onChange, disabled, categories, placeholder, ask, id }) => {
+const FieldBindingPicker = ({ value, onChange, disabled, categories, exclude, placeholder, ask, id }) => {
   const isFixed = typeof value === 'string' && value.startsWith('fixed:');
   const isAsk = isAskBinding(value);
   /*
@@ -41,11 +41,11 @@ const FieldBindingPicker = ({ value, onChange, disabled, categories, placeholder
       .map((c) => ({
         label: c.label,
         options: FIELD_CATALOGUE
-          .filter((f) => f.category === c.key)
+          .filter((f) => f.category === c.key && !exclude?.includes(f.path))
           .map((f) => ({ value: f.path, label: f.label, path: f.path, sample: f.sample })),
       }))
       .filter((g) => g.options.length);
-  }, [categories]);
+  }, [categories, exclude]);
 
   const meta = mode === MODE.FIELD && value ? getFieldMeta(value) : null;
 

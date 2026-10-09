@@ -59,10 +59,6 @@ const StickerFaceCard = ({
             label='"This side up" mark' checked={face.symbol === 'THIS_SIDE_UP'} disabled={locked}
             onChange={(on) => set({ symbol: on ? 'THIS_SIDE_UP' : null })}
           />
-          <LabeledSwitch
-            label="Exporter logo" checked={face.logo !== false} disabled={locked} onChange={(logo) => set({ logo })}
-            hint={'Prints only while "Show the exporter logo" is on in the Identity tab.'}
-          />
         </Space>
       </Form>
       <StickerLineTable

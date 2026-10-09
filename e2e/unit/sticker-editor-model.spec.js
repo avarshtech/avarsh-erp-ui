@@ -1,7 +1,11 @@
 // Node-only: the carton-sticker editor's model and the keys of its per-run questions. No browser, no login, no API.
 //   npx playwright test e2e/unit/sticker-editor-model.spec.js --project=unit
 import { test, expect } from '@playwright/test';
-import { askKeyFor, askKeysExcept, isBindable } from '../../src/utils/expDocTemplateSchema.js';
+import {
+  STICKER_HIDDEN_FIELDS, askKeyFor, askKeysExcept, catalogueForReader, isBindable,
+} from '../../src/utils/expDocTemplateSchema.js';
+import { DOC_TYPE } from '../../src/utils/expDocConstants.js';
+import { buildStickerSheetHtml } from '../../src/utils/expDocStickerHtml.js';
 import {
   barcodeSourceChanges, fieldBindingChanges, newFace, newLine, nextFaceKey, switchKind,
 } from '../../src/pages/expdoc/template/editor/sticker/stickerEditorModel.js';
@@ -85,9 +89,9 @@ test.describe('faces and lines', () => {
     expect(faces.map((f) => f.key)).toEqual(['SIDE', 'FACE3', 'MAIN', 'FACE4']);
   });
 
-  test('a new face is an empty, bordered LINES face without the logo', () => {
+  test('a new face is an empty, bordered LINES face, with no exporter logo to switch on', () => {
     expect(newFace('MAIN')).toEqual({
-      key: 'MAIN', title: 'MAIN MARK', render: 'LINES', border: true, caption: null, symbol: null, logo: false, lines: [],
+      key: 'MAIN', title: 'MAIN MARK', render: 'LINES', border: true, caption: null, symbol: null, lines: [],
     });
   });
 
@@ -124,5 +128,29 @@ test.describe('faces and lines', () => {
     });
     expect(barcodeSourceChanges({ barcode: { symbology: 'CODE128' } }, 'carton.eanBySize').barcode)
       .toEqual({ symbology: 'EAN13', perSize: true });
+  });
+});
+
+// Owner, 2026-10-09: a carton sticker never carries the exporter logo, by any route.
+test.describe('no exporter logo on a carton sticker', () => {
+  test('the AI reader and the sticker field pickers are never offered it', () => {
+    const sticker = catalogueForReader(DOC_TYPE.STICKER).map((f) => f.path);
+    expect(sticker).toContain('exporter.country');
+    expect(sticker).not.toContain('exporter.logoUrl');
+    expect(STICKER_HIDDEN_FIELDS).toEqual(['exporter.logoUrl']);
+    // Packing lists and invoices keep their own letterhead rules.
+    expect(catalogueForReader(DOC_TYPE.PACKING_LIST).map((f) => f.path)).toContain('exporter.logoUrl');
+  });
+
+  test('a face prints no logo, even from a layout saved while the old switches were on', () => {
+    const face = {
+      key: 'MAIN', title: 'MAIN MARK', render: 'LINES', border: true, logo: true,
+      lines: [{ key: 'po', kind: 'FIELD', label: 'PO NO', binding: 'carton.buyerPoNo' }],
+    };
+    const html = buildStickerSheetHtml([{ cartonNo: 1, buyerPoNo: 'PO-884213' }], {
+      layout: { faces: [face] }, paper: 'A4_1UP', ctx: { showLogo: true, exporter: { name: 'Avarsh' } },
+    });
+    expect(html).toContain('PO-884213');
+    expect(html).not.toMatch(/<img/i);
   });
 });

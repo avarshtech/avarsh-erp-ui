@@ -71,9 +71,12 @@ const TabIdentity = ({ tpl, patch, locked, buyers = [], codeEditable = false }) 
           </Space>
         </Card>
       </Col>
-      <Col xs={24} lg={12}>
-        <IdentityPageCard tpl={tpl} patch={patch} locked={locked} isSticker={isSticker} />
-      </Col>
+      {/* A carton sticker has no printed title or page here, and no exporter logo at all. */}
+      {!isSticker && (
+        <Col xs={24} lg={12}>
+          <IdentityPageCard tpl={tpl} patch={patch} locked={locked} />
+        </Col>
+      )}
     </Row>
   );
 };

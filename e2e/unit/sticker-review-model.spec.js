@@ -47,6 +47,8 @@ test('every line is an element; only a labelled field line can be given a data s
   // The key is only a hint while nothing is bound: both "ORDER #" lines would be asked as orderNo now.
   expect(byId['faces:MAIN.lines:batch']).toMatchObject({ bindable: true, binding: null, askKey: 'batchNo' });
   expect(stickerLineElements(VGT).filter((e) => e.label === 'ORDER #').map((e) => e.askKey)).toEqual(['orderNo', 'orderNo']);
+  // "Choose the ERP data" never offers the exporter logo for a sticker line.
+  expect(byId['faces:MAIN.lines:batch'].exclude).toEqual(['exporter.logoUrl']);
 });
 
 test('"Ask when printing" is keyed when it is given, so two "ORDER #" lines never share an answer', () => {
@@ -91,7 +93,8 @@ test('a sticker with no line cannot be saved, and a line added to it starts the 
   expect(blockingIssues({ template: empty })).toEqual([{ text: 'A carton sticker needs at least one face with a line.', tab: 'sticker' }]);
   const added = apply(empty, appendStickerLinePatch(empty, { label: null, binding: 'fixed:MADE IN INDIA' }));
   expect(added.stickerLayout.faces).toHaveLength(1);
-  expect(added.stickerLayout.faces[0]).toMatchObject({ key: 'MAIN', logo: false });
+  expect(added.stickerLayout.faces[0]).toMatchObject({ key: 'MAIN' });
+  expect(added.stickerLayout.faces[0]).not.toHaveProperty('logo');
   expect(blockingIssues({ template: added })).toEqual([]);
   // The blocker asks about it, so the reader's own "no sticker lines" note is not repeated.
   const result = { findings: [{ severity: 'ERROR', code: 'NO_FACES', message: 'No sticker lines were read.', document: 0 }] };

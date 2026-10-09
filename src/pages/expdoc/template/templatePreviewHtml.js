@@ -100,7 +100,6 @@ const renderSample = (sample, exporter) => {
         buyer: { name: sample.pl.buyerName },
         styleByEntry,
         ask: askPreview(tpl.stickerLayout),
-        showLogo: tpl.identity?.showLogo === true,
       },
     });
   }

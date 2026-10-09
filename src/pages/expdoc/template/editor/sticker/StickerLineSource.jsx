@@ -1,6 +1,7 @@
 import { Input, Space, Typography } from 'antd';
 import { FormSelect } from '../../../../../components/form';
 import { STICKER_LINE_KIND } from '../../../../../utils/expDocConstants';
+import { STICKER_HIDDEN_FIELDS } from '../../../../../utils/expDocTemplateSchema';
 import FieldBindingPicker from '../../FieldBindingPicker';
 import {
   BARCODE_SOURCES, STICKER_FIELD_CATEGORIES, barcodeSourceChanges, fieldBindingChanges,
@@ -42,7 +43,7 @@ const StickerLineSource = ({ line, takenAskKeys, idp, locked, onChange }) => {
   return (
     <FieldBindingPicker
       id={`${idp}-binding`} value={line.binding} disabled={locked} categories={STICKER_FIELD_CATEGORIES}
-      placeholder="Blank — left for hand-writing" ask={{ label: line.label, taken: takenAskKeys }}
+      exclude={STICKER_HIDDEN_FIELDS} placeholder="Blank — left for hand-writing" ask={{ label: line.label, taken: takenAskKeys }}
       onChange={(binding) => onChange(fieldBindingChanges(line, binding ?? null))}
     />
   );

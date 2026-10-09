@@ -197,7 +197,7 @@ export const attentionItems = ({ draft, result, dismissed = new Set() }) => {
   elements
     .filter((e) => e.bindable && e.label && !e.binding && !asked.has(e.id))
     .forEach((e) => add({
-      kind: ATTENTION.UNBOUND, elementId: e.id, label: e.label, data: e.data, removable: e.removable,
+      kind: ATTENTION.UNBOUND, elementId: e.id, label: e.label, data: e.data, exclude: e.exclude, removable: e.removable,
       evidence: meta[e.id]?.evidence, sample: meta[e.id]?.sample, suggested: meta[e.id]?.suggestedBinding,
       // A sticker line's: it may also be asked once per print run, under this key.
       askKey: e.askKey,

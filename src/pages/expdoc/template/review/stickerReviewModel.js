@@ -6,7 +6,7 @@
  */
 import { STICKER_LINE_KIND } from '../../../../utils/expDocConstants';
 import {
-  STICKER_READER_CATEGORIES, askKeyFor, askKeysExcept, isAskBinding,
+  STICKER_HIDDEN_FIELDS, STICKER_READER_CATEGORIES, askKeyFor, askKeysExcept, isAskBinding,
 } from '../../../../utils/expDocTemplateSchema';
 import { plural } from '../../../../utils/plural';
 import {
@@ -50,6 +50,7 @@ export const stickerLineElements = (t = {}) => {
       binding: line.binding ?? null,
       bindable,
       data: STICKER_READER_CATEGORIES,
+      exclude: STICKER_HIDDEN_FIELDS,
       askKey: bindable ? askKeyFor(line.label, askKeysExcept(faces, fi, li)) : undefined,
     };
   }));

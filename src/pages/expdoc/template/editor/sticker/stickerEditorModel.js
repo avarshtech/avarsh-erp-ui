@@ -53,9 +53,9 @@ export const nextFaceKey = (faces) => {
   return keyAt(n);
 };
 
-/** An empty face: plain "LABEL: value" lines inside a border, without the exporter's logo. */
+/** An empty face: plain "LABEL: value" lines inside a border. */
 export const newFace = (key) => ({
-  key, title: FACE_TITLES[key] || key, render: FACE_RENDER.LINES, border: true, caption: null, symbol: null, logo: false, lines: [],
+  key, title: FACE_TITLES[key] || key, render: FACE_RENDER.LINES, border: true, caption: null, symbol: null, lines: [],
 });
 
 const KIND_DEFAULTS = {

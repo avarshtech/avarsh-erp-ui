@@ -12,9 +12,9 @@
  *   STACK       a small grey label beside each value
  * A size grid prints where its line stands; a barcode in its line's value area. What a
  * line prints is expDocStickerParts'; this module lays the lines, faces and sheets out.
+ * A carton sticker never carries the exporter's logo (owner, 2026-10-09).
  */
-import exporterLogo from '../assets/images/sristi_logo.jpeg';
-import { esc, escAttr, documentShell, pageCss } from './printDoc';
+import { esc, documentShell, pageCss } from './printDoc';
 import { FACE_RENDER, PAPER_SPECS } from './expDocConstants';
 import {
   lineContent, lineStyle, labelOf, alignOf,
@@ -23,8 +23,6 @@ import {
 const STICKER_CSS = `
   .label { padding: 4mm; display: flex; flex-direction: column; justify-content: flex-start; }
   .label.box { border: 1.5pt solid #000; }
-  .face-logo { text-align: center; margin-bottom: 2mm; }
-  .face-logo img { height: 12mm; object-fit: contain; }
   .face-tag { position: absolute; top: 1mm; right: 2mm; font-size: 6pt; color: #999; letter-spacing: 1pt; }
   .face-caption { text-align: center; font-weight: 700; letter-spacing: 1pt; margin-bottom: 2mm; }
   .tsu { display: flex; gap: 2mm; margin-bottom: 2mm; }
@@ -147,12 +145,8 @@ export const renderStickerFace = (face, carton, ctx = {}, { printBarcodes = true
   const lines = (face.lines || []).filter(Boolean);
   const render = Object.hasOwn(RENDER, face.render) ? RENDER[face.render] : linesHtml;
   const box = face.border === true || face.render === FACE_RENDER.TABLE ? ' box' : '';
-  // `identity.showLogo` is the sticker template's own switch; a face can still opt out.
-  const logo = ctx.showLogo && face.logo !== false
-    ? `<div class="face-logo"><img src="${escAttr(exporterLogo)}" alt="" /></div>`
-    : '';
   return `<div class="label${box}" style="position:relative">${
-    face.title ? `<span class="face-tag">${esc(face.title)}</span>` : ''}${logo}${faceChrome(face)}${
+    face.title ? `<span class="face-tag">${esc(face.title)}</span>` : ''}${faceChrome(face)}${
     render(lines, full, { printBarcodes })}</div>`;
 };
 

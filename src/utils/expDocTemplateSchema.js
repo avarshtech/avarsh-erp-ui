@@ -377,13 +377,18 @@ export const unboundLabelsOf = (t) => templateBindings(t)
  */
 export const STICKER_READER_CATEGORIES = ['CARTON', 'STYLE', 'PL', 'SHIPMENT', 'BUYER', 'EXPORTER'];
 
+/** Fields of those categories a carton sticker never prints: no exporter logo on a carton (owner, 2026-10-09). */
+export const STICKER_HIDDEN_FIELDS = ['exporter.logoUrl'];
+
 /**
  * The catalogue as the AI reader of uploaded documents is sent it. Packing lists and
  * invoices (the default) never see the sticker-only CARTON fields; a sticker sees the
  * fields a carton mark can print.
  */
 export const catalogueForReader = (kind) => FIELD_CATALOGUE
-  .filter((f) => (kind === DOC_TYPE.STICKER ? STICKER_READER_CATEGORIES.includes(f.category) : f.category !== 'CARTON'))
+  .filter((f) => (kind === DOC_TYPE.STICKER
+    ? STICKER_READER_CATEGORIES.includes(f.category) && !STICKER_HIDDEN_FIELDS.includes(f.path)
+    : f.category !== 'CARTON'))
   .map(({ path, label, category }) => ({ path, label, category }));
 
 // ─── Binding resolution ─────────────────────────────────────────────────────────
