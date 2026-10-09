@@ -14,7 +14,7 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
-  goTo, settle, pickOption, selectFor, fillDate, expectToast, button,
+  goTo, settle, pickOption, selectFor, inputFor, fillDate, expectToast, button,
 } from '../sample-requests/helpers.js';
 
 const LIST = '/export-docs/shipments/list';
@@ -54,10 +54,17 @@ const apiShipment = async (buyerName, locationLabel, orderNo) => {
     orderIds: [orders.find((o) => o.orderNo === orderNo).orderId],
     mode: 'SEA',
     incoterm: 'FOB',
+    preCarriageBy: 'ROAD',
+    placeOfReceipt: 'Tiruppur',
+    vesselFlightNo: 'MSC ANNA V.241E',
     portOfLoading: 'Chennai Sea',
     portOfDischarge: 'Rotterdam',
+    finalDestination: 'Rotterdam, Netherlands',
+    countryOfFinalDestination: 'Netherlands',
     etd: '2026-12-01',
-    containerNos: [],
+    eta: '2026-12-27',
+    forwarder: 'Kuehne + Nagel',
+    containerNos: ['HLXU1234567'],
   });
   expect(res.status, JSON.stringify(res.data)).toBe(201);
   created.push(res.data.id);
@@ -94,6 +101,24 @@ test.describe('Shipments', () => {
     await pickOption(page, selectFor(page, 'Port of loading'), 'Chennai Sea');
     await pickOption(page, selectFor(page, 'Port of discharge'), 'Rotterdam');
     await fillDate(page, 'ETD', '01-Nov-2026'); // the form's DD-MMM-YYYY
+
+    // Every field is mandatory but the BL/AWB (issued after loading); a sea shipment needs a container
+    await button(page, 'Save').click();
+    for (const error of ['Enter the place of receipt', 'Enter the vessel or flight no.', 'Enter the ETA',
+      'Enter the forwarder', 'Enter the container number(s): a sea shipment travels in containers']) {
+      await expect(page.locator('.ant-form-item-explain-error').filter({ hasText: error })).toBeVisible();
+    }
+    await expect(page).toHaveURL(/\/export-docs\/shipments\/new$/);
+    await inputFor(page, 'Place of receipt').fill('Tiruppur');
+    await inputFor(page, 'Vessel').fill('MSC ANNA V.241E');
+    await inputFor(page, 'Final destination').fill('Rotterdam, Netherlands');
+    await inputFor(page, 'Country of final destination').fill('Netherlands');
+    await fillDate(page, 'ETA', '25-Nov-2026');
+    await inputFor(page, 'Forwarder').fill('Kuehne + Nagel');
+    const containers = selectFor(page, 'Container');
+    await containers.click();
+    await containers.locator('input').fill('mscu1234567');
+    await page.keyboard.press('Enter');
 
     const consignee = page.getByText(/^Zara \(Inditex\)\s+Plataforma Logistica PLAZA/);
     await expect(consignee).toContainText('Attn: Miguel Torres');

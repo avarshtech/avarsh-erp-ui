@@ -122,6 +122,8 @@ const ShipmentForm = () => {
 
   const parties = useShipmentParties(form, buyers, record);
   const { onPartiesChange, partiesPayload } = parties;
+  // A sea shipment travels in containers, so its container numbers are mandatory
+  const mode = Form.useWatch('mode', form);
 
   const handleValuesChange = useCallback((changed) => {
     setIsDirty(true);
@@ -225,7 +227,7 @@ const ShipmentForm = () => {
             incotermOptions={INCOTERM_OPTIONS}
             consigneeLocked={consigneeLocked}
           />
-          <ShipmentTransportSections portOptions={PORT_OPTIONS} />
+          <ShipmentTransportSections portOptions={PORT_OPTIONS} containersRequired={mode === 'SEA'} />
         </Form>
       </Spin>
     </div>
