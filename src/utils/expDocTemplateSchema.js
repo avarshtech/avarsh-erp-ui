@@ -254,6 +254,20 @@ export const askKeysExcept = (faces, faceIndex, lineIndex) => (faces || []).flat
   .filter(isAskBinding)
   .map((binding) => binding.slice('ask:'.length)));
 
+/**
+ * What a sticker layout asks once per print run: one question per distinct `ask:` key, in
+ * layout order, labelled by the first line that asks it (else by its key). Two lines
+ * bound to one key print one answer, so they are one question.
+ */
+export const stickerAskQuestions = (stickerLayout) => {
+  const questions = new Map();
+  (stickerLayout?.faces || []).forEach((face) => (face?.lines || []).forEach((line) => {
+    const key = isAskBinding(line?.binding) ? line.binding.slice('ask:'.length) : '';
+    if (key && !questions.has(key)) questions.set(key, { key, label: String(line.label ?? '').trim() || key });
+  }));
+  return [...questions.values()];
+};
+
 // ─── Resolution ─────────────────────────────────────────────────────────────────
 
 /**
@@ -309,6 +323,19 @@ export const rankTemplateCandidates = (templates, { buyerId, buyerName, docType 
     autoSelectId: first.length === 1 ? first[0].id : null,
     hasOwn: own.length > 0,
   };
+};
+
+/**
+ * The sticker template a print run uses, from `rankTemplateCandidates`: the one picked —
+ * or, when the picked revision was superseded while the page was open, its own family's
+ * revision in force (`pickedCode`), never another family's — else the current revision of
+ * the family the packing list last printed with, else the automatic choice. Null: pick one.
+ */
+export const stickerTemplateChoice = ({ candidates, autoSelectId }, { templateId, pickedCode, latestTemplateCode } = {}) => {
+  const byCode = (code) => (code ? candidates.find((c) => c.templateCode === code) : null);
+  const picked = templateId == null ? null
+    : candidates.find((c) => String(c.id) === String(templateId)) ?? byCode(pickedCode);
+  return (picked ?? byCode(latestTemplateCode))?.id ?? autoSelectId ?? null;
 };
 
 /**

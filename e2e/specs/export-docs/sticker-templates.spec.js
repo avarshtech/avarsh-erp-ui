@@ -1,5 +1,6 @@
 /**
- * Carton-sticker buyer templates: uploading one and checking it (plan §5.4, §9).
+ * Carton-sticker buyer templates: uploading one and checking it, and printing with one
+ * (plan §5.4, §5.5, §9).
  *
  * The e2e stack has no AI key, so the upload answers POST .../extract from a fixture
  * modelled on Van Gennip's "VGT" sticker — a POST, which the service worker never
@@ -9,7 +10,9 @@
  * genuine sticker passes and only then meets the missing AI key.
  *
  * Every template a spec creates gets a unique code, so the specs can run again on the
- * same stack. The e2e seed already gives JOMO BV two ACTIVE sticker templates.
+ * same stack. The e2e seed already gives JOMO BV two ACTIVE sticker templates, AMG and
+ * SCA; the print workspace spec picks them by name, because the upload spec adds another
+ * ACTIVE JOMO sticker on every run.
  */
 import fs from 'fs';
 import path from 'path';
@@ -19,6 +22,7 @@ import { ensureSessionActive } from '../../helpers/navigation.js';
 import {
   attentionItem, familyCard, fixtureForRun, textPdf, uploadForReading,
 } from '../../helpers/export-templates.js';
+import { goTo } from '../sample-requests/helpers.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(here, '../../fixtures/ai/template-extraction-sticker.json'), 'utf8'));
@@ -28,6 +32,20 @@ const STICKER = 'Carton sticker';
 const ONE_EXAMPLE = 'One example of each sticker layout is enough — not the whole print run.';
 /** The words of a VGT carton sticker, as its PDF's text layer carries them. */
 const VGT_LINES = ['Article Number : M60980-37GOY', 'Size : 98', 'Quantity : 30', 'Carton Number :', 'Weight of Carton : 7.000 KGS'];
+/** The seeded JOMO BV sticker layouts, by the words of their names. */
+const AMG = 'Carton Sticker (AMG main and side)';
+const SCA = 'Carton Sticker (colon list with EAN)';
+
+/**
+ * Picks a layout in the sticker workspace by name. The list grows with every run of the
+ * upload spec, and the dropdown renders only what is in view, so the name is typed.
+ */
+const pickLayout = async (page, name) => {
+  await page.locator('.ant-select').filter({ has: page.locator('#sticker-layout') }).click();
+  await page.keyboard.type(name);
+  await page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
+    .filter({ hasText: name }).first().click();
+};
 
 test.describe('Carton-sticker templates', () => {
   test.beforeEach(async ({ page }) => {
@@ -105,5 +123,63 @@ test.describe('Carton-sticker templates', () => {
     dialog = await uploadForReading(page, textPdf('vgt-carton-sticker.pdf', VGT_LINES), { contains: STICKER });
     await expect(dialog.getByText('AI reading is not available here')).toBeVisible({ timeout: 30000 });
     await expect(dialog.getByRole('button', { name: 'Build it by hand' })).toBeVisible();
+  });
+
+  test('stickers print with the layout picked by name, its batch number asked once and kept on the run', async ({ page }) => {
+    // Packing lists are still the browser mock: one for JOMO BV's packing entry 1 (cartons
+    // 1–61), raised through the same service the screens call. No shipment is named, so
+    // this holds before and after the shipments move to the API.
+    await goTo(page, '/export-docs/stickers');
+    const plId = await page.evaluate(async () => {
+      const svc = await import('/src/services/expdoc/expDocService.js');
+      return (await svc.createPackingList({ packingEntryIds: [1] })).id;
+    });
+    await goTo(page, `/export-docs/stickers/${plId}`);
+
+    // JOMO BV has two layouts of its own, so nothing prints until one is picked.
+    await expect(page.getByText('Pick the sticker layout', { exact: true })).toBeVisible();
+    const generate = page.getByRole('button', { name: /Generate & print/ });
+    await expect(generate).toBeDisabled();
+
+    // AMG: a main and a side mark, the size grid with its totals, the carton as "n OF N".
+    const sheet = page.frameLocator('iframe[title="Sticker sheet preview"]').locator('body');
+    await pickLayout(page, AMG);
+    await expect(sheet).toContainText('MAIN MARK');
+    await expect(sheet).toContainText('SIDE MARK');
+    await expect(sheet).toContainText('TOTAL');
+    await expect(sheet).toContainText('1 OF 61');
+
+    // SCA brings its own face and asks its batch number once for the run (focus 5).
+    await pickLayout(page, SCA);
+    const batch = page.getByLabel('BATCH #');
+    await expect(batch).toBeVisible();
+    await expect(sheet).toContainText('Weight of Carton');
+    await expect(sheet).not.toContainText('MAIN MARK');
+    // It prints EANs, which cartons 48–61 do not have: barcodes start off, and say so (focus 6).
+    await expect(page.getByRole('switch', { name: 'Print barcodes' })).not.toBeChecked();
+    const noEan = page.getByRole('alert').filter({ hasText: 'This template prints EAN barcodes, but 14 carton(s) have no EAN' });
+    await expect(noEan).toBeVisible();
+    await expect(noEan).toContainText('Cartons without an EAN: 48–61.');
+    await expect(generate).toBeDisabled();
+
+    // The answer prints after the label's one colon, never "::" (focus 3).
+    const value = `E2E-${run}`;
+    await batch.fill(value);
+    await expect(sheet).toContainText(new RegExp(`BATCH #\\s*:\\s*${value}`));
+    await expect(sheet).not.toContainText('::');
+
+    // A draft packing list prints only with the override and a reason; the labels open in a print window.
+    await expect(generate).toBeEnabled();
+    await generate.click();
+    const override = page.getByRole('dialog', { name: 'Print from a draft packing list?' });
+    await override.locator('textarea').fill('E2E: the cartons are labelled before the list is final.');
+    const printWindow = page.waitForEvent('popup');
+    await override.getByRole('button', { name: 'Print draft labels' }).click();
+    await (await printWindow).close();
+
+    // The run is recorded with the value it printed.
+    const runs = page.locator('.ant-card').filter({ has: page.getByText('Printed runs', { exact: true }) });
+    await expect(runs).toContainText(`BATCH #: ${value}`);
+    await expect(runs).toContainText('From draft');
   });
 });

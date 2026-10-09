@@ -26,6 +26,7 @@ import {
   intersectRanges, formatRanges, cartonHash, readPath,
 } from '../../utils/expDocCalc';
 import { validate } from '../../utils/expDocValidation';
+import { stickerAskQuestions } from '../../utils/expDocTemplateSchema';
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
 
@@ -62,6 +63,9 @@ const isBlank = (v) => v === null || v === undefined || v === '' || v === 0 || (
 const printsEans = (layout) => (layout?.stickerLayout?.faces || []).some((f) => (f.lines || [])
   .some((l) => l.kind === STICKER_LINE_KIND.BARCODE && l.binding === 'carton.eanBySize'));
 
+/** Whether a carton holds a size with no EAN: with barcodes on, it cannot be printed. */
+const lacksEan = (carton) => (carton.sizes || []).some((size) => !carton.eanBySize?.[size]);
+
 /**
  * Cartons that cannot be printed because a field the layout prints is empty.
  *
@@ -79,10 +83,25 @@ export const blockedCartons = (cartons, layout, { contextOf = (carton) => ({ car
   cartons.forEach((carton) => {
     const ctx = contextOf(carton);
     const missing = required.filter((path) => isBlank(readPath(ctx, path))).map((m) => String(m).split('.').pop());
-    if (needsEans && (carton.sizes || []).some((size) => !carton.eanBySize?.[size])) missing.push('EAN');
+    if (needsEans && lacksEan(carton)) missing.push('EAN');
     if (missing.length) out.push({ cartonNo: carton.cartonNo, missing });
   });
   return out;
+};
+
+/**
+ * The selected cartons that hold a size with no EAN, while the layout prints per-size
+ * EANs — what the workspace warns about beside its barcode switch. Per ROW: a row's
+ * cartons share its sizes and EANs, so the row's first carton answers for all of them
+ * (as in `rowPrintHash`) and the selection is never expanded.
+ */
+const cartonsWithoutEan = (raw, layout, selected, totalCartonsInShipment) => {
+  if (!printsEans(layout)) return { count: 0, ranges: [] };
+  const ranges = mergeRanges(allRows(raw).flatMap((row) => {
+    const first = expandCartonRange([row], row.cartonFrom, row.cartonFrom, { totalCartonsInShipment })[0];
+    return first && lacksEan(first) ? intersectRanges([{ from: row.cartonFrom, to: row.cartonTo }], selected) : [];
+  }));
+  return { count: countCartons(ranges), ranges };
 };
 
 /**
@@ -160,16 +179,17 @@ const withSeason = (cartons, styles) =>
 /**
  * What a packing list's sticker bindings resolve against, by their full path: the
  * carton, its own entry's style, the packing list, the shipment, the buyer and the
- * exporter — the namespaces the workspace prints with. The exporter is the mock's
- * profile; the organisation master's own fields (name, country) are the screens' to read.
+ * exporter — the namespaces the workspace prints with. The exporter is the organisation
+ * the screen prints (`options.exporter`), so a mandatory `exporter.*` field and the V-14
+ * hash read what the labels carry; the mock's profile only stands in without one.
  */
-const printScope = (db, raw, pl) => {
+const printScope = (db, raw, pl, exporter) => {
   const styles = styleByEntryOf(db, raw);
   const base = {
     pl,
     shipment: (db.shipments || []).find((s) => s.id === raw.shipmentId) || {},
     buyer: { name: raw.buyerName },
-    exporter: db.masters?.exporterProfileExtra || {},
+    exporter: exporter || db.masters?.exporterProfileExtra || {},
   };
   return { styles, contextOf: (carton) => ({ ...base, carton, style: styles[carton.sourceEntryId] || {} }) };
 };
@@ -221,6 +241,7 @@ export const getStickerContext = async (plId, options = {}) => {
     selectedCount,
     selectedRanges: ranges,
     selectedLabel: formatRanges(ranges),
+    eanMissing: cartonsWithoutEan(raw, layout, ranges, totalCartonsInShipment),
     cartons: withSeason(slice, styleByEntry),
     printedRanges: printed,
     printedLabel: formatRanges(printed),
@@ -291,7 +312,7 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   const layout = options.layout || null;
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
-  const print = printScope(db, raw, pl);
+  const print = printScope(db, raw, pl, options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
 
   const blocked = blockedCartons(cartons, layout, { contextOf: print.contextOf, printBarcodes: options.printBarcodes });
@@ -376,10 +397,22 @@ export const generateStickerRun = async (plId, options = {}) => {
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const layout = options.layout || null;
   if (!layout) fail('CONFLICT', noLayoutReason(options.layoutOptions));
+  // The template's once-per-run questions (`ask:` lines): each answer prints on every label.
+  const questions = stickerAskQuestions(layout.stickerLayout);
+  const given = options.askValues || {};
+  const askValues = Object.fromEntries(questions.map(({ key }) => [
+    key, Object.hasOwn(given, key) ? String(given[key] ?? '').trim() : '',
+  ]));
+  const unanswered = questions.find(({ key }) => !askValues[key]);
+  if (unanswered) fail('VALIDATION', `Answer “${unanswered.label}” before printing.`);
+  // A run that prints no face prints no label, and must not record its cartons as printed.
+  const faceKeys = options.faceKeys || (layout.stickerLayout?.faces || []).map((f) => f.key);
+  const faceCount = (layout.stickerLayout?.faces || []).filter((f) => faceKeys.includes(f.key)).length;
+  if (!faceCount) fail('VALIDATION', 'Tick at least one face to print.');
 
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
-  const print = printScope(db, raw, decoratePl(raw, db));
+  const print = printScope(db, raw, decoratePl(raw, db), options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
   if (!cartons.length) fail('CONFLICT', 'The selected range contains no cartons.');
 
@@ -418,12 +451,14 @@ export const generateStickerRun = async (plId, options = {}) => {
     templateCode: layout.templateCode,
     templateVersion: layout.version,
     paper: options.paper || layout.stickerLayout?.paperDefault,
-    faceKeys: options.faceKeys || (layout.stickerLayout?.faces || []).map((f) => f.key),
-    // The template's once-per-run questions (`ask:` lines), as answered for this run.
-    askValues: clone(options.askValues || {}),
+    faceKeys,
+    // The answers to the layout's own questions, and the labels they were asked by, so the
+    // history still reads "BATCH #: …" after the template changes.
+    askValues,
+    askLabels: Object.fromEntries(questions.map(({ key, label }) => [key, label])),
     scope: clone(scope),
     cartonCount: cartons.length,
-    labelCount: cartons.length * ((options.faceKeys || layout.stickerLayout?.faces || []).length || 1),
+    labelCount: cartons.length * faceCount,
     fromDraft: raw.status === PL_STATUS.DRAFT,
     overrideReason: options.overrideReason || null,
     isReprint: Boolean(options.isReprint),

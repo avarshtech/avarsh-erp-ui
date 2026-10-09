@@ -4,23 +4,21 @@
  * layout — the mock never calls the API.
  */
 import { listTemplateCandidates, loadTemplateSnapshot } from './expDocTemplateBridge';
-import { DOC_TYPE, TEMPLATE_STATUS } from '../../utils/expDocConstants';
-import { templateLabel } from '../../utils/expDocTemplateSchema';
+import { DOC_TYPE } from '../../utils/expDocConstants';
+import { stickerTemplateChoice, templateLabel } from '../../utils/expDocTemplateSchema';
 
 /**
- * `request` is the packing list's buyer and the code its latest run printed with. The
- * layout is the template asked for while it is a candidate, else the current version of
- * the family last printed, else the only candidate (the standard one for a buyer with
- * none); null while the user still has to pick. The options are every candidate.
+ * `request` is the packing list's buyer and the code its latest run printed with; the
+ * choice itself is `stickerTemplateChoice`. A picked id that is no longer a candidate was
+ * superseded, so its own snapshot names the family it stands for. The options are every
+ * candidate, the standard one marked so the screen does not count it as the buyer's.
  */
 export const resolveStickerTemplate = async ({ buyerName, latestTemplateCode }, templateId) => {
-  const { candidates, autoSelectId } = await listTemplateCandidates({ buyerName, docType: DOC_TYPE.STICKER });
-  const asked = templateId == null ? null : candidates.find((c) => String(c.id) === String(templateId));
-  const previous = latestTemplateCode
-    ? candidates.find((c) => c.status === TEMPLATE_STATUS.ACTIVE && c.templateCode === latestTemplateCode)
-    : null;
+  const ranked = await listTemplateCandidates({ buyerName, docType: DOC_TYPE.STICKER });
+  const stale = templateId != null && !ranked.candidates.some((c) => String(c.id) === String(templateId));
+  const pickedCode = stale ? (await loadTemplateSnapshot(templateId))?.templateCode : null;
   return {
-    layout: await loadTemplateSnapshot(asked?.id ?? previous?.id ?? autoSelectId),
-    layoutOptions: candidates.map((c) => ({ value: c.id, label: templateLabel(c) })),
+    layout: await loadTemplateSnapshot(stickerTemplateChoice(ranked, { templateId, pickedCode, latestTemplateCode })),
+    layoutOptions: ranked.candidates.map((c) => ({ value: c.id, label: templateLabel(c), isSystem: Boolean(c.isSystem) })),
   };
 };
