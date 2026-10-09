@@ -51,6 +51,11 @@ const CartonPackingForm = () => {
 
   const isEdit = Boolean(id);
   const [record, setRecord] = useState(null);
+  // The entry in hand decides whether it exists, not the route: after a create the URL moves to
+  // /edit/:id in a router transition, and until that lands `id` is still empty. A Save clicked
+  // meanwhile must update the new entry, never create a second one.
+  const entryId = record?.id ?? (isEdit ? id : null);
+  const isSaved = entryId != null;
   const [groups, setGroups] = useState([]);
   const [orderId, setOrderId] = useState(null);
   const [sizes, setSizes] = useState([]);
@@ -71,11 +76,14 @@ const CartonPackingForm = () => {
     useDebouncedSearch();
 
   const { clearDirty } = useUnsavedChanges(isDirty);
-  const canWrite = hasPermission(MODULE_ID, isEdit ? 'update' : 'add');
+  const canWrite = hasPermission(MODULE_ID, isSaved ? 'update' : 'add');
 
   // ── Load the record ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!isEdit) return undefined;
+    // Just created here: the router keeps this instance for /edit/:id and the saved entry is
+    // already in hand. Reloading it would unmount the form under a click made meanwhile.
+    if (record && String(record.id) === String(id)) return undefined;
     let cancelled = false;
     setLoading(true);
     getPackingEntry(id)
@@ -212,7 +220,7 @@ const CartonPackingForm = () => {
     [groups],
   );
 
-  const readOnly = !canWrite || (isEdit && record?.status !== PACKING_ENTRY_STATUS.OPEN);
+  const readOnly = !canWrite || (isSaved && record?.status !== PACKING_ENTRY_STATUS.OPEN);
 
   const handleGroupsChange = useCallback((next) => {
     setGroups(next);
@@ -231,29 +239,29 @@ const CartonPackingForm = () => {
       orderBreakdown,
       groups,
     };
-    const saved = isEdit
-      ? await updatePackingEntry(id, { ...payload, version: record?.version })
+    const saved = isSaved
+      ? await updatePackingEntry(entryId, { ...payload, version: record?.version })
       : await createPackingEntry(payload);
     setRecord(saved);
     setGroups(saved.groups || []);
     setIsDirty(false);
     clearDirty();
     return saved;
-  }, [form, orderId, sizes, orderBreakdown, groups, isEdit, id, record, clearDirty]);
+  }, [form, orderId, sizes, orderBreakdown, groups, isSaved, entryId, record, clearDirty]);
 
   const handleSave = useCallback(async () => {
     setBusy('save');
     try {
       const saved = await persist();
       message.success(`${saved.packingNo} saved`);
-      if (!isEdit) navigate(`/production/packing/edit/${saved.id}`, { replace: true });
+      if (!isSaved) navigate(`/production/packing/edit/${saved.id}`, { replace: true });
     } catch (e) {
       if (e?.errorFields) message.warning('Complete the mandatory fields first');
       else if (!e.isOptimisticLockConflict) message.error(e.message || 'Failed to save');
     } finally {
       setBusy(null);
     }
-  }, [persist, message, isEdit, navigate, setBusy]);
+  }, [persist, message, isSaved, navigate, setBusy]);
 
   const handleComplete = useCallback(() => {
     modal.confirm({
@@ -265,7 +273,7 @@ const CartonPackingForm = () => {
         try {
           // Unsaved edits are saved first; the complete command goes with the version the entry holds then
           const current = isDirty ? await persist() : record;
-          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.COMPLETED, current.version);
+          const saved = await setPackingEntryStatus(current.id, PACKING_ENTRY_STATUS.COMPLETED, current.version);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} marked complete`);
@@ -276,7 +284,7 @@ const CartonPackingForm = () => {
         }
       },
     });
-  }, [modal, id, isDirty, persist, record, message, setBusy]);
+  }, [modal, isDirty, persist, record, message, setBusy]);
 
   const handleReopen = useCallback(() => {
     modal.confirm({
@@ -287,7 +295,7 @@ const CartonPackingForm = () => {
       onOk: async () => {
         setBusy('reopen');
         try {
-          const saved = await setPackingEntryStatus(id, PACKING_ENTRY_STATUS.OPEN, record.version);
+          const saved = await setPackingEntryStatus(record.id, PACKING_ENTRY_STATUS.OPEN, record.version);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} reopened`);
@@ -298,7 +306,7 @@ const CartonPackingForm = () => {
         }
       },
     });
-  }, [modal, id, record, message, setBusy]);
+  }, [modal, record, message, setBusy]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loadError) {
@@ -366,7 +374,7 @@ const CartonPackingForm = () => {
       >
         <ActionButton action="close" text="Cancel" onClick={() => navigate('/production/packing/list')} />
         {!readOnly && <ActionButton action="save" text="Save" {...busyProps('save')} onClick={handleSave} />}
-        {isEdit && record?.status === PACKING_ENTRY_STATUS.OPEN && canWrite && (
+        {isSaved && record?.status === PACKING_ENTRY_STATUS.OPEN && canWrite && (
           <ActionButton
             action="approve"
             text="Mark complete"
@@ -379,7 +387,7 @@ const CartonPackingForm = () => {
             onClick={handleComplete}
           />
         )}
-        {isEdit && record?.status === PACKING_ENTRY_STATUS.COMPLETED && canWrite && (
+        {isSaved && record?.status === PACKING_ENTRY_STATUS.COMPLETED && canWrite && (
           <ActionButton action="edit" text="Reopen" {...busyProps('reopen')} onClick={handleReopen} />
         )}
       </PageHeader>
@@ -415,14 +423,14 @@ const CartonPackingForm = () => {
             <Form.Item name="orderNo" label="Order" rules={[{ required: true, message: 'Select an order' }]}>
               <FormSelect
                 placeholder="Search confirmed or in-production orders"
-                disabled={isEdit || readOnly}
+                disabled={isSaved || readOnly}
                 loading={orderLoading}
                 onSearch={setOrderSearch}
                 searchValue={orderSearch}
                 filterOption={false}
                 onChange={handleOrderSelect}
                 options={
-                  isEdit && record
+                  isSaved && record
                     ? [{ value: record.orderNo, label: record.orderNo }]
                     : orderOptions.map((o) => ({
                       value: o.orderNo,
