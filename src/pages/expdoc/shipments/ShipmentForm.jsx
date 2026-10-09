@@ -8,7 +8,7 @@ import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../utils/permissions';
 import {
-  EXPDOC_MODULE, EXPORT_PORTS, INCOTERMS, SHIPMENT_STATUS, SHIPMENT_STATUS_LABELS,
+  EXPDOC_MODULE, INCOTERMS, SHIPMENT_STATUS, SHIPMENT_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { SHIPMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { useStore } from '../../../context/StoreContext';
@@ -21,7 +21,6 @@ import ShipmentTransportSections from './ShipmentTransportSections';
 
 const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 const DATE_FIELDS = ['etd', 'eta', 'blAwbDate'];
-const PORT_OPTIONS = EXPORT_PORTS.map((p) => ({ value: p.name, label: `${p.name} (${p.code})` }));
 const INCOTERM_OPTIONS = INCOTERMS.map((i) => ({ value: i, label: i }));
 const statusLabel = (status) => SHIPMENT_STATUS_LABELS[status] || status;
 
@@ -122,13 +121,18 @@ const ShipmentForm = () => {
 
   const parties = useShipmentParties(form, buyers, record);
   const { onPartiesChange, partiesPayload } = parties;
-  // A sea shipment travels in containers, so its container numbers are mandatory
+  // The mode decides the ports offered and whether containers are required
   const mode = Form.useWatch('mode', form);
 
   const handleValuesChange = useCallback((changed) => {
     setIsDirty(true);
     onPartiesChange(changed);
-  }, [onPartiesChange]);
+    // Sea ports are no good by air or courier, nor airports by sea: the picked ports go. Here, on the
+    // user's change, not in an effect on `mode`, which would also fire when a saved shipment loads.
+    if ('mode' in changed && (changed.mode === 'SEA') !== (mode === 'SEA')) {
+      form.setFieldsValue({ portOfLoadingId: undefined, portOfDischargeId: undefined });
+    }
+  }, [onPartiesChange, form, mode]);
 
   const handleSave = useCallback(async () => {
     let values;
@@ -227,7 +231,7 @@ const ShipmentForm = () => {
             incotermOptions={INCOTERM_OPTIONS}
             consigneeLocked={consigneeLocked}
           />
-          <ShipmentTransportSections portOptions={PORT_OPTIONS} containersRequired={mode === 'SEA'} />
+          <ShipmentTransportSections mode={mode} record={record} />
         </Form>
       </Spin>
     </div>

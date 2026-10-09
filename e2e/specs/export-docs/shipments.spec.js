@@ -1,6 +1,9 @@
 /**
  * Shipments on the real API (/api/v1/export-docs/shipments).
  *
+ * Ports come from the port catalogue (/api/v1/ports), which the API loads from its bundled
+ * UN/LOCODE release at startup; the pickers search it as the user types.
+ *
  * The e2e seed gives Zara (two shipping locations) a bank (db/e2eseed/V20261008214442), so
  * notifying the bank asks which location prints under the consignee; H&M has no bank and
  * notifies a location. Orders: ORD/0002 is Zara's, ORD/0001 (a draft) is H&M's.
@@ -43,6 +46,24 @@ const buyerNamed = async (name) => {
   return (Array.isArray(data) ? data : data.content).find((b) => b.name === name);
 };
 
+/** A port's catalogue id (the API loads UN/LOCODE at startup). */
+const portId = async (code, kinds) => {
+  const { data } = await api.get('/ports', { search: code, kinds });
+  return data.find((p) => p.code === code).id;
+};
+
+/** A port picked the way a user does: the picker searches the catalogue on the server as they type. */
+const pickPort = async (page, label, typed, optionText) => {
+  const select = selectFor(page, label);
+  await select.click();
+  await select.locator('input').fill(typed);
+  const option = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option')
+    .filter({ hasText: optionText }).first();
+  await option.waitFor({ state: 'visible', timeout: 15000 });
+  await option.click();
+  return option;
+};
+
 /** An OPEN shipment of the buyer, notifying one of its locations, made through the API. */
 const apiShipment = async (buyerName, locationLabel, orderNo) => {
   const buyer = await buyerNamed(buyerName);
@@ -57,8 +78,8 @@ const apiShipment = async (buyerName, locationLabel, orderNo) => {
     preCarriageBy: 'ROAD',
     placeOfReceipt: 'Tiruppur',
     vesselFlightNo: 'MSC ANNA V.241E',
-    portOfLoading: 'Chennai Sea',
-    portOfDischarge: 'Rotterdam',
+    portOfLoadingId: await portId('INMAA1', 'SEA'),
+    portOfDischargeId: await portId('NLRTM', 'SEA'),
     finalDestination: 'Rotterdam, Netherlands',
     countryOfFinalDestination: 'Netherlands',
     etd: '2026-12-01',
@@ -98,8 +119,9 @@ test.describe('Shipments', () => {
     await pickOption(page, selectFor(page, 'Notify party'), 'Banco Santander');
     // Zara has two shipping locations, so the address under the consignee must be picked
     await pickOption(page, selectFor(page, 'Consignee address'), 'Zaragoza DC');
-    await pickOption(page, selectFor(page, 'Port of loading'), 'Chennai Sea');
-    await pickOption(page, selectFor(page, 'Port of discharge'), 'Rotterdam');
+    // Ports from the catalogue, found by their code; Chennai is known by its former name too
+    await pickPort(page, 'Port of loading', 'madras', 'Chennai (INMAA1)');
+    await pickPort(page, 'Port of discharge', 'NLRTM', 'Rotterdam (NLRTM)');
     await fillDate(page, 'ETD', '01-Nov-2026'); // the form's DD-MMM-YYYY
 
     // Every field is mandatory but the BL/AWB (issued after loading); a sea shipment needs a container
@@ -147,13 +169,42 @@ test.describe('Shipments', () => {
     expect((await resaved).status()).toBe(200);
     expect(saveRequests).toEqual(['PUT']);
 
-    // Found by its order, and the view shows what prints
+    // Found by its order and by its port's code, and the view shows what prints: the port's name and code
     const row = await findInRegister(page, 'ORD/0002');
     await expect(row.first()).toBeVisible();
+    await expect((await findInRegister(page, 'INMAA1')).filter({ hasText: shipmentNo })).toContainText('Chennai (INMAA1)');
     await page.locator('.ant-table-row').filter({ hasText: shipmentNo }).first().click();
     const view = page.getByRole('dialog');
     await expect(view.getByText(/Plataforma Logistica PLAZA/).first()).toBeVisible();
     await expect(view.getByText('Banco Santander S.A.').first()).toBeVisible();
+    await expect(view.getByText('Chennai (INMAA1)').first()).toBeVisible();
+    await expect(view.getByText('Rotterdam (NLRTM)').first()).toBeVisible();
+  });
+
+  test('the mode decides the ports: switching to air empties them and offers airports', async ({ page }) => {
+    await goTo(page, '/export-docs/shipments/new');
+    await pickPort(page, 'Port of loading', 'INTUP6', 'ICD Tiruppur (INTUP6)'); // a sea shipment may load at an ICD
+    await pickPort(page, 'Port of discharge', 'NLRTM', 'Rotterdam (NLRTM)');
+
+    // Reopened, the picker starts again from the first page, not from the last search
+    await selectFor(page, 'Port of discharge').click();
+    const listed = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option');
+    await expect(listed.filter({ hasNotText: 'Rotterdam' }).first()).toBeVisible({ timeout: 15000 });
+    await page.keyboard.press('Escape');
+
+    await pickOption(page, selectFor(page, 'Mode'), 'Air');
+    await expect(selectFor(page, 'Port of loading')).not.toContainText('Tiruppur');
+    await expect(selectFor(page, 'Port of discharge')).not.toContainText('Rotterdam');
+
+    // By air: Chennai's airport, and Rotterdam's airport, not its seaport
+    await pickPort(page, 'Port of loading', 'chennai', 'Chennai (INMAA4)');
+    const discharge = selectFor(page, 'Port of discharge');
+    await discharge.click();
+    await discharge.locator('input').fill('NLRTM');
+    const offered = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option');
+    await expect(offered.first()).toContainText('Airport', { timeout: 15000 });
+    await expect(offered.filter({ hasText: 'Seaport' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
   });
 
   test('notifying a shipping location prints its address under the consignee, with no address to pick', async ({ page }) => {

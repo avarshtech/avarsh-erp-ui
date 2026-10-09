@@ -137,7 +137,7 @@ const renderSample = (sample, exporter) => {
     countryOfOrigin: 'INDIA',
     countryOfFinalDestination: shipment.countryOfFinalDestination,
     incoterm: shipment.incoterm,
-    incotermPlace: shipment.portOfLoading,
+    incotermPlace: shipment.portOfLoadingName || shipment.portOfLoading,
     paymentTerms: 'TT 60 DAYS FROM BL DATE',
     buyerOrderNo: sample.entry?.orderNo,
     consignee: shipment.consignee || null,

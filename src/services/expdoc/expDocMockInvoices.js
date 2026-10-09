@@ -441,7 +441,8 @@ export const createInvoice = async (payload = {}) => {
     consignee: shipment?.consignee ?? null,
     notify: shipment?.notify ?? null,
     incoterm: shipment?.incoterm || commercial.incoterm || null,
-    incotermPlace: shipment?.portOfLoading || null,
+    // The named place is the port's name ("FOB Chennai"), not the printed name and code
+    incotermPlace: shipment?.portOfLoadingName || shipment?.portOfLoading || null,
     paymentTerms: commercial.paymentTerms || null,
     countryOfOrigin: 'INDIA',
     countryOfFinalDestination: shipment?.countryOfFinalDestination ?? null,

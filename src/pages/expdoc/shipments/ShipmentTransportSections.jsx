@@ -1,10 +1,66 @@
-import { Form, Select } from 'antd';
+import { Form, Select, Space, Spin, Typography } from 'antd';
 import dayjs from 'dayjs';
 import { FormSection, FormInput, FormSelect, FormDatePicker } from '../../../components/form';
+import usePortOptions from './usePortOptions';
+
+const { Text } = Typography;
 
 // Every field is mandatory (the owner's rule, 2026-10-09) except the BL/AWB number and date,
 // issued only once the cargo is loaded. The API refuses the same.
 const required = (message) => [{ required: true, whitespace: true, message }];
+
+// What each port may be for the mode (the API refuses the rest): a sea shipment loads at an Indian
+// seaport or ICD and discharges at a seaport; air and courier use airports.
+const loadingKinds = (mode) => (mode === 'SEA' ? ['SEA', 'ICD'] : ['AIR']);
+const dischargeKinds = (mode) => (mode === 'SEA' ? ['SEA'] : ['AIR']);
+const KIND_LABELS = { SEA: 'Seaport', AIR: 'Airport', ICD: 'ICD' };
+
+const portsEmptyText = ({ loading, failed }) => {
+  if (loading) return <Spin size="small" />;
+  if (failed) return 'Ports could not be loaded';
+  return 'No port matches: type a name or a code (INMAA1)';
+};
+
+const renderPort = ({ data }) => (
+  <Space size={6}>
+    <span>{data.label}</span>
+    {data.kind && <Text type="secondary">{[KIND_LABELS[data.kind], data.country].filter(Boolean).join(' · ')}</Text>}
+  </Space>
+);
+
+/**
+ * A port from the catalogue (UN/LOCODE), searched on the server by name or code. `saved` is the
+ * shipment's own port ({ id, label }); `legacyName` the name a shipment saved before the catalogue
+ * keeps, shown under the field until a port is picked.
+ */
+const PortField = ({ name, label, kinds, country, saved, legacyName, message, tooltip }) => {
+  const form = Form.useFormInstance();
+  const value = Form.useWatch(name, form);
+  const ports = usePortOptions({ kinds, country, value, saved });
+  return (
+    <Form.Item
+      name={name}
+      label={label}
+      tooltip={tooltip}
+      rules={[{ required: true, message }]}
+      extra={value == null && legacyName ? `Saved before the port list as "${legacyName}": select the port.` : undefined}
+    >
+      <FormSelect
+        options={ports.options}
+        loading={ports.loading}
+        onSearch={ports.onSearch}
+        onOpenChange={ports.onOpenChange}
+        filterOption={false}
+        optionRender={renderPort}
+        placeholder="Type a port name or code"
+        notFoundContent={portsEmptyText(ports)}
+      />
+    </Form.Item>
+  );
+};
+
+/** The shipment's own port, as the picker keeps it among its options. */
+const savedPort = (id, label) => (id != null ? { id, label } : null);
 
 /** ETA may not fall before ETD. */
 const etaRule = ({ getFieldValue }) => ({
@@ -35,9 +91,10 @@ const containersRule = ({ getFieldValue }) => ({
 
 /**
  * The shipment's routing and its container / BL fields — rendered inside the shipment Form.
- * `containersRequired`: the mode is Sea.
+ * `mode` decides which ports are offered and whether containers are required; `record` is the
+ * saved shipment, whose ports stay labelled (and a legacy one's old names shown).
  */
-const ShipmentTransportSections = ({ portOptions, containersRequired }) => (
+const ShipmentTransportSections = ({ mode, record }) => (
   <>
     <FormSection title="Routing" columns={3}>
       <Form.Item name="preCarriageBy" label="Pre-carriage by" rules={required('Enter the pre-carriage')}>
@@ -49,12 +106,25 @@ const ShipmentTransportSections = ({ portOptions, containersRequired }) => (
       <Form.Item name="vesselFlightNo" label="Vessel / Flight No." rules={required('Enter the vessel or flight no.')}>
         <FormInput placeholder="MAERSK CHENNAI V.214W" maxLength={100} />
       </Form.Item>
-      <Form.Item name="portOfLoading" label="Port of loading" rules={[{ required: true, message: 'Select the port of loading' }]}>
-        <FormSelect options={portOptions} placeholder="Select port" />
-      </Form.Item>
-      <Form.Item name="portOfDischarge" label="Port of discharge" rules={[{ required: true, message: 'Select the port of discharge' }]}>
-        <FormSelect options={portOptions} placeholder="Select port" />
-      </Form.Item>
+      <PortField
+        name="portOfLoadingId"
+        label="Port of loading"
+        tooltip={mode === 'SEA' ? 'An Indian seaport or ICD.' : 'An Indian airport.'}
+        kinds={loadingKinds(mode)}
+        country="IN"
+        saved={savedPort(record?.portOfLoadingId, record?.portOfLoadingLabel)}
+        legacyName={record && record.portOfLoadingId == null ? record.portOfLoadingName : null}
+        message="Select the port of loading"
+      />
+      <PortField
+        name="portOfDischargeId"
+        label="Port of discharge"
+        tooltip={mode === 'SEA' ? 'A seaport anywhere.' : 'An airport anywhere.'}
+        kinds={dischargeKinds(mode)}
+        saved={savedPort(record?.portOfDischargeId, record?.portOfDischargeLabel)}
+        legacyName={record && record.portOfDischargeId == null ? record.portOfDischargeName : null}
+        message="Select the port of discharge"
+      />
       <Form.Item name="finalDestination" label="Final destination" rules={required('Enter the final destination')}>
         <FormInput placeholder="Valkenswaard, Netherlands" maxLength={150} />
       </Form.Item>
@@ -78,7 +148,7 @@ const ShipmentTransportSections = ({ portOptions, containersRequired }) => (
         name="containerNos"
         label="Container No(s)"
         tooltip="Type a number and press Enter to add another. Needed for a sea shipment; air and courier have none."
-        required={containersRequired}
+        required={mode === 'SEA'}
         dependencies={['mode']}
         rules={[containersRule]}
       >

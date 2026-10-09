@@ -43,7 +43,7 @@ const KIDS_EU_SIZES = ['74', '80', '86', '92', '98', '104', '110', '116', '122',
 const BABY_SIZES = ['50/56', '62/68', '74/80', '86/92'];
 
 // ─── Masters ────────────────────────────────────────────────────────────────────
-// Ports and incoterms are fixed lists in utils/expDocConstants.js (EXPORT_PORTS, INCOTERMS).
+// Incoterms are a fixed list in utils/expDocConstants.js; ports are the API's port catalogue.
 
 // Garment HS codes with their IGST rate. The rate is fiscal rather than stylistic,
 // which is why it lives on the code and not on the style.

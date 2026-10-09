@@ -35,7 +35,7 @@ import {
   listTemplateCandidates as candidatesFor, loadTemplateSnapshot, findNewerTemplateRevision as newerRevision,
 } from './expDocTemplateBridge';
 import { resolveStickerTemplate } from './expDocStickerTemplates';
-import { EXPORT_PORTS, INCOTERMS, SHIPMENT_STATUS } from '../../utils/expDocConstants';
+import { INCOTERMS, SHIPMENT_STATUS } from '../../utils/expDocConstants';
 
 const notReady = () => {
   throw new Error('Export Documentation backend not implemented yet — mock phase');
@@ -73,8 +73,8 @@ const thenSyncShipment = (fn, before = () => null) => async (...a) => {
 };
 
 // ── Masters ── GET /export-docs/masters/*
-// Ports and incoterms are fixed lists (utils/expDocConstants.js), not masters.
-export const listPorts = async () => EXPORT_PORTS;
+// Incoterms are a fixed list (utils/expDocConstants.js); ports come from the port catalogue
+// (services/master/portService.js).
 export const listIncoterms = async () => INCOTERMS;
 export const listHsCodes = (...a) => masters.listHsCodes(...a);
 export const getHsDefault = (...a) => masters.getHsDefault(...a);

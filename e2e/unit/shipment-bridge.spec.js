@@ -98,17 +98,35 @@ test.describe('the API record and the screens', () => {
     expect(s.closedBy).toBeNull();
   });
 
+  test('a port prints its name and code; the bare name stays for the incoterm place', () => {
+    const s = fromApi({
+      id: 5, portOfLoading: 'Chennai', portOfLoadingId: 11, portOfLoadingCode: 'INMAA1', portOfLoadingLabel: 'Chennai (INMAA1)',
+      portOfDischarge: 'Rotterdam', portOfDischargeId: 12, portOfDischargeCode: 'NLRTM', portOfDischargeLabel: 'Rotterdam (NLRTM)',
+    });
+    expect(s.portOfLoading).toBe('Chennai (INMAA1)');
+    expect(s.portOfLoadingName).toBe('Chennai');
+    expect(s.portOfLoadingId).toBe(11);
+    expect(s.portOfDischarge).toBe('Rotterdam (NLRTM)');
+    expect(s.portOfDischargeName).toBe('Rotterdam');
+
+    // Saved before the port catalogue: the name alone, as it was
+    const legacy = fromApi({ id: 6, portOfLoading: 'Chennai Sea', portOfLoadingId: null, portOfLoadingLabel: 'Chennai Sea' });
+    expect(legacy.portOfLoading).toBe('Chennai Sea');
+    expect(legacy.portOfLoadingName).toBe('Chennai Sea');
+  });
+
   test('a save sends ids only, blanks as null and never a printed block', () => {
     const body = toApi({
       buyerId: 2, notifyParty: { kind: 'BANK', locationId: null }, consigneeLocationId: 22, orderIds: [9],
-      mode: 'SEA', incoterm: 'FOB', preCarriageBy: '  ', vesselFlightNo: ' MSC ANNA ', portOfLoading: 'Chennai Sea',
-      portOfDischarge: 'Rotterdam', etd: '2026-11-01', containerNos: ['MSKU7712345'], version: 3,
-      consignee: { block: 'stale text' }, buyerName: 'Zara (Inditex)',
+      mode: 'SEA', incoterm: 'FOB', preCarriageBy: '  ', vesselFlightNo: ' MSC ANNA ', portOfLoadingId: 11,
+      portOfDischargeId: 12, portOfLoading: 'Chennai (INMAA1)', etd: '2026-11-01', containerNos: ['MSKU7712345'],
+      version: 3, consignee: { block: 'stale text' }, buyerName: 'Zara (Inditex)',
     });
     expect(body).toMatchObject({
       buyerId: 2, notifyParty: { kind: 'BANK', locationId: null }, consigneeLocationId: 22, orderIds: [9],
-      preCarriageBy: null, vesselFlightNo: 'MSC ANNA', eta: null, version: 3,
+      preCarriageBy: null, vesselFlightNo: 'MSC ANNA', portOfLoadingId: 11, portOfDischargeId: 12, eta: null, version: 3,
     });
+    expect(body).not.toHaveProperty('portOfLoading');
     expect(body).not.toHaveProperty('consignee');
     expect(body).not.toHaveProperty('buyerName');
   });

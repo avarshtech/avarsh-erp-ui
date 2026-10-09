@@ -6,6 +6,11 @@
  * the container count, and the people as names. `toApi` sends ids only: the server
  * builds the printed consignee and notify blocks from the buyer master.
  *
+ * Ports: `portOfLoading` / `portOfDischarge` become what prints, the server's label
+ * ("Chennai (INMAA1)"; a legacy shipment's name alone), the field every print binding,
+ * template and reader already uses. The bare name stays as `portOfLoadingName`, for the
+ * incoterm's named place ("FOB Chennai").
+ *
  * Pure, with no axios or storage, so the unit spec imports it in Node.
  */
 
@@ -19,6 +24,10 @@ export const fromApi = (dto) => {
     containerNos,
     orderNos: orders.map((o) => o.orderNo).filter(Boolean),
     containerCount: containerNos.length,
+    portOfLoadingName: dto.portOfLoading ?? null,
+    portOfLoading: dto.portOfLoadingLabel ?? dto.portOfLoading ?? null,
+    portOfDischargeName: dto.portOfDischarge ?? null,
+    portOfDischarge: dto.portOfDischargeLabel ?? dto.portOfDischarge ?? null,
     createdBy: dto.createdByName ?? null,
     updatedBy: dto.updatedByName ?? null,
     closedBy: dto.closedByName ?? null,
@@ -41,8 +50,8 @@ export const toApi = (s) => ({
   preCarriageBy: textOrNull(s.preCarriageBy),
   placeOfReceipt: textOrNull(s.placeOfReceipt),
   vesselFlightNo: textOrNull(s.vesselFlightNo),
-  portOfLoading: s.portOfLoading,
-  portOfDischarge: s.portOfDischarge,
+  portOfLoadingId: s.portOfLoadingId ?? null,
+  portOfDischargeId: s.portOfDischargeId ?? null,
   finalDestination: textOrNull(s.finalDestination),
   countryOfFinalDestination: textOrNull(s.countryOfFinalDestination),
   etd: s.etd,
