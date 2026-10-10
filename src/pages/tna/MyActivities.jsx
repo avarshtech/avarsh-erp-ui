@@ -1,106 +1,86 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Button, Card, Table, Tooltip } from 'antd';
-import { CalendarOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Alert, App, Card, Select, Table, Tag, Tooltip, Typography,
+} from 'antd';
+import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader';
+import { listMyActivities, getMeta } from '../../services/tna/tnaService';
+import { SOURCE_MODULES, fmtDate, signedDays } from '../../utils/tnaConstants';
 import TnaStatusTag from './components/TnaStatusTag';
-import FloatBar from './components/FloatBar';
-import ActualDrawer from './plan/ActualDrawer';
-import { listMyActivities } from '../../services/tna/tnaService';
-import { DATE_FORMAT } from '../../utils/uiConstants';
-import { getTablePagination } from '../../utils/paginationConfig';
+import MockDataNote from './components/MockDataNote';
 
-/** §15 "My activities" — everything assigned to me, urgency first, three taps to complete. */
+const { Text } = Typography;
+const mono = { fontFamily: 'var(--font-mono, monospace)' };
+
+/**
+ * Activities owned through their source module, across every live order, ranked by urgency:
+ * overdue first, then due soon, then critical (FR-6.5). Read-only — the work is done in the
+ * source screen, and the activity completes when its event arrives.
+ */
 const MyActivities = () => {
   const { message } = App.useApp();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [drawer, setDrawer] = useState(null); // {planId, line}
+  const navigate = useNavigate();
+  const [module, setModule] = useState(null);
+  const [result, setResult] = useState({ key: null, rows: [] });
+  const [meta, setMeta] = useState(null);
+  const key = module || 'ALL';
 
-  const load = useCallback(() => {
-    listMyActivities()
-      .then(setRows)
-      .catch(() => message.error('Failed to load your activities'))
-      .finally(() => setLoading(false));
-  }, [message]);
-  useEffect(load, [load]);
+  useEffect(() => { getMeta().then(setMeta).catch(() => {}); }, []);
+  useEffect(() => {
+    listMyActivities({ module: key === 'ALL' ? null : key })
+      .then((rows) => setResult({ key, rows }))
+      .catch(() => { message.error('Failed to load activities'); setResult({ key, rows: [] }); });
+  }, [key, message]);
+  const loading = result.key !== key;
+  const rows = result.rows;
 
   const columns = useMemo(() => [
-    { title: 'Status', dataIndex: 'status', width: 150, render: (v) => <TnaStatusTag status={v} size="small" /> },
+    { title: 'Order', dataIndex: 'orderNo', width: 132, fixed: 'left', render: (v) => <Text strong style={mono}>{v}</Text> },
+    { title: 'Buyer / style', key: 'b', width: 170, render: (_, r) => `${r.buyer} / ${r.styleNo}` },
+    { title: 'Code', dataIndex: 'code', width: 66, render: (v) => <Text style={mono}>{v}</Text> },
     {
-      title: 'Activity',
-      dataIndex: 'name',
-      render: (v, r) => (
-        <div>
-          <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)', marginRight: 6 }}>{r.code}</span>
-          <span style={{ fontWeight: 600 }}>{v}</span>
-        </div>
-      ),
+      title: 'Activity', dataIndex: 'name', width: 250,
+      render: (v, r) => <span>{v}{r.isGate && <Tag color="blue" style={{ marginLeft: 4 }}>gate</Tag>}{r.awaitingSource && <Tooltip title={r.missingNote}><Tag color="orange" style={{ marginLeft: 4 }}>awaiting source</Tag></Tooltip>}</span>,
     },
-    {
-      title: 'Order',
-      dataIndex: 'orderNo',
-      width: 200,
-      render: (v, r) => (
-        <div>
-          <Link to={`/tna/plan/${r.planId}`} style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</Link>
-          <div style={{ fontSize: 11.5, color: 'var(--text-secondary)' }}>{r.buyer} · {r.styleNo}</div>
-        </div>
-      ),
-    },
-    {
-      title: 'Planned',
-      dataIndex: 'plannedDate',
-      width: 150,
-      render: (v) => {
-        const diff = dayjs(v).diff(dayjs().startOf('day'), 'day');
-        return (
-          <div>
-            <div style={{ fontVariantNumeric: 'tabular-nums' }}>{dayjs(v).format(DATE_FORMAT)}</div>
-            <div style={{ fontSize: 11, fontWeight: 600, color: diff < 0 ? 'var(--error-color)' : diff <= 2 ? 'var(--warning-color)' : 'var(--text-muted)' }}>
-              {diff < 0 ? `${-diff}d overdue` : diff === 0 ? 'Due today' : `in ${diff}d`}
-            </div>
-          </div>
-        );
-      },
-    },
-    { title: 'Float', dataIndex: 'floatDays', width: 140, render: (v) => <FloatBar floatDays={v} /> },
-    {
-      title: '',
-      key: 'actions',
-      width: 140,
-      fixed: 'right',
-      render: (_, r) => r.allowManualActual && (
-        <Button size="small" type="primary" ghost icon={<CalendarOutlined />} onClick={() => setDrawer({ planId: r.planId, line: r })}>
-          Mark done
-        </Button>
-      ),
-    },
+    { title: 'Owner module', dataIndex: 'sourceModule', width: 130 },
+    { title: 'Completes on', dataIndex: 'completionEvent', width: 200, render: (v) => <code style={{ fontSize: 12 }}>{v}</code> },
+    { title: 'Revised target', dataIndex: 'revisedTarget', width: 112, render: fmtDate },
+    { title: 'Forecast', dataIndex: 'forecastDate', width: 104, render: fmtDate },
+    { title: 'Overdue', dataIndex: 'overdueDays', width: 80, align: 'center', render: (v) => (v > 0 ? <Tag color="red" style={{ marginInlineEnd: 0 }}>{v} WD</Tag> : '—') },
+    { title: 'Float', dataIndex: 'floatDays', width: 80, align: 'right', render: (v) => <span style={{ ...mono, color: v <= 0 ? 'var(--error-color)' : undefined }}>{signedDays(v, 'WD')}</span> },
+    { title: 'Status', dataIndex: 'status', width: 140, render: (s) => <TnaStatusTag status={s} /> },
   ], []);
 
   return (
     <div className="animate-fade-in-up">
-      <PageHeader title="My Activities" subtitle="Every TNA activity assigned to you across live orders, most urgent first" />
+      <PageHeader
+        title="My activities"
+        subtitle="Open activities owned by your source module, across every live order — overdue first"
+        extra={<MockDataNote asOf={meta?.asOf} />}
+      />
       <Card size="small" styles={{ body: { paddingTop: 12 } }}>
+        <Select
+          allowClear
+          name="ownerModule"
+          placeholder="Owner module: all"
+          style={{ width: 240, marginBottom: 12 }}
+          value={module}
+          onChange={(v) => setModule(v || null)}
+          options={SOURCE_MODULES.map((m) => ({ value: m, label: m }))}
+        />
+        <Alert type="info" style={{ marginBottom: 12 }} title="Nothing is entered here. Do the work in the owning screen; the activity completes when that screen's completion event arrives." />
         <Table
           rowKey={(r) => `${r.planId}-${r.code}`}
           size="small"
+          bordered
           loading={loading}
           columns={columns}
           dataSource={rows}
-          pagination={getTablePagination({ pageSize: 25 }, 'activities')}
-          scroll={{ x: 860 }}
-          onRow={(r) => (r.status === 'OVERDUE_CRITICAL' ? { style: { background: 'color-mix(in srgb, var(--error-color) 4%, transparent)' } } : {})}
+          pagination={{ pageSize: 50, showSizeChanger: false }}
+          scroll={{ x: 1650, y: 'calc(100vh - 360px)' }}
+          onRow={(r) => ({ onClick: () => navigate(`/tna/plan/${r.planId}?activity=${r.code}`), style: { cursor: 'pointer' } })}
         />
       </Card>
-      <ActualDrawer
-        open={!!drawer}
-        planId={drawer?.planId}
-        line={drawer?.line}
-        onClose={() => setDrawer(null)}
-        onSaved={() => { setDrawer(null); load(); }}
-      />
     </div>
   );
 };

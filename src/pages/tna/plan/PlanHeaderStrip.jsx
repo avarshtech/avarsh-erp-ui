@@ -1,77 +1,94 @@
 import { memo } from 'react';
-import { Alert, Card, Col, Progress, Row, Tag, Tooltip } from 'antd';
-import dayjs from 'dayjs';
-import StatusTag from '../../../components/StatusTag';
-import RagBadge from '../components/RagBadge';
-import { PLAN_STATUS, FEASIBILITY } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
+import {
+  Col, Row, Space, Table, Tag, Tooltip,
+} from 'antd';
+import { InfoCircleOutlined } from '@ant-design/icons';
+import { FEASIBILITY, fmtDate, signedDays } from '../../../utils/tnaConstants';
+import HealthTag from '../components/HealthTag';
+import DeltaTag from '../components/DeltaTag';
 
-const Field = ({ label, value, mono, tip }) => (
-  <div style={{ minWidth: 0 }}>
-    <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-    <Tooltip title={tip}>
-      <div style={{ fontSize: 13.5, fontWeight: 600, fontFamily: mono ? 'monospace' : undefined, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
-    </Tooltip>
+const box = { border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '8px 12px', background: 'var(--bg-secondary)', height: '100%' };
+const cap = { fontSize: 11, letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--text-muted)' };
+
+const Fact = ({ label, tip, children }) => (
+  <div style={box}>
+    <div style={cap}>
+      {label}
+      {tip && <Tooltip title={tip}><InfoCircleOutlined style={{ marginLeft: 4 }} /></Tooltip>}
+    </div>
+    <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>{children}</div>
   </div>
 );
 
-const Big = ({ label, value, color, tip }) => (
-  <Tooltip title={tip}>
-    <div style={{ textAlign: 'center', padding: '0 18px', borderLeft: '1px solid var(--border-color)' }}>
-      <div style={{ fontSize: 24, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color, lineHeight: 1.2 }}>{value}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>
-    </div>
-  </Tooltip>
-);
+const lineColumns = [
+  { title: 'Line', dataIndex: 'lineNo', width: 50 },
+  { title: 'Buyer PO', dataIndex: 'buyerPoNo', width: 130 },
+  { title: 'Destination', dataIndex: 'destination', width: 130 },
+  { title: 'Qty', dataIndex: 'qty', width: 80, align: 'right', render: (v) => v.toLocaleString('en-IN') },
+  { title: 'Original', dataIndex: 'originalCommitment', width: 104, render: fmtDate },
+  { title: 'Latest', dataIndex: 'latestCommitment', width: 104, render: fmtDate },
+  { title: 'Movement', dataIndex: 'movement', width: 90, render: (v) => (v ? <DeltaTag value={v} tone="movement" /> : '—') },
+  { title: 'Dispatched', dataIndex: 'actualDispatch', width: 104, render: fmtDate },
+  { title: 'Delay vs latest', key: 'd', width: 110, render: (_, l) => <DeltaTag value={l.actualDelayLatest ?? l.forecastDelayLatest} tip={l.actualDispatch ? 'Actual' : 'Forecast'} /> },
+];
 
-/** §10.1 header block — the plan's flight strip, every figure derived, every figure explained. */
-const PlanHeaderStrip = memo(function PlanHeaderStrip({ plan }) {
-  const fmt = (d) => dayjs(d).format(DATE_FORMAT);
-  const delay = plan.projectedDelay;
+/** WF-02 header: both commitments, the derived lead time, forecast, delay on both bases, health. */
+const PlanHeaderStrip = memo(function PlanHeaderStrip({ header: h }) {
+  const feas = FEASIBILITY[h.generation?.feasibility];
   return (
-    <Card size="small" style={{ marginBottom: 12 }} styles={{ body: { padding: '14px 18px' } }}>
-      <Row gutter={[16, 12]} align="middle">
-        <Col xs={24} lg={13}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'monospace', fontSize: 17, fontWeight: 700 }}>{plan.orderNo}</span>
-            <RagBadge rag={plan.rag} />
-            <StatusTag status={plan.planStatus} config={PLAN_STATUS} getLabel={(s) => PLAN_STATUS[s].label} />
-            <Tag>v{plan.planVersion}{plan.replanCount ? ` · ${plan.replanCount} re-plan${plan.replanCount > 1 ? 's' : ''}` : ' · baseline'}</Tag>
-          </div>
-          <Row gutter={[14, 10]}>
-            <Col xs={12} md={6}><Field label="Buyer" value={plan.buyer} /></Col>
-            <Col xs={12} md={6}><Field label="Style" value={plan.styleNo} mono /></Col>
-            <Col xs={12} md={6}><Field label="Product" value={plan.productType} /></Col>
-            <Col xs={12} md={6}><Field label="Qty" value={`${plan.qty.toLocaleString()} ${plan.uom}`} mono /></Col>
-            <Col xs={12} md={6}><Field label="Received" value={fmt(plan.orderReceived)} tip="Forward-pass anchor — buyer PO confirmation date" /></Col>
-            <Col xs={12} md={6}><Field label="ETD" value={fmt(plan.etd)} tip="Backward-pass anchor — goods must leave the unit" /></Col>
-            <Col xs={12} md={6}><Field label="Template" value={`${plan.templateCode} v${plan.templateVersion}`} mono tip="Resolved by buyer + product type precedence (§7.4)" /></Col>
-            <Col xs={12} md={6}><Field label="Merchandiser" value={plan.merchandiser} /></Col>
-          </Row>
+    <div style={{ marginBottom: 14 }}>
+      <Row gutter={[10, 10]}>
+        <Col xs={12} md={8} xl={4}><Fact label="Original dispatch (B0)">{fmtDate(h.originalCommitment)}</Fact></Col>
+        <Col xs={12} md={8} xl={4}>
+          <Fact label="Latest dispatch commitment" tip="Commitment movement is its own metric — never added to, or reported as, delay (FR-7.6)">
+            <Space size={6}>{fmtDate(h.latestCommitment)}{h.commitmentMovement ? <DeltaTag value={h.commitmentMovement} tone="movement" /> : null}</Space>
+          </Fact>
         </Col>
-        <Col xs={24} lg={11}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', rowGap: 10 }}>
-            <Big label="Leadtime" value={`${plan.leadtime}d`} color="var(--primary-color)" tip="ETD − order received, calendar days. The driver of the whole plan — never keyed in." />
-            <Big label="Projected Dispatch" value={fmt(plan.projectedDispatch)} color={delay > 0 ? 'var(--error-color)' : 'var(--text-primary)'} tip="Recomputed live: actuals recorded so far + remaining planned durations. A projection, not a re-plan." />
-            <Big label="Projected Delay" value={delay > 0 ? `+${delay}d` : delay === 0 ? '0d' : `${delay}d`} color={delay > 0 ? 'var(--error-color)' : 'var(--success-color)'} tip="Projected dispatch − ETD. Positive means late. The number management reads first." />
-            <div style={{ padding: '0 18px', borderLeft: '1px solid var(--border-color)', minWidth: 120 }}>
-              <Progress type="circle" percent={plan.progressPct} size={56} />
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Progress</div>
-            </div>
-          </div>
+        <Col xs={12} md={8} xl={4}>
+          <Fact label="Lead time (derived)" tip={`Original commitment − order date (D-01). A derived order attribute, never an activity duration (FR-3.2). Elapsed to the latest commitment: ${h.elapsedToLatestDays ?? '—'} CD`}>
+            {h.leadTimeDays ?? '—'} CD
+          </Fact>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Fact label="Forecast dispatch" tip={`Feasible forecast: open activities start no earlier than today (FR-7.4). Projected from source facts: ${fmtDate(h.revisedDispatch)}. Baseline: ${fmtDate(h.baselineDispatch)}`}>
+            {fmtDate(h.forecastDispatch)}
+          </Fact>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Fact label="Delay — original / latest" tip="Forecast (or actual, once dispatched) against each commitment, in calendar days">
+            <Space size={4}>
+              <DeltaTag value={h.actualDispatch ? h.original?.actualDelay : h.original?.forecastDelay} />
+              <DeltaTag value={h.actualDispatch ? h.latest?.actualDelay : h.latest?.forecastDelay} />
+            </Space>
+          </Fact>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Fact label="Health">
+            <Space size={4} wrap><HealthTag health={h.healthLatest} suffix="vs latest" /><HealthTag health={h.healthOriginal} suffix="vs original" /></Space>
+          </Fact>
         </Col>
       </Row>
-      {plan.feasibility !== 'FEASIBLE' && (
-        <Alert
-          style={{ marginTop: 12 }}
-          type={plan.feasibility === 'INFEASIBLE' ? 'error' : 'warning'}
-          showIcon
-          title={plan.feasibility === 'INFEASIBLE'
-            ? `Infeasible — critical path exceeds the leadtime by ${plan.shortfallDays} days even with every activity at its floor. Plan is in Draft and NOT activated: negotiate a later ETD, switch to an express template, or record a management override.`
-            : `Compressed to fit — ${plan.compressedDays} day${plan.compressedDays > 1 ? 's' : ''} squeezed out of ${Object.keys(plan.compressedFrom || {}).join(', ')}. Float on the critical path is zero: this order has no tolerance for slippage.`}
+      <Space size={[16, 4]} wrap style={{ marginTop: 10, fontSize: 12, color: 'var(--text-secondary)' }}>
+        <span>Driving activity: <strong>{h.driving ? `${h.driving.code} ${h.driving.name}` : '—'}</strong></span>
+        <span>Next gate: <strong>{h.nextGateActivity ? `${h.nextGateActivity.code} ${h.nextGateActivity.name} · ${fmtDate(h.nextGateActivity.revisedTarget)}` : '—'}</strong></span>
+        <span>Dispatch float: <strong>{signedDays(h.latest?.dispatchFloat, 'WD')}</strong> vs latest</span>
+        <span>Progress: <strong>{h.progress ? `${h.progress.done} / ${h.progress.total}` : '—'}</strong></span>
+        <span>At generation: {feas ? <Tag color={feas.color}>{feas.label}</Tag> : '—'} master v{h.generation?.masterVersion} · rules {h.generation?.ruleVersion}</span>
+        <span style={{ color: 'var(--text-muted)' }}>Feasibility covers dependencies and the working calendar only — line capacity is not assessed (FR-3.12).</span>
+      </Space>
+      {h.lines?.length > 1 && (
+        <Table
+          style={{ marginTop: 10 }}
+          size="small"
+          bordered
+          rowKey="lineId"
+          pagination={false}
+          columns={lineColumns}
+          dataSource={h.lines}
+          title={() => <span style={cap}>Shipment lines — each against its own commitment (FR-7.12); the first line drives the network</span>}
         />
       )}
-    </Card>
+    </div>
   );
 });
 

@@ -136,6 +136,25 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
+      // Time & Action engine — pure functions asserted against the CR-TNA-001 §17 worked
+      // example. Imports the engine directly: no browser, no login, no backend.
+      name: 'tna-engine',
+      testDir: './e2e/specs/tna',
+      testMatch: /01-engine.*\.spec\.js$/,
+    },
+    {
+      // Time & Action screens — read-only, derived plans (mock data until the API lands).
+      name: 'tna',
+      testDir: './e2e/specs/tna',
+      testIgnore: /01-engine/,
+      timeout: 120000,
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+    {
       // Sewing floor — the module runs entirely on the API, so these specs
       // assert the screens load from it, records survive a reload and the
       // server-derived rules reach the screen.

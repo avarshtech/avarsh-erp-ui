@@ -1,70 +1,108 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Col, Row } from 'antd';
+import {
+  Alert, App, Button, Card, Segmented, Space,
+} from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import SearchFilterBar from '../../../components/SearchFilterBar';
-import { listPlans, listReplans } from '../../../services/tna/tnaService';
+import { listPlans } from '../../../services/tna/tnaService';
+import { DELAY_BASIS, HEALTH, fmtDate } from '../../../utils/tnaConstants';
+import { downloadCsv } from '../../../utils/download';
+import MockDataNote from '../components/MockDataNote';
 import ControlTowerKpis from './ControlTowerKpis';
 import OrderRiskTable from './OrderRiskTable';
-import AttentionRail from './AttentionRail';
 
-/** §15 — TNA Control Tower: every live order, one row, ranked by risk. */
+const option = (v) => ({ value: v, label: v });
+
+/** WF-01 — every live order with a system-generated plan, plus the orders that could not be planned. */
 const ControlTower = () => {
   const { message } = App.useApp();
-  const [plans, setPlans] = useState([]);
-  const [replans, setReplans] = useState([]);
+  const navigate = useNavigate();
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({});
+  const [filters, setFilters] = useState({ basis: 'latest' });
 
   useEffect(() => {
-    Promise.all([listPlans(), listReplans()])
-      .then(([p, r]) => { setPlans(p); setReplans(r); })
-      .catch(() => message.error('Failed to load TNA control tower'))
+    listPlans()
+      .then(setData)
+      .catch(() => message.error('Failed to load the Control Tower'))
       .finally(() => setLoading(false));
   }, [message]);
 
+  const rows = useMemo(() => data?.rows || [], [data]);
   const setFilter = useCallback((key) => (value) => setFilters((f) => ({ ...f, [key]: value })), []);
-  const opts = useCallback((key) => [...new Set(plans.map((p) => p[key]))].map((v) => ({ value: v, label: v })), [plans]);
+  const healthKey = filters.basis === 'original' ? 'healthOriginal' : 'healthLatest';
 
-  const visible = useMemo(() => plans.filter((p) => (
-    !['COMPLETED', 'CANCELLED'].includes(p.planStatus)
-    && (!filters.search || `${p.orderNo} ${p.styleNo} ${p.buyer}`.toLowerCase().includes(filters.search.toLowerCase()))
-    && (!filters.buyer || p.buyer === filters.buyer)
-    && (!filters.merchandiser || p.merchandiser === filters.merchandiser)
-    && (!filters.productType || p.productType === filters.productType)
-    && (!filters.rag || p.rag === filters.rag)
-  )), [plans, filters]);
+  const visible = useMemo(() => rows.filter((r) => (
+    (!filters.search || `${r.orderNo} ${r.styleNo} ${r.buyer}`.toLowerCase().includes(filters.search.toLowerCase()))
+    && (!filters.buyer || r.buyer === filters.buyer)
+    && (!filters.productType || r.productType === filters.productType)
+    && (!filters.health || r[healthKey] === filters.health)
+    && (!filters.month || dayjs(r.latestCommitment).format('YYYY-MM') === filters.month)
+  )), [rows, filters, healthKey]);
 
   const filterDefs = useMemo(() => [
-    { key: 'buyer', type: 'select', span: { md: 4 }, props: { placeholder: 'Buyer', options: opts('buyer'), onChange: setFilter('buyer') } },
-    { key: 'merch', type: 'select', span: { md: 4 }, props: { placeholder: 'Merchandiser', options: opts('merchandiser'), onChange: setFilter('merchandiser') } },
-    { key: 'ptype', type: 'select', span: { md: 4 }, props: { placeholder: 'Product type', options: opts('productType'), onChange: setFilter('productType') } },
-    { key: 'rag', type: 'select', span: { md: 4 }, props: { placeholder: 'RAG', options: [{ value: 'RED', label: 'Delayed' }, { value: 'AMBER', label: 'At Risk' }, { value: 'GREEN', label: 'On Track' }], onChange: setFilter('rag') } },
-  ], [opts, setFilter]);
+    { key: 'buyer', type: 'select', span: { md: 4 }, props: { placeholder: 'Buyer', options: [...new Set(rows.map((r) => r.buyer))].map(option), onChange: setFilter('buyer') } },
+    { key: 'product', type: 'select', span: { md: 4 }, props: { placeholder: 'Product', options: [...new Set(rows.map((r) => r.productType))].map(option), onChange: setFilter('productType') } },
+    { key: 'health', type: 'select', span: { md: 3 }, props: { placeholder: 'Health', options: Object.entries(HEALTH).map(([value, h]) => ({ value, label: h.label })), onChange: setFilter('health') } },
+    {
+      key: 'month', type: 'select', span: { md: 4 },
+      props: { placeholder: 'Month of dispatch', options: [...new Set(rows.map((r) => dayjs(r.latestCommitment).format('YYYY-MM')))].sort().map((m) => ({ value: m, label: dayjs(`${m}-01`).format('MMM YYYY') })), onChange: setFilter('month') },
+    },
+  ], [rows, setFilter]);
+
+  const exportCsv = useCallback(() => {
+    const head = ['Order', 'Buyer', 'Style', 'Order date', 'Original dispatch', 'Latest dispatch', 'Commitment movement (CD)', 'Forecast dispatch', 'Vs original (CD)', 'Vs latest (CD)', 'Progress', 'Next gate', 'Health vs latest', 'Health vs original'];
+    downloadCsv([head, ...visible.map((r) => [
+      r.orderNo, r.buyer, r.styleNo, fmtDate(r.orderDate), fmtDate(r.originalCommitment), fmtDate(r.latestCommitment), r.commitmentMovement,
+      r.forecastDispatch ? fmtDate(r.forecastDispatch) : 'Not computed', r.delayOriginal ?? '', r.delayLatest ?? '',
+      r.progress ? `${r.progress.done}/${r.progress.total}` : '', r.nextGate?.name || '', r.healthLatest, r.healthOriginal,
+    ])], `tna-control-tower-${data?.asOf || 'today'}.csv`);
+  }, [visible, data]);
+
+  const blocked = visible.filter((r) => r.status === 'BLOCKED');
 
   return (
     <div className="animate-fade-in-up">
       <PageHeader
-        title="TNA Control Tower"
-        subtitle="Every live order in one view — ranked by risk, driven by projected dispatch (design preview on sample data)"
+        title="Control Tower"
+        subtitle="Live orders — every plan is generated by the system on order confirmation and derived from source records"
+        extra={(
+          <Space wrap>
+            <MockDataNote asOf={data?.asOf} />
+            <Button icon={<DownloadOutlined />} onClick={exportCsv} disabled={!visible.length}>Export</Button>
+          </Space>
+        )}
       />
-      <ControlTowerKpis plans={plans} pendingReplans={replans.filter((r) => r.workflowStatus === 'PENDING_APPROVAL').length} loading={loading} />
-      <Row gutter={[16, 16]}>
-        <Col xs={24} xl={17}>
-          <Card size="small" styles={{ body: { paddingTop: 12 } }}>
-            <SearchFilterBar
-              searchText={filters.search}
-              onSearchChange={(e) => setFilter('search')(e.target.value)}
-              searchPlaceholder="Search order / style / buyer"
-              filters={filterDefs}
-              style={{ marginBottom: 12 }}
-            />
-            <OrderRiskTable plans={visible} loading={loading} />
-          </Card>
-        </Col>
-        <Col xs={24} xl={7}>
-          <AttentionRail plans={plans} replans={replans} />
-        </Col>
-      </Row>
+      <ControlTowerKpis kpis={data?.kpis} loading={loading} />
+      <Card size="small" styles={{ body: { paddingTop: 12 } }}>
+        <SearchFilterBar
+          searchText={filters.search}
+          onSearchChange={(e) => setFilter('search')(e.target.value)}
+          searchPlaceholder="Search order / style / buyer"
+          filters={filterDefs}
+          extra={(
+            <Space size={6}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Delay basis</span>
+              <Segmented size="small" value={filters.basis} onChange={setFilter('basis')} options={DELAY_BASIS} />
+            </Space>
+          )}
+          style={{ marginBottom: 12 }}
+        />
+        {blocked.map((b) => (
+          <Alert
+            key={b.id}
+            type="warning"
+            showIcon
+            style={{ marginBottom: 8 }}
+            title={<span><strong>{b.orderNo}</strong> — plan not generated. {b.blockedReason}.</span>}
+            action={<Button size="small" onClick={() => navigate('/tna/exceptions')}>Open in Exceptions</Button>}
+          />
+        ))}
+        <OrderRiskTable rows={visible} basis={filters.basis} loading={loading} onOpen={(r) => navigate(`/tna/plan/${r.id}`)} />
+      </Card>
     </div>
   );
 };

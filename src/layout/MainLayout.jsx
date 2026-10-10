@@ -460,7 +460,8 @@ const MainLayoutInner = () => {
       children: [
         { key: "/tna/control-tower", label: "Control Tower", moduleId: "tna" },
         { key: "/tna/my-activities", label: "My Activities", moduleId: "tna" },
-        { key: "/tna/replans", label: "Re-plan Approvals", moduleId: "tna-replan-approval" },
+        { key: "/tna/revisions", label: "Revisions & Audit", moduleId: "tna-replan-approval" },
+        { key: "/tna/exceptions", label: "Exceptions", moduleId: "tna" },
         { key: "/tna/analytics", label: "Analytics", moduleId: "tna" },
         { key: "/tna/masters", label: "Masters", moduleId: "tna-masters" },
       ],

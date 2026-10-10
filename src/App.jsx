@@ -64,11 +64,12 @@ const CutPanelPoList = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoList')
 const CutPanelPoForm = lazy(() => import('./pages/po/cutPanelPo/CutPanelPoForm'));
 const GarmentProcessPoList = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoList'));
 const GarmentProcessPoForm = lazy(() => import('./pages/po/garmentProcessPo/GarmentProcessPoForm'));
-// TNA (Time & Action) module — mock-data design phase (lazy-loaded)
+// Time & Action (CR-TNA-001) — derived, read-only plans; mock source data in Round 1 (lazy-loaded)
 const TnaControlTower = lazy(() => import('./pages/tna/control-tower/ControlTower'));
 const TnaPlanPage = lazy(() => import('./pages/tna/plan/TnaPlanPage'));
 const TnaMyActivities = lazy(() => import('./pages/tna/MyActivities'));
-const TnaReplanInbox = lazy(() => import('./pages/tna/replan/ReplanInbox'));
+const TnaRevisionsAudit = lazy(() => import('./pages/tna/revisions/RevisionsAudit'));
+const TnaExceptionsConsole = lazy(() => import('./pages/tna/exceptions/ExceptionsConsole'));
 const TnaMastersPage = lazy(() => import('./pages/tna/masters/TnaMastersPage'));
 const TnaAnalytics = lazy(() => import('./pages/tna/analytics/TnaAnalytics'));
 const CuttingWorkspace = lazy(() => import('./pages/production/cutting/CuttingWorkspace'));
@@ -317,7 +318,10 @@ const ThemedApp = () => {
             <Route path="tna/control-tower" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaControlTower /></Suspense></PermissionRoute>} />
             <Route path="tna/plan/:planId" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaPlanPage /></Suspense></PermissionRoute>} />
             <Route path="tna/my-activities" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaMyActivities /></Suspense></PermissionRoute>} />
-            <Route path="tna/replans" element={<PermissionRoute module="tna-replan-approval" operation="view"><Suspense fallback={<PageSkeleton />}><TnaReplanInbox /></Suspense></PermissionRoute>} />
+            <Route path="tna/revisions" element={<PermissionRoute module="tna-replan-approval" operation="view"><Suspense fallback={<PageSkeleton />}><TnaRevisionsAudit /></Suspense></PermissionRoute>} />
+            {/* CR-TNA-001 removed the re-plan approval queue (FR-5.8); old links land on Revisions & Audit */}
+            <Route path="tna/replans" element={<Navigate to="/tna/revisions" replace />} />
+            <Route path="tna/exceptions" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaExceptionsConsole /></Suspense></PermissionRoute>} />
             <Route path="tna/masters" element={<PermissionRoute module="tna-masters" operation="view"><Suspense fallback={<PageSkeleton />}><TnaMastersPage /></Suspense></PermissionRoute>} />
             <Route path="tna/analytics" element={<PermissionRoute module="tna" operation="view"><Suspense fallback={<PageSkeleton />}><TnaAnalytics /></Suspense></PermissionRoute>} />
             <Route path="production/cutting" element={<PermissionRoute module="production-cutting" operation="view"><Suspense fallback={<PageSkeleton />}><CuttingWorkspace /></Suspense></PermissionRoute>} />

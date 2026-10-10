@@ -1,78 +1,102 @@
-import { memo, useMemo } from 'react';
-import { Space, Switch, Tooltip } from 'antd';
+import { memo, useMemo, useState } from 'react';
+import {
+  Checkbox, Col, Row, Space, Switch,
+} from 'antd';
 import dayjs from 'dayjs';
-import { ACTIVITY_GROUPS, GROUP_COLORS } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { toDay, fromDay } from '../../../services/tna/tnaCalendar';
+import { fmtDate, GANTT_LABEL_W as LABEL_W } from '../../../utils/tnaConstants';
 import GanttRow from './GanttRow';
 
-const Marker = ({ leftPct, color, label, dashed }) => (
-  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(190px + (100% - 190px) * ${leftPct / 100})`, width: 0, borderLeft: `2px ${dashed ? 'dashed' : 'solid'} ${color}`, zIndex: 2 }}>
-    <span style={{ position: 'absolute', top: -20, left: -14, fontSize: 10, fontWeight: 700, color, whiteSpace: 'nowrap' }}>{label}</span>
+const SHOW_OPTIONS = [{ value: 'baseline', label: 'Baseline' }, { value: 'forecast', label: 'Forecast' }, { value: 'actual', label: 'Actual' }];
+const latest = (dates) => dates.filter(Boolean).reduce((m, d) => (d > m ? d : m), '0000-00-00');
+
+const Marker = ({ pct, color, label, dashed, row }) => (
+  <div style={{ position: 'absolute', top: 0, bottom: 0, left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${pct / 100})`, borderLeft: `2px ${dashed ? 'dashed' : 'solid'} ${color}`, zIndex: 2 }}>
+    <span style={{ position: 'absolute', top: -16 - row * 13, ...(pct > 80 ? { right: 4 } : { left: 4 }), fontSize: 10, fontWeight: 700, color, whiteSpace: 'nowrap' }}>{label}</span>
+  </div>
+);
+
+const Fact = ({ label, children }) => (
+  <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '8px 12px', height: '100%' }}>
+    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4, color: 'var(--text-muted)' }}>{label}</div>
+    <div style={{ fontWeight: 600, marginTop: 2 }}>{children}</div>
   </div>
 );
 
 /**
- * Baseline / planned / actual timeline. Float renders as a light band after each
- * bar — the backward pass made visible. Critical chain carries a red spine.
+ * WF-03 — baseline, forecast and actual as distinct bars; both dispatch commitments are fixed
+ * markers that execution never redraws (FR-8.4, FR-4.1). Criticality is float against the latest
+ * commitment (FR-3.7); the chain into dispatch is the network's longest path (FR-7.7).
  */
-const TnaGantt = memo(function TnaGantt({ plan, showBaseline, onToggleBaseline }) {
-  const { rangeStart, span, months } = useMemo(() => {
-    const start = dayjs(plan.orderReceived).subtract(2, 'day');
-    const last = plan.lines.reduce((m, l) => {
-      const cands = [l.latestAllowableDate, l.plannedDate, l.actualDate].filter(Boolean);
-      return cands.reduce((mm, d) => (dayjs(d).isAfter(mm) ? dayjs(d) : mm), m);
-    }, dayjs(plan.etd));
-    const end = last.add(4, 'day');
-    const ms = [];
-    for (let m = start.startOf('month'); !m.isAfter(end); m = m.add(1, 'month')) ms.push(m);
-    return { rangeStart: start, span: end.diff(start, 'day'), months: ms };
-  }, [plan]);
+const TnaGantt = memo(function TnaGantt({ header, activities, onOpen }) {
+  const [show, setShow] = useState(['baseline', 'forecast', 'actual']);
+  const [criticalOnly, setCriticalOnly] = useState(false);
+  const byCode = useMemo(() => Object.fromEntries(activities.map((a) => [a.code, a])), [activities]);
+  const asOf = header.asOf;
 
-  const pos = useMemo(() => (d) => Math.min(100, Math.max(0, (dayjs(d).diff(rangeStart, 'day') / span) * 100)), [rangeStart, span]);
-  const grouped = useMemo(() => ACTIVITY_GROUPS
-    .map((g) => ({ group: g, rows: plan.lines.filter((l) => l.group === g) }))
-    .filter((g) => g.rows.length), [plan.lines]);
-  const todayPct = pos(dayjs());
+  const bars = useMemo(() => Object.fromEntries(activities.map((a) => {
+    const preds = a.predecessors.map((p) => byCode[p]);
+    const baseStart = preds.length ? latest(preds.map((p) => p.baselineDate)) : header.orderDate;
+    const doneStart = preds.length ? latest(preds.map((p) => p.actualDate || p.forecastDate)) : header.orderDate;
+    const openStart = latest([doneStart, asOf]);
+    return [a.code, {
+      baseline: a.baselineDate ? { from: baseStart > a.baselineDate ? a.baselineDate : baseStart, to: a.baselineDate } : null,
+      forecast: !a.actualDate ? { from: openStart > a.forecastDate ? a.forecastDate : openStart, to: a.forecastDate } : null,
+      actual: a.actualDate ? { from: doneStart > a.actualDate ? a.actualDate : doneStart, to: a.actualDate } : null,
+    }];
+  })), [activities, byCode, header.orderDate, asOf]);
+
+  const range = useMemo(() => {
+    const start = toDay(header.orderDate) - 2;
+    const end = toDay(latest([header.latestCommitment, header.originalCommitment, header.forecastDispatch, ...activities.map((a) => a.forecastDate)])) + 5;
+    return { start, span: end - start };
+  }, [header, activities]);
+  const pos = useMemo(() => (d) => Math.min(100, Math.max(0, ((toDay(d) - range.start) / range.span) * 100)), [range]);
+  const months = useMemo(() => {
+    const out = [];
+    for (let m = dayjs(fromDay(range.start)).startOf('month').add(1, 'month'); toDay(m.format('YYYY-MM-DD')) < range.start + range.span; m = m.add(1, 'month')) out.push(m);
+    return out;
+  }, [range]);
+
+  const chain = header.longestPath || [];
+  const rows = criticalOnly ? activities.filter((a) => chain.includes(a.code)) : activities;
 
   return (
     <div>
-      <Space style={{ marginBottom: 20, width: '100%', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <Space size={16} style={{ fontSize: 12, color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
-          <span><span style={{ display: 'inline-block', width: 18, height: 8, borderRadius: 4, background: 'var(--primary-color)', marginRight: 5, verticalAlign: 'middle' }} />Planned</span>
-          <span><span style={{ display: 'inline-block', width: 18, height: 8, borderRadius: 4, background: 'color-mix(in srgb, var(--primary-color) 14%, transparent)', marginRight: 5, verticalAlign: 'middle' }} />Float</span>
-          <span><span style={{ display: 'inline-block', width: 2, height: 12, background: 'var(--text-secondary)', marginRight: 5, verticalAlign: 'middle' }} />Baseline</span>
-          <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: 'var(--success-color)', marginRight: 5, verticalAlign: 'middle' }} />Actual</span>
-          <span style={{ color: 'var(--error-color)', fontWeight: 600 }}>▍Critical chain</span>
+      <Space wrap style={{ marginBottom: 28, width: '100%', justifyContent: 'space-between' }}>
+        <Space wrap>
+          <span style={{ fontSize: 12 }}>Show</span>
+          <Checkbox.Group options={SHOW_OPTIONS} value={show} onChange={setShow} />
+          <Switch size="small" checked={criticalOnly} onChange={setCriticalOnly} aria-label="Longest path only" />
+          <span style={{ fontSize: 12 }}>Longest path only</span>
         </Space>
-        <Space size={6}>
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Baseline</span>
-          <Switch size="small" checked={showBaseline} onChange={onToggleBaseline} />
+        <Space size={14} wrap style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+          <span><span style={{ display: 'inline-block', width: 16, height: 6, borderRadius: 3, background: 'var(--text-muted)', marginRight: 4 }} />Baseline (frozen)</span>
+          <span><span style={{ display: 'inline-block', width: 16, height: 8, borderRadius: 4, background: 'var(--info-color, #3b82f6)', marginRight: 4 }} />Forecast</span>
+          <span><span style={{ display: 'inline-block', width: 16, height: 8, borderRadius: 4, background: 'var(--error-color)', marginRight: 4 }} />Forecast, zero or negative float</span>
+          <span><span style={{ display: 'inline-block', width: 16, height: 8, borderRadius: 4, background: 'var(--success-color)', marginRight: 4 }} />Actual from source</span>
         </Space>
       </Space>
-
-      <div style={{ position: 'relative', paddingTop: 22 }}>
-        <div style={{ position: 'relative', marginLeft: 190, height: 18 }}>
+      <div style={{ position: 'relative', paddingTop: 30 }}>
+        <div style={{ position: 'relative', marginLeft: LABEL_W, height: 16 }}>
           {months.map((m) => (
-            <span key={m.format('YYYY-MM')} style={{ position: 'absolute', left: `${pos(m)}%`, fontSize: 10, color: 'var(--text-muted)', borderLeft: '1px solid var(--border-color)', paddingLeft: 4 }}>
-              {m.format('MMM YYYY')}
-            </span>
+            <span key={m.format('YYYY-MM')} style={{ position: 'absolute', left: `${pos(m.format('YYYY-MM-DD'))}%`, fontSize: 10, color: 'var(--text-muted)', borderLeft: '1px solid var(--border-color)', paddingLeft: 3 }}>{m.format('MMM YYYY')}</span>
           ))}
         </div>
-        {todayPct > 0 && todayPct < 100 && <Marker leftPct={todayPct} color="var(--info-color)" label="Today" />}
-        <Tooltip title={`ETD ${dayjs(plan.etd).format(DATE_FORMAT)} — goods must leave the unit`}>
-          <div><Marker leftPct={pos(plan.etd)} color="var(--error-color)" label="ETD" dashed /></div>
-        </Tooltip>
-
-        {grouped.map(({ group, rows }) => (
-          <div key={group}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 2px', paddingLeft: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: GROUP_COLORS[group] }} />
-              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-secondary)' }}>{group}</span>
-            </div>
-            {rows.map((l) => <GanttRow key={l.code} line={l} pos={pos} showBaseline={showBaseline} />)}
-          </div>
-        ))}
+        <Marker pct={pos(asOf)} color="var(--warning-color)" label="Today" row={0} />
+        <Marker pct={pos(header.originalCommitment)} color="var(--text-primary)" label={`Original ${fmtDate(header.originalCommitment)}`} row={1} />
+        {header.latestCommitment !== header.originalCommitment && <Marker pct={pos(header.latestCommitment)} color="var(--primary-color)" label={`Latest ${fmtDate(header.latestCommitment)}`} row={0} dashed />}
+        {rows.map((a) => <GanttRow key={a.code} a={a} bars={bars[a.code]} pos={pos} show={show} onOpen={onOpen} />)}
       </div>
+      <Row gutter={[10, 10]} style={{ marginTop: 14 }}>
+        <Col xs={24} md={6}><Fact label="Original commitment">{fmtDate(header.originalCommitment)}</Fact></Col>
+        <Col xs={24} md={6}><Fact label="Latest commitment">{fmtDate(header.latestCommitment)}</Fact></Col>
+        <Col xs={24} md={12}>
+          <Fact label="Longest path driving dispatch">
+            <span style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: 12 }}>{chain.join(' → ')}</span>
+          </Fact>
+        </Col>
+      </Row>
     </div>
   );
 });

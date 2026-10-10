@@ -1,57 +1,94 @@
-import { memo, useMemo } from 'react';
-import { Tooltip } from 'antd';
-import { StarFilled } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import TnaStatusTag from '../components/TnaStatusTag';
-import { ACTIVITY_GROUPS, GROUP_COLORS } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
+import { memo, useMemo, useState } from 'react';
+import {
+  Alert, Select, Space, Switch, Tag,
+} from 'antd';
+import { LANES, fmtDate, signedDays } from '../../../utils/tnaConstants';
 
-/** Swim-lane view — one lane per activity group (§7.1), progress reading left to right. */
-const PlanSwimlane = memo(function PlanSwimlane({ plan, onOpenLine }) {
-  const lanes = useMemo(() => ACTIVITY_GROUPS
-    .map((g) => ({ group: g, rows: plan.lines.filter((l) => l.group === g) }))
-    .filter((g) => g.rows.length), [plan.lines]);
+const edgeColour = (a) => {
+  if (a.actualDate) return a.status === 'COMPLETED_ON_TIME' ? 'var(--success-color)' : 'var(--error-color)';
+  if (a.status === 'OVERDUE') return 'var(--error-color)';
+  if (a.status === 'DUE_SOON') return 'var(--warning-color)';
+  return 'var(--border-color)';
+};
+
+const LaneCard = ({ a, dim, showLines, onOpen }) => (
+  <div
+    role="button"
+    tabIndex={0}
+    aria-label={`${a.code} ${a.name}`}
+    onClick={() => onOpen(a.code)}
+    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(a.code); } }}
+    style={{
+      cursor: 'pointer', minWidth: 170, maxWidth: 230, padding: '6px 10px', borderRadius: 'var(--radius-md)',
+      border: '1px solid var(--border-color)', borderLeft: `4px solid ${edgeColour(a)}`, background: 'var(--bg-secondary)', opacity: dim ? 0.35 : 1,
+    }}
+  >
+    <div style={{ fontSize: 12, fontWeight: 600 }}>
+      {a.code} {a.name}{a.isGate && <Tag color="blue" style={{ marginLeft: 4, marginInlineEnd: 0 }}>gate</Tag>}
+    </div>
+    <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{a.actualDate ? `Actual ${fmtDate(a.actualDate)}` : `Target ${fmtDate(a.revisedTarget)}`}</div>
+    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+      {a.actualDate && (a.baselineVariance ? `${signedDays(a.baselineVariance, 'WD')} vs baseline` : 'on baseline')}
+      {!a.actualDate && (a.overdueDays > 0 ? `overdue ${a.overdueDays} WD` : a.awaitingSource ? 'awaiting source' : 'open')}
+    </div>
+    {showLines && a.scope?.lines.map((l) => (
+      <div key={l.lineKey} style={{ fontSize: 11, color: 'var(--text-secondary)', borderTop: '1px dashed var(--border-color)', marginTop: 4, paddingTop: 2 }}>
+        {l.lineKey} · {l.panel ? `${l.panel} · ` : ''}{l.colours.join(', ')} · {l.qty.toLocaleString('en-IN')}
+      </div>
+    ))}
+  </div>
+);
+
+/**
+ * WF-04 — grouped by owning source module: where in the business the plan is stuck.
+ * Ownership follows the source module; T&A keeps no assignment list (FR-6.5).
+ */
+const PlanSwimlane = memo(function PlanSwimlane({ activities, driving, onOpen }) {
+  const [colours, setColours] = useState([]);
+  const [showLines, setShowLines] = useState(false);
+  const colourOptions = useMemo(
+    () => [...new Set(activities.flatMap((a) => a.scope?.colours || []))].map((c) => ({ value: c, label: c })),
+    [activities],
+  );
+  const dim = (a) => colours.length > 0 && !!a.scope && !a.scope.colours.some((c) => colours.includes(c));
+  const lanes = LANES.map((l) => ({ ...l, acts: activities.filter((a) => a.lane === l.key) })).filter((l) => l.acts.length);
 
   return (
-    <div style={{ overflowX: 'auto', paddingBottom: 8 }}>
-      <div style={{ display: 'flex', gap: 12, minWidth: lanes.length * 250 }}>
-        {lanes.map(({ group, rows }) => (
-          <div key={group} style={{ flex: '1 0 238px', background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-lg)', padding: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '2px 4px' }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: GROUP_COLORS[group] }} />
-              <span style={{ fontWeight: 700, fontSize: 12.5, textTransform: 'uppercase', letterSpacing: 0.5 }}>{group}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
-                {rows.filter((l) => l.actualDate).length}/{rows.length}
-              </span>
-            </div>
-            {rows.map((l) => (
-              <Tooltip key={l.code} title={l.predecessors.length ? `After ${l.predecessors.join(', ')} · ${l.responsible}` : l.responsible}>
-                <div
-                  onClick={() => onOpenLine?.(l)}
-                  style={{
-                    background: 'var(--card-bg)', borderRadius: 'var(--radius-md)', padding: '8px 10px', marginBottom: 8,
-                    borderLeft: `3px solid ${l.isCritical ? 'var(--error-color)' : GROUP_COLORS[group]}`,
-                    boxShadow: 'var(--shadow-sm)', cursor: onOpenLine ? 'pointer' : 'default',
-                    opacity: l.actualDate ? 0.75 : 1,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontFamily: 'monospace', fontSize: 10.5, color: 'var(--text-muted)' }}>{l.code}</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name}</span>
-                    {l.milestone && <StarFilled style={{ color: 'var(--accent-color)', fontSize: 10 }} />}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 5 }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
-                      {dayjs(l.actualDate || l.plannedDate).format(DATE_FORMAT)}
-                    </span>
-                    <TnaStatusTag status={l.status} size="small" />
-                  </div>
-                </div>
-              </Tooltip>
-            ))}
+    <div>
+      <Space wrap style={{ marginBottom: 12 }}>
+        <Select
+          mode="multiple"
+          allowClear
+          name="colourway"
+          placeholder="Colourway: all"
+          style={{ minWidth: 220 }}
+          options={colourOptions}
+          value={colours}
+          onChange={setColours}
+        />
+        <Space size={6}>
+          <Switch size="small" checked={showLines} onChange={setShowLines} aria-label="Expand requirement lines" />
+          <span style={{ fontSize: 12 }}>Expand requirement lines (FR-2.5)</span>
+        </Space>
+      </Space>
+      {lanes.map((lane) => (
+        <div key={lane.key} style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 12px', background: 'var(--bg-tertiary, var(--bg-secondary))', borderBottom: '1px solid var(--border-color)' }}>
+            <strong style={{ fontSize: 13 }}>{lane.label}</strong>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{lane.acts.filter((a) => a.actualDate).length}/{lane.acts.length} complete</span>
           </div>
-        ))}
-      </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: 10 }}>
+            {lane.acts.map((a) => <LaneCard key={a.code} a={a} dim={dim(a)} showLines={showLines} onOpen={onOpen} />)}
+          </div>
+        </div>
+      ))}
+      {driving && (
+        <Alert
+          type={driving.overdueDays > 0 ? 'error' : 'info'}
+          showIcon
+          title={`Driving activity: ${driving.code} ${driving.name} (${driving.sourceModule}). Nothing downstream on the longest path can finish before it. Owner is derived from the source module, not assigned in T&A.`}
+        />
+      )}
     </div>
   );
 });

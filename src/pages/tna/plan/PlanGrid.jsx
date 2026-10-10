@@ -1,108 +1,85 @@
-import { memo, useMemo, useState } from 'react';
-import { Table, Tag, Tooltip, Space, Switch, Segmented, Button } from 'antd';
-import { StarFilled, PaperClipOutlined, EditOutlined, CalendarOutlined, ThunderboltFilled } from '@ant-design/icons';
-import dayjs from 'dayjs';
+import { memo, useMemo } from 'react';
+import {
+  Space, Table, Tag, Tooltip, Typography,
+} from 'antd';
+import { LockOutlined } from '@ant-design/icons';
+import { fmtDate, SOURCE_STATUS } from '../../../utils/tnaConstants';
 import TnaStatusTag from '../components/TnaStatusTag';
-import FloatBar from '../components/FloatBar';
-import DeviationCell from '../components/DeviationCell';
-import { GROUP_COLORS } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
+import DeltaTag from '../components/DeltaTag';
 
-const fmt = (d) => (d ? dayjs(d).format(DATE_FORMAT) : '—');
+const { Text } = Typography;
+const mono = { fontFamily: 'var(--font-mono, monospace)', fontSize: 12 };
 
-/** §10.2 activity grid. Planned dates are never editable here — re-plan is a workflow. */
-const PlanGrid = memo(function PlanGrid({ plan, onRecordActual, onProposeReplan }) {
-  const [showBaseline, setShowBaseline] = useState(false);
-  const [devVs, setDevVs] = useState('baseline');
-  const [criticalOnly, setCriticalOnly] = useState(false);
+const ActivityCell = ({ a }) => (
+  <div>
+    <Space size={4} wrap>
+      <span>{a.name}</span>
+      {a.isGate && <Tag color="blue" style={{ marginInlineEnd: 0 }}>gate</Tag>}
+      {a.provisional && <Tooltip title="Requirement still in Draft — planned from master defaults, outside the baseline"><Tag color="gold" style={{ marginInlineEnd: 0 }}>provisional</Tag></Tooltip>}
+      {a.postBaseline && <Tooltip title={`${a.addendumReason} · ${fmtDate(a.addendumOn)}`}><Tag color="cyan" style={{ marginInlineEnd: 0 }}>addendum</Tag></Tooltip>}
+      {a.awaitingSource && <Tooltip title={a.missingNote}><Tag color="orange" style={{ marginInlineEnd: 0 }}>awaiting source</Tag></Tooltip>}
+    </Space>
+    {a.scope && (
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+        {a.scope.colours.join(', ')} · {a.requiredQty.toLocaleString('en-IN')} pcs{a.scope.panels.length ? ` · ${a.scope.panels.join(', ')}` : ''}
+      </div>
+    )}
+    {!a.actualDate && a.progressPct > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.progressPct}% received · threshold {a.threshold}%</div>}
+  </div>
+);
 
-  const maxFloat = useMemo(() => Math.max(10, ...plan.lines.map((l) => l.floatDays)), [plan.lines]);
-  const dataSource = useMemo(() => (criticalOnly ? plan.lines.filter((l) => l.isCritical) : plan.lines), [plan.lines, criticalOnly]);
-  const canAct = ['ACTIVE', 'DRAFT'].includes(plan.planStatus);
-
+/**
+ * WF-02 — every column is derived; nothing on this grid is typed. Baseline, revised target,
+ * forecast and actual are four separately held values (FR-5.5). Float is against the latest
+ * commitment, with the original available as a toggle (FR-3.7).
+ */
+const PlanGrid = memo(function PlanGrid({ activities, floatBasis, onOpen }) {
   const columns = useMemo(() => [
-    { title: '#', dataIndex: 'sequence', width: 42, align: 'center', render: (v) => <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{v}</span> },
+    { title: 'Code', dataIndex: 'code', width: 64, fixed: 'left', render: (v) => <Text style={{ ...mono, fontWeight: 600 }}>{v}</Text> },
+    { title: 'Activity', key: 'name', width: 250, fixed: 'left', render: (_, a) => <ActivityCell a={a} /> },
     {
-      title: 'Activity',
-      dataIndex: 'name',
-      width: 250,
-      render: (v, l) => (
-        <Tooltip title={l.predecessors.length ? `After: ${l.predecessors.join(', ')} · Responsible: ${l.responsible}` : `Start activity · Responsible: ${l.responsible}`}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: `3px solid ${GROUP_COLORS[l.group]}`, paddingLeft: 8 }}>
-            <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>{l.code}</span>
-            <span style={{ fontWeight: l.isCritical ? 600 : 400 }}>{v}</span>
-            {l.milestone && <StarFilled style={{ color: 'var(--accent-color)', fontSize: 11 }} />}
-            {l.attachmentName && <PaperClipOutlined style={{ color: 'var(--text-muted)', fontSize: 11 }} />}
-          </div>
+      title: 'Source screen', dataIndex: 'sourceScreen', width: 160,
+      render: (v, a) => (
+        <Tooltip title={`${SOURCE_STATUS[a.sourceStatus].hint}. Completes on ${a.completionEvent}`}>
+          <Tag style={{ marginInlineEnd: 0 }} color={a.sourceStatus === 'LIVE' ? undefined : SOURCE_STATUS[a.sourceStatus].color}>
+            {v}{a.sourceStatus === 'PROPOSED' ? ' *' : ''}
+          </Tag>
         </Tooltip>
       ),
     },
+    { title: 'Pred.', dataIndex: 'predecessors', width: 86, render: (p) => <span style={{ ...mono, color: 'var(--text-secondary)' }}>{p.length ? p.join(', ') : '—'}</span> },
+    { title: 'Dur', key: 'dur', width: 64, align: 'right', render: (_, a) => <Tooltip title={a.dayType === 'CD' ? 'Calendar days' : 'Working days'}><span style={mono}>{a.duration} {a.dayType}</span></Tooltip> },
+    { title: 'Baseline', dataIndex: 'baselineDate', width: 104, render: (v, a) => (v ? fmtDate(v) : <Tooltip title={a.provisional ? 'Provisional — outside the baseline' : 'No baseline'}>—</Tooltip>) },
+    { title: 'Revised target', dataIndex: 'revisedTarget', width: 110, render: fmtDate },
+    { title: 'Forecast', dataIndex: 'forecastDate', width: 104, render: fmtDate },
+    { title: 'Actual', dataIndex: 'actualDate', width: 104, render: (v) => (v ? <strong>{fmtDate(v)}</strong> : '—') },
+    { title: 'Base var', dataIndex: 'baselineVariance', width: 84, align: 'center', render: (v) => <DeltaTag value={v} unit="WD" tip="Actual (or forecast) − baseline, working days" /> },
     {
-      title: 'Days',
-      dataIndex: 'effectiveDays',
-      width: 62,
-      align: 'right',
-      render: (v, l) => (
-        <Tooltip title={`Raw scaled: ${l.rawDays}d${l.compressedBy ? ` · compressed −${l.compressedBy}d to fit the leadtime` : ''}${l.fixed ? ' · fixed duration (does not scale)' : ` · floor ${l.minDays}d / ceiling ${l.maxDays}d`}`}>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{v}{l.compressedBy ? <ThunderboltFilled style={{ color: 'var(--warning-color)', fontSize: 10, marginLeft: 3 }} /> : null}</span>
-        </Tooltip>
-      ),
+      title: 'Overdue', dataIndex: 'overdueDays', width: 76, align: 'center',
+      render: (v) => (v > 0 ? <Tooltip title="Working days past the revised target — ages daily, event or not (FR-7.8)"><Tag color="red" style={{ marginInlineEnd: 0 }}>{v}</Tag></Tooltip> : '—'),
     },
-    { title: 'Planned', dataIndex: 'plannedDate', width: 112, render: (v) => <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(v)}</span> },
-    ...(showBaseline ? [{ title: 'Baseline', dataIndex: 'baselineDate', width: 112, render: (v) => <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{fmt(v)}</span> }] : []),
-    { title: 'Latest Allowable', dataIndex: 'latestAllowableDate', width: 118, render: (v) => <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--text-secondary)' }}>{fmt(v)}</span> },
-    { title: 'Float', dataIndex: 'floatDays', width: 140, render: (v) => <FloatBar floatDays={v} max={maxFloat} /> },
     {
-      title: 'Actual',
-      dataIndex: 'actualDate',
-      width: 130,
-      render: (v, l) => (v ? (
-        <Tooltip title={`Source: ${l.actualSource}${l.actualSourceRef ? ` · ${l.actualSourceRef}` : ''}`}>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(v)}</span>
-        </Tooltip>
-      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>),
+      title: 'Float', key: 'float', width: 64, align: 'right',
+      render: (_, a) => {
+        const f = floatBasis === 'original' ? a.floatDaysOriginal : a.floatDays;
+        return <span style={{ ...mono, color: f <= 0 ? 'var(--error-color)' : undefined, fontWeight: f <= 0 ? 700 : 400 }}>{f}</span>;
+      },
     },
-    { title: 'Deviation', width: 90, align: 'right', render: (_, l) => <DeviationCell deviationDays={devVs === 'baseline' ? l.deviationDays : l.deviationVsPlan} vsLabel={devVs} /> },
-    { title: 'Status', dataIndex: 'status', width: 130, render: (v) => <TnaStatusTag status={v} size="small" /> },
-    {
-      title: '',
-      key: 'actions',
-      width: 80,
-      fixed: 'right',
-      render: (_, l) => canAct && (
-        <Space size={2}>
-          {!l.actualDate && l.allowManualActual && (
-            <Tooltip title="Record actual date"><Button type="text" size="small" icon={<CalendarOutlined />} onClick={() => onRecordActual(l)} /></Tooltip>
-          )}
-          {!l.actualDate && (
-            <Tooltip title="Propose re-plan"><Button type="text" size="small" icon={<EditOutlined />} onClick={() => onProposeReplan(l)} /></Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ], [showBaseline, devVs, maxFloat, canAct, onRecordActual, onProposeReplan]);
+    { title: 'Status', dataIndex: 'status', width: 140, render: (s) => <TnaStatusTag status={s} /> },
+    { title: <LockOutlined />, key: 'lock', width: 40, align: 'center', fixed: 'right', render: () => <Tooltip title="Read-only — derived from source"><LockOutlined style={{ color: 'var(--text-muted)' }} /></Tooltip> },
+  ], [floatBasis]);
 
   return (
-    <div>
-      <Space style={{ marginBottom: 10, flexWrap: 'wrap' }} size={16}>
-        <Space size={6}><Switch size="small" checked={showBaseline} onChange={setShowBaseline} /><span style={{ fontSize: 12 }}>Baseline column</span></Space>
-        <Space size={6}><Switch size="small" checked={criticalOnly} onChange={setCriticalOnly} /><span style={{ fontSize: 12 }}>Critical chain only</span></Space>
-        <Space size={6}>
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Deviation vs</span>
-          <Segmented size="small" value={devVs} onChange={setDevVs} options={[{ value: 'baseline', label: 'Baseline' }, { value: 'current plan', label: 'Current plan' }]} />
-        </Space>
-        <Tag color="default" style={{ fontSize: 11 }}><StarFilled style={{ color: 'var(--accent-color)' }} /> milestone</Tag>
-      </Space>
-      <Table
-        rowKey="code"
-        size="small"
-        columns={columns}
-        dataSource={dataSource}
-        pagination={false}
-        scroll={{ x: 1180 }}
-        onRow={(l) => (l.isCritical ? { style: { background: 'color-mix(in srgb, var(--error-color) 4%, transparent)' } } : {})}
-      />
-    </div>
+    <Table
+      rowKey="code"
+      size="small"
+      bordered
+      columns={columns}
+      dataSource={activities}
+      pagination={false}
+      scroll={{ x: 1650, y: 'calc(100vh - 380px)' }}
+      onRow={(a) => ({ onClick: () => onOpen(a.code), style: { cursor: 'pointer' } })}
+    />
   );
 });
 

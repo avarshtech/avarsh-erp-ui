@@ -279,12 +279,13 @@ export const SCREENS = [
   // ── Time & Action ──
   { id: 'tna', name: 'Time & Action', section: 'tna', kind: 'screen',
     path: '/tna/control-tower',
-    routes: ['/tna/control-tower', '/tna/my-activities', '/tna/analytics', '/tna/plan/:planId'],
+    routes: ['/tna/control-tower', '/tna/my-activities', '/tna/exceptions', '/tna/analytics', '/tna/plan/:planId'],
     ops: STANDARD_OPERATIONS },
   { id: 'tna-masters', name: 'TNA Masters', section: 'tna', kind: 'screen',
     path: '/tna/masters', ops: STANDARD_OPERATIONS },
-  { id: 'tna-replan-approval', name: 'TNA Re-plan Approvals', section: 'tna', kind: 'screen',
-    path: '/tna/replans', ops: STANDARD_OPERATIONS },
+  // Key kept from the retired re-plan approval queue (FR-5.8); the screen is now Revisions & Audit.
+  { id: 'tna-replan-approval', name: 'TNA Revisions & Audit', section: 'tna', kind: 'screen',
+    path: '/tna/revisions', ops: STANDARD_OPERATIONS },
 
   // ── Production ──
   { id: 'production-cutting', name: 'Production — Cutting', section: 'production', kind: 'screen',

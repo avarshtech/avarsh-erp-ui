@@ -1,90 +1,73 @@
 import { memo, useMemo } from 'react';
-import { Table, Progress, Tag, Badge, Tooltip } from 'antd';
-import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
-import RagBadge from '../components/RagBadge';
-import TnaStatusTag from '../components/TnaStatusTag';
-import { FEASIBILITY } from '../../../utils/tnaConstants';
-import { DATE_FORMAT } from '../../../utils/uiConstants';
-import { getTablePagination } from '../../../utils/paginationConfig';
+import { Table, Tag, Tooltip, Typography } from 'antd';
+import { fmtDate } from '../../../utils/tnaConstants';
+import HealthTag from '../components/HealthTag';
+import DeltaTag from '../components/DeltaTag';
 
-const RAG_RANK = { RED: 0, AMBER: 1, GREEN: 2 };
+const { Text } = Typography;
+const RISK = { RED: 0, INFEASIBLE: 1, AMBER: 2, BLOCKED: 3, GREEN: 4 };
+const mono = { fontFamily: 'var(--font-mono, monospace)', fontWeight: 600 };
 
-/** Risk-ranked cross-order table — reds surface first, projected delay is the headline. */
-const OrderRiskTable = memo(function OrderRiskTable({ plans, loading }) {
-  const navigate = useNavigate();
-
-  const dataSource = useMemo(() => [...plans].sort((a, b) => (RAG_RANK[a.rag] - RAG_RANK[b.rag]) || (b.projectedDelay - a.projectedDelay)), [plans]);
+/**
+ * WF-01 order table. Both commitments, the movement between them (never a delay — FR-7.6),
+ * the forecast, and delay on both bases side by side. Ranked by health, then by remaining
+ * float on the critical path (FR-11.4) for the chosen basis.
+ */
+const OrderRiskTable = memo(function OrderRiskTable({ rows, basis, loading, onOpen }) {
+  const sorted = useMemo(() => [...rows].sort((x, y) => {
+    const hx = basis === 'original' ? x.healthOriginal : x.healthLatest;
+    const hy = basis === 'original' ? y.healthOriginal : y.healthLatest;
+    const fx = basis === 'original' ? x.dispatchFloatOriginal : x.dispatchFloatLatest;
+    const fy = basis === 'original' ? y.dispatchFloatOriginal : y.dispatchFloatLatest;
+    return RISK[hx] - RISK[hy] || (fx ?? 999) - (fy ?? 999);
+  }), [rows, basis]);
 
   const columns = useMemo(() => [
-    { title: '', dataIndex: 'rag', width: 40, render: (rag, r) => <RagBadge rag={rag} showLabel={false} tooltip={`${rag === 'RED' ? 'Delayed' : rag === 'AMBER' ? 'At risk' : 'On track'} — projected ${r.projectedDelay > 0 ? `${r.projectedDelay}d late` : 'on time'}`} /> },
+    { title: 'Order', dataIndex: 'orderNo', width: 132, fixed: 'left', render: (v) => <Text style={mono}>{v}</Text> },
+    { title: 'Buyer / style', key: 'buyer', width: 170, render: (_, r) => <span>{r.buyer} / <Text type="secondary">{r.styleNo}</Text></span> },
+    { title: 'Order date', dataIndex: 'orderDate', width: 104, render: fmtDate },
+    { title: 'Original dispatch', dataIndex: 'originalCommitment', width: 116, render: fmtDate },
+    { title: 'Latest dispatch', dataIndex: 'latestCommitment', width: 112, render: fmtDate },
     {
-      title: 'Order / Style',
-      dataIndex: 'orderNo',
-      render: (v, r) => (
-        <div>
-          <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{v}</span>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{r.buyer} · {r.styleNo} · {r.productType}</div>
-        </div>
-      ),
-    },
-    { title: 'ETD', dataIndex: 'etd', width: 130, render: (v) => (
-      <div>
-        <div style={{ fontVariantNumeric: 'tabular-nums' }}>{dayjs(v).format(DATE_FORMAT)}</div>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dayjs(v).diff(dayjs(), 'day')}d to go</div>
-      </div>
-    ) },
-    { title: 'Progress', dataIndex: 'progressPct', width: 120, render: (v) => <Progress percent={v} size="small" status={v >= 100 ? 'success' : 'active'} /> },
-    {
-      title: 'Next Milestone',
-      dataIndex: 'nextMilestone',
-      render: (m) => (m ? (
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 500 }}>{m.name}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{dayjs(m.plannedDate).format(DATE_FORMAT)} <TnaStatusTag status={m.status} size="small" /></div>
-        </div>
-      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>),
+      title: 'Commit. movement', dataIndex: 'commitmentMovement', width: 120, align: 'center',
+      render: (v) => (v ? <DeltaTag value={v} tone="movement" tip="Commitment movement — reported on its own, never as delay" /> : '—'),
     },
     {
-      title: <Tooltip title="Projected dispatch − ETD. Positive means late. Recomputed live from actuals.">Proj. Delay</Tooltip>,
-      dataIndex: 'projectedDelay',
-      width: 100,
-      align: 'right',
-      render: (v) => (
-        <span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: 15, color: v > 0 ? 'var(--error-color)' : 'var(--success-color)' }}>
-          {v > 0 ? `+${v}d` : v === 0 ? 'On ETD' : `${v}d`}
-        </span>
-      ),
+      title: 'Forecast dispatch', dataIndex: 'forecastDispatch', width: 124,
+      render: (v, r) => (r.status === 'BLOCKED' ? <Tag>Not computed</Tag> : fmtDate(v)),
+    },
+    { title: 'Vs original', dataIndex: 'delayOriginal', width: 96, align: 'center', render: (v) => <DeltaTag value={v} tip="Forecast − original commitment" /> },
+    { title: 'Vs latest', dataIndex: 'delayLatest', width: 92, align: 'center', render: (v) => <DeltaTag value={v} tip="Forecast − latest commitment" /> },
+    {
+      title: 'Progress', dataIndex: 'progress', width: 84, align: 'right',
+      render: (p) => (p ? <span style={{ fontVariantNumeric: 'tabular-nums' }}>{p.done} / {p.total}</span> : '0 / —'),
+    },
+    { title: 'Next gate', dataIndex: 'nextGate', width: 190, ellipsis: true, render: (g) => (g ? <Tooltip title={`Target ${fmtDate(g.revisedTarget)}`}>{g.name}</Tooltip> : '—') },
+    {
+      title: 'Crit.', key: 'crit', width: 60, align: 'right',
+      render: (_, r) => {
+        const n = basis === 'original' ? r.openCriticalOriginal : r.openCriticalLatest;
+        return n == null ? '—' : <span style={{ color: n ? 'var(--error-color)' : undefined, fontWeight: n ? 600 : 400 }}>{n}</span>;
+      },
     },
     {
-      title: <Tooltip title="Zero-float activities past their planned date — each one has already moved the ship date">Crit.</Tooltip>,
-      dataIndex: 'overdueCriticals',
-      width: 60,
-      align: 'center',
-      render: (v) => (v ? <Badge count={v} /> : <span style={{ color: 'var(--text-muted)' }}>0</span>),
+      title: 'Health', key: 'health', width: 108, fixed: 'right', align: 'center',
+      render: (_, r) => <HealthTag health={basis === 'original' ? r.healthOriginal : r.healthLatest} />,
     },
-    {
-      title: 'Feasibility',
-      dataIndex: 'feasibility',
-      width: 130,
-      render: (v, r) => (v === 'FEASIBLE' ? null : (
-        <Tag color={FEASIBILITY[v].color} style={{ fontSize: 11 }}>
-          {v === 'INFEASIBLE' ? `Short ${r.shortfallDays}d` : `Compressed ${r.compressedDays}d`}
-        </Tag>
-      )),
-    },
-  ], []);
+  ], [basis]);
 
   return (
     <Table
       rowKey="id"
       size="small"
+      bordered
       loading={loading}
       columns={columns}
-      dataSource={dataSource}
-      onRow={(r) => ({ onClick: () => navigate(`/tna/plan/${r.id}`), style: { cursor: 'pointer' } })}
-      pagination={getTablePagination({ pageSize: 10 }, 'orders')}
-      scroll={{ x: 900 }}
+      dataSource={sorted}
+      pagination={false}
+      scroll={{ x: 1600, y: 'calc(100vh - 420px)' }}
+      onRow={(r) => ({ onClick: () => onOpen(r), style: { cursor: 'pointer' } })}
+      locale={{ emptyText: 'No live orders match these filters' }}
     />
   );
 });
