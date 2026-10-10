@@ -19,12 +19,15 @@ import {
 } from '../../../utils/expDocConstants';
 import { sectionTotals } from '../../../utils/expDocCalc';
 import { MODULE_ID } from './packingModule';
-import { searchOrders } from '../../../services/orders/orderService';
+import { searchOrders, getOrderById } from '../../../services/orders/orderService';
 import { getAllSizePresets } from '../../../services/master/sizePresetService';
 import {
   getPackingEntry, createPackingEntry, updatePackingEntry, setPackingEntryStatus,
 } from '../../../services/production/packingService';
+import { afterPackingEntrySaved, packingListsOfEntries } from '../../../services/expdoc/expDocService';
+import { resolveOrderSizes, orderPosOf } from '../../../utils/orderSizes';
 import CartonGroupEditor from './CartonGroupEditor';
+import PackAsPlan from './PackAsPlan';
 
 const { Text } = Typography;
 const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
@@ -60,6 +63,8 @@ const CartonPackingForm = () => {
   const [orderId, setOrderId] = useState(null);
   const [sizes, setSizes] = useState([]);
   const [orderBreakdown, setOrderBreakdown] = useState([]);
+  // The order's buyer POs: what each carton range's PO cell picks from (owner, 2026-10-09)
+  const [orderPos, setOrderPos] = useState([]);
   const [loading, setLoading] = useState(isEdit);
   // 'save' | 'complete' | 'reopen' | null — each header button spins only for its own action
   const { busy, setBusy, busyProps } = useBusyAction();
@@ -94,6 +99,10 @@ const CartonPackingForm = () => {
         setOrderId(data.orderId);
         setSizes(data.sizes || []);
         setOrderBreakdown(data.orderBreakdown || []);
+        // The order's POs for the PO cell; an order that cannot be read leaves the cell as text
+        getOrderById(data.orderId, { silent: true })
+          .then((order) => { if (!cancelled) setOrderPos(orderPosOf(order)); })
+          .catch(() => { if (!cancelled) setOrderPos([]); });
         form.setFieldsValue({
           orderNo: data.orderNo,
           packingDate: data.packingDate ? dayjs(data.packingDate) : null,
@@ -143,24 +152,8 @@ const CartonPackingForm = () => {
     return () => { cancelled = true; };
   }, [debouncedOrder, isEdit]);
 
-  /** Sizes in preset order — the persisted qty maps are unordered. */
-  const resolveSizes = useCallback((order) => {
-    const fromLines = new Set();
-    (order.orderLines || []).forEach((l) => {
-      Object.keys(l.sizePrices || {}).forEach((s) => fromLines.add(s));
-      // Some orders carry no size prices, only colour-wise quantities.
-      (l.colorRows || []).forEach((cr) => Object.keys(cr.quantities || {}).forEach((s) => fromLines.add(s)));
-    });
-    const presetId = (order.orderLines || [])[0]?.sizePresetId;
-    const preset = presetsRef.current.find((p) => p.id === presetId);
-    if (preset?.sizes?.length) {
-      const ordered = preset.sizes.filter((s) => fromLines.has(s));
-      // Anything on the order but absent from the preset still has to appear.
-      const extras = [...fromLines].filter((s) => !preset.sizes.includes(s));
-      return [...ordered, ...extras];
-    }
-    return [...fromLines];
-  }, []);
+  /** Sizes in preset order — the persisted qty maps are unordered (utils/orderSizes). */
+  const resolveSizes = useCallback((order) => resolveOrderSizes(order, presetsRef.current), []);
 
   const handleOrderSelect = useCallback(
     (orderNo) => {
@@ -168,6 +161,7 @@ const CartonPackingForm = () => {
       if (!order) return;
       setOrderId(order.id);
       setSizes(resolveSizes(order));
+      setOrderPos(orderPosOf(order));
       // Snapshot the ordered quantities now, while the real order is in hand. The
       // packing list reads them from here rather than re-fetching an order that may
       // since have changed (PRD §7.4: ordered qty never comes from packed data).
@@ -221,6 +215,12 @@ const CartonPackingForm = () => {
   );
 
   const readOnly = !canWrite || (isSaved && record?.status !== PACKING_ENTRY_STATUS.OPEN);
+  // An order with several POs: every range must name its PO, or no packing list can place it
+  const missingPo = orderPos.length > 1 && groups.some((g) => !g.buyerPoNo
+    // The same PO to two destinations: the range must say which
+    || (!g.destination && orderPos.filter((p) => p.buyerPoNo === g.buyerPoNo).length > 1));
+  // The packing lists in this browser holding this entry (Export Docs still keeps them here)
+  const onLists = useMemo(() => (record?.id ? packingListsOfEntries([record.id])[record.id] || [] : []), [record]);
 
   const handleGroupsChange = useCallback((next) => {
     setGroups(next);
@@ -246,6 +246,7 @@ const CartonPackingForm = () => {
     setGroups(saved.groups || []);
     setIsDirty(false);
     clearDirty();
+    afterPackingEntrySaved(saved);
     return saved;
   }, [form, orderId, sizes, orderBreakdown, groups, isSaved, entryId, record, clearDirty]);
 
@@ -274,6 +275,7 @@ const CartonPackingForm = () => {
           // Unsaved edits are saved first; the complete command goes with the version the entry holds then
           const current = isDirty ? await persist() : record;
           const saved = await setPackingEntryStatus(current.id, PACKING_ENTRY_STATUS.COMPLETED, current.version);
+          afterPackingEntrySaved(saved);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} marked complete`);
@@ -289,13 +291,16 @@ const CartonPackingForm = () => {
   const handleReopen = useCallback(() => {
     modal.confirm({
       title: 'Reopen for editing?',
-      content: 'Any packing list already built from this entry will be flagged as stale.',
+      content: onLists.length
+        ? `${[...new Set(onLists.map((l) => l.plNo))].join(', ')} ${onLists.length > 1 ? 'hold' : 'holds'} these cartons and will be flagged as stale.`
+        : 'Any packing list already built from this entry will be flagged as stale.',
       okText: 'Reopen',
       okButtonProps: { danger: true },
       onOk: async () => {
         setBusy('reopen');
         try {
           const saved = await setPackingEntryStatus(record.id, PACKING_ENTRY_STATUS.OPEN, record.version);
+          afterPackingEntrySaved(saved);
           setRecord(saved);
           setGroups(saved.groups || []);
           message.success(`${saved.packingNo} reopened`);
@@ -306,7 +311,7 @@ const CartonPackingForm = () => {
         }
       },
     });
-  }, [modal, record, message, setBusy]);
+  }, [modal, record, message, setBusy, onLists]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
   if (loadError) {
@@ -352,6 +357,7 @@ const CartonPackingForm = () => {
         issuesByRow={issuesByRow}
         styleNo={form.getFieldValue('styleNo')}
         buyerPoNo={null}
+        poOptions={orderPos}
         onChange={handleGroupsChange}
       />
     ),
@@ -378,11 +384,12 @@ const CartonPackingForm = () => {
           <ActionButton
             action="approve"
             text="Mark complete"
-            {...busyProps('complete', liveErrors.length > 0 || !groups.length)}
+            {...busyProps('complete', liveErrors.length > 0 || !groups.length || missingPo)}
             tooltip={
               liveErrors.length
                 ? `Blocked — ${liveErrors.length} structural error(s) must be fixed first`
-                : (!groups.length ? 'Add at least one carton group first' : undefined)
+                : (!groups.length ? 'Add at least one carton group first'
+                  : (missingPo ? 'Pick the buyer PO for every carton range first' : undefined))
             }
             onClick={handleComplete}
           />
@@ -392,6 +399,21 @@ const CartonPackingForm = () => {
         )}
       </PageHeader>
 
+      {onLists.length > 0 && (
+        <Space size={6} wrap style={{ marginBottom: 12 }}>
+          <Text type="secondary">On packing list</Text>
+          {onLists.map((l) => <Tag key={`${l.plId}|${l.buyerPoNo ?? ''}`} color="blue">{`${l.plNo}${l.buyerPoNo ? ` · PO ${l.buyerPoNo}` : ''}`}</Tag>)}
+        </Space>
+      )}
+      {missingPo && !readOnly && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Pick the buyer PO for every carton range"
+          description="This order has several buyer POs and they can go on different shipments, so each range must say which PO it is packed for."
+        />
+      )}
       {errors.length > 0 && (
         <Alert
           type="error"
@@ -480,6 +502,14 @@ const CartonPackingForm = () => {
           <Col xs={12} md={6}><StatCard title="CBM" value={num(totals.cbm, 3)} color="var(--secondary-color)" /></Col>
         </Row>
 
+        {!readOnly && orderId != null && (
+          <PackAsPlan
+            orderId={orderId}
+            groups={groups}
+            refreshKey={record?.version}
+            onFill={(rows) => handleGroupsChange([...groups, ...rows])}
+          />
+        )}
         {!sizes.length ? (
           <Alert
             type="info"

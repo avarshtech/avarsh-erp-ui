@@ -33,8 +33,8 @@ export const searchOrders = async (params = {}) => {
 /**
  * Get order by ID. GET /api/v1/orders/{id}
  */
-export const getOrderById = async (id) => {
-  const response = await axiosInstance.get(`${BASE}/${id}`);
+export const getOrderById = async (id, config = {}) => {
+  const response = await axiosInstance.get(`${BASE}/${id}`, config);
   return response.data;
 };
 

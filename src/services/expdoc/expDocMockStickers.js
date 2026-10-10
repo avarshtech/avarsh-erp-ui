@@ -27,11 +27,43 @@ import {
 } from '../../utils/expDocCalc';
 import { validate } from '../../utils/expDocValidation';
 import { stickerAskQuestions } from '../../utils/expDocTemplateSchema';
+import { NUMBERING, rowsByGroup, groupCartonCount } from '../../utils/expDocPlNumbering';
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
 
-/** Total cartons across the whole shipment — what "n of N" counts (PRD §9.1). */
-const shipmentCartonTotal = (db, pl) => {
+/**
+ * Under "restart for each buyer PO / style" (owner, 2026-10-09) carton numbers repeat
+ * across groups, so a run prints ONE group: its scope, its "n of N", its print history and
+ * its reprint check are that group's. A continuing list is one group (null).
+ */
+const restarts = (pl) => pl?.numbering === NUMBERING.PER_PO || pl?.numbering === NUMBERING.PER_STYLE;
+
+/** The groups a run can print under a restart rule, labelled; none on a continuing list. */
+export const printGroupsOf = (pl) => (restarts(pl) ? [...rowsByGroup(allRows(pl)).entries()].map(([key, rows]) => ({
+  key,
+  label: pl.numbering === NUMBERING.PER_PO ? `PO ${rows[0].buyerPoNo || '—'}` : (rows[0].orderNo || rows[0].styleNo || '—'),
+  cartons: groupCartonCount(rows, key),
+})) : []);
+
+/** The group a scope prints: the one asked for, else the first; null on a continuing list. */
+const groupOf = (pl, scope) => {
+  const groups = printGroupsOf(pl);
+  if (!groups.length) return null;
+  return groups.some((g) => g.key === scope?.group) ? scope.group : groups[0].key;
+};
+
+/** The rows a scope prints from: the list's, or one group's. */
+const rowsOf = (pl, scope) => {
+  const group = groupOf(pl, scope);
+  return group == null ? allRows(pl) : allRows(pl).filter((r) => r.numberGroup === group);
+};
+
+/** Runs of the same group as `scope`: under a restart rule another group's carton 1 is another carton. */
+const sameGroup = (pl, scope) => (run) => (run.scope?.group ?? null) === groupOf(pl, scope);
+
+/** Total cartons across the whole shipment — what "n of N" counts (PRD §9.1); a restarting group's own count. */
+const shipmentCartonTotal = (db, pl, scope) => {
+  if (restarts(pl)) return groupCartonCount(allRows(pl), groupOf(pl, scope));
   const ranges = (db.packingLists || [])
     .filter((p) => p.shipmentId === pl.shipmentId
       && [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED].includes(p.status))
@@ -41,7 +73,7 @@ const shipmentCartonTotal = (db, pl) => {
 
 /** Carton numbers a scope selects, without materialising the cartons themselves. */
 const scopeRanges = (pl, scope = {}) => {
-  const rows = toRanges(allRows(pl));
+  const rows = toRanges(rowsOf(pl, scope));
   if (scope.mode === 'RANGE') {
     return intersectRanges(rows, [{ from: Number(scope.from), to: Number(scope.to) }]);
   }
@@ -52,9 +84,10 @@ const scopeRanges = (pl, scope = {}) => {
 };
 
 const expandScope = (pl, scope, ctx) => {
-  if (scope?.mode === 'SELECTION') return expandCartonNos(allRows(pl), scope.cartonNos || [], ctx);
+  const rows = rowsOf(pl, scope);
+  if (scope?.mode === 'SELECTION') return expandCartonNos(rows, scope.cartonNos || [], ctx);
   const ranges = scopeRanges(pl, scope);
-  return ranges.flatMap((r) => expandCartonRange(allRows(pl), r.from, r.to, ctx));
+  return ranges.flatMap((r) => expandCartonRange(rows, r.from, r.to, ctx));
 };
 
 const isBlank = (v) => v === null || v === undefined || v === '' || v === 0 || (Array.isArray(v) && !v.length);
@@ -95,9 +128,9 @@ export const blockedCartons = (cartons, layout, { contextOf = (carton) => ({ car
  * cartons share its sizes and EANs, so the row's first carton answers for all of them
  * (as in `rowPrintHash`) and the selection is never expanded.
  */
-const cartonsWithoutEan = (raw, layout, selected, totalCartonsInShipment) => {
+const cartonsWithoutEan = (raw, layout, selected, totalCartonsInShipment, scope) => {
   if (!printsEans(layout)) return { count: 0, ranges: [] };
-  const ranges = mergeRanges(allRows(raw).flatMap((row) => {
+  const ranges = mergeRanges(rowsOf(raw, scope).flatMap((row) => {
     const first = expandCartonRange([row], row.cartonFrom, row.cartonFrom, { totalCartonsInShipment })[0];
     return first && lacksEan(first) ? intersectRanges([{ from: row.cartonFrom, to: row.cartonTo }], selected) : [];
   }));
@@ -164,13 +197,14 @@ export const entryStyle = (entry) => ({
   season: entry?.season ?? null,
 });
 
-/** `entryStyle` per source packing entry of this packing list's rows. */
-const styleByEntryOf = (db, pl) => {
-  const ids = new Set(allRows(pl).map((r) => r.sourceEntryId));
-  return Object.fromEntries((db.packingEntries || [])
-    .filter((e) => ids.has(e.id))
-    .map((e) => [e.id, entryStyle(e)]));
-};
+/**
+ * `entryStyle` per source packing entry of this packing list's rows: the entry's when this
+ * browser holds it, else what the row copied from it (style, garment, composition).
+ */
+const styleByEntryOf = (db, pl) => Object.fromEntries(allRows(pl).map((row) => {
+  const entry = (db.packingEntries || []).find((e) => e.id === row.sourceEntryId);
+  return [row.sourceEntryId, entryStyle(entry || row)];
+}));
 
 /** Cartons as they print: each with the season of its own packing entry. */
 const withSeason = (cartons, styles) =>
@@ -213,10 +247,9 @@ export const getStickerContext = async (plId, options = {}) => {
   const pl = decoratePl(raw, db);
   const layout = options.layout || null;
   const shipment = (db.shipments || []).find((s) => s.id === raw.shipmentId) || null;
-  const totalCartonsInShipment = shipmentCartonTotal(db, raw);
-  const styleByEntry = styleByEntryOf(db, raw);
-
   const scope = options.scope || { mode: 'ALL' };
+  const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
+  const styleByEntry = styleByEntryOf(db, raw);
   const ranges = scopeRanges(raw, scope);
   const selectedCount = countCartons(ranges);
 
@@ -228,10 +261,13 @@ export const getStickerContext = async (plId, options = {}) => {
     : [];
 
   const runs = runsForDocument(db, raw);
-  const printed = mergeRanges(runs.flatMap((r) => r.prints || []));
+  const printed = mergeRanges(runs.filter(sameGroup(raw, scope)).flatMap((r) => r.prints || []));
 
   return {
     pl,
+    // Under a restart rule: the groups a run can print, and the one this scope prints
+    printGroups: printGroupsOf(raw),
+    printGroup: groupOf(raw, scope),
     layout: layout ? clone(layout) : null,
     layoutOptions: clone(options.layoutOptions || []),
     // `style.*` per packing entry; a carton prints its own entry's (`carton.sourceEntryId`).
@@ -241,7 +277,7 @@ export const getStickerContext = async (plId, options = {}) => {
     selectedCount,
     selectedRanges: ranges,
     selectedLabel: formatRanges(ranges),
-    eanMissing: cartonsWithoutEan(raw, layout, ranges, totalCartonsInShipment),
+    eanMissing: cartonsWithoutEan(raw, layout, ranges, totalCartonsInShipment, scope),
     cartons: withSeason(slice, styleByEntry),
     printedRanges: printed,
     printedLabel: formatRanges(printed),
@@ -255,9 +291,9 @@ export const previewCartons = async (plId, options = {}) => {
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
-  const totalCartonsInShipment = shipmentCartonTotal(db, raw);
-  const styles = styleByEntryOf(db, raw);
   const scope = options.scope || { mode: 'ALL' };
+  const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
+  const styles = styleByEntryOf(db, raw);
   const size = options.pageSize || 4;
   const page = options.page || 0;
 
@@ -273,7 +309,7 @@ export const previewCartons = async (plId, options = {}) => {
     const nos = scope.cartonNos || [];
     return {
       cartons: withSeason(
-        expandCartonNos(allRows(raw), nos.slice(page * size, (page + 1) * size), { totalCartonsInShipment }), styles,
+        expandCartonNos(rowsOf(raw, scope), nos.slice(page * size, (page + 1) * size), { totalCartonsInShipment }), styles,
       ),
       total: nos.length,
     };
@@ -294,7 +330,7 @@ export const previewCartons = async (plId, options = {}) => {
     seen += len;
   }
   return {
-    cartons: withSeason(expandCartonNos(allRows(raw), cartonNos, { totalCartonsInShipment }), styles),
+    cartons: withSeason(expandCartonNos(rowsOf(raw, scope), cartonNos, { totalCartonsInShipment }), styles),
     total,
   };
 };
@@ -310,8 +346,8 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const pl = decoratePl(raw, db);
   const layout = options.layout || null;
-  const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
+  const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
   const print = printScope(db, raw, pl, options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
 
@@ -342,13 +378,20 @@ export const checkStickerGeneration = async (plId, options = {}) => {
    * across them would call every carton "changed".
    */
   const runs = layout
-    ? runsForDocument(db, raw).filter((run) => run.templateCode === layout.templateCode)
+    ? runsForDocument(db, raw).filter((run) => run.templateCode === layout.templateCode && sameGroup(raw, scope)(run))
     : [];
   const reprintRanges = [];
   runs.forEach((run) => {
     Object.entries(run.rowHashes || {}).forEach(([rowId, previous]) => {
       const row = allRows(raw).find((r) => String(r.id) === String(rowId));
-      if (!row || previous === rowPrintHash(row, layoutBindings, totalCartonsInShipment, print)) return;
+      // The numbers this row's labels carried when printed: a row since removed, or renumbered,
+      // left labels on cartons that now hold something else
+      const was = run.rowRanges?.[rowId];
+      if (!row || (was && (was.from !== row.cartonFrom || was.to !== row.cartonTo))) {
+        if (was) reprintRanges.push(...intersectRanges([was], run.prints || []));
+        return;
+      }
+      if (previous === rowPrintHash(row, layoutBindings, totalCartonsInShipment, print)) return;
       // Only the cartons of that row that were actually printed need reprinting.
       reprintRanges.push(
         ...intersectRanges([{ from: row.cartonFrom, to: row.cartonTo }], run.prints || []),
@@ -410,8 +453,8 @@ export const generateStickerRun = async (plId, options = {}) => {
   const faceCount = (layout.stickerLayout?.faces || []).filter((f) => faceKeys.includes(f.key)).length;
   if (!faceCount) fail('VALIDATION', 'Tick at least one face to print.');
 
-  const totalCartonsInShipment = shipmentCartonTotal(db, raw);
-  const scope = options.scope || { mode: 'ALL' };
+  const scope = { ...(options.scope || { mode: 'ALL' }), group: groupOf(raw, options.scope) };
+  const totalCartonsInShipment = shipmentCartonTotal(db, raw, scope);
   const print = printScope(db, raw, decoratePl(raw, db), options.exporter);
   const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
   if (!cartons.length) fail('CONFLICT', 'The selected range contains no cartons.');
@@ -431,10 +474,14 @@ export const generateStickerRun = async (plId, options = {}) => {
   // storage shape this module refuses everywhere else, and enough to blow the
   // ~5 MB quota on a large shipment, taking the whole mock store with it.
   const rowHashes = {};
+  // And the numbers each row printed under: a later renumbering is then a reprint (V-14)
+  const rowRanges = {};
   // A built carton exposes `sourceRowId`, not the row object.
   [...new Set(cartons.map((c) => c.sourceRowId).filter((id) => id !== undefined))].forEach((rowId) => {
     const row = allRows(raw).find((r) => r.id === rowId);
-    if (row) rowHashes[rowId] = rowPrintHash(row, layoutBindings, totalCartonsInShipment, print);
+    if (!row) return;
+    rowHashes[rowId] = rowPrintHash(row, layoutBindings, totalCartonsInShipment, print);
+    rowRanges[rowId] = { from: row.cartonFrom, to: row.cartonTo };
   });
 
   const id = Math.max(0, ...(db.stickerRuns || []).map((r) => r.id)) + 1;
@@ -468,6 +515,7 @@ export const generateStickerRun = async (plId, options = {}) => {
       ...r, at: nowStamp(), by: currentUserName(),
     })),
     rowHashes,
+    rowRanges,
     generatedAt: nowStamp(),
     generatedBy: currentUserName(),
   };
@@ -500,13 +548,14 @@ export const searchStickerRuns = async (params = {}) => {
  * Per-carton print history (PRD §20), derived by intersecting the stored ranges —
  * the answer the audit needs, without the storage shape that would not scale.
  */
-export const cartonPrintHistory = async (plId, cartonNo) => {
+export const cartonPrintHistory = async (plId, cartonNo, group = null) => {
   await delay(60);
   const db = loadDb();
   const n = Number(cartonNo);
   const events = [];
   (db.stickerRuns || [])
-    .filter((r) => r.plId === Number(plId))
+    // Under a restart rule a carton number is a carton of one group only
+    .filter((r) => r.plId === Number(plId) && (r.scope?.group ?? null) === (group ?? null))
     .forEach((run) => {
       (run.prints || []).forEach((pr) => {
         if (n < pr.from || n > pr.to) return;

@@ -43,7 +43,7 @@ const StickerWorkspace = () => {
   // Kept on the bounds that count: switching to Range before both are typed reloads nothing.
   const from = range.mode === SCOPE.RANGE && range.from && range.to ? range.from : null;
   const to = from ? range.to : null;
-  const scope = useMemo(() => (from ? { mode: 'RANGE', from, to } : { mode: 'ALL' }), [from, to]);
+  const scope = useMemo(() => ({ ...(from ? { mode: 'RANGE', from, to } : { mode: 'ALL' }), group: range.group }), [from, to, range.group]);
 
   const { ctx, error, loading, reloading, reload, retry } = useStickerContext(plId, scope, templateId);
   const settings = useLayoutSettings(ctx);
@@ -56,7 +56,7 @@ const StickerWorkspace = () => {
   const printedOverlap = useMemo(() => intersectRanges(ctx?.selectedRanges || [], ctx?.printedRanges || []), [ctx]);
   const gen = useStickerGenerate({
     plId, ctx, scope, settings, exporter, askValues: ask.askValues, preview, check, printedOverlap, reload,
-    onBatch: (from, to) => setRange({ mode: SCOPE.RANGE, from, to }),
+    onBatch: (from, to) => setRange((r) => ({ ...r, mode: SCOPE.RANGE, from, to })),
   });
 
   if (error) {
@@ -129,7 +129,7 @@ const StickerWorkspace = () => {
         </Col>
       </Row>
 
-      <StickerRunHistory plId={plId} runs={ctx.runs} />
+      <StickerRunHistory plId={plId} runs={ctx.runs} group={ctx.printGroup} />
 
       <AckReasonModal
         key={gen.reason?.key || 'none'}

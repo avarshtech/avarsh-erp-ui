@@ -17,17 +17,20 @@
  * carton count inside the browser's ~5 MB budget.
  *
  * Shipments are the API's: `db.shipments` is the in-memory mirror
- * (expDocShipmentMirror), laid over every load and stripped from every save.
+ * (expDocShipmentMirror), laid over every load and stripped from every save. So are
+ * the Carton Packing entries: `db.packingEntries` is expDocPackingMirror.
  */
 import { buildSeedDb, SEED_VERSION } from './expDocMockData';
 import { nextDocNo, EXPDOC_PREFIX } from './expDocDocNumbers';
 import { mirroredShipments } from './expDocShipmentMirror';
+import { mirroredPackingEntries } from './expDocPackingMirror';
 
 const STORAGE_KEY = 'avarsh.expdoc.mockStore.v1';
 
 let memoryDb = null; // fallback when localStorage is unavailable or full
 
-const withShipments = (db) => ({ ...db, shipments: mirroredShipments() });
+// The API's shipments and Carton Packing entries, laid over every load and never stored
+const withShipments = (db) => ({ ...db, shipments: mirroredShipments(), packingEntries: mirroredPackingEntries() });
 
 export const loadDb = () => {
   if (memoryDb && memoryDb.seedVersion === SEED_VERSION) return withShipments(memoryDb);
@@ -44,8 +47,8 @@ export const loadDb = () => {
 };
 
 export const saveDb = (db) => {
-  // Never stored: the API holds the only shipment record
-  const { shipments: _apiShipments, ...stored } = db;
+  // Never stored: the API holds the only shipment and Carton Packing records
+  const { shipments: _apiShipments, packingEntries: _apiEntries, ...stored } = db;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     memoryDb = null; // localStorage is authoritative again

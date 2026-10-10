@@ -13,6 +13,7 @@ import {
   PACKING_ENTRY_STATUS, PACKING_ENTRY_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { searchPackingEntries, deletePackingEntry } from '../../../services/production/packingService';
+import { packingListsOfEntries, afterPackingEntryDeleted } from '../../../services/expdoc/expDocService';
 import { buildCartonPackingColumns } from './CartonPackingColumns';
 import CartonPackingView from './CartonPackingView';
 import DailyPackingSummary from './DailyPackingSummary';
@@ -89,6 +90,7 @@ const CartonPackingList = () => {
     async (record) => {
       try {
         await deletePackingEntry(record.id);
+        afterPackingEntryDeleted(record);
         message.success(`${record.packingNo} deleted`);
         fetchData();
         setSummaryKey((k) => k + 1);
@@ -99,6 +101,9 @@ const CartonPackingList = () => {
     [message, fetchData],
   );
 
+  // The packing lists in this browser holding each entry of the page (Export Docs keeps them here)
+  const listsByEntry = useMemo(() => packingListsOfEntries(rows.map((r) => r.id)), [rows]);
+
   const columns = useMemo(
     () =>
       buildCartonPackingColumns({
@@ -107,8 +112,9 @@ const CartonPackingList = () => {
         onDelete: handleDelete,
         canUpdate,
         canDelete,
+        listsOf: (record) => listsByEntry[record.id] || [],
       }),
-    [navigate, handleDelete, canUpdate, canDelete],
+    [navigate, handleDelete, canUpdate, canDelete, listsByEntry],
   );
 
   // Computed over the loaded page only, and labelled as such — a page-scoped number

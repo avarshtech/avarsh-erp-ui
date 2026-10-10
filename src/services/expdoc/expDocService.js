@@ -23,7 +23,10 @@ import { optionOf } from './shipmentAdapter';
 import { syncShipmentMirror, mirrorPut, mirrorRemove } from './expDocShipmentMirror';
 import { syncShipmentStatus, assertShipmentDeletable } from './expDocShipmentBridge';
 import { buyerCodeOf } from './expDocMockData';
-import * as mockPacking from './expDocMockPacking';
+import {
+  syncPackingMirror, putPackingEntry, removePackingEntry as forgetPackingEntry, canReadPacking as packingReadable,
+} from './expDocPackingMirror';
+import { orderMetaFor } from './expDocOrderMeta';
 import * as mockPackingLists from './expDocMockPackingLists';
 import * as mockStickers from './expDocMockStickers';
 import * as mockInvoices from './expDocMockInvoices';
@@ -43,7 +46,6 @@ const notReady = () => {
 const guard = (impl) => (USE_MOCK_EXPDOC_DATA ? impl : new Proxy({}, { get: () => notReady }));
 
 const masters = guard(mockMasters);
-const packing = guard(mockPacking);
 const packingLists = guard(mockPackingLists);
 const stickers = guard(mockStickers);
 const invoices = guard(mockInvoices);
@@ -60,6 +62,19 @@ const withShipments = (fn, idsOf = () => []) => async (...a) => {
   await syncShipmentMirror([...mockShipments.documentShipmentIds(), ...idsOf(...a)]);
   return fn(...a);
 };
+
+/**
+ * A packing-list call that reads cartons reads the REAL Carton Packing entries: the
+ * mirror is synced first for the orders `ordersOf` names (fresh within 30 s). After the
+ * shipments, which tell a list its orders. It never writes: opening a list never changes it.
+ */
+const withPacking = (fn, ordersOf = () => [], options = {}) => async (...a) => {
+  await syncPackingMirror(ordersOf(...a), options);
+  return fn(...a);
+};
+
+/** The orders of a shipment, from the mirror the shipment sync just filled. */
+const shipmentOrderIds = (shipmentId) => (mockShipments.shipmentOrders(shipmentId) || []).map((o) => o.orderId);
 
 /**
  * A document action that can close or reopen its shipment, which then follows its
@@ -115,25 +130,56 @@ export const deleteShipment = async (shipment) => {
 export const listConsigneeOrders = (buyerId, search) => shipmentApi.listApiOrderOptions(buyerId, search);
 
 // ── Carton packing entry ── the Packing screens use the real API
-//    (services/production/packingService.js). Packing lists still bind the mock's
-//    seeded entries until the export-docs backend exists.
-export const listBindablePackingEntries = withShipments(
-  (...a) => packing.listBindablePackingEntries(...a), (shipmentId) => [shipmentId],
-);
+//    (services/production/packingService.js). Packing lists bind those real entries
+//    through expDocPackingMirror; these let the Carton Packing screens see the lists.
+/** Whether this user can read Carton Packing, without which a packing list shows no cartons. */
+export const canReadPacking = () => packingReadable();
+/** entry id -> the live packing lists in this browser holding it. */
+export const packingListsOfEntries = (entryIds) => packingLists.listsOfEntries(entryIds);
+/** A Carton Packing save, seen at once by the packing lists in this browser. */
+export const afterPackingEntrySaved = (entry) => putPackingEntry(entry);
+export const afterPackingEntryDeleted = (entry) => forgetPackingEntry(entry);
 
 // ── Packing lists ── GET/POST /packing-lists, GET/PUT/DELETE /{id},
 //    POST /{id}/status · /{id}/refresh · /{id}/acknowledge · /{id}/revise
 const plShipment = (id) => mockShipments.shipmentOfDocument('packingLists', id);
-export const searchPackingLists = withShipments((...a) => packingLists.searchPackingLists(...a));
-export const getPackingList = withShipments((...a) => packingLists.getPackingList(...a));
-/** `templateId` is the template the user chose; the document keeps a snapshot of it. */
-export const createPackingList = withShipments(thenSyncShipment(async (payload) => packingLists.createPackingList({
-  ...payload, templateSnapshot: await loadTemplateSnapshot(payload.templateId),
-})), (payload) => [payload?.shipmentId]);
-export const updatePackingList = withShipments((...a) => packingLists.updatePackingList(...a));
-export const refreshFromPacking = withShipments((...a) => packingLists.refreshFromPacking(...a));
-export const acknowledgeWarning = withShipments((...a) => packingLists.acknowledgeWarning(...a));
-export const changePlStatus = withShipments(thenSyncShipment((...a) => packingLists.changeStatus(...a)));
+const listOrders = (id) => packingLists.ordersOfList(id);
+export const searchPackingLists = withShipments(
+  withPacking((...a) => packingLists.searchPackingLists(...a), () => packingLists.ordersOfAllLists()),
+);
+export const getPackingList = withShipments(withPacking((...a) => packingLists.getPackingList(...a), listOrders));
+/**
+ * `templateId` is the template the user chose; the document keeps a snapshot of it. The
+ * shipment's orders are read from the orders API (sizes, garment, quantities per PO).
+ */
+export const createPackingList = withShipments(withPacking(thenSyncShipment(async (payload) => packingLists.createPackingList({
+  ...payload,
+  templateSnapshot: await loadTemplateSnapshot(payload.templateId),
+  orderMeta: await orderMetaFor(shipmentOrderIds(payload.shipmentId)),
+})), (payload) => shipmentOrderIds(payload?.shipmentId)), (payload) => [payload?.shipmentId]);
+export const updatePackingList = withShipments(withPacking((...a) => packingLists.updatePackingList(...a), listOrders));
+/** Reads the cartons again now, and the orders, so new packing and corrections arrive. */
+export const refreshFromPacking = withShipments(async (id) => {
+  const orders = listOrders(id);
+  await syncPackingMirror(orders, { force: true });
+  return packingLists.refreshFromPacking(id, { orderMeta: await orderMetaFor(orders) });
+});
+export const acknowledgeWarning = withShipments(withPacking((...a) => packingLists.acknowledgeWarning(...a), listOrders));
+export const changePlStatus = withShipments(
+  withPacking(thenSyncShipment((...a) => packingLists.changeStatus(...a)), listOrders),
+);
+/** Block actions on a draft: take units (entry x PO) on, take one off, move a block, drop an orphan. */
+export const bindPackingEntries = withShipments(withPacking((...a) => packingLists.bindPackingEntries(...a), listOrders));
+export const removePackingEntry = withShipments(withPacking((...a) => packingLists.removePackingEntry(...a), listOrders));
+export const moveBlock = withShipments(withPacking((...a) => packingLists.moveBlock(...a), listOrders));
+export const dropBlock = withShipments(withPacking((...a) => packingLists.dropBlock(...a), listOrders));
+/** The buyer's plan of one order on a draft, and a planned range marked (or no longer) Not shipping. */
+export const savePlPlan = withShipments(withPacking((...a) => packingLists.savePlPlan(...a), listOrders));
+export const markPlanNotShipping = withShipments(withPacking((...a) => packingLists.markPlanNotShipping(...a), listOrders));
+/** For Carton Packing: the draft lists in this browser that plan cartons of this order still to pack. */
+export const listOpenPlansForOrder = withShipments(withPacking(
+  (...a) => packingLists.openPlansForOrder(...a), (orderId) => [orderId],
+));
 export const revisePackingList = withShipments(thenSyncShipment((...a) => packingLists.revisePackingList(...a)));
 export const markPackingListExported = withShipments(
   thenSyncShipment((...a) => packingLists.markPackingListExported(...a)),
@@ -145,9 +191,10 @@ export const comparePackingLists = withShipments((...a) => packingLists.compareP
 export const deletePackingList = withShipments(
   thenSyncShipment((...a) => packingLists.deletePackingList(...a), plShipment),
 );
-export const listBindableForShipment = withShipments(
-  (...a) => packingLists.listBindableForShipment(...a), (shipmentId) => [shipmentId],
-);
+/** What a new packing list of a shipment could take, order by order and PO by PO. */
+export const listBindableForShipment = withShipments(withPacking(async (shipmentId) => packingLists.listBindableForShipment(
+  shipmentId, await orderMetaFor(shipmentOrderIds(shipmentId)),
+), shipmentOrderIds), (shipmentId) => [shipmentId]);
 
 // ── Carton stickers ── GET /packing-lists/{id}/stickers/context · /preview ·
 //    /check · POST /sticker-runs · GET /sticker-runs · /cartons/{no}/history
@@ -218,7 +265,9 @@ export const productivityReport = withShipments((...a) => reports.productivityRe
 export const searchAudit = (...a) => reports.searchAudit(...a);
 
 // ── Dashboard (§11.1 "Receives back") ── GET /export-docs/dashboard
-export const getExpDocDashboard = withShipments((...a) => dashboard.getExpDocDashboard(...a));
+export const getExpDocDashboard = withShipments(withPacking(
+  (...a) => dashboard.getExpDocDashboard(...a), () => mockShipments.openShipmentOrderIds(),
+));
 
 // ── Document set (§18) ── GET /export-docs/shipments/{id}/documents
 export const getShipmentDocumentSet = withShipments(

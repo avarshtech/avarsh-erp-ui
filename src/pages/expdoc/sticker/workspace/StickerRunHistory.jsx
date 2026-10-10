@@ -35,7 +35,7 @@ const COLUMNS = [
  * Every run printed for this packing list, latest first, with the values each was asked
  * for — and when one carton was printed, by which runs.
  */
-const StickerRunHistory = ({ plId, runs }) => {
+const StickerRunHistory = ({ plId, runs, group = null }) => {
   const rows = useMemo(() => [...(runs || [])].sort((a, b) => b.id - a.id), [runs]);
   const [cartonNo, setCartonNo] = useState(null);
   const [found, setFound] = useState({ cartonNo: null, history: null });
@@ -44,11 +44,12 @@ const StickerRunHistory = ({ plId, runs }) => {
   useEffect(() => {
     if (!cartonNo) return undefined;
     let latest = true;
-    cartonPrintHistory(plId, cartonNo)
+    // Under a restart rule a carton number is one group's: the PO or style being printed
+    cartonPrintHistory(plId, cartonNo, group)
       .then((history) => { if (latest) setFound({ cartonNo, history }); })
       .catch(() => { if (latest) setFound({ cartonNo, history: null, failed: true }); });
     return () => { latest = false; };
-  }, [plId, runs, cartonNo]);
+  }, [plId, runs, cartonNo, group]);
   const { history, failed } = found.cartonNo === cartonNo ? found : {};
 
   return (

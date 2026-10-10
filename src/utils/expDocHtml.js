@@ -262,7 +262,7 @@ const summaryBlock = (pl, template, blocks) => {
     <tr>
       <td>Total cartons</td><td class="grand v">${num(totals.cartons)}</td>
       <td>Total pieces</td><td class="grand v">${num(totals.pieces)}</td>
-      <td>Carton numbers</td><td class="grand v">${esc(formatRanges((pl.sections || []).flatMap((s) => (s.rows || []).map((r) => ({ from: r.cartonFrom, to: r.cartonTo })))))}</td>
+      <td>Carton numbers</td><td class="grand v">${esc(pl.cartonRangeLabel || formatRanges((pl.sections || []).flatMap((s) => (s.rows || []).map((r) => ({ from: r.cartonFrom, to: r.cartonTo })))))}</td>
     </tr>
     <tr>
       <td>Net weight (kg)</td><td class="grand v">${num(totals.netWeightKg, 3)}</td>

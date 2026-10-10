@@ -19,10 +19,24 @@ const StickerPrintControls = ({
 }) => {
   const faces = ctx.layout?.stickerLayout?.faces || [];
   const setRange = (patch) => onRange({ ...range, ...patch });
+  // Under "restart for each PO / style" carton numbers repeat, so a run prints one group
+  const groups = ctx.printGroups || [];
 
   return (
     <Card title="What to print" size="small">
       <Space orientation="vertical" size={14} style={{ width: '100%' }}>
+        {groups.length > 1 && (
+          <div>
+            <Text strong style={HEADING}><label htmlFor="sticker-group">Print for</label></Text>
+            <FormSelect
+              variant="default" allowClear={false} id="sticker-group" style={{ width: '100%' }}
+              options={groups.map((g) => ({ value: g.key, label: `${g.label} · ${g.cartons} ctn` }))}
+              value={ctx.printGroup}
+              onChange={(group) => setRange({ group, mode: SCOPE.ALL, from: null, to: null })}
+            />
+            <Text type="secondary" style={NOTE}>Carton numbers restart for each, so each prints in its own run.</Text>
+          </div>
+        )}
         <div>
           <Text strong style={HEADING}>Scope</Text>
           <Segmented

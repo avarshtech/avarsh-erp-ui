@@ -13,7 +13,7 @@ import { loadDb } from './expDocMockStore';
 import { delay, clone, pageOf, matchesText, colourKey } from './expDocMockCommon';
 import { PL_STATUS, DOC_TYPE, TEMPLATE_STATUS } from '../../utils/expDocConstants';
 import {
-  cartonCount, toRanges, countCartons, formatRanges, expandCartonNos, mergeRanges,
+  cartonCount, toRanges, formatRanges, expandCartonRange,
   intersectRanges, sizeQtyPerCarton, round,
 } from '../../utils/expDocCalc';
 import { decoratePl } from './expDocMockPackingLists';
@@ -53,21 +53,25 @@ export const packingStatusReport = async (params = {}) => {
     return rows.get(k);
   };
 
-  // Ordered comes from the packing entry's snapshot of the order (PRD §7.4: never
-  // from packed data).
-  (db.packingEntries || []).forEach((entry) => {
-    (entry.orderBreakdown || []).forEach((l) => {
-      touch(entry.orderNo, l.styleNo, l.colorName, l.size).orderQty += num(l.orderQty);
+  // Ordered comes from the order, as each live packing list read it for its shipment's POs
+  // (PRD §7.4: never from packed data). Counted once per order, PO, colour and size.
+  const counted = new Set();
+  (db.packingLists || []).filter((pl) => LIVE_PL.includes(pl.status)).forEach((pl) => {
+    (pl.orderBreakdown || []).forEach((l) => {
+      const orderNo = l.sourceOrderNo ?? null;
+      const once = `${orderNo}|${l.buyerPoNo ?? ''}|${l.destination ?? ''}|${key(l.styleNo, l.colorName, l.size)}`;
+      if (counted.has(once)) return;
+      counted.add(once);
+      touch(orderNo, l.styleNo, l.colorName, l.size).orderQty += num(l.orderQty);
     });
   });
 
-  const entryById = new Map((db.packingEntries || []).map((e) => [e.id, e]));
   (db.packingLists || [])
     .filter((pl) => LIVE_PL.includes(pl.status))
     .forEach((pl) => {
       const shipped = SHIPPED_PL.includes(pl.status);
       allRows(pl).forEach((row) => {
-        const orderNo = entryById.get(row.sourceEntryId)?.orderNo ?? null;
+        const orderNo = row.orderNo ?? null;
         const count = cartonCount(row);
         const add = (colour, size, perCarton) => {
           const r = touch(orderNo, row.styleNo, colour, size);
@@ -319,48 +323,48 @@ export const cartonMasterReport = async (params = {}) => {
     .filter((pl) => pl.shipmentId === shipmentId && LIVE_PL.includes(pl.status));
   if (!pls.length) return { ...pageOf([], params), shipmentNo: null };
 
+  /*
+   * Rows in print order, each list's after the one before. Rows, not merged ranges: under
+   * "restart for each PO / style" the same number is printed by several groups, and a
+   * merge would fold them into one carton.
+   */
   const rows = pls.flatMap((pl) => allRows(pl).map((r) => ({ ...r, __plNo: pl.plNo, __plId: pl.id })));
-  // A built carton carries `sourceRowId`, not the row itself, so the packing list a
-  // carton belongs to is looked up rather than read off the carton.
-  const plNoByRowId = new Map(rows.map((r) => [r.id, r.__plNo]));
-  const ranges = mergeRanges(toRanges(rows));
-  const total = countCartons(ranges);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const total = rows.reduce((n, r) => n + Math.max(0, (Number(r.cartonTo) || 0) - (Number(r.cartonFrom) || 0) + 1), 0);
 
   const size = Number(params.size ?? 25);
   const page = Number(params.page ?? 0);
   const startOrdinal = page * size;
 
-  /*
-   * Walk the merged ranges to collect exactly this page's carton NUMBERS, skipping
-   * the ranges that fall entirely before it. Numbers rather than a from–to window,
-   * because the ranges can have gaps: a page may legitimately span 47–48 and 60–81,
-   * and a window would either expand the gap or return short.
-   *
-   * Cost is O(ranges + pageSize) — page 900 costs what page 1 costs.
-   */
-  const cartonNos = [];
+  // Only this page's cartons are expanded: O(rows + pageSize), page 900 costs what page 1 costs.
+  const cartons = [];
   let seen = 0;
-  for (const r of ranges) {
-    const len = r.to - r.from + 1;
-    if (seen + len > startOrdinal) {
-      const startAt = Math.max(r.from, r.from + (startOrdinal - seen));
-      for (let n = startAt; n <= r.to && cartonNos.length < size; n += 1) cartonNos.push(n);
-      if (cartonNos.length >= size) break;
+  for (const r of rows) {
+    const len = Math.max(0, (Number(r.cartonTo) || 0) - (Number(r.cartonFrom) || 0) + 1);
+    if (seen + len > startOrdinal && cartons.length < size) {
+      const startAt = r.cartonFrom + Math.max(0, startOrdinal - seen);
+      const endAt = Math.min(r.cartonTo, startAt + (size - cartons.length) - 1);
+      cartons.push(...expandCartonRange([r], startAt, endAt, { totalCartonsInShipment: total }));
     }
     seen += len;
+    if (cartons.length >= size) break;
   }
-  const cartons = expandCartonNos(rows, cartonNos, { totalCartonsInShipment: total });
 
-  // Print counts come from the stored ranges, intersected — never a per-carton map.
+  // Print counts come from the stored ranges, intersected — never a per-carton map — and
+  // only from runs of the carton's own group, where numbers restart.
   const runs = (db.stickerRuns || []).filter((run) => pls.some((pl) => pl.id === run.plId));
   const content = cartons.map((c) => {
-    const printed = runs.reduce((n, run) => n
-      + (intersectRanges(run.prints || [], [{ from: c.cartonNo, to: c.cartonNo }]).length ? 1 : 0), 0);
+    const row = byId.get(c.sourceRowId);
+    const printed = runs.filter((run) => run.plId === row?.__plId
+      && (run.scope?.group == null || run.scope.group === row?.numberGroup))
+      .reduce((n, run) => n + (intersectRanges(run.prints || [], [{ from: c.cartonNo, to: c.cartonNo }]).length ? 1 : 0), 0);
     return {
-      id: `${shipmentId}-${c.cartonNo}`,
+      id: `${row?.__plId ?? shipmentId}-${c.sourceRowId}-${c.cartonNo}`,
       cartonNo: c.cartonNo,
       ofTotal: c.total,
-      plNo: plNoByRowId.get(c.sourceRowId) ?? null,
+      plNo: row?.__plNo ?? null,
+      orderNo: row?.orderNo ?? null,
+      buyerPoNo: row?.buyerPoNo ?? null,
       styleNo: c.styleNo,
       colorName: c.colorName,
       packingType: c.packingType,
@@ -380,7 +384,7 @@ export const cartonMasterReport = async (params = {}) => {
     size,
     number: page,
     shipmentNo: pls[0].shipmentNo,
-    cartonRangeLabel: formatRanges(ranges),
+    cartonRangeLabel: formatRanges(toRanges(rows)),
   };
 };
 

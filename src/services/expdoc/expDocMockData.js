@@ -31,7 +31,7 @@ import {
 // some sizes, and every packing entry a season.
 // 14 (2026-10-08): shipments moved to the API. The seeded shipments, ports and
 // incoterms are gone, and packing entries bind to a shipment of their buyer.
-export const SEED_VERSION = 14;
+export const SEED_VERSION = 15;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -417,19 +417,21 @@ const buildPackingEntries = () => [
 
 export const buildSeedDb = () => {
   groupSeq = 0;
-  const packingEntries = buildPackingEntries();
+  // Sample cartons for the template preview only: packing lists bind the REAL Carton
+  // Packing entries (expDocPackingMirror), never these.
+  const sampleEntries = buildPackingEntries();
 
   // No shipments: they are the API's, mirrored over every load (expDocMockStore).
   return {
     seedVersion: SEED_VERSION,
     // Explicit mirror of sys_doc_counters (prefix, fy_code): last number used.
     docSeq: {
-      [`${EXPDOC_PREFIX.PACKING_ENTRY}/${FY}`]: FIRST_DOC_NUMBER - 1 + packingEntries.length,
+      [`${EXPDOC_PREFIX.PACKING_ENTRY}/${FY}`]: FIRST_DOC_NUMBER - 1 + sampleEntries.length,
       [`${EXPDOC_PREFIX.PACKING_LIST}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.INVOICE}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.STICKER_RUN}/${FY}`]: FIRST_DOC_NUMBER - 1,
     },
-    packingEntries,
+    sampleEntries,
     packingLists: [],
     invoices: [],
     stickerRuns: [],

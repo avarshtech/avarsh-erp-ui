@@ -45,6 +45,8 @@ export const toApi = (s) => ({
   notifyParty: s.notifyParty ? { kind: s.notifyParty.kind, locationId: s.notifyParty.locationId ?? null } : null,
   consigneeLocationId: s.consigneeLocationId ?? null,
   orderIds: s.orderIds || [],
+  // The buyer POs each order sends, [{ orderId, pos: [{ buyerPoNo, destination }] }]; absent keeps the saved ones
+  orderPos: Array.isArray(s.orderPos) ? s.orderPos : null,
   mode: s.mode,
   incoterm: s.incoterm,
   preCarriageBy: textOrNull(s.preCarriageBy),

@@ -17,6 +17,9 @@
 import { test, expect } from '@playwright/test';
 import { createAuthenticatedClient } from '../../helpers/api-client.js';
 import {
+  createEntry, deleteEntry, orderIdOf, purgeMarked, range,
+} from '../../helpers/packing-api.js';
+import {
   goTo, settle, pickOption, selectFor, inputFor, fillDate, expectToast, button,
 } from '../sample-requests/helpers.js';
 
@@ -116,6 +119,13 @@ test.describe('Shipments', () => {
     await dropdown.locator('.ant-select-item-option').filter({ hasText: 'ORD/0002' }).first().click();
     await page.keyboard.press('Escape');
 
+    // ORD/0002 offers its two buyer POs, both ticked; one is left for another shipment
+    const po101 = page.getByRole('checkbox', { name: /ZR-PO-2025-101/ });
+    const po102 = page.getByRole('checkbox', { name: /ZR-PO-2025-102/ });
+    await expect(po101).toBeChecked({ timeout: 15000 });
+    await expect(po102).toBeChecked();
+    await po101.uncheck();
+
     await pickOption(page, selectFor(page, 'Notify party'), 'Banco Santander');
     // Zara has two shipping locations, so the address under the consignee must be picked
     await pickOption(page, selectFor(page, 'Consignee address'), 'Zaragoza DC');
@@ -152,6 +162,9 @@ test.describe('Shipments', () => {
     created.push(Number(page.url().match(/edit\/(\d+)/)[1]));
     await expectToast(page, /SHP\/.+ saved/);
     const shipmentNo = (await page.locator('h1, h2, h3, h4').filter({ hasText: /^SHP\// }).first().innerText()).trim();
+    // The shipment carries only the PO left ticked, with its order line's destination
+    const { data: saved } = await api.get(`${API}/${created[created.length - 1]}`);
+    expect(saved.orders[0].pos.map((p) => [p.buyerPoNo, p.destination])).toEqual([['ZR-PO-2025-102', 'Arteixo DC']]);
 
     // Saved again with the version the first save returned: the PUT answers 200, not a 409.
     // (Its toast proves nothing: the first save's identical one can still be on screen.)
@@ -179,6 +192,7 @@ test.describe('Shipments', () => {
     await expect(view.getByText('Banco Santander S.A.').first()).toBeVisible();
     await expect(view.getByText('Chennai (INMAA1)').first()).toBeVisible();
     await expect(view.getByText('Rotterdam (NLRTM)').first()).toBeVisible();
+    await expect(view.getByText(/ORD\/0002 .* PO ZR-PO-2025-102$/).first()).toBeVisible();
   });
 
   test('the mode decides the ports: switching to air empties them and offers airports', async ({ page }) => {
@@ -241,15 +255,19 @@ test.describe('Shipments', () => {
   });
 
   test('releasing its only document closes the shipment, and cancelling it reopens the shipment', async ({ page }) => {
-    // JOMO BV: its demo packing entries bind to a shipment of their buyer (seed V20261008214442)
+    // JOMO BV's e2e order (seed V20261008214442) with one real Carton Packing entry of its own
     const shipment = await apiShipment('JOMO BV', 'Valkenswaard DC', 'ORD/JOMO-E2E');
+    const orderId = await orderIdOf(api, 'ORD/JOMO-E2E');
+    await purgeMarked(api, orderId);
+    const entry = await createEntry(api, { orderId, groups: [range({ cartonFrom: 1, cartonTo: 10 })] });
     await goTo(page, LIST);
 
     // Packing lists are still the browser mock: driven through the same service the screens call
-    const raised = await page.evaluate(async (shipmentId) => {
+    const raised = await page.evaluate(async ({ shipmentId, entryId }) => {
       const svc = await import('/src/services/expdoc/expDocService.js');
-      const entries = (await svc.listBindableForShipment(shipmentId)).filter((e) => e.bindable);
-      let pl = await svc.createPackingList({ shipmentId, packingEntryIds: entries.map((e) => e.id) });
+      const { orders } = await svc.listBindableForShipment(shipmentId);
+      const units = orders.flatMap((o) => o.pos.flatMap((p) => p.units)).filter((u) => u.packingEntryId === entryId);
+      let pl = await svc.createPackingList({ shipmentId, units: units.map((u) => ({ packingEntryId: u.packingEntryId, poKey: u.poKey })) });
       for (let round = 0; round < 5 && pl.panelFindings.blocking.length; round += 1) {
         for (const finding of pl.panelFindings.blocking) {
           pl = await svc.acknowledgeWarning(pl.id, finding.targetKey, 'E2E: accepted for the closing check');
@@ -257,9 +275,9 @@ test.describe('Shipments', () => {
       }
       pl = await svc.changePlStatus(pl.id, 'FINAL');
       pl = await svc.markPackingListExported(pl.id);
-      return { plId: pl.id, status: pl.status, entries: entries.length };
-    }, shipment.id);
-    expect(raised.entries).toBeGreaterThan(0);
+      return { plId: pl.id, status: pl.status, units: pl.sourceRefs.length };
+    }, { shipmentId: shipment.id, entryId: entry.id });
+    expect(raised.units).toBe(1);
     expect(raised.status).toBe('EXPORTED');
     const closed = (await api.get(`${API}/${shipment.id}`)).data;
     expect(closed.status).toBe('CLOSED');
@@ -270,6 +288,7 @@ test.describe('Shipments', () => {
       await svc.changePlStatus(plId, 'CANCELLED', 'E2E: reopening the shipment');
     }, raised.plId);
     expect((await api.get(`${API}/${shipment.id}`)).data.status).toBe('OPEN');
+    await deleteEntry(api, entry.id);
   });
 
   test('an open shipment is deleted from the register', async ({ page }) => {

@@ -23,10 +23,20 @@ import {
   attentionItem, familyCard, fixtureForRun, textPdf, uploadForReading,
 } from '../../helpers/export-templates.js';
 import { goTo } from '../sample-requests/helpers.js';
+import { createAuthenticatedClient } from '../../helpers/api-client.js';
+import {
+  createEntry, deleteEntry, orderIdOf, purgeMarked, referenceRanges,
+} from '../../helpers/packing-api.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(here, '../../fixtures/ai/template-extraction-sticker.json'), 'utf8'));
 const run = Date.now().toString(36).toUpperCase();
+
+// Real Carton Packing entries are made through the API (packing lists bind them now)
+let api;
+test.beforeAll(async () => {
+  api = await createAuthenticatedClient();
+});
 
 const STICKER = 'Carton sticker';
 const ONE_EXAMPLE = 'One example of each sticker layout is enough — not the whole print run.';
@@ -126,14 +136,19 @@ test.describe('Carton-sticker templates', () => {
   });
 
   test('stickers print with the layout picked by name, its batch number asked once and kept on the run', async ({ page }) => {
-    // Packing lists are still the browser mock: one for JOMO BV's packing entry 1 (cartons
-    // 1–61), raised through the same service the screens call. No shipment is named, so
-    // this holds before and after the shipments move to the API.
+    // Packing lists are still the browser mock and bind REAL Carton Packing entries: one for
+    // JOMO BV's e2e order with the reference cartons 1–61 (every packing type), on the seeded
+    // shipment SHP/E2E/0001, raised through the same service the screens call.
+    const orderId = await orderIdOf(api, 'ORD/JOMO-E2E');
+    await purgeMarked(api, orderId);
+    const entry = await createEntry(api, { orderId, groups: referenceRanges() });
+    const { data: shipments } = await api.get('/export-docs/shipments', { search: 'SHP/E2E/0001', page: 0, size: 5 });
+    const shipmentId = shipments.content.find((s) => s.shipmentNo === 'SHP/E2E/0001').id;
     await goTo(page, '/export-docs/stickers');
-    const plId = await page.evaluate(async () => {
+    const plId = await page.evaluate(async ({ shipment, entryId }) => {
       const svc = await import('/src/services/expdoc/expDocService.js');
-      return (await svc.createPackingList({ packingEntryIds: [1] })).id;
-    });
+      return (await svc.createPackingList({ shipmentId: shipment, units: [{ packingEntryId: entryId, poKey: null }] })).id;
+    }, { shipment: shipmentId, entryId: entry.id });
     await goTo(page, `/export-docs/stickers/${plId}`);
 
     // JOMO BV has two layouts of its own, so nothing prints until one is picked.
@@ -155,11 +170,11 @@ test.describe('Carton-sticker templates', () => {
     await expect(batch).toBeVisible();
     await expect(sheet).toContainText('Weight of Carton');
     await expect(sheet).not.toContainText('MAIN MARK');
-    // It prints EANs, which cartons 48–61 do not have: barcodes start off, and say so (focus 6).
+    // It prints EANs, which no real carton carries yet (no screen holds them): barcodes start off, and say so (focus 6).
     await expect(page.getByRole('switch', { name: 'Print barcodes' })).not.toBeChecked();
-    const noEan = page.getByRole('alert').filter({ hasText: 'This template prints EAN barcodes, but 14 carton(s) have no EAN' });
+    const noEan = page.getByRole('alert').filter({ hasText: 'This template prints EAN barcodes, but 61 carton(s) have no EAN' });
     await expect(noEan).toBeVisible();
-    await expect(noEan).toContainText('Cartons without an EAN: 48–61.');
+    await expect(noEan).toContainText('Cartons without an EAN: 1–61.');
     await expect(generate).toBeDisabled();
 
     // The answer prints after the label's one colon, never "::" (focus 3).
@@ -181,5 +196,6 @@ test.describe('Carton-sticker templates', () => {
     const runs = page.locator('.ant-card').filter({ has: page.getByText('Printed runs', { exact: true }) });
     await expect(runs).toContainText(`BATCH #: ${value}`);
     await expect(runs).toContainText('From draft');
+    await deleteEntry(api, entry.id);
   });
 });

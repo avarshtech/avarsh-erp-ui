@@ -13,7 +13,8 @@ const num = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 /**
- * Read-only carton grid for one packing-list section.
+ * Read-only carton grid for one packing-list section or PO group. Carton numbers are
+ * the printed ones; "Packed in" names the entry and, when they differ, its own numbers.
  *
  * Columns come from the buyer template, expanded against the frozen size list — the
  * SAME spec the printed document uses, which is what stops the screen and the paper
@@ -22,6 +23,20 @@ const num = (v, dp = 0) =>
  */
 const PlCartonGrid = ({ section, sizes, template, issuesByRow = {} }) => {
   const rows = useMemo(() => section?.rows || [], [section]);
+
+  // Where the cartons came from, and the packers' own numbers when the list prints others
+  const packedIn = useMemo(() => (rows.some((r) => r.sourceEntryNo) ? [{
+    title: <span style={{ whiteSpace: 'nowrap' }}>Packed in</span>,
+    key: 'packedIn',
+    width: 210,
+    render: (_, r) => (
+      <Text type="secondary" style={{ whiteSpace: 'nowrap' }}>
+        {r.sourceEntryNo || '—'}
+        {r.ownFrom != null && (r.ownFrom !== r.cartonFrom || r.ownTo !== r.cartonTo)
+          ? ` · own ${formatRanges([{ from: r.ownFrom, to: r.ownTo }])}` : ''}
+      </Text>
+    ),
+  }] : []), [rows]);
 
   const columns = useMemo(() => {
     const spec = expandColumns(template, sizes);
@@ -32,10 +47,11 @@ const PlCartonGrid = ({ section, sizes, template, issuesByRow = {} }) => {
         { title: 'Cartons', key: 'range', width: 120, render: (_, r) => formatRanges([{ from: r.cartonFrom, to: r.cartonTo }]) },
         { title: 'Colour', dataIndex: 'colorName', width: 180, render: (v) => v || '—' },
         { title: 'Pcs/Ctn', key: 'ppc', width: 90, align: 'right', render: (_, r) => piecesPerCarton(r) },
+        ...packedIn,
       ];
     }
 
-    return spec.map((col) => ({
+    return [...spec.map((col) => ({
       title: col.isSizeColumn
         ? col.label
         : <span style={{ whiteSpace: 'nowrap' }}>{col.label}</span>,
@@ -71,8 +87,8 @@ const PlCartonGrid = ({ section, sizes, template, issuesByRow = {} }) => {
         const value = resolveBinding(col.binding, { row, calc: {} }, { decimals: col.decimals });
         return formatBound(value, { decimals: col.decimals, prefix: col.prefix, suffix: col.suffix });
       },
-    }));
-  }, [template, sizes]);
+    })), ...packedIn];
+  }, [template, sizes, packedIn]);
 
   const totals = useMemo(() => sectionTotals(rows), [rows]);
 
@@ -106,8 +122,8 @@ const PlCartonGrid = ({ section, sizes, template, issuesByRow = {} }) => {
   }, [template, sizes, totals]);
 
   const scrollX = useMemo(
-    () => expandColumns(template, sizes).reduce((sum, c) => sum + (c.width || 120), 0) || 1200,
-    [template, sizes],
+    () => (expandColumns(template, sizes).reduce((sum, c) => sum + (c.width || 120), 0) || 1200) + (packedIn.length ? 210 : 0),
+    [template, sizes, packedIn],
   );
 
   return (

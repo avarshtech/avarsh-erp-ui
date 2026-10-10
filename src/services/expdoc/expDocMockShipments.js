@@ -2,18 +2,24 @@
  * What the mock documents know about shipments. The shipment itself is the API's
  * (/export-docs/shipments, through expDocService); `db.shipments` here is the in-memory
  * mirror of it (expDocShipmentMirror). What stays is the document side: the counts a
- * shipment shows, the packing entries it can bind, and its document set (§18).
+ * shipment shows, the Carton Packing entries of its orders, and its document set (§18).
  */
 import { loadDb } from './expDocMockStore';
 import { delay, clone, fail } from './expDocMockCommon';
 
-/** The same buyer: by demo code when both carry one, else by name. */
-const sameBuyer = (entry, shipment) => (entry.buyerCode && shipment.buyerCode
-  ? entry.buyerCode === shipment.buyerCode
-  : entry.buyerName === shipment.buyerName);
+/** The Carton Packing entries of the shipment's orders this browser has read (expDocPackingMirror). */
+export const entriesOfShipment = (db, shipment) => {
+  const orders = new Set((shipment.orders || []).map((o) => o.orderId));
+  return (db.packingEntries || []).filter((e) => orders.has(e.orderId));
+};
 
-/** The seeded packing entries a shipment can bind: its buyer's. No entry names a shipment. */
-export const entriesOfShipment = (db, shipment) => (db.packingEntries || []).filter((e) => sameBuyer(e, shipment));
+/** One mirrored shipment's orders, or none. */
+export const shipmentOrders = (shipmentId) =>
+  (loadDb().shipments || []).find((s) => s.id === Number(shipmentId))?.orders || [];
+
+/** The orders of every open shipment the mirror holds: what the dashboard's readiness counts. */
+export const openShipmentOrderIds = () => [...new Set((loadDb().shipments || [])
+  .filter((s) => s.status !== 'CLOSED').flatMap((s) => (s.orders || []).map((o) => o.orderId)))];
 
 /** This browser's packing lists and invoices on one shipment, any status. */
 export const documentsOfShipment = (shipmentId) => {

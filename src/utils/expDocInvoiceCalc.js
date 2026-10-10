@@ -141,7 +141,8 @@ export const DEFAULT_GROUP_BY = {
   [LINE_GRAIN.PER_STYLE_SIZE_RANGE]: ['styleNo', 'colourKey'],
   [LINE_GRAIN.PER_SIZE]: ['styleNo', 'colourKey', 'size'],
   [LINE_GRAIN.PER_PO_STYLE]: ['buyerPoNo', 'styleNo'],
-  [LINE_GRAIN.PER_ORDER_LINE]: ['sourceEntryId', 'orderLineId'],
+  // An order line is one buyer PO to one destination of one order (order lines carry no id here)
+  [LINE_GRAIN.PER_ORDER_LINE]: ['orderNo', 'buyerPoNo', 'destination'],
   [LINE_GRAIN.MATERIAL_ROWS]: ['styleNo'],
 };
 
@@ -386,7 +387,10 @@ export const makeRateResolver = (orderBreakdown, options = {}) => {
   const { matchColour = defaultMatchColour, decimals = 4 } = options;
   const key = (styleNo, colour, size) => `${lower(styleNo)}||${matchColour(colour)}||${text(size)}`;
 
+  // A PO's own price first, when the breakdown names the PO; the style's price otherwise
+  const poKeyOf = (po, destination, styleNo, colour, size) => `${text(po) ?? ''}||${text(destination) ?? ''}||${key(styleNo, colour, size)}`;
   const index = new Map();
+  const byPo = new Map();
   (orderBreakdown || []).forEach((l) => {
     // `Number(null)` is 0, which is finite — so an unpriced line has to be rejected
     // before the numeric test, or every one of them indexes as a free item.
@@ -394,7 +398,8 @@ export const makeRateResolver = (orderBreakdown, options = {}) => {
     const r = Number(l.orderRate);
     // A zero FOB price is not a price to default from; V-12 reports the gap instead.
     if (!Number.isFinite(r) || r <= 0) return;
-    index.set(key(l.styleNo, l.colorName, l.size), r);
+    if (!index.has(key(l.styleNo, l.colorName, l.size))) index.set(key(l.styleNo, l.colorName, l.size), r);
+    if (l.buyerPoNo) byPo.set(poKeyOf(l.buyerPoNo, l.destination, l.styleNo, l.colorName, l.size), r);
   });
 
   const resolve = (group) => {
@@ -403,7 +408,8 @@ export const makeRateResolver = (orderBreakdown, options = {}) => {
     let qty = 0;
     const distinct = new Set();
     (group.members || []).forEach((atom) => {
-      const r = index.get(key(atom.styleNo, atom.colorName, atom.size));
+      const r = (atom.buyerPoNo ? byPo.get(poKeyOf(atom.buyerPoNo, atom.destination, atom.styleNo, atom.colorName, atom.size)) : undefined)
+        ?? index.get(key(atom.styleNo, atom.colorName, atom.size));
       if (r === undefined) return;
       weighted += r * atom.qty;
       qty += atom.qty;

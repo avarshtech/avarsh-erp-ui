@@ -12,17 +12,19 @@ import DraftWatermark from '../../../components/DraftWatermark';
 import { ActionButton } from '../../../components/buttons';
 import { PL_STATUS_CONFIG, PL_STATUS_FLOW } from '../../../utils/statusConfig';
 import {
-  DOC_TYPE, EXPDOC_MODULE, PL_STATUS, PL_STATUS_LABELS, SECTION_KEY,
+  DOC_TYPE, EXPDOC_MODULE, PL_STATUS, PL_STATUS_LABELS,
 } from '../../../utils/expDocConstants';
 import { hasPermission } from '../../../utils/permissions';
 import {
   getPackingList, refreshFromPacking, acknowledgeWarning, changePlStatus, revisePackingList,
   getShipment, markPackingListExported, changePlTemplate, findNewerTemplateRevision,
-  updatePackingList,
+  updatePackingList, bindPackingEntries, removePackingEntry, moveBlock, dropBlock, savePlPlan, markPlanNotShipping,
 } from '../../../services/expdoc/expDocService';
 import useExporterBlock from '../shared/useExporterBlock';
 import useBusyAction from '../../../hooks/useBusyAction';
-import PlCartonGrid from './PlCartonGrid';
+import PlOrderBlocks from './PlOrderBlocks';
+import PlNumberingBar from './PlNumberingBar';
+import PlPlanDrawer from './PlPlanDrawer';
 import PlValidationPanel from './PlValidationPanel';
 import PlOrderVsPackedPanel from './PlOrderVsPackedPanel';
 import AckReasonModal from '../shared/AckReasonModal';
@@ -80,6 +82,8 @@ const PackingListWorkspace = () => {
   const [shipment, setShipment] = useState(null);
   // Reported up by PlHeaderEditor, so Exit can warn instead of silently discarding.
   const [headerDirty, setHeaderDirty] = useState(false);
+  // The order whose buyer's plan is open for editing
+  const [planBlock, setPlanBlock] = useState(null);
   const exporter = useExporterBlock();
 
   const canUpdate = hasPermission(EXPDOC_MODULE.PACKING_LIST, 'update');
@@ -136,7 +140,8 @@ const PackingListWorkspace = () => {
       if (successMsg) message.success(successMsg);
       return next;
     } catch (e) {
-      if (!e.isOptimisticLockConflict) message.error(e.message || 'Action failed');
+      // An API 409 opens the conflict dialog (axiosInstance); the mock's own conflict has no dialog, so it is said here
+      if (!e.isOptimisticLockConflict || !e.isAxiosError) message.error(e.message || 'Action failed');
       return null;
     } finally {
       setBusy(null);
@@ -230,9 +235,10 @@ const PackingListWorkspace = () => {
     const actions = [];
     if (pl.status === PL_STATUS.DRAFT) {
       if (canUpdate && pl.canRefresh) {
+        // Reads Carton Packing again: corrections, new packing for the list's POs, deleted entries
         actions.push(
-          <ActionButton key="refresh" action="refresh" text="Refresh from packing" {...busyProps('refresh')}
-            onClick={() => run('refresh', () => refreshFromPacking(pl.id), 'Carton data refreshed')} />,
+          <ActionButton key="refresh" action="refresh" text="Check for new packing" {...busyProps('refresh')}
+            onClick={() => run('refresh', () => refreshFromPacking(pl.id), 'Carton data read again')} />,
         );
       }
       // The single gate. There is no approver behind it, so the tooltip has to name
@@ -340,8 +346,8 @@ const PackingListWorkspace = () => {
             )}
           />
           <DetailCard.Field
-            label="Bound packing entries"
-            value={(pl.sourceRefs || []).map((r) => `${r.packingNo} v${r.packingEntryVersion}`).join(', ')}
+            label="Packing entries"
+            value={[...new Set((pl.sourceRefs || []).map((r) => `${r.packingNo} v${r.packingEntryVersion}`))].join(', ') || 'None yet'}
           />
         </DetailCard>
       ),
@@ -361,7 +367,7 @@ const PackingListWorkspace = () => {
           // §12.1: the fields the document owns. Keyed on the version so a save
           // anywhere reseeds the inputs from the stored record.
           <PlHeaderEditor
-            key={pl.version}
+            key={pl.id}
             pl={pl}
             saving={busy === 'header'}
             onDirtyChange={setHeaderDirty}
@@ -389,25 +395,36 @@ const PackingListWorkspace = () => {
       label: panelLabel('Cartons', 'var(--info-color)', <Tag>{`${num(pl.totals.cartons)} cartons`}</Tag>),
       style: panelStyle('var(--info-color)'),
       children: (
-        <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-          {(pl.sections || []).map((section) => (
-            <div key={section.key}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                {section.title}
-                {section.key === SECTION_KEY.EXTRA && (
-                  <Text type="secondary" style={{ fontWeight: 400, marginInlineStart: 8, fontSize: 12 }}>
-                    Reported separately, included in the grand total
-                  </Text>
-                )}
-              </Text>
-              <PlCartonGrid
-                section={section}
-                sizes={pl.sizes || []}
-                template={pl.template}
-                issuesByRow={issuesByRow}
-              />
-            </div>
-          ))}
+        <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+          <PlNumberingBar
+            key={`num-${pl.id}-${pl.firstCartonNo}`}
+            pl={pl}
+            editable={pl.status === PL_STATUS.DRAFT && canUpdate}
+            busyKey={busy}
+            onApply={(patch) => run('numbering', () => updatePackingList(pl.id, { ...patch, version: pl.version }), 'Cartons renumbered')}
+          />
+          <PlOrderBlocks
+            key={pl.id}
+            pl={pl}
+            issuesByRow={issuesByRow}
+            editable={pl.status === PL_STATUS.DRAFT && canUpdate}
+            busy={busy === 'blocks'}
+            onAdd={(units) => run('blocks', () => bindPackingEntries(pl.id, units, pl.version), 'Packing added')}
+            onRemove={(unit) => run('blocks', () => removePackingEntry(pl.id, unit, pl.version), 'Packing taken off this list')}
+            onMove={(orderId, delta) => run('blocks', () => moveBlock(pl.id, orderId, delta, pl.version))}
+            onDrop={(orderId) => run('blocks', () => dropBlock(pl.id, orderId, pl.version), 'Dropped from this list')}
+            onEditPlan={setPlanBlock}
+            onNotShipping={(block, plan, mark) => (mark
+              ? setReasonCfg({
+                key: 'notShipping',
+                title: 'Not shipping these planned cartons',
+                label: 'Why do they not ship?',
+                context: { title: `Cartons ${plan.cartonFrom}–${plan.cartonTo}`, message: "The buyer's plan keeps them, marked; the list can then be finalised without them." },
+                okText: 'Mark not shipping',
+                onSubmit: (reason) => run('blocks', () => markPlanNotShipping(pl.id, block.orderId, plan.id, reason, pl.version), 'Marked not shipping'),
+              })
+              : run('blocks', () => markPlanNotShipping(pl.id, block.orderId, plan.id, null, pl.version), 'Shipping again'))}
+          />
         </Space>
       ),
     },
@@ -533,7 +550,9 @@ const PackingListWorkspace = () => {
           description={(
             <Space orientation="vertical" size={2}>
               <Text>
-                {pl.staleSources.map((s) => `${s.packingNo} moved from v${s.from} to v${s.to}`).join('; ')}
+                {pl.staleSources.map((s) => (s.missing
+                  ? `${s.packingNo} was deleted in Carton Packing`
+                  : `${s.packingNo} moved from v${s.from} to v${s.to}`)).join('; ')}
               </Text>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {pl.canRefresh
@@ -594,6 +613,21 @@ const PackingListWorkspace = () => {
         shipment={shipment}
         onClose={() => setPreviewOpen(false)}
       />
+
+      {planBlock && (
+        <PlPlanDrawer
+          open
+          block={planBlock}
+          sizes={pl.orderMeta?.[planBlock.orderId]?.sizes || pl.sizes || []}
+          rows={planBlock.planRows}
+          saving={busy === 'plan'}
+          onClose={() => setPlanBlock(null)}
+          onSave={async (rows) => {
+            const next = await run('plan', () => savePlPlan(pl.id, planBlock.orderId, rows, pl.version), "Buyer's plan saved");
+            if (next?.id) setPlanBlock(null);
+          }}
+        />
+      )}
 
       <PlCompareModal
         key={compareOpen ? `cmp-${pl.id}` : 'cmp-closed'}

@@ -13,6 +13,9 @@ const { Text } = Typography;
 const PRE_LINE = { whiteSpace: 'pre-line' };
 const statusLabel = (status) => SHIPMENT_STATUS_LABELS[status] || status;
 const when = (at, by) => (at ? `${at.replace('T', ' ').slice(0, 16)} · ${by || '—'}` : null);
+// An order and the buyer POs it sends; none saved means every PO of the order
+const orderText = (o) => [o.orderNo, o.styleNo].filter(Boolean).join(' — ')
+  + (o.pos?.length ? ` · PO ${o.pos.map((p) => p.buyerPoNo).join(', ')}` : ' · every PO');
 
 /**
  * Read-only shipment view.
@@ -78,7 +81,7 @@ const ShipmentView = ({ open, shipmentId, onClose, onEdit, canUpdate }) => {
               span={24}
               label="Orders"
               value={fresh.orders?.length
-                ? <Space size={4} wrap>{fresh.orders.map((o) => <Tag key={o.orderId ?? o.orderNo}>{[o.orderNo, o.styleNo].filter(Boolean).join(' — ')}</Tag>)}</Space>
+                ? <Space size={4} wrap>{fresh.orders.map((o) => <Tag key={o.orderId ?? o.orderNo}>{orderText(o)}</Tag>)}</Space>
                 : null}
             />
           </DetailCard>

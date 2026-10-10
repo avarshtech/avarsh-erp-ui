@@ -54,11 +54,9 @@ const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 /**
  * Rows for line generation, stamped with the order they came from.
  *
- * A packing-list row records which packing ENTRY produced it but not which order —
- * and the order is what separates line 1 of two orders in the per-order-line grain,
- * and what the description and rate resolve against. The join is
- * `row.sourceEntryId -> packingEntries[].orderNo`, done once here so no caller has
- * to know it.
+ * A packing-list row carries the order, garment and composition it was copied with
+ * (expDocPlBlocks), so the per-order-line grain and the description need no join; the
+ * packing entry, when this browser holds it, only fills what an older row lacks.
  */
 const rowsWithOrder = (db, pls) => {
   const entryById = new Map((db.packingEntries || []).map((e) => [e.id, e]));
@@ -66,10 +64,10 @@ const rowsWithOrder = (db, pls) => {
     const entry = entryById.get(row.sourceEntryId);
     return {
       ...row,
-      orderNo: entry?.orderNo ?? null,
+      orderNo: row.orderNo ?? entry?.orderNo ?? null,
       // Carried so the line builder can name the garment without re-joining.
-      __garmentName: entry?.garmentName ?? null,
-      __composition: entry?.compositionText ?? null,
+      __garmentName: row.garmentName ?? entry?.garmentName ?? null,
+      __composition: row.compositionText ?? entry?.compositionText ?? null,
       __category: entry?.garmentCategory ?? null,
       __plId: pl.id,
       __plNo: pl.plNo,
@@ -81,7 +79,8 @@ const rowsWithOrder = (db, pls) => {
 const mergedBreakdown = (pls) => {
   const out = new Map();
   pls.forEach((pl) => (pl.orderBreakdown || []).forEach((line) => {
-    const key = `${String(line.styleNo ?? '').toLowerCase()}|${colourKey(line.colorName)}|${String(line.size ?? '').trim()}`;
+    // Per buyer PO line too: two POs of one style may be priced apart
+    const key = `${line.buyerPoNo ?? ''}|${line.destination ?? ''}|${String(line.styleNo ?? '').toLowerCase()}|${colourKey(line.colorName)}|${String(line.size ?? '').trim()}`;
     if (!out.has(key)) out.set(key, clone(line));
   }));
   return [...out.values()];

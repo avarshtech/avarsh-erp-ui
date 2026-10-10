@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { listConsigneeOrders } from '../../../services/expdoc/expDocService';
 import { getStatusLabel } from '../../../utils/orderConstants';
 
-const optionOf = ({ orderId, orderNo, styleNo, status }) => ({
+// `pos`: the buyer POs the order can send. `fromPicker`: the picker answered for it, so
+// its POs are known; a saved order not in the answer brings only the ones the shipment has.
+const optionOf = ({ orderId, orderNo, styleNo, status, pos, fromPicker = false }) => ({
   value: orderId,
   label: [orderNo, styleNo].filter(Boolean).join(' — ') + (status ? ` · ${getStatusLabel(status)}` : ''),
-  order: { orderId, orderNo, styleNo: styleNo ?? null },
+  order: { orderId, orderNo, styleNo: styleNo ?? null, pos: pos || [], fromPicker },
 });
 
 /**
@@ -51,8 +53,9 @@ const useConsigneeOrders = (buyerId, savedOrders) => {
   }, [buyerId, search, requestKey]);
 
   const options = useMemo(() => {
-    const out = (seen.buyerId === buyerId ? seen.rows : []).map(optionOf);
+    const out = (seen.buyerId === buyerId ? seen.rows : []).map((o) => optionOf({ ...o, fromPicker: true }));
     (savedOrders || []).forEach((o) => {
+      // A saved order's own POs come from the picker's answer; until it lands, those the shipment saved
       if (!out.some((x) => x.value === o.orderId)) out.push(optionOf(o));
     });
     return out;

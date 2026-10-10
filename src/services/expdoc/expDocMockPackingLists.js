@@ -17,17 +17,28 @@ import {
   todayStr, currentUserName, colourKey, fieldDiff, describeChanges,
 } from './expDocMockCommon';
 import { getBuyerCommercial } from './expDocMockMasters';
-import { decorateEntry } from './expDocMockPacking';
-import { decorate as decorateShipment, entriesOfShipment } from './expDocMockShipments';
+import { decorate as decorateShipment } from './expDocMockShipments';
+import {
+  assemble, blocksOf, breakdownFor, groupsByOrder,
+} from './expDocPlAssemble';
+import {
+  takenBy, unitKeyOf, unitsOffered, unitsOfEntry, soloKeyOf,
+} from './expDocPlBlocks';
+import { readCoversBranch, packingReadOf, PACKING_READ } from './expDocPackingMirror';
+import { applyPlan, markNotShipping } from './expDocPlPlan';
+import { subtractRanges } from '../../utils/expDocPlanMatch';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
   PL_STATUS, PL_TRANSITIONS, SECTION_KEY, SECTION_TITLES, PHASE, DOC_TYPE,
 } from '../../utils/expDocConstants';
 import {
   sectionTotals, grandTotals, weightPerPiece, orderVsPacked, contentHashOfRows,
-  toRanges, countCartons, formatRanges, packedQuantities,
+  formatRanges, packedQuantities,
 } from '../../utils/expDocCalc';
 import { validate, buildAcknowledgement, acknowledgementApplies } from '../../utils/expDocValidation';
+import {
+  NUMBERING, DEFAULT_NUMBERING, rangeLabelOf, distinctCartonsOf,
+} from '../../utils/expDocPlNumbering';
 import { systemTemplateFor } from '../../utils/expDocSystemTemplates';
 
 const find = (db, id) => db.packingLists.find((p) => p.id === Number(id));
@@ -35,84 +46,34 @@ const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
 
 const LIVE_STATUSES = [PL_STATUS.DRAFT, PL_STATUS.FINAL, PL_STATUS.EXPORTED];
 
-// ─── Scaffolding ────────────────────────────────────────────────────────────────
+// ─── Assembly ───────────────────────────────────────────────────────────────────
+// Rows, printed numbers and the ordered breakdown come from expDocPlAssemble: a list is
+// built from the entry x PO units it binds, numbered by the buyer's rule.
 
-/**
- * Build the document's sections from the bound packing entries.
- *
- * Carton rows arrive from the packing module already split; this module renders
- * whatever ranges it receives and never merges or splits them (PRD §24.10).
- */
-const scaffoldSections = (entries) => {
-  const buckets = { [SECTION_KEY.MAIN]: [], [SECTION_KEY.EXTRA]: [] };
-  entries.forEach((entry) => {
-    (entry.groups || []).forEach((group) => {
-      const key = group.sectionKey || SECTION_KEY.MAIN;
-      buckets[key] = buckets[key] || [];
-      buckets[key].push({
-        ...clone(group),
-        sourceEntryId: entry.id,
-        sourceEntryNo: entry.packingNo,
-        sourceGroupId: group.id,
-      });
-    });
-  });
-  return Object.entries(buckets)
-    .filter(([, rows]) => rows.length)
-    .map(([key, rows], index) => ({
-      key,
-      title: SECTION_TITLES[key] || key,
-      order: index,
-      rows: rows.sort((a, b) => (a.cartonFrom || 0) - (b.cartonFrom || 0)),
-    }));
+const shipmentOf = (db, pl) => (db.shipments || []).find((sh) => sh.id === pl.shipmentId) || null;
+
+/** The unit a source ref names, as one key. */
+const refKey = (r) => unitKeyOf(r.packingEntryId, r.poKey);
+
+/** Rebuild from the bound units and record the ordered quantities of the shipment's POs. */
+const reassemble = (pl, db) => {
+  const shipment = shipmentOf(db, pl);
+  assemble(pl, db, shipment);
+  const breakdown = breakdownFor(pl, shipment);
+  if (breakdown.length) pl.orderBreakdown = breakdown;
+  return pl;
 };
 
-/**
- * The ordered breakdown, snapshotted onto the document so it stays stable.
- *
- * Preferred source is the packing entry: that is where a real order was bound, so
- * it holds the quantities as they were when the cartons were recorded. An explicit
- * payload wins if the caller has fresher data.
- */
-const buildOrderBreakdown = (payload, entries) => {
-  if ((payload.orderBreakdown || []).length) return clone(payload.orderBreakdown);
-
-  /*
-   * Two entries bound to the SAME order describe the same ordered quantity twice, so
-   * their lines must collapse. Two entries bound to DIFFERENT orders describe two
-   * genuinely separate quantities that happen to share a style/colour/size, so
-   * theirs must add up. The order number is what separates the two cases — keying
-   * without it either double-counts a multi-entry order or silently loses one
-   * order's quantity from the variance panel.
-   *
-   * The colour is normalised the same way `orderVsPacked` normalises it, or a
-   * Pantone-suffixed name would survive as a second line that can never match
-   * anything packed.
-   */
-  const byKey = new Map();
-  entries.forEach((entry) => {
-    (entry.orderBreakdown || []).forEach((line) => {
-      const orderKey = String(entry.orderNo ?? entry.id ?? '');
-      const dedupe = `${orderKey}|${String(line.styleNo ?? '').trim().toLowerCase()}|${colourKey(line.colorName)}|${String(line.size ?? '').trim()}`;
-      if (byKey.has(dedupe)) return; // same order, same line — already counted
-      byKey.set(dedupe, { ...clone(line), sourceOrderNo: entry.orderNo ?? null });
-    });
-  });
-
-  // Now fold across orders, so one style/colour/size ordered on two POs reads as one
-  // line with the combined quantity — which is what the variance panel compares.
-  const merged = new Map();
-  [...byKey.values()].forEach((line) => {
-    const key = `${String(line.styleNo ?? '').trim().toLowerCase()}|${colourKey(line.colorName)}|${String(line.size ?? '').trim()}`;
-    const hit = merged.get(key);
-    if (!hit) { merged.set(key, line); return; }
-    hit.orderQty = (Number(hit.orderQty) || 0) + (Number(line.orderQty) || 0);
-    // A blended rate here would be wrong: the invoice resolves rates per size from
-    // the order, so the first non-null price is kept only as a display hint.
-    if (hit.orderRate === null || hit.orderRate === undefined) hit.orderRate = line.orderRate ?? null;
-  });
-  return [...merged.values()];
-};
+/** A bound unit as the list records it, with the entry version it was taken at. */
+const sourceRefOf = (entry, key) => ({
+  packingEntryId: entry.id,
+  packingNo: entry.packingNo,
+  packingEntryVersion: entry.version,
+  orderId: entry.orderId,
+  poKey: key ?? null,
+  packingDate: entry.packingDate ?? null,
+  branchId: entry.branchId ?? null,
+});
 
 // ─── Decoration ─────────────────────────────────────────────────────────────────
 
@@ -145,7 +106,8 @@ const stalenessOf = (db, pl) => {
   const drifted = (pl.sourceRefs || [])
     .map((ref) => {
       const entry = (db.packingEntries || []).find((e) => e.id === ref.packingEntryId);
-      if (!entry) return { ...ref, missing: true };
+      // Gone only when a read that covered its branch did not return it; unread is not gone
+      if (!entry) return readCoversBranch(ref.orderId, ref.branchId) ? { ...ref, missing: true } : null;
       if (Number(entry.version) !== Number(ref.packingEntryVersion)) {
         return { ...ref, from: ref.packingEntryVersion, to: entry.version };
       }
@@ -164,7 +126,12 @@ const stalenessOf = (db, pl) => {
  */
 export const PL_EDITABLE_FIELDS = [
   'plDate', 'descriptionOfGoods', 'marksAndNos', 'containerNo', 'sealNo', 'remarks',
+  // How the cartons are numbered (owner, 2026-10-09): the rule, and where a continuing series starts
+  'numbering', 'firstCartonNo',
 ];
+
+/** The fields that renumber the cartons when they change. */
+const NUMBERING_FIELDS = ['numbering', 'firstCartonNo'];
 
 /** Resolve a document field to its own value, else the shipment's. */
 const inherited = (own, from) => (own === null || own === undefined || own === '' ? from ?? null : own);
@@ -180,8 +147,9 @@ export const decoratePl = (pl, db, options = {}) => {
   out.sections = (out.sections || []).map((s) => ({ ...s, totals: sectionTotals(s.rows) }));
   out.totals = grandTotals(out.sections);
   out.weightPerPiece = weightPerPiece(out.totals);
-  out.cartonRangeLabel = formatRanges(toRanges(rows));
-  out.distinctCartons = countCartons(toRanges(rows));
+  out.numbering = out.numbering || DEFAULT_NUMBERING;
+  out.cartonRangeLabel = rangeLabelOf(rows, out.numbering);
+  out.distinctCartons = distinctCartonsOf(rows);
   out.template = template ? clone(template) : null;
   out.tolerancePercent = tolerancePercent;
 
@@ -204,6 +172,11 @@ export const decoratePl = (pl, db, options = {}) => {
   // §17: every revision of this number, so the history panel can offer a comparison
   // between any two — not only between consecutive ones.
   out.revisions = revisionChain(db, out);
+  // §11.1 blocks: per order and PO, its cartons and (on a draft) what Carton Packing offers
+  out.blocks = blocksOf(out, db, shipmentRow);
+  // Renumbering a list already printed from asks first (its cartons then need reprinting)
+  out.stickerRunCount = (db.stickerRuns || []).filter((r) => r.plId === out.id).length;
+  out.packingUnreadable = out.blocks.some((b) => b.unreadable);
 
   const staleness = stalenessOf(db, out);
   out.isStale = staleness.isStale;
@@ -227,6 +200,9 @@ export const decoratePl = (pl, db, options = {}) => {
     plsInShipment: (db.packingLists || []).filter((p) => p.shipmentId === out.shipmentId),
     packedElsewhere: packedElsewhere(db, out),
     matchColour: colourKey,
+    blocks: out.blocks,
+    // V-21: the shipment's POs that have cartons on any of its live packing lists
+    coveredPos: coveredPos(db, out),
   };
   const phase = options.phase || PHASE.SAVE;
   out.validation = validate(ctx, { phase, acknowledgements: out.acknowledgements || [] });
@@ -261,9 +237,15 @@ export const decoratePl = (pl, db, options = {}) => {
   out.finaliseBlockers = out.submitCheck.blocking.map((b) => b.message);
 
   out.canRevise = out.status === PL_STATUS.FINAL || out.status === PL_STATUS.EXPORTED;
-  out.canRefresh = out.status === PL_STATUS.DRAFT && out.isStale;
+  // Always on a draft: new packing for its orders arrives without the list changing
+  out.canRefresh = out.status === PL_STATUS.DRAFT;
   return out;
 };
+
+/** The order x PO keys with cartons on any live packing list of this shipment. */
+const coveredPos = (db, pl) => new Set((db.packingLists || [])
+  .filter((p) => p.shipmentId === pl.shipmentId && LIVE_STATUSES.includes(p.status))
+  .flatMap((p) => allRows(p).map((r) => `${r.orderId}|${r.poKey ?? ''}`)));
 
 // ─── Queries ────────────────────────────────────────────────────────────────────
 
@@ -299,34 +281,49 @@ export const getPackingList = async (id, options = {}) => {
 
 // ─── Creation ───────────────────────────────────────────────────────────────────
 
+/** The rule this buyer's latest packing list used, else the default. */
+const buyersRule = (db, buyerId, buyerName) => {
+  const latest = (db.packingLists || [])
+    .filter((p) => (buyerId != null ? p.buyerId === buyerId : p.buyerName === buyerName) && p.numbering)
+    .sort((a, b) => b.id - a.id)[0];
+  return latest?.numbering || DEFAULT_NUMBERING;
+};
+
+/** Where a continuing series starts: after the highest number on the shipment's other live lists. */
+const nextFirstCarton = (db, shipmentId) => 1 + Math.max(0, ...(db.packingLists || [])
+  .filter((p) => p.shipmentId === shipmentId && LIVE_STATUSES.includes(p.status))
+  .flatMap((p) => allRows(p).map((r) => Number(r.cartonTo) || 0)));
+
+/**
+ * Create a packing list for a shipment (§7.1). It may bind nothing yet: the buyer's list
+ * can come before the packing. `units` are entry x PO pairs ({ packingEntryId, poKey });
+ * `orderMeta` is what the facade read of each order (expDocOrderMeta).
+ */
 export const createPackingList = async (payload) => {
   await delay();
   const db = loadDb();
 
-  const entries = (payload.packingEntryIds || [])
-    .map((eid) => db.packingEntries.find((e) => e.id === Number(eid)))
-    .filter(Boolean);
-  if (!entries.length) fail('VALIDATION', 'Select at least one packing entry to bind.');
-
   const shipment = db.shipments.find((s) => s.id === Number(payload.shipmentId));
   // The shipment is the API's, mirrored: unreadable now (deleted, offline) is a refusal, not a list without one
-  if (payload.shipmentId != null && !shipment) {
-    fail('NOT_FOUND', 'The shipment could not be read. Reload and pick it again.');
-  }
+  if (!shipment) fail('NOT_FOUND', 'The shipment could not be read. Reload and pick it again.');
 
-  const buyerCode = payload.buyerCode ?? shipment?.buyerCode ?? entries[0]?.buyerCode ?? null;
-
-  /*
-   * The template was chosen by the user (a buyer may have several) and arrives as a
-   * snapshot of that revision. None means the built-in standard layout.
-   */
   const template = payload.templateSnapshot || null;
   if (template && template.docType !== DOC_TYPE.PACKING_LIST) {
     fail('VALIDATION', 'That template is not a packing-list layout.');
   }
-  const sections = scaffoldSections(entries);
-  const id = Math.max(0, ...db.packingLists.map((p) => p.id)) + 1;
 
+  const taken = takenBy(db, null);
+  const refs = (payload.units || []).map((u) => {
+    const entry = (db.packingEntries || []).find((e) => e.id === Number(u.packingEntryId));
+    if (!entry) fail('NOT_FOUND', 'A packing entry could not be read. Reload and pick again.');
+    const by = taken.get(unitKeyOf(entry.id, u.poKey));
+    if (by) fail('CONFLICT', `${entry.packingNo} is already on ${by}.`);
+    return sourceRefOf(entry, u.poKey);
+  });
+
+  const numbering = Object.values(NUMBERING).includes(payload.numbering)
+    ? payload.numbering : buyersRule(db, shipment.buyerId, shipment.buyerName);
+  const id = Math.max(0, ...db.packingLists.map((p) => p.id)) + 1;
   const record = {
     id,
     // Allocated at CREATE: packing lists are referenced while still drafts, and a
@@ -342,28 +339,29 @@ export const createPackingList = async (payload) => {
     containerNo: null,
     sealNo: null,
     remarks: null,
-    shipmentId: shipment?.id ?? null,
-    shipmentNo: shipment?.shipmentNo ?? null,
-    buyerId: payload.buyerId ?? shipment?.buyerId ?? null,
-    buyerCode,
-    buyerName: payload.buyerName ?? shipment?.buyerName ?? entries[0]?.buyerName ?? null,
-    orderIds: payload.orderIds || [],
-    orderNos: [...new Set(entries.map((e) => e.orderNo).filter(Boolean))],
-    // Frozen from the entries, so a later size-preset edit cannot reorder columns.
-    sizes: [...new Set(entries.flatMap((e) => e.sizes || []))],
+    shipmentId: shipment.id,
+    shipmentNo: shipment.shipmentNo ?? null,
+    buyerId: payload.buyerId ?? shipment.buyerId ?? null,
+    buyerCode: payload.buyerCode ?? shipment.buyerCode ?? null,
+    buyerName: payload.buyerName ?? shipment.buyerName ?? null,
+    orderIds: (shipment.orders || []).map((o) => o.orderId),
+    orderNos: [],
+    numbering,
+    firstCartonNo: numbering === NUMBERING.CONTINUE
+      ? Math.max(1, Number(payload.firstCartonNo) || nextFirstCarton(db, shipment.id)) : 1,
+    blockOrder: (shipment.orders || []).map((o) => o.orderId),
+    orderMeta: clone(payload.orderMeta || {}),
+    excludedUnits: [],
+    sizes: [],
     templateId: template?.id ?? null,
     templateVersion: template?.version ?? null,
     templateSnapshot: template,
     templateMatchedOn: template && !template.isSystem ? 'CHOSEN' : 'STANDARD',
     templateIsFallback: !template || Boolean(template.isSystem),
     templateOverride: null,
-    sourceRefs: entries.map((e) => ({
-      packingEntryId: e.id,
-      packingNo: e.packingNo,
-      packingEntryVersion: e.version,
-    })),
-    sections,
-    orderBreakdown: buildOrderBreakdown(payload, entries),
+    sourceRefs: refs,
+    sections: [],
+    orderBreakdown: clone(payload.orderBreakdown || []),
     tolerancePercent: payload.tolerancePercent ?? null,
     acknowledgements: [],
     finalSnapshot: null,
@@ -371,12 +369,14 @@ export const createPackingList = async (payload) => {
     reviseReason: null,
     cancelReason: null,
     version: 0,
-    contentHash: contentHashOfRows(sections.flatMap((s) => s.rows)),
+    contentHash: null,
     createdAt: nowStamp(),
     createdBy: currentUserName(),
     updatedAt: nowStamp(),
     updatedBy: currentUserName(),
   };
+  reassemble(record, db);
+  record.contentHash = contentHashOfRows(allRows(record));
 
   db.packingLists.push(record);
   pushAudit(db, {
@@ -384,7 +384,8 @@ export const createPackingList = async (payload) => {
     entityId: id,
     entityNo: record.plNo,
     action: 'Packing list created',
-    details: `Bound ${entries.map((e) => e.packingNo).join(', ')} · template ${template?.name || 'standard layout'}`,
+    details: `${refs.length ? `Bound ${[...new Set(refs.map((r) => r.packingNo))].join(', ')}` : 'Nothing packed yet'}`
+      + ` · template ${template?.name || 'standard layout'}`,
   });
   saveDb(db);
   return decoratePl(record, db);
@@ -423,8 +424,11 @@ export const updatePackingList = async (id, payload) => {
       pl[f] = v === '' ? null : v;
     }
   });
+  if (!Object.values(NUMBERING).includes(pl.numbering)) pl.numbering = before.numbering || DEFAULT_NUMBERING;
+  pl.firstCartonNo = Math.max(1, Number(pl.firstCartonNo) || 1);
   const changes = fieldDiff(before, pl, PL_EDITABLE_FIELDS);
   if (!changes.length) return decoratePl(pl, db);
+  if (changes.some((c) => NUMBERING_FIELDS.includes(c.field))) reassemble(pl, db);
   touch(pl);
   pushAudit(db, {
     entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
@@ -441,7 +445,7 @@ export const updatePackingList = async (id, payload) => {
  * Packing"). Carton corrections are made in the entry screen; this is how they
  * reach a document that is still a draft.
  */
-export const refreshFromPacking = async (id) => {
+export const refreshFromPacking = async (id, options = {}) => {
   await delay();
   const db = loadDb();
   const pl = find(db, id);
@@ -449,24 +453,147 @@ export const refreshFromPacking = async (id) => {
   if (pl.status !== PL_STATUS.DRAFT) {
     fail('CONFLICT', 'Only a draft packing list can be refreshed. Revise the document to pull newer carton data.');
   }
-  const entries = (pl.sourceRefs || [])
-    .map((ref) => db.packingEntries.find((e) => e.id === ref.packingEntryId))
-    .filter(Boolean);
-  if (!entries.length) fail('CONFLICT', 'The bound packing entries no longer exist.');
-
-  pl.sections = scaffoldSections(entries);
-  pl.sizes = [...new Set(entries.flatMap((e) => e.sizes || []))];
-  pl.sourceRefs = entries.map((e) => ({
-    packingEntryId: e.id, packingNo: e.packingNo, packingEntryVersion: e.version,
-  }));
-  // Re-pull the ordered breakdown as well: a refresh means "match the source again".
-  pl.orderBreakdown = buildOrderBreakdown({}, entries);
+  // An entry deleted in Carton Packing drops off; one this browser could not read stays as it was
+  const dropped = [];
+  const groups = groupsByOrder(pl, shipmentOf(db, pl));
+  pl.sourceRefs = (pl.sourceRefs || []).flatMap((ref) => {
+    const entry = (db.packingEntries || []).find((e) => e.id === ref.packingEntryId);
+    if (entry) {
+      // The packer moved this PO's cartons to another PO: nothing of the unit is left here
+      const orderGroups = groups.get(ref.orderId) || [];
+      const { units } = unitsOfEntry(entry, orderGroups, soloKeyOf(orderGroups, pl.orderMeta?.[ref.orderId]));
+      if (!(units.get(ref.poKey ?? null) || []).length) { dropped.push(`${ref.packingNo} (no cartons for that PO now)`); return []; }
+      return [{ ...sourceRefOf(entry, ref.poKey) }];
+    }
+    if (readCoversBranch(ref.orderId, ref.branchId)) { dropped.push(`${ref.packingNo} (deleted in Carton Packing)`); return []; }
+    return [ref];
+  });
+  if (options.orderMeta) {
+    Object.entries(options.orderMeta).forEach(([orderId, meta]) => {
+      // An order that cannot be read now keeps what was read before
+      if (meta?.readable || !pl.orderMeta?.[orderId]) pl.orderMeta = { ...(pl.orderMeta || {}), [orderId]: meta };
+    });
+  }
+  reassemble(pl, db);
   const changed = touch(pl);
 
   pushAudit(db, {
     entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
     action: changed ? 'Refreshed from packing — carton data changed' : 'Refreshed from packing — no change',
-    details: entries.map((e) => `${e.packingNo} v${e.version}`).join(', '),
+    details: [
+      (pl.sourceRefs || []).map((r) => `${r.packingNo} v${r.packingEntryVersion}`).join(', '),
+      dropped.length ? `dropped: ${dropped.join(', ')}` : '',
+    ].filter(Boolean).join(' · '),
+  });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/** Guard shared by the block actions: a draft, at the version the screen holds. */
+const draftFor = (db, id, version) => {
+  const pl = find(db, id);
+  if (!pl) fail('NOT_FOUND', `Packing list ${id} not found`);
+  if (pl.status !== PL_STATUS.DRAFT) {
+    fail('CONFLICT', `${pl.plNo} is ${pl.status.toLowerCase()}. Revise it to change its cartons.`);
+  }
+  if (version != null && Number(version) !== Number(pl.version)) failConflict(pl.plNo, version, pl.version);
+  return pl;
+};
+
+/** Take entry x PO units onto a draft (§7.1 "Add"). Each must be packed, readable and on no other live list. */
+export const bindPackingEntries = async (id, units = [], version) => {
+  await delay(80);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  const taken = takenBy(db, pl.id);
+  const bound = new Set((pl.sourceRefs || []).map(refKey));
+  const added = [];
+  units.forEach((u) => {
+    const entry = (db.packingEntries || []).find((e) => e.id === Number(u.packingEntryId));
+    if (!entry) fail('NOT_FOUND', 'A packing entry could not be read. Check for new packing and try again.');
+    const key = unitKeyOf(entry.id, u.poKey);
+    if (taken.get(key)) fail('CONFLICT', `${entry.packingNo} is already on ${taken.get(key)}.`);
+    if (bound.has(key)) return;
+    bound.add(key);
+    pl.sourceRefs.push(sourceRefOf(entry, u.poKey));
+    added.push(entry.packingNo);
+  });
+  if (!added.length) return decoratePl(pl, db);
+  pl.excludedUnits = (pl.excludedUnits || []).filter((x) => !bound.has(unitKeyOf(x.packingEntryId, x.poKey)));
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, {
+    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
+    action: 'Packing added', details: [...new Set(added)].join(', '),
+  });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/** Take one unit off a draft; it is not offered again until added back by hand. */
+export const removePackingEntry = async (id, unit, version) => {
+  await delay(80);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  const key = unitKeyOf(unit.packingEntryId, unit.poKey);
+  const ref = (pl.sourceRefs || []).find((r) => refKey(r) === key);
+  if (!ref) return decoratePl(pl, db);
+  pl.sourceRefs = pl.sourceRefs.filter((r) => refKey(r) !== key);
+  pl.excludedUnits = [...(pl.excludedUnits || []).filter((x) => unitKeyOf(x.packingEntryId, x.poKey) !== key),
+    { packingEntryId: ref.packingEntryId, poKey: ref.poKey ?? null }];
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, {
+    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
+    action: 'Packing removed', details: `${ref.packingNo}${ref.poKey ? ` · PO ${ref.poKey.split('\u0000')[0]}` : ''}`,
+  });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/** Move an order's block up (-1) or down (+1): under "continue", the carton numbers follow. */
+export const moveBlock = async (id, orderId, delta, version) => {
+  await delay(60);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  reassemble(pl, db);
+  const order = [...pl.blockOrder];
+  const at = order.indexOf(orderId);
+  const to = at + Math.sign(delta);
+  if (at < 0 || to < 0 || to >= order.length) return decoratePl(pl, db);
+  [order[at], order[to]] = [order[to], order[at]];
+  pl.blockOrder = order;
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, { entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo, action: 'Order blocks reordered' });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/** Drop an order the shipment no longer carries: its cartons come off the list. */
+export const dropBlock = async (id, orderId, version) => {
+  await delay(60);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  const shipment = shipmentOf(db, pl);
+  // Never on a guess: an unreadable shipment would make every order look dropped
+  if (!shipment) fail('NOT_FOUND', 'The shipment could not be read. Reload and try again.');
+  const onShipment = (shipment.orders || []).some((o) => o.orderId === orderId);
+  const groups = groupsByOrder(pl, shipment).get(orderId) || [];
+  const gone = (r) => r.orderId === orderId && (!onShipment || groups.some((g) => g.orphan && g.key === (r.poKey ?? null)));
+  const removed = (pl.sourceRefs || []).filter(gone);
+  pl.sourceRefs = (pl.sourceRefs || []).filter((r) => !gone(r));
+  // The buyer's plan for what no longer ships goes with it
+  const plan = pl.plans?.[orderId];
+  const droppedPlan = (plan?.rows || []).filter((r) => gone({ orderId, poKey: r.poKey }));
+  if (droppedPlan.length) pl.plans = { ...pl.plans, [orderId]: { ...plan, rows: plan.rows.filter((r) => !droppedPlan.includes(r)) } };
+  if (!onShipment) pl.blockOrder = (pl.blockOrder || []).filter((x) => x !== orderId);
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, {
+    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
+    action: 'Cartons no longer on the shipment dropped',
+    details: [...new Set(removed.map((r) => r.packingNo)), ...(droppedPlan.length ? [`${droppedPlan.length} planned range(s)`] : [])].join(', '),
   });
   saveDb(db);
   return decoratePl(pl, db);
@@ -664,6 +791,11 @@ export const changeStatus = async (id, target, reason) => {
         marksAndNos: pl.marksAndNos,
         remarks: pl.remarks,
         resolved: decorated.resolved,
+        // How the cartons are numbered and grouped, frozen with them (BR-08)
+        numbering: pl.numbering,
+        firstCartonNo: pl.firstCartonNo,
+        blockOrder: pl.blockOrder,
+        cartonRangeLabel: decorated.cartonRangeLabel,
       }),
     };
   }
@@ -788,41 +920,130 @@ export const deletePackingList = async (id) => {
 };
 
 /**
- * Packing entries a new packing list may bind, with the reason when it may not: those
- * of the shipment's buyer (seeded entries name no shipment, the shipment is the API's).
+ * What a new packing list of this shipment could take, order by order and PO by PO:
+ * the Carton Packing entries of the shipment's orders, each split by PO, with the reason
+ * when one cannot be taken. `orderMeta` tells an order's POs when the shipment ticked none.
  */
-export const listBindableForShipment = async (shipmentId) => {
+export const listBindableForShipment = async (shipmentId, orderMeta = {}) => {
   await delay(80);
   const db = loadDb();
-  const takenBy = new Map();
-  (db.packingLists || [])
-    .filter((p) => LIVE_STATUSES.includes(p.status))
-    .forEach((p) => (p.sourceRefs || []).forEach((r) => takenBy.set(r.packingEntryId, p.plNo)));
+  const shipment = (db.shipments || []).find((s) => s.id === Number(shipmentId));
+  if (!shipment) return { orders: [], unreadable: false };
+  const probe = { id: null, shipmentId: shipment.id, blockOrder: [], sourceRefs: [], orderMeta };
+  const groups = groupsByOrder(probe, shipment);
+  const taken = takenBy(db, null);
+  const orders = (shipment.orders || []).map((o) => {
+    const offered = unitsOffered(db, o.orderId, groups.get(o.orderId) || [], { taken, meta: orderMeta[o.orderId] });
+    return {
+      orderId: o.orderId,
+      orderNo: o.orderNo,
+      styleNo: o.styleNo,
+      unreadable: packingReadOf(o.orderId) === PACKING_READ.UNREADABLE,
+      pos: (groups.get(o.orderId) || []).map((g) => ({ ...g, units: offered.byGroup.get(g.key) || [] })),
+      unplaced: offered.unplaced,
+    };
+  });
+  return { orders, unreadable: orders.some((o) => o.unreadable) };
+};
 
-  const shipment = shipmentId ? (db.shipments || []).find((s) => s.id === Number(shipmentId)) : null;
-  if (shipmentId && !shipment) return [];
-  return (shipment ? entriesOfShipment(db, shipment) : db.packingEntries || [])
-    .map((e) => {
-      const dec = decorateEntry(e);
-      const taken = takenBy.get(e.id);
-      return {
-        id: e.id,
-        packingNo: e.packingNo,
-        orderNo: e.orderNo,
-        styleNo: e.styleNo,
-        status: e.status,
-        cartons: dec.totals.cartons,
-        pieces: dec.totals.pieces,
-        sizes: e.sizes || [],
-        hasOrderBreakdown: (e.orderBreakdown || []).length > 0,
-        bindable: dec.errorCount === 0 && !taken,
-        // Not-yet-complete entries CAN be bound, with a warning (PRD §7.1).
-        bindWarning: e.status !== 'COMPLETED' ? 'Packing entry is not marked complete.' : null,
-        blockedReason: taken
-          ? `Already bound to ${taken}.`
-          : (dec.errorCount > 0 ? `${dec.errorCount} structural error(s) must be fixed first.` : null),
-      };
+/**
+ * Save the buyer's plan for one order of a draft (owner, 2026-10-09): ranges in the buyer's
+ * numbers, each for a PO the shipment carries. The cartons renumber to the plan.
+ */
+export const savePlPlan = async (id, orderId, rows, version) => {
+  await delay(80);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  const shipment = shipmentOf(db, pl);
+  // A plan names only POs the shipment carries — not one it no longer has
+  const groups = (groupsByOrder(pl, shipment).get(Number(orderId)) || []).filter((g) => !g.orphan);
+  try {
+    applyPlan(pl, Number(orderId), rows || [], groups, pl.orderMeta?.[orderId]);
+  } catch (e) {
+    fail('VALIDATION', e.message);
+  }
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, {
+    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
+    action: "Buyer's plan saved", details: `${(rows || []).length} planned range(s) for order ${orderId}`,
+  });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/** Mark a planned range Not shipping with a reason (a short shipment), or `reason` null to ship it again. */
+export const markPlanNotShipping = async (id, orderId, planRowId, reason, version) => {
+  await delay(60);
+  const db = loadDb();
+  const pl = draftFor(db, id, version);
+  let row;
+  try {
+    row = markNotShipping(pl, Number(orderId), planRowId, reason);
+  } catch (e) {
+    fail('VALIDATION', e.message);
+  }
+  // Numbers of a range not shipping are no longer free for cartons packed before the plan
+  reassemble(pl, db);
+  touch(pl);
+  pushAudit(db, {
+    entityType: 'PACKING_LIST', entityId: pl.id, entityNo: pl.plNo,
+    action: reason ? 'Planned cartons marked not shipping' : 'Planned cartons shipping again',
+    details: `${row.cartonFrom}–${row.cartonTo}`, reason: reason || null,
+  });
+  saveDb(db);
+  return decoratePl(pl, db);
+};
+
+/**
+ * The draft packing lists in this browser whose buyer's plan still has cartons of this
+ * order to pack, for Carton Packing's "Pack as per packing list".
+ */
+export const openPlansForOrder = async (orderId) => {
+  await delay(60);
+  const db = loadDb();
+  return (db.packingLists || [])
+    .filter((p) => p.status === PL_STATUS.DRAFT && (p.plans?.[orderId]?.rows || []).length)
+    .map((p) => {
+      const block = (decoratePl(p, db).blocks || []).find((b) => b.orderId === Number(orderId));
+      const rows = (block?.pos || []).filter((po) => po.onShipment).flatMap((po) => {
+        // Packed as per this plan but not added to the list yet: those cartons exist, so are not offered again.
+        // Packing of the PO on another list (another shipment, numbered from 1 again) says nothing of this plan.
+        const held = (po.offers || []).filter((o) => o.inPlan && !o.onList).flatMap((o) => o.ownRanges);
+        return (po.plan?.rows || []).map((r) => ({ plan: r.plan, toPack: subtractRanges(r.toPack, held) }));
+      }).filter((r) => r.toPack.length);
+      return { plId: p.id, plNo: p.plNo, shipmentNo: p.shipmentNo, rows };
+    })
+    .filter((p) => p.rows.length);
+};
+
+/** The orders a packing list reads cartons for: its shipment's, and those of the units it binds. */
+export const ordersOfList = (id) => {
+  const db = loadDb();
+  const pl = find(db, id);
+  if (!pl) return [];
+  const shipment = shipmentOf(db, pl);
+  return [...new Set([...(shipment?.orders || []).map((o) => o.orderId), ...(pl.sourceRefs || []).map((r) => r.orderId)])];
+};
+
+/** The orders of every packing list in this browser: the register flags lists behind their cartons. */
+export const ordersOfAllLists = () => [...new Set((loadDb().packingLists || []).flatMap((p) => (p.sourceRefs || []).map((r) => r.orderId)))];
+
+/**
+ * The live packing lists in this browser that hold each of these Carton Packing entries,
+ * for the Carton Packing screens: entry id -> [{ plId, plNo, status, buyerPoNo }].
+ */
+export const listsOfEntries = (entryIds = []) => {
+  const wanted = new Set(entryIds.map(Number));
+  const out = {};
+  (loadDb().packingLists || []).filter((p) => LIVE_STATUSES.includes(p.status)).forEach((p) => {
+    (p.sourceRefs || []).filter((r) => wanted.has(r.packingEntryId)).forEach((r) => {
+      out[r.packingEntryId] = [...(out[r.packingEntryId] || []), {
+        plId: p.id, plNo: p.plNo, status: p.status, buyerPoNo: r.poKey ? r.poKey.split('\u0000')[0] : null,
+      }];
     });
+  });
+  return out;
 };
 
 // ─── Version compare (§16, §17) ─────────────────────────────────────────────────
@@ -831,7 +1052,7 @@ export const listBindableForShipment = async (shipmentId) => {
 const COMPARE_HEADER = [
   'plDate', 'descriptionOfGoods', 'marksAndNos', 'remarks',
   'containerNo', 'sealNo', 'templateId', 'templateVersion',
-  'shipmentNo',
+  'shipmentNo', 'numbering', 'firstCartonNo',
 ];
 
 /** Carton-row fields that change what the document says. */
@@ -843,14 +1064,12 @@ const COMPARE_ROW = [
 ];
 
 /**
- * A row's identity across revisions.
- *
- * `sourceRowId` is the packing-entry group the row was copied from, so it survives a
- * revision that changed the carton numbers — which is exactly the change a reader
- * most wants to see as an edit rather than as a delete plus an add.
+ * A row's identity across revisions: its stable id (entry, PO, section and the entry's
+ * own carton numbers), so a revision that renumbered the printed cartons reads as an
+ * edit rather than as a delete plus an add.
  */
-const rowKey = (row) => (row.sourceRowId != null
-  ? `SRC:${row.sourceRowId}`
+const rowKey = (row) => (row.id != null
+  ? `ID:${row.id}`
   : `POS:${row.sectionKey || ''}|${row.cartonFrom}-${row.cartonTo}`);
 
 /** How a row reads in a diff: what it is, and which cartons it covers. */

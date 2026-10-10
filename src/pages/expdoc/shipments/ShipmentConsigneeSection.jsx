@@ -1,6 +1,7 @@
 import { Col, Form, Spin } from 'antd';
 import FactSheet from '../../../components/FactSheet';
 import { FormSection, FormSelect } from '../../../components/form';
+import ShipmentPoPicker from './ShipmentPoPicker';
 
 const PRE_LINE = { whiteSpace: 'pre-line', fontWeight: 400 };
 
@@ -29,14 +30,14 @@ const printsAs = (block) => (block ? <span style={PRE_LINE}>{block}</span> : nul
 const onlyIf = (condition) => (condition ? true : undefined);
 
 /**
- * Consignee, orders, notify party and — only when the bank is notified and the buyer
+ * Consignee, orders and the buyer POs each sends, notify party and — only when the bank is notified and the buyer
  * has several shipping locations — the consignee address, with what each will print
  * as. `parties` is useShipmentParties; rendered inside the shipment Form.
  * `consigneeLocked`: documents name the consignee, so it stays as it is.
  */
 const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions, consigneeLocked }) => {
   const {
-    buyerId, orders, notifyOptions, addressOptions, askAddress, consigneePreview, notifyPreview,
+    buyerId, orders, poOrders, notifyOptions, addressOptions, askAddress, consigneePreview, notifyPreview,
   } = parties;
 
   return (
@@ -92,6 +93,11 @@ const ShipmentConsigneeSection = ({ parties, buyerOptions, incotermOptions, cons
         >
           <FormSelect options={addressOptions} placeholder="Select shipping location" />
         </Form.Item>
+      )}
+      {poOrders.length > 0 && (
+        <Col xs={24} style={{ marginBottom: 12 }}>
+          <ShipmentPoPicker orders={poOrders} />
+        </Col>
       )}
       {(consigneePreview || notifyPreview) && (
         <Col xs={24} style={{ marginBottom: 24 }}>

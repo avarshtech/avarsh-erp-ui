@@ -19,7 +19,7 @@ export const getTemplateSample = async (template) => {
   await delay(80);
   const db = loadDb();
   const t = clone(template);
-  const entries = db.packingEntries || [];
+  const entries = db.sampleEntries || [];
   const entry = entries.find((e) => e.buyerCode && e.buyerCode === t.buyerCode)
     || entries.find((e) => t.buyerName && e.buyerName === t.buyerName)
     || entries[0] || null;

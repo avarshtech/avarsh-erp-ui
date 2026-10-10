@@ -144,6 +144,7 @@ const evaluateConditions = (db) => {
     .filter((p) => p.status === 'DRAFT')
     .forEach((p) => {
       const drifted = (p.sourceRefs || []).filter((ref) => {
+        // Only entries this browser has read: an unread entry is not a changed one
         const live = (db.packingEntries || []).find((e) => e.id === ref.packingEntryId);
         return live && live.version !== ref.packingEntryVersion;
       });

@@ -15,6 +15,7 @@ import { useStore } from '../../../context/StoreContext';
 import { getBuyers } from '../../../services/master/buyerService';
 import { getShipment, createShipment, updateShipment } from '../../../services/expdoc/expDocService';
 import { notifyValueOf } from './shipmentParties';
+import { savedTicksOf } from './shipmentPos';
 import useShipmentParties from './useShipmentParties';
 import ShipmentConsigneeSection from './ShipmentConsigneeSection';
 import ShipmentTransportSections from './ShipmentTransportSections';
@@ -33,6 +34,7 @@ const valuesOf = (shipment) => {
     ...shipment,
     notifyValue: notifyValueOf(shipment.notifyParty),
     orderIds: (shipment.orders || []).map((o) => o.orderId),
+    orderPos: savedTicksOf(shipment.orders),
   };
   DATE_FIELDS.forEach((f) => { values[f] = shipment[f] ? dayjs(shipment[f]) : null; });
   return values;
@@ -223,7 +225,9 @@ const ShipmentForm = () => {
           layout="vertical"
           disabled={!canEdit}
           onValuesChange={handleValuesChange}
-          initialValues={{ mode: 'SEA', incoterm: 'FOB', preCarriageBy: 'ROAD', containerNos: [], orderIds: [] }}
+          initialValues={{
+            mode: 'SEA', incoterm: 'FOB', preCarriageBy: 'ROAD', containerNos: [], orderIds: [], orderPos: {},
+          }}
         >
           <ShipmentConsigneeSection
             parties={parties}

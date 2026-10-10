@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { App, Button, Input, InputNumber, Select, Space, Table, Tooltip, Typography } from 'antd';
+import { poKey, poRefOf } from '../../../utils/expDocPoKeys';
 import { DeleteOutlined, CopyOutlined, PlusOutlined } from '@ant-design/icons';
 import { SectionAddButton } from '../../../components/buttons';
 import { numericInputProps, integerInputProps } from '../../../utils/inputHelpers';
@@ -41,8 +42,15 @@ const ReadCell = ({ value, dp, suffix }) => {
   return <Text type="secondary" style={{ whiteSpace: 'nowrap' }}>{shown}</Text>;
 };
 
+// New rows get ids from a counter, never the clock: two rows added in one millisecond would share one
+let tmpSeq = 0;
+const nextTmpId = () => { tmpSeq += 1; return `tmp-${tmpSeq}`; };
+
+/** "4500123 · Hamburg DC" — a buyer PO of the order, as the PO cell offers it. */
+const poOptionLabel = (p) => [p.buyerPoNo, p.destination].filter(Boolean).join(' · ');
+
 const blankGroup = (sectionKey, packingType, afterCarton) => ({
-  id: `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+  id: nextTmpId(),
   sectionKey,
   packingType,
   cartonFrom: afterCarton ? afterCarton + 1 : 1,
@@ -83,6 +91,8 @@ const CartonGroupEditor = ({
   issuesByRow = {},
   styleNo,
   buyerPoNo,
+  // The order's buyer POs: the PO cell picks one, and an order with one fills it in (owner, 2026-10-09)
+  poOptions = [],
   // §10.1: a template narrows which pack structures its buyer uses — VGT packs solid
   // and mixed only. Offering all five let a packer build a carton the buyer's layout
   // has no columns to print.
@@ -158,13 +168,20 @@ const CartonGroupEditor = ({
     [replaceRow, modal],
   );
 
+  // A new row starts on the order's only PO; with several, the packer picks one
+  const soloPo = poOptions.length === 1 ? poOptions[0] : null;
   const addRow = useCallback(() => {
     const lastCarton = groups.reduce((max, g) => Math.max(max, Number(g.cartonTo) || 0), 0);
     onChange([
       ...groups,
-      { ...blankGroup(sectionKey, PACKING_TYPE.SOLID, lastCarton), styleNo, buyerPoNo },
+      {
+        ...blankGroup(sectionKey, PACKING_TYPE.SOLID, lastCarton),
+        styleNo,
+        buyerPoNo: soloPo?.buyerPoNo ?? buyerPoNo,
+        destination: soloPo?.destination ?? null,
+      },
     ]);
-  }, [groups, onChange, sectionKey, styleNo, buyerPoNo]);
+  }, [groups, onChange, sectionKey, styleNo, buyerPoNo, soloPo]);
 
   const duplicateRow = useCallback(
     (row) => {
@@ -174,7 +191,7 @@ const CartonGroupEditor = ({
         ...groups,
         {
           ...row,
-          id: `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+          id: nextTmpId(),
           cartonFrom: lastCarton + 1,
           cartonTo: lastCarton + span,
         },
@@ -258,13 +275,28 @@ const CartonGroupEditor = ({
         )),
       },
       {
-        title: 'PO No.',
+        title: <Tooltip title="The buyer PO these cartons are packed for — the packing list takes each PO's cartons to its shipment">PO No.</Tooltip>,
         dataIndex: 'buyerPoNo',
-        width: 130,
-        render: (value, row) => (readOnly ? <ReadCell value={value} /> : (
-          <Input size="small" value={value ?? ''}
-            onChange={(e) => setCell(row.id, 'buyerPoNo', e.target.value)} />
-        )),
+        width: poOptions.length ? 220 : 130,
+        render: (value, row) => {
+          if (readOnly) return <ReadCell value={[value, poOptions.length > 1 ? row.destination : null].filter(Boolean).join(' · ') || null} />;
+          if (!poOptions.length) {
+            return <Input size="small" value={value ?? ''} name={`po-${row.id}`} onChange={(e) => setCell(row.id, 'buyerPoNo', e.target.value)} />;
+          }
+          const current = value ? poKey({ buyerPoNo: value, destination: row.destination }) : undefined;
+          const options = poOptions.map((p) => ({ value: poKey(p), label: poOptionLabel(p) }));
+          // A PO the order no longer has stays readable, marked, until the packer picks another
+          if (current && !options.some((o) => o.value === current)) {
+            options.push({ value: current, label: `${poOptionLabel({ buyerPoNo: value, destination: row.destination })} (not on the order)` });
+          }
+          return (
+            <Select
+              size="small" id={`po-${row.id}`} value={current} options={options} allowClear placeholder="Pick the PO"
+              status={poOptions.length > 1 && !value ? 'warning' : undefined} style={{ width: '100%' }}
+              onChange={(key) => replaceRow(row.id, key ? poRefOf(key) : { buyerPoNo: null, destination: null })}
+            />
+          );
+        },
       },
       {
         title: 'Colour',
@@ -411,7 +443,7 @@ const CartonGroupEditor = ({
     }
 
     return cols;
-  }, [sizes, readOnly, issuesByRow, packingTypeOptions, setCell, setSizeCell, setPackingType, duplicateRow, removeRow]);
+  }, [sizes, readOnly, issuesByRow, packingTypeOptions, setCell, setSizeCell, setPackingType, duplicateRow, removeRow, poOptions, replaceRow]);
 
   const expandable = useMemo(
     () => ({

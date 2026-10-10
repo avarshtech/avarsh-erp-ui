@@ -30,8 +30,8 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
     remarks: pl.remarks || undefined,
   }), [pl]);
 
-  // No reset effect: the parent keys this on the document's version, so any save —
-  // here, a refresh, a revision — remounts it with the stored values.
+  // Keyed on the document, not its version: an action elsewhere on the list (adding packing,
+  // renumbering) must not wipe an edit in progress here. A revision is a new document.
 
   // Lifted so the workspace's Exit can warn before discarding an edit. Reported on
   // mount too, which is what clears the flag after a save remounts this.
@@ -55,10 +55,12 @@ const PlHeaderEditor = ({ pl, saving, onSave, onDirtyChange }) => {
 
   const submit = async () => {
     const v = await form.validateFields();
-    await onSave({
+    const saved = await onSave({
       ...v,
       plDate: v.plDate ? v.plDate.format('YYYY-MM-DD') : null,
     });
+    // Saved: what is on screen is now the document's own
+    if (saved) setDirty(false);
   };
 
   return (

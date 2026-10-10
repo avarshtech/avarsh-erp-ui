@@ -14,7 +14,12 @@ const numeric = (v, dp = 0) =>
   (Number(v) || 0).toLocaleString('en-IN', { minimumFractionDigits: dp, maximumFractionDigits: dp });
 
 /** Column unit for the carton packing register. */
-export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate, canDelete }) => [
+/** The packing lists (this browser) holding an entry, as "PKL/26-27/1001 · PO 4500123". */
+const listText = (lists) => [...new Set(lists.map((l) => `${l.plNo}${l.buyerPoNo ? ` · PO ${l.buyerPoNo}` : ''}`))].join(', ');
+
+export const buildCartonPackingColumns = ({
+  onView, onEdit, onDelete, canUpdate, canDelete, listsOf = () => [],
+}) => [
   {
     title: 'Packing No',
     dataIndex: 'packingNo',
@@ -48,6 +53,12 @@ export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate,
     width: 150,
     ellipsis: true,
     render: (v) => nowrap(v),
+  },
+  {
+    title: 'Packing list',
+    key: 'packingLists',
+    width: 230,
+    render: (_, record) => nowrap(listText(listsOf(record)) || '—'),
   },
   {
     title: 'Pieces',
@@ -133,7 +144,7 @@ export const buildCartonPackingColumns = ({ onView, onEdit, onDelete, canUpdate,
         {canUpdate && <ActionButton action="edit" size="small" onClick={() => onEdit(record)} />}
         {canDelete && (
           <DeleteConfirm
-            title="Delete packing entry"
+            title={listsOf(record).length ? `Delete packing entry? It is on ${listText(listsOf(record))}` : 'Delete packing entry'}
             recordLabel={record.packingNo}
             onConfirm={() => onDelete(record)}
           >

@@ -12,7 +12,7 @@
  * VALUES that triggered the warning, and only applies while those values still hold.
  * Without that, an approved override silently survives the edit that made it wrong.
  *
- * Coverage: V-01…V-13, V-15 and V-16 are here. V-14 deliberately is NOT — it asks
+ * Coverage: V-01…V-13, V-15…V-21 are here. V-14 deliberately is NOT — it asks
  * whether a carton has changed since it was PRINTED, which is a fact about sticker
  * run history rather than about the document, so it is computed in
  * `expDocMockStickers.checkStickerGeneration` from the stored per-carton hashes.
@@ -22,6 +22,7 @@
  * aggregate rather than any one document.
  */
 import { SEVERITY, PHASE, PACKING_TYPE } from './expDocConstants';
+import { rowsByGroup, groupsCollide } from './expDocPlNumbering';
 import {
   cartonCount, piecesPerCarton, sizeQtyPerCarton, toRanges, findRangeOverlaps,
   findRangeGaps, intersectRanges, formatRanges, orderVsPacked, canonical, fnv1a,
@@ -63,6 +64,13 @@ export const acknowledgementApplies = (ack, item) =>
 
 const allRows = (pl) => (pl?.sections || []).flatMap((s) => s.rows || []);
 
+/**
+ * A list's rows by numbering group (expDocPlNumbering): under a restart rule every PO or
+ * style counts from 1, so carton numbers are unique only inside a group. Rows without a
+ * group — Carton Packing's own check of one entry — are one group.
+ */
+const byGroup = (pl) => [...rowsByGroup(allRows(pl)).entries()];
+
 const isBlank = (v) => v === null || v === undefined || v === '';
 
 /** Read a dotted path, treating a missing branch as blank rather than throwing. */
@@ -89,12 +97,16 @@ export const RULES = [
     // numbers, so an unbounded carton count stays affordable.
     evaluate: (ctx) => {
       const out = [];
-      const mine = toRanges(allRows(ctx.pl));
+      const mine = byGroup(ctx.pl);
       if (!mine.length) return out;
       (ctx.plsInShipment || [])
         .filter((other) => other.id !== ctx.pl?.id && !['CANCELLED', 'SUPERSEDED'].includes(other.status))
         .forEach((other) => {
-          const clash = intersectRanges(mine, toRanges(allRows(other)));
+          const theirs = byGroup(other);
+          // Two restarting groups (two POs, two styles) may both print carton 1; anything else may not
+          const clash = mine.flatMap(([g, rows]) => theirs
+            .filter(([h]) => groupsCollide(g === '_' ? 'list' : g, h === '_' ? 'list' : h))
+            .flatMap(([, others]) => intersectRanges(toRanges(rows), toRanges(others))));
           if (!clash.length) return;
           out.push(finding(
             'V-01',
@@ -113,7 +125,7 @@ export const RULES = [
     title: 'Carton range overlap',
     severity: SEVERITY.ERROR,
     phases: [PHASE.EDIT, PHASE.SAVE, PHASE.SUBMIT, PHASE.APPROVE],
-    evaluate: (ctx) => findRangeOverlaps(toRanges(allRows(ctx.pl))).map((hit) => finding(
+    evaluate: (ctx) => byGroup(ctx.pl).flatMap(([, rows]) => findRangeOverlaps(toRanges(rows))).map((hit) => finding(
       'V-02',
       SEVERITY.ERROR,
       'Carton range overlap',
@@ -129,7 +141,7 @@ export const RULES = [
     // Legitimate when cartons are dropped, so warn and list the gaps rather than block.
     phases: [PHASE.SUBMIT, PHASE.APPROVE, PHASE.STICKER],
     evaluate: (ctx) => {
-      const gaps = findRangeGaps(toRanges(allRows(ctx.pl)));
+      const gaps = byGroup(ctx.pl).flatMap(([, rows]) => findRangeGaps(toRanges(rows)));
       if (!gaps.length) return [];
       return [finding(
         'V-03',
@@ -141,6 +153,93 @@ export const RULES = [
         true,
       )];
     },
+  },
+  {
+    code: 'V-20',
+    title: 'Cartons of an order or PO no longer on the shipment',
+    severity: SEVERITY.ERROR,
+    phases: [PHASE.SAVE, PHASE.SUBMIT, PHASE.APPROVE],
+    // The shipment says which orders and POs travel (owner, 2026-10-09); a list must not
+    // print cartons it no longer carries. Dropped from the block in one click.
+    evaluate: (ctx) => (ctx.blocks || []).flatMap((block) => block.pos
+      .filter((po) => (po.rows.length || po.plan?.rows?.length) && !po.onShipment)
+      .map((po) => finding(
+        'V-20', SEVERITY.ERROR, 'Cartons of an order or PO no longer on the shipment',
+        block.onShipment
+          ? `PO ${po.buyerPoNo} of ${block.orderNo} is no longer on the shipment, yet ${po.rows.length ? `${po.totals.cartons} of its cartons are` : "the buyer's plan for it is"} on this list. Drop them, or tick the PO on the shipment again.`
+          : `${block.orderNo} is no longer on the shipment, yet ${block.totals.cartons ? `${block.totals.cartons} of its cartons are` : "the buyer's plan for it is"} on this list. Drop them, or add the order to the shipment again.`,
+        [{ type: 'BLOCK', id: `${block.orderId}|${po.key ?? ''}`, label: block.orderNo }],
+        { orderId: block.orderId, poKey: po.key ?? null },
+      ))),
+  },
+  {
+    code: 'V-21',
+    title: 'A shipment PO has no cartons on any packing list',
+    severity: SEVERITY.WARN,
+    phases: [PHASE.SUBMIT, PHASE.APPROVE],
+    // A PO forgotten on the documents is the classic export-docs slip. Acknowledged with a
+    // reason when it legitimately ships later or on another list of this shipment.
+    evaluate: (ctx) => (ctx.blocks || []).filter((block) => block.onShipment).flatMap((block) => block.pos
+      .filter((po) => po.onShipment && !po.rows.length && !(ctx.coveredPos || new Set()).has(`${block.orderId}|${po.key ?? ''}`))
+      .map((po) => finding(
+        'V-21', SEVERITY.WARN, 'A shipment PO has no cartons on any packing list',
+        po.key == null
+          ? `${block.orderNo} is on the shipment, but none of its cartons are on a packing list.`
+          : `PO ${po.buyerPoNo} of ${block.orderNo} is on the shipment, but none of its cartons are on a packing list.`,
+        [{ type: 'BLOCK', id: `${block.orderId}|${po.key ?? ''}`, label: block.orderNo }],
+        { orderId: block.orderId, poKey: po.key ?? null },
+        true,
+      ))),
+  },
+  {
+    code: 'V-17',
+    title: 'Planned cartons not packed',
+    severity: SEVERITY.ERROR,
+    phases: [PHASE.SUBMIT, PHASE.APPROVE],
+    // The buyer's plan says these ship; the list cannot be final without them. A short
+    // shipment marks them Not shipping (with a reason) instead of deleting the plan.
+    // A PO no longer on the shipment is V-20's: dropped, not packed
+    evaluate: (ctx) => (ctx.blocks || []).flatMap((block) => block.pos.filter((po) => po.onShipment).flatMap((po) => (po.plan?.rows || [])
+      .filter((r) => r.toPack.length)
+      .map((r) => finding(
+        'V-17', SEVERITY.ERROR, 'Planned cartons not packed',
+        `Cartons ${formatRanges(r.toPack)}${po.buyerPoNo ? ` of PO ${po.buyerPoNo}` : ''} (${block.orderNo}) are on the buyer's plan but not packed. Pack them, or mark them Not shipping.`,
+        [{ type: 'PLAN_ROW', id: r.plan.id, label: block.orderNo }],
+        { orderId: block.orderId, ranges: formatRanges(r.toPack) },
+      )))),
+  },
+  {
+    code: 'V-18',
+    title: 'Packed differently from the plan',
+    severity: SEVERITY.WARN,
+    phases: [PHASE.SAVE, PHASE.SUBMIT, PHASE.APPROVE],
+    evaluate: (ctx) => (ctx.blocks || []).flatMap((block) => block.pos.flatMap((po) => (po.plan?.rows || [])
+      .filter((r) => r.differs.length)
+      .map((r) => {
+        const ranges = formatRanges(r.differs.flatMap((d) => d.ranges));
+        const aspects = [...new Set(r.differs.flatMap((d) => d.aspects))].join(', ');
+        return finding(
+          'V-18', SEVERITY.WARN, 'Packed differently from the plan',
+          `Cartons ${ranges}${po.buyerPoNo ? ` of PO ${po.buyerPoNo}` : ''} differ from the buyer's plan: ${aspects}.`,
+          [{ type: 'PLAN_ROW', id: r.plan.id, label: block.orderNo }],
+          // Tied to the ranges and what differs: a reason stops applying when either changes
+          { orderId: block.orderId, ranges, aspects }, true,
+        );
+      }))),
+  },
+  {
+    code: 'V-19',
+    title: 'Packed outside the plan',
+    severity: SEVERITY.WARN,
+    phases: [PHASE.SAVE, PHASE.SUBMIT, PHASE.APPROVE],
+    evaluate: (ctx) => (ctx.blocks || []).flatMap((block) => block.pos
+      .filter((po) => po.plan?.extra?.length)
+      .map((po) => finding(
+        'V-19', SEVERITY.WARN, 'Packed outside the plan',
+        `Cartons ${formatRanges(po.plan.extra)}${po.buyerPoNo ? ` of PO ${po.buyerPoNo}` : ''} (${block.orderNo}) are packed but not on the buyer's plan.`,
+        [{ type: 'BLOCK', id: `${block.orderId}|${po.key ?? ''}`, label: block.orderNo }],
+        { orderId: block.orderId, ranges: formatRanges(po.plan.extra) }, true,
+      ))),
   },
   {
     code: 'V-06',

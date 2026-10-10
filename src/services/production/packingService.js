@@ -27,8 +27,9 @@ const toPayload = ({ groups = [], ...rest }) => ({
   }) => g),
 });
 
-export const searchPackingEntries = async (params = {}) => {
-  const page = await call(axiosInstance.get(`${BASE}/entries`, { params }));
+/** `config` for a caller that degrades on its own (the export-docs mirror): `silent`, `timeout`. */
+export const searchPackingEntries = async (params = {}, config = {}) => {
+  const page = await call(axiosInstance.get(`${BASE}/entries`, { params, ...config }));
   return { ...page, content: (page.content || []).map(decorateEntry) };
 };
 

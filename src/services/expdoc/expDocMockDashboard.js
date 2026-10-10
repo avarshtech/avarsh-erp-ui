@@ -58,7 +58,7 @@ const readinessRows = (db) => {
   return (db.shipments || [])
     .filter((s) => s.status !== 'CLOSED')
     .map((s) => {
-      // The buyer's seeded entries: none names a shipment since shipments moved to the API.
+      // The Carton Packing entries of its orders, as far as this browser has read them
       const entries = entriesOfShipment(db, s);
       const pls = (db.packingLists || []).filter(
         (p) => p.shipmentId === s.id && ![PL_STATUS.CANCELLED, PL_STATUS.SUPERSEDED].includes(p.status),
