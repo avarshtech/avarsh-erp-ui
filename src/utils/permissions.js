@@ -122,9 +122,9 @@ export const EXPORT_DOC_OPERATIONS = ['view', 'add', 'update', 'delete', 'revise
 // exception), `override` to print from a still-Draft PL.
 export const EXPORT_STICKER_OPERATIONS = ['view', 'print', 'reprint', 'override'];
 
-// `publish` moves a Draft template to Active and retires the previous Active — the
-// only act that can break the "exactly one Active per buyer/sub-client/doc-type"
-// invariant, so it is separated from ordinary draft editing.
+// `publish` moves a Draft template to Active and retires the template's previous
+// Active revision — the act that changes what new documents print, so it is
+// separated from ordinary draft editing.
 export const EXPORT_TEMPLATE_OPERATIONS = ['view', 'add', 'update', 'delete', 'publish'];
 
 // Dashboard only has view
@@ -409,7 +409,7 @@ export const SCREENS = [
   // verify = the Accounts Executive check; approve = the value-band approver.
   { id: 'inventory-bill-passing', name: 'Bill Passing', section: 'inventory', kind: 'screen',
     path: '/inventory/bill-passing',
-    routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id'],
+    routes: ['/inventory/bill-passing', '/inventory/bill-passing/:id', '/inventory/bill-passing/job-work/:id'],
     ops: BILL_PASSING_OPERATIONS },
   // `post` commits a batch to stock. It is checked by the screens
   // (OpeningStockBatchForm:54) but the old if-ladder never returned it, so the

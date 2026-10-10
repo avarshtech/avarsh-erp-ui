@@ -1,22 +1,24 @@
 /**
  * Export Documentation — the built-in standard layouts.
  *
- * What a packing list or invoice prints when its buyer has no template of its own
- * (PRD §15: offer the standard template rather than fail), and the starting point
- * for a new template. These are product defaults that ship with the renderer, not
+ * What a packing list, invoice or carton sticker prints when its buyer has no template
+ * of its own (PRD §15: offer the standard template rather than fail), and the starting
+ * point for a new template. These are product defaults that ship with the renderer, not
  * demo data — they change in the same commit as the renderer that draws them.
  *
- * Buyer templates live in the API (/export-docs/templates); carton-sticker templates
- * are still in the export-docs mock store.
+ * Buyer templates of every document type live in the API (/export-docs/templates).
  */
-import { DOC_TYPE, TEMPLATE_STATUS, LINE_GRAIN, PACKING_TYPE, SECTION_KEY } from './expDocConstants';
+import {
+  DOC_TYPE, TEMPLATE_STATUS, LINE_GRAIN, PACKING_TYPE, SECTION_KEY, PAPER, FACE_RENDER, STICKER_LINE_KIND,
+} from './expDocConstants';
 
-/** Where a template row came from; decides which service a write goes to. */
-export const TEMPLATE_SOURCE = { API: 'API', MOCK: 'MOCK', SYSTEM: 'SYSTEM' };
+/** Where a template row came from: the API, or a built-in standard layout. */
+export const TEMPLATE_SOURCE = { API: 'API', SYSTEM: 'SYSTEM' };
 
 export const SYSTEM_TEMPLATE_ID = {
   [DOC_TYPE.PACKING_LIST]: 'SYSTEM-PACKING_LIST',
   [DOC_TYPE.INVOICE]: 'SYSTEM-INVOICE',
+  [DOC_TYPE.STICKER]: 'SYSTEM-STICKER',
 };
 
 export const isSystemTemplateId = (id) => String(id ?? '').startsWith('SYSTEM-');
@@ -30,7 +32,7 @@ export const LAYOUT_KEYS = [
   'identity', 'headerFields', 'addressBlocks', 'textBlocks', 'columns', 'sizeSet',
   'packingTypesAllowed', 'sheets', 'invoiceHeader', 'invoiceColumns', 'invoiceLineGrain',
   'charges', 'igst', 'bankBlock', 'ediAccounts', 'declarations', 'annexeSheets', 'series',
-  'formatting', 'printWeights', 'printDimensions', 'mandatoryForSubmit', 'mandatoryForDocGen',
+  'stickerLayout', 'formatting', 'printWeights', 'printDimensions', 'mandatoryForSubmit', 'mandatoryForDocGen',
 ];
 
 export const STANDARD_PL_COLUMNS = [
@@ -76,12 +78,14 @@ const SYSTEM_ROW = {
   buyerId: null,
   buyerName: null,
   buyerCode: null,
-  subClientCode: null,
   version: 1,
   status: TEMPLATE_STATUS.ACTIVE,
   effectiveFrom: null,
   effectiveTo: null,
 };
+
+/** One line of the standard carton marking: a printed label and the field it shows. */
+const markLine = (key, label, binding, format = {}) => ({ key, kind: STICKER_LINE_KIND.FIELD, label, binding, ...format });
 
 export const SYSTEM_TEMPLATES = {
   [DOC_TYPE.PACKING_LIST]: {
@@ -159,6 +163,48 @@ export const SYSTEM_TEMPLATES = {
     printWeights: true,
     printDimensions: true,
     mandatoryForSubmit: ['invoice.consignee', 'invoice.incoterm', 'invoice.paymentTerms'],
+    mandatoryForDocGen: [],
+  },
+  [DOC_TYPE.STICKER]: {
+    ...SYSTEM_ROW,
+    id: SYSTEM_TEMPLATE_ID[DOC_TYPE.STICKER],
+    templateCode: 'STD-STICKER',
+    name: 'Standard export carton marking',
+    docType: DOC_TYPE.STICKER,
+    identity: { titleText: 'CARTON STICKER' },
+    stickerLayout: {
+      paperDefault: PAPER.A4_2UP,
+      faces: [
+        {
+          key: 'MAIN', title: 'MAIN MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null,
+          lines: [
+            markLine('buyer', null, 'buyer.name', { bold: true, fontPt: 16, align: 'CENTER' }),
+            markLine('po', 'PO NO', 'carton.buyerPoNo'),
+            markLine('style', 'STYLE NO', 'carton.styleNo'),
+            markLine('colour', 'COLOUR', 'carton.colorName'),
+            markLine('sizes', 'SIZE', 'carton.sizes', { join: ' / ' }),
+            markLine('quantity', 'QUANTITY', 'carton.pieces', { suffix: ' PCS' }),
+            markLine('cartonNo', 'CARTON NO', 'carton.cartonNo', { pattern: '{n} OF {N}' }),
+            markLine('port', 'PORT OF DESTINATION', 'carton.destination'),
+            markLine('madeIn', 'MADE IN', 'exporter.country'),
+          ],
+        },
+        {
+          key: 'SIDE', title: 'SIDE MARK', render: FACE_RENDER.LINES, border: true, caption: null, symbol: null,
+          lines: [
+            markLine('netWeight', 'NET WEIGHT', 'carton.netWeightKg', { decimals: 3, suffix: ' KGS' }),
+            markLine('grossWeight', 'GROSS WEIGHT', 'carton.grossWeightKg', { decimals: 3, suffix: ' KGS' }),
+            markLine('measurement', 'MEASUREMENT', 'carton.dimensions', { pattern: '{L} X {B} X {H} CMS' }),
+          ],
+        },
+      ],
+      // V-08 at print time: a carton missing one of these is named and not printed.
+      mandatoryFields: ['carton.netWeightKg', 'carton.grossWeightKg', 'carton.dimensions'],
+    },
+    formatting: { font: 'Arial' },
+    printWeights: true,
+    printDimensions: true,
+    mandatoryForSubmit: [],
     mandatoryForDocGen: [],
   },
 };

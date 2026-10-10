@@ -3,18 +3,21 @@
  *
  * Two jobs:
  *
- *  1. CHOICE. A buyer may keep several active packing-list and invoice templates
- *     (sea / air, one per end customer …). There is no default: a new document takes
- *     the buyer's only template, and when there are several the user picks one
- *     (`rankTemplateCandidates`). The chosen revision is recorded on the document with
- *     a snapshot of its layout, so re-rendering a year later reproduces the original —
- *     templates are immutable once active. Carton-sticker templates are still resolved
- *     automatically, by buyer + sub-client (`resolveTemplate`).
+ *  1. CHOICE. A buyer may keep several active packing-list, invoice and carton-sticker
+ *     templates (sea / air, solid / ratio pack …). There is no default, for stickers
+ *     either: a new document or sticker run takes the buyer's only template, and when
+ *     there are several the user picks one (`rankTemplateCandidates`; stickers once per
+ *     print run). The chosen revision is recorded on the document with a snapshot of
+ *     its layout, and on a sticker run by its id, so re-rendering a year later
+ *     reproduces the original — templates are immutable once active.
  *
  *  2. BINDINGS. Everything printed is either a binding drawn from this catalogue or
  *     a fixed literal, so an admin cannot invent a field that would force manual
- *     entry downstream (PRD §10.3). The AI reader of uploaded buyer documents is sent
- *     this catalogue too, so it can only propose fields that exist.
+ *     entry downstream (PRD §10.3). The one exception is a sticker line bound
+ *     `ask:<key>`: a per-order value (season, batch no.) asked once per print run,
+ *     printed on every label of that run and kept on the run — never per carton. The
+ *     AI reader of uploaded buyer documents is sent this catalogue too, so it can only
+ *     propose fields that exist.
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from './expDocConstants';
 import { round } from './expDocCalc';
@@ -40,22 +43,20 @@ export const FIELD_CATALOGUE = [
   { path: 'exporter.starExportHouse', label: 'Star export house', category: 'EXPORTER', type: 'string', sample: 'Two Star Export House' },
   { path: 'exporter.bankBlock', label: 'Exporter bank details', category: 'EXPORTER', type: 'block', sample: 'UCO Bank, IBB Branch\nA/C NO: 18100200002081' },
 
-  // Buyer and sub-client.
+  // Buyer — also the consignee.
   { path: 'buyer.name', label: 'Buyer name', category: 'BUYER', type: 'string', sample: 'JOMO BV' },
-  { path: 'buyer.subClient', label: 'Sub-client / end customer', category: 'BUYER', type: 'string', sample: 'AMG' },
 
   // Shipment — the entity this module supplies.
   { path: 'shipment.shipmentNo', label: 'Shipment number', category: 'SHIPMENT', type: 'string', sample: 'SHP/26-27/1001' },
+  { path: 'shipment.orderNos', label: 'Order number(s) on the shipment', category: 'SHIPMENT', type: 'list', sample: 'SG/26-27/1042, SG/26-27/1044' },
   { path: 'shipment.etd', label: 'ETD', category: 'SHIPMENT', type: 'date', sample: '2026-09-13' },
   { path: 'shipment.eta', label: 'ETA', category: 'SHIPMENT', type: 'date', sample: '2026-10-09' },
   { path: 'shipment.vesselFlightNo', label: 'Vessel / flight', category: 'SHIPMENT', type: 'string', sample: 'MAERSK CHENNAI V.214W' },
-  { path: 'shipment.portOfLoading', label: 'Port of loading', category: 'SHIPMENT', type: 'string', sample: 'Chennai Sea' },
-  { path: 'shipment.portOfDischarge', label: 'Port of discharge', category: 'SHIPMENT', type: 'string', sample: 'Rotterdam' },
+  { path: 'shipment.portOfLoading', label: 'Port of loading', category: 'SHIPMENT', type: 'string', sample: 'Chennai (INMAA1)' },
+  { path: 'shipment.portOfDischarge', label: 'Port of discharge', category: 'SHIPMENT', type: 'string', sample: 'Rotterdam (NLRTM)' },
   { path: 'shipment.finalDestination', label: 'Final destination', category: 'SHIPMENT', type: 'string', sample: 'Valkenswaard, Netherlands' },
   { path: 'shipment.containerNos', label: 'Container number(s)', category: 'SHIPMENT', type: 'list', sample: 'MSKU7712345' },
-  { path: 'shipment.sealNo', label: 'Seal number', category: 'SHIPMENT', type: 'string', sample: 'IN884213' },
   { path: 'shipment.incoterm', label: 'Incoterm', category: 'SHIPMENT', type: 'string', sample: 'FOB' },
-  { path: 'shipment.deliveryCentre', label: 'Delivery centre', category: 'SHIPMENT', type: 'string', sample: 'DM Karlsruhe' },
   { path: 'shipment.consignee.block', label: 'Consignee address block', category: 'SHIPMENT', type: 'block', sample: 'JOMO BV\nValkenswaard' },
   { path: 'shipment.notify.block', label: 'Notify party block', category: 'SHIPMENT', type: 'block', sample: 'ABN AMRO Bank N.V.' },
   { path: 'shipment.preCarriageBy', label: 'Pre-carriage by', category: 'SHIPMENT', type: 'string', sample: 'N.A.' },
@@ -66,14 +67,14 @@ export const FIELD_CATALOGUE = [
   { path: 'pl.plNo', label: 'Packing list number', category: 'PL', type: 'string', sample: 'PKL/26-27/1001' },
   { path: 'pl.plDate', label: 'Packing list date', category: 'PL', type: 'date', sample: '2026-09-01' },
   { path: 'pl.revision', label: 'Revision', category: 'PL', type: 'number', sample: 0 },
-  // §12.1 document-level fields. The four resolved ones fall back to the shipment when
-  // the document has not overridden them, so a template binds one path either way.
+  // §12.1 document-level fields. The resolved consignee is always the shipment's; the
+  // container no. falls back to the shipment's when the document has not overridden
+  // it, so a template binds one path either way. The seal no. is the document's own.
   { path: 'pl.descriptionOfGoods', label: 'Description of goods', category: 'PL', type: 'string', sample: "MEN'S KNITTED GARMENTS" },
   { path: 'pl.marksAndNos', label: 'Marks & numbers', category: 'PL', type: 'string', sample: '1-48' },
   { path: 'pl.orderNos', label: 'Order number(s)', category: 'PL', type: 'list', sample: 'SG/26-27/1042' },
   { path: 'pl.remarks', label: 'Document remarks', category: 'PL', type: 'string', sample: 'Loose cartons stowed aft' },
   { path: 'pl.resolved.consignee.block', label: 'Consignee (document)', category: 'PL', type: 'block', sample: 'JOMO BV, Valkenswaard' },
-  { path: 'pl.resolved.deliveryCentre', label: 'Delivery centre (document)', category: 'PL', type: 'string', sample: 'DM Karlsruhe' },
   { path: 'pl.resolved.containerNo', label: 'Container no. (document)', category: 'PL', type: 'string', sample: 'MSKU1234567' },
   { path: 'pl.resolved.sealNo', label: 'Seal no. (document)', category: 'PL', type: 'string', sample: 'SL-889210' },
   { path: 'pl.totals.cartons', label: 'Total cartons', category: 'PL', type: 'number', sample: 48 },
@@ -92,7 +93,6 @@ export const FIELD_CATALOGUE = [
   { path: 'row.cartonRange', label: 'Carton number range', category: 'ROW', type: 'string', sample: '1-47' },
   { path: 'row.cartonCount', label: 'Number of cartons', category: 'ROW', type: 'number', sample: 47 },
   { path: 'row.danNo', label: 'DAN number', category: 'ROW', type: 'string', sample: 'DAN-4471' },
-  { path: 'row.endCustomer', label: 'End customer', category: 'ROW', type: 'string', sample: 'Ten Hoor' },
   { path: 'row.packingCode', label: 'Packing code', category: 'ROW', type: 'string', sample: 'PC-12' },
   { path: 'row.buyerPoNo', label: 'Buyer PO number', category: 'ROW', type: 'string', sample: 'PO-884213' },
   { path: 'row.styleNo', label: 'Style (row)', category: 'ROW', type: 'string', sample: 'ST-2026-0441' },
@@ -112,7 +112,6 @@ export const FIELD_CATALOGUE = [
   { path: 'carton.pieces', label: 'Pieces in the carton', category: 'CARTON', type: 'number', sample: 60 },
   { path: 'carton.colorName', label: 'Carton colour', category: 'CARTON', type: 'string', sample: 'Navy' },
   { path: 'carton.danNo', label: 'Carton DAN number', category: 'CARTON', type: 'string', sample: 'DAN-4471' },
-  { path: 'carton.endCustomer', label: 'Carton end customer', category: 'CARTON', type: 'string', sample: 'Ten Hoor' },
   { path: 'carton.buyerPoNo', label: 'Carton PO number', category: 'CARTON', type: 'string', sample: 'PO-884213' },
   { path: 'carton.styleNo', label: 'Carton style', category: 'CARTON', type: 'string', sample: 'ST-2026-0441' },
   { path: 'carton.netWeightKg', label: 'Carton net weight', category: 'CARTON', type: 'number', decimals: 3, sample: 12.48 },
@@ -123,6 +122,10 @@ export const FIELD_CATALOGUE = [
   { path: 'carton.destination', label: 'Port of destination', category: 'CARTON', type: 'string', sample: 'Rotterdam' },
   { path: 'carton.cbm', label: 'Carton CBM', category: 'CARTON', type: 'number', decimals: 3, sample: 0.084 },
   { path: 'carton.eanBySize', label: 'EAN by size', category: 'CARTON', type: 'map', sample: '{ M: 8712345678901 }' },
+  { path: 'carton.sizes', label: 'Sizes in the carton, as a list', category: 'CARTON', type: 'list', sample: '4 / 8' },
+  { path: 'carton.piecesSum', label: 'Pieces per size, added up', category: 'CARTON', type: 'string', sample: '30+35=65' },
+  { path: 'carton.sizeQty', label: 'Quantity per size', category: 'CARTON', type: 'map', sample: '{ 4: 30, 8: 35 }' },
+  { path: 'carton.season', label: 'Season', category: 'CARTON', type: 'string', sample: '2026-WINTER' },
 
   // Computed — never enterable.
   { path: 'calc.piecesPerCarton', label: 'Pieces per carton', category: 'CALC', type: 'number', sample: 60 },
@@ -162,7 +165,7 @@ export const FIELD_CATALOGUE = [
   { path: 'invoice.consignee.block', label: 'Consignee address block', category: 'INVOICE', type: 'block', sample: 'JOMO BV, Handelsweg 24, 5555 XT Valkenswaard' },
   { path: 'invoice.notify.block', label: 'Notify party block', category: 'INVOICE', type: 'block', sample: 'ABN AMRO Bank N.V., Amsterdam' },
   { path: 'invoice.incoterm', label: 'Incoterm', category: 'INVOICE', type: 'string', sample: 'FOB' },
-  { path: 'invoice.incotermPlace', label: 'Incoterm named place', category: 'INVOICE', type: 'string', sample: 'Chennai Sea' },
+  { path: 'invoice.incotermPlace', label: 'Incoterm named place', category: 'INVOICE', type: 'string', sample: 'Chennai' },
   { path: 'invoice.paymentTerms', label: 'Payment terms', category: 'INVOICE', type: 'string', sample: 'TT 60 DAYS FROM BL DATE' },
   { path: 'invoice.currency', label: 'Currency', category: 'INVOICE', type: 'string', sample: 'EUR' },
   { path: 'invoice.fxRate', label: 'Exchange rate', category: 'INVOICE', type: 'number', decimals: 4, sample: 94.25 },
@@ -212,47 +215,60 @@ const CATALOGUE_BY_PATH = FIELD_CATALOGUE.reduce((acc, f) => {
 
 export const getFieldMeta = (path) => CATALOGUE_BY_PATH[path] || null;
 
-export const isBindable = (path) =>
-  Boolean(CATALOGUE_BY_PATH[path]) || String(path || '').startsWith('fixed:');
+/** A per-run question's key: `ask:batchNo`, `ask:customerOrderNo`. */
+const ASK_KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
 
-// ─── Resolution ─────────────────────────────────────────────────────────────────
-
-const active = (tpl, onDate) => {
-  if (tpl.status !== TEMPLATE_STATUS.ACTIVE) return false;
-  if (tpl.effectiveFrom && onDate && tpl.effectiveFrom > onDate) return false;
-  if (tpl.effectiveTo && onDate && tpl.effectiveTo < onDate) return false;
-  return true;
+export const isBindable = (path) => {
+  const raw = String(path || '');
+  if (raw.startsWith('ask:')) return ASK_KEY.test(raw.slice(4));
+  return Boolean(CATALOGUE_BY_PATH[raw]) || raw.startsWith('fixed:');
 };
+
+/** Whether a binding is a value asked once per print run (`ask:<key>`). */
+export const isAskBinding = (binding) => typeof binding === 'string' && binding.startsWith('ask:');
 
 /**
- * Resolve the template for a document.
- *
- * Specificity order, most specific first:
- *   buyer + sub-client  >  buyer  >  generic
- * so a JOMO order for end-customer AMG picks the AMG template over JOMO's own,
- * and a buyer with no template at all still gets the standard export set rather
- * than failing (PRD §15: offer the standard template and notify the admin).
+ * The key a per-run answer is kept under, made from its line's label so it fits ASK_KEY:
+ * the label's words in camelCase ("CUSTOMER ORDER NO." → customerOrderNo; "#" reads as
+ * "No", so "BATCH #" → batchNo), "q" before a leading digit, at most 40 characters, and
+ * unique among `taken` — a second "ORDER #" becomes orderNo2, so two questions never share
+ * one answer. A line with no label asks "headline".
  */
-export const resolveTemplate = (templates, { buyerCode, subClientCode, docType, onDate } = {}) => {
-  const candidates = (templates || []).filter((t) => t.docType === docType && active(t, onDate));
-  if (!candidates.length) return { template: null, matchedOn: 'NONE', isFallback: true };
-
-  const bySpecificity = [
-    { level: 'BUYER_SUBCLIENT', test: (t) => buyerCode && subClientCode && t.buyerCode === buyerCode && t.subClientCode === subClientCode },
-    { level: 'BUYER', test: (t) => buyerCode && t.buyerCode === buyerCode && !t.subClientCode },
-    { level: 'GENERIC', test: (t) => !t.buyerCode },
-  ];
-
-  for (const tier of bySpecificity) {
-    const hits = candidates.filter(tier.test);
-    if (!hits.length) continue;
-    // Newest active version wins if a tenant has somehow published two.
-    const template = hits.sort((a, b) => (b.version || 0) - (a.version || 0))[0];
-    return { template, matchedOn: tier.level, isFallback: tier.level === 'GENERIC' && Boolean(buyerCode) };
-  }
-
-  return { template: null, matchedOn: 'NONE', isFallback: true };
+export const askKeyFor = (label, taken = []) => {
+  const words = String(label ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss')
+    .replace(/#/g, ' No ')
+    .split(/[^A-Za-z0-9]+/)
+    .filter(Boolean);
+  const camel = words.map((w, i) => (i === 0 ? w.toLowerCase() : `${w[0].toUpperCase()}${w.slice(1).toLowerCase()}`)).join('');
+  const base = (/^[0-9]/.test(camel) ? `q${camel}` : camel || 'headline').slice(0, 40);
+  const used = new Set(taken);
+  let key = base;
+  for (let n = 2; used.has(key); n += 1) key = `${base.slice(0, 40 - String(n).length)}${n}`;
+  return key;
 };
+
+/** The `ask:` keys of every line of a sticker layout's faces but one (that line's face and position). */
+export const askKeysExcept = (faces, faceIndex, lineIndex) => (faces || []).flatMap((face, fi) => (face?.lines || [])
+  .filter((_, li) => fi !== faceIndex || li !== lineIndex)
+  .map((line) => line?.binding)
+  .filter(isAskBinding)
+  .map((binding) => binding.slice('ask:'.length)));
+
+/**
+ * What a sticker layout asks once per print run: one question per distinct `ask:` key, in
+ * layout order, labelled by the first line that asks it (else by its key). Two lines
+ * bound to one key print one answer, so they are one question.
+ */
+export const stickerAskQuestions = (stickerLayout) => {
+  const questions = new Map();
+  (stickerLayout?.faces || []).forEach((face) => (face?.lines || []).forEach((line) => {
+    const key = isAskBinding(line?.binding) ? line.binding.slice('ask:'.length) : '';
+    if (key && !questions.has(key)) questions.set(key, { key, label: String(line.label ?? '').trim() || key });
+  }));
+  return [...questions.values()];
+};
+
+// ─── Resolution ─────────────────────────────────────────────────────────────────
 
 /**
  * A buyer name as the template matcher compares it: accents, case, punctuation and
@@ -269,8 +285,8 @@ export const normBuyerName = (name) => String(name || '')
 
 /**
  * Does a template belong to this buyer? By buyer id when both sides have one; by
- * name otherwise, because packing lists and invoices are still mock documents that
- * carry the buyer's NAME, while templates are keyed on the real buyer master.
+ * name otherwise, because packing lists, invoices and sticker runs are still mock
+ * records that carry the buyer's NAME, while templates are keyed on the real buyer master.
  */
 export const templateMatchesBuyer = (template, { buyerId, buyerName } = {}) => {
   if (template.buyerId != null && buyerId != null) return Number(template.buyerId) === Number(buyerId);
@@ -279,24 +295,23 @@ export const templateMatchesBuyer = (template, { buyerId, buyerName } = {}) => {
 };
 
 /**
- * The templates a new packing list or invoice may use, in the order they are offered.
+ * The templates a new packing list, invoice or sticker run may use, in the order they
+ * are offered.
  *
- *   1. the buyer's own active templates — those for the document's sub-client first;
+ *   1. the buyer's own active templates, by name;
  *   2. tenant-wide templates (no buyer);
  *   3. the built-in standard layout.
  *
  * There is no default: `autoSelectId` is set only when the first tier that has any
  * template has exactly one. With two or more the user must choose.
  */
-export const rankTemplateCandidates = (templates, { buyerId, buyerName, subClientCode, docType } = {}) => {
+export const rankTemplateCandidates = (templates, { buyerId, buyerName, docType } = {}) => {
   const active = (templates || []).filter((t) => t.docType === docType
     && t.status === TEMPLATE_STATUS.ACTIVE && !t.isSystem);
-  const sub = String(subClientCode || '').trim().toUpperCase();
   const own = active
     .filter((t) => (t.buyerId != null || t.buyerName) && templateMatchesBuyer(t, { buyerId, buyerName }))
-    .map((t) => ({ ...t, tier: 'BUYER', matchesSubClient: Boolean(sub) && String(t.subClientCode || '').toUpperCase() === sub }))
-    .sort((a, b) => Number(b.matchesSubClient) - Number(a.matchesSubClient)
-      || String(a.name).localeCompare(String(b.name)));
+    .map((t) => ({ ...t, tier: 'BUYER' }))
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)));
   const generic = active
     .filter((t) => t.buyerId == null && !t.buyerName)
     .map((t) => ({ ...t, tier: 'GENERIC' }));
@@ -311,9 +326,22 @@ export const rankTemplateCandidates = (templates, { buyerId, buyerName, subClien
 };
 
 /**
+ * The sticker template a print run uses, from `rankTemplateCandidates`: the one picked —
+ * or, when the picked revision was superseded while the page was open, its own family's
+ * revision in force (`pickedCode`), never another family's — else the current revision of
+ * the family the packing list last printed with, else the automatic choice. Null: pick one.
+ */
+export const stickerTemplateChoice = ({ candidates, autoSelectId }, { templateId, pickedCode, latestTemplateCode } = {}) => {
+  const byCode = (code) => (code ? candidates.find((c) => c.templateCode === code) : null);
+  const picked = templateId == null ? null
+    : candidates.find((c) => String(c.id) === String(templateId)) ?? byCode(pickedCode);
+  return (picked ?? byCode(latestTemplateCode))?.id ?? autoSelectId ?? null;
+};
+
+/**
  * Every bound element of a template, wherever it lives in the layout: header fields,
  * address blocks, the grid, each sheet's own columns, the invoice's columns and header
- * boxes, and sticker faces. `label` is what the builder names it by.
+ * boxes, and the lines of every sticker face. `label` is what the builder names it by.
  */
 export const templateBindings = (t = {}) => {
   const out = [];
@@ -325,10 +353,11 @@ export const templateBindings = (t = {}) => {
   (t.sheets || []).forEach((s) => columns(s.columns));
   columns(t.invoiceColumns);
   Object.values(t.invoiceHeader?.boxes || {}).forEach((b) => { if (b?.binding) add(b.label, b.binding); });
-  (t.stickerLayout?.faces || []).forEach((face) => {
-    (face.lines || []).forEach((l) => add(l.label, l.binding, false));
-    if (face.barcode?.binding) add('Barcode', face.barcode.binding, false);
-  });
+  // A sticker line of any kind — a field, a size grid, a barcode — is bound by its own
+  // binding; `ask:` and `fixed:` count as bound. A labelled line with no binding is left
+  // blank for hand-writing on purpose (§3), so it never counts as unbound; a binding the
+  // catalogue does not know is still reported.
+  (t.stickerLayout?.faces || []).forEach((face) => (face.lines || []).forEach((l) => add(l.label, l.binding, false)));
   return out;
 };
 
@@ -342,28 +371,25 @@ export const unboundLabelsOf = (t) => templateBindings(t)
   .filter((e) => e.bindable && e.label && !e.binding)
   .map((e) => e.label);
 
-/** The catalogue as the AI reader of uploaded documents is sent it (no sticker-only fields). */
-export const catalogueForReader = () => FIELD_CATALOGUE
-  .filter((f) => f.category !== 'CARTON')
-  .map(({ path, label, category }) => ({ path, label, category }));
+/**
+ * What a carton sticker may print: the carton, its style, and the document's own fields.
+ * The AI reader is sent these, and the sticker editor's field picker offers the same.
+ */
+export const STICKER_READER_CATEGORIES = ['CARTON', 'STYLE', 'PL', 'SHIPMENT', 'BUYER', 'EXPORTER'];
+
+/** Fields of those categories a carton sticker never prints: no exporter logo on a carton (owner, 2026-10-09). */
+export const STICKER_HIDDEN_FIELDS = ['exporter.logoUrl'];
 
 /**
- * Sticker templates that break "exactly one Active per buyer / sub-client / doc type"
- * — the rule stickers still resolve by. Surfaced on the template register rather than
- * discovered at render time. Packing-list and invoice templates may have several.
+ * The catalogue as the AI reader of uploaded documents is sent it. Packing lists and
+ * invoices (the default) never see the sticker-only CARTON fields; a sticker sees the
+ * fields a carton mark can print.
  */
-export const findActiveConflicts = (templates) => {
-  const seen = new Map();
-  (templates || [])
-    .filter((t) => t.status === TEMPLATE_STATUS.ACTIVE)
-    .forEach((t) => {
-      const key = `${t.buyerCode || '*'}|${t.subClientCode || '*'}|${t.docType}`;
-      seen.set(key, [...(seen.get(key) || []), t]);
-    });
-  return [...seen.entries()]
-    .filter(([, list]) => list.length > 1)
-    .map(([key, list]) => ({ key, templates: list }));
-};
+export const catalogueForReader = (kind) => FIELD_CATALOGUE
+  .filter((f) => (kind === DOC_TYPE.STICKER
+    ? STICKER_READER_CATEGORIES.includes(f.category) && !STICKER_HIDDEN_FIELDS.includes(f.path)
+    : f.category !== 'CARTON'))
+  .map(({ path, label, category }) => ({ path, label, category }));
 
 // ─── Binding resolution ─────────────────────────────────────────────────────────
 
@@ -375,6 +401,7 @@ const readPath = (source, path) =>
  *
  * `fixed:` literals pass through verbatim — that is how a template carries text the
  * ERP has no field for (a licence number, a regulatory line) without inventing one.
+ * `ask:<key>` is the value given for this print run (`ctx.ask`), null until answered.
  * Unknown paths return null rather than throwing: a document must still render when
  * a template references something the current data does not carry.
  */
@@ -382,6 +409,12 @@ export const resolveBinding = (path, ctx, options = {}) => {
   if (path == null) return null;
   const raw = String(path);
   if (raw.startsWith('fixed:')) return raw.slice(6);
+  if (raw.startsWith('ask:')) {
+    // Own answers only: a key such as "constructor" must not read Object.prototype.
+    const answers = ctx?.ask;
+    const key = raw.slice(4);
+    return answers && Object.hasOwn(answers, key) ? answers[key] ?? null : null;
+  }
 
   const value = readPath(ctx, raw);
   if (value === undefined) return null;

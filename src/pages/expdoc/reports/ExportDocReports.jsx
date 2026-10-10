@@ -42,7 +42,8 @@ const ExportDocReports = () => {
   useEffect(() => { pagRef.current = pagination; }, [pagination]);
 
   useEffect(() => {
-    listShipmentOptions().then((s) => {
+    // Every shipment, closed ones too: reports look back at released documents
+    listShipmentOptions({ includeClosed: true }).then((s) => {
       setShipments(s);
       // The carton list needs a shipment to mean anything, so it opens on one.
       setShipmentId((cur) => cur ?? s[0]?.value);

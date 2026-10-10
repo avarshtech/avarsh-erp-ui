@@ -2,24 +2,15 @@
  * Master-data lookups for the Export Documentation mock.
  *
  * Everything here is a data gap the API phase owes (see the plan's data-gap
- * ledger): ports, incoterms, garment HS codes, buyer commercial profiles,
- * sub-clients and a date-addressable FX master do not exist in the ERP today.
- * The one exception is the FX rate for TODAY, which has a real endpoint.
+ * ledger): garment HS codes, buyer commercial profiles and a date-addressable FX
+ * master do not exist in the ERP today. Ports and incoterms are fixed lists in
+ * utils/expDocConstants.js. The one exception is the FX rate for TODAY, which has a
+ * real endpoint.
  */
 import { loadDb } from './expDocMockStore';
 import { delay, clone, todayStr } from './expDocMockCommon';
 import { DEFAULT_BUYER_COMMERCIAL } from './expDocMockData';
 import { getTodaysRate } from '../costing/costingService';
-
-export const listPorts = async () => {
-  await delay(60);
-  return clone(loadDb().masters.ports);
-};
-
-export const listIncoterms = async () => {
-  await delay(60);
-  return clone(loadDb().masters.incoterms);
-};
 
 export const listHsCodes = async () => {
   await delay(60);
@@ -50,14 +41,8 @@ export const getBuyerCommercial = (buyer) => {
   return clone(hit || DEFAULT_BUYER_COMMERCIAL);
 };
 
-export const listSubClients = (buyer) => getBuyerCommercial(buyer).subClients || [];
-
 export const getTolerancePercent = (buyer) =>
   Number(getBuyerCommercial(buyer).tolerancePercent) || 0;
-
-export const listConsigneeProfiles = (buyer) => getBuyerCommercial(buyer).consigneeProfiles || [];
-
-export const listNotifyProfiles = (buyer) => getBuyerCommercial(buyer).notifyProfiles || [];
 
 export const getExporterProfileExtra = () => clone(loadDb().masters.exporterProfileExtra);
 

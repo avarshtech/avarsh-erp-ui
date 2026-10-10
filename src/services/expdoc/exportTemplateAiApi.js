@@ -5,9 +5,9 @@ import { catalogueForReader } from '../../utils/expDocTemplateSchema';
 const AI_TIMEOUT_MS = 180000;
 
 /**
- * POST /export-docs/templates/extract — a buyer's packing list / invoice (PDF or Excel)
- * read into template drafts for review (ExtractionResultDTO). Nothing is saved. The
- * field catalogue travels with the file, so the screens stay its single owner. Silent:
+ * POST /export-docs/templates/extract — a buyer's packing list, invoice or carton sticker
+ * read into template drafts for review (ExtractionResultDTO). Nothing is saved. Both
+ * field catalogues travel with the file, so the screens stay their single owner. Silent:
  * the upload dialog shows the error where it happened.
  */
 export const extractTemplate = async (file, { buyerId, docTypeHint, signal } = {}) => {
@@ -16,6 +16,7 @@ export const extractTemplate = async (file, { buyerId, docTypeHint, signal } = {
   if (buyerId) form.append('buyerId', buyerId);
   form.append('docTypeHint', docTypeHint || 'AUTO');
   form.append('catalogue', JSON.stringify(catalogueForReader()));
+  form.append('stickerCatalogue', JSON.stringify(catalogueForReader('STICKER')));
   const { data } = await axiosInstance.post('/export-docs/templates/extract', form, {
     headers: { 'Content-Type': 'multipart/form-data' }, timeout: AI_TIMEOUT_MS, silent: true, signal,
   });
@@ -32,7 +33,7 @@ export const templateAiErrorMessage = (err) => {
 export const isAiNotConfigured = (err) => err?.response?.status === 503;
 
 /**
- * 422: the file was checked and refused — it is not a packing list or an invoice, or
- * not the type the user chose. The message says what it is instead.
+ * 422: the file was checked and refused — it is not a packing list, an invoice or a
+ * carton sticker, or not the type the user chose. The message says what it is instead.
  */
 export const isNotATemplateDocument = (err) => err?.response?.status === 422;

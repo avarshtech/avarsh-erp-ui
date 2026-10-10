@@ -11,8 +11,9 @@ import { ActionButton } from '../../../../components/buttons';
 import useUnsavedChanges from '../../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../../utils/permissions';
 import { DOC_TYPE_LABELS, EXPDOC_MODULE } from '../../../../utils/expDocConstants';
+import { plural } from '../../../../utils/plural';
 import {
-  saveUploadedTemplates, publishTemplate, listStickerBuyers,
+  saveUploadedTemplates, publishTemplate,
 } from '../../../../services/expdoc/expDocService';
 import useExporterBlock from '../../shared/useExporterBlock';
 import TemplateEditor from '../editor/TemplateEditor';
@@ -34,8 +35,6 @@ import {
 const { Text } = Typography;
 const LIST_PATH = '/export-docs/templates/list';
 const GLOBAL_ALERT = { ERROR: 'error', WARN: 'warning' };
-
-const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 /** The layout editor's two views: beside the live print preview (the default), or alone. */
 const EDITOR_VIEW = { SPLIT: 'split', EDITOR: 'editor' };
@@ -68,7 +67,6 @@ const TemplateImportReview = () => {
   const [editorView, setEditorView] = useState(EDITOR_VIEW.SPLIT);
   const [saving, setSaving] = useState(null);
   const { buyers } = useExportBuyers();
-  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
   const exporter = useExporterBlock();
   const canPublish = hasPermission(EXPDOC_MODULE.TEMPLATES, 'publish');
   const { clearDirty } = useUnsavedChanges(Boolean(result));
@@ -184,7 +182,7 @@ const TemplateImportReview = () => {
         <Alert key={`${f.code}-${f.message}`} type={GLOBAL_ALERT[f.severity]} showIcon style={{ marginBottom: 12 }} title={f.message} />
       ))}
       <Text style={{ display: 'block', marginBottom: 12 }}>
-        {`We found ${count(docs.length, 'document', 'documents')} in ${fileName}. Check each one, then save — nothing is saved until you do.`}
+        {`We found ${plural(docs.length, 'document', 'documents')} in ${fileName}. Check each one, then save — nothing is saved until you do.`}
       </Text>
       {infos.length > 0 && (
         <Alert
@@ -272,7 +270,6 @@ const TemplateImportReview = () => {
                 meta={active.meta}
                 onEvidence={showInFile}
                 buyers={buyers}
-                stickerBuyers={stickerBuyers}
                 defaultTab={editor.tab || undefined}
               />
             </Col>

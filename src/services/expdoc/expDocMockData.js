@@ -20,15 +20,18 @@ import {
   PACKING_TYPE,
   SECTION_KEY,
   PACKING_ENTRY_STATUS,
-  TEMPLATE_STATUS,
-  DOC_TYPE,
-  FACE_RENDER,
-  PAPER,
   LINE_GRAIN,
   DEFAULT_TENANT_CONFIG,
 } from '../../utils/expDocConstants';
 
-export const SEED_VERSION = 11;
+// 12 (2026-10-08): shipments take the consignee from the buyer master and carry
+// their orders; sub-client, end customer, seal, pallets and delivery centre removed.
+// 13 (2026-10-08): carton-sticker templates moved to the API, so the STK-n seeds are
+// gone (a stored run naming one would be looked up there); JOMO rows carry EANs for
+// some sizes, and every packing entry a season.
+// 14 (2026-10-08): shipments moved to the API. The seeded shipments, ports and
+// incoterms are gone, and packing entries bind to a shipment of their buyer.
+export const SEED_VERSION = 14;
 
 const FY = fiscalYearLabel();
 const d = (offsetDays) => dayjs().add(offsetDays, 'day').format('YYYY-MM-DD');
@@ -40,21 +43,7 @@ const KIDS_EU_SIZES = ['74', '80', '86', '92', '98', '104', '110', '116', '122',
 const BABY_SIZES = ['50/56', '62/68', '74/80', '86/92'];
 
 // ─── Masters ────────────────────────────────────────────────────────────────────
-
-const SEED_PORTS = [
-  { code: 'INMAA1', name: 'Chennai Sea', country: 'India', type: 'SEA' },
-  { code: 'INTUT1', name: 'Tuticorin Sea', country: 'India', type: 'SEA' },
-  { code: 'INMAA4', name: 'Chennai Air', country: 'India', type: 'AIR' },
-  { code: 'NLRTM', name: 'Rotterdam', country: 'Netherlands', type: 'SEA' },
-  { code: 'BEANR', name: 'Antwerp', country: 'Belgium', type: 'SEA' },
-  { code: 'DEHAM', name: 'Hamburg', country: 'Germany', type: 'SEA' },
-  { code: 'USNYC', name: 'New York', country: 'USA', type: 'SEA' },
-];
-
-// Incoterms 2020 — a fixed constant list, not a maintainable master.
-const SEED_INCOTERMS = [
-  'EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP',
-];
+// Incoterms are a fixed list in utils/expDocConstants.js; ports are the API's port catalogue.
 
 // Garment HS codes with their IGST rate. The rate is fiscal rather than stylistic,
 // which is why it lives on the code and not on the style.
@@ -73,8 +62,10 @@ const SEED_HS_CODES = [
  * buyer master supplies ids we cannot know at seed time. Lookup falls back to a
  * neutral default so an unseeded buyer still produces a usable document.
  *
- * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms,
- * tolerance and consignee/notify profiles do not exist on mst_buyers today.
+ * Everything here is a MOCK-ONLY data gap: currency, incoterm, payment terms and
+ * tolerance do not exist on mst_buyers today. The consignee and notify party are
+ * NOT here — a shipment takes them from the real buyer master (the buyer, its
+ * shipping locations and its bank).
  */
 const SEED_BUYER_COMMERCIAL = [
   {
@@ -85,44 +76,6 @@ const SEED_BUYER_COMMERCIAL = [
     paymentTerms: 'TT 60 DAYS FROM BL DATE',
     tolerancePercent: 2,
     allowMultiInvoicePerPl: false,
-    // The sub-client concept exists nowhere in the ERP — this is the whole of it.
-    subClients: [
-      { code: 'AMG', name: 'AMG Retail BV' },
-      { code: 'PP', name: 'PP Fashion' },
-      { code: 'DM', name: 'DM Drogerie Markt' },
-      { code: 'CHARLIE_GRS', name: 'Charlie GRS' },
-    ],
-    consigneeProfiles: [
-      {
-        id: 'jomo-nl',
-        name: 'JOMO BV',
-        addressLines: ['Handelsweg 24'],
-        city: 'Valkenswaard', state: '', country: 'Netherlands', postalCode: '5555 XT',
-        taxId: 'NL812345678B01',
-      },
-      {
-        id: 'dm-karlsruhe',
-        name: 'DM Verteilzentrum Karlsruhe',
-        addressLines: ['Am Dm-Platz 1'],
-        city: 'Karlsruhe', state: 'Baden-Wurttemberg', country: 'Germany', postalCode: '76227',
-        taxId: 'DE143585121',
-      },
-      {
-        id: 'dm-bor',
-        name: 'DM Online-VZ Bor',
-        addressLines: ['Prumyslova 1', 'CTPark Bor'],
-        city: 'Bor', state: '', country: 'Czech Republic', postalCode: '34802',
-        taxId: 'CZ26482941',
-      },
-    ],
-    notifyProfiles: [
-      {
-        id: 'jomo-bank',
-        name: 'ABN AMRO Bank N.V.',
-        addressLines: ['Gustav Mahlerlaan 10'],
-        city: 'Amsterdam', state: '', country: 'Netherlands', postalCode: '1082 PP', taxId: null,
-      },
-    ],
   },
   {
     buyerCode: 'VGT',
@@ -132,17 +85,6 @@ const SEED_BUYER_COMMERCIAL = [
     paymentTerms: 'TT 45 DAYS',
     tolerancePercent: 0,
     allowMultiInvoicePerPl: false,
-    subClients: [],
-    consigneeProfiles: [
-      {
-        id: 'vgt-nl',
-        name: 'Van Gennip Textiles BV',
-        addressLines: ['Nijverheidsweg 12'],
-        city: 'Uden', state: '', country: 'Netherlands', postalCode: '5405 NL',
-        taxId: 'NL009876543B01',
-      },
-    ],
-    notifyProfiles: [],
   },
   {
     buyerCode: 'PRENATAL',
@@ -153,27 +95,14 @@ const SEED_BUYER_COMMERCIAL = [
     tolerancePercent: 0,
     allowMultiInvoicePerPl: false,
     discountPercent: 3, // the Prénatal 3% discount line (PRD §8.4)
-    subClients: [],
-    // D/A terms put the BANK on the invoice as consignee, not the buyer (PRD §8.2).
-    consigneeProfiles: [
-      {
-        id: 'prenatal-bank',
-        name: 'Deutsche Bank AG',
-        addressLines: ['Taunusanlage 12'],
-        city: 'Frankfurt am Main', state: '', country: 'Germany', postalCode: '60325',
-        taxId: null,
-      },
-      {
-        id: 'prenatal-nl',
-        name: 'Prénatal Moeder en Kind BV',
-        addressLines: ['Sterrenbergweg 6'],
-        city: 'Amersfoort', state: '', country: 'Netherlands', postalCode: '3821 AT',
-        taxId: 'NL004455667B01',
-      },
-    ],
-    notifyProfiles: [],
   },
 ];
+
+/** The demo buyer code a real buyer's name maps to, or null; the profiles are keyed by both. */
+export const buyerCodeOf = (buyerName) => {
+  const name = String(buyerName ?? '').trim().toLowerCase();
+  return SEED_BUYER_COMMERCIAL.find((b) => b.buyerName.toLowerCase() === name)?.buyerCode ?? null;
+};
 
 export const DEFAULT_BUYER_COMMERCIAL = {
   buyerCode: null,
@@ -183,9 +112,6 @@ export const DEFAULT_BUYER_COMMERCIAL = {
   paymentTerms: 'TT 30 DAYS',
   tolerancePercent: DEFAULT_TENANT_CONFIG.defaultTolerancePercent,
   allowMultiInvoicePerPl: false,
-  subClients: [],
-  consigneeProfiles: [],
-  notifyProfiles: [],
 };
 
 /**
@@ -223,400 +149,6 @@ const buildFxRates = () => {
   }
   return rows;
 };
-
-// ─── Templates ──────────────────────────────────────────────────────────────────
-// Carton-sticker templates only. Packing-list and invoice templates live in the API
-// (/export-docs/templates) and the standard layouts in utils/expDocSystemTemplates.js.
-// Sticker ids are strings so a sticker can never collide with an API template id.
-
-const buildTemplates = () => [
-  {
-    // Two-face sticker layout — the JOMO LONG SIDE / SHORT SIDE pattern (PRD §9.2).
-    id: 'STK-3',
-    templateCode: 'JOMO-AMG-STICKER',
-    name: 'JOMO — AMG — Carton Sticker',
-    buyerId: null,
-    buyerCode: 'JOMO',
-    subClientCode: 'AMG',
-    docType: DOC_TYPE.STICKER,
-    version: 1,
-    status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180),
-    effectiveTo: null,
-    clonedFromId: null,
-    publishedAt: ts(-180),
-    publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [],
-    addressBlocks: [],
-    columns: [],
-    sheets: [],
-    invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'JOMO-AMG',
-      paperDefault: PAPER.A4_2UP,
-      faces: [
-        {
-          key: 'LONG',
-          title: 'LONG SIDE',
-          render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'buyer', label: null, binding: 'buyer.name', fontPt: 22, bold: true, align: 'CENTER' },
-            { key: 'endCustomer', label: null, binding: 'carton.endCustomer', fontPt: 16, align: 'CENTER' },
-            { key: 'po', label: 'ORDER NO', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'pieces', label: 'QTY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 16, bold: true },
-            { key: 'origin', label: 'MADE IN', binding: 'exporter.country', fontPt: 14, bold: true },
-          ],
-          sizeGrid: null,
-          barcode: null,
-        },
-        {
-          key: 'SHORT',
-          title: 'SHORT SIDE',
-          render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'dan', label: 'DAN', binding: 'carton.danNo', fontPt: 16, bold: true },
-            { key: 'ctn', label: 'CARTON', binding: 'carton.nOfN', fontPt: 16, bold: true },
-            { key: 'nw', label: 'N.W.', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3, fontPt: 12 },
-            { key: 'gw', label: 'G.W.', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3, fontPt: 12 },
-            { key: 'dims', label: 'MEAS.', binding: 'carton.dimensions', suffix: ' CM', fontPt: 11 },
-          ],
-          sizeGrid: null,
-          barcode: { type: 'CODE128', binding: 'carton.cartonNo', enabled: false, heightMm: 12 },
-        },
-      ],
-      // Drives V-08 at sticker generation: these must be present or the affected
-      // cartons are named and generation is blocked.
-      mandatoryFields: ['carton.danNo', 'carton.endCustomer', 'carton.netWeightKg', 'carton.grossWeightKg'],
-    },
-    formatting: { font: 'Arial' },
-    printWeights: true,
-    printDimensions: true,
-    mandatoryForSubmit: [],
-    mandatoryForDocGen: [],
-  },
-  {
-    // JOMO SCA customer — two faces again, but a different field set: this is the
-    // variation the template engine has to absorb without new code (PRD 9.2).
-    id: 'STK-5',
-    templateCode: 'JOMO-SCA-STICKER',
-    name: 'JOMO — SCA — Carton Sticker',
-    buyerId: null, buyerCode: 'JOMO', subClientCode: 'SCA',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-180), effectiveTo: null, clonedFromId: 'STK-3',
-    publishedAt: ts(-180), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'JOMO-SCA',
-      paperDefault: PAPER.A4_2UP,
-      faces: [
-        {
-          // The buyer's own carton-marking sheet: a THIS SIDE UP head, the shipping
-          // mark, then ten fields whose colons line up in a column. COLON_LIST is
-          // what holds that alignment however long a label runs.
-          key: 'LONG', title: 'LONG SIDE', render: FACE_RENDER.COLON_LIST,
-          border: { style: 'solid', widthPt: 1.5 },
-          caption: 'THIS SIDE UP',
-          symbol: 'THIS_SIDE_UP',
-          lines: [
-            // The shipping mark head. Fixed text: the ERP has no field for it, and
-            // §10 says a template carries what the data model does not.
-            { key: 'mark', label: null, binding: 'fixed:BJJI:', fontPt: 13, bold: true },
-            { key: 'clientOrder', label: 'CLIENT ORDER No', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'po', label: 'PO No', binding: 'pl.orderNos', fontPt: 12 },
-            { key: 'article', label: 'CLIENT ARTICLE No', binding: 'carton.articleNo', fontPt: 12 },
-            { key: 'style', label: 'STYLE No', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'division', label: 'ASSORTMENT DIVISION, CUSTOMER', binding: 'carton.endCustomer', fontPt: 12 },
-            { key: 'ctn', label: 'CARTON No', binding: 'carton.nOfN', fontPt: 12 },
-            { key: 'port', label: 'PORT OF DESTINATION', binding: 'carton.destination', fontPt: 12 },
-            { key: 'colour', label: 'COLOR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'size', label: 'SIZE', binding: 'carton.sizeText', fontPt: 12 },
-            { key: 'qty', label: 'QUANTITY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-        {
-          // Three weights-and-measures lines only. The carton number and the port
-          // are NOT repeated here: the buyer's sheet puts both on the long side.
-          // Colons align the same way, so the two faces read as one document.
-          key: 'SHORT', title: 'SHORT SIDE', render: FACE_RENDER.COLON_LIST,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'nw', label: 'NET WEIGHT', binding: 'carton.netWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
-            { key: 'gw', label: 'GROSS WEIGHT', binding: 'carton.grossWeightKg', suffix: ' KGS', decimals: 3, fontPt: 12 },
-            { key: 'dims', label: 'CARTON MEASUREMENT', binding: 'carton.dimensions', suffix: ' CM', fontPt: 12 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      // Every field the buyer's sheet prints has to be there before the run goes out,
-      // or a carton ships with a blank line where the customer looks for its article.
-      mandatoryFields: [
-        'carton.netWeightKg', 'carton.grossWeightKg', 'carton.buyerPoNo',
-        'carton.articleNo', 'carton.endCustomer', 'carton.destination',
-      ],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Prenatal solid pack — a single face, FROM/TO addressing.
-    id: 'STK-6',
-    templateCode: 'PRENATAL-SOLID-STICKER',
-    name: 'Prénatal — Solid Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL', subClientCode: null,
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-120), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'PRENATAL-SOLID',
-      paperDefault: PAPER.A5,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'from', label: 'FROM', binding: 'exporter.name', fontPt: 12 },
-            { key: 'to', label: 'TO', binding: 'fixed:PRENATAL / NETHERLAND', fontPt: 12, bold: true },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName', fontPt: 12 },
-            { key: 'qty', label: 'QTY', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-            { key: 'ctn', label: 'C/NO', binding: 'carton.nOfN', fontPt: 14, bold: true },
-            { key: 'nw', label: 'N.W.', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3, fontPt: 11 },
-            { key: 'gw', label: 'G.W.', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3, fontPt: 11 },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg', 'carton.grossWeightKg'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: false,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Prenatal ratio pack — the one layout that prints a colour x size table.
-    id: 'STK-7',
-    templateCode: 'PRENATAL-RATIO-STICKER',
-    name: 'Prénatal — Ratio Pack — Carton Sticker',
-    buyerId: null, buyerCode: 'PRENATAL', subClientCode: 'RATIO',
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-120), effectiveTo: null, clonedFromId: 'STK-6',
-    publishedAt: ts(-120), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'PRENATAL-RATIO',
-      paperDefault: PAPER.A5,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.STACK,
-          border: { style: 'solid', widthPt: 1.5 },
-          lines: [
-            { key: 'to', label: 'TO', binding: 'fixed:PRENATAL / NETHERLAND', fontPt: 12, bold: true },
-            { key: 'style', label: 'STYLE', binding: 'carton.styleNo', fontPt: 12 },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo', fontPt: 12 },
-            { key: 'ctn', label: 'C/NO', binding: 'carton.nOfN', fontPt: 14, bold: true },
-            { key: 'qty', label: 'TOTAL', binding: 'carton.pieces', suffix: ' PCS', fontPt: 12 },
-          ],
-          sizeGrid: { enabled: true, rows: 'COLOUR', cols: 'SIZE' },
-          barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: false,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Vingino — a bordered key/value table, and the ONLY analysed buyer whose label
-    // carries a barcode (its EAN, printed as a number today). PRD 19.
-    id: 'STK-8',
-    templateCode: 'VINGINO-STICKER',
-    name: 'Vingino — Carton Sticker',
-    buyerId: null, buyerCode: 'VINGINO', subClientCode: null,
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-90), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-90), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'VINGINO',
-      paperDefault: PAPER.A4_2X2,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.TABLE,
-          border: { style: 'solid', widthPt: 1 },
-          lines: [
-            { key: 'ctn', label: 'Carton no', binding: 'carton.nOfN' },
-            { key: 'supplier', label: 'Supplier number', binding: 'fixed:SUP-4471' },
-            { key: 'po', label: 'PO', binding: 'carton.buyerPoNo' },
-            { key: 'article', label: 'Article no', binding: 'carton.styleNo' },
-            { key: 'colour', label: 'Colour', binding: 'carton.colorName' },
-            { key: 'qty', label: 'Quantity', binding: 'carton.pieces' },
-            { key: 'dims', label: 'Carton dimension', binding: 'carton.dimensions', suffix: ' cm' },
-            { key: 'gw', label: 'Gross weight', binding: 'carton.grossWeightKg', suffix: ' kg', decimals: 3 },
-            { key: 'nw', label: 'Net weight', binding: 'carton.netWeightKg', suffix: ' kg', decimals: 3 },
-            { key: 'season', label: 'Season / run', binding: 'fixed:SS26 / R2' },
-          ],
-          sizeGrid: null,
-          barcode: { type: 'CODE128', binding: 'carton.cartonNo', enabled: true, heightMm: 14 },
-        },
-      ],
-      mandatoryFields: ['carton.grossWeightKg', 'carton.netWeightKg', 'carton.dimensions'],
-    },
-    formatting: { font: 'Arial' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-  {
-    // Van Gennip — the nine-line monospace block that is copy-pasted by hand
-    // hundreds of times today (PRD 2). One template row replaces all of it.
-    id: 'STK-9',
-    templateCode: 'VGT-STICKER',
-    name: 'Van Gennip — Carton Sticker',
-    buyerId: null, buyerCode: 'VGT', subClientCode: null,
-    docType: DOC_TYPE.STICKER, version: 1, status: TEMPLATE_STATUS.ACTIVE,
-    effectiveFrom: d(-150), effectiveTo: null, clonedFromId: null,
-    publishedAt: ts(-150), publishedBy: 'R. Kumar',
-    identity: { titleText: 'CARTON MARKING', showLogo: false },
-    headerFields: [], addressBlocks: [], columns: [], sheets: [], invoiceLineGrain: null,
-    stickerLayout: {
-      layoutId: 'VGT',
-      paperDefault: PAPER.A4_2X2,
-      faces: [
-        {
-          key: 'MAIN', title: null, render: FACE_RENDER.TEXT_BLOCK,
-          border: { style: 'none' },
-          lines: [
-            { key: 'article', label: 'ARTICLE NUMBER', binding: 'carton.styleNo' },
-            { key: 'colour', label: 'COLOUR', binding: 'carton.colorName' },
-            { key: 'qty', label: 'QUANTITY', binding: 'carton.pieces' },
-            { key: 'ctn', label: 'CARTON NUMBER', binding: 'carton.nOfN' },
-            { key: 'nw', label: 'NET WEIGHT', binding: 'carton.netWeightKg', suffix: ' KG', decimals: 3 },
-            { key: 'gw', label: 'GROSS WEIGHT', binding: 'carton.grossWeightKg', suffix: ' KG', decimals: 3 },
-            { key: 'meas', label: 'MEASUREMENT', binding: 'carton.dimensions', suffix: ' CM' },
-            { key: 'origin', label: 'MADE IN', binding: 'fixed:INDIA' },
-            { key: 'order', label: 'ORDER', binding: 'carton.buyerPoNo' },
-          ],
-          sizeGrid: null, barcode: null,
-        },
-      ],
-      mandatoryFields: ['carton.netWeightKg', 'carton.grossWeightKg', 'carton.dimensions'],
-    },
-    formatting: { font: 'Courier New' }, printWeights: true, printDimensions: true,
-    mandatoryForSubmit: [], mandatoryForDocGen: [],
-  },
-];
-
-
-// ─── Shipments ──────────────────────────────────────────────────────────────────
-// A minimal entity invented by this module: no shipment record exists anywhere in
-// the ERP, yet V-01 is shipment-scoped and the invoice header needs ports/vessel.
-
-const buildShipments = () => [
-  {
-    id: 1,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1001, FY),
-    status: 'OPEN',
-    buyerCode: 'JOMO',
-    buyerName: 'JOMO BV',
-    subClientCode: 'AMG',
-    mode: 'SEA',
-    incoterm: 'FOB',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'MAERSK CHENNAI V.214W',
-    portOfLoading: 'Chennai Sea',
-    portOfDischarge: 'Rotterdam',
-    finalDestination: 'Valkenswaard, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: ['MSKU7712345'],
-    sealNo: 'IN884213',
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(12),
-    eta: d(38),
-    forwarder: 'Kuehne + Nagel',
-    deliveryCentre: 'DM Verteilzentrum Karlsruhe',
-    consigneeProfileId: 'jomo-nl',
-    notifyProfileId: 'jomo-bank',
-    totalPallets: 12,
-    version: 0,
-    createdAt: ts(-6),
-    createdBy: 'Priya S.',
-  },
-  {
-    id: 2,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1002, FY),
-    status: 'OPEN',
-    buyerCode: 'VGT',
-    buyerName: 'Van Gennip Textiles BV',
-    subClientCode: null,
-    mode: 'SEA',
-    incoterm: 'CIF',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'CMA CGM LOIRE V.0PA3RE1MA',
-    portOfLoading: 'Tuticorin Sea',
-    portOfDischarge: 'Antwerp',
-    finalDestination: 'Uden, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: ['CMAU4451209', 'CMAU4451210'],
-    sealNo: 'IN884990',
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(25),
-    eta: d(52),
-    forwarder: 'DSV Air & Sea',
-    deliveryCentre: null,
-    consigneeProfileId: 'vgt-nl',
-    notifyProfileId: null,
-    totalPallets: 24,
-    version: 0,
-    createdAt: ts(-3),
-    createdBy: 'Priya S.',
-  },
-  {
-    // D/A terms — the bank is the consignee, not the buyer (PRD §24.9).
-    id: 3,
-    shipmentNo: docNo(EXPDOC_PREFIX.SHIPMENT, 1003, FY),
-    status: 'OPEN',
-    buyerCode: 'PRENATAL',
-    buyerName: 'Prénatal Moeder en Kind BV',
-    subClientCode: null,
-    mode: 'SEA',
-    incoterm: 'FOB',
-    preCarriageBy: 'ROAD',
-    placeOfReceipt: 'Tiruppur',
-    vesselFlightNo: 'HAPAG EXPRESS V.118E',
-    portOfLoading: 'Chennai Sea',
-    portOfDischarge: 'Rotterdam',
-    finalDestination: 'Amersfoort, Netherlands',
-    countryOfFinalDestination: 'Netherlands',
-    containerNos: [],
-    sealNo: null,
-    blAwbNo: null,
-    blAwbDate: null,
-    etd: d(40),
-    eta: d(66),
-    forwarder: null,
-    deliveryCentre: null,
-    consigneeProfileId: 'prenatal-bank',
-    notifyProfileId: null,
-    totalPallets: 0,
-    version: 0,
-    createdAt: ts(-1),
-    createdBy: 'Priya S.',
-  },
-];
 
 // ─── Packing entries ────────────────────────────────────────────────────────────
 
@@ -661,7 +193,6 @@ const g = (over) => {
     cartonFrom: 1,
     cartonTo: 1,
     packingCode: null,
-    endCustomer: null,
     danNo: null,
     // Every seeded entry binds a single order line (lineNo 1), mirroring its
     // orderLineRefs. Left null, the per-order-line invoice grain would collapse
@@ -698,17 +229,17 @@ const buildPackingEntries = () => [
     id: 1,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1001, FY),
     status: PACKING_ENTRY_STATUS.COMPLETED,
-    shipmentId: 1,
     orderNo: orderNo(1042),
     buyerCode: 'JOMO',
     buyerName: 'JOMO BV',
-    subClientCode: 'AMG',
     styleNo: 'ST-2026-0441',
     garmentName: "Men's Slim Fit Polo",
     // Drives the HS-code default. No such field exists on the real style master —
     // see the data-gap ledger; the API phase owes stl_styles.hs_code.
     garmentCategory: 'Knit',
     compositionText: '95% COTTON 5% ELASTANE',
+    // What a sticker prints as `carton.season` for every carton of this entry.
+    season: 'AW26',
     sizePresetName: 'Men M–XXXL',
     sizes: MENS_SIZES,
     orderLineRefs: [
@@ -723,25 +254,31 @@ const buildPackingEntries = () => [
     groups: [
       g({
         packingType: PACKING_TYPE.SOLID, cartonFrom: 1, cartonTo: 47,
-        danNo: 'DAN-4471', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4471', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
         // The buyer's own article number, one per size — what JOMO's SCA carton
         // marking prints as CLIENT ARTICLE No.
         articleNos: { M: 'ART-99120', L: 'ART-99121', XL: 'ART-99122' },
+        // One EAN-13 per size, for a template that prints a barcode per size. Only
+        // this row has them all: the next has some, the rest none — so a barcode run
+        // over the whole list shows the "no EAN" path as well as the printed one.
+        eanBySize: { M: '8712345001018', L: '8712345001025', XL: '8712345001032' },
         sizeQty: { M: 10, L: 20, XL: 30 },
         netWeightKg: 12.48, grossWeightKg: 13.5, lengthCm: 60, breadthCm: 40, heightCm: 35,
       }),
       g({
         packingType: PACKING_TYPE.RATIO, cartonFrom: 48, cartonTo: 57,
-        danNo: 'DAN-4472', endCustomer: 'Jensen', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4472', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Flame Scarlet 18-1662 TCX',
         articleNos: { M: 'ART-99130', L: 'ART-99131', XL: 'ART-99132', XXL: 'ART-99133' },
+        // XL and XXL deliberately have no EAN.
+        eanBySize: { M: '8712345002015', L: '8712345002022' },
         ratio: { M: 1, L: 2, XL: 2, XXL: 1 }, assortmentsPerCarton: 4,
         netWeightKg: 9.2, grossWeightKg: 10.0, lengthCm: 60, breadthCm: 40, heightCm: 30,
       }),
       g({
         packingType: PACKING_TYPE.MIXED, cartonFrom: 58, cartonTo: 60,
-        danNo: 'DAN-4473', endCustomer: 'Marja', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4473', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: null,
         articleNos: { M: 'ART-99120', L: 'ART-99121' },
         mixedRows: [
@@ -754,7 +291,7 @@ const buildPackingEntries = () => [
         // Leftover odd carton with its own smaller dimensions (PRD §24.4).
         sectionKey: SECTION_KEY.EXTRA, packingType: PACKING_TYPE.EXTRA,
         cartonFrom: 61, cartonTo: 61,
-        danNo: 'DAN-4474', endCustomer: 'Ten Hoor', buyerPoNo: 'PO-884213',
+        danNo: 'DAN-4474', buyerPoNo: 'PO-884213',
         destination: 'Rotterdam', styleNo: 'ST-2026-0441', colorName: 'Navy',
         articleNos: { M: 'ART-99120', L: 'ART-99121' },
         sizeQty: { M: 3, L: 4 },
@@ -773,15 +310,14 @@ const buildPackingEntries = () => [
     id: 2,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1002, FY),
     status: PACKING_ENTRY_STATUS.COMPLETED,
-    shipmentId: 2,
     orderNo: orderNo(1055),
     buyerCode: 'VGT',
     buyerName: 'Van Gennip Textiles BV',
-    subClientCode: null,
     styleNo: 'ST-2026-0512',
     garmentName: "Girls' Printed Tee",
     garmentCategory: 'Knit',
     compositionText: '100% ORGANIC COTTON',
+    season: '2026-WINTER',
     sizePresetName: 'Kids EU 74–140',
     sizes: KIDS_EU_SIZES,
     orderLineRefs: [
@@ -832,15 +368,14 @@ const buildPackingEntries = () => [
     id: 3,
     packingNo: docNo(EXPDOC_PREFIX.PACKING_ENTRY, 1003, FY),
     status: PACKING_ENTRY_STATUS.OPEN,
-    shipmentId: 3,
     orderNo: orderNo(1061),
     buyerCode: 'PRENATAL',
     buyerName: 'Prénatal Moeder en Kind BV',
-    subClientCode: null,
     styleNo: 'ST-2026-0588',
     garmentName: 'Baby 3-pack Bodysuit',
     garmentCategory: 'Baby',
     compositionText: '100% COTTON INTERLOCK',
+    season: 'SS27',
     sizePresetName: 'Baby 50/56–86/92',
     sizes: BABY_SIZES,
     orderLineRefs: [
@@ -882,30 +417,24 @@ const buildPackingEntries = () => [
 
 export const buildSeedDb = () => {
   groupSeq = 0;
-  const shipments = buildShipments();
   const packingEntries = buildPackingEntries();
-  const templates = buildTemplates();
 
+  // No shipments: they are the API's, mirrored over every load (expDocMockStore).
   return {
     seedVersion: SEED_VERSION,
     // Explicit mirror of sys_doc_counters (prefix, fy_code): last number used.
     docSeq: {
-      [`${EXPDOC_PREFIX.SHIPMENT}/${FY}`]: FIRST_DOC_NUMBER - 1 + shipments.length,
       [`${EXPDOC_PREFIX.PACKING_ENTRY}/${FY}`]: FIRST_DOC_NUMBER - 1 + packingEntries.length,
       [`${EXPDOC_PREFIX.PACKING_LIST}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.INVOICE}/${FY}`]: FIRST_DOC_NUMBER - 1,
       [`${EXPDOC_PREFIX.STICKER_RUN}/${FY}`]: FIRST_DOC_NUMBER - 1,
     },
-    shipments,
     packingEntries,
     packingLists: [],
     invoices: [],
     stickerRuns: [],
-    templates,
     audit: [],
     masters: {
-      ports: SEED_PORTS,
-      incoterms: SEED_INCOTERMS,
       hsCodes: SEED_HS_CODES,
       buyerCommercial: SEED_BUYER_COMMERCIAL,
       fxRates: buildFxRates(),

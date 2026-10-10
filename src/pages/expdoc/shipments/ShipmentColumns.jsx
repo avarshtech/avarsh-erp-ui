@@ -1,17 +1,18 @@
 import { Space, Tag, Tooltip, Typography } from 'antd';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';
 import RecordLink from '../../../components/RecordLink';
+import StatusTag from '../../../components/StatusTag';
+import { SHIPMENT_STATUS, SHIPMENT_STATUS_LABELS } from '../../../utils/expDocConstants';
+import { SHIPMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 
 const { Text } = Typography;
 
-const nowrap = (text) => <Text style={{ whiteSpace: 'nowrap' }}>{text || '—'}</Text>;
+const orDash = (text) => text || <Text type="secondary">—</Text>;
+const statusLabel = (status) => SHIPMENT_STATUS_LABELS[status] || status;
 
 /**
- * Column unit for the shipment register.
- *
- * Shipments are an entity this module invents — nothing upstream carries ports,
- * vessel, container or ETD — so the register doubles as the place those values are
- * first captured.
+ * Column unit for the shipment register. Every cell stays on one line (the table is
+ * `table-nowrap`); a CLOSED shipment is read-only, so it offers neither Edit nor Delete.
  */
 export const buildShipmentColumns = ({ onView, onEdit, onDocuments, onDelete, canUpdate, canDelete }) => [
   {
@@ -19,92 +20,81 @@ export const buildShipmentColumns = ({ onView, onEdit, onDocuments, onDelete, ca
     dataIndex: 'shipmentNo',
     key: 'shipmentNo',
     fixed: 'left',
-    width: 170,
     render: (text, record) => <RecordLink text={text} onClick={() => onView(record)} />,
   },
   {
-    title: 'Buyer',
-    dataIndex: 'buyerName',
-    key: 'buyerName',
-    width: 220,
-    ellipsis: true,
-    render: (name, record) => (
+    title: 'Status',
+    dataIndex: 'status',
+    key: 'status',
+    render: (status) => <StatusTag status={status} config={SHIPMENT_STATUS_CONFIG} getLabel={statusLabel} />,
+  },
+  { title: 'Consignee', dataIndex: 'buyerName', key: 'buyerName' },
+  {
+    title: 'Orders',
+    dataIndex: 'orderNos',
+    key: 'orderNos',
+    // One line however many orders: the first, then "+N" naming the rest on hover.
+    render: (nos) => (nos?.length ? (
       <Space size={4} wrap={false}>
-        <Text ellipsis>{name || '—'}</Text>
-        {record.subClientCode && <Tag color="geekblue">{record.subClientCode}</Tag>}
+        {nos[0]}
+        {nos.length > 1 && (
+          <Tooltip title={nos.join(', ')}>
+            <Tag style={{ marginInlineEnd: 0 }}>{`+${nos.length - 1}`}</Tag>
+          </Tooltip>
+        )}
       </Space>
-    ),
+    ) : orDash(null)),
   },
-  { title: 'Mode', dataIndex: 'mode', key: 'mode', width: 80, align: 'center' },
-  { title: 'Incoterm', dataIndex: 'incoterm', key: 'incoterm', width: 96, align: 'center' },
-  {
-    title: 'Port of Loading',
-    dataIndex: 'portOfLoading',
-    key: 'portOfLoading',
-    width: 150,
-    ellipsis: true,
-  },
-  {
-    title: 'Port of Discharge',
-    dataIndex: 'portOfDischarge',
-    key: 'portOfDischarge',
-    width: 160,
-    ellipsis: true,
-  },
-  { title: 'ETD', dataIndex: 'etd', key: 'etd', width: 116, render: nowrap },
-  { title: 'ETA', dataIndex: 'eta', key: 'eta', width: 116, render: nowrap },
+  { title: 'Mode', dataIndex: 'mode', key: 'mode', align: 'center' },
+  { title: 'Incoterm', dataIndex: 'incoterm', key: 'incoterm', align: 'center' },
+  { title: 'Port of Loading', dataIndex: 'portOfLoading', key: 'portOfLoading', render: orDash },
+  { title: 'Port of Discharge', dataIndex: 'portOfDischarge', key: 'portOfDischarge', render: orDash },
+  { title: 'ETD', dataIndex: 'etd', key: 'etd', render: orDash },
+  { title: 'ETA', dataIndex: 'eta', key: 'eta', render: orDash },
   {
     title: 'Containers',
     dataIndex: 'containerCount',
     key: 'containerCount',
-    width: 106,
     align: 'right',
-    render: (count) => (count ? count : <Text type="secondary">—</Text>),
+    render: (count) => (count ? count : orDash(null)),
   },
   {
-    title: 'Packing',
-    key: 'packing',
-    width: 128,
+    // Packing lists still live in the browser that raised them.
+    title: <Tooltip title="Packing lists raised in this browser">Packing Lists</Tooltip>,
+    dataIndex: 'packingListCount',
+    key: 'packingListCount',
     align: 'right',
-    render: (_, record) =>
-      record.packingEntryCount ? (
-        <Text style={{ whiteSpace: 'nowrap' }}>
-          {record.packingEntryCount} entr{record.packingEntryCount === 1 ? 'y' : 'ies'}
-        </Text>
-      ) : (
-        <Text type="secondary">Not started</Text>
-      ),
+    render: (count) => (count ? count : <Text type="secondary">None yet</Text>),
   },
   {
     title: 'Actions',
     key: 'actions',
     fixed: 'right',
-    width: 168,
     // The row itself opens the record — keep action clicks from bubbling into it.
     onCell: () => ({ onClick: (e) => e.stopPropagation() }),
-    render: (_, record) => (
-      <Space size="small">
-        <ActionButton action="view" size="small" onClick={() => onView(record)} />
-        {/* §18: the whole consignment’s paperwork, from the row that owns it. */}
-        <Tooltip title="Document set">
-          <span>
-            <ActionButton action="print" size="small" onClick={() => onDocuments(record)} />
-          </span>
-        </Tooltip>
-        {canUpdate && <ActionButton action="edit" size="small" onClick={() => onEdit(record)} />}
-        {canDelete && (
-          <DeleteConfirm
-            title="Delete shipment"
-            recordLabel={record.shipmentNo}
-            onConfirm={() => onDelete(record)}
-          >
-            {/* DeleteConfirm renders only its children inside a Popconfirm — without
-                one, nothing appears at all. */}
-            <ActionButton action="delete" size="small" />
-          </DeleteConfirm>
-        )}
-      </Space>
-    ),
+    render: (_, record) => {
+      const open = record.status === SHIPMENT_STATUS.OPEN;
+      return (
+        <Space size="small">
+          <ActionButton action="view" size="small" onClick={() => onView(record)} />
+          {/* §18: the whole consignment’s paperwork, from the row that owns it. ActionButton
+              renders its own tooltip — wrapping it in another showed two popovers. */}
+          <ActionButton action="print" size="small" tooltip="Document set" onClick={() => onDocuments(record)} />
+          {canUpdate && open && <ActionButton action="edit" size="small" onClick={() => onEdit(record)} />}
+          {canDelete && open && (
+            <DeleteConfirm
+              title="Delete shipment"
+              recordLabel={record.shipmentNo}
+              onConfirm={() => onDelete(record)}
+            >
+              {/* DeleteConfirm renders only its children inside a Popconfirm — without
+                  one, nothing appears at all. */}
+              <ActionButton action="delete" size="small" />
+            </DeleteConfirm>
+          )}
+        </Space>
+      );
+    },
   },
 ];
 

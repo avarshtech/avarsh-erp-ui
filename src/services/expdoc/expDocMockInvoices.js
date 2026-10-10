@@ -20,7 +20,7 @@ import {
 } from './expDocMockCommon';
 import { getBuyerCommercial, getHsDefault, getFxRate, getExporterProfileExtra } from './expDocMockMasters';
 import { decoratePl } from './expDocMockPackingLists';
-import { decorate as decorateShipment, syncShipmentStatus } from './expDocMockShipments';
+import { decorate as decorateShipment } from './expDocMockShipments';
 import { raise, EXPDOC_NOTIFICATION as NOTIF } from './expDocMockNotifications';
 import {
   INVOICE_STATUS, INVOICE_TRANSITIONS, PL_STATUS, PHASE, DOC_TYPE,
@@ -341,7 +341,6 @@ export const listInvoiceablePls = async (params = {}) => {
         buyerId: pl.buyerId ?? null,
         buyerCode: pl.buyerCode,
         buyerName: pl.buyerName,
-        subClientCode: pl.subClientCode,
         shipmentId: pl.shipmentId,
         shipmentNo: pl.shipmentNo,
         totals: decorated.totals,
@@ -382,6 +381,10 @@ export const createInvoice = async (payload = {}) => {
   const first = pls[0];
   const commercial = getBuyerCommercial(first);
   const shipmentRaw = (db.shipments || []).find((s) => s.id === first.shipmentId) || null;
+  // The invoice copies the shipment's parties: one that cannot be read now (deleted, offline) is a refusal
+  if (first.shipmentId != null && !shipmentRaw) {
+    fail('NOT_FOUND', `The shipment of ${first.plNo} could not be read. Reload and try again.`);
+  }
   const shipment = shipmentRaw ? decorateShipment(shipmentRaw, db) : null;
 
   // Chosen by the user (a buyer may have several) and handed in as a snapshot of that
@@ -408,7 +411,6 @@ export const createInvoice = async (payload = {}) => {
     buyerId: first.buyerId ?? null,
     buyerCode: first.buyerCode,
     buyerName: first.buyerName,
-    subClientCode: first.subClientCode ?? null,
     shipmentId: first.shipmentId,
     shipmentNo: first.shipmentNo,
 
@@ -430,12 +432,17 @@ export const createInvoice = async (payload = {}) => {
 
     // Header (§8.2). Every value has a source; none is typed at create.
     exporterRef: extra?.iecNumber ? `IEC ${extra.iecNumber}` : null,
-    buyerOrderNo: [...new Set(pls.flatMap((p) => p.orderNos || []))].join(', ') || null,
+    // The packed orders first; a shipment's own order list stands in when the packing
+    // lists carry none.
+    buyerOrderNo: [...new Set(pls.flatMap((p) => p.orderNos || []))].join(', ')
+      || (shipment?.orderNos || []).join(', ')
+      || null,
     buyerOrderDate: null,
     consignee: shipment?.consignee ?? null,
     notify: shipment?.notify ?? null,
     incoterm: shipment?.incoterm || commercial.incoterm || null,
-    incotermPlace: shipment?.portOfLoading || null,
+    // The named place is the port's name ("FOB Chennai"), not the printed name and code
+    incotermPlace: shipment?.portOfLoadingName || shipment?.portOfLoading || null,
     paymentTerms: commercial.paymentTerms || null,
     countryOfOrigin: 'INDIA',
     countryOfFinalDestination: shipment?.countryOfFinalDestination ?? null,
@@ -736,7 +743,7 @@ export const markInvoiceExported = async (id, options = {}) => {
     actionUrl: `/export-docs/invoices/edit/${row.id}`,
     entityType: 'EXPORT_INVOICE', entityId: row.id, entityNo: row.invoiceNo,
   });
-  syncShipmentStatus(db, row.shipmentId);
+  // The shipment reflects its documents; the facade closes it (expDocShipmentBridge).
   saveDb(db);
   return decorateInvoice(row, db);
 };

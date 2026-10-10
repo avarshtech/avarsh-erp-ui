@@ -10,32 +10,25 @@
  * bound and would be the first thing to blow the browser's storage budget. Per-carton
  * history ("who printed carton 57, when, how many times") is derived on read by
  * intersecting ranges — PRD §20 asks for the answer, not for that storage shape.
+ *
+ * The template a run prints with lives in the API. expDocService resolves it and hands
+ * its layout in (`options.layout`, the choices as `options.layoutOptions`), so this
+ * mock never calls the API; a run records the revision it printed with, not a copy.
  */
 import { loadDb, saveDb, nextStickerRunNo } from './expDocMockStore';
 import {
   delay, clone, fail, pageOf, pushAudit, nowStamp, currentUserName,
 } from './expDocMockCommon';
 import { decoratePl } from './expDocMockPackingLists';
-import { DOC_TYPE, PL_STATUS, PHASE } from '../../utils/expDocConstants';
+import { PL_STATUS, PHASE, STICKER_LINE_KIND } from '../../utils/expDocConstants';
 import {
   expandCartonRange, expandCartonNos, toRanges, countCartons, mergeRanges,
-  intersectRanges, formatRanges, cartonHash,
+  intersectRanges, formatRanges, cartonHash, readPath,
 } from '../../utils/expDocCalc';
-import { resolveTemplate } from '../../utils/expDocTemplateSchema';
 import { validate } from '../../utils/expDocValidation';
+import { stickerAskQuestions } from '../../utils/expDocTemplateSchema';
 
 const allRows = (pl) => (pl.sections || []).flatMap((s) => s.rows || []);
-
-/** The sticker template for a packing list's buyer — resolved, never chosen. */
-export const stickerLayoutFor = (db, pl) => {
-  const { template } = resolveTemplate(db.templates, {
-    buyerCode: pl.buyerCode,
-    subClientCode: pl.subClientCode,
-    docType: DOC_TYPE.STICKER,
-    onDate: pl.plDate,
-  });
-  return template || null;
-};
 
 /** Total cartons across the whole shipment — what "n of N" counts (PRD §9.1). */
 const shipmentCartonTotal = (db, pl) => {
@@ -64,41 +57,69 @@ const expandScope = (pl, scope, ctx) => {
   return ranges.flatMap((r) => expandCartonRange(allRows(pl), r.from, r.to, ctx));
 };
 
+const isBlank = (v) => v === null || v === undefined || v === '' || v === 0 || (Array.isArray(v) && !v.length);
+
+/** Whether a layout prints the per-size EANs as barcodes. */
+const printsEans = (layout) => (layout?.stickerLayout?.faces || []).some((f) => (f.lines || [])
+  .some((l) => l.kind === STICKER_LINE_KIND.BARCODE && l.binding === 'carton.eanBySize'));
+
+/** Whether a carton holds a size with no EAN: with barcodes on, it cannot be printed. */
+const lacksEan = (carton) => (carton.sizes || []).some((size) => !carton.eanBySize?.[size]);
+
 /**
  * Cartons that cannot be printed because a field the layout prints is empty.
  *
  * V-08 is a warning while drafting and a hard ERROR here: a label with a blank
  * weight is worse than no label. The offending cartons are named, per PRD §9.3.
+ * A mandatory binding is read by its full path from the carton's print context
+ * (`contextOf`), so `style.compositionText` is the style's, not a missing carton
+ * field. With barcodes switched on, a carton holding a size with no EAN is blocked.
  */
-export const blockedCartons = (cartons, layout) => {
+export const blockedCartons = (cartons, layout, { contextOf = (carton) => ({ carton }), printBarcodes = false } = {}) => {
   const required = layout?.stickerLayout?.mandatoryFields || [];
-  if (!required.length) return [];
+  const needsEans = Boolean(printBarcodes) && printsEans(layout);
+  if (!required.length && !needsEans) return [];
   const out = [];
   cartons.forEach((carton) => {
-    const missing = required.filter((path) => {
-      const leaf = String(path).split('.').pop();
-      const v = carton[leaf];
-      return v === null || v === undefined || v === '' || v === 0;
-    });
-    if (missing.length) out.push({ cartonNo: carton.cartonNo, missing: missing.map((m) => m.split('.').pop()) });
+    const ctx = contextOf(carton);
+    const missing = required.filter((path) => isBlank(readPath(ctx, path))).map((m) => String(m).split('.').pop());
+    if (needsEans && lacksEan(carton)) missing.push('EAN');
+    if (missing.length) out.push({ cartonNo: carton.cartonNo, missing });
   });
   return out;
 };
 
-/** Everything a preview or a generate needs, assembled once. */
+/**
+ * The selected cartons that hold a size with no EAN, while the layout prints per-size
+ * EANs — what the workspace warns about beside its barcode switch. Per ROW: a row's
+ * cartons share its sizes and EANs, so the row's first carton answers for all of them
+ * (as in `rowPrintHash`) and the selection is never expanded.
+ */
+const cartonsWithoutEan = (raw, layout, selected, totalCartonsInShipment) => {
+  if (!printsEans(layout)) return { count: 0, ranges: [] };
+  const ranges = mergeRanges(allRows(raw).flatMap((row) => {
+    const first = expandCartonRange([row], row.cartonFrom, row.cartonFrom, { totalCartonsInShipment })[0];
+    return first && lacksEan(first) ? intersectRanges([{ from: row.cartonFrom, to: row.cartonTo }], selected) : [];
+  }));
+  return { count: countCartons(ranges), ranges };
+};
+
 /**
  * The hash of everything a layout PRINTS from one row.
  *
  * Built from the row's first carton so the existing `cartonHash` picker can be
  * reused, with the carton's own identity excluded — a carton number never changes,
  * and including it would force a different hash per carton and defeat the point.
+ * The paths are read from that carton's print context, as they print (`printScope`).
  */
-const rowPrintHash = (row, bindings, totalCartonsInShipment) => {
-  const one = expandCartonRange([row], row.cartonFrom, row.cartonFrom, { totalCartonsInShipment })[0];
+const rowPrintHash = (row, bindings, totalCartonsInShipment, print) => {
+  const one = withSeason(
+    expandCartonRange([row], row.cartonFrom, row.cartonFrom, { totalCartonsInShipment }), print.styles,
+  )[0];
   // A row with no expandable carton has nothing printed from it to compare.
   if (!one) return `row:${row.id}`;
   const stable = (bindings || []).filter((b) => !['carton.cartonNo', 'carton.ordinal', 'carton.total'].includes(b));
-  return cartonHash(one, stable);
+  return cartonHash(one, stable, print.contextOf(one));
 };
 
 /**
@@ -117,15 +138,83 @@ const runsForDocument = (db, pl) => {
   return (db.stickerRuns || []).filter((r) => chain.has(r.plId));
 };
 
+/**
+ * What expDocService needs to choose this packing list's sticker template from the
+ * API: the buyer, and the template family (code) its latest run printed with — a
+ * reprint keeps its layout. The code, not the id: a new version issues a new id.
+ */
+export const stickerTemplateRequest = (plId) => {
+  const db = loadDb();
+  const raw = db.packingLists.find((p) => p.id === Number(plId));
+  if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
+  const latestRun = [...runsForDocument(db, raw)].sort((a, b) => b.id - a.id)[0];
+  return { buyerName: raw.buyerName, latestTemplateCode: latestRun?.templateCode ?? null };
+};
+
+/** Why a run has no layout: several to choose from, or none could be loaded at all. */
+const noLayoutReason = (layoutOptions) => ((layoutOptions || []).length > 1
+  ? 'Pick the sticker layout to print with.'
+  : 'No sticker layout could be loaded for this buyer.');
+
+/** The style a sticker prints for one packing entry (`style.*`), and its cartons' season. */
+export const entryStyle = (entry) => ({
+  styleNo: entry?.styleNo ?? null,
+  garmentName: entry?.garmentName ?? null,
+  compositionText: entry?.compositionText ?? null,
+  season: entry?.season ?? null,
+});
+
+/** `entryStyle` per source packing entry of this packing list's rows. */
+const styleByEntryOf = (db, pl) => {
+  const ids = new Set(allRows(pl).map((r) => r.sourceEntryId));
+  return Object.fromEntries((db.packingEntries || [])
+    .filter((e) => ids.has(e.id))
+    .map((e) => [e.id, entryStyle(e)]));
+};
+
+/** Cartons as they print: each with the season of its own packing entry. */
+const withSeason = (cartons, styles) =>
+  cartons.map((c) => ({ ...c, season: styles[c.sourceEntryId]?.season ?? null }));
+
+/**
+ * What a packing list's sticker bindings resolve against, by their full path: the
+ * carton, its own entry's style, the packing list, the shipment, the buyer and the
+ * exporter — the namespaces the workspace prints with. The exporter is the organisation
+ * the screen prints (`options.exporter`), so a mandatory `exporter.*` field and the V-14
+ * hash read what the labels carry; the mock's profile only stands in without one.
+ */
+const printScope = (db, raw, pl, exporter) => {
+  const styles = styleByEntryOf(db, raw);
+  const base = {
+    pl,
+    shipment: (db.shipments || []).find((s) => s.id === raw.shipmentId) || {},
+    buyer: { name: raw.buyerName },
+    exporter: exporter || db.masters?.exporterProfileExtra || {},
+  };
+  return { styles, contextOf: (carton) => ({ ...base, carton, style: styles[carton.sourceEntryId] || {} }) };
+};
+
+/**
+ * The data a layout prints, for V-14 — not fixed text, not a per-run answer. A carton
+ * number printed "{n} OF {N}" also prints the shipment's total, so it is compared as
+ * `carton.nOfN`, exactly as the n-of-N binding it replaces was.
+ */
+const printedPaths = (layout) => [...new Set((layout?.stickerLayout?.faces || [])
+  .flatMap((f) => f.lines || [])
+  .map((l) => (l.binding === 'carton.cartonNo' && String(l.pattern || '').includes('{N}') ? 'carton.nOfN' : l.binding))
+  .filter((b) => b && !/^(fixed|ask):/.test(String(b))))];
+
+/** Everything a preview or a generate needs, assembled once. */
 export const getStickerContext = async (plId, options = {}) => {
   await delay(80);
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const pl = decoratePl(raw, db);
-  const layout = stickerLayoutFor(db, raw);
+  const layout = options.layout || null;
   const shipment = (db.shipments || []).find((s) => s.id === raw.shipmentId) || null;
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
+  const styleByEntry = styleByEntryOf(db, raw);
 
   const scope = options.scope || { mode: 'ALL' };
   const ranges = scopeRanges(raw, scope);
@@ -144,12 +233,16 @@ export const getStickerContext = async (plId, options = {}) => {
   return {
     pl,
     layout: layout ? clone(layout) : null,
+    layoutOptions: clone(options.layoutOptions || []),
+    // `style.*` per packing entry; a carton prints its own entry's (`carton.sourceEntryId`).
+    styleByEntry,
     shipment: shipment ? clone(shipment) : null,
     totalCartonsInShipment,
     selectedCount,
     selectedRanges: ranges,
     selectedLabel: formatRanges(ranges),
-    cartons: slice,
+    eanMissing: cartonsWithoutEan(raw, layout, ranges, totalCartonsInShipment),
+    cartons: withSeason(slice, styleByEntry),
     printedRanges: printed,
     printedLabel: formatRanges(printed),
     runs: clone(runs),
@@ -163,6 +256,7 @@ export const previewCartons = async (plId, options = {}) => {
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
+  const styles = styleByEntryOf(db, raw);
   const scope = options.scope || { mode: 'ALL' };
   const size = options.pageSize || 4;
   const page = options.page || 0;
@@ -178,7 +272,9 @@ export const previewCartons = async (plId, options = {}) => {
   if (scope.mode === 'SELECTION') {
     const nos = scope.cartonNos || [];
     return {
-      cartons: expandCartonNos(allRows(raw), nos.slice(page * size, (page + 1) * size), { totalCartonsInShipment }),
+      cartons: withSeason(
+        expandCartonNos(allRows(raw), nos.slice(page * size, (page + 1) * size), { totalCartonsInShipment }), styles,
+      ),
       total: nos.length,
     };
   }
@@ -198,7 +294,7 @@ export const previewCartons = async (plId, options = {}) => {
     seen += len;
   }
   return {
-    cartons: expandCartonNos(allRows(raw), cartonNos, { totalCartonsInShipment }),
+    cartons: withSeason(expandCartonNos(allRows(raw), cartonNos, { totalCartonsInShipment }), styles),
     total,
   };
 };
@@ -213,12 +309,13 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
   const pl = decoratePl(raw, db);
-  const layout = stickerLayoutFor(db, raw);
+  const layout = options.layout || null;
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
-  const cartons = expandScope(raw, scope, { totalCartonsInShipment });
+  const print = printScope(db, raw, pl, options.exporter);
+  const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
 
-  const blocked = blockedCartons(cartons, layout);
+  const blocked = blockedCartons(cartons, layout, { contextOf: print.contextOf, printBarcodes: options.printBarcodes });
 
   // V-03 gaps and V-08 missing fields, at STICKER severity.
   const findings = validate({
@@ -232,22 +329,26 @@ export const checkStickerGeneration = async (plId, options = {}) => {
   }, { phase: PHASE.STICKER, acknowledgements: raw.acknowledgements || [] });
 
   // V-14: cartons already printed whose bound fields have since changed.
-  const layoutBindings = (layout?.stickerLayout?.faces || [])
-    .flatMap((f) => (f.lines || []).map((l) => l.binding))
-    .filter((b) => String(b).startsWith('carton.'));
+  const layoutBindings = printedPaths(layout);
   /*
    * V-14, compared per ROW and reported as ranges.
    *
    * The printed fields all come from the row, so one hash per row answers the same
    * question as one per carton — and it does so in O(rows) rather than expanding
    * every printed carton of a shipment whose carton count has no ceiling.
+   *
+   * Only runs of the layout family (template code) being printed now are compared: a
+   * run printed with another of the buyer's layouts hashed other fields, and comparing
+   * across them would call every carton "changed".
    */
-  const runs = runsForDocument(db, raw);
+  const runs = layout
+    ? runsForDocument(db, raw).filter((run) => run.templateCode === layout.templateCode)
+    : [];
   const reprintRanges = [];
   runs.forEach((run) => {
     Object.entries(run.rowHashes || {}).forEach(([rowId, previous]) => {
       const row = allRows(raw).find((r) => String(r.id) === String(rowId));
-      if (!row || previous === rowPrintHash(row, layoutBindings, totalCartonsInShipment)) return;
+      if (!row || previous === rowPrintHash(row, layoutBindings, totalCartonsInShipment, print)) return;
       // Only the cartons of that row that were actually printed need reprinting.
       reprintRanges.push(
         ...intersectRanges([{ from: row.cartonFrom, to: row.cartonTo }], run.prints || []),
@@ -280,7 +381,7 @@ export const checkStickerGeneration = async (plId, options = {}) => {
       && findings.errors.length === 0
       && Boolean(layout),
     blockedReason: !layout
-      ? 'No sticker layout is configured for this buyer.'
+      ? noLayoutReason(options.layoutOptions)
       : (!cartons.length ? 'The selected range contains no cartons.'
         : (blocked.length
           ? `${blocked.length} carton(s) are missing a field this layout prints.`
@@ -294,15 +395,28 @@ export const generateStickerRun = async (plId, options = {}) => {
   const db = loadDb();
   const raw = db.packingLists.find((p) => p.id === Number(plId));
   if (!raw) fail('NOT_FOUND', `Packing list ${plId} not found`);
-  const layout = stickerLayoutFor(db, raw);
-  if (!layout) fail('CONFLICT', 'No sticker layout is configured for this buyer.');
+  const layout = options.layout || null;
+  if (!layout) fail('CONFLICT', noLayoutReason(options.layoutOptions));
+  // The template's once-per-run questions (`ask:` lines): each answer prints on every label.
+  const questions = stickerAskQuestions(layout.stickerLayout);
+  const given = options.askValues || {};
+  const askValues = Object.fromEntries(questions.map(({ key }) => [
+    key, Object.hasOwn(given, key) ? String(given[key] ?? '').trim() : '',
+  ]));
+  const unanswered = questions.find(({ key }) => !askValues[key]);
+  if (unanswered) fail('VALIDATION', `Answer “${unanswered.label}” before printing.`);
+  // A run that prints no face prints no label, and must not record its cartons as printed.
+  const faceKeys = options.faceKeys || (layout.stickerLayout?.faces || []).map((f) => f.key);
+  const faceCount = (layout.stickerLayout?.faces || []).filter((f) => faceKeys.includes(f.key)).length;
+  if (!faceCount) fail('VALIDATION', 'Tick at least one face to print.');
 
   const totalCartonsInShipment = shipmentCartonTotal(db, raw);
   const scope = options.scope || { mode: 'ALL' };
-  const cartons = expandScope(raw, scope, { totalCartonsInShipment });
+  const print = printScope(db, raw, decoratePl(raw, db), options.exporter);
+  const cartons = withSeason(expandScope(raw, scope, { totalCartonsInShipment }), print.styles);
   if (!cartons.length) fail('CONFLICT', 'The selected range contains no cartons.');
 
-  const blocked = blockedCartons(cartons, layout);
+  const blocked = blockedCartons(cartons, layout, { contextOf: print.contextOf, printBarcodes: options.printBarcodes });
   if (blocked.length) {
     fail('CONFLICT', `Cannot generate — ${blocked.length} carton(s) are missing a printed field: ${
       blocked.slice(0, 8).map((b) => `${b.cartonNo} (${b.missing.join(', ')})`).join('; ')}${
@@ -312,9 +426,7 @@ export const generateStickerRun = async (plId, options = {}) => {
     fail('CONFLICT', 'This packing list is still a draft. Printing from a draft needs the override right and a reason.');
   }
 
-  const layoutBindings = (layout.stickerLayout?.faces || [])
-    .flatMap((f) => (f.lines || []).map((l) => l.binding))
-    .filter((b) => String(b).startsWith('carton.'));
+  const layoutBindings = printedPaths(layout);
   // One entry per ROW. A per-carton map is O(cartons) in localStorage — the exact
   // storage shape this module refuses everywhere else, and enough to blow the
   // ~5 MB quota on a large shipment, taking the whole mock store with it.
@@ -322,7 +434,7 @@ export const generateStickerRun = async (plId, options = {}) => {
   // A built carton exposes `sourceRowId`, not the row object.
   [...new Set(cartons.map((c) => c.sourceRowId).filter((id) => id !== undefined))].forEach((rowId) => {
     const row = allRows(raw).find((r) => r.id === rowId);
-    if (row) rowHashes[rowId] = rowPrintHash(row, layoutBindings, totalCartonsInShipment);
+    if (row) rowHashes[rowId] = rowPrintHash(row, layoutBindings, totalCartonsInShipment, print);
   });
 
   const id = Math.max(0, ...(db.stickerRuns || []).map((r) => r.id)) + 1;
@@ -333,14 +445,20 @@ export const generateStickerRun = async (plId, options = {}) => {
     plNo: raw.plNo,
     plVersion: raw.version,
     plContentHash: raw.contentHash,
+    // The revision printed with, by id and family — never a copy of its layout (the
+    // quota above): a published revision does not change, so its id is its layout.
     templateId: layout.id,
+    templateCode: layout.templateCode,
     templateVersion: layout.version,
-    layoutId: layout.stickerLayout?.layoutId,
     paper: options.paper || layout.stickerLayout?.paperDefault,
-    faceKeys: options.faceKeys || (layout.stickerLayout?.faces || []).map((f) => f.key),
+    faceKeys,
+    // The answers to the layout's own questions, and the labels they were asked by, so the
+    // history still reads "BATCH #: …" after the template changes.
+    askValues,
+    askLabels: Object.fromEntries(questions.map(({ key, label }) => [key, label])),
     scope: clone(scope),
     cartonCount: cartons.length,
-    labelCount: cartons.length * ((options.faceKeys || layout.stickerLayout?.faces || []).length || 1),
+    labelCount: cartons.length * faceCount,
     fromDraft: raw.status === PL_STATUS.DRAFT,
     overrideReason: options.overrideReason || null,
     isReprint: Boolean(options.isReprint),

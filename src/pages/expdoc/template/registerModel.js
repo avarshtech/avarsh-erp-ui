@@ -2,15 +2,13 @@
  * The template register's shape: templates grouped by buyer, and each buyer's
  * revisions folded into template "families" (one card per template code).
  *
- * Packing-list and invoice templates belong to a real buyer (buyerId); carton-sticker
- * templates are still mock rows naming a buyer by its commercial-profile name, so they
- * join a buyer by name, and any that match no buyer are listed as demo data.
+ * Every template — packing list, invoice or carton sticker — belongs to a real buyer
+ * (buyerId), or to none and is listed with the standard layouts.
  */
 import { DOC_TYPE, TEMPLATE_STATUS } from '../../../utils/expDocConstants';
-import { SYSTEM_TEMPLATES, TEMPLATE_SOURCE } from '../../../utils/expDocSystemTemplates';
-import { normBuyerName } from '../../../utils/expDocTemplateSchema';
+import { SYSTEM_TEMPLATES } from '../../../utils/expDocSystemTemplates';
 
-export const RAIL_KEY = { STANDARD: 'standard', DEMO_STICKERS: 'demo-stickers' };
+export const RAIL_KEY = { STANDARD: 'standard' };
 
 export const buyerKey = (id) => `buyer:${id}`;
 
@@ -33,20 +31,12 @@ export const groupTemplatesByBuyer = (templates, buyers) => {
   };
   ensure(RAIL_KEY.STANDARD, { title: 'Standard & any-buyer', standard: true });
   (buyers || []).forEach((b) => ensure(buyerKey(b.id), { buyerId: b.id, title: b.name, inactive: b.active === false }));
-  const byName = new Map((buyers || []).map((b) => [normBuyerName(b.name), b]));
 
   (templates || []).forEach((t) => {
-    if (t.source === TEMPLATE_SOURCE.API) {
-      const group = t.buyerId == null
-        ? groups.get(RAIL_KEY.STANDARD)
-        : ensure(buyerKey(t.buyerId), { buyerId: t.buyerId, title: t.buyerName || `Buyer ${t.buyerId}` });
-      group.templates.push(t);
-      return;
-    }
-    if (!t.buyerCode) { groups.get(RAIL_KEY.STANDARD).templates.push(t); return; }
-    const buyer = byName.get(normBuyerName(t.buyerName));
-    if (buyer) ensure(buyerKey(buyer.id), { buyerId: buyer.id, title: buyer.name }).templates.push(t);
-    else ensure(RAIL_KEY.DEMO_STICKERS, { title: 'Sticker templates (demo data)', demo: true }).templates.push(t);
+    const group = t.buyerId == null
+      ? groups.get(RAIL_KEY.STANDARD)
+      : ensure(buyerKey(t.buyerId), { buyerId: t.buyerId, title: t.buyerName || `Buyer ${t.buyerId}` });
+    group.templates.push(t);
   });
 
   groups.get(RAIL_KEY.STANDARD).templates.unshift(

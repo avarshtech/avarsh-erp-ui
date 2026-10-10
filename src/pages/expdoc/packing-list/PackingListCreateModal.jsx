@@ -115,7 +115,6 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
         buyerId: shipment?.buyerId ?? null,
         buyerCode: shipment?.buyerCode ?? null,
         buyerName: commercial.buyerName ?? null,
-        subClientCode: commercial.subClients?.length ? undefined : null,
         packingEntryIds: chosen.map((e) => e.id),
         orderBreakdown,
       });
@@ -222,7 +221,6 @@ const PackingListCreateModal = ({ open, onCancel, onCreated }) => {
             docType={DOC_TYPE.PACKING_LIST}
             buyerId={shipment.buyerId}
             buyerName={shipment.buyerName}
-            subClientCode={shipment.subClientCode}
             value={templateId}
             onChange={setTemplateId}
           />

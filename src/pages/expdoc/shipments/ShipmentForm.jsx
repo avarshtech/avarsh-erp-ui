@@ -1,43 +1,50 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { App, Form, Result, Skeleton, Select, Spin } from 'antd';
+import { Alert, App, Form, Result, Skeleton, Spin } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../../components/PageHeader';
 import StatusTag from '../../../components/StatusTag';
 import { ActionButton } from '../../../components/buttons';
-import {
-  FormSection, FormInput, FormSelect, FormDatePicker, FormInputNumber,
-} from '../../../components/form';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../../utils/permissions';
-import { EXPDOC_MODULE } from '../../../utils/expDocConstants';
+import {
+  EXPDOC_MODULE, INCOTERMS, SHIPMENT_STATUS, SHIPMENT_STATUS_LABELS,
+} from '../../../utils/expDocConstants';
+import { SHIPMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { useStore } from '../../../context/StoreContext';
 import { getBuyers } from '../../../services/master/buyerService';
-import {
-  getShipment, createShipment, updateShipment,
-  listPorts, listIncoterms, getBuyerCommercial,
-} from '../../../services/expdoc/expDocService';
+import { getShipment, createShipment, updateShipment } from '../../../services/expdoc/expDocService';
+import { notifyValueOf } from './shipmentParties';
+import useShipmentParties from './useShipmentParties';
+import ShipmentConsigneeSection from './ShipmentConsigneeSection';
+import ShipmentTransportSections from './ShipmentTransportSections';
 
 const STICKY_HEADER = { position: 'sticky', top: 64, zIndex: 10 };
 const DATE_FIELDS = ['etd', 'eta', 'blAwbDate'];
+const INCOTERM_OPTIONS = INCOTERMS.map((i) => ({ value: i, label: i }));
+const statusLabel = (status) => SHIPMENT_STATUS_LABELS[status] || status;
 
-const SHIPMENT_STATUS_CONFIG = {
-  OPEN: { color: 'processing' },
-  CLOSED: { color: 'default' },
+/** The API's 422 for a location id Buyer Master has since renewed: the buyers are read again. */
+const isStaleLocation = (e) => e?.response?.status === 422 && /shipping location/i.test(e?.message || '');
+
+/** A saved shipment as the form holds it. */
+const valuesOf = (shipment) => {
+  const values = {
+    ...shipment,
+    notifyValue: notifyValueOf(shipment.notifyParty),
+    orderIds: (shipment.orders || []).map((o) => o.orderId),
+  };
+  DATE_FIELDS.forEach((f) => { values[f] = shipment[f] ? dayjs(shipment[f]) : null; });
+  return values;
 };
 
-const MODE_OPTIONS = [
-  { value: 'SEA', label: 'Sea' },
-  { value: 'AIR', label: 'Air' },
-  { value: 'COURIER', label: 'Courier' },
-];
-
 /**
- * Shipment create / edit.
+ * Shipment create / edit, on the API (/export-docs/shipments).
  *
- * Every field here is a data gap: no shipment record, port master or incoterm list
- * exists in the ERP today (see the plan's data-gap ledger). Ports and incoterms
- * come from the mock master so the API phase has a shape to adopt.
+ * The consignee is the buyer itself, read from the real buyer master; the notify
+ * party is that buyer's bank or one of its shipping locations (useShipmentParties).
+ * The form sends ids and the server builds what prints. A CLOSED shipment opens
+ * read-only: every document on it is released.
  */
 const ShipmentForm = () => {
   const { id } = useParams();
@@ -51,64 +58,52 @@ const ShipmentForm = () => {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [ports, setPorts] = useState([]);
-  const [incoterms, setIncoterms] = useState([]);
 
   const { clearDirty } = useUnsavedChanges(isDirty);
-  const canUpdate = hasPermission(EXPDOC_MODULE.SHIPMENTS, isEdit ? 'update' : 'add');
+  // A record in hand is saved with an update, even before the URL has moved to /edit/:id
+  const canUpdate = hasPermission(EXPDOC_MODULE.SHIPMENTS, isEdit || record ? 'update' : 'add');
+  const isClosed = record?.status === SHIPMENT_STATUS.CLOSED;
+  const canEdit = canUpdate && !isClosed;
+  // Documents raised against the shipment name its consignee; this browser's are all there are, for now.
+  const consigneeLocked = Boolean(record) && (record.packingListCount || 0) + (record.invoiceCount || 0) > 0;
 
   // Buyers come from the real master, cached in StoreContext like everywhere else.
   const { buyers: storeBuyers, setData, isCacheValid, setLoading: setStoreLoading } = useStore();
   const [buyers, setBuyers] = useState(storeBuyers || []);
 
+  const reloadBuyers = useCallback(async () => {
+    setStoreLoading('buyers', true);
+    try {
+      const data = await getBuyers();
+      const list = Array.isArray(data) ? data : data?.content || [];
+      setBuyers(list);
+      setData('buyers', list);
+    } catch {
+      // The interceptor has toasted; the list we had stays
+    } finally {
+      setStoreLoading('buyers', false);
+    }
+  }, [setData, setStoreLoading]);
+
   useEffect(() => {
-    let cancelled = false;
-    const loadBuyers = async () => {
-      if (isCacheValid('buyers') && storeBuyers.length) {
-        setBuyers(storeBuyers);
-        return;
-      }
-      setStoreLoading('buyers', true);
-      try {
-        const data = await getBuyers();
-        const list = Array.isArray(data) ? data : data?.content || [];
-        if (cancelled) return;
-        setBuyers(list);
-        setData('buyers', list);
-      } catch {
-        if (!cancelled) setBuyers([]);
-      } finally {
-        setStoreLoading('buyers', false);
-      }
-    };
-    loadBuyers();
-    return () => { cancelled = true; };
+    if (!isCacheValid('buyers') || !storeBuyers.length) reloadBuyers();
+    // Once, on open: the store's cache is the source after that.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    Promise.all([listPorts(), listIncoterms()])
-      .then(([p, i]) => {
-        if (cancelled) return;
-        setPorts(p);
-        setIncoterms(i);
-      })
-      .catch(() => { /* pickers degrade to free text */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
     if (!isEdit) return undefined;
+    // Just created here: the router keeps this instance for /edit/:id and the saved record is
+    // already in hand. Reloading it unmounted the form under a Save clicked meanwhile.
+    if (record && String(record.id) === String(id)) return undefined;
     let cancelled = false;
     setLoading(true);
-    getShipment(id)
+    // Silent: a shipment that cannot be opened says why on the page itself
+    getShipment(id, { silent: true })
       .then((data) => {
         if (cancelled) return;
         setRecord(data);
-        const values = { ...data };
-        DATE_FIELDS.forEach((f) => { values[f] = data[f] ? dayjs(data[f]) : null; });
-        form.setFieldsValue(values);
+        form.setFieldsValue(valuesOf(data));
       })
       .catch((e) => { if (!cancelled) setLoadError(e.message || 'Failed to load shipment'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -116,51 +111,28 @@ const ShipmentForm = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
 
+  // Active buyers, and the saved consignee however Buyer Master has since marked it.
   const buyerOptions = useMemo(
-    () => (buyers || []).map((b) => ({ value: b.name, label: b.name, id: b.id })),
-    [buyers],
+    () => (buyers || [])
+      .filter((b) => b.active !== false || b.id === record?.buyerId)
+      .map((b) => ({ value: b.id, label: b.name })),
+    [buyers, record],
   );
 
-  const watchedBuyerName = Form.useWatch('buyerName', form);
+  const parties = useShipmentParties(form, buyers, record);
+  const { onPartiesChange, partiesPayload } = parties;
+  // The mode decides the ports offered and whether containers are required
+  const mode = Form.useWatch('mode', form);
 
-  // Sub-clients are a mock-only concept — no buyer in the ERP has one.
-  const subClientOptions = useMemo(() => {
-    if (!watchedBuyerName) return [];
-    return (getBuyerCommercial({ buyerName: watchedBuyerName }).subClients || []).map((s) => ({
-      value: s.code,
-      label: `${s.code} — ${s.name}`,
-    }));
-  }, [watchedBuyerName]);
-
-  /*
-   * The consignee and notify party are chosen HERE, on the shipment, because that is
-   * where they vary: the same buyer ships to DM Karlsruhe on one shipment and DM Bor
-   * on the next, and Prenatal's D/A terms consign to a bank (§8.2, §24).
-   *
-   * Without these two controls every shipment a user created produced an invoice
-   * with empty Consignee and Notify blocks, with nowhere in the UI to fix it.
-   */
-  const consigneeOptions = useMemo(() => {
-    if (!watchedBuyerName) return [];
-    return (getBuyerCommercial({ buyerName: watchedBuyerName }).consigneeProfiles || [])
-      .map((c) => ({ value: c.id, label: `${c.name} — ${c.city || c.country || ''}`.trim() }));
-  }, [watchedBuyerName]);
-
-  const notifyOptions = useMemo(() => {
-    if (!watchedBuyerName) return [];
-    return (getBuyerCommercial({ buyerName: watchedBuyerName }).notifyProfiles || [])
-      .map((c) => ({ value: c.id, label: `${c.name} — ${c.city || c.country || ''}`.trim() }));
-  }, [watchedBuyerName]);
-
-  const portOptions = useMemo(
-    () => ports.map((p) => ({ value: p.name, label: `${p.name} (${p.code})` })),
-    [ports],
-  );
-
-  const incotermOptions = useMemo(
-    () => incoterms.map((i) => ({ value: i, label: i })),
-    [incoterms],
-  );
+  const handleValuesChange = useCallback((changed) => {
+    setIsDirty(true);
+    onPartiesChange(changed);
+    // Sea ports are no good by air or courier, nor airports by sea: the picked ports go. Here, on the
+    // user's change, not in an effect on `mode`, which would also fire when a saved shipment loads.
+    if ('mode' in changed && (changed.mode === 'SEA') !== (mode === 'SEA')) {
+      form.setFieldsValue({ portOfLoadingId: undefined, portOfDischargeId: undefined });
+    }
+  }, [onPartiesChange, form, mode]);
 
   const handleSave = useCallback(async () => {
     let values;
@@ -172,30 +144,33 @@ const ShipmentForm = () => {
     }
     setSaving(true);
     try {
-      const payload = { ...values };
+      const payload = { ...values, ...partiesPayload(values) };
       DATE_FIELDS.forEach((f) => {
         payload[f] = values[f] ? dayjs(values[f]).format('YYYY-MM-DD') : null;
       });
-      const buyer = buyerOptions.find((b) => b.value === values.buyerName);
-      payload.buyerId = buyer?.id ?? null;
-      payload.buyerCode = getBuyerCommercial({ buyerName: values.buyerName }).buyerCode ?? null;
 
-      const saved = isEdit
-        ? await updateShipment(id, { ...payload, version: record?.version })
+      // The record in hand decides, not the route: after a create the URL moves to /edit/:id in a
+      // router transition, and a Save clicked before it lands must update, not create a second one.
+      const existingId = record?.id ?? (isEdit ? id : null);
+      const saved = existingId != null
+        ? await updateShipment(existingId, { ...payload, version: record?.version })
         : await createShipment(payload);
 
+      // Adopt the saved record: its version, and what the server stored (blocks, container numbers)
       setRecord(saved);
+      form.setFieldsValue(valuesOf(saved));
       setIsDirty(false);
       clearDirty();
       message.success(`${saved.shipmentNo} saved`);
-      if (!isEdit) navigate(`/export-docs/shipments/edit/${saved.id}`, { replace: true });
+      if (existingId == null) navigate(`/export-docs/shipments/edit/${saved.id}`, { replace: true });
     } catch (e) {
-      // A version clash is surfaced by the global ConflictDialog, not a toast.
-      if (!e.isOptimisticLockConflict) message.error(e.message || 'Failed to save shipment');
+      // An API error was shown by the interceptor; a version clash opens the ConflictDialog.
+      if (!e?.isAxiosError) message.error(e?.message || 'Failed to save shipment');
+      if (isStaleLocation(e)) reloadBuyers();
     } finally {
       setSaving(false);
     }
-  }, [form, message, isEdit, id, record, buyerOptions, navigate, clearDirty]);
+  }, [form, message, isEdit, id, record, partiesPayload, navigate, clearDirty, reloadBuyers]);
 
   if (loadError) {
     return (
@@ -221,140 +196,42 @@ const ShipmentForm = () => {
     <div className="animate-fade-in-up">
       <PageHeader
         title={record?.shipmentNo || 'New Shipment'}
-        subtitle={record ? `${record.buyerName} · ETD ${record.etd || '—'}` : 'Ports, vessel and container for one consignment'}
+        subtitle={record ? `${record.buyerName} · ETD ${record.etd || '—'}` : 'Consignee, orders, ports, vessel and container for one consignment'}
         onBack={() => navigate('/export-docs/shipments/list')}
-        status={record ? <StatusTag status={record.status} config={SHIPMENT_STATUS_CONFIG} /> : null}
+        status={record ? <StatusTag status={record.status} config={SHIPMENT_STATUS_CONFIG} getLabel={statusLabel} /> : null}
         style={STICKY_HEADER}
       >
-        <ActionButton action="close" text="Cancel" onClick={() => navigate('/export-docs/shipments/list')} />
-        {canUpdate && (
+        <ActionButton action="close" text={canEdit ? 'Cancel' : 'Close'} onClick={() => navigate('/export-docs/shipments/list')} />
+        {canEdit && (
           <ActionButton action="save" text="Save" loading={saving} onClick={handleSave} />
         )}
       </PageHeader>
+
+      {isClosed && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Closed: every packing list and invoice on this shipment is released"
+          description="It opens for editing again when one of them is cancelled or revised."
+        />
+      )}
 
       <Spin spinning={saving}>
         <Form
           form={form}
           layout="vertical"
-          disabled={!canUpdate}
-          onValuesChange={() => setIsDirty(true)}
-          initialValues={{ mode: 'SEA', incoterm: 'FOB', preCarriageBy: 'ROAD', containerNos: [] }}
+          disabled={!canEdit}
+          onValuesChange={handleValuesChange}
+          initialValues={{ mode: 'SEA', incoterm: 'FOB', preCarriageBy: 'ROAD', containerNos: [], orderIds: [] }}
         >
-          <FormSection title="Buyer & Consignment" columns={4}>
-            <Form.Item name="buyerName" label="Buyer" rules={[{ required: true, message: 'Select a buyer' }]}>
-              <FormSelect options={buyerOptions} placeholder="Select buyer" />
-            </Form.Item>
-            <Form.Item
-              name="subClientCode"
-              label="Sub-client / End customer"
-              tooltip="Mock-only: the ERP has no sub-client concept yet. It drives buyer template resolution."
-            >
-              <FormSelect options={subClientOptions} placeholder={subClientOptions.length ? 'Optional' : 'None configured'} disabled={!subClientOptions.length} />
-            </Form.Item>
-            <Form.Item name="mode" label="Mode" rules={[{ required: true }]}>
-              <FormSelect variant="default" options={MODE_OPTIONS} />
-            </Form.Item>
-            <Form.Item name="incoterm" label="Incoterm" rules={[{ required: true, message: 'Select an incoterm' }]}>
-              <FormSelect variant="default" options={incotermOptions} />
-            </Form.Item>
-            <Form.Item
-              name="consigneeProfileId"
-              label="Consignee"
-              tooltip="Printed on the invoice. It can differ per shipment — the same buyer may ship to a different delivery centre, and D/A terms consign to a bank."
-            >
-              <FormSelect
-                options={consigneeOptions}
-                placeholder={consigneeOptions.length
-                  ? 'Select consignee'
-                  : (watchedBuyerName
-                    // Naming the cause: consignee profiles are a mock master keyed by
-                    // buyer code, so a real ERP buyer that the mock does not know has
-                    // none to offer. Silence here would read as "this buyer has none".
-                    ? 'No consignee profile configured for this buyer'
-                    : 'Pick a buyer first')}
-                disabled={!consigneeOptions.length}
-              />
-            </Form.Item>
-            <Form.Item name="notifyProfileId" label="Notify party">
-              <FormSelect
-                options={notifyOptions}
-                placeholder={notifyOptions.length ? 'Optional' : 'None configured for this buyer'}
-                disabled={!notifyOptions.length}
-              />
-            </Form.Item>
-            <Form.Item name="deliveryCentre" label="Delivery centre" tooltip="Free text, printed where the buyer's layout shows one.">
-              <FormInput placeholder="e.g. DM Verteilzentrum Karlsruhe" />
-            </Form.Item>
-          </FormSection>
-
-          <FormSection title="Routing" columns={3}>
-            <Form.Item name="preCarriageBy" label="Pre-carriage by">
-              <FormInput placeholder="ROAD" />
-            </Form.Item>
-            <Form.Item name="placeOfReceipt" label="Place of receipt">
-              <FormInput placeholder="Tiruppur" />
-            </Form.Item>
-            <Form.Item name="vesselFlightNo" label="Vessel / Flight No.">
-              <FormInput placeholder="MAERSK CHENNAI V.214W" />
-            </Form.Item>
-            <Form.Item name="portOfLoading" label="Port of loading" rules={[{ required: true, message: 'Select the port of loading' }]}>
-              <FormSelect options={portOptions} placeholder="Select port" />
-            </Form.Item>
-            <Form.Item name="portOfDischarge" label="Port of discharge" rules={[{ required: true, message: 'Select the port of discharge' }]}>
-              <FormSelect options={portOptions} placeholder="Select port" />
-            </Form.Item>
-            <Form.Item name="finalDestination" label="Final destination">
-              <FormInput placeholder="Valkenswaard, Netherlands" />
-            </Form.Item>
-            <Form.Item name="countryOfFinalDestination" label="Country of final destination">
-              <FormInput placeholder="Netherlands" />
-            </Form.Item>
-            <Form.Item name="etd" label="ETD" rules={[{ required: true, message: 'Enter the ETD' }]}>
-              <FormDatePicker />
-            </Form.Item>
-            <Form.Item
-              name="eta"
-              label="ETA"
-              dependencies={['etd']}
-              rules={[
-                () => ({
-                  validator: (_, value) => {
-                    const etd = form.getFieldValue('etd');
-                    if (value && etd && dayjs(value).isBefore(dayjs(etd), 'day')) {
-                      return Promise.reject(new Error('ETA cannot be before ETD'));
-                    }
-                    return Promise.resolve();
-                  },
-                }),
-              ]}
-            >
-              <FormDatePicker />
-            </Form.Item>
-          </FormSection>
-
-          <FormSection title="Container & Documents" columns={3}>
-            <Form.Item name="containerNos" label="Container No(s)" tooltip="Type a number and press Enter to add another.">
-              <Select mode="tags" tokenSeparators={[',']} placeholder="MSKU7712345" open={false} suffixIcon={null} />
-            </Form.Item>
-            <Form.Item name="sealNo" label="Seal No.">
-              <FormInput />
-            </Form.Item>
-            <Form.Item name="totalPallets" label="Total pallets">
-              {/* Not variant="quantity": that variant exists to render a UOM addon,
-                  and a pallet count has no unit. Passing it without a `uom` emits an
-                  empty addonAfter, which AntD 6 deprecates. */}
-              <FormInputNumber min={0} precision={0} />
-            </Form.Item>
-            <Form.Item name="blAwbNo" label="BL / AWB No.">
-              <FormInput />
-            </Form.Item>
-            <Form.Item name="blAwbDate" label="BL / AWB date">
-              <FormDatePicker />
-            </Form.Item>
-            <Form.Item name="forwarder" label="Forwarder">
-              <FormInput />
-            </Form.Item>
-          </FormSection>
+          <ShipmentConsigneeSection
+            parties={parties}
+            buyerOptions={buyerOptions}
+            incotermOptions={INCOTERM_OPTIONS}
+            consigneeLocked={consigneeLocked}
+          />
+          <ShipmentTransportSections mode={mode} record={record} />
         </Form>
       </Spin>
     </div>

@@ -1,13 +1,12 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { App, Card, Form, Input, DatePicker, Row, Col, Collapse, Typography, Tag, Alert, Space, Modal, Skeleton, Result } from 'antd';
+import { App, Card, Form, Input, DatePicker, Row, Col, Collapse, Typography, Tag, Alert, Space, Skeleton, Result } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { QuestionCircleOutlined } from '@ant-design/icons';
 import PageHeader from '../../../components/PageHeader';
 import ApprovalActionBar from '../../../components/approval/ApprovalActionBar';
 import { ActionButton } from '../../../components/buttons';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
-import useBusyAction from '../../../hooks/useBusyAction';
+import useBillWorkflow from '../../../hooks/useBillWorkflow';
 import useBillPassingMasters from '../../../hooks/useBillPassingMasters';
 import { useTheme } from '../../../context/ThemeContext';
 import { hasPermission } from '../../../utils/permissions';
@@ -22,8 +21,6 @@ import {
   EXCEPTION_SEVERITY,
   ISSUE_STATUS,
   BP_MODULE_ID,
-  isBillSubmittable,
-  canReferBackBill,
   getBillReason,
 } from '../../../utils/billPassingConstants';
 import {
@@ -41,11 +38,20 @@ import BpDebitTable from './BpDebitTable';
 import BpCalculationPanel from './BpCalculationPanel';
 import BpIssueLog from './BpIssueLog';
 import BpAttachments from './BpAttachments';
+import BillWorkflowBar from './BillWorkflowBar';
+import BillReasonModal from './BillReasonModal';
+import { buildBillActions } from './billWorkflowActions';
 
 const { Text } = Typography;
 const { TextArea } = Input;
 
 const SECTION_KEYS = ['po', 'grn', 'qc', 'recon', 'debits', 'calc', 'issues', 'docs'];
+
+/** The supplier bill's workflow verbs, under the names the shared action table uses. */
+const SUPPLIER_VERBS = {
+  startVerification, referBack: referBackBill, raiseQuery, hold: holdBill, sendForApproval, releaseHold,
+  approve: approveBill, reject: rejectBill, sendToAccounts, reopen: reopenBill, recordTallyReference,
+};
 
 /**
  * The bill workspace, always opened on an existing draft — the supplier/PO pick
@@ -62,17 +68,20 @@ const BillPassingForm = () => {
   const [source, setSource] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  // The key of the mutation in flight (see `run`), so only that action's button spins.
-  const { busy, setBusy, busyProps } = useBusyAction();
   // Cached across screens rather than fetched on every bill open.
   const { debitTypes, chargeTypes, issueTypes } = useBillPassingMasters();
 
   const [isDirty, setIsDirty] = useState(false);
   const { clearDirty } = useUnsavedChanges(isDirty);
 
-  // Reason capture — one modal serves every action that needs a typed justification
-  const [reasonCfg, setReasonCfg] = useState(null);
-  const [reasonText, setReasonText] = useState('');
+  // Every mutation returns the bill; adopting it (version included) is what keeps the next save from a
+  // false conflict. `run` / `busyProps` / the reason modal are shared with the job-work bill workspace.
+  const adoptBill = useCallback((next) => {
+    setBill(next);
+    setIsDirty(false);
+    clearDirty();
+  }, [clearDirty]);
+  const { busyProps, run, openReason, reasonModal } = useBillWorkflow(adoptBill);
 
   // Permissions come from the session token and do not change while the page is mounted.
   const { canUpdate, canVerify, canApprove } = useMemo(() => ({
@@ -140,37 +149,7 @@ const BillPassingForm = () => {
     }
   }, [message]);
 
-  // ==================== MUTATION PLUMBING ====================
-
-  /**
-   * Runs a service call, folds the returned bill into state and toasts the outcome.
-   * `key` names the action so its own button (via `busyProps(key)`) is the one that spins.
-   */
-  const run = useCallback(async (key, fn, successMsg, onError) => {
-    setBusy(key);
-    try {
-      const next = await fn();
-      if (next?.id) {
-        // Adopt what came back, version included: the next call sends that
-        // version, and holding the copy we had would make it look stale.
-        setBill(next);
-        setIsDirty(false);
-        clearDirty();
-      }
-      if (successMsg) message.success(successMsg);
-      return next;
-    } catch (e) {
-      // A caller that can offer the user a way out of this particular failure
-      // says so by returning true, and nothing further is reported.
-      if (onError?.(e)) return null;
-      // axiosInstance already toasts the server's message; only say something
-      // when it could not have.
-      if (!e.response) message.error(e.message || 'Action failed');
-      return null;
-    } finally {
-      setBusy(null);
-    }
-  }, [message, setBusy, clearDirty]);
+  // ==================== LOCAL EDITS ====================
 
   /** Local, in-progress edits (GRN picks, charges, adjustments) — recalculated live. */
   const patchBill = useCallback((patch) => {
@@ -189,8 +168,6 @@ const BillPassingForm = () => {
     });
     setIsDirty(true);
   }, []);
-
-  const openReason = useCallback((cfg) => { setReasonText(''); setReasonCfg(cfg); }, []);
 
   /** Everything the server needs to save the bill, from the form and local edits. */
   const savePayload = useCallback((values, duplicateOverrideReason) => ({
@@ -277,19 +254,6 @@ const BillPassingForm = () => {
     });
   }, [bill, handleSave, modal, run]);
 
-  const submitReason = useCallback(async () => {
-    if (!reasonCfg) return;
-    const text = reasonText.trim();
-    const min = reasonCfg.minLength ?? 10;
-    if (text.length < min) {
-      message.warning(`Please enter at least ${min} characters`);
-      return;
-    }
-    const cfg = reasonCfg;
-    setReasonCfg(null);
-    await run(cfg.key, () => cfg.onSubmit(text), cfg.successMsg);
-  }, [reasonCfg, reasonText, run, message]);
-
   // The same voucher the view dialog prints. GSTIN and payment terms live on the
   // supplier master, which the PO billing source already carries, so the window
   // opens synchronously inside the click and pop-up blockers stay quiet.
@@ -319,118 +283,20 @@ const BillPassingForm = () => {
     return null;
   }, [bill]);
 
-  const headerActions = useMemo(() => {
-    if (!bill) return null;
-    const btns = [];
-    const push = (el) => btns.push(el);
-
-    if (bill.editable && canUpdate) {
-      push(<ActionButton key="save" action="save" variant="draft" text="Save" {...busyProps('save')} onClick={() => handleSave()} />);
-    }
-    if (isBillSubmittable(bill.status) && canUpdate) {
-      push(<ActionButton key="submit" action="save" text="Submit" {...busyProps('submit', Boolean(submitBlockReason))}
-        tooltip={submitBlockReason || undefined} onClick={handleSubmit} />);
-    }
-    if (bill.status === S.SUBMITTED && canVerify) {
-      push(<ActionButton key="verify" action="approve" text="Start Verification" {...busyProps('verify')} onClick={() => modal.confirm({
-        title: `Start verification of ${bill.bpNumber}?`,
-        content: 'You take up the bill for checking against the PO, GRN and QC records. The clerk can still correct it until it is approved, and every edit is logged on the activity trail.',
-        okText: 'Start',
-        onOk: () => run('verify', () => startVerification(bill.id, bill.version), 'Verification started'),
-      })} />);
-    }
-    if (canReferBackBill(bill.status) && (canVerify || canApprove)) {
-      push(<ActionButton key="referback" action="refer-back" text="Refer Back" {...busyProps('referback')} onClick={() => openReason({
-        key: 'referback',
-        title: 'Refer this bill back for correction', label: 'What needs correcting', successMsg: 'Bill referred back',
-        onSubmit: (t) => referBackBill(bill.id, t, bill.version),
-      })} />);
-    }
-    if ((bill.status === S.UNDER_VERIFICATION || bill.status === S.PENDING_APPROVAL) && (canVerify || canApprove)) {
-      push(<ActionButton key="query" action="refer-back" icon={<QuestionCircleOutlined />} text="Raise Query" {...busyProps('query')} onClick={() => openReason({
-        key: 'query',
-        title: 'Raise a query with the supplier', label: 'Query details', successMsg: 'Query raised',
-        onSubmit: (t) => raiseQuery(bill.id, t, bill.version),
-      })} />);
-      push(<ActionButton key="hold" action="cancel" text="Hold" {...busyProps('hold')} onClick={() => openReason({
-        key: 'hold',
-        title: 'Put this bill on hold', label: 'Hold reason', successMsg: 'Bill put on hold',
-        onSubmit: (t) => holdBill(bill.id, t, bill.version),
-      })} />);
-    }
-    if (bill.status === S.UNDER_VERIFICATION && canVerify) {
-      push(<ActionButton key="approval" action="send" text="Send for Approval"
-        {...busyProps('approval', !bill.canSendForApproval && !bill.blockers?.length)}
-        onClick={() => {
-          if (bill.blockers?.length) {
-            openReason({
-              key: 'approval',
-              title: 'Override and send for approval', label: 'Override justification',
-              successMsg: 'Sent for approval with override',
-              onSubmit: (t) => sendForApproval(bill.id, { overrideReason: t }, bill.version),
-            });
-            return;
-          }
-          run('approval', () => sendForApproval(bill.id, {}, bill.version), 'Sent for approval');
-        }} />);
-    }
-    if (bill.status === S.ON_HOLD && canVerify) {
-      push(<ActionButton key="release" action="refresh" text="Release Hold" {...busyProps('release')} onClick={() => openReason({
-        key: 'release',
-        title: 'Release this bill from hold', label: 'Release remarks', successMsg: 'Hold released',
-        onSubmit: (t) => releaseHold(bill.id, t, bill.version),
-      })} />);
-    }
-    // When an approval flow governs this bill the engine owns the decision and
-    // ApprovalActionBar carries it; these buttons are for the case where no
-    // flow matched, which is the default until an admin configures one.
-    if (bill.status === S.PENDING_APPROVAL && canApprove && bill.approvalMode !== 'ENGINE') {
-      // The bill stays editable while it waits, so a blocker can appear after
-      // Send for Approval cleared it — the same gate applies here.
-      const blocked = Boolean(bill.blockers?.length);
-      push(<ActionButton key="approve" action="approve" text="Approve" {...busyProps('approve', blocked)}
-        tooltip={blocked ? 'Clear the blockers listed above before approving' : undefined}
-        onClick={() => modal.confirm({
-        title: `Approve ${bill.bpNumber}?`,
-        content: `Net payable ${formatCurrency(bill.netPayable)} will be cleared for accounts.`,
-        okText: 'Approve',
-        onOk: () => run('approve', () => approveBill(bill.id, '', bill.version), 'Bill approved'),
-      })} />);
-      push(<ActionButton key="reject" action="reject" text="Reject" {...busyProps('reject')} onClick={() => openReason({
-        key: 'reject',
-        title: 'Reject this bill', label: 'Rejection reason', danger: true, okText: 'Reject',
-        successMsg: 'Bill rejected', onSubmit: (t) => rejectBill(bill.id, t, bill.version),
-      })} />);
-    }
-    if (bill.status === S.APPROVED) {
-      if (canApprove) {
-        push(<ActionButton key="accounts" action="send" text="Send to Accounts" {...busyProps('accounts')} onClick={() => modal.confirm({
-          title: `Send ${bill.bpNumber} to accounts?`,
-          content: 'The bill is handed to Tally for payment processing and can no longer be reopened by verification.',
-          okText: 'Send',
-          onOk: () => run('accounts', () => sendToAccounts(bill.id, bill.version), 'Sent to accounts'),
-        })} />);
-        push(<ActionButton key="reopen" action="refer-back" text="Reopen" {...busyProps('reopen')} onClick={() => openReason({
-          key: 'reopen',
-          title: 'Reopen this bill for verification', label: 'Reopen reason', successMsg: 'Bill reopened',
-          onSubmit: (t) => reopenBill(bill.id, t, bill.version),
-        })} />);
-      }
-      push(<ActionButton key="print" action="print" text="Print Voucher" onClick={handlePrint} />);
-    }
-    if (bill.status === S.SENT_TO_ACCOUNTS) {
-      if (canApprove) {
-        push(<ActionButton key="tally" action="save" variant="draft" text="Record Tally Ref" {...busyProps('tally')} onClick={() => openReason({
-          key: 'tally',
-          title: 'Record the Tally reference', label: 'Tally reference no', minLength: 3,
-          placeholder: 'e.g. TLY/26-27/00412', successMsg: 'Tally reference recorded',
-          onSubmit: (t) => recordTallyReference(bill.id, t, bill.version),
-        })} />);
-      }
-      push(<ActionButton key="print" action="print" text="Print Voucher" onClick={handlePrint} />);
-    }
-    return <Space wrap>{btns}</Space>;
-  }, [bill, submitBlockReason, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
+  const headerActions = useMemo(() => (
+    <BillWorkflowBar
+      busyProps={busyProps}
+      actions={buildBillActions({
+        bill,
+        docNo: bill?.bpNumber,
+        can: { update: canUpdate, verify: canVerify, approve: canApprove },
+        verbs: SUPPLIER_VERBS,
+        ui: { run, openReason, confirm: (cfg) => modal.confirm(cfg), onSave: handleSave, onSubmit: handleSubmit },
+        submitBlockReason,
+        print: { text: 'Print Voucher', onClick: handlePrint },
+      })}
+    />
+  ), [bill, submitBlockReason, canUpdate, canVerify, canApprove, busyProps, handleSave, handleSubmit, handlePrint, modal, run, openReason]);
 
   // ==================== SECTION STYLES ====================
 
@@ -692,30 +558,7 @@ const BillPassingForm = () => {
 
       <Collapse defaultActiveKey={SECTION_KEYS} items={collapseItems} />
 
-      <Modal
-        open={Boolean(reasonCfg)}
-        title={reasonCfg?.title}
-        width={480}
-        destroyOnHidden
-        okText={reasonCfg?.okText || 'Confirm'}
-        okButtonProps={{ danger: reasonCfg?.danger, loading: busy !== null }}
-        onOk={submitReason}
-        onCancel={() => setReasonCfg(null)}
-      >
-        <Text type="secondary" style={{ color: 'var(--text-secondary)' }}>
-          {reasonCfg?.label} — recorded on the bill's audit trail.
-        </Text>
-        <TextArea
-          rows={4}
-          value={reasonText}
-          maxLength={500}
-          showCount
-          autoFocus
-          style={{ marginTop: 8 }}
-          placeholder={reasonCfg?.placeholder || `Minimum ${reasonCfg?.minLength ?? 10} characters`}
-          onChange={(e) => setReasonText(e.target.value)}
-        />
-      </Modal>
+      <BillReasonModal {...reasonModal} />
     </div>
   );
 };

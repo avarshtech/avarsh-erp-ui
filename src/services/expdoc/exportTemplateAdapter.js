@@ -10,12 +10,13 @@
  * travels as `lockVersion`. The mock used one field for both, which is how a template
  * save could fail with a false conflict.
  */
-import { DOC_TYPE } from '../../utils/expDocConstants';
 import { TEMPLATE_SOURCE, pickLayout } from '../../utils/expDocSystemTemplates';
 
 export const fromApi = (dto) => {
   if (!dto) return dto;
-  const { layout, revision, version, revisions, ...rest } = dto;
+  // The API still stores a sub-client code; the business has no such concept, so no
+  // screen is handed one (the column goes in the API phase).
+  const { layout, revision, version, revisions, subClientCode: _subClient, ...rest } = dto;
   return {
     ...(layout || {}),
     ...rest,
@@ -40,11 +41,7 @@ export const toApi = (template) => ({
   name: (template.name || '').trim(),
   docType: template.docType,
   buyerId: template.buyerId ?? null,
-  subClientCode: template.subClientCode || null,
   layout: pickLayout(template),
   extractionMeta: template.extractionMeta ?? undefined,
   version: template.lockVersion ?? undefined,
 });
-
-/** The documents the API stores; carton stickers still live in the mock. */
-export const isApiDocType = (docType) => docType === DOC_TYPE.PACKING_LIST || docType === DOC_TYPE.INVOICE;

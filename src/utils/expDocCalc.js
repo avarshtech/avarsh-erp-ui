@@ -465,11 +465,23 @@ export const formatRanges = (ranges) =>
  * Derived from `sizeQtyPerCarton`, so a ratio pack and a mixed carton report the
  * sizes they really hold rather than the sizes the order happened to mention.
  */
+const sizesOf = (row) => Object.entries(sizeQtyPerCarton(row))
+  .filter(([, q]) => num(q) > 0)
+  .map(([size]) => size);
+
 const sizeTextOf = (row) => {
-  const sizes = Object.entries(sizeQtyPerCarton(row))
-    .filter(([, q]) => num(q) > 0)
-    .map(([size]) => size);
+  const sizes = sizesOf(row);
   return sizes.length ? sizes.join(' / ') : null;
+};
+
+/**
+ * "30+35=65": the pieces of each size in one carton, added up — how some buyers print
+ * a carton's quantity. A carton of one size prints just its total.
+ */
+const piecesSumOf = (row) => {
+  const parts = Object.values(sizeQtyPerCarton(row)).map(num).filter((q) => q > 0);
+  if (parts.length < 2) return String(piecesPerCarton(row));
+  return `${parts.join('+')}=${parts.reduce((s, q) => s + q, 0)}`;
 };
 
 /**
@@ -491,7 +503,6 @@ const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   sectionKey: row.sectionKey,
   packingType: row.packingType,
   packingCode: row.packingCode ?? null,
-  endCustomer: row.endCustomer ?? null,
   danNo: row.danNo ?? null,
   buyerPoNo: row.buyerPoNo ?? null,
   destination: row.destination ?? null,
@@ -500,6 +511,8 @@ const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   mixedRows: row.mixedRows ?? null,
   sizeQty: sizeQtyPerCarton(row),
   sizeText: sizeTextOf(row),
+  sizes: sizesOf(row),
+  piecesSum: piecesSumOf(row),
   ratio: row.ratio ?? null,
   assortmentsPerCarton: row.assortmentsPerCarton ?? null,
   // The master-polybag structure a Prenatal layout prints, alongside the ratio one.
@@ -517,6 +530,8 @@ const buildCarton = (row, cartonNo, ordinal, total, cfg) => ({
   articleNos: row.articleNos ?? null,
   articleNo: articleNoOf(row),
   eanBySize: row.eanBySize ?? null,
+  // The packing entry the row came from: what a sticker's `style.*` and season are read from.
+  sourceEntryId: row.sourceEntryId ?? null,
 });
 
 /**
@@ -618,7 +633,6 @@ export const contentHashOfRows = (rows) =>
         cartonTo: int(r.cartonTo),
         packingType: r.packingType,
         packingCode: r.packingCode ?? null,
-        endCustomer: r.endCustomer ?? null,
         danNo: r.danNo ?? null,
         buyerPoNo: r.buyerPoNo ?? null,
         styleNo: r.styleNo ?? null,
@@ -638,18 +652,25 @@ export const contentHashOfRows = (rows) =>
     ),
   );
 
+/** A binding's raw value, read by its WHOLE dotted path; undefined when a step is missing. */
+export const readPath = (source, path) =>
+  String(path).split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), source);
+
 /**
  * Hash of one carton across ONLY the fields a sticker layout binds.
  *
  * This is what makes the reprint list trustworthy: editing a field the sticker
  * never prints must not demand a reprint (PRD §24.17). `bindings` are the dotted
- * paths from the template's sticker layout, resolved against the expanded carton.
+ * paths from the template's sticker layout, each read by its full path from the print
+ * context — `ctx` (packing list, shipment, the carton's style …) with this carton as
+ * `carton` — so `style.styleNo` is never mistaken for the carton's own `styleNo`.
  */
-export const cartonHash = (carton, bindings) => {
+export const cartonHash = (carton, bindings, ctx = {}) => {
+  const scope = { ...ctx, carton };
   const picked = {};
   (bindings || []).forEach((path) => {
-    const leaf = String(path).split('.').pop();
-    if (leaf in (carton || {})) picked[leaf] = carton[leaf];
+    const value = readPath(scope, path);
+    if (value !== undefined) picked[path] = value;
   });
   return fnv1a(canonical(picked));
 };

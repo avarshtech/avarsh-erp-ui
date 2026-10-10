@@ -48,7 +48,6 @@ const blankGroup = (sectionKey, packingType, afterCarton) => ({
   cartonFrom: afterCarton ? afterCarton + 1 : 1,
   cartonTo: afterCarton ? afterCarton + 1 : 1,
   packingCode: null,
-  endCustomer: null,
   danNo: null,
   buyerPoNo: null,
   destination: null,
@@ -256,15 +255,6 @@ const CartonGroupEditor = ({
         render: (value, row) => (readOnly ? <ReadCell value={value} /> : (
           <Input size="small" value={value ?? ''}
             onChange={(e) => setCell(row.id, 'danNo', e.target.value)} />
-        )),
-      },
-      {
-        title: 'End customer',
-        dataIndex: 'endCustomer',
-        width: 140,
-        render: (value, row) => (readOnly ? <ReadCell value={value} /> : (
-          <Input size="small" value={value ?? ''}
-            onChange={(e) => setCell(row.id, 'endCustomer', e.target.value)} />
         )),
       },
       {

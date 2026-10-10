@@ -21,7 +21,7 @@ const TIER_LABEL = { BUYER: "This buyer's templates", GENERIC: 'Any-buyer templa
  * The parent keys this per opening.
  */
 const ChangeTemplateModal = ({
-  open, docType, buyerId, buyerName, subClientCode, current, canOverride, confirming, onCancel, onSubmit,
+  open, docType, buyerId, buyerName, current, canOverride, confirming, onCancel, onSubmit,
 }) => {
   const { message } = App.useApp();
   const [candidates, setCandidates] = useState([]);
@@ -31,7 +31,7 @@ const ChangeTemplateModal = ({
 
   useEffect(() => {
     let alive = true;
-    listTemplateCandidates({ buyerId, buyerName, subClientCode, docType })
+    listTemplateCandidates({ buyerId, buyerName, docType })
       .then((res) => {
         if (!alive) return;
         setCandidates(res.candidates);
@@ -87,7 +87,6 @@ const ChangeTemplateModal = ({
             <Space size={6}>
               <Text>{data.label}</Text>
               {data.row?.templateCode === current?.templateCode && data.row?.version > (current?.version || 0) && <Tag color="green">Newer version</Tag>}
-              {data.row?.subClientCode && <Tag>{data.row.subClientCode}</Tag>}
             </Space>
           )}
         />

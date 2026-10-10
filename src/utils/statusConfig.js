@@ -26,6 +26,7 @@ import {
   PL_STATUS,
   INVOICE_STATUS,
   TEMPLATE_STATUS,
+  SHIPMENT_STATUS,
 } from './expDocConstants';
 import { MAPPING_STATUS } from './poOrderMappingConstants';
 import { REQUIREMENT_STATUS } from './requirementStatus';
@@ -277,6 +278,11 @@ export const TEMPLATE_STATUS_CONFIG = {
   [TEMPLATE_STATUS.DRAFT]:   { color: 'default', icon: FileTextOutlined },
   [TEMPLATE_STATUS.ACTIVE]:  { color: 'green',   icon: CheckCircleOutlined },
   [TEMPLATE_STATUS.RETIRED]: { color: 'default', icon: StopOutlined },
+};
+
+export const SHIPMENT_STATUS_CONFIG = {
+  [SHIPMENT_STATUS.OPEN]:   { color: 'processing', icon: InboxOutlined },
+  [SHIPMENT_STATUS.CLOSED]: { color: 'cyan',       icon: SafetyCertificateOutlined },
 };
 
 // ==================== STATUS FLOW (for StatusSteps) ====================

@@ -9,19 +9,15 @@ import {
   BILL_PASSING_STATUS_LABEL,
   isBillEditable,
   isBillDeletable,
+  areDebitsEditable,
 } from '../../../utils/billPassingConstants';
+import { isJobWorkSource } from '../../../utils/jobWorkBillConstants';
 
 const { Text } = Typography;
 
-const ALL_STATUSES = Object.values(BILL_PASSING_STATUS);
-
-// Every state before APPROVED — the header and its GRN selection stay open until
-// the bill is passed. Derived from the shared helper so the grid and the workspace
-// can never disagree about what a status allows.
-const EDITABLE_STATUSES = new Set(ALL_STATUSES.filter(isBillEditable));
-
-// DRAFT alone — once a bill is submitted it is audit history and is never removed.
-const DELETABLE_STATUSES = new Set(ALL_STATUSES.filter(isBillDeletable));
+// A supplier bill stays open until it is passed; a job-work bill only while its deductions are open (its lines
+// and its debit note move together). DRAFT alone is ever deleted.
+const isRowEditable = (r) => (isJobWorkSource(r.source) ? areDebitsEditable(r.status) : isBillEditable(r.status));
 
 // Accounts hand-off states: a Tally reference only ever exists here, so a blank
 // cell in any earlier status is expected rather than missing data.
@@ -30,102 +26,78 @@ const TALLY_EXPECTED_STATUSES = new Set([
   BILL_PASSING_STATUS.SENT_TO_ACCOUNTS,
 ]);
 
-/** The three money columns, summarised onto the row by the server. */
-const money = (record, key) => record?.valueSummary?.[key];
+const money = (amount, extra) => <CurrencyDisplay amount={amount} currency="INR" {...extra} />;
 
-export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate = false, canDelete = false }) => [
+/**
+ * Columns of the one bill list over supplier and job-work bills (rows from listAllBills). `partyLabel` heads
+ * the party column: Supplier, Vendor, or Party when both kinds are listed.
+ */
+export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate = false, canDelete = false, partyLabel = 'Party' }) => [
   {
-    title: 'Bill Passing No',
-    dataIndex: 'bpNumber',
-    key: 'bpNumber',
+    title: 'Bill No',
+    dataIndex: 'number',
+    key: 'number',
     fixed: 'left',
-    width: 160,
-    render: (text, record) => <RecordLink text={text} onClick={() => onView?.(record)} />,
+    width: 170,
+    render: (text, record) => (
+      <Space size={6}>
+        <RecordLink text={text} onClick={() => onView?.(record)} />
+        {record.demo && <Tag color="orange" style={{ marginInlineEnd: 0 }}>Demo</Tag>}
+      </Space>
+    ),
   },
   {
-    title: 'Supplier',
-    dataIndex: 'supplierName',
-    key: 'supplierName',
-    width: 200,
-    ellipsis: true,
-    render: (name) => <Text strong>{name || '-'}</Text>,
+    title: partyLabel,
+    dataIndex: 'partyName',
+    key: 'partyName',
+    width: 220,
+    render: (name, record) => (
+      <Space size={6}>
+        <Text strong>{name || '-'}</Text>
+        {partyLabel === 'Party' && (
+          <Tag color={record.partyType === 'VENDOR' ? 'purple' : 'blue'} style={{ marginInlineEnd: 0 }}>
+            {record.partyType === 'VENDOR' ? 'Vendor' : 'Supplier'}
+          </Tag>
+        )}
+      </Space>
+    ),
   },
   {
-    title: 'Supplier Invoice',
-    dataIndex: 'supplierInvoiceNo',
-    key: 'supplierInvoiceNo',
+    title: 'Invoice',
+    dataIndex: 'invoiceNo',
+    key: 'invoiceNo',
     width: 180,
     render: (invoiceNo, record) => (
-      <div>
-        <div>{invoiceNo || '-'}</div>
+      <Space size={6}>
+        <span>{invoiceNo || '-'}</span>
         <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-          {record.invoiceDate ? dayjs(record.invoiceDate).format('DD-MMM-YYYY') : '-'}
+          {record.invoiceDate ? dayjs(record.invoiceDate).format('DD-MMM-YYYY') : ''}
         </Text>
-      </div>
+      </Space>
     ),
   },
+  { title: 'PO No', dataIndex: 'poNumber', key: 'poNumber', width: 150, render: (v) => v || '-' },
+  { title: 'Challan / DC No(s)', dataIndex: 'challanNumbers', key: 'challanNumbers', width: 170, render: (v) => v || '-' },
   {
-    title: 'PO No',
-    dataIndex: 'poNumber',
-    key: 'poNumber',
-    width: 150,
-    render: (v) => v || '-',
-  },
-  {
-    title: 'Challan No(s)',
-    dataIndex: 'challanNumbers',
-    key: 'challanNumbers',
-    width: 160,
-    ellipsis: true,
-    render: (v) => v || '-',
-  },
-  {
-    title: 'Material',
-    key: 'material',
+    title: 'Material / Process',
+    dataIndex: 'summary',
+    key: 'summary',
     width: 210,
-    ellipsis: true,
-    // Summarised server-side and stored on the bill, so the grid never has to
-    // walk every line of every row to render one column.
-    render: (_, record) => record.materialSummary || '-',
+    // Summarised and stored on the bill, so the grid never walks every line of every row.
+    render: (v) => v || '-',
   },
-  {
-    title: 'Total PO Value',
-    key: 'poValue',
-    width: 140,
-    align: 'right',
-    render: (_, record) => <CurrencyDisplay amount={money(record, 'poValue')} currency="INR" />,
-  },
-  {
-    title: 'Total GRN Value',
-    key: 'grnValue',
-    width: 145,
-    align: 'right',
-    render: (_, record) => <CurrencyDisplay amount={money(record, 'grnValue')} currency="INR" />,
-  },
-  {
-    title: 'Invoice Value',
-    key: 'invoiceValue',
-    width: 140,
-    align: 'right',
-    render: (_, record) => (
-      <CurrencyDisplay
-        amount={money(record, 'invoiceValue') ?? record.invoiceBasicAmount}
-        currency="INR"
-      />
-    ),
-  },
+  { title: 'PO Value', dataIndex: 'poValue', key: 'poValue', width: 130, align: 'right', render: (v) => money(v) },
+  { title: 'Received Value', dataIndex: 'receivedValue', key: 'receivedValue', width: 140, align: 'right', render: (v) => money(v) },
+  { title: 'Invoice Value', dataIndex: 'invoiceValue', key: 'invoiceValue', width: 135, align: 'right', render: (v) => money(v) },
   {
     title: 'Total Debit',
     dataIndex: 'debitTotal',
     key: 'debitTotal',
-    width: 135,
+    width: 125,
     align: 'right',
-    render: (amount) =>
-      amount ? (
-        <CurrencyDisplay amount={amount} currency="INR" color="var(--warning-color)" />
-      ) : (
-        <Text style={{ color: 'var(--text-secondary)' }}>-</Text>
-      ),
+    render: (amount) => (amount
+      ? money(amount, { color: 'var(--warning-color)' })
+      : <Text style={{ color: 'var(--text-secondary)' }}>-</Text>),
   },
   {
     title: 'Net Payable',
@@ -133,18 +105,13 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     key: 'netPayable',
     width: 160,
     align: 'right',
-    // Unresolved mismatch cue: a bill that still has blockers cannot be passed,
-    // so its payable figure is provisional and reads in the error colour.
+    // A bill that still has blockers cannot be passed: its payable is provisional and reads in the error colour.
     render: (amount, record) => {
       const blocked = Number(record.blockerCount) > 0;
-      return (
-        <CurrencyDisplay
-          amount={amount}
-          currency="INR"
-          color={blocked ? 'var(--error-color)' : undefined}
-          secondary={blocked ? `${record.blockerCount} unresolved` : undefined}
-        />
-      );
+      return money(amount, {
+        color: blocked ? 'var(--error-color)' : undefined,
+        secondary: blocked ? `${record.blockerCount} unresolved` : undefined,
+      });
     },
   },
   {
@@ -152,12 +119,10 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     title: 'Tally Ref',
     dataIndex: 'tallyReferenceNo',
     key: 'tallyReferenceNo',
-    width: 150,
+    width: 140,
     render: (ref, record) => {
       if (ref) return <Text code>{ref}</Text>;
-      if (TALLY_EXPECTED_STATUSES.has(record.status)) {
-        return <Text style={{ color: 'var(--text-secondary)' }}>Pending</Text>;
-      }
+      if (TALLY_EXPECTED_STATUSES.has(record.status)) return <Text style={{ color: 'var(--text-secondary)' }}>Pending</Text>;
       return '-';
     },
   },
@@ -168,11 +133,7 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     width: 165,
     fixed: 'right',
     align: 'center',
-    render: (status) => (
-      <Tag color={BILL_PASSING_STATUS_COLOR[status]}>
-        {BILL_PASSING_STATUS_LABEL[status] || status}
-      </Tag>
-    ),
+    render: (status) => <Tag color={BILL_PASSING_STATUS_COLOR[status]}>{BILL_PASSING_STATUS_LABEL[status] || status}</Tag>,
   },
   {
     title: 'Actions',
@@ -183,13 +144,11 @@ export const getBillPassingListColumns = ({ onView, onEdit, onDelete, canUpdate 
     render: (_, record) => (
       <Space size="small">
         <ActionButton action="view" size="small" onClick={() => onView?.(record)} />
-        {canUpdate && EDITABLE_STATUSES.has(record.status) && (
-          <ActionButton action="edit" size="small" onClick={() => onEdit?.(record)} />
-        )}
-        {canDelete && DELETABLE_STATUSES.has(record.status) && (
+        {canUpdate && isRowEditable(record) && <ActionButton action="edit" size="small" onClick={() => onEdit?.(record)} />}
+        {canDelete && isBillDeletable(record.status) && (
           <Popconfirm
             title="Delete draft bill"
-            description={`Delete ${record.bpNumber}? This cannot be undone.`}
+            description={`Delete ${record.number}? This cannot be undone.`}
             okText="Delete"
             okType="danger"
             cancelText="Cancel"

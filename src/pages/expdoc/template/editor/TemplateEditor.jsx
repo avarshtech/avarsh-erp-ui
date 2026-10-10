@@ -6,14 +6,17 @@ import TabHeader from './TabHeader';
 import TabColumns from './TabColumns';
 import TabInvoice from './TabInvoice';
 import TabTextBlocks from './TabTextBlocks';
-import TabSticker from './TabSticker';
+import StickerTab from './sticker/StickerTab';
 import TabRules from './TabRules';
 
-/** Which tabs a document type actually has — an invoice has no carton columns. */
+/**
+ * Which tabs a document type actually has — an invoice has no carton columns, and a
+ * sticker no document rules: printing reads only its own layout's mandatory fields.
+ */
 const TABS_FOR = {
   [DOC_TYPE.PACKING_LIST]: ['identity', 'header', 'columns', 'text', 'rules'],
   [DOC_TYPE.INVOICE]: ['identity', 'header', 'invoice', 'text', 'rules'],
-  [DOC_TYPE.STICKER]: ['identity', 'sticker', 'rules'],
+  [DOC_TYPE.STICKER]: ['identity', 'sticker'],
 };
 
 const TAB_LABELS = {
@@ -37,7 +40,7 @@ const TAB_LABELS = {
  * opens it where a problem is fixed.
  */
 const TemplateEditor = ({
-  tpl, patch, locked, meta, onEvidence, buyers, stickerBuyers, codeEditable = false, defaultTab,
+  tpl, patch, locked, meta, onEvidence, buyers, codeEditable = false, defaultTab,
 }) => {
   const tabs = TABS_FOR[tpl.docType] || TABS_FOR[DOC_TYPE.PACKING_LIST];
   const [tab, setTab] = useState(defaultTab || tabs[0]);
@@ -45,12 +48,12 @@ const TemplateEditor = ({
   const props = { tpl, patch, locked, meta, onEvidence };
 
   const bodies = {
-    identity: <TabIdentity tpl={tpl} patch={patch} locked={locked} buyers={buyers} stickerBuyers={stickerBuyers} codeEditable={codeEditable} />,
+    identity: <TabIdentity tpl={tpl} patch={patch} locked={locked} buyers={buyers} codeEditable={codeEditable} />,
     header: <TabHeader {...props} />,
     columns: <TabColumns {...props} />,
     invoice: <TabInvoice {...props} />,
     text: <TabTextBlocks {...props} />,
-    sticker: <TabSticker tpl={tpl} patch={patch} locked={locked} />,
+    sticker: <StickerTab {...props} />,
     rules: <TabRules tpl={tpl} patch={patch} locked={locked} />,
   };
 

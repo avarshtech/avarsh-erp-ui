@@ -1,0 +1,60 @@
+{
+  "_about": "Golden cases for the job-work bill calculator (src/utils/jobWorkBillCalc.js). Stage 2's Java calculators must reproduce every expected figure. Quantities are pieces; money is in the PO's billing unit.",
+  "lines": [
+    {
+      "name": "piece line, rejects at receipt and at QC, no allowance",
+      "poStatus": "COMPLETED",
+      "line": { "id": 1, "uom": "PIECE", "unitPieces": 1, "unitUnits": 1, "poQty": 500, "issuedQty": 500, "goodQty": 490, "rejectedReceiptQty": 10, "rejectedQcQty": 15, "allowanceQty": 0, "poRate": 4.5 },
+      "expect": { "returnedQty": 500, "acceptedQty": 475, "rejectedQty": 25, "shortQty": 0, "invoiceUnits": 500, "passedUnits": 475, "invoiceAmount": 2250, "passedAmount": 2137.5, "rateDiffAmount": 0, "rejectionAmount": 112.5, "recoverableRejectQty": 25, "recoverableShortQty": 0, "allowanceUsed": 0 }
+    },
+    {
+      "name": "garment line with an excess allowance and an invoice rate above the PO",
+      "poStatus": "COMPLETED",
+      "line": { "id": 2, "uom": "PIECE", "unitPieces": 1, "unitUnits": 1, "poQty": 1020, "issuedQty": 1020, "goodQty": 1008, "rejectedReceiptQty": 12, "rejectedQcQty": 10, "allowanceQty": 20, "poRate": 18, "invoiceRate": 18.5 },
+      "expect": { "returnedQty": 1020, "acceptedQty": 998, "rejectedQty": 22, "invoiceUnits": 1020, "passedUnits": 998, "invoiceAmount": 18870, "passedAmount": 17964, "rateDiffAmount": 499, "rejectionAmount": 407, "recoverableRejectQty": 2, "recoverableShortQty": 0, "allowanceUsed": 20 }
+    },
+    {
+      "name": "short-closed line: shortage on top of rejects",
+      "poStatus": "CLOSED",
+      "line": { "id": 3, "uom": "PIECE", "unitPieces": 1, "unitUnits": 1, "poQty": 300, "issuedQty": 300, "goodQty": 270, "rejectedReceiptQty": 6, "rejectedQcQty": 4, "allowanceQty": 0, "poRate": 6 },
+      "expect": { "returnedQty": 276, "acceptedQty": 266, "rejectedQty": 10, "shortQty": 24, "invoiceUnits": 276, "passedUnits": 266, "invoiceAmount": 1656, "passedAmount": 1596, "rateDiffAmount": 0, "rejectionAmount": 60, "recoverableRejectQty": 10, "recoverableShortQty": 24, "allowanceUsed": 0 }
+    },
+    {
+      "name": "allowance covers the rejects and part of the shortage",
+      "poStatus": "CLOSED",
+      "line": { "id": 4, "uom": "PIECE", "unitPieces": 1, "unitUnits": 1, "poQty": 210, "issuedQty": 210, "goodQty": 195, "rejectedReceiptQty": 3, "rejectedQcQty": 2, "allowanceQty": 10.5, "poRate": 20 },
+      "expect": { "returnedQty": 198, "acceptedQty": 193, "rejectedQty": 5, "shortQty": 12, "recoverableRejectQty": 0, "recoverableShortQty": 7, "allowanceUsed": 10 }
+    },
+    {
+      "name": "dozen line: money per dozen, recovery in pieces",
+      "poStatus": "COMPLETED",
+      "line": { "id": 5, "uom": "DOZEN", "unitPieces": 12, "unitUnits": 1, "poQty": 240, "issuedQty": 240, "goodQty": 240, "rejectedReceiptQty": 0, "rejectedQcQty": 12, "allowanceQty": 0, "poRate": 96 },
+      "expect": { "returnedQty": 240, "acceptedQty": 228, "invoiceUnits": 20, "passedUnits": 19, "passedPcs": 228, "invoiceAmount": 1920, "passedAmount": 1824, "rejectionAmount": 96, "rateDiffAmount": 0, "recoverableRejectQty": 12 }
+    },
+    {
+      "name": "KG line invoiced below what was accepted, at a rate below the PO",
+      "poStatus": "COMPLETED",
+      "line": { "id": 6, "uom": "KG", "unitPieces": 500, "unitUnits": 25, "poQty": 500, "issuedQty": 500, "goodQty": 500, "rejectedReceiptQty": 0, "rejectedQcQty": 0, "allowanceQty": 0, "poRate": 120, "invoiceUnits": 24, "invoiceRate": 115 },
+      "expect": { "passedUnits": 25, "billedUnits": 24, "invoiceAmount": 2760, "passedAmount": 2760, "rateDiffAmount": 0, "rejectionAmount": 0, "recoverableRejectQty": 0 }
+    },
+    {
+      "name": "verifier pays three rejects (not his fault): those are not recovered",
+      "poStatus": "COMPLETED",
+      "line": { "id": 7, "uom": "PIECE", "unitPieces": 1, "unitUnits": 1, "poQty": 100, "issuedQty": 100, "goodQty": 95, "rejectedReceiptQty": 5, "rejectedQcQty": 0, "allowanceQty": 0, "poRate": 10, "passedUnits": 98 },
+      "expect": { "acceptedQty": 95, "passedPcs": 98, "invoiceAmount": 1000, "passedAmount": 980, "rejectionAmount": 20, "recoverableRejectQty": 2 }
+    }
+  ],
+  "totals": [
+    {
+      "name": "intra-state vendor, other charges above the PO, one confirmed GST and one non-GST deduction",
+      "bill": { "gstRatePercent": 5, "igstApplicable": false, "otherCharges": 150, "poOtherCharges": 100, "invoiceCgst": 60, "invoiceSgst": 60, "invoiceIgst": 0, "invoiceRoundOff": 0 },
+      "lines": [{ "invoiceAmount": 2250, "passedAmount": 2137.5, "rejectionAmount": 112.5, "rateDiffAmount": 0 }],
+      "deductions": [
+        { "status": "CONFIRMED", "amount": 112.5, "gstAmount": 5.63 },
+        { "status": "CONFIRMED", "amount": 300, "gstAmount": 0 },
+        { "status": "DROPPED", "amount": 50, "gstAmount": 2.5 }
+      ],
+      "expect": { "invoiceTaxable": 2400, "invoiceGst": 120, "invoiceTotal": 2520, "taxVariance": 0, "deductionTotal": 412.5, "deductionGst": 5.63, "debitNoteTotal": 418.13, "netPayable": 2101.87, "debitPercent": 17.19 }
+    }
+  ]
+}

@@ -15,34 +15,42 @@
  * Quota note: carton data is stored as RANGES, never as one row per carton, so a
  * shipment of any size costs a handful of rows. That is what keeps an unbounded
  * carton count inside the browser's ~5 MB budget.
+ *
+ * Shipments are the API's: `db.shipments` is the in-memory mirror
+ * (expDocShipmentMirror), laid over every load and stripped from every save.
  */
 import { buildSeedDb, SEED_VERSION } from './expDocMockData';
 import { nextDocNo, EXPDOC_PREFIX } from './expDocDocNumbers';
+import { mirroredShipments } from './expDocShipmentMirror';
 
 const STORAGE_KEY = 'avarsh.expdoc.mockStore.v1';
 
 let memoryDb = null; // fallback when localStorage is unavailable or full
 
+const withShipments = (db) => ({ ...db, shipments: mirroredShipments() });
+
 export const loadDb = () => {
-  if (memoryDb && memoryDb.seedVersion === SEED_VERSION) return memoryDb;
+  if (memoryDb && memoryDb.seedVersion === SEED_VERSION) return withShipments(memoryDb);
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const db = JSON.parse(raw);
-      if (db.seedVersion === SEED_VERSION) return db;
+      if (db.seedVersion === SEED_VERSION) return withShipments(db);
     }
   } catch { /* fall through to reseed */ }
   const fresh = buildSeedDb();
   saveDb(fresh);
-  return fresh;
+  return withShipments(fresh);
 };
 
 export const saveDb = (db) => {
+  // Never stored: the API holds the only shipment record
+  const { shipments: _apiShipments, ...stored } = db;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     memoryDb = null; // localStorage is authoritative again
   } catch {
-    memoryDb = db;
+    memoryDb = stored;
   }
 };
 
@@ -55,10 +63,8 @@ export const isMemoryOnly = () => memoryDb != null;
 
 // ── Numbering ──────────────────────────────────────────────────────────────
 // Every series follows the ERP standard <PREFIX>/<FY>/<NNNN> handed out by the
-// backend DocumentNumberService — see expDocDocNumbers.js.
-
-/** Shipment, e.g. SHP/26-27/1001. */
-export const nextShipmentNo = (db) => nextDocNo(db, EXPDOC_PREFIX.SHIPMENT);
+// backend DocumentNumberService — see expDocDocNumbers.js. Shipments are numbered
+// by the API itself.
 
 /**
  * Packing list, e.g. PKL/26-27/1001. Allocated at CREATE, unlike the invoice:

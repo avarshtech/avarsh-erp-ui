@@ -28,12 +28,8 @@ export const listEditor = (list, onChange) => ({
  */
 export const withRowKeys = (list) => (list || []).map((row, i) => ({ ...row, __row: i }));
 
-let keySeq = 0;
-/** A key for a new row — unique for the page's life, never two in one millisecond. */
-export const newRowKey = (prefix) => {
-  keySeq += 1;
-  return `${prefix}${Date.now().toString(36)}${keySeq}`;
-};
+// Kept in a plain module (no antd) so models can use it; re-exported for the editors.
+export { newRowKey } from './rowKeys';
 
 /** A "Source" table column for a list, shown only when there are reader notes. */
 export const evidenceColumn = (meta, list, onEvidence) => (meta && Object.keys(meta).length ? [{

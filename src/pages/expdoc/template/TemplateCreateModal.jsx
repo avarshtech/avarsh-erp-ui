@@ -1,16 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
-  App, AutoComplete, Input, Modal, Segmented, Space, Typography,
+  App, Input, Modal, Segmented, Space, Typography,
 } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { MODAL_WIDTHS } from '../../../utils/uiConstants';
-import { DOC_TYPE, DOC_TYPE_LABELS, SECTION_KEY } from '../../../utils/expDocConstants';
+import { DOC_TYPE, DOC_TYPE_LABELS, PAPER, SECTION_KEY } from '../../../utils/expDocConstants';
 import { SYSTEM_TEMPLATES, completeLayout } from '../../../utils/expDocSystemTemplates';
-import { createTemplate, cloneTemplate, listStickerBuyers } from '../../../services/expdoc/expDocService';
+import { createTemplate, cloneTemplate } from '../../../services/expdoc/expDocService';
+import { newFace } from './editor/sticker/stickerEditorModel';
 
 const { Text } = Typography;
 
 const MODE = { CLONE: 'Copy an existing', BLANK: 'Start blank' };
+const DOC_TYPES = Object.values(DOC_TYPE);
 
 /** A layout with nothing buyer-specific in it yet, but sections that print every carton. */
 const blankLayout = (docType) => completeLayout(docType, {
@@ -23,6 +25,11 @@ const blankLayout = (docType) => completeLayout(docType, {
     { key: 'MAIN', title: 'PACKING LIST', include: [SECTION_KEY.MAIN], showSectionTotals: true },
     { key: 'EXTRA', title: 'EXTRA CARTONS', include: [SECTION_KEY.EXTRA], showSectionTotals: true, joinGrandTotal: true },
   ] : [],
+  // Given explicitly, or the standard carton marking's faces would be copied in: one
+  // empty main face to start from.
+  stickerLayout: docType === DOC_TYPE.STICKER
+    ? { paperDefault: PAPER.A4_1UP, faces: [newFace('MAIN')], mandatoryFields: [] }
+    : undefined,
 });
 
 /** "PRENATAL" from "Prénatal Moeder en Kind BV" — the start of a suggested code. */
@@ -35,8 +42,14 @@ const SUFFIX = { [DOC_TYPE.PACKING_LIST]: 'PL', [DOC_TYPE.INVOICE]: 'INV', [DOC_
  * The ways a template comes into being besides uploading the buyer's document: copy
  * the nearest one and change the deltas (the PRD's primary path), or start blank.
  * Either lands as a draft.
+ *
+ * It opens on copying, unless `mode` is 'BLANK': "Build it by hand" after an upload opens
+ * a blank template of the `docType` the user said the file holds — a packing list when
+ * they let the reader decide.
  */
-const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaultBuyerId, onCancel, onCreated }) => {
+const TemplateCreateModal = ({
+  open, source, templates = [], buyers = [], defaultBuyerId, mode: startMode, docType: startType, onCancel, onCreated,
+}) => {
   const { message } = App.useApp();
   const [mode, setMode] = useState(MODE.CLONE);
   const [sourceId, setSourceId] = useState();
@@ -45,23 +58,18 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const [name, setName] = useState('');
   const [docType, setDocType] = useState(DOC_TYPE.PACKING_LIST);
   const [buyerId, setBuyerId] = useState();
-  const [buyerCode, setBuyerCode] = useState();
-  const [subClientCode, setSubClientCode] = useState('');
   const [busy, setBusy] = useState(false);
-  const stickerBuyers = useMemo(() => listStickerBuyers(), []);
 
   useEffect(() => {
     if (!open) return;
-    setMode(MODE.CLONE);
+    setMode(MODE[startMode] || MODE.CLONE);
     setSourceId(source?.id);
     setTemplateCode('');
     setCodeTouched(false);
     setName(source ? `${source.name} (copy)` : '');
-    setDocType(source?.docType || DOC_TYPE.PACKING_LIST);
+    setDocType(source?.docType || (DOC_TYPES.includes(startType) ? startType : DOC_TYPE.PACKING_LIST));
     setBuyerId(source?.isSystem ? defaultBuyerId : (source?.buyerId ?? defaultBuyerId));
-    setBuyerCode(source?.buyerCode || undefined);
-    setSubClientCode('');
-  }, [open, source, defaultBuyerId]);
+  }, [open, source, defaultBuyerId, startMode, startType]);
 
   const pool = useMemo(() => {
     const seen = new Set(templates.map((t) => t.id));
@@ -70,11 +78,10 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
   const chosen = pool.find((t) => t.id === sourceId) || (source?.id === sourceId ? source : null);
 
   const targetType = mode === MODE.CLONE ? chosen?.docType : docType;
-  const isSticker = targetType === DOC_TYPE.STICKER;
   const buyerName = buyers.find((b) => b.id === buyerId)?.name;
 
   // A code suggested from the buyer and document, until the user types their own.
-  const suggestedCode = targetType ? `${codeBase(isSticker ? buyerCode : buyerName)}-${SUFFIX[targetType]}` : '';
+  const suggestedCode = targetType ? `${codeBase(buyerName)}-${SUFFIX[targetType]}` : '';
   const effectiveCode = codeTouched ? templateCode : suggestedCode;
 
   const cloneOptions = useMemo(() => pool.map((t) => ({
@@ -82,9 +89,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     label: `${t.templateCode} v${t.version} — ${DOC_TYPE_LABELS[t.docType]}${t.isSystem ? ' (standard)' : ''}${t.buyerName ? ` · ${t.buyerName}` : ''}`,
   })), [pool]);
 
-  const buyerOptions = isSticker
-    ? stickerBuyers
-    : buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
+  const buyerOptions = buyers.filter((b) => b.active !== false).map((b) => ({ value: b.id, label: b.name }));
 
   const canSubmit = Boolean(effectiveCode.trim() && name.trim()) && (mode === MODE.CLONE ? Boolean(chosen) : Boolean(docType));
 
@@ -93,8 +98,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
     try {
       const identity = {
         templateCode: effectiveCode.trim(), name: name.trim(),
-        buyerId: isSticker ? null : buyerId ?? null, buyerName: isSticker ? null : buyerName ?? null,
-        buyerCode: isSticker ? buyerCode ?? null : null, subClientCode: subClientCode.trim() || null,
+        buyerId: buyerId ?? null, buyerName: buyerName ?? null,
       };
       const created = mode === MODE.CLONE
         ? await cloneTemplate(chosen, identity)
@@ -122,7 +126,7 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
             <FormSelect variant="default" style={{ width: '100%' }} value={sourceId} onChange={setSourceId}
               options={cloneOptions} placeholder="Pick the nearest existing layout" />
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Every block comes across — header, columns, sheets, declarations. Change only what differs.
+              Every block comes across — header, columns, sheets, declarations, sticker faces. Change only what differs.
             </Text>
           </div>
         )}
@@ -137,30 +141,23 @@ const TemplateCreateModal = ({ open, source, templates = [], buyers = [], defaul
           <Text type="secondary">Buyer</Text>
           <FormSelect
             variant="default" style={{ width: '100%' }}
-            value={(isSticker ? buyerCode : buyerId) ?? undefined}
-            onChange={(v) => (isSticker ? setBuyerCode(v) : setBuyerId(v))}
+            value={buyerId ?? undefined}
+            onChange={setBuyerId}
             options={buyerOptions} placeholder="Leave blank for a tenant-wide template"
           />
         </div>
-        <Space size={12} style={{ width: '100%' }} wrap>
-          <div style={{ minWidth: 200 }}>
-            <Text type="secondary">Template code</Text>
-            <Input name="newTemplateCode" value={effectiveCode} placeholder="e.g. PRENATAL-PL"
-              onChange={(e) => { setCodeTouched(true); setTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); }} />
-          </div>
-          <div style={{ minWidth: 160 }}>
-            <Text type="secondary">Sub-client</Text>
-            <AutoComplete style={{ width: '100%' }} value={subClientCode} placeholder="Optional"
-              onChange={(v) => setSubClientCode(String(v || '').toUpperCase())} options={[]} />
-          </div>
-        </Space>
+        <div>
+          <Text type="secondary">Template code</Text>
+          <Input name="newTemplateCode" value={effectiveCode} placeholder="e.g. PRENATAL-PL"
+            onChange={(e) => { setCodeTouched(true); setTemplateCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '')); }} />
+        </div>
         <div>
           <Text type="secondary">Name</Text>
           <Input name="newTemplateName" value={name} placeholder="Shown when staff pick a template, e.g. Packing list — sea"
             onChange={(e) => setName(e.target.value)} />
         </div>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          The draft is not offered on any document until it is published.
+          The draft is not offered on any document or sticker run until it is published.
         </Text>
       </Space>
     </Modal>

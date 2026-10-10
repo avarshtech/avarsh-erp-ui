@@ -15,10 +15,16 @@ const call = (request) =>
     throw e;
   });
 
-/** Groups are rebuilt server-side: new rows carry `tmp-…` ids and derived fields are recomputed. */
+/**
+ * Groups are rebuilt server-side: new rows carry `tmp-…` ids and derived fields are recomputed.
+ * `endCustomer` is never sent — the business has no end-customer concept (the column goes in
+ * the API phase), and a value loaded from an older entry is cleared on its next save.
+ */
 const toPayload = ({ groups = [], ...rest }) => ({
   ...rest,
-  groups: groups.map(({ id: _id, cartonCount: _c, piecesPerCarton: _p, totalPieces: _t, cbm: _cbm, ...g }) => g),
+  groups: groups.map(({
+    id: _id, cartonCount: _c, piecesPerCarton: _p, totalPieces: _t, cbm: _cbm, endCustomer: _ec, ...g
+  }) => g),
 });
 
 export const searchPackingEntries = async (params = {}) => {

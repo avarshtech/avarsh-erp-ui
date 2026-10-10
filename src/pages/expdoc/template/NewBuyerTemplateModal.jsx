@@ -189,7 +189,7 @@ const NewBuyerTemplateModal = ({
               <Radio value={NEXT.ANOTHER}>
                 <Choice
                   title={`Add another template for ${buyerName}`}
-                  hint="For a different document or shipment — say a separate packing list for air, or for a sub-client."
+                  hint="For a different document or shipment — say a separate packing list for air."
                 />
               </Radio>
             </Space>
@@ -205,9 +205,9 @@ const NewBuyerTemplateModal = ({
               <Radio value={HOW.UPLOAD}>
                 <Choice
                   icon={<CloudUploadOutlined />}
-                  title="Upload the buyer's packing list or invoice"
+                  title="Upload the buyer's packing list, invoice or carton sticker"
                   tag={<Tag color="green" style={{ marginInlineEnd: 0 }}>Recommended</Tag>}
-                  hint="PDF or Excel, blank or filled in. It is read for you, and you check it before anything is saved."
+                  hint="PDF, Excel or Word (.pdf, .xlsx, .xls or .docx), blank or filled in. It is read for you, and you check it before anything is saved."
                 />
               </Radio>
               <Radio value={HOW.COPY}>

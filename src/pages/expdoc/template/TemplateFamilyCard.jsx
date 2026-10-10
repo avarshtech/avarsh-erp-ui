@@ -34,7 +34,6 @@ const TemplateFamilyCard = ({
         <Space size={8} wrap>
           <Text strong>{head.name}</Text>
           <Tag style={{ fontFamily: 'monospace' }}>{head.templateCode}</Tag>
-          {head.subClientCode && <Tag color="cyan">{`Sub-client ${head.subClientCode}`}</Tag>}
           {head.isSystem && <Tag color="blue">Built-in</Tag>}
           {highlighted && <Tag color="green">Just saved</Tag>}
         </Space>

@@ -89,7 +89,8 @@ const ExportInvoiceForm = () => {
 
   useEffect(() => {
     if (!inv?.shipmentId) return;
-    getShipment(inv.shipmentId).then(setShipment).catch(() => setShipment(null));
+    // Silent: a shipment that cannot be read (deleted, another branch) prints as a dash
+    getShipment(inv.shipmentId, { silent: true }).then(setShipment).catch(() => setShipment(null));
   }, [inv?.shipmentId]);
 
   useEffect(() => {
@@ -443,7 +444,6 @@ const ExportInvoiceForm = () => {
           docType={DOC_TYPE.INVOICE}
           buyerId={working.buyerId}
           buyerName={working.buyerName}
-          subClientCode={working.subClientCode}
           current={working.templateId ? {
             id: working.templateId, templateCode: working.template?.templateCode,
             version: working.templateVersion, name: working.template?.name,

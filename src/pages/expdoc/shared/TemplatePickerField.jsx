@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Alert, Select, Space, Tag, Typography,
+  Alert, Select, Space, Typography,
 } from 'antd';
 import { DOC_TYPE_LABELS } from '../../../utils/expDocConstants';
 import { listTemplateCandidates } from '../../../services/expdoc/expDocService';
@@ -13,19 +13,19 @@ const TIER_LABEL = { BUYER: "This buyer's templates", GENERIC: 'Any-buyer templa
 /**
  * Which template a new packing list or invoice is made with.
  *
- * A buyer may keep several (sea / air, one per end customer), and there is no default:
- * with one it is filled in, with two or more the user must pick. With none the
- * standard layout is used, and the field says so.
+ * A buyer may keep several (sea / air, say), and there is no default: with one it is
+ * filled in, with two or more the user must pick. With none the standard layout is
+ * used, and the field says so.
  */
 const TemplatePickerField = ({
-  docType, buyerId, buyerName, subClientCode, value, onChange, id = 'templateId',
+  docType, buyerId, buyerName, value, onChange, id = 'templateId',
 }) => {
   const [state, setState] = useState({ key: null, candidates: [], autoSelectId: null, hasOwn: false });
-  const key = `${docType}|${buyerId ?? ''}|${buyerName ?? ''}|${subClientCode ?? ''}`;
+  const key = `${docType}|${buyerId ?? ''}|${buyerName ?? ''}`;
 
   useEffect(() => {
     let alive = true;
-    listTemplateCandidates({ buyerId, buyerName, subClientCode, docType })
+    listTemplateCandidates({ buyerId, buyerName, docType })
       .then((res) => {
         if (!alive) return;
         setState({ key, ...res });
@@ -71,12 +71,6 @@ const TemplatePickerField = ({
         optionFilterProp="label"
         placeholder={needsChoice ? 'This buyer has several — pick one' : 'Pick a template'}
         status={needsChoice && !value ? 'warning' : undefined}
-        optionRender={({ data }) => (
-          <Space size={6}>
-            <Text>{data.label}</Text>
-            {data.row?.subClientCode && <Tag color={data.row.matchesSubClient ? 'cyan' : 'default'}>{data.row.subClientCode}</Tag>}
-          </Space>
-        )}
       />
       {!loading && state.failed && (
         <Alert type="error" showIcon title="The buyer's templates could not be loaded"

@@ -131,7 +131,6 @@ const InvoiceCreateModal = ({ open, onCancel, onCreated }) => {
             docType={DOC_TYPE.INVOICE}
             buyerId={chosen[0].buyerId}
             buyerName={chosen[0].buyerName}
-            subClientCode={chosen[0].subClientCode}
             value={templateId}
             onChange={setTemplateId}
           />
