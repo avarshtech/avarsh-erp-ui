@@ -1,7 +1,10 @@
 import { Component } from 'react';
 import { Button, Result, Typography } from 'antd';
+import { isChunkLoadError } from '../utils/chunkReload';
 
 const { Paragraph, Text } = Typography;
+
+const reloadPage = () => window.location.reload();
 
 /**
  * Catches a rendering error and shows it, instead of a white page.
@@ -39,19 +42,36 @@ class ErrorBoundary extends Component {
     const { error } = this.state;
     if (!error) return this.props.children;
 
+    // The screen's code file could not be fetched: a deploy since this page was opened removed it,
+    // or the connection dropped. "Try again" cannot help, because React keeps the failed import and
+    // throws it again; only a reload fetches the current build.
+    const chunkError = isChunkLoadError(error);
+
     return (
       <Result
         status="error"
-        title="This screen could not be displayed"
-        subTitle="The error is below. Everything you had already saved is unaffected."
-        extra={[
-          <Button type="primary" key="retry" onClick={this.handleReset}>
-            Try again
-          </Button>,
-          <Button key="reload" onClick={() => window.location.reload()}>
-            Reload the page
-          </Button>,
-        ]}
+        title={chunkError ? 'This screen could not be loaded' : 'This screen could not be displayed'}
+        subTitle={
+          chunkError
+            ? 'The app may have been updated since this page was opened, or the connection dropped. Reload the page to continue. Everything you had already saved is unaffected.'
+            : 'The error is below. Everything you had already saved is unaffected.'
+        }
+        extra={
+          chunkError
+            ? [
+                <Button type="primary" key="reload" onClick={reloadPage}>
+                  Reload the page
+                </Button>,
+              ]
+            : [
+                <Button type="primary" key="retry" onClick={this.handleReset}>
+                  Try again
+                </Button>,
+                <Button key="reload" onClick={reloadPage}>
+                  Reload the page
+                </Button>,
+              ]
+        }
       >
         <Paragraph>
           <Text code style={{ whiteSpace: 'pre-wrap' }}>
