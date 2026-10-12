@@ -1,11 +1,34 @@
 {
+  "e2e/specs/approvals/02-conditions-routing.spec.js": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
   "e2e/specs/grn-qc/grn-qc-workflow-api.spec.js": {
     "no-unused-vars": {
       "count": 1
     }
   },
+  "e2e/unit/job-work-bill-mock.spec.js": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "src/App.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/components/ConflictDialog.jsx": {
     "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/components/ErrorBoundary.jsx": {
+    "no-console": {
       "count": 1
     }
   },
@@ -24,6 +47,16 @@
       "count": 2
     }
   },
+  "src/components/PwaInstallPrompt.jsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/components/ScrollToTop.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/components/SessionExpiryGuard.jsx": {
     "react-hooks/preserve-manual-memoization": {
       "count": 1
@@ -34,8 +67,18 @@
       "count": 1
     }
   },
+  "src/components/approval/ApprovalHistoryTimeline.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/components/branch/BranchField.jsx": {
     "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/components/dashboard/RecentOrdersCard.jsx": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -67,17 +110,89 @@
       "count": 1
     }
   },
+  "src/hooks/usePushNotification.js": {
+    "no-console": {
+      "count": 3
+    }
+  },
   "src/layout/MainLayout.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
+  "src/pages/Profile.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/admin/AdminDashboard.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/admin/ApprovalFlowForm.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/admin/ApprovalFlowList.jsx": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/pages/admin/UserManagement.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/approvals/MyApprovals.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/bom/BOMForm.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 9
+    }
+  },
+  "src/pages/bom/BOMView.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
   "src/pages/bom/ConsumptionMatrixDialog.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
   "src/pages/bom/ProcessAllowanceModal.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
@@ -92,9 +207,35 @@
       "count": 1
     }
   },
+  "src/pages/costing/ConsumptionCalcModal.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/CostingHistoryModal.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "src/pages/costing/CostingList.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
   "src/pages/costing/CostingPdfPreviewModal.jsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
+    }
+  },
+  "src/pages/costing/CostingView.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 15
     }
   },
   "src/pages/costing/KnitsConsumptionModal.jsx": {
@@ -102,9 +243,167 @@
       "count": 1
     }
   },
+  "src/pages/costing/sheet/genie/useCostingGenieActions.js": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/sheet/grid/useGridKeyboard.js": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/pages/costing/sheet/hooks/useSheetShortcuts.js": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/expdoc/invoice/ExportInvoiceForm.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/expdoc/invoice/InvSteps.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 23
+    }
+  },
+  "src/pages/expdoc/packing-list/PackingListWorkspace.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/expdoc/template/editor/sticker/StickerLineFormat.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/pages/hr/HrDashboard.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
+    }
+  },
+  "src/pages/hr/attendance/AttendanceCalendar.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/pages/hr/attendance/GatePassList.jsx": {
+    "no-restricted-syntax": {
+      "count": 12
+    }
+  },
+  "src/pages/hr/attendance/MissPunchList.jsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "src/pages/hr/employee/EmployeeForm.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/hr/employee/EmployeeView.jsx": {
+    "no-restricted-syntax": {
+      "count": 34
+    }
+  },
+  "src/pages/hr/employee/SalaryStructureDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/hr/fnf/FnfView.jsx": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "src/pages/hr/leave/LeaveApplicationList.jsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "src/pages/hr/loan/LoanView.jsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "src/pages/hr/payroll/SalaryRecordDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/pages/hr/payroll/SalarySlipView.jsx": {
+    "no-restricted-syntax": {
+      "count": 6
+    }
+  },
+  "src/pages/inventory/adjustment/AdjustmentViewDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "src/pages/inventory/bill-passing/BillPassingForm.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/inventory/grn/AccessoriesGRNForm.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/pages/inventory/grn/AccessoriesGRNSummaryPanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/pages/inventory/grn/FabricGRNForm.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/pages/inventory/grn/FabricGRNSummaryPanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/pages/inventory/grn/GRNViewModal.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/inventory/grn/grnAttachments.js": {
+    "no-console": {
+      "count": 4
+    }
+  },
+  "src/pages/inventory/issue/FabricIssueSummaryPanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/pages/inventory/issue/SampleIssueSummaryPanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 12
     }
   },
   "src/pages/inventory/opening-stock/OpeningStockAccessoriesItemTable.jsx": {
@@ -118,16 +417,71 @@
     }
   },
   "src/pages/inventory/qc/FabricQCInspection.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 3
     }
   },
+  "src/pages/inventory/qc/QCViewModal.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
   "src/pages/inventory/qc/TrimsQCInspection.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
+  "src/pages/inventory/return-to-supplier/ReturnToSupplierDetailDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 22
+    }
+  },
+  "src/pages/inventory/return-to-supplier/ReturnToSupplierForm.jsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/pages/inventory/transfer/StockTransferForm.jsx": {
+    "no-restricted-syntax": {
+      "count": 10
+    }
+  },
+  "src/pages/master/BuyerMaster.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/CategoryMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/ItemMaster.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 9
+    }
+  },
+  "src/pages/master/ItemTypeMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
   "src/pages/master/MasterDashboard.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/preserve-manual-memoization": {
       "count": 1
     },
@@ -135,18 +489,152 @@
       "count": 1
     }
   },
+  "src/pages/master/PaymentTermsMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/SizePresetMaster.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/master/StyleMaster.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/pages/master/SubCategoryMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/SupplierMaster.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/TermsConditionsMaster.jsx": {
+    "no-console": {
+      "count": 3
+    }
+  },
+  "src/pages/master/UomMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/VariantMaster.jsx": {
+    "no-console": {
+      "count": 2
+    }
+  },
+  "src/pages/master/genie/useMasterGenieActions.js": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/orders/OrderBranchAllocation.jsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
   "src/pages/orders/OrderForm.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 6
+    },
     "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/orders/OrderList.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/orders/OrderView.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 7
+    }
+  },
+  "src/pages/po/BomLineSelectionDrawer.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/po/EwayBillGenerateDialog.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
       "count": 1
     }
   },
   "src/pages/po/FabricStagesDialog.jsx": {
+    "max-lines": {
+      "count": 1
+    },
     "react-hooks/set-state-in-effect": {
       "count": 1
     }
   },
+  "src/pages/po/POForm.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/pages/po/POView.jsx": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 2
+    },
     "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/po/SizeColorMatrix.jsx": {
+    "no-restricted-syntax": {
+      "count": 4
+    }
+  },
+  "src/pages/po/components/MaterialStockPanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/po/components/OrderCoveragePanel.jsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/po/components/ProductionApprovalTimeline.jsx": {
+    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -155,7 +643,75 @@
       "count": 1
     }
   },
+  "src/pages/po/components/ProductionPoView.jsx": {
+    "no-restricted-syntax": {
+      "count": 23
+    }
+  },
+  "src/pages/po/cutting/CuttingPoForm.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/po/cutting/CuttingPoList.jsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/pages/po/finishing/FinishingPoForm.jsx": {
+    "no-restricted-syntax": {
+      "count": 5
+    }
+  },
+  "src/pages/po/finishing/FinishingPoList.jsx": {
+    "no-restricted-syntax": {
+      "count": 2
+    }
+  },
+  "src/pages/po/order-mapping/PoOrderMappingDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/po/workorder/WorkOrderList.jsx": {
+    "no-restricted-syntax": {
+      "count": 3
+    }
+  },
+  "src/pages/production/cutting/PanelIssueDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/production/cutting/ProcessReturnDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/production/packing/CartonGroupEditor.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/production/packing/CartonPackingForm.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/reports/AiChatPage.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/reports/ReportBuilderPage.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
   "src/pages/reports/components/AiResultsDisplay.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    },
     "react-hooks/preserve-manual-memoization": {
       "count": 1
     }
@@ -173,6 +729,233 @@
   "src/pages/reports/components/ReportResultsTable.jsx": {
     "react-hooks/preserve-manual-memoization": {
       "count": 1
+    }
+  },
+  "src/pages/sample-request/OrderSampleRequestSummaryCard.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/sample-request/dispatch/DispatchList.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/sample-request/dispatch/DispatchView.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/sample-request/form/MaterialsColumns.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/sample-request/form/SectionHeader.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/pages/sample-request/invoice/SampleInvoiceForm.jsx": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/pages/virtual-factory/hud/RulesDrawer.jsx": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/services/admin/organisationService.js": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/services/auth/authService.js": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/services/expdoc/expDocMockInvoices.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/services/expdoc/expDocMockPackingLists.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/services/expdoc/expDocMockReports.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/services/expdoc/expDocTemplateStore.js": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/services/inventory/inventoryMockData.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/services/inventory/inventoryService.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/services/inventory/openingStockMockData.js": {
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "src/services/inventory/returnToSupplierMockData.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/services/master/supplierService.js": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/services/tna/tnaCalendar.js": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/costingPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/expDocCalc.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/utils/expDocHtml.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/utils/expDocValidation.js": {
+    "max-lines": {
+      "count": 1
+    }
+  },
+  "src/utils/fabricQCPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/grnPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/issueSlipPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/orderPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 2
+    },
+    "no-restricted-syntax": {
+      "count": 8
+    }
+  },
+  "src/utils/permissions.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/utils/poPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 5
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    },
+    "prefer-const": {
+      "count": 1
+    }
+  },
+  "src/utils/productionPoPdfGenerator.js": {
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/returnToSupplierPdfGenerator.js": {
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/swRegistration.js": {
+    "no-console": {
+      "count": 1
+    }
+  },
+  "src/utils/trimsQCPdfGenerator.js": {
+    "max-lines": {
+      "count": 1
+    },
+    "no-console": {
+      "count": 3
+    },
+    "no-restricted-syntax": {
+      "count": 1
+    }
+  },
+  "src/utils/workOrderPdfGenerator.js": {
+    "no-restricted-syntax": {
+      "count": 2
     }
   }
 }
