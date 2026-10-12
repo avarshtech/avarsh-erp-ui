@@ -57,7 +57,7 @@ const withPreviewTag = (label) => (
   </span>
 );
 import ErrorBoundary from "../components/ErrorBoundary";
-import { consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
+import { APP_VERSION, consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
@@ -189,7 +189,7 @@ const SidebarVersion = () => (
       borderTop: '1px solid var(--sidebar-border)',
     }}
   >
-    Version 1.05.01
+    Version {APP_VERSION}
   </div>
 );
 
