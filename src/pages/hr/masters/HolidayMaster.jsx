@@ -246,7 +246,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
       </div>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <MasterSplitView
+        <MasterSplitView orderBy="id"
           title="Holidays"
           subtitle="Work Schedule"
           addLabel="Add Holiday"

@@ -225,7 +225,7 @@ const LeaveTypeMaster = ({ onDirtyChange }) => {
   const isCarryForward = Form.useWatch('isCarryForward', form);
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Leave Types"
       subtitle="Leave Policy"
       addLabel="Add Leave Type"

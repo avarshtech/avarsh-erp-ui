@@ -143,7 +143,7 @@ const ProductionMasterPanel = ({
   const readOnly = Boolean(selectedId) && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title={title}
       subtitle={subtitle}
       addLabel={`Add ${noun}`}

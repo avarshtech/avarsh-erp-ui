@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Row, Col, Card, Button, Table, Typography, Input, Drawer } from 'antd';
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
@@ -24,12 +24,21 @@ const MasterSplitView = ({
   searchPlaceholder = "Search...",
   onSearch,
   assistant,
+  orderBy,
 }) => {
   const [searchText, setSearchText] = useState('');
   const search = (text) => { setSearchText(text); onSearch?.(text); };
+  // Opt-in stable order for masters whose API returns rows without an ORDER BY: PostgreSQL
+  // writes an updated row elsewhere, so an edit would otherwise move it in the list.
+  // orderBy names an immutable numeric key (normally the id); masters that have a defined
+  // order of their own (sort order, name, slab ladder) leave it unset.
+  const rows = useMemo(() => {
+    if (!orderBy || !Array.isArray(data)) return data;
+    return [...data].sort((a, b) => (a?.[orderBy] ?? 0) - (b?.[orderBy] ?? 0));
+  }, [data, orderBy]);
   // Laya AI on the Master Data page: `assistant` = { form, markDirty, fillable?, refresh? }.
   useMasterAssistant(assistant ? {
-    rows: data, columns, searchText, search,
+    rows, columns, searchText, search,
     openNew: onAdd, openRecord: (record) => onSelectRow(record), close: onCloseForm,
     isOpen: !!isEditing, recordId: selectedId ?? null,
     form: assistant.form, markDirty: assistant.markDirty, fillable: assistant.fillable !== false, refresh: assistant.refresh,
@@ -80,7 +89,7 @@ const MasterSplitView = ({
       <div style={{ flex: 1, overflow: 'auto' }} data-laya="list">
         <Table
           className="master-split-table"
-          dataSource={data}
+          dataSource={rows}
           columns={columns}
           rowKey={rowKey}
           loading={loading}

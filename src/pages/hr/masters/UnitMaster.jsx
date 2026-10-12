@@ -204,7 +204,7 @@ const UnitMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Units"
       subtitle="Organisation"
       addLabel="Add Unit"

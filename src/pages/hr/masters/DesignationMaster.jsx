@@ -201,7 +201,7 @@ const DesignationMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Designations"
       subtitle="Organization"
       addLabel="Add Designation"

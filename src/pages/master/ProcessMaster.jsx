@@ -236,7 +236,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       assistant={{ form, markDirty: () => markDirty(true) }}
       title="Processes"
       subtitle="Manufacturing"

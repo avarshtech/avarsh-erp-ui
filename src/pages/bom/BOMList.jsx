@@ -70,8 +70,10 @@ const BOMList = () => {
       setData(res.content || []);
       setPagination((prev) => ({
         ...prev,
-        current: (res.page ?? 0) + 1,
-        pageSize: res.size || prev.pageSize,
+        // The API's PaginatedResponse names these pageNumber/pageSize. Reading page/size kept
+        // the paginator on page 1, which then refetched page 1 — page 2 was unreachable.
+        current: (res.pageNumber ?? res.page ?? 0) + 1,
+        pageSize: res.pageSize || res.size || prev.pageSize,
         total: res.totalElements || 0,
       }));
     } catch {

@@ -125,7 +125,7 @@ const TrimsQCCriteriaMaster = ({ onDirtyChange }) => {
   };
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       assistant={{ form, markDirty: () => markDirty(true) }}
       title="Trims QC Criteria"
       subtitle="Quality Control"

@@ -189,7 +189,7 @@ const ShiftMaster = ({ onDirtyChange }) => {
   const isReadOnly = selectedId && !canUpdate;
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       title="Shifts"
       subtitle="Work Schedule"
       addLabel="Add Shift"

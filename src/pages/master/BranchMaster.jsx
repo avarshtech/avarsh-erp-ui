@@ -150,7 +150,7 @@ const BranchMaster = ({ onDirtyChange }) => {
   const selected = data.find((b) => b.id === selectedId);
 
   return (
-    <MasterSplitView
+    <MasterSplitView orderBy="id"
       assistant={{ form, markDirty: () => markDirty(true) }}
       title="Branches"
       subtitle="Organisation"
