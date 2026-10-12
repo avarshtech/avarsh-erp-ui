@@ -9,6 +9,7 @@ import {
   Drawer,
   App,
   Badge,
+  Tag,
 } from "antd";
 import {
   DashboardOutlined,
@@ -43,7 +44,18 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { getCurrentUser, logoutUser } from "../services/auth/authService";
 import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
-import { hasModuleAccess } from "../utils/permissions";
+import { hasModuleAccess, PREVIEW_SCREEN_IDS, PREVIEW_MESSAGE } from "../utils/permissions";
+import PreviewBanner from "../components/PreviewBanner";
+
+/** A menu label with the "Preview" tag of a browser-only screen (SCREENS `preview`). */
+const withPreviewTag = (label) => (
+  <span>
+    {label}
+    <Tooltip title={PREVIEW_MESSAGE}>
+      <Tag color="orange" style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>Preview</Tag>
+    </Tooltip>
+  </span>
+);
 import ErrorBoundary from "../components/ErrorBoundary";
 import { consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
@@ -568,13 +580,21 @@ const MainLayoutInner = () => {
       // Strip moduleId before passing to Ant Design Menu to avoid DOM warnings
       const { moduleId, children, ...rest } = item;
       if (children) {
-        const filteredChildren = children
-          .filter((child) => {
-            if (!child.moduleId) return true;
-            return hasModuleAccess(child.moduleId);
-          })
-          .map(({ moduleId: _mid, ...childRest }) => childRest);
-        return { ...rest, children: filteredChildren.length > 0 ? filteredChildren : undefined };
+        const visible = children.filter((child) => {
+          if (!child.moduleId) return true;
+          return hasModuleAccess(child.moduleId);
+        });
+        // Browser-only (preview) screens carry a tag: once on the group when every item in it is
+        // one, otherwise on each such item.
+        const allPreview = visible.length > 0 && visible.every((child) => PREVIEW_SCREEN_IDS.has(child.moduleId));
+        const filteredChildren = visible.map(({ moduleId: mid, ...childRest }) => (
+          !allPreview && PREVIEW_SCREEN_IDS.has(mid) ? { ...childRest, label: withPreviewTag(childRest.label) } : childRest
+        ));
+        return {
+          ...rest,
+          ...(allPreview ? { label: withPreviewTag(rest.label) } : {}),
+          children: filteredChildren.length > 0 ? filteredChildren : undefined,
+        };
       }
       return rest;
     });
@@ -1010,6 +1030,7 @@ const MainLayoutInner = () => {
                 page, indistinguishable from a slow load. Wrapping the routed
                 content keeps the shell and shows what went wrong. */}
             <ErrorBoundary>
+              <PreviewBanner />
               <Outlet />
             </ErrorBoundary>
           </Content>

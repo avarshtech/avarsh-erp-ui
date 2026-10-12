@@ -159,6 +159,9 @@ export const DASHBOARD_OPERATIONS = ['view'];
 //   requires  optional  A hard dependency on another screen, declared ONLY where
 //                       the code actually enforces one.
 //   description optional One line, shown muted under the name.
+//   preview   optional  true while the screen keeps its data in the browser (a mock
+//                       store) rather than the API: the menu tags it "Preview" and its
+//                       routes show PreviewBanner. Remove it at the screen's API cutover.
 //
 // Order matters: buildPermissions walks this array, so it fixes the key order of
 // the persisted jsonb.
@@ -280,12 +283,12 @@ export const SCREENS = [
   { id: 'tna', name: 'Time & Action', section: 'tna', kind: 'screen',
     path: '/tna/control-tower',
     routes: ['/tna/control-tower', '/tna/my-activities', '/tna/exceptions', '/tna/analytics', '/tna/plan/:planId'],
-    ops: STANDARD_OPERATIONS },
+    ops: STANDARD_OPERATIONS, preview: true },
   { id: 'tna-masters', name: 'TNA Masters', section: 'tna', kind: 'screen',
-    path: '/tna/masters', ops: STANDARD_OPERATIONS },
+    path: '/tna/masters', ops: STANDARD_OPERATIONS, preview: true },
   // Key kept from the retired re-plan approval queue (FR-5.8); the screen is now Revisions & Audit.
   { id: 'tna-replan-approval', name: 'TNA Revisions & Audit', section: 'tna', kind: 'screen',
-    path: '/tna/revisions', ops: STANDARD_OPERATIONS },
+    path: '/tna/revisions', ops: STANDARD_OPERATIONS, preview: true },
 
   // ── Production ──
   { id: 'production-cutting', name: 'Production — Cutting', section: 'production', kind: 'screen',
@@ -305,7 +308,7 @@ export const SCREENS = [
   { id: 'production-finishing', name: 'Production — Finishing', section: 'production', kind: 'screen',
     path: '/production/finishing',
     routes: ['/production/finishing', '/production/finishing/checking/new', '/production/finishing/checking/:id'],
-    ops: STANDARD_OPERATIONS },
+    ops: STANDARD_OPERATIONS, preview: true },
   { id: 'production-packing', name: 'Production — Packing', section: 'production', kind: 'screen',
     path: '/production/packing/list',
     routes: ['/production/packing/list', '/production/packing/new', '/production/packing/edit/:id'],
@@ -323,7 +326,8 @@ export const SCREENS = [
       cancel: 'Short-close job · Cancel receipt / pull-back · Close or cancel inward job orders',
       approve: 'Approve pull-back',
     },
-    description: 'Job work both ways: outsourced jobs at vendors (daily status, receipts, pull-backs, order split) and work we do for principals on their material (job orders, party stock, returns, statements).' },
+    description: 'Job work both ways: outsourced jobs at vendors (daily status, receipts, pull-backs, order split) and work we do for principals on their material (job orders, party stock, returns, statements).',
+    preview: true },
 
   // ── Export Documentation ──
   { id: 'export-shipments', name: 'Shipments', section: 'expdoc', kind: 'screen',
@@ -335,14 +339,14 @@ export const SCREENS = [
     routes: ['/export-docs/packing-lists/list', '/export-docs/packing-lists/edit/:id',
              '/export-docs/reports', '/export-docs/audit'],
     ops: EXPORT_DOC_OPERATIONS,
-    description: 'Also gates the export reports and the audit trail.' },
+    description: 'Also gates the export reports and the audit trail.', preview: true },
   { id: 'export-invoice', name: 'Export Invoice', section: 'expdoc', kind: 'screen',
     path: '/export-docs/invoices/list',
     routes: ['/export-docs/invoices/list', '/export-docs/invoices/edit/:id'],
-    ops: EXPORT_DOC_OPERATIONS },
+    ops: EXPORT_DOC_OPERATIONS, preview: true },
   { id: 'export-stickers', name: 'Carton Stickers', section: 'expdoc', kind: 'screen',
     path: '/export-docs/stickers', routes: ['/export-docs/stickers', '/export-docs/stickers/:plId'],
-    requires: 'export-packing-list', ops: EXPORT_STICKER_OPERATIONS },
+    requires: 'export-packing-list', ops: EXPORT_STICKER_OPERATIONS, preview: true },
   { id: 'export-templates', name: 'Buyer Document Templates', section: 'expdoc', kind: 'screen',
     path: '/export-docs/templates/list',
     routes: ['/export-docs/templates/list', '/export-docs/templates/edit/:id', '/export-docs/templates/import'],
@@ -553,6 +557,22 @@ const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, 
 export const MODULES = Object.freeze(
   SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {}),
 );
+
+// ─── Preview screens (data kept in the browser, not the API) ──────────────────
+
+/** Ids of the screens flagged `preview` in SCREENS. */
+export const PREVIEW_SCREEN_IDS = new Set(SCREENS.filter((s) => s.preview).map((s) => s.id));
+
+const routePattern = (route) =>
+  new RegExp(`^${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/:[^/]+/g, '[^/]+')}/?$`);
+const PREVIEW_ROUTES = SCREENS.filter((s) => s.preview).flatMap((s) => (s.routes || [s.path]).map(routePattern));
+
+/** True when `pathname` is one of a preview screen's routes. */
+export const isPreviewPath = (pathname) => PREVIEW_ROUTES.some((re) => re.test(pathname));
+
+/** What a preview screen tells its users (PreviewBanner, the menu tag's tooltip). */
+export const PREVIEW_MESSAGE =
+  'Preview: data entered here is kept in this browser only and is not saved to the server.';
 
 /** Grouped layout consumed by the permission matrix. */
 export const PERMISSION_GROUPS = SECTIONS.map((section) => ({

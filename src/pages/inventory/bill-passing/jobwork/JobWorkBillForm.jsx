@@ -26,6 +26,7 @@ import JwbLinesGrid from './JwbLinesGrid';
 import JwbDeductionTable from './JwbDeductionTable';
 import JwbDeductionEditor from './JwbDeductionEditor';
 import JwbCalculationPanel from './JwbCalculationPanel';
+import PreviewBanner from '../../../../components/PreviewBanner';
 
 const BACK = '/inventory/bill-passing';
 
@@ -102,6 +103,7 @@ const JobWorkBillForm = () => {
   const readOnly = !bill.editable || !can.update;
   return (
     <div className="animate-fade-in-up inv-page">
+      {JOB_WORK_BILL_DEMO && <PreviewBanner force />}
       <PageHeader
         title={bill.jwbNumber}
         subtitle={`${bill.vendorName} · ${billSourceOf(bill.source).label} ${bill.poNumber}`}
