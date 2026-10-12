@@ -7,8 +7,11 @@
  * Non-credential display data (user name, role, permissions) is cached in
  * sessionStorage WITHOUT the token field for instant UI rendering on page refresh.
  *
- * This module has ZERO imports to prevent circular dependency issues.
+ * To prevent circular dependency issues this module imports only leaf modules that import
+ * nothing themselves (utils/apiCaches).
  */
+
+import { clearApiCaches, clearPreviewStores } from '../../utils/apiCaches';
 
 // ── Private in-memory state (not accessible via browser storage APIs) ────────
 
@@ -187,4 +190,9 @@ export const clearAll = () => {
   sessionStorage.removeItem('authToken');
   sessionStorage.removeItem('refreshToken');
   sessionStorage.removeItem('organisationInfo');
+
+  // On a shared PC the next person must not be served this user's data: the service worker's
+  // API caches and the Preview modules' browser-only stores go with the session.
+  clearApiCaches();
+  clearPreviewStores();
 };

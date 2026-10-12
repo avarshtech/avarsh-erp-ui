@@ -3,6 +3,16 @@ import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { API_CACHE_NAMES } from './utils/apiCaches';
+
+// ─── Drop the API caches an earlier worker filled ───
+// Up to this release the catch-all route below cached every /api/v1 GET (users and roles
+// included) for 30-60 minutes, keyed by URL alone, so on a shared PC the next user could be
+// served the previous user's data. A newly activated worker removes those caches; logout,
+// session expiry and branch changes remove them from the page (utils/apiCaches.js).
+self.addEventListener('activate', (event) => {
+  event.waitUntil(Promise.all(API_CACHE_NAMES.map((name) => caches.delete(name))));
+});
 
 // ─── Skip Waiting (required for injectManifest strategy) ───
 // When the user clicks "Restart Now", registerSW sends this message
@@ -78,7 +88,7 @@ registerRoute(
   ({ url, request }) =>
     !isStreamingRequest({ url, request })
     && url.pathname.match(
-      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|vendors|buyers|styles|terms-conditions|payment-terms|size-presets|users|roles)/
+      /\/api\/v1\/(categories|sub-categories|item-types|attributes|uoms|variants|suppliers|vendors|buyers|styles|terms-conditions|payment-terms|size-presets)/
     ),
   new NetworkFirst({
     cacheName: 'erp-master-data',
@@ -112,18 +122,14 @@ registerRoute(
   'GET'
 );
 
-// ─── Runtime Caching: Other API GET requests ───
+// ─── Every other API GET: always from the network ───
+// Transactional data is never served from a cache: a slow network shows the request's error
+// instead of another user's, another branch's or a stale record (whose old version would turn
+// the next save into a 409).
 registerRoute(
   ({ url, request }) =>
     !isStreamingRequest({ url, request }) && url.pathname.startsWith('/api/v1/'),
-  new NetworkFirst({
-    cacheName: 'erp-api-data',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 30 }),
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-    ],
-    networkTimeoutSeconds: 10,
-  }),
+  new NetworkOnly(),
   'GET'
 );
 

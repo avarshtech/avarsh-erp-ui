@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getActiveBranches } from '../services/master/branchService';
 import { getCurrentUser } from '../services/auth/authService';
+import { clearApiCaches } from '../utils/apiCaches';
 
 /**
  * The company's branches and which one the user is currently working in.
@@ -45,6 +46,9 @@ export const BranchProvider = ({ children }) => {
   // axiosInstance reads the same key to send X-Branch-Id, so this is the one place it is written.
   const setActiveBranch = useCallback((id) => {
     const next = id == null ? ALL : String(id);
+    // The service worker's API caches are keyed by URL alone, so a response cached for the
+    // previous branch would answer for the new one on a slow network.
+    if (readStored() !== next) clearApiCaches();
     setStored(next);
     try {
       localStorage.setItem(STORAGE_KEY, next);
@@ -72,7 +76,10 @@ export const BranchProvider = ({ children }) => {
 
   // axiosInstance stores "all" when the server refuses the working branch; follow it here
   useEffect(() => {
-    const onReset = () => setStored(readStored());
+    const onReset = () => {
+      clearApiCaches();
+      setStored(readStored());
+    };
     window.addEventListener('erp:branch-reset', onReset);
     return () => window.removeEventListener('erp:branch-reset', onReset);
   }, []);
