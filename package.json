@@ -1,7 +1,7 @@
 {
   "name": "erp-dashboard",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.10.15",
   "type": "module",
   "scripts": {
     "start": "vite",

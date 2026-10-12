@@ -7,6 +7,7 @@ import { hasSessionActiveFlag } from '../../services/auth/sessionStore';
 import { useTheme } from '../../context/ThemeContext';
 import { getFirstAccessibleRoute } from '../../utils/permissions';
 import { applyUpdate, checkForUpdate, subscribeToUpdates } from '../../utils/swRegistration';
+import { getVersionLabel } from '../../utils/appVersion';
 import avarshLogoDark from '../../assets/images/avarsh-logo-dark.png';
 import avarshLogoLight from '../../assets/images/avarsh-logo-light.png';
 import PwaInstallPrompt from '../../components/PwaInstallPrompt';
@@ -286,7 +287,7 @@ const Login = () => {
         fontSize: 11,
         color: isDarkMode ? 'rgba(148, 163, 184, 0.5)' : 'rgba(255, 255, 255, 0.6)',
       }}>
-        Version 1.05.01
+        {getVersionLabel()}
       </Text>
     </div>
   );

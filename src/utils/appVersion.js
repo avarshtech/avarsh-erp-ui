@@ -23,6 +23,19 @@ export const getDisplayVersion = () => {
 };
 
 /**
+ * The build as screens show it: "v1.10.15 · e1be641", with the environment appended on any
+ * build that is not the production site's ("· dev", "· qa", "· e2e"), so a test or development
+ * build is never mistaken for production. VITE_APP_ENV comes from the site's own environment.
+ * @returns {string}
+ */
+export const getVersionLabel = () => {
+  const env = import.meta.env.VITE_APP_ENV;
+  const parts = [getDisplayVersion() || 'unversioned', BUILD_ID];
+  if (env !== 'production') parts.push(!env || env === 'development' ? 'dev' : env);
+  return parts.join(' · ');
+};
+
+/**
  * Report whether this browser is running a build it has not run before, and
  * record the build so the answer is true only once per deploy.
  *

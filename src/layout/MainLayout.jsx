@@ -47,7 +47,7 @@ import { useTheme } from "../context/ThemeContext";
 import { SessionProvider, useSession } from "../context/SessionContext";
 import { hasModuleAccess } from "../utils/permissions";
 import ErrorBoundary from "../components/ErrorBoundary";
-import { consumeBuildChange, getDisplayVersion } from "../utils/appVersion";
+import { consumeBuildChange, getDisplayVersion, getVersionLabel } from "../utils/appVersion";
 import { getPendingApprovals } from "../services/core/approvalFlowService";
 import SessionExpiryGuard from "../components/SessionExpiryGuard";
 import OfflineBanner from "../components/OfflineBanner";
@@ -592,6 +592,9 @@ const MainLayoutInner = () => {
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {currentUser?.email || currentUser?.username || ''}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+            {getVersionLabel()}
           </div>
         </div>
       ),
