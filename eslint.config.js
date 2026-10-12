@@ -5,9 +5,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  // Build output, test reports, local tool state and the git-ignored docs folder. `.kilo` holds
-  // another tool's worktrees — full copies of src — which `eslint .` would otherwise lint twice.
-  globalIgnores(['dist', 'coverage', 'e2e-report', 'test-results', 'playwright-report', 'blob-report', '.kilo', '.playwright-mcp', 'docs']),
+  // Build output, test reports, local tool state and the git-ignored docs folder. `.kilo` and
+  // `.claude/worktrees` hold other sessions' worktrees (full copies of src), which `eslint .` would
+  // otherwise lint again, without the src-scoped plugins, and fail.
+  globalIgnores(['dist', 'coverage', 'e2e-report', 'test-results', 'playwright-report', 'blob-report', '.kilo', '.claude/worktrees', '.playwright-mcp', 'docs']),
   {
     // Build/tooling config runs in Node, not the browser
     files: ['vite.config.js', 'eslint.config.js', 'playwright.config.js', 'scripts/**/*.{js,mjs}'],
