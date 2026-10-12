@@ -17,19 +17,41 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+desktop.ini
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Playwright
+# Merge and patch leftovers
+*.orig
+*.rej
+*.bak
+
+# Test output: Playwright, unit-test coverage, local e2e reports and recordings
 e2e/.auth/
 e2e-report/
 test-results/
 playwright-report/
+blob-report/
+coverage/
+e2e/reports/
+e2e/videos/
 
+# Tool caches and local tool state (.sentryclirc can hold an auth token;
+# .claude/worktrees and .kilo hold other sessions' full checkouts)
+.eslintcache
+.stylelintcache
+.netlify/
+.sentryclirc
 .claude/settings.local.json
+.claude/worktrees/
 .playwright-mcp/
+.kilo/
 
-docs/
+# docs/ holds the confidential tester pack, which stays on this machine.
+# Only docs/engineering/ (the UI standard, scorecard and review register) is tracked.
+/docs/*
+!/docs/engineering/
