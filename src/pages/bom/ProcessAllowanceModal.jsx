@@ -2,7 +2,7 @@ import { Modal, Table, InputNumber, Typography, Space, Tag, Button, Tooltip, Row
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { HolderOutlined } from '@ant-design/icons';
 import { numericInputProps } from '../../utils/inputHelpers';
-import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid } from '../../utils/bomConstants';
+import { calcPurchaseQty, calcPurchaseWidth, CONSUMPTION_MODE, buildOrderQtyGrid, calcMatrixTotal } from '../../utils/bomConstants';
 
 const { Text } = Typography;
 
