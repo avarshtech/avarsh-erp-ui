@@ -15,8 +15,8 @@
  * Environment variables:
  *   E2E_SOAK_PASSWORD — password for all three (default: admin123)
  *
- * NOTE the default is admin123, the seeded password. admin98 is the PRODUCTION superadmin
- * password and must never be sent for these accounts.
+ * NOTE the default is admin123, the seeded password. A real environment's superadmin password
+ * must never be committed or sent for these accounts.
  */
 
 import { test as setup, expect } from '@playwright/test';

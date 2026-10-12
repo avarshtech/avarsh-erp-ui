@@ -11,10 +11,10 @@ import { test } from '@playwright/test';
 import { createAuthenticatedClient } from '../helpers/api-client.js';
 import { antSelect, antFormFill, antFormSelect } from '../helpers/antd-helpers.js';
 
-// The credentials every other spec signs in with (e2e/helpers/navigation.js): admin98 on the dev
-// database, E2E_PASSWORD (admin123) on the e2e profile.
+// The credentials every other spec signs in with (e2e/helpers/navigation.js): the e2e seed's
+// superadmin (admin123) by default; any other database needs E2E_PASSWORD set explicitly.
 const E2E_USERNAME = process.env.E2E_USERNAME || 'superadmin';
-const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin98';
+const E2E_PASSWORD = process.env.E2E_PASSWORD || 'admin123';
 
 const runId = Date.now();
 /** Navigate, re-login if needed, wait for ready */

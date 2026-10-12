@@ -75,7 +75,7 @@ async function navigateWithAuth(page, path) {
   // If login form appeared, re-authenticate
   if (await loginField.isVisible().catch(() => false)) {
     await loginField.fill('superadmin');
-    await page.getByPlaceholder('Password').fill('admin98');
+    await page.getByPlaceholder('Password').fill(process.env.E2E_PASSWORD || 'admin123');
     await page.getByRole('button', { name: /Sign In/i }).click();
     await page.waitForLoadState('networkidle');
     await page.goto(path);
@@ -458,7 +458,7 @@ test.describe.skip('Costing Module — API Integration', () => {
 
   test.beforeAll(async ({ request }) => {
     const loginResponse = await request.post(`${API_BASE}/auth/login`, {
-      data: { username: 'superadmin', password: 'admin98' },
+      data: { username: 'superadmin', password: process.env.E2E_PASSWORD || 'admin123' },
     });
     expect(loginResponse.ok()).toBeTruthy();
     const loginData = await loginResponse.json();

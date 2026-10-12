@@ -5,7 +5,7 @@
 # With no arguments it runs the full estate in dependency order.
 #
 # Assumes: backend on :8088 (e2e profile), UI on :3000, E2E_PASSWORD exported
-# (admin123 for H2, admin98 for the Neon dev DB).
+# (admin123 for H2; for any other database export its password, never commit it).
 
 set -u
 PROJECTS=("$@")
