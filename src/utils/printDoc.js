@@ -30,6 +30,16 @@ export const esc = (v) => String(v ?? '')
   .replace(/\n/g, '<br/>');
 
 /**
+ * Escape a value destined for TEXT content, leaving newlines as they are: HTML runs them together
+ * as spaces. For the documents (the PO and order prints) whose layout has always shown a multi-line
+ * value as one run of text — esc() would break those values onto separate lines.
+ */
+export const escInline = (v) => String(v ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
+
+/**
  * Escape a value destined for an ATTRIBUTE.
  *
  * esc() is not safe here on two counts: it leaves quotes intact, so a value could
