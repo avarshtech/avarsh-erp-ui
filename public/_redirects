@@ -1,1 +1,7 @@
+# A deploy removes the previous build's files under /assets. A request for one that is gone must
+# get a 404: the catch-all below would answer it with index.html and a 200, which a module import
+# cannot run and a cache can keep under the file's name. Netlify serves a file that exists before
+# it applies any rule, so existing assets are untouched. The first matching rule wins, so this line
+# stays above the catch-all.
+/assets/*    /404.html     404
 /*    /index.html   200
