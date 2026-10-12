@@ -742,7 +742,7 @@ const QuickAddSizePresetModal = ({ open, sizes, onSuccess, onCancel }) => {
         type="info"
         showIcon
         icon={<ExclamationCircleOutlined />}
-        message="New sizes detected from buyer PO"
+        title="New sizes detected from buyer PO"
         description={
           <span>
             The extracted sizes <strong>[{sizes.join(', ')}]</strong> don't match any existing size preset.

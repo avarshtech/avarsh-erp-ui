@@ -211,7 +211,7 @@ const MainLayoutInner = () => {
 
     const version = getDisplayVersion();
     notification.success({
-      message: "Avarsh ERP Updated",
+      title: "Avarsh ERP Updated",
       description: version
         ? `You are now running version ${version}.`
         : "You are now running the latest version.",

@@ -58,7 +58,7 @@ const LoanDrawer = ({ open, onClose, onSuccess }) => {
       open={open}
       onClose={onClose}
       size={480}
-      destroyOnClose
+      destroyOnHidden
       extra={
         <Space>
           <Button onClick={onClose}>Cancel</Button>

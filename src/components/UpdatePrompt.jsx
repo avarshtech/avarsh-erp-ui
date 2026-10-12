@@ -18,7 +18,7 @@ const UpdatePrompt = () => {
   useEffect(() => {
     if (offlineReady) {
       notification.success({
-        message: 'App Ready',
+        title: 'App Ready',
         description: 'Avarsh ERP is ready to work offline.',
         duration: 5,
         onClose: dismissOfflineReady,

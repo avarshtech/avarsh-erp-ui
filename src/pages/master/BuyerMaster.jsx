@@ -726,7 +726,7 @@ const BuyerMaster = () => {
             onValuesChange={() => setUnsavedChanges(true)}
           >
             {/* --- Buyer Information --- */}
-            <Divider orientation="left" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Buyer Information</Divider>
+            <Divider titlePlacement="start" style={{ marginTop: 0, fontSize: 13, fontWeight: 600 }}>Buyer Information</Divider>
             <Row gutter={16}>
               <Col xs={24} md={12}>
                 <Form.Item
@@ -786,7 +786,7 @@ const BuyerMaster = () => {
             </Row>
 
             {/* --- Bank Details --- */}
-            <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
+            <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>
               <BankOutlined style={{ marginRight: 6 }} />Bank Details
             </Divider>
             <Row gutter={16}>
@@ -819,7 +819,7 @@ const BuyerMaster = () => {
           </Form>
 
           {/* --- Shipping Locations (outside Form) --- */}
-          <Divider orientation="left" style={{ fontSize: 13, fontWeight: 600 }}>
+          <Divider titlePlacement="start" style={{ fontSize: 13, fontWeight: 600 }}>
             <EnvironmentOutlined style={{ marginRight: 6 }} />Shipping Locations
             <Text type="danger" style={{ fontSize: 11, marginLeft: 8 }}>* At least one required</Text>
           </Divider>

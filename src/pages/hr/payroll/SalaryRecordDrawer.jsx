@@ -43,7 +43,7 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Descriptions.Item label="Designation">{record.designationName || '-'}</Descriptions.Item>
         </Descriptions>
 
-        <Divider orientation="left" style={{ marginTop: 20 }}>Attendance</Divider>
+        <Divider titlePlacement="start" style={{ marginTop: 20 }}>Attendance</Divider>
         <Descriptions column={2} size="small" bordered>
           <Descriptions.Item label="Calendar days">{days(record.calendarDays)}</Descriptions.Item>
           <Descriptions.Item label="Present">{days(record.presentDays)}</Descriptions.Item>
@@ -52,7 +52,7 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Descriptions.Item label="OT hours">{days(record.otHours)}</Descriptions.Item>
         </Descriptions>
 
-        <Divider orientation="left">Earnings</Divider>
+        <Divider titlePlacement="start">Earnings</Divider>
         <Text type="secondary" style={{ fontSize: 12 }}>
           Each component is pro-rated by payable days over calendar days.
         </Text>
@@ -74,7 +74,7 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Line label="Total earnings" value={record.totalEarnings} strong />
         </div>
 
-        <Divider orientation="left">Deductions</Divider>
+        <Divider titlePlacement="start">Deductions</Divider>
         <div>
           <Line
             label="PF (employee)"
@@ -98,10 +98,10 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Line label="Total deductions" value={record.totalDeductions} strong tone="danger" />
         </div>
 
-        <Divider orientation="left">Net</Divider>
+        <Divider titlePlacement="start">Net</Divider>
         <Line label="Net salary" value={record.netSalary} strong tone="success" />
 
-        <Divider orientation="left">Employer contributions</Divider>
+        <Divider titlePlacement="start">Employer contributions</Divider>
         <Text type="secondary" style={{ fontSize: 12 }}>
           Paid by the company on top of the salary above, not deducted from it.
         </Text>

@@ -65,7 +65,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
       open={open}
       onClose={onClose}
       size={480}
-      destroyOnClose
+      destroyOnHidden
       extra={
         <Space>
           <Button onClick={onClose}>Cancel</Button>

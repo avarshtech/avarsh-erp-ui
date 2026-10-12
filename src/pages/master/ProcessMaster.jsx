@@ -336,7 +336,7 @@ const ProcessMaster = ({ onDirtyChange }) => {
                     );
                     return (
                       <>
-                        <Divider orientation="left" style={{ margin: '8px 0 16px' }}>Process Defaults</Divider>
+                        <Divider titlePlacement="start" style={{ margin: '8px 0 16px' }}>Process Defaults</Divider>
                         <Alert
                           type="info"
                           showIcon
