@@ -144,6 +144,11 @@ const ElEncashmentRunView = lazy(() => import('./pages/hr/statutory/ElEncashment
 const FnfList = lazy(() => import('./pages/hr/fnf/FnfList'));
 const FnfForm = lazy(() => import('./pages/hr/fnf/FnfForm'));
 const FnfView = lazy(() => import('./pages/hr/fnf/FnfView'));
+// Asset Management
+const AssetList = lazy(() => import('./pages/asset/AssetList'));
+const AssetForm = lazy(() => import('./pages/asset/AssetForm'));
+const AssetView = lazy(() => import('./pages/asset/AssetView'));
+const AssetSetup = lazy(() => import('./pages/asset/AssetSetup'));
 // Sample Requests (lazy-loaded — UI mock phase)
 const SampleRequestList = lazy(() => import('./pages/sample-request/SampleRequestList'));
 const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
@@ -482,6 +487,13 @@ const ThemedApp = () => {
             <Route path="hr/fnf/new" element={<PermissionRoute module="hr-fnf" operation="add"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/edit/:id" element={<PermissionRoute module="hr-fnf" operation="update"><Suspense fallback={<PageSkeleton />}><FnfForm /></Suspense></PermissionRoute>} />
             <Route path="hr/fnf/:id" element={<PermissionRoute module="hr-fnf" operation="view"><Suspense fallback={<PageSkeleton />}><FnfView /></Suspense></PermissionRoute>} />
+            {/* Asset Management */}
+            <Route path="assets" element={<PermissionRoute module="assets" operation="view"><Suspense fallback={<PageSkeleton />}><AssetList /></Suspense></PermissionRoute>} />
+            {/* Setup before :id, or "setup" is read as an asset id. */}
+            <Route path="assets/setup" element={<PermissionRoute module="asset-setup" operation="view"><Suspense fallback={<PageSkeleton />}><AssetSetup /></Suspense></PermissionRoute>} />
+            <Route path="assets/new" element={<PermissionRoute module="assets" operation="add"><Suspense fallback={<PageSkeleton />}><AssetForm /></Suspense></PermissionRoute>} />
+            <Route path="assets/:id/edit" element={<PermissionRoute module="assets" operation="update"><Suspense fallback={<PageSkeleton />}><AssetForm /></Suspense></PermissionRoute>} />
+            <Route path="assets/:id" element={<PermissionRoute module="assets" operation="view"><Suspense fallback={<PageSkeleton />}><AssetView /></Suspense></PermissionRoute>} />
             {/* Reports (lazy-loaded) */}
             <Route path="reports/list" element={<PermissionRoute module="reports" operation="view"><Suspense fallback={<Spin />}><ReportListPage /></Suspense></PermissionRoute>} />
             <Route path="reports/builder/:id" element={<PermissionRoute module="reports" operation="view"><Suspense fallback={<Spin />}><ReportBuilderPage /></Suspense></PermissionRoute>} />

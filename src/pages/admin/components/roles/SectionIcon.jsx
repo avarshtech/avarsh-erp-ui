@@ -2,7 +2,7 @@ import {
   DashboardOutlined, ShoppingCartOutlined, FileTextOutlined, DollarOutlined,
   ShoppingOutlined, ExperimentOutlined, AppstoreOutlined, ScissorOutlined,
   FieldTimeOutlined, ContainerOutlined, DatabaseOutlined, BarChartOutlined,
-  TeamOutlined, SettingOutlined,
+  TeamOutlined, SettingOutlined, ToolOutlined,
 } from '@ant-design/icons';
 
 // Elements, not component types: picking a type out of a map during render reads as a
@@ -22,6 +22,7 @@ const ICONS = {
   BarChartOutlined: <BarChartOutlined aria-hidden="true" />,
   TeamOutlined: <TeamOutlined aria-hidden="true" />,
   SettingOutlined: <SettingOutlined aria-hidden="true" />,
+  ToolOutlined: <ToolOutlined aria-hidden="true" />,
 };
 
 /** A section's icon by its registry name (SECTIONS[].icon); nothing for a name the map lacks. */

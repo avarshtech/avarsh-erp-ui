@@ -67,6 +67,7 @@ export const SECTIONS = [
     description: 'Every tab of the Master Data workspace is granted separately.' },
   { key: 'reports',    label: 'Reports',              icon: 'BarChartOutlined' },
   { key: 'hr',         label: 'HR & Payroll',         icon: 'TeamOutlined' },
+  { key: 'assets',     label: 'Asset Management',     icon: 'ToolOutlined' },
   { key: 'admin',      label: 'Administration',       icon: 'SettingOutlined' },
 ];
 
@@ -534,6 +535,17 @@ export const SCREENS = [
     path: '/hr/fnf', routes: ['/hr/fnf', '/hr/fnf/new', '/hr/fnf/edit/:id', '/hr/fnf/:id'],
     ops: [...STANDARD_OPERATIONS, 'approve', 'pay'],
     opLabels: { pay: 'Settle' } },
+
+  // Setup is separate from the register on purpose: a category's code becomes
+  // part of every asset ID printed under it, so inventing categories is a
+  // different job from adding assets.
+  { id: 'assets', name: 'Asset Register', section: 'assets', kind: 'screen',
+    path: '/assets', routes: ['/assets', '/assets/new', '/assets/:id', '/assets/:id/edit'],
+    ops: STANDARD_OPERATIONS },
+  { id: 'asset-setup', name: 'Asset Setup', section: 'assets', kind: 'screen',
+    path: '/assets/setup', routes: ['/assets/setup'],
+    ops: STANDARD_OPERATIONS,
+    description: 'Categories, their extra fields, and the section and line levels of a location.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

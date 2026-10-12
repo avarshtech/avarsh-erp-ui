@@ -34,6 +34,7 @@ import {
   CloseOutlined,
   BarChartOutlined,
   TeamOutlined,
+  ToolOutlined,
   AuditOutlined,
   ScissorOutlined,
   ExperimentOutlined,
@@ -540,6 +541,16 @@ const MainLayoutInner = () => {
         { key: "/hr/statutory/pt", label: "Professional Tax", moduleId: "hr-statutory" },
         { key: "/hr/statutory/el", label: "EL Encashment", moduleId: "hr-statutory" },
         { key: "/hr/fnf", label: "F&F Settlement", moduleId: "hr-fnf" },
+      ],
+    },
+    {
+      key: "/assets",
+      icon: <ToolOutlined />,
+      label: "Assets",
+      moduleId: ["assets", "asset-setup"],
+      children: [
+        { key: "/assets", label: "Asset Register", moduleId: "assets" },
+        { key: "/assets/setup", label: "Asset Setup", moduleId: "asset-setup" },
       ],
     },
     {
