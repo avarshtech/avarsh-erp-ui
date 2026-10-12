@@ -11,9 +11,10 @@ const parseDefs = (json) => {
 /**
  * Add or edit a category.
  *
- * The code is the one field that cannot be corrected later once the category
- * owns assets: it is the first part of every asset ID already printed under it.
- * The server refuses the change; this says so before the user tries.
+ * The name is the whole identity, and the asset ID is built from it:
+ * "Sewing Machines" gives SEWINGMACH-U1-01001. Renaming later is allowed - the
+ * IDs already issued keep the old name, because a sticker on a machine does not
+ * change because someone edited a master.
  */
 const AssetCategoryDrawer = ({ open, category, parentOptions, onClose, onSave }) => {
   const [form] = Form.useForm();
@@ -24,7 +25,6 @@ const AssetCategoryDrawer = ({ open, category, parentOptions, onClose, onSave })
   useEffect(() => {
     if (!open) return;
     form.setFieldsValue({
-      code: category?.code,
       name: category?.name,
       parentId: category?.parentId ?? undefined,
       assignable: category?.assignable ?? false,
@@ -39,7 +39,6 @@ const AssetCategoryDrawer = ({ open, category, parentOptions, onClose, onSave })
     try {
       await onSave({
         ...values,
-        code: values.code?.toUpperCase(),
         // Every field needs the shape the server validates: options only mean
         // something for a dropdown, so the rest send an empty list.
         fieldDefs: (values.fieldDefs ?? []).map((def) => ({
@@ -70,31 +69,16 @@ const AssetCategoryDrawer = ({ open, category, parentOptions, onClose, onSave })
       )}
     >
       <Form form={form} layout="vertical" onFinish={submit}>
-        {isEdit && (
-          <Alert
-            type="info"
-            showIcon
-            title="The code is fixed once this category has assets"
-            description="It is the first part of every asset ID printed under it, so changing it would orphan those stickers."
-            style={{ marginBottom: 16 }}
-          />
-        )}
         <Form.Item name="parentId" label="Parent category" hidden={!isSub}>
           <Select disabled options={parentOptions} />
         </Form.Item>
         <Form.Item
-          name="code"
-          label="Code"
-          tooltip="2-10 capitals or digits. Becomes the asset ID prefix: SEW-U1-01001."
-          rules={[
-            { required: true, message: 'Give the category a code' },
-            { pattern: /^[A-Za-z0-9]{2,10}$/, message: '2 to 10 letters or digits, no spaces' },
-          ]}
+          name="name"
+          label="Name"
+          tooltip="The first part of every asset ID under this category, shortened to ten characters: Sewing Machines gives SEWINGMACH."
+          rules={[{ required: true, message: 'Name the category' }]}
         >
-          <Input maxLength={10} style={{ textTransform: 'uppercase' }} placeholder="SEW" />
-        </Form.Item>
-        <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Name the category' }]}>
-          <Input maxLength={100} placeholder="Sewing machines" />
+          <Input maxLength={100} placeholder="Sewing Machines" />
         </Form.Item>
         <Form.Item
           name="assignable"

@@ -66,13 +66,6 @@ const UnitMaster = ({ onDirtyChange }) => {
       dataIndex: 'unitName',
       sorter: (a, b) => (a.unitName || '').localeCompare(b.unitName || ''),
     },
-    {
-      // Second, not first: it is an asset-ID token now, not how anyone names a unit.
-      title: 'Short Code',
-      dataIndex: 'unitCode',
-      width: 120,
-      sorter: (a, b) => (a.unitCode || '').localeCompare(b.unitCode || ''),
-    },
     ...(isMultiBranch ? [{
       title: 'Branch',
       dataIndex: 'branchId',
@@ -189,7 +182,6 @@ const UnitMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.unitCode?.toLowerCase().includes(lower) ||
         item.unitName?.toLowerCase().includes(lower) ||
         item.city?.toLowerCase().includes(lower)
       )
@@ -275,16 +267,15 @@ const UnitMaster = ({ onDirtyChange }) => {
                   <Select placeholder="Select branch" options={branchOptions} showSearch optionFilterProp="label" />
                 </Form.Item>
               )}
-              <Form.Item name="unitName" label="Unit Name" rules={[{ required: true, message: 'Please enter a unit name' }]}>
-                <Input placeholder="e.g. Sewing Unit 1" maxLength={200} />
-              </Form.Item>
+              {/* A unit is the factory or building, not the kind of work done in it -
+                  that is a department. The placeholder says so. */}
               <Form.Item
-                name="unitCode"
-                label="Short Code"
-                extra="Goes inside every asset ID under this unit, e.g. SEW-U1-01001. Keep it short."
-                rules={[{ required: true, message: 'Please enter a short code' }]}
+                name="unitName"
+                label="Unit Name"
+                extra="The factory or building. Asset IDs are built from it, so a short name keeps the stickers short."
+                rules={[{ required: true, message: 'Please enter a unit name' }]}
               >
-                <Input placeholder="e.g. U1" maxLength={20} style={{ textTransform: 'uppercase' }} />
+                <Input placeholder="e.g. U1, or Unit 1 - Tirupur" maxLength={200} />
               </Form.Item>
               <Form.Item name="address" label="Address">
                 <Input.TextArea rows={2} placeholder="Street address" maxLength={500} />

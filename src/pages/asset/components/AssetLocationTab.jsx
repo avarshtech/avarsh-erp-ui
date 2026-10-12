@@ -35,7 +35,6 @@ const AssetLocationTab = ({ lookups }) => {
   };
 
   const columns = [
-    { title: 'Code', dataIndex: 'code', width: 110 },
     { title: 'Name', dataIndex: 'name' },
     { title: 'Department', dataIndex: 'departmentName', width: 180 },
     { title: 'Lines', key: 'lines', width: 90, render: (_, row) => row.lines?.length ?? 0 },
@@ -72,7 +71,6 @@ const AssetLocationTab = ({ lookups }) => {
   ];
 
   const lineColumns = [
-    { title: 'Code', dataIndex: 'code', width: 110 },
     { title: 'Name', dataIndex: 'name' },
     {
       title: 'Active',

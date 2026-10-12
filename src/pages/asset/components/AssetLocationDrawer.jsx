@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Drawer, Form, Input, Select, Space, Switch } from 'antd';
 
-/** Add or edit a section or a line - the same four fields either way. */
+/** Add or edit a section or a line - the same three fields either way. */
 const AssetLocationDrawer = ({ drawer, departmentOptions, sectionOptions, onClose, onSave }) => {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -13,7 +13,6 @@ const AssetLocationDrawer = ({ drawer, departmentOptions, sectionOptions, onClos
   useEffect(() => {
     if (!open) return;
     form.setFieldsValue({
-      code: record?.code,
       name: record?.name,
       departmentId: record?.departmentId,
       sectionId: record?.sectionId,
@@ -24,7 +23,7 @@ const AssetLocationDrawer = ({ drawer, departmentOptions, sectionOptions, onClos
   const submit = async (values) => {
     setSaving(true);
     try {
-      await onSave({ ...values, code: values.code?.toUpperCase() });
+      await onSave(values);
     } catch {
       // Reported by onSave; the drawer stays open so nothing typed is lost.
     } finally {
@@ -63,9 +62,6 @@ const AssetLocationDrawer = ({ drawer, departmentOptions, sectionOptions, onClos
             <Select showSearch optionFilterProp="label" options={sectionOptions} placeholder="Select section" />
           </Form.Item>
         )}
-        <Form.Item name="code" label="Code" rules={[{ required: true, message: `Give the ${noun} a code` }]}>
-          <Input maxLength={20} style={{ textTransform: 'uppercase' }} placeholder={isSection ? 'OVR' : 'L05'} />
-        </Form.Item>
         <Form.Item name="name" label="Name" rules={[{ required: true, message: `Name the ${noun}` }]}>
           <Input maxLength={100} placeholder={isSection ? 'Overlock' : 'Line 05'} />
         </Form.Item>
