@@ -1,6 +1,6 @@
 name: CI
 
-# Lint, build and audit every push to dev and to release branches, and every pull request into dev.
+# Lint, unit-test, build and audit every push to dev and to release branches, and every pull request into dev.
 # Netlify still builds and deploys dev on its own; this workflow is the check that the build is sound.
 #
 # Lint ratchet: the errors that existed on 2026-10-12 are recorded in eslint-suppressions.json, so
@@ -48,6 +48,9 @@ jobs:
 
       - name: Lint (new errors and extra warnings fail)
         run: npm run lint
+
+      - name: Unit tests (Vitest)
+        run: npm test
 
       - name: Build
         run: npm run build
