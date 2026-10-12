@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import ReactQuill from 'react-quill-new';
+import ReactQuill, { Quill } from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import { RICH_TEXT_FORMATS, sanitizeRichTextWith } from '../utils/sanitizeRichText';
 
 /**
  * RichTextEditor — based on react-quill (recommended by Ant Design).
@@ -44,18 +45,16 @@ const RichTextEditor = ({
     [readOnly]
   );
 
-  // Quill formats
-  const formats = [
-    'size',
-    'bold',
-    'italic',
-    'underline',
-    'strike',
-    'list',
-    'bullet',
-    'align',
-    'indent',
-  ];
+  // Quill formats. 'list' covers ordered and bullet lists; Quill 2 has no separate 'bullet'
+  // format, and naming one made it log a console error on every mount.
+  const formats = RICH_TEXT_FORMATS;
+
+  // Stored HTML is rendered read-only below, so it is reduced to the formats above first:
+  // anything that is not editor formatting (scripts, handlers, iframes) is dropped.
+  const readOnlyHtml = useMemo(
+    () => (readOnly ? sanitizeRichTextWith(Quill, value) : ''),
+    [readOnly, value]
+  );
 
   // Handle change
   const handleChange = (content, delta, source, editor) => {
@@ -83,7 +82,7 @@ const RichTextEditor = ({
           background: 'var(--bg-tertiary, #f8fafc)',
           ...style,
         }}
-        dangerouslySetInnerHTML={{ __html: value || '<em>No content</em>' }}
+        dangerouslySetInnerHTML={{ __html: readOnlyHtml || '<em>No content</em>' }}
       />
     );
   }
