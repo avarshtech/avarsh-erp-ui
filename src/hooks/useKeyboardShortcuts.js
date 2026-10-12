@@ -5,8 +5,9 @@ import { useEffect } from 'react';
  *
  * Shortcuts:
  * - Ctrl/Cmd + S → Triggers submit on the nearest visible form
- * - Escape → Closes topmost Ant Design modal/drawer
- * - Ctrl/Cmd + K → Focuses the header search input
+ *
+ * (Ctrl/Cmd + K focused a header search box that searched nothing; both were removed until a
+ * real global search exists.)
  *
  * Works in both standalone PWA and regular web mode.
  */
@@ -29,15 +30,6 @@ const useKeyboardShortcuts = () => {
         }
       }
 
-      // ── Ctrl/Cmd + K → Focus search input ──
-      if (isMeta && e.key === 'k') {
-        e.preventDefault();
-        const searchInput = document.querySelector('.ant-layout-header .ant-input');
-        if (searchInput) {
-          searchInput.focus();
-          searchInput.select();
-        }
-      }
     };
 
     window.addEventListener('keydown', handleKeyDown);

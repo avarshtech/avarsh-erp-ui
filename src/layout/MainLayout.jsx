@@ -5,7 +5,6 @@ import {
   Avatar,
   Dropdown,
   Space,
-  Input,
   Tooltip,
   Drawer,
   App,
@@ -21,7 +20,6 @@ import {
   DollarOutlined,
   SettingOutlined,
   UserOutlined,
-  SearchOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -191,7 +189,7 @@ const MainLayoutInner = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isDarkMode, toggleTheme } = useTheme();
-  const { isMobile, isTablet, isMobileOrTablet } = useResponsive();
+  const { isMobile, isMobileOrTablet } = useResponsive();
   const { isWco } = useIsPwa();
   const { isOffline } = useNetworkStatus();
   // Inter-branch transfers only make sense with more than one branch
@@ -920,20 +918,6 @@ const MainLayoutInner = () => {
                     height: 28,
                     objectFit: 'contain',
                     filter: isDarkMode ? 'none' : 'brightness(0.2)',
-                  }}
-                />
-              )}
-              {/* Hide search on mobile, show on tablet+ */}
-              {!isMobile && (
-                <Input
-                  placeholder="Search..."
-                  prefix={<SearchOutlined style={{ color: 'var(--text-muted)' }} />}
-                  style={{
-                    width: isTablet ? 200 : 280,
-                    borderRadius: 20,
-                    marginLeft: isMobileOrTablet ? 8 : 16,
-                    background: 'var(--input-bg)',
-                    borderColor: 'var(--input-border)',
                   }}
                 />
               )}
