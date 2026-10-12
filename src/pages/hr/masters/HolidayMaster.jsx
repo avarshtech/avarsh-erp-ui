@@ -39,7 +39,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const canView = hasPermission(MODULE_ID, 'view');
 
   const unitOptions = useMemo(() =>
-    units.map(f => ({ value: f.id, label: `${f.unitCode} - ${f.unitName}` })),
+    units.map(f => ({ value: f.id, label: f.unitName })),
   [units]);
 
   const unitMap = useMemo(() => {

@@ -26,17 +26,17 @@ export const recordEmployeeLabel = (r) =>
   r ? [r.employeeNo, r.employeeName].filter(Boolean).join(' - ') : '';
 
 /**
- * Unit record (UnitDTO) — the fields are `unitCode` and
- * `unitName`, not `code` and `name`.
+ * Unit record (UnitDTO) — the field is `unitName`, not `name`.
  *
- * Renders as "FAC-A - Avarsh Apparels, Unit 1".
+ * Renders as "Avarsh Apparels, Unit 1": the name alone, because unit names are
+ * now unique and the name is what a user recognises. The code it used to lead
+ * with survives only as the token inside an asset ID (SEW-U1-01001), which is
+ * no reason to put it in front of every dropdown.
  *
- * Name alone is ambiguous once two units are named similarly, and the code
- * is what appears on the PF and ESI registrations, so it is the half people
- * recognise. Matches employeeLabel, which has always led with the code.
+ * Unlike employeeLabel, which keeps the employee number because two people
+ * genuinely do share a name.
  */
-export const unitLabel = (f) =>
-  (f ? [f.unitCode, f.unitName].filter(Boolean).join(' - ') : '');
+export const unitLabel = (f) => (f ? (f.unitName || '') : '');
 
 /** Options for a unit Select. */
 export const unitOptions = (list = []) =>

@@ -36,7 +36,7 @@ const DepartmentMaster = ({ onDirtyChange }) => {
   const canView = hasPermission(MODULE_ID, 'view');
 
   const unitOptions = useMemo(() =>
-    units.map(f => ({ value: f.id, label: `${f.unitCode} - ${f.unitName}` })),
+    units.map(f => ({ value: f.id, label: f.unitName })),
   [units]);
 
   const unitMap = useMemo(() => {
@@ -73,21 +73,18 @@ const DepartmentMaster = ({ onDirtyChange }) => {
 
   const columns = [
     {
-      title: 'Code',
-      dataIndex: 'code',
-      width: 100,
-      sorter: (a, b) => (a.code || '').localeCompare(b.code || ''),
-    },
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
-    },
-    {
+      // The unit leads: a department's name only identifies it inside its unit,
+      // so "Sewing" on its own does not say which department this is.
       title: 'Unit',
       dataIndex: 'unitId',
-      width: 140,
+      width: 180,
+      sorter: (a, b) => (unitMap[a.unitId] || '').localeCompare(unitMap[b.unitId] || ''),
       render: (val) => unitMap[val] || '—',
+    },
+    {
+      title: 'Department',
+      dataIndex: 'name',
+      sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
     },
     {
       title: 'Status',
@@ -181,7 +178,6 @@ const DepartmentMaster = ({ onDirtyChange }) => {
     const lower = value.toLowerCase();
     setFilteredData(
       data.filter((item) =>
-        item.code?.toLowerCase().includes(lower) ||
         item.name?.toLowerCase().includes(lower)
       )
     );
@@ -261,14 +257,18 @@ const DepartmentMaster = ({ onDirtyChange }) => {
               disabled={isReadOnly}
               onValuesChange={() => { if (!skipDirty.current) markDirty(true); }}
             >
-              <Form.Item name="code" label="Department Code" rules={[{ required: true, message: 'Please enter a department code' }]}>
-                <Input placeholder="e.g. PROD" maxLength={20} />
+              {/* Unit first: a department is created inside a unit, so the form reads
+                  in the order the thing is built. */}
+              <Form.Item
+                name="unitId"
+                label="Unit"
+                extra="The department belongs to this unit. The same name may be used again in another unit."
+                rules={[{ required: true, message: 'Please select the unit this department belongs to' }]}
+              >
+                <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" />
               </Form.Item>
               <Form.Item name="name" label="Department Name" rules={[{ required: true, message: 'Please enter a department name' }]}>
-                <Input placeholder="e.g. Production" maxLength={200} />
-              </Form.Item>
-              <Form.Item name="unitId" label="Unit" rules={[{ required: true, message: 'Please select a unit' }]}>
-                <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" allowClear />
+                <Input placeholder="e.g. Finishing" maxLength={200} />
               </Form.Item>
               <Form.Item name="isActive" label="Active" valuePropName="checked">
                 <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
