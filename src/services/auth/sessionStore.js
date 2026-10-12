@@ -11,7 +11,7 @@
  * nothing themselves (utils/apiCaches).
  */
 
-import { clearApiCaches, clearPreviewStores } from '../../utils/apiCaches';
+import { clearApiCaches } from '../../utils/apiCaches';
 
 // ── Private in-memory state (not accessible via browser storage APIs) ────────
 
@@ -192,7 +192,6 @@ export const clearAll = () => {
   sessionStorage.removeItem('organisationInfo');
 
   // On a shared PC the next person must not be served this user's data: the service worker's
-  // API caches and the Preview modules' browser-only stores go with the session.
+  // API caches go with the session.
   clearApiCaches();
-  clearPreviewStores();
 };
