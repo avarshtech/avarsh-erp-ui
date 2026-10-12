@@ -1,0 +1,22 @@
+# Editor settings matching the style the repo already uses (https://editorconfig.org).
+# Line endings: the repository stores LF; Git on Windows may still check files out as CRLF.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+# Two trailing spaces are a Markdown line break.
+trim_trailing_whitespace = false
+
+[*.{py,ps1}]
+indent_size = 4
+
+[eslint-suppressions.json]
+# ESLint writes this file (--suppress-rule, --prune-suppressions) without a final newline.
+insert_final_newline = false
