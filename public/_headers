@@ -25,3 +25,18 @@
 # on every load, which is pure latency for immutable files.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# ── Security headers (every path) ───────────────────────────────────────────
+# These header names never appear in the rules above, so the cache rules stay on
+# disjoint paths as intended. The CSP is REPORT-ONLY: violations show in the
+# browser console (and in Sentry once its report-uri is added) and it becomes
+# enforcing only after a clean week. connect-src lists the dev, QA and production
+# API hosts because this file ships to every site. Same-origin framing stays
+# allowed (print previews); the microphone is the voice-costing recorder and
+# fullscreen the Virtual Factory.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), geolocation=(), payment=(), usb=(), microphone=(self), fullscreen=(self)
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://www.pantone.com; connect-src 'self' https://api.avarshai.com https://apiqa.avarshai.com https://sristi.avarshai.com https://i8k09r4vbf.execute-api.us-east-1.amazonaws.com https://api.postalpincode.in https://api.zippopotam.us https://open.er-api.com; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'
