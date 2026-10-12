@@ -36,12 +36,12 @@
     "@ant-design/icons": "^6.1.0",
     "@react-three/fiber": "^9.8.1",
     "antd": "^6.2.2",
-    "axios": "^1.13.4",
+    "axios": "^1.20.0",
     "dayjs": "^1.11.19",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-quill-new": "^3.8.3",
-    "react-router-dom": "^7.13.0",
+    "react-router-dom": "^7.18.4",
     "three": "^0.186.1"
   },
   "devDependencies": {
