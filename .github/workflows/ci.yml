@@ -1,0 +1,63 @@
+name: CI
+
+# Lint, build and audit every push to dev and to release branches, and every pull request into dev.
+# Netlify still builds and deploys dev on its own; this workflow is the check that the build is sound.
+#
+# Lint ratchet: the errors that existed on 2026-10-12 are recorded in eslint-suppressions.json, so
+# only NEW errors fail, and warnings are capped (`npm run lint`). When you fix a suppressed error,
+# run `npm run lint:prune` and commit the smaller file in the same commit — a stale suppression
+# fails the run, which is what keeps the baseline shrinking.
+on:
+  push:
+    branches: [dev, 'avarsh/release/**']
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Version
+        id: version
+        run: |
+          echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "commit=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Release branch matches package.json
+        if: startsWith(github.ref_name, 'avarsh/release/')
+        run: node scripts/check-release-branch.mjs "$GITHUB_REF_NAME"
+
+      - name: Lint (new errors and extra warnings fail)
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit shipped dependencies (high and critical fail)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Upload the build
+        uses: actions/upload-artifact@v4
+        with:
+          name: avarsh-erp-ui-v${{ steps.version.outputs.version }}-${{ steps.version.outputs.commit }}
+          path: dist/
+          retention-days: 14

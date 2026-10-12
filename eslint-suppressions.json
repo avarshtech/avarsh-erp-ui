@@ -1,0 +1,178 @@
+{
+  "e2e/specs/grn-qc/grn-qc-workflow-api.spec.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/components/ConflictDialog.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/components/FileUpload.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 1
+    }
+  },
+  "src/components/GlobalMessageEmitter.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/components/PermissionGuard.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 2
+    }
+  },
+  "src/components/SessionExpiryGuard.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 1
+    }
+  },
+  "src/components/approval/ApprovalHistoryPanel.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/branch/BranchField.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/context/BranchContext.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/context/LiveActivityFeedContext.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    },
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/context/SessionContext.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/context/StoreContext.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 2
+    }
+  },
+  "src/context/ThemeContext.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/layout/MainLayout.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/bom/ConsumptionMatrixDialog.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/bom/ProcessAllowanceModal.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/BomImportModal.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/BuyerPriceTrendModal.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/CostingPdfPreviewModal.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/costing/KnitsConsumptionModal.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/hr/HrDashboard.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/inventory/opening-stock/OpeningStockAccessoriesItemTable.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 6
+    }
+  },
+  "src/pages/inventory/opening-stock/OpeningStockFabricRollTable.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 8
+    }
+  },
+  "src/pages/inventory/qc/FabricQCInspection.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "src/pages/inventory/qc/TrimsQCInspection.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/master/MasterDashboard.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/orders/OrderForm.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/po/FabricStagesDialog.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/po/POView.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/po/components/ProductionEngineHistory.jsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/pages/reports/components/AiResultsDisplay.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 1
+    }
+  },
+  "src/pages/reports/components/ModuleReportCard.jsx": {
+    "react-refresh/only-export-components": {
+      "count": 1
+    }
+  },
+  "src/pages/reports/components/ReportColumnPicker.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 4
+    }
+  },
+  "src/pages/reports/components/ReportResultsTable.jsx": {
+    "react-hooks/preserve-manual-memoization": {
+      "count": 1
+    }
+  }
+}

@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // Build output, test reports, local tool state and the git-ignored docs folder. `.kilo` holds
+  // another tool's worktrees — full copies of src — which `eslint .` would otherwise lint twice.
+  globalIgnores(['dist', 'coverage', 'e2e-report', 'test-results', 'playwright-report', 'blob-report', '.kilo', '.playwright-mcp', 'docs']),
   {
     // Build/tooling config runs in Node, not the browser
     files: ['vite.config.js', 'eslint.config.js', 'playwright.config.js', 'scripts/**/*.{js,mjs}'],
@@ -24,14 +26,21 @@ export default defineConfig([
     },
   },
   {
-    files: ['**/*.{js,jsx}'],
+    // React's rules apply to the app only. In e2e/, Playwright fixtures receive a `use` callback,
+    // which react-hooks' rules-of-hooks would read as a hook call.
+    files: ['src/**/*.{js,jsx}'],
     extends: [
-      js.configs.recommended,
       reactHooks.configs.flat.recommended,
       reactRefresh.configs.vite,
     ],
+  },
+  {
+    files: ['**/*.{js,jsx}'],
+    extends: [
+      js.configs.recommended,
+    ],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 'latest',
       globals: {
         ...globals.browser,
         // Injected at build time by vite.config.js `define`
