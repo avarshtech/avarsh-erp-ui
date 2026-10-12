@@ -93,5 +93,11 @@ export default defineConfig({
   ],
   server: {
     port: 3000,
+    // Test runs and tools write into the project while the dev server is up. Watching those folders
+    // is wasted work, and on Windows a report the reporter still holds open (EBUSY) crashes the watcher.
+    watch: {
+      ignored: ['**/e2e-report/**', '**/test-results/**', '**/playwright-report/**', '**/blob-report/**',
+        '**/coverage/**', '**/.playwright-mcp/**', '**/.kilo/**', '**/docs/**'],
+    },
   },
 })

@@ -49,6 +49,17 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    // ── Smoke: every screen's landing route loads cleanly (dev server; e2e/specs/smoke) ──
+    {
+      name: 'smoke',
+      testDir: './e2e/specs/smoke',
+      use: {
+        browserName: 'chromium',
+        storageState: './e2e/.auth/user.json',
+      },
+      dependencies: ['setup'],
+    },
+
     // ── Module-Wise Test Suites ────────────────────────────
     {
       // Buyer document templates (API) + the mock packing-list picker that uses them.
