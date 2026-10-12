@@ -38,7 +38,7 @@ const CuttingTableMaster = ({ onDirtyChange }) => {
   ], []);
 
   return (
-    <ProductionMasterPanel
+    <ProductionMasterPanel orderBy="id"
       title="Cutting Tables"
       subtitle="Cutting floor"
       noun="Table"

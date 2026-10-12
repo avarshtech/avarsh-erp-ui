@@ -41,7 +41,7 @@ const SewingLookupMaster = ({ onDirtyChange }) => {
   ], []);
 
   return (
-    <ProductionMasterPanel
+    <ProductionMasterPanel orderBy="id"
       title="Sewing Lookups"
       subtitle="Code lists &amp; thresholds"
       noun="Lookup"

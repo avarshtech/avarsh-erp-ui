@@ -15,7 +15,7 @@ const MachineTypeMaster = ({ onDirtyChange }) => {
   ], []);
 
   return (
-    <ProductionMasterPanel
+    <ProductionMasterPanel orderBy="id"
       title="Machine Types"
       subtitle="Sewing floor"
       noun="Machine Type"

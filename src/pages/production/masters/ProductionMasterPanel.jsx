@@ -14,6 +14,10 @@ export const MODULE_ID = 'production-masters';
  * Each master supplies only what makes it different — its columns, its form
  * fields and its four API calls — so the six of them stay a few dozen lines
  * each instead of six copies of the same three hundred.
+ *
+ * `orderBy` is only for a master whose list endpoint returns rows unordered (a plain findAll()):
+ * it keeps an edited row in place. The masters whose endpoint sorts (by sort order, category,
+ * name) leave it out and show the API's order.
  */
 const ProductionMasterPanel = ({
   title,
@@ -27,6 +31,7 @@ const ProductionMasterPanel = ({
   toFormValues,
   onDirtyChange,
   extraHeader,
+  orderBy,
 }) => {
   const { message, modal } = App.useApp();
   const [form] = Form.useForm();
@@ -143,7 +148,7 @@ const ProductionMasterPanel = ({
   const readOnly = Boolean(selectedId) && !canUpdate;
 
   return (
-    <MasterSplitView orderBy="id"
+    <MasterSplitView orderBy={orderBy}
       title={title}
       subtitle={subtitle}
       addLabel={`Add ${noun}`}
