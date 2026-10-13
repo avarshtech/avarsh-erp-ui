@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { getHeapStatistics } from 'node:v8'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
 
@@ -19,13 +20,38 @@ const resolveBuildId = () => {
     return String(Date.now())
   }
 }
+const buildId = resolveBuildId()
+
+// Source maps exist only for Sentry (src/observability/sentry.js). A build that can upload them,
+// because SENTRY_AUTH_TOKEN is set in its environment, builds them hidden (the bundle names no map),
+// uploads them for this release, then deletes them, so no .map file is ever deployed. Without the
+// token the build is what it always was: no source maps and no Sentry plugin.
+const uploadSourceMaps = Boolean(process.env.SENTRY_AUTH_TOKEN)
+// Mapping this bundle for Sentry needs about 4 GB of heap. Node's default (about 2 GB) runs out two
+// minutes into the build, so a heap that small fails here, at once, with the remedy.
+if (uploadSourceMaps && getHeapStatistics().heap_size_limit < 3.5 * 1024 ** 3) {
+  throw new Error('Uploading source maps to Sentry needs a larger Node heap: set NODE_OPTIONS=--max-old-space-size=4096 '
+    + 'in this site\'s environment, next to SENTRY_AUTH_TOKEN (see RELEASING.md).')
+}
+const sentryPlugins = uploadSourceMaps
+  ? [(await import('@sentry/vite-plugin')).sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      // The release the app reports under: `${__APP_VERSION__}+${__BUILD_ID__}`
+      release: { name: `${pkg.version}+${buildId}` },
+      sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] },
+      telemetry: false,
+    })]
+  : []
 
 // https://vite.dev/config/
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
-    __BUILD_ID__: JSON.stringify(resolveBuildId()),
+    __BUILD_ID__: JSON.stringify(buildId),
   },
+  ...(uploadSourceMaps ? { build: { sourcemap: 'hidden' } } : {}),
   plugins: [
     react(),
     VitePWA({
@@ -40,6 +66,9 @@ export default defineConfig({
         // that screen download it.
         globIgnores: ['**/node_modules/**/*', '**/VirtualFactoryPage-*.{js,css}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+        // The service worker is built after the Sentry plugin has deleted the uploaded maps, so it
+        // must never get one of its own (the default follows build.sourcemap, which is false today).
+        sourcemap: false,
       },
       manifest: {
         name: 'Avarsh ERP Dashboard',
@@ -90,6 +119,7 @@ export default defineConfig({
         enabled: false,
       },
     }),
+    ...sentryPlugins,
   ],
   server: {
     port: 3000,
