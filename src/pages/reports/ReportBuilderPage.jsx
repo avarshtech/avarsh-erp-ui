@@ -9,6 +9,7 @@ import ReportFilterBar from './components/ReportFilterBar';
 import ReportResultsTable from './components/ReportResultsTable';
 import ReportExportBar from './components/ReportExportBar';
 import SaveReportDrawer from './components/SaveReportDrawer';
+import { sourceHasCurrency } from './reportCurrency';
 import {
   getReportDefinition,
   executeReport,
@@ -289,6 +290,7 @@ const ReportBuilderPage = () => {
         loading={executing}
         pagination={pagination}
         onTableChange={handleTableChange}
+        sourceHasCurrency={sourceHasCurrency(definition)}
       />
 
       <SaveReportDrawer

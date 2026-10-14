@@ -16,8 +16,8 @@ const formatCellValue = (value, fieldType, currency) => {
     case 'DATETIME':
       return dayjs(value).isValid() ? dayjs(value).format('DD-MMM-YYYY HH:mm') : '\u2014';
     case 'CURRENCY':
-      // Each row's own currency symbol (U307: a USD order used to read as rupees); with no
-      // currency to go by, the plain number, as the Excel and PDF exports print it
+      // The cell's currency symbol (U307: a USD order used to read as rupees; see cellCurrency);
+      // with the currency unknown, the plain number, as the Excel and PDF exports print it
       return currency ? formatCurrency(value, currency) : formatNumber(value, 2);
     case 'NUMBER':
       return formatNumber(value, 2);
@@ -34,9 +34,13 @@ const ReportResultsTable = memo(function ReportResultsTable({
   loading = false,
   pagination,
   onTableChange,
+  sourceHasCurrency = false,
 }) {
   const tableColumns = useMemo(() => {
-    const hasCurrencyColumn = columns.some((col) => col.fieldCode === 'currency');
+    const currencyOf = {
+      sourceHasCurrency,
+      currencyInRun: columns.some((col) => col.fieldCode === 'currency'),
+    };
     return columns.map((col) => ({
       title: col.displayName,
       dataIndex: col.fieldCode,
@@ -44,9 +48,9 @@ const ReportResultsTable = memo(function ReportResultsTable({
       sorter: col.isSortable !== false,
       ellipsis: true,
       render: (value, record) => formatCellValue(value, col.fieldType,
-        col.fieldType === 'CURRENCY' ? cellCurrency(col.fieldCode, record, hasCurrencyColumn) : null),
+        col.fieldType === 'CURRENCY' ? cellCurrency(col.fieldCode, record, currencyOf) : null),
     }));
-  }, [columns]);
+  }, [columns, sourceHasCurrency]);
 
   const tablePagination = useMemo(() => {
     if (!pagination) return false;

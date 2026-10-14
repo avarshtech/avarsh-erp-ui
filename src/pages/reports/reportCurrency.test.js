@@ -1,24 +1,48 @@
 // Which currency a report's money cell is shown in (U307).
 //   npx vitest run src/pages/reports/reportCurrency.test.js
 import { describe, test, expect } from 'vitest';
-import { cellCurrency } from './reportCurrency';
+import { cellCurrency, sourceHasCurrency } from './reportCurrency';
+
+describe('sourceHasCurrency', () => {
+  test('orders and cost sheets carry a currency, even when the report left the column out', () => {
+    expect(sourceHasCurrency({ dataSourceKey: 'orders', fields: [] })).toBe(true);
+    expect(sourceHasCurrency({ dataSourceKey: 'cost_sheets' })).toBe(true);
+    expect(sourceHasCurrency({ dataSourceKey: null, fields: [{ fieldCode: 'currency' }] })).toBe(true);
+  });
+
+  test('purchase orders, inventory and production do not', () => {
+    expect(sourceHasCurrency({ dataSourceKey: 'purchase_orders', fields: [{ fieldCode: 'grand_total' }] })).toBe(false);
+    expect(sourceHasCurrency(null)).toBe(false);
+  });
+});
+
+const inRun = { sourceHasCurrency: true, currencyInRun: true };
+const leftOut = { sourceHasCurrency: true, currencyInRun: false };
+const rupeeOnly = { sourceHasCurrency: false };
 
 describe('cellCurrency', () => {
-  test('a row shows its own currency when the report has a currency column', () => {
-    expect(cellCurrency('total_order_value', { currency: 'USD' }, true)).toBe('USD');
-    expect(cellCurrency('total_order_value', { currency: 'INR' }, true)).toBe('INR');
-    expect(cellCurrency('final_price', { currency: ' eur ' }, true)).toBe('EUR');
+  test('a source with no currency field is rupees, as before', () => {
+    expect(cellCurrency('grand_total', {}, rupeeOnly)).toBe('INR');
+    expect(cellCurrency('unit_cost', { currency: 'USD' }, rupeeOnly)).toBe('INR');
+    expect(cellCurrency('grand_total', {})).toBe('INR');
   });
 
-  test('a row with no currency value, or a report with no currency column, has none', () => {
-    expect(cellCurrency('total_order_value', { currency: null }, true)).toBeNull();
-    expect(cellCurrency('total_order_value', { currency: '' }, true)).toBeNull();
-    expect(cellCurrency('grand_total', { currency: 'INR' }, false)).toBeNull();
-    expect(cellCurrency('grand_total', {}, false)).toBeNull();
+  test('with the currency field in the run, each row shows its own currency', () => {
+    expect(cellCurrency('total_order_value', { currency: 'USD' }, inRun)).toBe('USD');
+    expect(cellCurrency('total_order_value', { currency: 'INR' }, inRun)).toBe('INR');
+    expect(cellCurrency('final_price', { currency: ' eur ' }, inRun)).toBe('EUR');
+    expect(cellCurrency('total_order_value', { currency: null }, inRun)).toBeNull();
+    expect(cellCurrency('total_order_value', { currency: '' }, inRun)).toBeNull();
   });
 
-  test('a column that names its currency keeps it, whatever the row says', () => {
-    expect(cellCurrency('final_price_usd', { currency: 'INR' }, true)).toBe('USD');
-    expect(cellCurrency('final_price_usd', {}, false)).toBe('USD');
+  test('with the currency field left out of the run, the currency is unknown', () => {
+    expect(cellCurrency('total_order_value', { currency: 'INR' }, leftOut)).toBeNull();
+    expect(cellCurrency('total_order_value', {}, leftOut)).toBeNull();
+  });
+
+  test('a column that names its currency keeps it, whatever the row or source says', () => {
+    expect(cellCurrency('final_price_usd', { currency: 'INR' }, inRun)).toBe('USD');
+    expect(cellCurrency('final_price_usd', {}, leftOut)).toBe('USD');
+    expect(cellCurrency('final_price_usd', {}, rupeeOnly)).toBe('USD');
   });
 });
