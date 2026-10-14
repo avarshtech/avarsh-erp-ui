@@ -10,8 +10,13 @@ rather than editing this file by hand.
   `src/pages/{orders,bom,costing,po}`, their services under `src/services/`, the module utilities
   they import (calculators, constants, print generators) and the shared hooks and components they
   lean on, where a defect shows on these screens. Code reviewed at `dev` 4672795 (2026-10-12).
-- **Next batches, in plan order:** inventory, production, master; then admin, sample-request, hr,
-  reports; then the shared code as a whole; then the Preview modules.
+- **Batch 2:** inventory, production and master data: `src/pages/{inventory,production,master}`,
+  their services and the API behind them. The browser-only Preview screens in these folders
+  (production finishing, production job work, job-work bill passing — all browser demo data with a
+  Preview tag) wait for the Preview batch. Batch 2 ids start at
+  U208; batch 1 ids are unchanged.
+- **Next batches, in plan order:** admin, sample-request, hr, reports; then the shared code as a
+  whole; then the Preview modules.
 - **Method:** nine reviewers, one per slice (orders; BOM; cut panel and garment process
   requirements; costing list and view; costing sheet; supplier PO form; supplier PO view and list;
   production POs; job-work POs), read every line of their slice against Appendix A of the plan and
@@ -20,7 +25,10 @@ rather than editing this file by hand.
   confirm, correct, re-grade or refute it; a few defects the verifiers spotted on the way were
   checked by the lead before being added. The mechanical sweep items (catch-block toasts, locale,
   memoised columns) were checked by the lead with scripted greps. The lead re-checked every P0 and
-  P1 against the code. Anything that could not be confirmed was dropped.
+  P1 against the code. Anything that could not be confirmed was dropped. To stay within the
+  account's usage limit, batch 2's reviewers confirmed each finding themselves by re-reading the
+  code path before reporting it (no separate verifier pass); the lead re-checked every P0 and P1
+  and spot-checked the P2s.
 - **Severity:** P0 = crash, data loss or a security hole. P1 = wrong data, a blocked workflow, or a
   visible bug users hit. P2 = degraded UX, or a maintainability risk with a real consequence.
   P3 = cleanup.
@@ -36,18 +44,21 @@ rather than editing this file by hand.
 
 ## Summary
 
-Open findings by module and severity, with the estimate in developer hours. The last column counts the findings the test-release gate already fixed (listed at the end, not re-reported).
+Open findings by module and severity, with the estimate in developer hours. The last column counts the findings the test-release gate already fixed (listed at the end, not re-reported). Ids are stable: new batches append from the next free id, so ids are not contiguous within a module.
 
 | Module | P0 | P1 | P2 | P3 | Open | Estimate (h) | Fixed by the gate |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | Orders | 1 | 5 | 11 | 10 | 27 | 20.4 | 0 |
 | BOM (bill of materials, cut panel and garment process requirements) | 1 | 9 | 18 | 20 | 48 | 47.6 | 2 |
 | Costing | 2 | 7 | 20 | 16 | 45 | 57 | 0 |
-| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 43 | 19 | 76 | 104.1 | 2 |
+| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 44 | 24 | 82 | 110.6 | 2 |
+| Inventory (GRN, QC, bill passing, issues, transfers, stock) | 0 | 10 | 20 | 11 | 41 | 84 | 0 |
+| Production (cutting, sewing, packing, production masters) | 0 | 8 | 14 | 7 | 29 | 70.8 | 0 |
+| Master data | 0 | 5 | 11 | 5 | 21 | 34.3 | 0 |
 | Shared code, as used by these screens | 0 | 2 | 1 | 3 | 6 | 6.3 | 1 |
-| **Total** | **4** | **37** | **93** | **68** | **202** | **235.2** | **5** |
+| **Total** | **4** | **60** | **139** | **96** | **299** | **430.8** | **5** |
 
-P0 and P1 together: 41 findings, about 69.5 h. Every one was re-checked by the lead against the code on `dev`.
+P0 and P1 together: 64 findings, about 139.3 h. Every one was re-checked by the lead against the code on `dev`.
 
 ## Orders
 
@@ -1518,6 +1529,14 @@ P0 and P1 together: 41 findings, about 69.5 h. Every one was re-checked by the l
 - **Fix:** Keep list state in the URL (WS7) and reset to id/desc on a cleared sort; the id tie-breaker is A1. *(visible: the list returns as left)*
 - **Estimate:** 3 h
 
+#### U208 · P2 · rule 4 — A slow earlier PO load can replace the PO the user just opened, and actions then apply to it
+
+*POView* — `src/pages/po/POView.jsx:236-291`
+
+- **What happens:** loadPODetails sets the PO and its attachments from whichever response lands, with no guard against a newer poId. Clicking PO A, closing it before it loads and opening PO B can show A in B's dialog (Cancel/Refer Back then act on A), or list A's attachments under B so Remove deletes A's file while logging it on B.
+- **Fix:** Tag each load with the poId (or a counter) and drop results for any other PO; revoke blob URLs that arrive after close. *(not visible)*
+- **Estimate:** 1.5 h
+
 ### P3
 
 #### U178 · P3 · rule 1 — A failed requirement lookup leaves the CPP table spinning (or the GPO picker saying there are no requirements) with no retry
@@ -1674,6 +1693,814 @@ P0 and P1 together: 41 findings, about 69.5 h. Every one was re-checked by the l
 - **Fix:** toastUnlessHandled (WS7); give follow-up activity writes their own try. *(visible: one toast)*
 - **Estimate:** 1.5 h
 
+#### U209 · P3 · rule 4 — Supplier PO list: an older search response can overwrite a newer one
+
+*POList* — `src/pages/po/POList.jsx:91-135`
+
+- **What happens:** No request token: typing a supplier name then quickly picking a status can leave the search's rows and total under the status filter until the next refresh.
+- **Fix:** Sequence-ref guard (or move onto useServerList). *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U210 · P3 · correctness — POView's tax totals add per-line rounded values, so they can differ by a paisa from the form, the stored header and the print
+
+*POView* — `src/pages/po/POView.jsx:673-675, 704-707`
+
+- **What happens:** When lines carry stored tax values the view sums each line's rounded CGST/SGST; the form, the server header and the print add unrounded tax and round once. Two ₹10.10 lines at 5% show CGST ₹0.50 here and ₹0.51 everywhere else, and the components no longer add up to the grand total.
+- **Fix:** Show the header's stored tax values when present; keep line values for the per-rate breakup only. *(visible: totals can change by a paisa)*
+- **Estimate:** 1 h
+
+#### U211 · P3 · rule 27 — POView shows the same status in two colours
+
+*POView* — `src/pages/po/POView.jsx:176-185, 729-736; src/utils/statusConfig.js:62-71`
+
+- **What happens:** The local STATUS_CONFIG makes Sent To Supplier magenta and Pending Approval gold, while the header's StatusTag uses PO_STATUS_CONFIG (cyan, processing); the timeline and header disagree in one dialog.
+- **Fix:** Render the timeline's status tags with StatusTag and PO_STATUS_CONFIG. *(visible: timeline tags take the header's colours)*
+- **Estimate:** 0.5 h
+
+#### U212 · P3 · correctness — The PO print's "Approved By" name is always blank
+
+*PO print* — `src/utils/poPdfGenerator.js:836; erp/purchaseorder/dto/PurchaseOrderDTO.java`
+
+- **What happens:** The print reads po.approvedByName, which PurchaseOrderDTO does not have, so every printed PO has an empty name above Approved By while Prepared By is filled.
+- **Fix:** Add approvedByName to the DTO from the approval, or drop the name line. *(visible: the approver's name appears)*
+- **Estimate:** 1 h
+
+#### U213 · P3 · rule 1 — Version history's change summary ignores line edits, and a load error reads as "no history"
+
+*POVersionHistory* — `src/pages/po/POVersionHistory.jsx:36-57, 92-110, 131-137`
+
+- **What happens:** getDiff compares only header fields (supplier, delivery date, grand total, line count, remarks), so a resubmit that swapped a line's variant shows no change; a failed /versions call shows 'No version history available'.
+- **Fix:** Diff lines by id (variant, quantity, rate) plus PO date and T&C, and show an error state with Retry. *(visible: more change lines; an error panel)*
+- **Estimate:** 2 h
+
+## Inventory (GRN, QC, bill passing, issues, transfers, stock)
+
+### P1
+
+#### U214 · P1 · correctness — The "Received At (Branch)" choice is never sent to the API, so the GRN and its stock go to the PO's delivery branch
+
+*Fabric / Accessories GRN form* — `src/services/inventory/inventoryService.js:426-495 (the request built at 481-494 has no branchId); src/pages/inventory/grn/FabricGRNForm.jsx:273, 427-429; src/pages/inventory/grn/AccessoriesGRNForm.jsx:261, 404-406; erp/inventory/grn/service/GRNService.java:208-215`
+
+- **What happens:** In a multi-branch company the user picks Received At = Branch B for a PO delivered to Branch A and submits. buildGrnRequest drops branchId, so the server falls back to the PO's delivery branch A, and QC approval puts the stock at Branch A. Changing the branch on an edit is ignored the same way.
+- **Fix:** Add branchId to the object buildGrnRequest returns. *(not visible (the saved branch matches what the user picked))*
+- **Estimate:** 0.5 h
+
+#### U215 · P1 · correctness — Reopening a saved Fabric QC replaces the recorded per-roll results with blank rows rebuilt from the GRN
+
+*Fabric QC inspection* — `src/pages/inventory/qc/FabricQCInspection.jsx:82-107, 120-147; reached from src/pages/inventory/bill-passing/BpQcPanel.jsx:60-65 and BpAttachments.jsx:95-98`
+
+- **What happens:** Opening a Draft or Referred-Back QC (or an Approved one through Bill Passing's QC No link) loads the saved rolls, then the materialise effect (deps selectedGRN/poLineItemId/grns) rebuilds them with actual width, GSM and result all null. Every roll shows undecided, and a Save Draft after any edit writes the blanks over the inspector's results.
+- **Fix:** Rebuild rolls only when the user picks a GRN or line (or skip it when the rolls belong to the loaded QC), and map the saved width/GSM back on load. *(visible: an existing QC shows its saved per-roll results)*
+- **Estimate:** 1.5 h
+
+#### U216 · P1 · correctness — The standard width and GSM of each QC roll are never saved (UI sends stdWidth/stdGsm, the DTO expects width/gsm)
+
+*Fabric QC inspection / QC view / QC report print* — `src/pages/inventory/qc/FabricQCInspection.jsx:128-140; src/pages/inventory/qc/FabricQCRollInspectionTable.jsx:41-42; src/pages/inventory/qc/QCViewModal.jsx:58-59; src/utils/fabricQCPdfGenerator.js:82-83, 131-142; erp/inventory/qc/dto/QCRollDTO.java:21-22; erp/inventory/qc/service/QCService.java:611-612`
+
+- **What happens:** Every saved fabric QC roll stores width and GSM as null, so the QC view's Width/GSM columns are empty, the printed QC report shows '-' for the PO width/GSM, and the 4-point average is never calculated. A supplier-facing rejection report goes out without the specification it was measured against.
+- **Fix:** Send width and gsm (from stdWidth/stdGsm) in the roll payload and read them back into the view and the edit table. *(visible: the view and the report show the standard width/GSM and the 4-point average)*
+- **Estimate:** 1.5 h
+
+#### U217 · P1 · correctness — Attachments, debits, issues and workflow actions adopt the server's bill and silently discard unsaved edits; Approve can pass figures the approver was not shown
+
+*Bill Passing workspace* — `src/pages/inventory/bill-passing/BillPassingForm.jsx:79-84, 374-377, 402-404, 416-417; src/hooks/useBillWorkflow.js:18-24; src/pages/inventory/bill-passing/billWorkflowActions.js:42, 79, 92-103; erp/inventory/billpassing/controller/BpAttachmentController.java:36-37`
+
+- **What happens:** A clerk ticks GRN lines and enters charges, then attaches the supplier invoice (required by BR-15), adds a debit or logs an issue: the returned bill replaces the local one, the edits vanish and the dirty flag clears. A verifier or approver who edits figures and then clicks Send for Approval or Approve passes the last saved figures, while the Approve confirmation shows the locally recalculated Net Payable.
+- **Fix:** When the bill is dirty, save it before any workflow, debit, issue or attachment call (as Submit does) or block with 'Save your changes first'; for those responses merge only server-owned parts and the new version. *(visible: edits survive, or the user is asked to save first)*
+- **Estimate:** 3 h
+
+#### U218 · P1 · correctness — Late deliveries cannot be received: invoice and DC dates are capped at the PO's original delivery date and the revised date is ignored
+
+*Fabric / Accessories GRN form* — `src/pages/inventory/grn/FabricGRNForm.jsx:461-467, 482-488; src/pages/inventory/grn/AccessoriesGRNForm.jsx:438-444, 459-465; src/utils/grnValidation.js:43-45, 55-57; src/services/inventory/inventoryService.js:49; erp/inventory/grn/service/GRNService.java:782-792`
+
+- **What happens:** A supplier ships two weeks late with an invoice dated after the PO delivery date: the pickers disable that date and the server refuses 'Invoice date must fall within the PO date range', even when the PO's revised delivery date covers it. The goods cannot be received without amending the PO.
+- **Fix:** Use revisedDeliveryDate ?? deliveryDate as the upper bound in UI and API, or allow late dates with a warning. *(visible: later dates become selectable)*
+- **Estimate:** 2 h
+- **Note:** Needs owner: decide whether late invoices are allowed with a warning or only up to the revised date.
+
+#### U219 · P1 · correctness — GRNs from the previous financial year that are still QC-pending vanish from the QC GRN dropdown on 1 April
+
+*QC inspection (Fabric and Accessories): GRN picker* — `src/services/inventory/inventoryService.js:617-629; erp/inventory/grn/service/GRNService.java:113-121`
+
+- **What happens:** Goods received on 28 March and inspected on 2 April: the lookup sends no date range, the server applies the current-FY window, the GRN is not offered, no QC can be raised, and the goods never reach stock.
+- **Fix:** Send an explicit wide dateStart for this status lookup, or skip the FY default for status=QC_Pending. *(not visible (older pending GRNs reappear))*
+- **Estimate:** 1 h
+
+#### U220 · P1 · rule 15 — The bulk issue registers only ever load the newest 25 issues
+
+*Material Issue – Fabric / Accessories registers* — `src/services/inventory/materialIssueService.js:10-13; src/pages/inventory/issue/FabricIssueList.jsx:39-58, 152-160; src/pages/inventory/issue/AccessoriesIssueList.jsx:39-58, 163-171; erp/inventory/issue/dto/MaterialIssueRequests.java:85-86`
+
+- **What happens:** The list sends only type and search, so the server returns its default first page of 25 and the table paginates those on the client. Once a branch has more than 25 fabric issues, 'Total Issues' shows 40 but older issues cannot be viewed, reprinted or cancelled, and the date filter searches only those 25. Search also refetches on every keystroke.
+- **Fix:** Use server paging (page, size, dates, debounced search) as StockTransferList does. *(visible: the pager reaches every issue)*
+- **Estimate:** 4 h
+
+#### U221 · P1 · rule 15 — The stock registers show only the first 25 items
+
+*Stock Register (Fabric / Accessories)* — `src/services/inventory/inventoryService.js:865-870, 913-918; src/pages/inventory/stock/FabricStockRegister.jsx:33-58, 97-104; src/pages/inventory/stock/AccessoriesStockRegister.jsx:43-57, 88-95; erp/inventory/stock/service/FabricStockService.java:70, 163-177`
+
+- **What happens:** The register always requests page 0 of 25 and lets antd paginate that one page. A store with 60 fabric items shows 'Total Fabric Items 60', but only 25 rows can be reached without searching, and the Sub Category filter is built from those 25 rows.
+- **Fix:** Pass the table's page and size to the server and render totalElements; debounce the search; take sub-category options from master data. *(visible: every stock item reachable)*
+- **Estimate:** 4 h
+
+#### U222 · P1 · correctness — Accessories issue ignores the BOM line's variant: same-item rows collide and FIFO takes another colour's lots
+
+*Accessories Material Issue (bulk, Work Order)* — `erp/inventory/issue/service/MaterialIssueLookupService.java:148-158; erp/inventory/issue/service/MaterialIssueService.java:397-417; src/pages/inventory/issue/AccessoriesIssueForm.jsx:73-76, 96-99, 133-137; src/pages/inventory/issue/AccessoriesIssueItemTable.jsx:12-14, 68`
+
+- **What happens:** A Work Order BOM with ZIP-001 Navy and ZIP-001 Black shows two identical rows sharing one key (id = itemId), with no colour. Entering 200 on the Navy row FIFO-consumes every lot of the item at the branch with no variant filter, so the older Black lot is decremented while Navy stays in stock; variant stock is silently wrong afterwards.
+- **Fix:** Carry bomLineId and variantId on the lines, key rows by bomLineId, show the variant, and filter FIFO lots by the line's variant. *(visible: rows show variant code/colour)*
+- **Estimate:** 8 h
+- **Note:** API change (erp-purchase).
+
+#### U223 · P1 · correctness — Opening stock is captured without a variant, so it never counts as stock for a variant BOM line
+
+*Opening Stock batch form → Stock Register / Accessories Issue* — `src/pages/inventory/opening-stock/ItemPicker.jsx:11-58; src/pages/inventory/opening-stock/OpeningStockFabricRollTable.jsx:40-49; src/pages/inventory/opening-stock/OpeningStockAccessoriesItemTable.jsx:39-49; erp/inventory/openingstock/service/OpeningStockPostingService.java:116, 189; erp/production/common/service/StockPool.java:76-80`
+
+- **What happens:** The picker and the CSV parse set only itemId, so every posted opening lot has no variant. The register shows 'Item Code —' for those rows, and for a Work Order whose BOM line names a variant StockPool skips them: the issue form shows Available 0 and blocks issuing stock that physically exists.
+- **Fix:** Add a variant selector to opening-stock rows and the CSV template; fall back to itemCode in the register. *(visible: variant picker; register shows a code)*
+- **Estimate:** 8 h
+
+### P2
+
+#### U224 · P2 · correctness — Multi-colour fabric lines share one id, and the roll picker cannot tell colours apart
+
+*Fabric Material Issue (bulk, Cutting PO)* — `erp/inventory/issue/service/MaterialIssueLookupService.java:104-113; erp/inventory/issue/dto/IssuableRollDTO.java:12-29; src/pages/inventory/issue/FabricIssueForm.jsx:100-106, 134-141; src/pages/inventory/issue/FabricIssueRollPicker.jsx:112-121`
+
+- **What happens:** A Cutting PO BOM with F-100 Navy and F-100 Black gives two line options with the same value; choosing Black resolves to Navy's line, rolls of both colours are offered with no colour column, and black rolls can be issued against the navy line.
+- **Fix:** Key lines by bomLineId and add colour/variant to the roll picker, filtering or flagging other variants. *(visible: colour column)*
+- **Estimate:** 5 h
+
+#### U225 · P2 · correctness — Bulk accessories issues never store bomQty, so every line reads as excess and the gate pass prints BOM Qty 0
+
+*Material Issue view / Accessories issue slip* — `erp/inventory/issue/service/MaterialIssueService.java:407; src/pages/inventory/issue/IssueViewDrawer.jsx:38-50; src/utils/issueSlipPdfGenerator.js:73, 76, 131, 138`
+
+- **What happens:** Issue 150 buttons against a Work Order needing 200: the view shows a blank BOM Qty and '+150' excess, and the printed slip shows BOM Qty 0 and '—' for the item code.
+- **Fix:** Pass the served BOM line's requirement into ofLot; fall back to itemCode in the slip. *(visible: correct BOM qty and item code)*
+- **Estimate:** 2 h
+
+#### U226 · P2 · correctness — Date-range filters drop records dated on the first day of the range
+
+*Material Issue registers, QC lists* — `src/pages/inventory/issue/FabricIssueList.jsx:71-75; src/pages/inventory/issue/AccessoriesIssueList.jsx:70-74; src/pages/inventory/qc/FabricQCList.jsx:118-126; src/pages/inventory/qc/TrimsQCList.jsx:125-132`
+
+- **What happens:** A client re-filter uses a strict isAfter(start of day), so filtering 14-Oct to 14-Oct (or 1-31 Oct) hides every record dated on the start day while the stat cards count them.
+- **Fix:** Use !isBefore(start) && !isAfter(end), or let the server filter. *(visible: start-day records appear)*
+- **Estimate:** 0.5 h
+
+#### U227 · P2 · correctness — A Rejected QC shows an Edit button, but the form opens read-only
+
+*Fabric / Accessories QC list and inspection* — `src/pages/inventory/qc/FabricQCList.jsx:27-31, 175-177; src/pages/inventory/qc/TrimsQCList.jsx:27-31, 178-180; src/pages/inventory/qc/FabricQCInspection.jsx:72-73; src/pages/inventory/qc/TrimsQCInspection.jsx:102; erp/inventory/qc/service/QCService.java:846, 853-856`
+
+- **What happens:** The rejection dialog says the QC is returned to the creator for revision; the creator clicks Edit and gets a disabled form, although the API allows editing a Rejected QC.
+- **Fix:** Make Rejected editable in the forms or remove it from the lists' editable statuses. *(visible)*
+- **Estimate:** 1 h
+- **Note:** Needs owner: the intended flow for a rejected QC.
+
+#### U228 · P2 · correctness — Nothing prevents a second QC on the same GRN line
+
+*QC inspection (Fabric and Accessories)* — `src/pages/inventory/qc/FabricQCInspection.jsx:192-195; src/pages/inventory/qc/TrimsQCInspection.jsx:201-207; erp/inventory/qc/service/QCService.java:213-217, 821-828`
+
+- **What happens:** Two inspectors (or one user twice) raise QCs for the same line; if one is approved and the other rejected, the same rolls are both stocked and queued for return.
+- **Fix:** Refuse a QC for a line that already has a non-Draft, non-Rejected QC, and disable those lines in the picker. *(visible: inspected lines disabled)*
+- **Estimate:** 2 h
+- **Note:** API change (erp-purchase).
+
+#### U229 · P2 · rule 9 — API "not in the future" date checks use the UTC date, so today's date is rejected between 00:00 and 05:30 IST
+
+*GRN / QC submit (API)* — `erp/inventory/grn/service/GRNService.java:774-784; erp/inventory/qc/service/QCService.java:569, 711`
+
+- **What happens:** A night-shift receipt or inspection at 01:30 IST with today's invoice/DC/inspection date is refused as 'in the future' (LocalDate.now() is still yesterday in UTC), so users backdate it.
+- **Fix:** Use LocalDate.now(businessClock), which these services already inject for the FY. *(not visible)*
+- **Estimate:** 0.5 h
+- **Note:** API change (erp-purchase).
+
+#### U230 · P2 · rule 15 — The GRN and QC lists load only the newest 100 records of the year
+
+*GRN list / QC lists* — `src/services/inventory/inventoryService.js:149-154, 574-580; src/pages/inventory/grn/GRNList.jsx:53, 161-167; src/pages/inventory/qc/FabricQCList.jsx:203-211; src/pages/inventory/qc/TrimsQCList.jsx:206-214`
+
+- **What happens:** Past 100 GRNs or QCs in a year the 'Total GRNs' card says 340 while paging stops at 100; older records can be reached only by searching.
+- **Fix:** Server paging as the Bill Passing list does. *(visible: all records reachable)*
+- **Estimate:** 3 h
+
+#### U231 · P2 · rule 16, rule 4 — Search fires on every keystroke with no debounce and no stale-response guard
+
+*GRN list / QC lists* — `src/pages/inventory/grn/GRNList.jsx:43-64, 156; src/pages/inventory/qc/FabricQCList.jsx:58-74, 102-104, 199; src/pages/inventory/qc/TrimsQCList.jsx:66-82, 110, 202`
+
+- **What happens:** Typing 'GRN/26-27/0123' quickly on a slow line can let the response for 'GRN/2' land last and show the wrong rows.
+- **Fix:** useDebouncedSearch plus a request-sequence guard. *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U232 · P2 · correctness — Three QC list columns are always blank (Fabric Description, Item Description, Category)
+
+*Fabric / Accessories QC list* — `src/pages/inventory/qc/FabricQCList.jsx:156; src/pages/inventory/qc/TrimsQCList.jsx:159-160; src/pages/inventory/qc/FabricQCInspection.jsx:250-270; erp/inventory/qc/dto/QCResponse.java:37-39`
+
+- **What happens:** The payload never sets fabricDescription and the response has no itemDescription or category, so those columns are empty and the search box cannot match them.
+- **Fix:** Send fabricDescription and add itemDescription/category to the response (or drop the columns). *(visible: columns populated)*
+- **Estimate:** 1.5 h
+
+#### U233 · P2 · rule 8, rule 5 — Accessories QC has no unsaved-changes guard, sends no version, and fails silently on load
+
+*Accessories QC inspection* — `src/pages/inventory/qc/TrimsQCInspection.jsx:83-129, 255-271`
+
+- **What happens:** An inspector ticks 12 criteria and clicks Back: everything is lost without the prompt the Fabric screen shows; two users saving one draft overwrite each other; a failed load leaves an empty form that looks new.
+- **Fix:** Add useUnsavedChanges, send version, and add a loading state with a catch. *(visible: leave prompt and loading skeleton)*
+- **Estimate:** 1 h
+
+#### U234 · P2 · correctness — After a reversal request in the view modal, the GRN list keeps the old status and actions
+
+*GRN list / GRN view modal* — `src/pages/inventory/grn/GRNViewModal.jsx:158; src/pages/inventory/grn/GRNList.jsx:172-176`
+
+- **What happens:** The row still shows QC Pending with Cancel and Edit after the modal closes, and Cancel then fails with a transition error until a reload.
+- **Fix:** Pass onUpdated from GRNList to reload, as the QC lists do. *(visible: the row refreshes)*
+- **Estimate:** 0.5 h
+
+#### U235 · P2 · rule 5 — A failed Post on a new batch leaves an orphan draft, and the retry creates a second batch that can double stock
+
+*Opening Stock batch form* — `src/pages/inventory/opening-stock/OpeningStockBatchForm.jsx:172-189; erp/inventory/openingstock/service/OpeningStockPostingService.java:103-108, 170-182`
+
+- **What happens:** Post creates draft OSB-ACC-0007, then posting fails (a UOM mismatch); the saved id is not kept, so the retry creates and posts OSB-ACC-0008 while 0007 stays a draft with the same rows; posting 0007 later doubles the accessories stock.
+- **Fix:** Adopt the saved batch as soon as the save returns, before posting. *(not visible)*
+- **Estimate:** 1 h
+
+#### U236 · P2 · rule 7 — The item picker shows raw numeric ids for loaded rows, and index row keys mix rows up
+
+*Opening Stock batch form* — `src/pages/inventory/opening-stock/ItemPicker.jsx:12, 46-57; src/pages/inventory/opening-stock/OpeningStockFabricRollTable.jsx:40-49, 112, 118; src/pages/inventory/opening-stock/OpeningStockAccessoriesItemTable.jsx:39-49, 98, 104`
+
+- **What happens:** After a CSV load or reopening a draft the Item column shows '1043', '1044'…; deleting row 3 shifts the index keys so row 4's picker inherits row 3's options. The columns' useMemo also omits patch.
+- **Fix:** Seed each picker's options from the row and give rows a monotonic client key. *(visible: item codes instead of numbers)*
+- **Estimate:** 2 h
+
+#### U237 · P2 · rule 8 — Opening Stock has no unsaved-changes guard, so a long manual or CSV entry is lost on navigation
+
+*Opening Stock batch form* — `src/pages/inventory/opening-stock/OpeningStockBatchForm.jsx:35-62, 283`
+
+- **What happens:** 200 rows entered or loaded, then a sidebar click or Back discards everything without a prompt.
+- **Fix:** useUnsavedChanges with a dirty flag cleared on save/post. *(visible: leave prompt)*
+- **Estimate:** 1 h
+
+#### U238 · P2 · correctness — The allowance report checks at most 100 GRNs with one call per GRN, and flags Draft GRNs
+
+*GRN Allowance Exceptions* — `src/services/inventory/inventoryService.js:149-154, 263-287; src/pages/inventory/allowance/AllowancePage.jsx:34-47`
+
+- **What happens:** A month with 140 GRNs silently misses over-allowance receipts among the older 40, fires up to 100 parallel detail requests, and counts unsubmitted drafts as supplier over-supply.
+- **Fix:** A server endpoint for offending lines in the range, excluding Draft. *(visible: missing GRNs appear, drafts drop out)*
+- **Estimate:** 4 h
+
+#### U239 · P2 · rule 5 — Create versus update is decided by the route id, so a quick second Save makes a duplicate draft transfer
+
+*Stock Transfer form* — `src/pages/inventory/transfer/StockTransferForm.jsx:51-52, 178-187; erp/inventory/transfer/service/StockTransferService.java:125-136, 335-372`
+
+- **What happens:** Save Draft on a new accessories transfer navigates to /inventory/transfer/:id; a second Save before that commits POSTs again, giving two STN drafts with the same lines. Accessories are not guarded like fabric rolls, so both can be dispatched and move twice the stock.
+- **Fix:** Keep the saved id in state and choose PUT/POST from the record in hand. *(not visible)*
+- **Estimate:** 1 h
+
+#### U240 · P2 · correctness — The category filter is a hard-coded list of 7 names that does not match stored categories
+
+*Accessories Stock Register* — `src/pages/inventory/stock/AccessoriesStockRegister.jsx:20-28, 86; erp/inventory/stock/service/StockPopulationService.java:251; erp/inventory/openingstock/service/OpeningStockPostingService.java:192-193`
+
+- **What happens:** GRN trims store their sub-category ('Hang Tag', 'Poly Bag') and opening stock stores the top category ('Trims'); the dropdown offers only Buttons, Zippers, Labels, Thread, Elastic, Interlining, Packaging, so most categories cannot be filtered.
+- **Fix:** Build options from master data and store one consistent category on opening lots. *(visible: real categories)*
+- **Estimate:** 2 h
+
+#### U241 · P2 · rule 17 — The 'Pending Issues' card builds full BOM stock for every approved PO on each visit
+
+*Material Issue registers* — `src/pages/inventory/issue/FabricIssueList.jsx:54-58, 136; src/pages/inventory/issue/AccessoriesIssueList.jsx:54-58, 147; erp/inventory/issue/service/MaterialIssueLookupService.java:48-62, 100-146`
+
+- **What happens:** Each register visit computes stock-by-BOM for every approved PO just to count them, so load time grows with PO count, and the card shows approved POs rather than issues pending.
+- **Fix:** A lightweight count endpoint. *(visible: the card value may change)*
+- **Estimate:** 3 h
+
+#### U242 · P2 · correctness — Total Variance adds quantities across different units
+
+*Stock Adjustment register / view* — `erp/inventory/adjustment/service/StockAdjustmentService.java:199-212; src/pages/inventory/adjustment/StockAdjustmentList.jsx:109-118, 140-148, 174; src/pages/inventory/adjustment/AdjustmentViewDrawer.jsx:11-12`
+
+- **What happens:** -50 pcs of buttons and +20 m of elastic is stored as total variance -30 'pcs', and the stat card adds kg, pcs and m together.
+- **Fix:** Show totals per unit or drop the mixed total. *(visible: per-unit totals)*
+- **Estimate:** 2 h
+
+#### U243 · P2 · rule 37 — "Adjusted By" on a stock adjustment is taken from the request body
+
+*Stock Adjustment form (API)* — `src/pages/inventory/adjustment/StockAdjustmentForm.jsx:123-124, 144; erp/inventory/adjustment/service/StockAdjustmentService.java:177-179`
+
+- **What happens:** The server keeps any non-blank adjustedBy it receives, so a crafted request can record someone else as the counter on a stock correction.
+- **Fix:** Use the authenticated actor on the server and stop sending the field. *(not visible)*
+- **Estimate:** 1 h
+- **Note:** API change (erp-purchase).
+
+### P3
+
+#### U244 · P3 · correctness — Reopened draft lines are keyed by line id, so 'Add' on an already-picked roll duplicates it
+
+*Stock Transfer form* — `src/pages/inventory/transfer/StockTransferForm.jsx:85-99, 144-150, 266-267`
+
+- **What happens:** On a reopened draft the candidate row for a roll already on the transfer reads Add instead of Update; clicking it appends a second line and Save fails 'the same roll is on the transfer twice'.
+- **Fix:** Key hydrated lines with the candidates' row id. *(visible: the button reads Update)*
+- **Estimate:** 1 h
+
+#### U245 · P3 · rule 5 — Draft transfers and opening batches have no optimistic lock, so the last writer silently wins
+
+*Stock Transfer / Opening Stock forms (API)* — `src/pages/inventory/transfer/StockTransferForm.jsx:164-175; erp/inventory/transfer/service/StockTransferService.java:138-145; src/pages/inventory/opening-stock/OpeningStockBatchForm.jsx:125-136; erp/inventory/openingstock/service/OpeningStockService.java:127-142`
+
+- **What happens:** Two users editing the same draft: the second save replaces all lines with no conflict.
+- **Fix:** Send and check @Version (saveAndFlush so the echo is fresh). *(not visible)*
+- **Estimate:** 2 h
+
+#### U246 · P3 · rule 7 — The success dialog uses static Modal.confirm instead of App.useApp().modal
+
+*Return to Supplier – New Return* — `src/pages/inventory/return-to-supplier/ReturnToSupplierForm.jsx:4, 109-123`
+
+- **What happens:** The static dialog ignores the app theme (dark tokens) and antd warns that static functions cannot consume context.
+- **Fix:** Use modal from App.useApp(). *(visible: the dialog follows the theme)*
+- **Estimate:** 0.5 h
+
+#### U247 · P3 · rule 36 — Inventory print generators use private escapers, leave the GRN UOM unescaped, total mixed units, and fail silently on a blocked pop-up
+
+*GRN, QC and issue prints* — `src/utils/grnPdfGenerator.js:77-85, 654, 729-733; src/utils/fabricQCPdfGenerator.js:37, 148-150, 181-184; src/utils/trimsQCPdfGenerator.js:25; src/utils/issueSlipPdfGenerator.js:848-860`
+
+- **What happens:** rows[0].uom is written raw (master-controlled, low risk); the GRN grand total sums kg, m and pcs under the first line's unit; the Fabric QC status badge is always amber because it compares 'Pass' with 'PASS'; the issue slip can call print() twice; a blocked pop-up only logs to the console.
+- **Fix:** Move onto printDoc.js esc/openPrintWindow, show per-unit totals, compare case-insensitively, print once, and warn when blocked. *(visible: totals line, badge colour, pop-up warning)*
+- **Estimate:** 2 h
+
+#### U248 · P3 · correctness — The PO picker stays editable on an existing GRN, but the API refuses a PO change
+
+*Fabric / Accessories GRN form* — `src/pages/inventory/grn/FabricGRNForm.jsx:432; src/pages/inventory/grn/AccessoriesGRNForm.jsx:409; erp/inventory/grn/service/GRNService.java:492-496`
+
+- **What happens:** Switching the PO on a draft clears every roll; after re-entering them, Save is refused 'cannot be moved to another purchase order'.
+- **Fix:** Disable the PO select in edit mode. *(visible: PO field disabled in edit)*
+- **Estimate:** 0.25 h
+
+#### U249 · P3 · rule 9 — PO, received and balance quantities show 1 decimal although quantities carry 3
+
+*GRN form: PO line picker* — `src/pages/inventory/grn/POLineItemPicker.jsx:30-31, 45`
+
+- **What happens:** A balance of 1,903.125 KG shows as 1,903.1; keying the rounded figure gives a 'short' notice.
+- **Fix:** formatNumber(v, 3). *(visible: 3 decimals)*
+- **Estimate:** 0.25 h
+
+#### U250 · P3 · rule 34 — Dead inventory code: issue edit mode and routes, mock exports, and the mock-only toISOString date
+
+*Inventory screens* — `src/App.jsx:408, 410; src/pages/inventory/issue/FabricIssueForm.jsx:54-93, 216-222; src/pages/inventory/issue/AccessoriesIssueForm.jsx:56-90, 113-119; src/services/inventory/inventoryService.js:26, 935-960, 1113-1130`
+
+- **What happens:** Nothing navigates to the issue edit routes (saving there only says 'cannot be amended'); the mock list exports have no callers; Appendix B's toISOString date at inventoryService.js:1125 runs only in the mock branch, which is dead while USE_MOCK_INVENTORY_DATA is false.
+- **Fix:** Remove the edit routes, edit-mode hydration and mock exports. *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U251 · P3 · rule 2 — Duplicate catch-block toasts across the inventory screens
+
+*Inventory screens* — `src/pages/inventory/grn/FabricGRNForm.jsx:80, 137, 314, 332; src/pages/inventory/grn/AccessoriesGRNForm.jsx:78, 129, 291, 309; src/pages/inventory/grn/GRNList.jsx:56, 77, 97; src/pages/inventory/grn/GRNViewModal.jsx:117; src/pages/inventory/grn/GRNApprovalActions.jsx:66; src/pages/inventory/grn/CancelGRNModal.jsx:33; src/pages/inventory/qc/FabricQCInspection.jsx:77-78, 105, 291, 311; src/pages/inventory/qc/TrimsQCInspection.jsx:106-107, 288, 304; src/pages/inventory/qc/FabricQCList.jsx:70, 94; src/pages/inventory/qc/TrimsQCList.jsx:78, 102; src/pages/inventory/qc/QualityControlPage.jsx:46; src/pages/inventory/bill-passing/BillPassingViewModal.jsx:59; src/pages/inventory/issue/FabricIssueForm.jsx:51, 88, 115, 247; src/pages/inventory/issue/AccessoriesIssueForm.jsx:53, 85, 143; src/pages/inventory/issue/FabricIssueList.jsx:46; src/pages/inventory/issue/AccessoriesIssueList.jsx:46; src/pages/inventory/issue/CancelIssueModal.jsx:38; src/pages/inventory/transfer/StockTransferForm.jsx:106, 119, 129, 189, 203, 235; src/pages/inventory/transfer/StockTransferList.jsx:53; src/pages/inventory/adjustment/StockAdjustmentForm.jsx:68, 83, 102, 158; src/pages/inventory/adjustment/StockAdjustmentList.jsx:58; src/pages/inventory/allowance/AllowancePage.jsx:40; src/pages/inventory/opening-stock/OpeningStockBatchForm.jsx:79, 153, 185, 200; src/pages/inventory/opening-stock/CsvUploadCard.jsx:38, 53; src/pages/inventory/opening-stock/OpeningStockDashboard.jsx:58, 75; src/pages/inventory/return-to-supplier/ReturnToSupplierForm.jsx:49, 68, 132; src/pages/inventory/return-to-supplier/ReturnToSupplierList.jsx:39; src/pages/inventory/return-to-supplier/ReturnToSupplierDetailDrawer.jsx:43; src/pages/inventory/stock/FabricStockRegister.jsx:43; src/pages/inventory/stock/AccessoriesStockRegister.jsx:53; src/pages/inventory/dashboard/InventoryDashboard.jsx:38`
+
+- **What happens:** Any refused save or failed load shows the server message twice, or the server message plus a generic one. Bill Passing and the sample issue forms already use the right pattern.
+- **Fix:** toastUnlessHandled (WS7). *(visible: one toast)*
+- **Estimate:** 3 h
+
+#### U252 · P3 · rule 14 — Un-memoised columns in inventory tables
+
+*Inventory screens* — `src/pages/inventory/qc/FabricQCParameters.jsx:54-165; src/pages/inventory/transfer/StockTransferForm.jsx:246, 272; src/pages/inventory/opening-stock/OpeningStockDashboard.jsx:88; src/pages/inventory/return-to-supplier/ReturnToSupplierDetailDrawer.jsx:61, 134; src/pages/inventory/stock/AccessoriesStockViewDrawer.jsx:162`
+
+- **What happens:** Columns rebuild on every keystroke, re-rendering every row.
+- **Fix:** useMemo (WS6). *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U253 · P3 · rule 33 — Keyboard and screen-reader gaps: mouse-only row openers, a clickable Tag, unlabeled controls
+
+*Inventory screens* — `src/pages/inventory/stock/FabricStockRegister.jsx:104-107; src/pages/inventory/stock/AccessoriesStockRegister.jsx:95-98; src/pages/inventory/opening-stock/OpeningStockDashboard.jsx:198-201; src/pages/inventory/return-to-supplier/ReturnToSupplierList.jsx:101-104; src/pages/inventory/issue/AwaitingSrsAlert.jsx:28-33; src/pages/inventory/adjustment/AdjustmentFilterCard.jsx:27-60; src/pages/inventory/grn/FabricGRNRollTable.jsx:251-267`
+
+- **What happens:** A keyboard user cannot open a stock item, opening batch or return (row click only); SR chips are clickable Tags; filter Selects and icon-only add/remove roll buttons have no accessible name.
+- **Fix:** A view link per row, buttons for chips, aria-labels/ids. *(visible: a view link per row)*
+- **Estimate:** 2.5 h
+
+#### U254 · P3 · rule 1, rule 9 — The count sheet shows no loading state, and the posted-batch banner prints raw numbers
+
+*Stock Adjustment / Opening Stock forms* — `src/pages/inventory/adjustment/StockAdjustmentForm.jsx:249-253; src/pages/inventory/adjustment/AdjustmentCountTable.jsx:23, 101-113; src/pages/inventory/opening-stock/OpeningStockBatchForm.jsx:235`
+
+- **What happens:** While a category's count sheet loads the card still says 'Select category to load items'; a posted batch shows 'total value ₹125000.0000'.
+- **Fix:** Pass loading to the table; format the banner. *(visible: spinner and formatted figures)*
+- **Estimate:** 0.5 h
+
+## Production (cutting, sewing, packing, production masters)
+
+### P1
+
+#### U255 · P1 · rule 9 — Panel issues and process returns recorded before 05:30 IST are dated the previous day
+
+*Cutting — panel issue and process return* — `src/pages/production/cutting/PanelIssueDrawer.jsx:55; src/pages/production/cutting/ProcessReturnDrawer.jsx:91; erp/production/cuttingroom/service/CutExternalProcessService.java:107, 177`
+
+- **What happens:** Both drawers send new Date().toISOString().slice(0, 10), the UTC date, and the server stores it as the issue/return date. A night shift issuing panels to a job worker at 02:00 IST on 15-Oct records 14-Oct, which then drives the DC, the job-work tracker and any ageing by date.
+- **Fix:** Send dayjs().format('YYYY-MM-DD') (local date). *(not visible (dates become correct))*
+- **Estimate:** 0.25 h
+- **Note:** Appendix B bug 6. Its third cited site, src/services/inventory/inventoryService.js:1125, is in the mock branch (USE_MOCK_INVENTORY_DATA is false) and is dead code, not a live bug.
+
+#### U256 · P1 · rule 34 — "Import CAD Marker Excel" imports nothing: it overwrites the plan with hard-coded demo markers
+
+*Cutting › Marker Plan form* — `src/pages/production/cutting/MarkerPlanForm.jsx:91-105; src/pages/production/cutting/MarkerMatrix.jsx:132`
+
+- **What happens:** No file picker opens: widths become 59.5/57, allowance 5%, and the planner's markers are replaced by three invented rows (heights 100/66/40, fake file names) with a success toast; with fewer than 4 sizes the ratio gets an 'undefined' key. Saving stores the invented markers, from which cut quantities and lays are derived.
+- **Fix:** Hide the button until a real CAD import exists (or wire it to an upload and server parse); never replace entered markers without asking. *(visible: the button disappears (or opens a file picker))*
+- **Estimate:** 1 h
+
+#### U257 · P1 · correctness — Work Order # is pre-filled with the demo value 'WO/26-27/1001' and saved as-is
+
+*Cutting › Bundling › Issue to Sewing* — `src/pages/production/cutting/BundleIssueDrawer.jsx:12, 28, 32, 66; erp/production/cuttingroom/service/CutBundlingService.java:198`
+
+- **What happens:** Issuing bundles without retyping the box records work order WO/26-27/1001 (free text, unvalidated), which sewing's Cut Parts Receipt and the issues register then show; the box is not cleared after a save, so the next issue repeats it.
+- **Fix:** Start empty (or pick from the Cut PO's approved work orders) and clear after each save. *(visible: the box starts empty)*
+- **Estimate:** 1 h
+
+#### U258 · P1 · correctness — The mandatory re-cut 'Line' and the line filter use a hard-coded demo list, not the production-line master
+
+*Cutting › Re-Cut Register* — `src/pages/production/cutting/ReCutRegisterTab.jsx:9, 73, 92, 113; src/utils/cuttingConstants.js:65`
+
+- **What happens:** The dropdown offers only Line-A, Line-B, B-1, B-2; the factory's real lines are absent and the field is required, so every re-cut is saved against a fictitious line and the filter never matches real data.
+- **Fix:** Feed both selects from useSewingMasters().lineOptions. *(visible: real line names)*
+- **Estimate:** 1 h
+
+#### U259 · P1 · correctness — The TMB gate is client-only, judged per Cut PO rather than per lay, from the newest 200 checks
+
+*Cutting › Bundling › Generate Bundles* — `src/pages/production/cutting/BundlingDrawer.jsx:37-41, 67, 87-90; src/pages/production/cutting/BundlingTab.jsx:29; src/services/production/cuttingApi.js:161-164; erp/production/cuttingroom/service/CutBundlingService.java:107-160`
+
+- **What happens:** A Cut PO with 4 cut lays and a PASSED TMB check only for lay 1 can bundle and issue the 3 unchecked lays (against BR-FR-06-07); the server's generate has no TMB check. Once there are more than 200 TMB checks, an older Cut PO's checks fall out of the list and 'Auto-Generate Bundles' is disabled for good.
+- **Fix:** Enforce 'every reported lay has a PASSED TMB check' in CutBundlingService.generate and return the blocking reason from the preview endpoint. *(not visible (the button is enabled or blocked correctly))*
+- **Estimate:** 4 h
+- **Note:** API change (erp-purchase).
+
+#### U260 · P1 · rule 15 — Every cutting list fetches only the newest 200 rows, which breaks bundling, TMB checks and panel-check edits as history grows
+
+*Cutting registers and the pickers built from them* — `src/services/production/cuttingApi.js:44, 61, 82, 136, 162, 198, 221, 233, 251, 261, 275; src/pages/production/cutting/TmbCheckForm.jsx:30, 89-91; src/pages/production/cutting/PanelCheckForm.jsx:32-37; src/pages/production/cutting/FabricRelaxationDrawer.jsx:93; src/pages/production/cutting/ProcessReturnDrawer.jsx:21, 117`
+
+- **What happens:** A week or two after go-live there are more than 200 lay audits: an older lay cannot be picked for a TMB check, 'Receive from Vendor' no longer lists an older open panel issue, an older panel check spins forever (looked up in the list), and the registers stop at 200 with no hint.
+- **Fix:** Server paging for the registers; pickers query by filter (Cut PO, open issues); load a panel check by id. *(visible: registers page through the full history)*
+- **Estimate:** 8 h
+
+#### U261 · P1 · rule 4, rule 8 — Changing date, shift or plan keeps the previous sheet's id, so a save moves that sheet to the new slot; unsaved rows are discarded without warning
+
+*Sewing › Hourly Production* — `src/pages/production/sewing/HourlyProductionTab.jsx:52-63, 87-95, 107, 133-139; erp/production/sewing/service/SewHourlyService.java:87-93, 175-178`
+
+- **What happens:** With 14-Oct's sheet open the supervisor changes the date to 13-Oct; before the load returns (or if it fails) the grid still holds 14-Oct's sheet id, and Save posts that id with sheetDate 13-Oct, so the server rewrites the 14th's sheet as the 13th's. Switching plans quickly can save one line's rows onto another plan. Typed rows are lost on any selector change.
+- **Fix:** Clear the sheet while switching and drop stale responses; build the payload from the loaded sheet's own plan/date/shift; confirm before discarding unsaved rows. *(visible: a brief spinner and a discard confirm)*
+- **Estimate:** 3 h
+
+#### U262 · P1 · correctness — No screen enrols sewing operators or maintains SAM sheets, so the hourly grid has no operators to book against
+
+*Sewing › Hourly Production / Operators & SAM* — `src/services/production/sewingApi.js:17-22, 37-42; src/pages/production/sewing/HourlyGrid.jsx:25-29; src/pages/production/sewing/OperatorSamTab.jsx:9-92; erp/production/sewing/service/SewOperatorService.java:59-67`
+
+- **What happens:** saveOperator and saveStyleSam have no caller and nothing seeds operators. On a fresh production database the Tailor dropdown is empty, so hourly output (and efficiency, incentives, skill matrix) cannot be recorded, and 'Load from SAM Sheet' always says none exists.
+- **Fix:** Add operator enrolment and SAM-sheet editors calling the existing endpoints. *(visible: new add/edit forms)*
+- **Estimate:** 12 h
+- **Note:** Needs owner: confirm the go-live scope of hourly production.
+
+### P2
+
+#### U263 · P2 · correctness — Cutting and Sewing never check add/update/approve in the UI: view-only users see and can try every write action
+
+*Cutting and Sewing workspaces* — `src/App.jsx:330-346; src/pages/production/cutting/FabricReceiptList.jsx:52, 63; BundlingTab.jsx:69-70; ReconciliationTab.jsx:111, 119, 175; MarkerPlanForm.jsx:165, 215-218; ExternalProcessTab.jsx:94-102; src/pages/production/sewing/CutPartsReceiptList.jsx:55; HourlyProductionTab.jsx:149; GarmentIssueList.jsx:63; erp application.properties:329 (ENFORCE) vs application-qa/dev.properties (AUDIT)`
+
+- **What happens:** A supervisor with view-only rights on production-cutting sees Generate Bundles, Issue to Sewing, Return Roll and 'Mark Size-Set Approved'. In production (ENFORCE) the server refuses them with an error; on QA and dev (AUDIT) they succeed.
+- **Fix:** Gate each create/save/issue/return button with hasPermission(module, op), put size-set approval behind 'approve', and make the /:id forms read-only without 'update'. *(visible: users without add/update no longer see those buttons)*
+- **Estimate:** 6 h
+
+#### U264 · P2 · rule 4 — End-bit weight is saved on every keystroke, so out-of-order or colliding saves can store a partial weight that is then credited to stock
+
+*Cutting › Reconciliation* — `src/pages/production/cutting/ReconciliationTab.jsx:44-47, 79, 86; erp/production/cuttingroom/service/CutReconciliationService.java:122-137, 188`
+
+- **What happens:** Typing 12.75 sends PUTs for 1, 12, 12.7 and 12.75; the first inserts can collide on the unique key, and if an earlier response lands last the roll keeps 12.7 or 1, which 'Return End-Bit' then credits back to fabric stock.
+- **Fix:** Save on blur/Enter, one request at a time, dropping stale responses (same for Reusable). *(visible: the weight saves when the cell is left)*
+- **Estimate:** 1.5 h
+
+#### U265 · P2 · rule 1 — Add Re-Cut Entry has no in-flight guard: a double click posts duplicates that the UI cannot delete
+
+*Cutting › Re-Cut Register* — `src/pages/production/cutting/ReCutRegisterTab.jsx:72-81, 102; erp/production/cuttingroom/service/CutRecutService.java:62-86`
+
+- **What happens:** A double click on a slow connection saves two identical re-cut rows, doubling re-cut qty, re-cut % and the fabric charged to reconciliation; there is no delete in the UI, and a failed POST is an unhandled rejection.
+- **Fix:** A saving state on the modal's OK (confirmLoading), early return while saving, try/finally. *(visible: the OK button spins)*
+- **Estimate:** 0.5 h
+
+#### U266 · P2 · rule 5 — A quick second Save after creating a plan POSTs a duplicate plan
+
+*Sewing › Production Plan form* — `src/pages/production/sewing/SewingPlanForm.jsx:41-63, 108-120`
+
+- **What happens:** The create path navigates to /plan/:id without adopting the saved plan, so plan.id stays empty until the route commits; a second Save in that window creates a second plan for the same line.
+- **Fix:** setPlan(saved) before navigating and decide create-vs-update from plan.id. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U267 · P2 · correctness — 'Save & Print DC', 'Save & Print Receipt' and 'Issue & Print Note' print nothing, and the bundle ticket is a mock-up
+
+*Cutting › External Process / Bundling* — `src/pages/production/cutting/PanelIssueDrawer.jsx:56, 71; src/pages/production/cutting/ProcessReturnDrawer.jsx:109; src/pages/production/cutting/BundleIssueDrawer.jsx:54; src/pages/production/cutting/BundleTicketPreview.jsx:13, 22-23, 39-42; src/pages/production/cutting/BundlingTab.jsx:47`
+
+- **What happens:** Sending panels to an embroiderer with 'Save & Print DC' toasts 'DC ready to print' but produces no challan, so goods leave without the delivery challan the gate and GST job-work rules need; the bundle ticket shows a placeholder QR stamped with today's date.
+- **Fix:** Build the prints with printDoc.js (escaping every value), or rename the buttons to Save/Issue until printing exists. *(visible: a print window opens, or the labels lose 'Print')*
+- **Estimate:** 8 h
+- **Note:** Needs owner: build the challan prints now or relabel for go-live.
+
+#### U268 · P2 · correctness — Cutting lookups, thresholds and fabric types (relaxation hours) have no maintenance screen
+
+*Production Masters* — `src/services/production/cuttingMasterService.js:8-22; src/pages/production/masters/ProductionMastersPage.jsx:17-26; erp/masterdata/cuttinglookup/CuttingLookupController.java:42-47`
+
+- **What happens:** Adding a re-cut reason, changing TMB_TOLERANCE_CM or RECUT_ALERT_PCT, or setting Denim to 48 h relaxation needs a database edit, although the API has POST/PUT.
+- **Fix:** Add 'Cutting Lookups & Thresholds' and 'Fabric Types' tabs on ProductionMasterPanel. *(visible: two new tabs)*
+- **Estimate:** 4 h
+
+#### U269 · P2 · correctness — On a saved plan the SAM / Target / CM tiles show the saved figures while editing, not the live preview
+
+*Sewing › Production Plan form* — `src/pages/production/sewing/SewingPlanForm.jsx:116, 216-222`
+
+- **What happens:** Changing operators from 6 to 8 keeps Target/Hour, Target/Day, Garment SAM and CM Rate at the last saved values until Save, so line loading is judged on stale numbers.
+- **Fix:** Show the locally computed values while the plan has unsaved changes. *(visible: tiles update as fields change)*
+- **Estimate:** 1 h
+
+#### U270 · P2 · correctness — Partly filled rows are silently dropped on save
+
+*Sewing › Parts Replacement / Cutting › Panel Issue* — `src/pages/production/sewing/PartsReplacementDrawer.jsx:86-96; src/pages/production/cutting/PanelIssueDrawer.jsx:44-46`
+
+- **What happens:** Three rejected parts with one missing its damage reason saves two parts with a normal toast; the third never reaches cutting.
+- **Fix:** Refuse to save while a row is incomplete and name it. *(visible: a warning naming the row)*
+- **Estimate:** 1 h
+
+#### U271 · P2 · rule 17 — The Bundling tab loads every bundle ever cut, and each issue re-reads all bundles of its Cut PO
+
+*Cutting › Bundling* — `src/services/production/cuttingApi.js:202-205; src/pages/production/cutting/BundlingTab.jsx:29; erp/production/cuttingroom/service/CutBundlingService.java:57-62, 261-264`
+
+- **What happens:** After a season (tens of thousands of bundles) opening Bundling pulls the whole table into the browser and the issue list runs one bundle query per issue; it gets slower every week.
+- **Fix:** Page bundles server-side and load bundled bundles per Cut PO in the drawer. *(not visible)*
+- **Estimate:** 4 h
+
+#### U272 · P2 · correctness — The 'Fabric Utilization' KPI is the utilization of whichever Cut PO happens to be first
+
+*Cutting › Dashboard* — `src/pages/production/cutting/CuttingDashboard.jsx:21-26, 36`
+
+- **What happens:** 'Fabric Utilization 92%' reads as the cutting room's figure but is getReconciliation(pos[0]) for one arbitrary Cut PO.
+- **Fix:** Return a plant-level figure, or label the tile with its Cut PO. *(visible)*
+- **Estimate:** 1 h
+
+#### U273 · P2 · correctness — Changing the order on a new entry keeps the carton groups built for the previous order
+
+*Packing › Carton Packing form* — `src/pages/production/packing/CartonPackingForm.jsx:158-186`
+
+- **What happens:** Picking Order A, adding carton ranges, then switching to Order B keeps A's buyer POs and size keys (hidden from the grid), all saved against B; the server does not check sizes against the entry.
+- **Fix:** Confirm and clear the groups on an order change. *(visible: a confirm)*
+- **Estimate:** 1 h
+
+#### U274 · P2 · correctness — A COMPLETED packing entry can be deleted although it cannot be edited
+
+*Packing › Carton Packing register (API)* — `src/pages/production/packing/CartonPackingColumns.jsx:145-155; erp/production/packing/service/PackingEntryService.java:120-122, 173-178`
+
+- **What happens:** Delete has no status check on the server, so a completed entry that packing lists are built from can be removed and its cartons vanish from those documents; update refuses completed entries.
+- **Fix:** Refuse delete unless OPEN on the server and hide Delete on completed rows. *(visible: no Delete on completed rows)*
+- **Estimate:** 1 h
+- **Note:** API change (erp-purchase).
+
+#### U275 · P2 · correctness — The Inspector picker offers only the first 200 active employees
+
+*Sewing › Measurement / End-Line Check forms* — `src/pages/production/sewing/MeasurementReportForm.jsx:55, 226-229; src/pages/production/sewing/TopseForm.jsx:44, 190-193`
+
+- **What happens:** With more than 200 active employees (normal with tailors on payroll) the inspector may be missing, and the field is required; an inspector beyond 200 shows as a bare id when editing.
+- **Fix:** Search the employee API (debounced) and include the saved inspector as an option. *(visible: typing searches all employees)*
+- **Estimate:** 2 h
+
+#### U276 · P2 · rule 4 — Two photo uploads in quick succession keep only the last; the first file is orphaned
+
+*Sewing › Measurement Report form* — `src/pages/production/sewing/MeasurementReportForm.jsx:155-164`
+
+- **What happens:** Both upload callbacks patch from the same report.photos, so the second overwrites the first and the report saves with one photo.
+- **Fix:** Append with a functional state update. *(not visible)*
+- **Estimate:** 0.5 h
+
+### P3
+
+#### U277 · P3 · rule 1 — Endless spinner when there is no Cut PO to show
+
+*Cutting › Cutting Report / Reconciliation* — `src/pages/production/cutting/CuttingReportTab.jsx:18, 25-26, 58; src/pages/production/cutting/ReconciliationTab.jsx:25, 34-35, 130-139`
+
+- **What happens:** With no active Cut PO (go-live, or all closed) or a failed load, both tabs spin forever instead of saying there is nothing to show.
+- **Fix:** An EmptyState when the list is empty or none is selected. *(visible: an empty state)*
+- **Estimate:** 0.5 h
+
+#### U278 · P3 · correctness — Small cutting display defects: empty Action tags, lay date not pre-filled, quantities always labelled kg
+
+*Cutting › various* — `src/pages/production/cutting/SizeJumpAlert.jsx:14; src/pages/production/cutting/CuttingReportPivot.jsx:130; src/pages/production/cutting/ReconciliationTab.jsx:56-74, 105-120, 163-168; src/pages/production/cutting/CuttingReportTab.jsx:62-68`
+
+- **What happens:** The size-jump alert's Action column shows blank tags; picking a lay never pre-fills its date (reads l.date, the field is layDate); woven/denim quantities in metres are labelled kg.
+- **Fix:** Fill or drop the column, use layDate, use the reconciliation's unit. *(visible)*
+- **Estimate:** 1 h
+
+#### U279 · P3 · correctness — Misleading over-issue wording, a stale lookup-type alert, and a duplicate chart load
+
+*Sewing › Garment Issue / Production Masters / Measurement* — `src/pages/production/sewing/GarmentIssueDrawer.jsx:66-67, 102-105; src/pages/production/masters/SewingLookupMaster.jsx:23, 52, 60-73; src/pages/production/sewing/MeasurementReportForm.jsx:99-102, 217`
+
+- **What happens:** 'PM approval required' is promised but no approval exists; after viewing a THRESHOLD lookup, Add keeps its alert and required value; changing size loads the chart twice (two 'no chart' warnings).
+- **Fix:** Reword; reset lookupType on Add; let the effect alone load the chart. *(visible: wording and a single warning)*
+- **Estimate:** 0.75 h
+
+#### U280 · P3 · rule 7 — Editable grids key rows by array index
+
+*Production editable grids* — `src/pages/production/cutting/MarkerMatrix.jsx:138; LayAuditRollGrid.jsx:94; TmbCheckGrid.jsx:78; PanelCheckForm.jsx:155; src/pages/production/sewing/HourlyGrid.jsx:86; OperationBreakdownGrid.jsx:109; MeasurementReportForm.jsx:244; TopseForm.jsx:225; PartsReplacementDrawer.jsx:136`
+
+- **What happens:** Deleting a middle row re-keys the rows below, so an expanded row or a focused input's draft moves to the neighbour.
+- **Fix:** A monotonic client key per new row (as CartonGroupEditor does). *(not visible)*
+- **Estimate:** 2 h
+
+#### U281 · P3 · rule 34 — Unwired service functions: hourly sheet submit/reopen and issuedBySize have no caller
+
+*Sewing services* — `src/services/production/sewingApi.js:135-143, 280-283`
+
+- **What happens:** The day's hourly sheet can never be closed (SUBMITTED) from the UI although the API has the flow.
+- **Fix:** Add Submit/Reopen to the sheet or record them as intentionally unused. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U282 · P3 · rule 2 — Duplicate catch-block toasts across the production screens
+
+*Cutting, Sewing, Packing, Masters* — `src/pages/production/cutting/* (FabricReceiptList.jsx:25; FabricReceiptDrawer.jsx:78, 148; FabricRelaxationList.jsx:32, 49; FabricRelaxationDrawer.jsx:70; MarkerPlanTab.jsx:26; MarkerPlanForm.jsx:53, 136, 146; LayAuditList.jsx:24; LayAuditForm.jsx:42, 84; TmbCheckList.jsx:25; TmbCheckForm.jsx:38, 69; CuttingReportTab.jsx:22, 29; CuttingReportPivot.jsx:100; CuttingDashboard.jsx:27; BundlingTab.jsx:31; BundlingDrawer.jsx:53; BundleIssueDrawer.jsx:37; ExternalProcessTab.jsx:32; ReCutRegisterTab.jsx:40; ReconciliationTab.jsx:29, 39); src/pages/production/sewing/* (SewingPlanList.jsx:23; SewingPlanForm.jsx:58, 97, 105, 118; CutPartsReceiptList.jsx:24; CutPartsReceiptDrawer.jsx:30, 110; GarmentIssueList.jsx:24; GarmentIssueDrawer.jsx:24, 71; HourlyProductionTab.jsx:45, 54, 60, 110; MeasurementReportForm.jsx:69, 96, 175; MeasurementReportList.jsx:25; MeasurementChartUpload.jsx:25, 62; TopseForm.jsx:146; TopseList.jsx:25; TrimVerificationDrawer.jsx:57, 129; TrimVerificationList.jsx:30; PartsReplacementList.jsx:30, 45; PartsReplacementDrawer.jsx:35, 101; OperatorSamTab.jsx:25; SewingDashboard.jsx:16); src/pages/production/packing/CartonPackingForm.jsx:261, 283, 308; CartonPackingList.jsx:76, 98; CartonPackingView.jsx:39; DailyPackingSummary.jsx:44; src/pages/production/masters/ProductionMasterPanel.jsx:61, 122, 142; ProductionLineMaster.jsx:21; CuttingTableMaster.jsx:22; SewingOperationMaster.jsx:14; MeasurementChartMaster.jsx:34, 43`
+
+- **What happens:** Any refusal shows two error toasts; a stale-version 409 on plan status or packing complete/reopen shows the conflict dialog plus a red toast.
+- **Fix:** toastUnlessHandled (WS7), as PanelCheckForm does. *(visible: one toast)*
+- **Estimate:** 3 h
+
+#### U283 · P3 · rule 14, rule 33 — Un-memoised columns, and a link without href
+
+*Cutting drawers and dashboard* — `src/pages/production/cutting/PanelIssueFromPo.jsx:27; PanelIssueFreeText.jsx:35; CuttingDashboard.jsx:84, 88-98; BundlingDrawer.jsx:103-107; BundleIssueDrawer.jsx:73-78`
+
+- **What happens:** Columns rebuild on every keystroke in these drawers; the dashboard's 'Fabric In →' is an <a> with no href, unreachable by keyboard.
+- **Fix:** useMemo; Button type=link. *(not visible)*
+- **Estimate:** 0.75 h
+
+## Master data
+
+### P1
+
+#### U284 · P1 · rule 5 — A second edit of the same master record without a reload raises a spurious conflict: the API echoes a stale version that the screen keeps
+
+*Categories, Sub Categories, Item Types, UOM, Payment Terms, Styles* — `src/pages/master/CategoryMaster.jsx:101-104; src/pages/master/SubCategoryMaster.jsx:101-104; src/pages/master/ItemTypeMaster.jsx:106-109; src/pages/master/UomMaster.jsx:101-104; src/pages/master/PaymentTermsMaster.jsx:119-122; src/pages/master/StyleMaster.jsx:264-275; erp/masterdata/category/CategoryService.java:43-53; erp/masterdata/subcategory/SubCategoryService.java:46-63; erp/item/service/ItemTypeService.java:133-154; erp/masterdata/unitofmeasure/UnitOfMeasureService.java:43-55; erp/masterdata/paymentterms/PaymentTermsService.java:43-55; erp/costing/service/StyleService.java:30-67`
+
+- **What happens:** These updates return toDTO(repository.save(entity)), mapped before the version increment, and the screens write that response into the store. Edit a UOM and save, then change the same UOM again and save: the second save sends the old version and gets the 'modified by another user' dialog for the user's own edit. Buyer, Supplier, T&C, Size Preset, Item, Process, Parts, Overhead, Branch, Courier and Vendor are unaffected (they reload or flush).
+- **Fix:** saveAndFlush in the six update methods (the courier/vendor pattern); no UI change. *(not visible)*
+- **Estimate:** 2 h
+- **Note:** API change (erp-purchase). This is the version-echo trap recorded in project memory; most old master services still have it.
+
+#### U285 · P1 · correctness — The Buyer dropdown is empty, and the list shows raw buyer ids, unless another screen loaded buyers first
+
+*Styles* — `src/pages/master/StyleMaster.jsx:18, 44-46, 62-65, 430-441; src/pages/master/MasterDashboard.jsx:451-537`
+
+- **What happens:** After login, Master Data → Styles → Add Style: the store's buyers key is filled only by Buyer Master, the shipment form or the costing sheet, and neither StyleMaster nor the dashboard loads it, so the required Buyer select has no options (no style can be created) and the Buyer column shows ids like 12.
+- **Fix:** Load buyers into the store when empty or stale (in StyleMaster or MasterDashboard.fetchAllMetaData). *(visible: the dropdown is populated and names show)*
+- **Estimate:** 1 h
+
+#### U286 · P1 · correctness — The shipping-location address strips commas, slashes, hyphens, '#' and '.' as typed, corrupting the consignee address printed on export documents
+
+*Buyers (shipping locations)* — `src/pages/master/BuyerMaster.jsx:53, 905-914; erp/exportdoc/shipment/service/ShipmentPartyBuilder.java:72-75`
+
+- **What happens:** 'Unit 12/3, Rue de la Paix - Bat. B' is saved as 'Unit 123 Rue de la Paix  Bat B' by the alphanumeric normalizer; the house number is now wrong on every export document that prints this consignee or notify address.
+- **Fix:** Drop the normalizer or allow normal address punctuation (, . / - # & ' ( )). *(visible: the field accepts punctuation)*
+- **Estimate:** 0.5 h
+
+#### U287 · P1 · rule 8 — Changing only the approved units never marks the form dirty, so Update stays disabled and Cancel drops the change silently
+
+*Buyers (approved units)* — `src/pages/master/BuyerMaster.jsx:294-306, 453, 473, 715, 858`
+
+- **What happens:** Adding an approved unit and its valid-till date only calls setApprovedUnits; Update (disabled until something is dirty) stays grey, so the list cannot be saved without editing an unrelated field, and Cancel closes without the discard prompt.
+- **Fix:** setUnsavedChanges(true) in patchUnit, the row delete and the add handler, as the shipping-location handlers do. *(visible: Update enables and Cancel asks first)*
+- **Estimate:** 0.5 h
+
+#### U288 · P1 · correctness — Style delete is a hard delete with no in-use check, leaving orders and sample requests pointing at a missing style
+
+*Styles (API)* — `src/pages/master/StyleMaster.jsx:294-318; erp/costing/service/StyleService.java:90-97; db/migration/V6__order.sql:75; db/migration/V20260903165410__sampling_requests.sql:34`
+
+- **What happens:** Only BOMs, cost sheets and cutting POs have a foreign key to styles. Delete a style used by an order or a sample request (with no cost sheet or BOM yet): the delete succeeds and the order, sample request, work order or finishing PO keeps a style id that no longer exists, so its style shows blank everywhere.
+- **Fix:** Check usages (orders, sample requests, work orders, finishing POs) as Buyer and Supplier do, and refuse or soft-retire. *(visible: deleting a style in use is refused with the referencing documents named)*
+- **Estimate:** 2 h
+- **Note:** API change (erp-purchase).
+
+### P2
+
+#### U289 · P2 · correctness — The QC masters have no add/update/delete permission checks and send no version on update
+
+*Defect Types, Trims QC Criteria* — `src/pages/master/DefectTypeMaster.jsx:47-113, 138-151; src/pages/master/TrimsQCCriteriaMaster.jsx:47-113, 138-151; src/pages/master/MasterDashboard.jsx:274-292; erp/item/service/AttributeConfigService.java:42-50`
+
+- **What happens:** Every other master gates Add/Save/Delete; these show them to anyone who can see the QC masters (the production server refuses under ENFORCE; QA/dev under AUDIT accept). Updates omit version, so concurrent edits overwrite silently; the Attribute API ignores the version it receives.
+- **Fix:** Gate with hasPermission('inventory-qc', op) as ProcessMaster does, send the version, and check it in AttributeConfigService. *(visible: view-only users lose Add/Delete and get a read-only form)*
+- **Estimate:** 2 h
+
+#### U290 · P2 · correctness — A 'deleted' buyer returns as Inactive on the next load, and any edit silently reactivates it
+
+*Buyers* — `src/pages/master/BuyerMaster.jsx:195-207, 222-224; erp/masterdata/buyer/BuyerService.java:28-31, 66, 150-161`
+
+- **What happens:** Delete only sets active=false and the list still returns the buyer; editing it for any reason sends active: true (hard-coded), so the retired buyer is back in every picker.
+- **Fix:** Send the record's current active value (or an Active switch) and word Delete as Deactivate. *(visible: 'Deactivate' wording; editing keeps it inactive)*
+- **Estimate:** 1 h
+
+#### U291 · P2 · correctness — A style switched to Inactive disappears for good and can never be reactivated
+
+*Styles* — `src/pages/master/StyleMaster.jsx:504-506; erp/costing/service/StyleService.java:78-82`
+
+- **What happens:** GET /styles returns active styles only, so after the next load an inactive style is gone from the master with no way to find or revive it.
+- **Fix:** Let the master list request inactive styles too; keep pickers active-only. *(visible: inactive styles stay listed)*
+- **Estimate:** 1.5 h
+
+#### U292 · P2 · correctness — The client duplicate check is global, but the server allows the same style number for another buyer
+
+*Styles* — `src/pages/master/StyleMaster.jsx:252-260; erp/costing/service/StyleService.java:47-53`
+
+- **What happens:** Buyer A has style '1001'; creating '1001' for Buyer B is refused on the screen although the API allows it.
+- **Fix:** Include buyerId in the client check. *(visible: the style is accepted for another buyer)*
+- **Estimate:** 0.5 h
+
+#### U293 · P2 · correctness — Supplier Name accepts letters and spaces only, so legal names with punctuation cannot be entered
+
+*Suppliers* — `src/pages/master/SupplierMaster.jsx:620-633`
+
+- **What happens:** 'K.P.R. Mill Ltd', 'Sri Murugan Textiles & Co', 'ABC Fabrics (P) Ltd' or '3M India' fail validation; the name is locked on edit, so the legal name on POs stays wrong.
+- **Fix:** Allow letters, digits, spaces and . & ' ( ) - , /. *(visible: punctuation accepted)*
+- **Estimate:** 0.5 h
+
+#### U294 · P2 · rule 37 — The supplier list returns every supplier's PAN and bank account details to any caller
+
+*Suppliers (API)* — `erp/masterdata/supplier/SupplierService.java:26-30; src/pages/master/SupplierMaster.jsx:87-94`
+
+- **What happens:** Every screen that lists suppliers (PO pickers included) receives PAN, account number, IFSC and SWIFT for all suppliers; the Vendor release moved the same fields to a private record loaded only by id.
+- **Fix:** Apply the vendor pattern: drop them from the list DTO and load them by id when editing. *(not visible)*
+- **Estimate:** 3 h
+- **Note:** API change (erp-purchase).
+
+#### U295 · P2 · correctness — Dropdown/Multi-Select attribute options are silently discarded on save
+
+*Attributes* — `src/pages/master/VariantMaster.jsx:13-20, 116-127, 260-273; erp/item/dto/AttributeConfigDTO.java:12-16; src/pages/master/ItemMaster.jsx:1418-1454`
+
+- **What happens:** The API has no field for the options, so Red/Blue entered for a Dropdown attribute vanish after a success toast, and Item Master renders select attributes as free text anyway.
+- **Fix:** Persist the options and render a Select, or stop offering the select types until built. *(visible)*
+- **Estimate:** 6 h
+- **Note:** Needs owner: build select attributes or remove them.
+
+#### U296 · P2 · correctness — In-use classifier edits are not guarded: re-parenting or removing an item type's attribute corrupts existing items
+
+*Sub Categories, Item Types (API)* — `erp/masterdata/subcategory/SubCategoryService.java:52-62; erp/item/service/ItemTypeService.java:138-151; erp/item/service/ItemService.java:476-483`
+
+- **What happens:** Only renames are blocked. Moving a used sub-category or item type leaves items whose hierarchy no longer matches (Item Master then loads no variants); removing an attribute from a used item type erases that value from every variant on the item's next save.
+- **Fix:** Refuse parent changes and attribute/UOM removals while items reference the record. *(visible: such saves are refused with a message)*
+- **Estimate:** 4 h
+- **Note:** API change (erp-purchase).
+
+#### U297 · P2 · correctness — Replacing an image deletes the old file before uploading the new one, so a failed upload loses the original
+
+*Items, Styles* — `src/pages/master/ItemMaster.jsx:306-351; src/pages/master/StyleMaster.jsx:127-152`
+
+- **What happens:** If the upload fails after the old file was deleted, the screen keeps pointing at a deleted file and the user believes the image is still there.
+- **Fix:** Upload first; delete the old file only after success. *(not visible)*
+- **Estimate:** 1.5 h
+
+#### U298 · P2 · correctness — Removing an unsaved variant tab selects a non-existent index; typing then creates a phantom variant
+
+*Items* — `src/pages/master/ItemMaster.jsx:1024-1032, 1044-1056, 1069-1106, 2022-2095`
+
+- **What happens:** With two unsaved variants, closing the first leaves the active index at 1 of a one-element array: the panel edits nothing, typing creates a ghost variant and Add Variant throws.
+- **Fix:** Compute the next active index from the post-delete array. *(visible: the remaining variant is selected)*
+- **Estimate:** 1 h
+
+#### U299 · P2 · rule 8 — Clicking another row or Add with unsaved changes discards them without a prompt
+
+*All MasterSplitView masters* — `src/components/MasterSplitView.jsx:83-86, 99-100; src/pages/master/UomMaster.jsx:63-74 (same handleSelect/handleAdd in the other split-view masters)`
+
+- **What happens:** Edit a T&C body or a size preset, then click another row: handleSelect replaces the form and clears dirty at once.
+- **Fix:** An isDirty prop on MasterSplitView wrapping row select and Add in the dashboard's unsaved-changes confirm. *(visible: a discard confirm)*
+- **Estimate:** 1.5 h
+
+### P3
+
+#### U300 · P3 · correctness — After a save or delete the list shows every row while the search box still shows the filter
+
+*All MasterSplitView masters* — `src/components/MasterSplitView.jsx:29-30, 73-82 (store-sync effects in each split-view master)`
+
+- **What happens:** Search 'kg', edit and save a result: the list resets to all rows while the box still reads 'kg'.
+- **Fix:** Re-apply the search text whenever the data changes (let MasterSplitView own filtering). *(visible: the list stays filtered)*
+- **Estimate:** 1.5 h
+
+#### U301 · P3 · correctness — GSTIN is uppercased only by CSS, so lowercase input fails the pattern while it looks correct
+
+*Branches* — `src/pages/master/BranchMaster.jsx:215-222`
+
+- **What happens:** '33abcde1234f1z5' displays uppercase but fails validation with a puzzling message.
+- **Fix:** normalize to upper case. *(not visible)*
+- **Estimate:** 0.25 h
+
+#### U302 · P3 · rule 2 — Duplicate catch-block toasts in the master screens
+
+*Master data* — `src/pages/master/BuyerMaster.jsx:129; SupplierMaster.jsx:96; TermsConditionsMaster.jsx:67; SizePresetMaster.jsx:244; OverheadMaster.jsx:40; PartsMaster.jsx:39; ProcessMaster.jsx:83; DefectTypeMaster.jsx:33, 89, 109; TrimsQCCriteriaMaster.jsx:33, 89, 109; BpDebitTypeMaster.jsx:36, 100, 121; BpChargeTypeMaster.jsx:36, 99, 120; BpIssueTypeMaster.jsx:36, 99, 120; MasterDashboard.jsx:459-529; ItemMaster.jsx:337, 406, 523-525, 560, 584; StyleMaster.jsx:148, 180`
+
+- **What happens:** Any failed call shows the server's message and a generic one.
+- **Fix:** toastUnlessHandled, as Courier and Branch do (WS7). *(visible: one toast)*
+- **Estimate:** 1.5 h
+
+#### U303 · P3 · rule 14, rule 33 — Un-memoised columns, and master rows that open only by mouse
+
+*Master data* — `src/pages/master/CategoryMaster.jsx:35 (and the other split-view masters, BuyerMaster.jsx:367, SupplierMaster.jsx:313, ItemMaster.jsx:1468); src/components/MasterSplitView.jsx:99-105; src/pages/master/BuyerMaster.jsx:376; src/pages/master/SupplierMaster.jsx:322`
+
+- **What happens:** Columns rebuild per keystroke; a keyboard user cannot focus or open a master row or the buyer/supplier name (vendorColumns already does this right).
+- **Fix:** useMemo; tabIndex and Enter/Space on rows and names. *(visible: focus rings)*
+- **Estimate:** 2 h
+
+#### U304 · P3 · rule 34 — Dead Item Master code: an unused ColorPicker, unused imports and a duplicated validation loop
+
+*Items* — `src/pages/master/ItemMaster.jsx:4, 17, 58-152, 1232-1240, 1258-1268`
+
+- **What happens:** ColorPicker (95 lines) is never rendered; the 5-character variant-name check runs twice with different messages.
+- **Fix:** Delete them. *(not visible)*
+- **Estimate:** 0.5 h
+
 ## Shared code, as used by these screens
 
 ### P1
@@ -1805,10 +2632,10 @@ Recorded for the scorecard. Each fix was confirmed in the code on `dev` at the c
 
 The supplier-PO form and view verifiers were stopped by the account's usage limit. The lead verified
 every P1 and most P2s of those two slices directly; these reviewer candidates could not be confirmed and
-are left out, to be re-checked when the shared batch runs: POView stale-load race, POList response race,
-paisa-level tax rounding on POView, version-history diff scope, status colours, Approved-By on the print,
-the 5-cell details row, accessibility gaps in POView/POForm/BOM drawer, the mapping drawer's per-line
-requests, POForm line-grid re-render cost, and POForm dead imports.
+were left out of batch 1. Six of them were verified and added in batch 2 (U-ids from U208 in the PO
+section). Still unverified, to be re-checked with the shared batch: the 5-cell details row on a revised
+PO's print, accessibility gaps in POView/POForm/the BOM drawer, the mapping drawer's per-line requests,
+POForm line-grid re-render cost, and POForm dead imports.
 
 ## Checked and found sound
 
