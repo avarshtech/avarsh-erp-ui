@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { App, Drawer, Form, InputNumber, DatePicker, Button, Space, Descriptions } from 'antd';
 import dayjs from 'dayjs';
 import { createSalaryStructure, updateSalaryStructure } from '../../../services/hr/salaryStructureService';
@@ -35,7 +35,15 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
     }
   }, [open, editData, form]);
 
+  // A second click while the first save is in flight would create a second current structure
+  // (U351). The ref stops a click that lands before the button re-renders as loading.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+
   const handleSave = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       const values = await form.validateFields();
       const payload = {
@@ -56,6 +64,9 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
     } catch (err) {
       if (err?.errorFields) return;
       // axiosInstance already toasts the server's message; adding another here showed two.
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -69,7 +80,7 @@ const SalaryStructureDrawer = ({ open, onClose, employeeId, employeeName, curren
       extra={
         <Space>
           <Button onClick={onClose}>Cancel</Button>
-          <Button type="primary" onClick={handleSave}>Save</Button>
+          <Button type="primary" onClick={handleSave} loading={saving}>Save</Button>
         </Space>
       }
     >
