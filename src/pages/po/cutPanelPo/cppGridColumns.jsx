@@ -5,10 +5,9 @@ import { QtyCell, RateCell } from './CppGridCells';
 import { billingQty, isKeyedBilling, lineAmount, round2 } from '../../../utils/jobWorkPoCalc';
 import { jobWorkUomOptions } from '../../../utils/jobWorkConstants';
 import { numericInputProps } from '../../../utils/inputHelpers';
-import { formatMoney } from '../../../utils/formatters';
+import { formatCount, formatMoney } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const num = (title, render, width = 80) => ({ title, key: title, align: 'right', width, render });
 
 /**
@@ -50,12 +49,12 @@ export const cppGridColumns = (h) => [
       </Space>
     ) : <span style={{ paddingLeft: 8 }}>{r.size}</span>),
   },
-  num('Required', (_, r) => n(r.required)),
-  num("Prev PO'd", (_, r) => n(r.prevPoQty)),
-  num('Balance', (_, r) => (r.isGroup ? n(r.children.reduce((s, l) => s + h.balanceOf(l), 0)) : <strong>{n(h.balanceOf(r))}</strong>)),
+  num('Required', (_, r) => formatCount(r.required)),
+  num("Prev PO'd", (_, r) => formatCount(r.prevPoQty)),
+  num('Balance', (_, r) => (r.isGroup ? formatCount(r.children.reduce((s, l) => s + h.balanceOf(l), 0)) : <strong>{formatCount(h.balanceOf(r))}</strong>)),
   {
     title: 'PO Qty', key: 'poQty', width: 140,
-    render: (_, r) => (r.isGroup ? <strong>{n(r.poQty)}</strong> : (
+    render: (_, r) => (r.isGroup ? <strong>{formatCount(r.poQty)}</strong> : (
       <QtyCell line={r} balance={h.balanceOf(r)} editable={h.editable && h.balanceOf(r) + Number(r.poQty || 0) > 0}
         override={h.overrideOf(r)} canRequest={h.canRequest} onChange={(p) => h.onPatch(r.key, p)} onRequest={(excess) => h.onRequest(r, excess)} />
     )),
@@ -69,7 +68,7 @@ export const cppGridColumns = (h) => [
   },
   num('Billing Qty', (_, r) => {
     if (r.isGroup) return null;
-    if (!isKeyedBilling(r.uom)) return n(billingQty(r));
+    if (!isKeyedBilling(r.uom)) return formatCount(billingQty(r));
     return (
       <InputNumber size="small" name={`billingQty-${r.key}`} aria-label="Billing quantity" min={0} precision={3} controls={false}
         style={{ width: 80 }} disabled={!h.editable} value={r.billingQty} status={r.billingQty == null ? 'warning' : undefined}

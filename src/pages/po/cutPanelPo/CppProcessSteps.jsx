@@ -5,9 +5,9 @@ import { getCprAllocation } from '../../../services/bom/cutPanel/cutPanelService
 import { allocationRows } from '../../../utils/jobWorkAllocation';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * Every process step of the requirements on this PO, and which POs cover it (PRD §13.2).
@@ -37,9 +37,9 @@ const CppProcessSteps = memo(function CppProcessSteps({ cprIds, processLabel }) 
     { title: 'CPR', dataIndex: 'cprNo', width: 150 },
     { title: 'Step', dataIndex: 'steps', width: 70, render: (s) => s.join(', ') },
     { title: 'Process', dataIndex: 'label', render: (l) => (l === processLabel ? <strong>{l} (this PO)</strong> : l) },
-    { title: 'Required', dataIndex: 'required', align: 'right', width: 90, render: n },
-    { title: "PO'd", dataIndex: 'allocated', align: 'right', width: 90, render: n },
-    { title: 'Balance', dataIndex: 'balance', align: 'right', width: 90, render: n },
+    { title: 'Required', dataIndex: 'required', align: 'right', width: 90, render: formatCount },
+    { title: "PO'd", dataIndex: 'allocated', align: 'right', width: 90, render: formatCount },
+    { title: 'Balance', dataIndex: 'balance', align: 'right', width: 90, render: formatCount },
     {
       title: 'Covered by', dataIndex: 'pos',
       render: (pos) => (pos.length

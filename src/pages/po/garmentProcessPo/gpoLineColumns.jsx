@@ -3,12 +3,11 @@ import { DeleteOutlined } from '@ant-design/icons';
 import ColorDot from '../../../components/ColorDot';
 import { GpoQtyCell, GpoRateCell, GpoUomCell } from './GpoLineCells';
 import { lineAmount } from '../../../utils/jobWorkPoCalc';
-import { formatMoney } from '../../../utils/formatters';
+import { formatCount, formatMoney } from '../../../utils/formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const LOCKED = { style: { background: 'var(--bg-secondary, rgba(0, 0, 0, 0.03))' } };
 const locked = (col) => ({ ...col, onCell: () => LOCKED });
-const num = (title, dataIndex, width = 80) => locked({ title, dataIndex, key: title, align: 'right', width, render: n });
+const num = (title, dataIndex, width = 80) => locked({ title, dataIndex, key: title, align: 'right', width, render: formatCount });
 
 /**
  * Line columns (PRD §8.2, §19): requirement columns locked and tinted; PO qty, UOM and rate
@@ -27,7 +26,7 @@ export const gpoLineColumns = (h) => [
   locked({ title: 'Process', dataIndex: 'processLabel', width: 130 }),
   num('Required', 'required'),
   num('Prev PO', 'prevPoQty', 76),
-  locked({ title: 'Balance', key: 'balance', align: 'right', width: 80, render: (_, l) => <strong>{n(h.balanceOf(l))}</strong> }),
+  locked({ title: 'Balance', key: 'balance', align: 'right', width: 80, render: (_, l) => <strong>{formatCount(h.balanceOf(l))}</strong> }),
   {
     title: 'PO Qty *', key: 'poQty', width: 150,
     render: (_, l) => <GpoQtyCell line={l} balance={h.balanceOf(l)} editable={h.editable} excess={h.excessOf(l)} canRequest={h.canRequest}

@@ -6,9 +6,9 @@ import StatusTag from '../../../components/StatusTag';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { balanceBlock } from '../../../utils/cutPanelPoCalc';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const Stat = ({ label, value }) => <span><Text type="secondary">{label}</Text> <strong>{value}</strong></span>;
 
 /**
@@ -25,8 +25,8 @@ const CppActionBar = memo(function CppActionBar({ doc, ctx, value, buttons, busy
         <>
           <Stat label="Process" value={doc.process?.label ?? doc.process?.name ?? '—'} />
           <Stat label="Lines" value={live.length} />
-          <Stat label="PO qty" value={`${n(live.reduce((s, l) => s + Number(l.poQty), 0))} pcs`} />
-          <Stat label="Balance after" value={n(balanceAfter)} />
+          <Stat label="PO qty" value={`${formatCount(live.reduce((s, l) => s + Number(l.poQty), 0))} pcs`} />
+          <Stat label="Balance after" value={formatCount(balanceAfter)} />
           <Stat label="PO value" value={`₹${value.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`} />
           <StatusTag status={doc.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />
         </>

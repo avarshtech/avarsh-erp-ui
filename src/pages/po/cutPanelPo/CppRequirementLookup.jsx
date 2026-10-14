@@ -4,9 +4,9 @@ import StatusTag from '../../../components/StatusTag';
 import { REQUIREMENT_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { getRequirementStatusLabel } from '../../../utils/requirementStatus';
 import { gridScroll } from '../../../utils/gridScroll';
+import { formatCount } from '../../../utils/formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const num = (title, dataIndex) => ({ title, dataIndex, align: 'right', width: 96, render: n });
+const num = (title, dataIndex) => ({ title, dataIndex, align: 'right', width: 96, render: formatCount });
 
 const COLUMNS = [
   { title: 'CPR No.', dataIndex: 'cprNo', width: 150 },
@@ -19,8 +19,8 @@ const COLUMNS = [
   },
   num('Required', 'required'),
   num("PO'd", 'allocated'),
-  { ...num('In draft PO', 'inDraft'), render: (v) => (v ? n(v) : '—') },
-  { ...num('Balance', 'balance'), render: (v) => <strong>{n(v)}</strong> },
+  { ...num('In draft PO', 'inDraft'), render: (v) => (v ? formatCount(v) : '—') },
+  { ...num('Balance', 'balance'), render: (v) => <strong>{formatCount(v)}</strong> },
 ];
 
 /**

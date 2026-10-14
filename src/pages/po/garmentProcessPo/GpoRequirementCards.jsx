@@ -4,10 +4,9 @@ import { LockOutlined, ProfileOutlined } from '@ant-design/icons';
 import DetailCard from '../../../components/DetailCard';
 import RecordLink from '../../../components/RecordLink';
 import FactSheet from '../../../components/FactSheet';
-import { formatDate } from '../../../utils/formatters';
+import { formatCount, formatDate } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const pct = (v, of) => (of > 0 ? Math.max(0, Math.min(100, (v / of) * 100)) : 0);
 
 /**
@@ -43,10 +42,10 @@ const GpoRequirementCards = memo(function GpoRequirementCards({ cards, orders, o
               />
               <Progress percent={pct(c.prevPoQty + c.thisPo, c.required)} success={{ percent: pct(c.prevPoQty, c.required) }} showInfo={false} style={{ margin: '12px 0 8px' }} />
               <FactSheet tiles={[
-                { label: 'Required', value: n(c.required) },
-                { label: "Previously PO'd", value: n(c.prevPoQty) },
-                { label: 'This PO', value: n(c.thisPo), accent: true },
-                { label: 'Balance after', value: n(c.balanceAfter), danger: c.balanceAfter < 0 },
+                { label: 'Required', value: formatCount(c.required) },
+                { label: "Previously PO'd", value: formatCount(c.prevPoQty) },
+                { label: 'This PO', value: formatCount(c.thisPo), accent: true },
+                { label: 'Balance after', value: formatCount(c.balanceAfter), danger: c.balanceAfter < 0 },
               ]} />
             </DetailCard>
           </Col>

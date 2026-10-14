@@ -6,9 +6,9 @@ import StatusTag from '../../../components/StatusTag';
 import JobWorkActionButtons from '../jobWork/JobWorkActionButtons';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const Stat = ({ label, value }) => <span><Text type="secondary">{label}</Text> <strong>{value}</strong></span>;
 const List = ({ items }) => <ul style={{ margin: 0, paddingLeft: 18, maxWidth: 520 }}>{items.map((m) => <li key={m}>{m}</li>)}</ul>;
 
@@ -34,7 +34,7 @@ const GpoActionBar = memo(function GpoActionBar({ doc, value, checks, buttons, b
           {draft && doc.lines.length > 0 && status}
           {warnings.length > 0 && <Popover title="Warnings" content={<List items={warnings} />}><Text type="warning" style={{ cursor: 'help' }}>{warnings.length} warning{warnings.length > 1 ? 's' : ''}</Text></Popover>}
           <Stat label="Lines" value={doc.lines.length} />
-          <Stat label="PO qty" value={`${n(doc.lines.reduce((s, l) => s + (Number(l.poQty) || 0), 0))} pcs`} />
+          <Stat label="PO qty" value={`${formatCount(doc.lines.reduce((s, l) => s + (Number(l.poQty) || 0), 0))} pcs`} />
           <Stat label="Grand total" value={`₹${value.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`} />
           <StatusTag status={doc.status} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />
         </>

@@ -4,9 +4,8 @@ import RecordLink from '../../../components/RecordLink';
 import { ActionButton, DeleteConfirm } from '../../../components/buttons';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel, JW_PO_STATUS as S } from '../../../utils/jobWorkPoStatus';
-import { formatDate, formatInr } from '../../../utils/formatters';
+import { formatCount, formatDate, formatInr } from '../../../utils/formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const firstPlus = (list = []) => (list.length ? (
   <Space size={4}><span>{list[0]}</span>{list.length > 1 && <Tooltip title={list.slice(1).join(', ')}><Tag>+{list.length - 1}</Tag></Tooltip>}</Space>
 ) : '—');
@@ -23,7 +22,7 @@ export const buildGpoListColumns = (a) => [
   { title: 'Style', dataIndex: 'styleNos', width: 110, render: firstPlus },
   { title: 'Vendor', dataIndex: 'vendorName', width: 190 },
   { title: 'Process', dataIndex: 'processLabel', width: 150 },
-  { title: 'Qty', dataIndex: 'poQty', width: 90, align: 'right', render: n },
+  { title: 'Qty', dataIndex: 'poQty', width: 90, align: 'right', render: formatCount },
   { title: 'Grand Total', dataIndex: 'poValue', width: 130, align: 'right', render: formatInr },
   { title: 'PO Date', dataIndex: 'poDate', width: 110, render: (v) => formatDate(v) },
   { title: 'Expected delivery', dataIndex: 'expectedReturnDate', width: 140, render: (v) => formatDate(v) },

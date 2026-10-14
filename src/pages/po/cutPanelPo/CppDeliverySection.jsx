@@ -7,14 +7,14 @@ import JobWorkDeliveryFields from '../jobWork/JobWorkDeliveryFields';
 import JobWorkValueSummary from '../jobWork/JobWorkValueSummary';
 import { CPP_RETURN_TO } from '../../../utils/jobWorkConstants';
 import { balanceBlock } from '../../../utils/cutPanelPoCalc';
+import { formatCount } from '../../../utils/formatters';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const BALANCE_COLUMNS = [
   { title: 'CPR', dataIndex: 'cprNo' },
-  { title: 'Required', dataIndex: 'required', align: 'right', render: n },
-  { title: "Previously PO'd", dataIndex: 'prevPoQty', align: 'right', render: n },
-  { title: 'This PO', dataIndex: 'thisPo', align: 'right', render: n },
-  { title: 'Balance after', dataIndex: 'balanceAfter', align: 'right', render: (v) => <strong>{n(v)}</strong> },
+  { title: 'Required', dataIndex: 'required', align: 'right', render: formatCount },
+  { title: "Previously PO'd", dataIndex: 'prevPoQty', align: 'right', render: formatCount },
+  { title: 'This PO', dataIndex: 'thisPo', align: 'right', render: formatCount },
+  { title: 'Balance after', dataIndex: 'balanceAfter', align: 'right', render: (v) => <strong>{formatCount(v)}</strong> },
 ];
 
 /**

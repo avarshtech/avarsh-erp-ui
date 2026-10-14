@@ -3,10 +3,10 @@ import { Button, Col, Form, Row, Select, Space, Table, Tooltip, Typography } fro
 import { PlusOutlined } from '@ant-design/icons';
 import ColorDot from '../../../components/ColorDot';
 import useGpoRequirementPicker from './useGpoRequirementPicker';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const num = (title, dataIndex, render = n) => ({ title, dataIndex, key: dataIndex, align: 'right', width: 96, render });
+const num = (title, dataIndex, render = formatCount) => ({ title, dataIndex, key: dataIndex, align: 'right', width: 96, render });
 
 const COLUMNS = [
   { title: 'Seq', dataIndex: 'seqNo', key: 'seqNo', width: 56, align: 'center' },
@@ -16,7 +16,7 @@ const COLUMNS = [
   num('Required', 'required'),
   num("PO'd", 'allocated'),
   num('In draft PO', 'inDraft'),
-  num('Balance', 'balance', (v) => <strong>{n(v)}</strong>),
+  num('Balance', 'balance', (v) => <strong>{formatCount(v)}</strong>),
 ];
 
 /**

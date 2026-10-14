@@ -2,9 +2,9 @@ import { memo } from 'react';
 import { Button, Input, InputNumber, Select, Space, Tag, Typography } from 'antd';
 import { numericInputProps } from '../../../utils/inputHelpers';
 import { ZERO_RATE_REASON, RATE_VARIANCE_PCT } from '../../../utils/jobWorkConstants';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const OVERRIDE_TAG = { REQUESTED: ['warning', 'Override requested'], AUTHORISED: ['success', 'Override authorised'] };
 
 /**
@@ -22,7 +22,7 @@ export const QtyCell = memo(function QtyCell({ line, balance, editable, override
       />
       {excess > 0 && (
         <div style={{ fontSize: 12, lineHeight: 1.3, marginTop: 2 }}>
-          <Text type={override?.status === 'AUTHORISED' ? 'secondary' : 'danger'}>Exceeds balance by {n(excess)}</Text>
+          <Text type={override?.status === 'AUTHORISED' ? 'secondary' : 'danger'}>Exceeds balance by {formatCount(excess)}</Text>
           {override && <Tag color={OVERRIDE_TAG[override.status][0]} style={{ marginLeft: 4 }}>{OVERRIDE_TAG[override.status][1]}</Tag>}
           {!override && canRequest && <Button type="link" size="small" style={{ padding: 0, marginLeft: 4 }} onClick={() => onRequest(excess)}>Request override</Button>}
         </div>

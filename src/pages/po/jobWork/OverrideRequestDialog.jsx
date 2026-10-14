@@ -1,8 +1,7 @@
 import { memo, useState } from 'react';
 import { Alert, Form, Input, Modal, Select } from 'antd';
 import { OVERRIDE_REASONS } from '../../../utils/jobWorkConstants';
-
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
+import { formatCount } from '../../../utils/formatters';
 
 const Body = ({ request, onSubmit, onClose }) => {
   const [reasonCode, setReasonCode] = useState(undefined);
@@ -24,7 +23,7 @@ const Body = ({ request, onSubmit, onClose }) => {
     >
       <Alert
         type="warning" showIcon style={{ marginBottom: 12 }}
-        title={`${request.label}: PO qty ${n(request.poQty)} exceeds the balance ${n(request.balance)} by ${n(request.excess)}.`}
+        title={`${request.label}: PO qty ${formatCount(request.poQty)} exceeds the balance ${formatCount(request.balance)} by ${formatCount(request.excess)}.`}
         description={request.note}
       />
       <Form layout="vertical">
