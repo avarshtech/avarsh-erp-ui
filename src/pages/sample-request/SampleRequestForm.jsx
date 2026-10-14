@@ -157,6 +157,12 @@ const SampleRequestForm = () => {
   // on save, so spreading the line back would only leak computed columns.
   const buildPayload = () => {
     const v = form.getFieldsValue();
+    // A per-colour or material request picks its colourway or fabric when it is raised (the
+    // batch's colours / bomLineIds). Once it exists, that choice is part of what it is, and the
+    // edit form mounts no single-value field for it - so getFieldsValue() has no colourName or
+    // bomLineId, and the server would rebuild the identity from nothing. Edits send the record's.
+    const record = savedId ? draft.record : null;
+    const keepsRecordColour = record && (scope === SR_SCOPE.ORDER_PER_COLOUR || isMaterialScope);
     return {
       bomId: draft.header?.bomId ?? draft.record?.bomId ?? null,
       // Optimistic locking — the server rejects a stale version with 409
@@ -165,10 +171,12 @@ const SampleRequestForm = () => {
       colourSubstitutionAllowed: Boolean(v.colourSubstitutionAllowed),
       sampleQty: v.sampleQty ?? null,
       sizes: v.sizes || [],
-      // The colourway this request IS. A per-colour type sends its set through
-      // the batch instead, and a lab dip sends none at all — its colour comes
-      // off the BOM line, server-side, so it cannot be made to disagree.
-      colourName: v.colourName || null,
+      // The colourway this request IS. Raising a per-colour or material type sends
+      // its set through the batch instead (a lab dip's colour comes off the BOM
+      // line, server-side); editing one sends back the record's colour and fabric,
+      // because the update rebuilds the identity from exactly these two fields.
+      colourName: (keepsRecordColour ? record.colourName : v.colourName) || null,
+      bomLineId: (record && isMaterialScope ? record.bomLineId : null) ?? null,
       colourReference: v.colourReference || '',
       priority: v.priority || 'NORMAL',
       specialInstructions: v.specialInstructions || '',
