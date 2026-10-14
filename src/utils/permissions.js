@@ -566,6 +566,13 @@ export const SCREENS = [
     path: '/assets', routes: [],
     ops: ['view', 'add', 'update'],
     description: 'Issuing assets to employees and taking them back. Shown on the asset itself.' },
+  // verify is one scan; lock is closing and reopening the run, which decides
+  // whether anybody may still scan into it.
+  { id: 'asset-verification', name: 'Asset Verification', section: 'assets', kind: 'screen',
+    path: '/assets/verification',
+    routes: ['/assets/verification', '/assets/verification/:id'],
+    ops: ['view', 'add', 'verify', 'lock'],
+    description: 'Physical checks that the assets recorded at a location are really there.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

@@ -137,3 +137,21 @@ export const maintenanceDue = (nextDueDate, today = new Date()) => {
   if (days <= 7) return { label: `Due in ${days} d`, color: 'orange' };
   return { label: `Due in ${days} d`, color: 'default' };
 };
+
+/** Mirrors VerificationResult. Only OK and PENDING are not somebody's problem. */
+export const VERIFICATION_RESULT = {
+  PENDING: { label: 'Not checked yet', color: 'default' },
+  OK: { label: 'Found, as expected', color: 'green' },
+  LOCATION_MISMATCH: { label: 'Found elsewhere', color: 'orange' },
+  CONDITION_CHANGED: { label: 'Condition differs', color: 'gold' },
+  NOT_FOUND: { label: 'Not found', color: 'red' },
+  EXTRA: { label: 'Found unexpectedly', color: 'purple' },
+};
+
+export const verificationResultMeta = (result) =>
+  VERIFICATION_RESULT[result] ?? { label: result ?? '-', color: 'default' };
+
+export const VERIFICATION_STATUS = {
+  OPEN: { label: 'In progress', color: 'blue' },
+  CLOSED: { label: 'Closed', color: 'default' },
+};

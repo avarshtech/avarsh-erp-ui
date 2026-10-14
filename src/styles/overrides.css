@@ -2139,3 +2139,13 @@ textarea.ant-input:active {
   border-color: rgba(255, 255, 255, 0.22);
 }
 [data-theme="dark"] .employee-photo-busy { background: rgba(0, 0, 0, 0.5); }
+
+/* A verification row somebody has to look at. Tinted rather than badged: the
+   result column already names it, and on a list of three hundred machines the
+   eye wants to find the exceptions without reading every one. */
+.row-needs-attention > td {
+  background: rgba(250, 173, 20, 0.08) !important;
+}
+[data-theme="dark"] .row-needs-attention > td {
+  background: rgba(250, 173, 20, 0.14) !important;
+}
