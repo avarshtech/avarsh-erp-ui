@@ -54,6 +54,9 @@ const OrderList = () => {
   // View modal state
   const [viewModalVisible, setViewModalVisible] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
+  // A notification's Approve/Reject, bound to the order it came for ({ action, orderId }). It is
+  // used once: opening any order from the list, finishing an action or a failed load clears it,
+  // so it can never act on another order the user opens afterwards.
   const [pendingAction, setPendingAction] = useState(null);
 
   // Handle deep link from push notification (?viewId=X&action=approve)
@@ -62,17 +65,21 @@ const OrderList = () => {
     const viewId = searchParams.get('viewId');
     const action = searchParams.get('action');
     if (viewId) {
-      if (action) setPendingAction(action);
+      const orderId = parseInt(viewId);
+      if (action) setPendingAction({ action, orderId });
       searchParams.delete('viewId');
       searchParams.delete('action');
       setSearchParams(searchParams, { replace: true });
       // OrderView needs the full order object — fetch by ID
-      getOrderById(parseInt(viewId))
+      getOrderById(orderId)
         .then((orderData) => {
           setViewingOrder(orderData);
           setViewModalVisible(true);
         })
-        .catch(() => message.error('Failed to load order'));
+        .catch(() => {
+          setPendingAction(null);
+          message.error('Failed to load order');
+        });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -151,11 +158,13 @@ const OrderList = () => {
 
   // View
   const handleView = useCallback((record) => {
+    setPendingAction(null);
     setViewingOrder(record);
     setViewModalVisible(true);
   }, []);
 
   const handleStatusActionComplete = () => {
+    setPendingAction(null);
     setViewModalVisible(false);
     setViewingOrder(null);
     fetchData(pagination.current, pagination.pageSize);
@@ -394,7 +403,7 @@ const OrderList = () => {
       <OrderView
         open={viewModalVisible}
         orderData={viewingOrder}
-        pendingAction={pendingAction}
+        pendingAction={pendingAction && pendingAction.orderId === viewingOrder?.id ? pendingAction.action : null}
         onClose={() => {
           setViewModalVisible(false);
           setViewingOrder(null);
