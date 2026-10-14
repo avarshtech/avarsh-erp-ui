@@ -484,6 +484,9 @@ const buildGrnRequest = (data, grnType) => {
     grnType,
     grnDate: data.grnDate,
     poId: data.poId,
+    // Received At (Branch). Null leaves the API's default: the PO's delivery branch on a new GRN,
+    // the GRN's own branch on an edit.
+    branchId: data.branchId,
     challanNo: data.challanNo,
     invoiceDate: data.invoiceDate,
     deliveryChallanDate: data.deliveryChallanDate,
