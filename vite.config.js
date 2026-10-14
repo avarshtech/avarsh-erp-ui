@@ -4,8 +4,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { getHeapStatistics } from 'node:v8'
+import { fileURLToPath } from 'node:url'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+
+// Other sessions' checkouts nested in THIS checkout. Anchored to this config's folder: a dev server
+// started inside one of them has no nested worktrees of its own, so it still watches its own files.
+const nestedWorktrees = fileURLToPath(new URL('./.claude/worktrees/', import.meta.url)).replace(/\\/g, '/').toLowerCase()
+const isNestedWorktree = (path) => path.replace(/\\/g, '/').toLowerCase().startsWith(nestedWorktrees)
 
 // Identifies the build so the app can tell "this is a different deploy" apart
 // from "same deploy, new page load" — independent of whether releases have been
@@ -127,7 +133,7 @@ export default defineConfig({
     // is wasted work, and on Windows a report the reporter still holds open (EBUSY) crashes the watcher.
     watch: {
       ignored: ['**/e2e-report/**', '**/test-results/**', '**/playwright-report/**', '**/blob-report/**',
-        '**/coverage/**', '**/.playwright-mcp/**', '**/.kilo/**', '**/.claude/worktrees/**', '**/docs/**'],
+        '**/coverage/**', '**/.playwright-mcp/**', '**/.kilo/**', '**/docs/**', isNestedWorktree],
     },
   },
 })
