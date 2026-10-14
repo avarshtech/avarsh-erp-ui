@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { getCachedOrganisation, fetchAndCacheOrganisation } from '../services/admin/organisationService';
 import { getCurrencySymbol } from './orderConstants';
+import { escInline } from './printDoc';
 import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 /**
@@ -17,9 +18,17 @@ import sristiLogo from '../assets/images/sristi_logo.jpeg';
 
 // ─── Format Helpers ────────────────────────────────────────────────────────────
 
+/**
+ * Text for the print window. The window is written with document.write in the app's own origin, so
+ * every value from the sheet or the organisation goes through this, never raw. It is printDoc's
+ * escInline (newlines stay as they are: the sheet has always printed a multi-line note as one run
+ * of text), and nothing (null, '', 0) prints as nothing, as before, so `esc(v) || '-'` keeps its dash.
+ */
+const esc = (value) => (value ? escInline(value) : '');
+
 const fmt = (val, currency = 'INR') => {
   const num = parseFloat(val) || 0;
-  const sym = getCurrencySymbol(currency) || '';
+  const sym = esc(getCurrencySymbol(currency));
   return `${sym} ${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
@@ -31,11 +40,6 @@ const fmtNum = (val, decimals = 2) => {
 const fmtDate = (dateStr) => {
   if (!dateStr) return '-';
   return dayjs(dateStr).format('DD-MMM-YYYY');
-};
-
-const esc = (str) => {
-  if (!str) return '';
-  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 };
 
 const getStatusLabel = (status) => {
@@ -51,7 +55,7 @@ const getStatusColor = (status) => {
 // Unit `consumption` is expressed in — the item's secondary UOM. Prefer the symbol ("GMS")
 // over uomName, which prints as the full word ("KILOGRAMS").
 const consumptionUomOf = (row) =>
-  String(row.uomSymbol || row.uom || row.uomName || '').toUpperCase();
+  esc(String(row.uomSymbol || row.uom || row.uomName || '').toUpperCase());
 
 /** The purchase unit a rate is quoted per, as a " / kg" suffix (blank when unknown). */
 const rateUomSuffix = (row) => {
@@ -80,10 +84,10 @@ const buildCostingHtml = (cs, org) => {
       <td>${esc(row.description) || '-'}</td>
       <td class="num">${row.consumption != null ? `${fmtNum(row.consumption, 4)} ${consumptionUomOf(row)}`.trim() : '-'}</td>
       <td class="num">${fmtNum(row.fabricPrice)}${rateUomSuffix(row)}</td>
-      <td class="center">${row.fabricWidthStd || '-'}</td>
-      <td class="center">${row.fabricWidthVendor || '-'}</td>
+      <td class="center">${esc(row.fabricWidthStd) || '-'}</td>
+      <td class="center">${esc(row.fabricWidthVendor) || '-'}</td>
       <td>${esc(row.vendorName) || '-'}</td>
-      <td class="num">${row.allowancePct || 0}%</td>
+      <td class="num">${esc(row.allowancePct) || 0}%</td>
       <td class="num highlight-cell">${fmtNum(row.netCost)}</td>
     </tr>`;
   });
@@ -210,7 +214,7 @@ const buildCostingHtml = (cs, org) => {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Cost Sheet ${costingId} - ${esc(cs.buyerName)} - ${esc(cs.styleNo)}</title>
+  <title>Cost Sheet ${esc(costingId)} - ${esc(cs.buyerName)} - ${esc(cs.styleNo)}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @page { size: A4 landscape; margin: 8mm 6mm 10mm 6mm; }
@@ -463,17 +467,17 @@ const buildCostingHtml = (cs, org) => {
         <div class="company-info">
           <div class="company-name">${esc(companyName)}</div>
           <div class="company-details">
-            ${[org?.addressLine1, org?.addressLine2].filter(Boolean).join(', ')}<br>
-            ${[org?.city, org?.state].filter(Boolean).join(', ')}${org?.pincode ? ' - ' + org.pincode : ''}<br>
-            ${org?.phone ? 'Tel: ' + org.phone + ' | ' : ''}${org?.email ? 'Email: ' + org.email : ''}<br>
-            ${org?.gstin ? 'GSTIN: ' + org.gstin : ''}${org?.pan ? ' | PAN: ' + org.pan : ''}${org?.cin ? ' | CIN: ' + org.cin : ''}
+            ${esc([org?.addressLine1, org?.addressLine2].filter(Boolean).join(', '))}<br>
+            ${esc([org?.city, org?.state].filter(Boolean).join(', '))}${org?.pincode ? ' - ' + esc(org.pincode) : ''}<br>
+            ${org?.phone ? 'Tel: ' + esc(org.phone) + ' | ' : ''}${org?.email ? 'Email: ' + esc(org.email) : ''}<br>
+            ${org?.gstin ? 'GSTIN: ' + esc(org.gstin) : ''}${org?.pan ? ' | PAN: ' + esc(org.pan) : ''}${org?.cin ? ' | CIN: ' + esc(org.cin) : ''}
           </div>
         </div>
       </div>
       <div class="cs-badge">
         <div class="cs-label">Cost Sheet</div>
         <div class="cs-number">${esc(costingId)}</div>
-        <div class="cs-status">${getStatusLabel(cs.status)}</div>
+        <div class="cs-status">${esc(getStatusLabel(cs.status))}</div>
       </div>
     </div>
 
@@ -501,7 +505,7 @@ const buildCostingHtml = (cs, org) => {
       </div>
       <div class="detail-item">
         <div class="label">Sizes</div>
-        <div class="value">${(cs.sizes || []).join(', ') || '-'}</div>
+        <div class="value">${esc((cs.sizes || []).join(', ')) || '-'}</div>
       </div>
       <div class="detail-item">
         <div class="label">Costing Currency</div>
@@ -513,15 +517,15 @@ const buildCostingHtml = (cs, org) => {
       </div>
       <div class="detail-item">
         <div class="label">Actual Rate</div>
-        <div class="value">${cs.actualRate || '-'}</div>
+        <div class="value">${esc(cs.actualRate) || '-'}</div>
       </div>
       <div class="detail-item">
         <div class="label">Today's Rate</div>
-        <div class="value">${cs.todaysRate || '-'}</div>
+        <div class="value">${esc(cs.todaysRate) || '-'}</div>
       </div>
       <div class="detail-item span2">
         <div class="label">USD to INR Rate</div>
-        <div class="value">${cs.usdToInrRate || '83.80'}</div>
+        <div class="value">${esc(cs.usdToInrRate) || '83.80'}</div>
       </div>
     </div>
 
@@ -538,12 +542,12 @@ const buildCostingHtml = (cs, org) => {
             <th>Class</th>
             <th>Description</th>
             <th style="width:80px;">Consumption</th>
-            <th style="width:55px;">Price (${getCurrencySymbol(currency)})</th>
+            <th style="width:55px;">Price (${esc(getCurrencySymbol(currency))})</th>
             <th style="width:42px;">Width Std</th>
             <th style="width:48px;">Width Vend</th>
             <th>Supplier</th>
             <th style="width:42px;">Allow %</th>
-            <th style="width:65px;">Net Cost (${getCurrencySymbol(currency)})</th>
+            <th style="width:65px;">Net Cost (${esc(getCurrencySymbol(currency))})</th>
           </tr>
         </thead>
         <tbody>
@@ -569,8 +573,8 @@ const buildCostingHtml = (cs, org) => {
             <th>Code</th>
             <th style="width:50px;">Size</th>
             <th style="width:80px;">Consumption</th>
-            <th style="width:60px;">Cost (${getCurrencySymbol(currency)})</th>
-            <th style="width:65px;">Price (${getCurrencySymbol(currency)})</th>
+            <th style="width:60px;">Cost (${esc(getCurrencySymbol(currency))})</th>
+            <th style="width:65px;">Price (${esc(getCurrencySymbol(currency))})</th>
           </tr>
         </thead>
         <tbody>
@@ -620,7 +624,7 @@ const buildCostingHtml = (cs, org) => {
             <th style="width:22px;">SN</th>
             <th>Sizes</th>
             <th>Process</th>
-            <th style="width:70px;">Cost (${getCurrencySymbol(currency)})</th>
+            <th style="width:70px;">Cost (${esc(getCurrencySymbol(currency))})</th>
             <th>Comments</th>
           </tr>
         </thead>
@@ -645,7 +649,7 @@ const buildCostingHtml = (cs, org) => {
             <th style="width:22px;">SN</th>
             <th>Sizes</th>
             <th>Description</th>
-            <th style="width:70px;">Cost (${getCurrencySymbol(currency)})</th>
+            <th style="width:70px;">Cost (${esc(getCurrencySymbol(currency))})</th>
             <th>Comments</th>
           </tr>
         </thead>
@@ -715,7 +719,7 @@ const buildCostingHtml = (cs, org) => {
             ${quoteCurrency !== 'INR' && quoteCurrency !== 'USD' ? `
             <div class="price-card quote">
               <div class="pc-label">Final Price (${esc(quoteCurrency)})</div>
-              <div class="pc-value">${getCurrencySymbol(quoteCurrency)} ${fmtNum(cs.finalPrice)}</div>
+              <div class="pc-value">${esc(getCurrencySymbol(quoteCurrency))} ${fmtNum(cs.finalPrice)}</div>
             </div>` : ''}
             <div class="price-card usd">
               <div class="pc-label">Final Price (USD)</div>
@@ -754,7 +758,7 @@ const buildCostingHtml = (cs, org) => {
       THIS IS A COMPUTER GENERATED DOCUMENT - NO SIGNATURE REQUIRED
     </div>
     <div class="note-line">
-      For any queries, please contact: ${org?.email || 'support@company.com'}
+      For any queries, please contact: ${esc(org?.email) || 'support@company.com'}
     </div>
   </div>
 </body>
