@@ -204,7 +204,12 @@ const watchRegistration = (registration, onOfflineReady) => {
  */
 export const registerServiceWorker = (onOfflineReady) => {
   if (registered) return;
-  if (!('serviceWorker' in navigator)) return;
+  // `in` is not enough: a browser that blocks service workers can expose the property as
+  // undefined, and register() would then throw.
+  if (!navigator.serviceWorker) return;
+  // The e2e build runs without a service worker: one would answer requests the tests route or
+  // watch. Everything below copes with no registration (swRegistration stays null).
+  if (import.meta.env.VITE_APP_ENV === 'e2e') return;
   registered = true;
 
   const start = () => {
