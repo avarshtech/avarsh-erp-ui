@@ -539,8 +539,15 @@ export const SCREENS = [
   // Setup is separate from the register on purpose: a category's code becomes
   // part of every asset ID printed under it, so inventing categories is a
   // different job from adding assets.
+  // Read-only, so view is its only operation. Separate from the register
+  // because seeing the shape of the estate is not the same right as opening
+  // every machine's purchase cost.
+  { id: 'asset-dashboard', name: 'Asset Dashboard', section: 'assets', kind: 'dashboard',
+    path: '/assets/dashboard', ops: ['view'],
+    description: 'Read-only indicators, pending queues and recent movements.' },
   { id: 'assets', name: 'Asset Register', section: 'assets', kind: 'screen',
-    path: '/assets', routes: ['/assets', '/assets/new', '/assets/:id', '/assets/:id/edit'],
+    path: '/assets',
+    routes: ['/assets', '/assets/new', '/assets/:id', '/assets/:id/edit', '/assets/code/:code'],
     ops: STANDARD_OPERATIONS },
   { id: 'asset-setup', name: 'Asset Setup', section: 'assets', kind: 'screen',
     path: '/assets/setup', routes: ['/assets/setup'],

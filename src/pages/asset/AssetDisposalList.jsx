@@ -8,6 +8,7 @@ import EmptyState from '../../components/EmptyState';
 import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
 import useServerList from '../../hooks/useServerList';
+import useUrlFilters from '../../hooks/useUrlFilters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import {
   approveDisposal, cancelDisposal, getDisposals, rejectDisposal, submitDisposal,
@@ -33,7 +34,9 @@ const money = (v) => (v === null || v === undefined ? '-' : `₹${Number(v).toLo
 const AssetDisposalList = () => {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
-  const list = useServerList(fetchPage, { status: undefined }, 'Could not load the disposal requests');
+  const fromUrl = useUrlFilters(['status']);
+  const list = useServerList(fetchPage, { status: undefined, ...fromUrl },
+    'Could not load the disposal requests');
   const [selected, setSelected] = useState(null);
   const [dialog, setDialog] = useState(null);
 

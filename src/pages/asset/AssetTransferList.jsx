@@ -9,6 +9,7 @@ import PermissionGuard from '../../components/PermissionGuard';
 import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
 import useServerList from '../../hooks/useServerList';
+import useUrlFilters from '../../hooks/useUrlFilters';
 import useAssetLookups from '../../hooks/useAssetLookups';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { getTransfers } from '../../services/asset/transferService';
@@ -35,9 +36,19 @@ const REASON_OPTIONS = Object.entries(TRANSFER_REASON).map(([value, label]) => (
 const AssetTransferList = () => {
   const navigate = useNavigate();
   const lookups = useAssetLookups();
+  // A status in the URL means the dashboard sent somebody here for that queue.
+  // The default "Needs action" view would hide exactly what they clicked, so the
+  // segmented control starts on All - and shows that it did, rather than sitting
+  // on no selection at all.
+  const fromUrl = useUrlFilters(['status', 'fromUnitId', 'toUnitId'],
+    { numeric: ['fromUnitId', 'toUnitId'] });
   const list = useServerList(
     fetchPage,
-    { view: 'open', status: undefined, reasonCode: undefined, fromUnitId: undefined, toUnitId: undefined },
+    {
+      view: fromUrl.status ? 'all' : 'open',
+      status: undefined, reasonCode: undefined, fromUnitId: undefined, toUnitId: undefined,
+      ...fromUrl,
+    },
     'Could not load the transfers',
   );
 

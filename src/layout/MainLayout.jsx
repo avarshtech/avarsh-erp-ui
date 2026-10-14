@@ -547,8 +547,9 @@ const MainLayoutInner = () => {
       key: "/assets",
       icon: <ToolOutlined />,
       label: "Assets",
-      moduleId: ["assets", "asset-setup", "asset-transfers", "asset-disposals", "asset-verification"],
+      moduleId: ["assets", "asset-dashboard", "asset-setup", "asset-transfers", "asset-disposals", "asset-verification"],
       children: [
+        { key: "/assets/dashboard", label: "Dashboard", moduleId: "asset-dashboard" },
         { key: "/assets", label: "Asset Register", moduleId: "assets" },
         { key: "/assets/transfers", label: "Transfers", moduleId: "asset-transfers" },
         { key: "/assets/disposals", label: "Disposals", moduleId: "asset-disposals" },

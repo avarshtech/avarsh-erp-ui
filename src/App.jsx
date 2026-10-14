@@ -154,6 +154,7 @@ const AssetTransferForm = lazy(() => import('./pages/asset/AssetTransferForm'));
 const AssetTransferView = lazy(() => import('./pages/asset/AssetTransferView'));
 const AssetDisposalList = lazy(() => import('./pages/asset/AssetDisposalList'));
 const AssetByCode = lazy(() => import('./pages/asset/AssetByCode'));
+const AssetDashboard = lazy(() => import('./pages/asset/AssetDashboard'));
 const AssetVerificationList = lazy(() => import('./pages/asset/AssetVerificationList'));
 const AssetVerificationView = lazy(() => import('./pages/asset/AssetVerificationView'));
 // Sample Requests (lazy-loaded — UI mock phase)
@@ -506,6 +507,7 @@ const ThemedApp = () => {
             <Route path="assets/transfers/new" element={<PermissionRoute module="asset-transfers" operation="add"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />
             <Route path="assets/transfers/:id/edit" element={<PermissionRoute module="asset-transfers" operation="update"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />
             <Route path="assets/transfers/:id" element={<PermissionRoute module="asset-transfers" operation="view"><Suspense fallback={<PageSkeleton />}><AssetTransferView /></Suspense></PermissionRoute>} />
+            <Route path="assets/dashboard" element={<PermissionRoute module="asset-dashboard" operation="view"><Suspense fallback={<PageSkeleton />}><AssetDashboard /></Suspense></PermissionRoute>} />
             {/* Where a scanned QR label lands: the sticker carries the printed asset ID, not the row id. */}
             <Route path="assets/code/:code" element={<PermissionRoute module="assets" operation="view"><Suspense fallback={<PageSkeleton />}><AssetByCode /></Suspense></PermissionRoute>} />
             <Route path="assets/new" element={<PermissionRoute module="assets" operation="add"><Suspense fallback={<PageSkeleton />}><AssetForm /></Suspense></PermissionRoute>} />

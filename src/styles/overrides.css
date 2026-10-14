@@ -2194,3 +2194,19 @@ textarea.ant-input:active {
   overflow: hidden;
 }
 [data-theme="dark"] .asset-label-preview { border-color: rgba(255, 255, 255, 0.35); }
+
+/* A pending-action row on the asset dashboard. Each one is a way into the queue
+   it counts, so the whole row is the target rather than the number alone. */
+.asset-pending-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.asset-pending-row:last-child { border-bottom: 0; }
+.asset-pending-row:hover { background: rgba(22, 119, 255, 0.06); }
+[data-theme="dark"] .asset-pending-row { border-bottom-color: rgba(255, 255, 255, 0.08); }
+[data-theme="dark"] .asset-pending-row:hover { background: rgba(22, 119, 255, 0.14); }

@@ -9,6 +9,7 @@ import RecordLink from '../../components/RecordLink';
 import { ActionButton } from '../../components/buttons';
 import useServerList from '../../hooks/useServerList';
 import useAssetLookups from '../../hooks/useAssetLookups';
+import useUrlFilters from '../../hooks/useUrlFilters';
 import { getTablePagination } from '../../utils/paginationConfig';
 import { getRuns, startRun } from '../../services/asset/verificationService';
 import { toastUnlessHandled } from '../../utils/apiError';
@@ -22,7 +23,8 @@ const AssetVerificationList = () => {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const lookups = useAssetLookups();
-  const list = useServerList(fetchPage, { status: undefined, unitId: undefined },
+  const fromUrl = useUrlFilters(['status', 'unitId'], { numeric: ['unitId'] });
+  const list = useServerList(fetchPage, { status: undefined, unitId: undefined, ...fromUrl },
     'Could not load the verification runs');
   const [form] = Form.useForm();
   const [starting, setStarting] = useState(false);
