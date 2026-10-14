@@ -546,6 +546,14 @@ export const SCREENS = [
     path: '/assets/setup', routes: ['/assets/setup'],
     ops: STANDARD_OPERATIONS,
     description: 'Categories, their extra fields, and the section and line levels of a location.' },
+  // Raising a move and approving one are different jobs, and the approval is
+  // what makes the movement history worth anything. dispatch and receive are
+  // the two ends of the journey.
+  { id: 'asset-transfers', name: 'Asset Transfers', section: 'assets', kind: 'screen',
+    path: '/assets/transfers',
+    routes: ['/assets/transfers', '/assets/transfers/new', '/assets/transfers/:id', '/assets/transfers/:id/edit'],
+    ops: ['view', 'add', 'update', 'approve', 'reject', 'cancel', 'dispatch', 'receive'],
+    description: 'Moving assets between units, departments, sections and lines.' },
 ];
 
 const SCREEN_BY_ID = SCREENS.reduce((acc, s) => { acc[s.id] = s; return acc; }, {});

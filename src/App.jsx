@@ -149,6 +149,9 @@ const AssetList = lazy(() => import('./pages/asset/AssetList'));
 const AssetForm = lazy(() => import('./pages/asset/AssetForm'));
 const AssetView = lazy(() => import('./pages/asset/AssetView'));
 const AssetSetup = lazy(() => import('./pages/asset/AssetSetup'));
+const AssetTransferList = lazy(() => import('./pages/asset/AssetTransferList'));
+const AssetTransferForm = lazy(() => import('./pages/asset/AssetTransferForm'));
+const AssetTransferView = lazy(() => import('./pages/asset/AssetTransferView'));
 // Sample Requests (lazy-loaded — UI mock phase)
 const SampleRequestList = lazy(() => import('./pages/sample-request/SampleRequestList'));
 const SampleRequestForm = lazy(() => import('./pages/sample-request/SampleRequestForm'));
@@ -491,6 +494,11 @@ const ThemedApp = () => {
             <Route path="assets" element={<PermissionRoute module="assets" operation="view"><Suspense fallback={<PageSkeleton />}><AssetList /></Suspense></PermissionRoute>} />
             {/* Setup before :id, or "setup" is read as an asset id. */}
             <Route path="assets/setup" element={<PermissionRoute module="asset-setup" operation="view"><Suspense fallback={<PageSkeleton />}><AssetSetup /></Suspense></PermissionRoute>} />
+            {/* Transfers before assets/:id, or "transfers" is read as an asset id. */}
+            <Route path="assets/transfers" element={<PermissionRoute module="asset-transfers" operation="view"><Suspense fallback={<PageSkeleton />}><AssetTransferList /></Suspense></PermissionRoute>} />
+            <Route path="assets/transfers/new" element={<PermissionRoute module="asset-transfers" operation="add"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />
+            <Route path="assets/transfers/:id/edit" element={<PermissionRoute module="asset-transfers" operation="update"><Suspense fallback={<PageSkeleton />}><AssetTransferForm /></Suspense></PermissionRoute>} />
+            <Route path="assets/transfers/:id" element={<PermissionRoute module="asset-transfers" operation="view"><Suspense fallback={<PageSkeleton />}><AssetTransferView /></Suspense></PermissionRoute>} />
             <Route path="assets/new" element={<PermissionRoute module="assets" operation="add"><Suspense fallback={<PageSkeleton />}><AssetForm /></Suspense></PermissionRoute>} />
             <Route path="assets/:id/edit" element={<PermissionRoute module="assets" operation="update"><Suspense fallback={<PageSkeleton />}><AssetForm /></Suspense></PermissionRoute>} />
             <Route path="assets/:id" element={<PermissionRoute module="assets" operation="view"><Suspense fallback={<PageSkeleton />}><AssetView /></Suspense></PermissionRoute>} />

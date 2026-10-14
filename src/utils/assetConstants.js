@@ -77,3 +77,28 @@ export const eventMeta = (event) => MOVEMENT_EVENT[event] ?? { label: event ?? '
 
 /** "-" rather than an empty cell, so a missing value reads as missing. */
 export const dash = (value) => (value === null || value === undefined || value === '' ? '-' : value);
+
+/** Mirrors TransferStatus. The colours follow the register's own status palette. */
+export const TRANSFER_STATUS = {
+  DRAFT: { label: 'Draft', color: 'default' },
+  SUBMITTED: { label: 'Awaiting approval', color: 'gold' },
+  APPROVED: { label: 'Approved', color: 'blue' },
+  IN_TRANSIT: { label: 'In transit', color: 'orange' },
+  COMPLETED: { label: 'Completed', color: 'green' },
+  REJECTED: { label: 'Rejected', color: 'red' },
+  CANCELLED: { label: 'Cancelled', color: 'default' },
+};
+
+export const TRANSFER_REASON = {
+  NEW_LINE: 'New line set-up',
+  LINE_CLOSURE: 'Line closed',
+  CAPACITY_BALANCING: 'Balancing capacity',
+  ORDER_REQUIREMENT: 'Order requirement',
+  REPAIR: 'Sending for repair',
+  RETURN_FROM_REPAIR: 'Returning from repair',
+  REALLOCATION: 'Reallocation',
+  OTHER: 'Other',
+};
+
+export const transferStatusMeta = (status) =>
+  TRANSFER_STATUS[status] ?? { label: status ?? '-', color: 'default' };
