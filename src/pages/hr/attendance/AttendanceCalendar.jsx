@@ -18,6 +18,26 @@ const { Text } = Typography;
 
 const statusMap = Object.fromEntries(ATTENDANCE_STATUS.map((s) => [s.value, s]));
 
+/** The API sends LocalTime as HH:mm:ss; the seconds are never meaningful here. */
+const clockTime = (value) => (value ? String(value).slice(0, 5) : '-');
+
+/**
+ * Hours between the punches, when both are there and run forwards.
+ *
+ * Deliberately silent on a pair that crosses midnight rather than guessing:
+ * this panel does not know the employee's shift, and payroll's own figure
+ * subtracts the break. A number here that disagreed with the payslip would be
+ * worse than no number.
+ */
+const workedHours = (day) => {
+  if (!day.inTime || !day.outTime) return null;
+  const [inH, inM] = String(day.inTime).split(':').map(Number);
+  const [outH, outM] = String(day.outTime).split(':').map(Number);
+  const minutes = (outH * 60 + outM) - (inH * 60 + inM);
+  if (minutes <= 0) return null;
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+};
+
 /**
  * Short labels for the coloured cell. The full label is too long to read at
  * calendar-cell width, so each status gets an abbreviation that still reads as
@@ -169,7 +189,10 @@ const AttendanceCalendar = () => {
     const key = date.format('YYYY-MM-DD');
     const record = calendarData[key];
     if (record) {
-      setSelectedDay({ date, ...record });
+      // The record carries its own `date` as a string from the API, so spreading
+      // it last overwrote the dayjs and the drawer died on date.format(). The
+      // dayjs wins because that is what this screen does arithmetic with.
+      setSelectedDay({ ...record, date });
       setDrawerOpen(true);
     }
   }, [calendarData]);
@@ -432,22 +455,45 @@ const AttendanceCalendar = () => {
       )}
 
       <Drawer
-        title="Attendance Details"
+        title={selectedDay ? selectedDay.date.format('dddd, DD MMM YYYY') : 'Attendance'}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        size={400}
+        size={420}
       >
         {selectedDay && (
-          <Descriptions column={1} bordered size="small">
-            <Descriptions.Item label="Date">{selectedDay.date?.format('DD MMM YYYY')}</Descriptions.Item>
-            <Descriptions.Item label="Status">
-              <Tag color={statusMap[selectedDay.status]?.tag}>{statusMap[selectedDay.status]?.label}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="In Time">{selectedDay.inTime || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Out Time">{selectedDay.outTime || '-'}</Descriptions.Item>
-            <Descriptions.Item label="OT Hours">{selectedDay.otHours ?? '-'}</Descriptions.Item>
-            <Descriptions.Item label="Remarks">{selectedDay.remarks || '-'}</Descriptions.Item>
-          </Descriptions>
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{selectedEmployee?.fullName}</div>
+              {selectedEmployee?.employeeNo && (
+                <div style={{ fontSize: 12, opacity: 0.65 }}>{selectedEmployee.employeeNo}</div>
+              )}
+            </div>
+            <Descriptions column={1} bordered size="small">
+              <Descriptions.Item label="Status">
+                <Tag color={statusMap[selectedDay.status]?.tag}>
+                  {statusMap[selectedDay.status]?.label ?? selectedDay.status}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="In Time">{clockTime(selectedDay.inTime)}</Descriptions.Item>
+              <Descriptions.Item label="Out Time">{clockTime(selectedDay.outTime)}</Descriptions.Item>
+              {/* Only worth a row when there is one: an hours row reading "-" on
+                  every ordinary day is noise on a panel this small. */}
+              {workedHours(selectedDay) && (
+                <Descriptions.Item label="Hours Worked">{workedHours(selectedDay)}</Descriptions.Item>
+              )}
+              {Number(selectedDay.otHours) > 0 && (
+                <Descriptions.Item label="Overtime">{Number(selectedDay.otHours)} h</Descriptions.Item>
+              )}
+              {selectedDay.halfDaySession && (
+                <Descriptions.Item label="Half Taken">
+                  {selectedDay.halfDaySession === 'FIRST_HALF' ? 'First half' : 'Second half'}
+                </Descriptions.Item>
+              )}
+              {selectedDay.leaveTypeName && (
+                <Descriptions.Item label="Leave Type">{selectedDay.leaveTypeName}</Descriptions.Item>
+              )}
+            </Descriptions>
+          </>
         )}
       </Drawer>
     </>
