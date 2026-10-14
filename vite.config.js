@@ -66,6 +66,9 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'prompt',
       injectRegister: null,
+      // The manifest's icons are PNGs in dist/icons, which globPatterns already precaches; adding
+      // them again listed each one twice in the precache manifest.
+      includeManifestIcons: false,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // The Virtual Factory page carries three.js (only it imports it), so only the people who open
