@@ -12,6 +12,7 @@ import {
 import { ActionButton } from '../../components/buttons';
 import EmptyState from '../../components/EmptyState';
 import { getItemMetaData, getItemById, createItem, updateItem, searchItems } from '../../services/master/itemService';
+import useServerList from '../../hooks/useServerList';
 import { hasPermission } from '../../utils/permissions';
 import PermissionGuard from '../../components/PermissionGuard';
 import { COLOR_PALETTE, getColorHex } from '../../utils/colorConstants';
@@ -151,6 +152,24 @@ const ColorPicker = ({ value, onChange, placeholder }) => {
   );
 };
 
+const ITEM_FILTERS = { categoryId: '', subCategoryId: '', itemTypeId: '', status: '' };
+const ITEM_LIST_OPTIONS = { defaultSort: { field: 'itemCode', order: 'descend' } };
+
+// One page of items for the list's search, filters and order (the API is 0-based).
+const fetchItemPage = async ({ page, size, search, sort, direction, categoryId, subCategoryId, itemTypeId, status }) => {
+  const params = { page: page - 1, size, sort, direction };
+  if (search) params.search = search;
+  if (categoryId) params.categoryId = parseInt(categoryId);
+  if (subCategoryId) params.subCategoryId = parseInt(subCategoryId);
+  if (itemTypeId) params.itemTypeId = parseInt(itemTypeId);
+  if (status === 'active') params.isActive = true;
+  else if (status === 'inactive') params.isActive = false;
+  const response = await searchItems(params);
+  const data = response?.data || response || {};
+  const items = Array.isArray(data) ? data : (data.content || []);
+  return { content: items, totalElements: data.totalElements || items.length };
+};
+
 const ItemMaster = () => {
   const { message, modal } = App.useApp();
   // RBAC Permissions
@@ -160,22 +179,26 @@ const ItemMaster = () => {
   // not offer the operation. The flag was computed here and never read.
   const canView = hasPermission(MODULE_ID, 'view');
 
-  // List State
-  const [filteredItems, setFilteredItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
-  const [sortConfig, setSortConfig] = useState({ field: 'itemCode', order: 'descend' });
+  // List State: pages, sorts and filters on the server; a saved edit reloads the same page, so the row
+  // stays where it was. The order with no column sorter is item code, newest first, as it always was.
+  const list = useServerList(fetchItemPage, ITEM_FILTERS, 'Failed to load items', ITEM_LIST_OPTIONS);
+  const {
+    rows: filteredItems, loading, searchText: searchTerm, setSearchText: setSearchTerm,
+    load: reloadItems, goToFirstPage, filters: listFilters, setFilter,
+  } = list;
 
   // Filters (use global store for master lists)
   const { categories: storeCategories, subCategories: storeSubCategories, itemTypes: storeItemTypes, invalidateCache } = useStore();
   const [subcategories, setSubcategories] = useState([]);
   const [itemTypes, setItemTypes] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSubcategory, setSelectedSubcategory] = useState('');
-  const [selectedItemType, setSelectedItemType] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
+  const selectedCategory = listFilters.categoryId;
+  const setSelectedCategory = setFilter('categoryId');
+  const selectedSubcategory = listFilters.subCategoryId;
+  const setSelectedSubcategory = setFilter('subCategoryId');
+  const selectedItemType = listFilters.itemTypeId;
+  const setSelectedItemType = setFilter('itemTypeId');
+  const selectedStatus = listFilters.status;
+  const setSelectedStatus = setFilter('status');
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -526,43 +549,6 @@ const ItemMaster = () => {
     }
   };
 
-  // Fetch Items from API with server-side pagination & filters
-  const fetchItems = useCallback(async (page, pageSize, sort, direction) => {
-    setLoading(true);
-    try {
-      const params = {
-        page: (page || pagination.current) - 1, // API is 0-indexed
-        size: pageSize || pagination.pageSize,
-        sort: sort || sortConfig.field,
-        direction: direction || (sortConfig.order === 'ascend' ? 'asc' : 'desc'),
-      };
-
-      if (debouncedSearch) params.search = debouncedSearch;
-      if (selectedCategory) params.categoryId = parseInt(selectedCategory);
-      if (selectedSubcategory) params.subCategoryId = parseInt(selectedSubcategory);
-      if (selectedItemType) params.itemTypeId = parseInt(selectedItemType);
-      if (selectedStatus === 'active') params.isActive = true;
-      else if (selectedStatus === 'inactive') params.isActive = false;
-
-      const response = await searchItems(params);
-      const data = response?.data || response || {};
-      const items = Array.isArray(data) ? data : (data.content || []);
-
-      setFilteredItems(items);
-      setPagination((prev) => ({
-        ...prev,
-        current: page || prev.current,
-        pageSize: pageSize || prev.pageSize,
-        total: data.totalElements || items.length,
-      }));
-    } catch (error) {
-      console.error('Failed to fetch items:', error);
-      message.error('Failed to load items');
-    } finally {
-      setLoading(false);
-    }
-  }, [pagination.current, pagination.pageSize, sortConfig, debouncedSearch, selectedCategory, selectedSubcategory, selectedItemType, selectedStatus]);
-
   // Fetch Item Metadata for Form
   const fetchMetaData = useCallback(async () => {
     setMetaDataLoading(true);
@@ -587,18 +573,6 @@ const ItemMaster = () => {
       setMetaDataLoading(false);
     }
   }, []);
-
-  // Debounce search term
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Re-fetch when any filter (including debounced search) changes
-  useEffect(() => {
-    fetchItems(1, pagination.pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, selectedCategory, selectedSubcategory, selectedItemType, selectedStatus]);
 
   // Filter change handler — just update state; useEffect triggers fetch
   const handleFilterChange = (setter) => (value) => setter(value || '');
@@ -1390,7 +1364,9 @@ const ItemMaster = () => {
       } catch {
         // Cache invalidation is best-effort; the refetch below is the real refresh.
       }
-      fetchItems(1, pagination.pageSize, sortConfig.field, sortConfig.order === 'ascend' ? 'asc' : 'desc');
+      // An edited item keeps its place: same page, same order. A new one goes to page 1, as before.
+      if (isUpdateOperation || list.pagination.current === 1) reloadItems();
+      else goToFirstPage();
     } catch (error) {
       // Error toast already shown by axiosInstance interceptor
       console.error('Failed to save item:', error);
@@ -1455,14 +1431,7 @@ const ItemMaster = () => {
   };
 
   // Clear Filters
-  const clearFilters = () => {
-    setSearchTerm('');
-    setDebouncedSearch('');
-    setSelectedCategory('');
-    setSelectedSubcategory('');
-    setSelectedItemType('');
-    setSelectedStatus('');
-  };
+  const clearFilters = list.resetFilters;
 
   // Table columns
   const columns = [
@@ -1551,14 +1520,6 @@ const ItemMaster = () => {
       : []),
   ];
 
-  const handleTableChange = (pag, filters, sorter) => {
-    const newSort = sorter.field || sortConfig.field;
-    const newOrder = sorter.order || 'descend';
-    setSortConfig({ field: newSort, order: newOrder });
-    const direction = newOrder === 'ascend' ? 'asc' : 'desc';
-    fetchItems(pag.current, pag.pageSize, newSort, direction);
-  };
-
   // Active variants for display
   const activeVariantsWithIndex = variants
     .map((v, idx) => ({ variant: v, originalIndex: idx }))
@@ -1570,7 +1531,7 @@ const ItemMaster = () => {
     rows: filteredItems, columns, searchText: searchTerm, search: setSearchTerm,
     openNew: canAdd ? handleAdd : undefined, openRecord: handleEdit, close: doCloseModal,
     isOpen: modalOpen, recordId: selectedItemId ?? null,
-    form, fillable: false, refresh: () => fetchItems(),
+    form, fillable: false, refresh: reloadItems,
   });
 
   return (
@@ -1660,11 +1621,12 @@ const ItemMaster = () => {
           rowKey="id"
           loading={loading}
           pagination={{
-            ...pagination,
+            ...list.pagination,
+            total: list.total,
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
           }}
-          onChange={handleTableChange}
+          onChange={list.onTableChange}
           scroll={{ x: 1000 }}
           size="small"
           locale={{
