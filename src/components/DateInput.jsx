@@ -99,7 +99,7 @@ const DateInput = ({
             // The compact Calendar card rather than a DatePicker forced open:
             // it is a supported component in its own right, so it does not
             // depend on the picker's popup behaving while its input is hidden.
-            <div style={{ width: 280 }}>
+            <div className="date-input-calendar" style={{ width: 304 }}>
               <Calendar
                 fullscreen={false}
                 value={current ?? dayjs()}

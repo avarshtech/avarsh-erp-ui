@@ -1979,7 +1979,7 @@ textarea.ant-input:active {
   padding-inline: 11px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
-  color: var(--ant-color-text-placeholder, rgba(0, 0, 0, 0.25));
+  color: rgba(0, 0, 0, 0.25);
   pointer-events: none;
   white-space: pre;
   overflow: hidden;
@@ -1995,4 +1995,62 @@ textarea.ant-input:active {
 }
 .masked-input-disabled .masked-input-ghost {
   opacity: 0.5;
+}
+[data-theme="dark"] .masked-input-ghost {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+/* ── The calendar inside a DateInput ──────────────────────────────────────
+   Scoped to this one popover: AttendanceCalendar and the T&A calendar use the
+   same component full width, where none of this applies. */
+
+/* Year, month and the Month/Year switch on one line. At the popover's width
+   the switch wrapped underneath, which read as a second row of controls
+   rather than as the toggle it is. */
+.date-input-calendar .ant-picker-calendar-header {
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 0 0 8px;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-year-select,
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-month-select {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-mode-switch {
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+.date-input-calendar .ant-picker-calendar-header .ant-picker-calendar-mode-switch .ant-radio-button-wrapper {
+  padding-inline: 8px;
+}
+
+/* The tail of the previous month and the head of the next are context, not
+   choices. antd's Calendar colours every date value the same, unlike its
+   DatePicker panel, so without this the 27th of September looks exactly as
+   pickable as the 27th of October. */
+.date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view) .ant-picker-calendar-date-value {
+  color: rgba(0, 0, 0, 0.25);
+}
+.date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view):hover .ant-picker-calendar-date-value {
+  color: rgba(0, 0, 0, 0.45);
+}
+[data-theme="dark"] .date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view) .ant-picker-calendar-date-value {
+  color: rgba(255, 255, 255, 0.28);
+}
+[data-theme="dark"] .date-input-calendar .ant-picker-cell:not(.ant-picker-cell-in-view):hover .ant-picker-calendar-date-value {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Employee photo frame ─────────────────────────────────────────────────
+   Here rather than inline because the dark theme needs its own values and this
+   app has no antd CSS variables to read them from. */
+.employee-photo-frame {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .employee-photo-frame {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
 }

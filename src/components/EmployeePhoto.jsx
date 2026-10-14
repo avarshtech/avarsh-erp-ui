@@ -108,10 +108,11 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
     },
   });
 
+  // The frame's colours live in the stylesheet, not here: this app has no antd
+  // CSS variables, so an inline var(--ant-*) resolves to its light fallback and
+  // the frame disappears into the dark theme.
   const frame = {
     width: size, height: size, borderRadius: 8, overflow: 'hidden',
-    border: '1px solid var(--ant-color-border, rgba(0,0,0,0.12))',
-    background: 'var(--ant-color-fill-tertiary, rgba(0,0,0,0.04))',
     display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
   };
 
@@ -123,7 +124,7 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96 })
 
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-      <div style={frame}>
+      <div className="employee-photo-frame" style={frame}>
         {busy ? <Spin indicator={<LoadingOutlined spin />} /> : face}
       </div>
       {/* Each action is its own control rather than a menu: only the upload
