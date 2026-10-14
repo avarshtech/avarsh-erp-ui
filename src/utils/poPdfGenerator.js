@@ -101,7 +101,9 @@ const getStatusLabel = (status) => {
 
 const computeGSTDetails = (po) => {
   const items = po.lineItems || [];
-  const isIgst = po.isIgstApplicable || po.igstApplicable || false;
+  // The PO from the API has no IGST flag: an inter-state PO is one whose lines carry IGST (as POView decides).
+  const isIgst = Boolean(po.isIgstApplicable || po.igstApplicable
+    || items.some((li) => parseFloat(li.igst || li.igstPercent || 0) > 0));
 
   let subtotal = 0;
   let totalSgst = 0;
