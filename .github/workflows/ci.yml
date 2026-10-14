@@ -40,6 +40,10 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Fails on a missing, invalid or extraneous package, including an unmet peer dependency.
+      - name: Dependency tree is consistent (peers included)
+        run: npm ls --all > /dev/null
+
       - name: Version
         id: version
         run: |
