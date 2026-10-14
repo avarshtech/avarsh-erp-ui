@@ -761,18 +761,19 @@ const EmployeeForm = () => {
       <PageHeader
         title={isEdit ? 'Edit Employee' : 'New Employee'}
         backPath="/hr/employees"
-      >
-        <Space align="start" size="middle">
-          {/* A photo is a file against an employee id. On a new employee there
-              is no id yet, so the picture is held here and uploaded by
-              handleSave once the employee exists - see pendingPhoto. */}
+        /* A photo is a file against an employee id. On a new employee there is
+           no id yet, so the picture is held here and uploaded by handleSave
+           once the employee exists - see pendingPhoto. */
+        avatar={(
           <EmployeePhoto
             employeeId={isEdit ? Number(id) : null}
             employeeName={form.getFieldValue('fullName')}
             canEdit
-            size={84}
             onPendingChange={(file) => { pendingPhoto.current = file; }}
           />
+        )}
+      >
+        <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/hr/employees')}>Back</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>Save</Button>
         </Space>

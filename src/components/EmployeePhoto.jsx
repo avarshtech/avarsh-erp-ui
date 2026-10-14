@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Button, Image, Space, Spin, Tooltip, Upload } from 'antd';
+import { App, Image, Spin, Tooltip, Upload } from 'antd';
 import {
-  DeleteOutlined, DownloadOutlined, EyeOutlined, LoadingOutlined,
-  UploadOutlined, UserOutlined,
+  CameraOutlined, DeleteOutlined, DownloadOutlined, LoadingOutlined, UserOutlined,
 } from '@ant-design/icons';
 import {
   deleteFile, downloadFileAsBlob, downloadStoredFile, getFilesByEntity, uploadFile,
@@ -10,12 +9,18 @@ import {
 import { toastUnlessHandled } from '../utils/apiError';
 
 /**
- * The employee's photo, where a photo belongs: the top corner of their record.
+ * The employee's photo, beside their name.
  *
  * It is one of the files already attached to the employee - entity EMPLOYEE,
  * category PHOTO - so nothing new is stored and the existing access rules
  * apply: reading needs hr-employees:view and changing it needs a write right,
  * which is right for a picture of a person.
+ *
+ * The actions live on the photo rather than next to it. A permanent column of
+ * icons reads as four more buttons on a header that already has Edit and
+ * Change Status; on hover they are plainly about the picture they sit on, and
+ * the rest of the time the header is a name and a face. Clicking the photo
+ * opens it full size, which is what clicking a photo should do.
  *
  * The newest PHOTO wins. Replacing one uploads the new file and removes the old
  * only once the new is safely stored, so a failed upload cannot leave the
@@ -31,10 +36,10 @@ import { toastUnlessHandled } from '../utils/apiError';
 const MAX_BYTES = 3 * 1024 * 1024;
 const ACCEPT = 'image/jpeg,image/png,image/webp';
 
-const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96, onPendingChange }) => {
+const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 104, onPendingChange }) => {
+  const { message, modal } = App.useApp();
   // No id means the employee does not exist yet: hold the file, upload later.
   const staging = !employeeId;
-  const { message, modal } = App.useApp();
   const [photo, setPhoto] = useState(null);
   const [src, setSrc] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -130,57 +135,80 @@ const EmployeePhoto = ({ employeeId, employeeName, canEdit = false, size = 96, o
     },
   }));
 
-  // The frame's colours live in the stylesheet, not here: this app has no antd
-  // CSS variables, so an inline var(--ant-*) resolves to its light fallback and
-  // the frame disappears into the dark theme.
-  const frame = {
-    width: size, height: size, borderRadius: 8, overflow: 'hidden',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-  };
+  const box = { width: size, height: size };
 
-  const face = src
-    ? <Image src={src} alt={employeeName ? `Photo of ${employeeName}` : 'Employee photo'}
-        width={size} height={size} style={{ objectFit: 'cover' }}
-        preview={{ visible: preview, onVisibleChange: setPreview, src }} />
-    : <UserOutlined style={{ fontSize: size / 2.5, opacity: 0.3 }} aria-hidden="true" />;
+  // No photo and no right to add one: a plain silhouette, with no affordance
+  // suggesting otherwise.
+  if (!src && !canEdit) {
+    return (
+      <div className="employee-photo employee-photo-empty" style={box}>
+        {busy ? <Spin indicator={<LoadingOutlined spin />} />
+          : <UserOutlined style={{ fontSize: size / 2.6 }} aria-hidden="true" />}
+      </div>
+    );
+  }
+
+  // No photo, but one may be added: the whole frame is the target, which is a
+  // bigger and plainer one than an icon button beside it.
+  if (!src) {
+    return (
+      <Upload beforeUpload={beforeUpload} showUploadList={false} accept={ACCEPT}>
+        <Tooltip title="JPG, PNG or WebP, up to 3 MB">
+          <div className="employee-photo employee-photo-add" style={box} role="button" tabIndex={0}>
+            {busy ? <Spin indicator={<LoadingOutlined spin />} /> : (
+              <>
+                <CameraOutlined style={{ fontSize: size / 4 }} />
+                <span className="employee-photo-add-label">Add photo</span>
+              </>
+            )}
+          </div>
+        </Tooltip>
+      </Upload>
+    );
+  }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-      <div className="employee-photo-frame" style={frame}>
-        {busy ? <Spin indicator={<LoadingOutlined spin />} /> : face}
-      </div>
-      {/* Each action is its own control rather than a menu: only the upload
-          button may be wrapped in Upload, or every click would open the file
-          dialog. Four small buttons also read as four things you can do. */}
-      <Space direction="vertical" size={2}>
-        {photo && (
-          <Tooltip title="View full size">
-            <Button type="text" size="small" icon={<EyeOutlined />} aria-label="View photo"
-              onClick={() => setPreview(true)} />
-          </Tooltip>
-        )}
-        {photo && !photo.staged && (
+    <div className="employee-photo employee-photo-filled" style={box}>
+      <Image
+        src={src}
+        alt={employeeName ? `Photo of ${employeeName}` : 'Employee photo'}
+        width={size}
+        height={size}
+        style={{ objectFit: 'cover' }}
+        preview={{ visible: preview, onVisibleChange: setPreview, src }}
+      />
+      {busy && <div className="employee-photo-busy"><Spin indicator={<LoadingOutlined spin />} /></div>}
+
+      {/* Shown on hover and on keyboard focus, so the actions are reachable
+          without a pointer. A held photo has nothing stored to download yet. */}
+      <div className="employee-photo-actions">
+        {!photo?.staged && (
           <Tooltip title="Download">
-            <Button type="text" size="small" icon={<DownloadOutlined />} aria-label="Download photo"
+            <button
+              type="button"
+              aria-label="Download photo"
               onClick={() => downloadStoredFile(photo)
-                .catch((e) => toastUnlessHandled(message, e, 'Could not download the photo'))} />
+                .catch((e) => toastUnlessHandled(message, e, 'Could not download the photo'))}
+            >
+              <DownloadOutlined />
+            </button>
           </Tooltip>
         )}
         {canEdit && (
           <Upload beforeUpload={beforeUpload} showUploadList={false} accept={ACCEPT}>
-            <Tooltip title={photo ? 'Replace photo (max 3 MB)' : 'Upload photo (max 3 MB)'}>
-              <Button type="text" size="small" icon={<UploadOutlined />} loading={busy}
-                aria-label={photo ? 'Replace photo' : 'Upload photo'} />
+            <Tooltip title="Replace photo">
+              <button type="button" aria-label="Replace photo"><CameraOutlined /></button>
             </Tooltip>
           </Upload>
         )}
-        {canEdit && photo && (
-          <Tooltip title="Remove">
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} aria-label="Remove photo"
-              onClick={remove} />
+        {canEdit && (
+          <Tooltip title="Remove photo">
+            <button type="button" aria-label="Remove photo" className="is-danger" onClick={remove}>
+              <DeleteOutlined />
+            </button>
           </Tooltip>
         )}
-      </Space>
+      </div>
     </div>
   );
 };

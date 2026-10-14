@@ -314,11 +314,9 @@ const EmployeeView = () => {
         title={employee.fullName}
         backPath="/hr/employees"
         status={<Tag color={getStatusColor(employee.status)}>{getLabel(EMPLOYEE_STATUS, employee.status)}</Tag>}
+        avatar={<EmployeePhoto employeeId={Number(id)} employeeName={employee.fullName} canEdit={canUpdate} />}
       >
-        <Space align="start" size="middle">
-          {/* Top right, next to the actions: a face is how people recognise a
-              record, and it belongs with the name rather than buried in a tab. */}
-          <EmployeePhoto employeeId={Number(id)} employeeName={employee.fullName} canEdit={canUpdate} size={84} />
+        <Space align="center" size="small">
           {canUpdate && (
             <>
               <Button icon={<EditOutlined />} onClick={() => navigate(`/hr/employees/edit/${id}`)}>Edit</Button>
