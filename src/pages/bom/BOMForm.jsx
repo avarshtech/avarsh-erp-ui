@@ -33,6 +33,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import { useTheme } from '../../context/ThemeContext';
 import useUnsavedChanges from '../../hooks/useUnsavedChanges';
 import { hasPermission } from '../../utils/permissions';
@@ -437,7 +438,7 @@ const BOMForm = () => {
         }
       } catch {
         message.error('Failed to load BOM');
-        navigate('/bom/list');
+        navigate(listPath('/bom/list'));
       } finally {
         // Defer so React paints the form with populated values before hiding the skeleton
         requestAnimationFrame(() => setLoading(false));
@@ -1555,7 +1556,7 @@ const BOMForm = () => {
       if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
-      navigate('/bom/list');
+      navigate(listPath('/bom/list'));
     } catch {
       message.error('Failed to save BOM');
     } finally {
@@ -1594,7 +1595,7 @@ const BOMForm = () => {
       if (stored?.version != null) setEntityVersion(stored.version);
       setIsDirty(false);
       clearDirty();
-      navigate('/bom/list');
+      navigate(listPath('/bom/list'));
     } catch {
       message.error(isEdit ? 'Failed to update BOM' : 'Failed to create BOM');
     } finally {
