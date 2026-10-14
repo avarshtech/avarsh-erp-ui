@@ -39,6 +39,7 @@ import SampleOrderTag from '../../components/SampleOrderTag';
 import useSampleOrderNos from '../../hooks/useSampleOrderNos';
 import { ActionButton } from '../../components/buttons';
 import { useNavigate, useParams } from 'react-router-dom';
+import { listPath } from '../../utils/listMemory';
 import dayjs from 'dayjs';
 import {
   getPurchaseOrderById,
@@ -614,7 +615,7 @@ const POForm = () => {
       setLineItems(mappedItems.length > 0 ? mappedItems : [createEmptyLineItem()]);
     } catch {
       message.error('Failed to load purchase order');
-      navigate('/purchase-orders/supplier-po/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } finally {
       // Defer so React paints the form with populated values before hiding the skeleton
       requestAnimationFrame(() => setPageLoading(false));
@@ -1470,7 +1471,7 @@ const POForm = () => {
       }
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/supplier-po/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } catch {
       message.error('Failed to save purchase order');
     } finally {
@@ -1627,7 +1628,7 @@ const POForm = () => {
       message.success('Purchase order submitted for approval');
       setIsDirty(false);
       clearDirty();
-      navigate('/purchase-orders/supplier-po/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     } catch {
       message.error('Failed to submit purchase order');
     } finally {
@@ -1644,10 +1645,10 @@ const POForm = () => {
         content: 'You have unsaved changes. Are you sure you want to leave?',
         okText: 'Leave',
         cancelText: 'Stay',
-        onOk: () => navigate('/purchase-orders/supplier-po/list'),
+        onOk: () => navigate(listPath('/purchase-orders/supplier-po/list')),
       });
     } else {
-      navigate('/purchase-orders/supplier-po/list');
+      navigate(listPath('/purchase-orders/supplier-po/list'));
     }
   };
 
