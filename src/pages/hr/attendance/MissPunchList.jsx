@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, TimePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
+import TimeInput from '../../../components/TimeInput';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { createMissPunch, getMissPunchByStatus, approveMissPunch, rejectMissPunch } from '../../../services/hr/missPunchService';
@@ -346,7 +347,7 @@ const MissPunchList = () => {
             <Select options={PUNCH_TYPE} placeholder="Select Type" />
           </Form.Item>
           <Form.Item name="correctedTime" label="Corrected Time" rules={[{ required: true, message: 'Please enter corrected time' }]}>
-            <TimePicker format="HH:mm" style={{ width: '100%' }} />
+            <TimeInput />
           </Form.Item>
           <Form.Item name="reason" label="Reason for Request" rules={[{ required: true, message: 'Please enter a reason' }]}>
             <Input.TextArea rows={3} placeholder="Reason for miss punch" />
