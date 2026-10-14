@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, InputNumber, Space, Table } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { getProcessJobWorkPos } from '../../../services/production/finishingService';
+import { formatCount } from '../../../utils/formatters';
 import JobWorkPoSummary from '../shared/JobWorkPoSummary';
 
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const key = (color, size) => `${String(color || '').trim().toUpperCase()}|${String(size || '').trim().toUpperCase()}`;
 
 /**
@@ -38,9 +38,9 @@ const GarmentIssueFromPo = ({ wo, value, onChange }) => {
   const columns = [
     { title: 'Colour', dataIndex: 'color', width: 140, ellipsis: true },
     { title: 'Size', dataIndex: 'size', width: 70, align: 'center' },
-    { title: 'WO Planned', dataIndex: 'planned', width: 95, align: 'right', render: n },
-    { title: 'Already Sent', dataIndex: 'sent', width: 100, align: 'right', render: n },
-    { title: 'PO Balance', dataIndex: 'balance', width: 95, align: 'right', render: n },
+    { title: 'WO Planned', dataIndex: 'planned', width: 95, align: 'right', render: formatCount },
+    { title: 'Already Sent', dataIndex: 'sent', width: 100, align: 'right', render: formatCount },
+    { title: 'PO Balance', dataIndex: 'balance', width: 95, align: 'right', render: formatCount },
     {
       title: 'Issue Qty', key: 'qty', width: 110, align: 'center',
       render: (_, r) => (

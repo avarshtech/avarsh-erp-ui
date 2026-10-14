@@ -1,11 +1,12 @@
 /** Display helpers shared by the Job Work screens. */
-import { formatDate } from '../../../utils/formatters';
+import { formatAmount, formatDate } from '../../../utils/formatters';
 
 export const fmtQty = (n) => (n === null || n === undefined || Number.isNaN(Number(n)) ? '—' : Number(n).toLocaleString('en-IN'));
 
 export const fmtDate = (d) => (d ? formatDate(d) : '—');
 
-export const fmtMoney = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+/** `₹1,23,456.5`: up to two decimals, none added; no value reads ₹0. */
+export const fmtMoney = (n) => formatAmount(n, { prefix: '₹', maxDecimals: 2 });
 
 export const pct = (a, b) => (b ? Math.min(100, Math.round((Number(a) / Number(b)) * 100)) : 0);
 

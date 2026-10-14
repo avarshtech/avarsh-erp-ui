@@ -60,6 +60,9 @@ export const formatMoney = (value) => formatAmount(value, { minDecimals: 2, maxD
 /** `₹1,23,456.50`: exactly two decimals; no value reads ₹0.00. */
 export const formatInr = (value) => formatAmount(value, { prefix: '₹', minDecimals: 2, maxDecimals: 2 });
 
+/** `1,23,456`: up to three decimals, none added; no value reads 0. Piece counts and quantities. */
+export const formatCount = (value) => formatAmount(value);
+
 export const formatPercentage = (value, decimals = 1) => {
   if (value === null || value === undefined || isNaN(value)) return '0%';
   return `${Number(value).toFixed(decimals)}%`;

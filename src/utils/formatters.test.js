@@ -3,9 +3,10 @@
 //   npx vitest run src/utils/formatters.test.js
 import { describe, test, expect } from 'vitest';
 import {
-  formatAmount, formatCurrency, formatDate, formatFileSize, formatInr, formatMoney, formatNumber,
+  formatAmount, formatCount, formatCurrency, formatDate, formatFileSize, formatInr, formatMoney, formatNumber,
   formatPercentage, formatQuantity, formatRupees, getCurrencySymbol, getInitials,
 } from './formatters';
+import { fmtMoney } from '../pages/production/jobwork/jwFormat';
 
 describe('currency', () => {
   test('a known code has its symbol; an unknown code is shown as itself', () => {
@@ -118,6 +119,10 @@ describe('the presets give the text of the local copies they replaced', () => {
       (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
     ['formatInr: job-work PO lists (money), JobWorkPoHero and JobWorkValueSummary (inr)', formatInr,
       (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+    ['formatCount: job-work issue-from-PO grids (n)', formatCount,
+      (v) => Number(v || 0).toLocaleString('en-IN')],
+    ['jwFormat fmtMoney: the Job Work screens', fmtMoney,
+      (n) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`],
   ];
 
   test.each(COPIES)('%s', (_, preset, copy) => {

@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Button, InputNumber, Space, Table } from 'antd';
 import { FormSelect } from '../../../components/form';
 import { listIssuableCutPanelPos } from '../../../services/production/cuttingService';
+import { formatCount } from '../../../utils/formatters';
 import JobWorkPoSummary from '../shared/JobWorkPoSummary';
-
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * An in-house Cut PO's panel issue (D4, D5): the approved Cut Panel POs for its order, then the process the
@@ -29,9 +28,9 @@ const PanelIssueFromPo = ({ cutPo, value, onChange }) => {
     { title: 'Fabric', dataIndex: 'fabricName', width: 120, ellipsis: true },
     { title: 'Panel', dataIndex: 'panel', width: 110, ellipsis: true },
     { title: 'Size', dataIndex: 'size', width: 70, align: 'center' },
-    { title: 'PO Qty', dataIndex: 'poQty', width: 80, align: 'right', render: n },
-    { title: 'Sent', dataIndex: 'issuedQty', width: 70, align: 'right', render: n },
-    { title: 'Balance', dataIndex: 'balance', width: 80, align: 'right', render: (v) => <strong>{n(v)}</strong> },
+    { title: 'PO Qty', dataIndex: 'poQty', width: 80, align: 'right', render: formatCount },
+    { title: 'Sent', dataIndex: 'issuedQty', width: 70, align: 'right', render: formatCount },
+    { title: 'Balance', dataIndex: 'balance', width: 80, align: 'right', render: (v) => <strong>{formatCount(v)}</strong> },
     {
       title: 'Issue Qty', key: 'qty', width: 110, align: 'center',
       render: (_, l) => (
