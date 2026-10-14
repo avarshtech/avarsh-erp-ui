@@ -13,9 +13,9 @@
  */
 
 import { request as playwrightRequest } from '@playwright/test';
-import process from 'process';
+import { E2E_API_URL, E2E_PASSWORD, E2E_USERNAME } from '../config/env.js';
 
-const API_BASE = process.env.E2E_API_URL || 'http://localhost:8088/api/v1';
+const API_BASE = E2E_API_URL;
 
 export class ApiClient {
   constructor(requestContext, ownsContext = false) {
@@ -25,8 +25,8 @@ export class ApiClient {
   }
 
   async login(username, password) {
-    const user = username || process.env.E2E_USERNAME || 'superadmin';
-    const pass = password || process.env.E2E_PASSWORD || 'admin123';
+    const user = username || E2E_USERNAME;
+    const pass = password || E2E_PASSWORD;
 
     const response = await this.request.post(`${API_BASE}/auth/login`, {
       data: { username: user, password: pass },

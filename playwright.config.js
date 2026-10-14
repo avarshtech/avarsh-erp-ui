@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 import process from 'process';
-
-const baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+// Loading env.js refuses a base or API URL that is not on this machine (E2E_ALLOW_REMOTE=1 to override).
+import { E2E_BASE_URL as baseURL } from './e2e/config/env.js';
 
 export default defineConfig({
   testDir: './e2e',
