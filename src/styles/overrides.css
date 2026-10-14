@@ -2210,3 +2210,14 @@ textarea.ant-input:active {
 .asset-pending-row:hover { background: rgba(22, 119, 255, 0.06); }
 [data-theme="dark"] .asset-pending-row { border-bottom-color: rgba(255, 255, 255, 0.08); }
 [data-theme="dark"] .asset-pending-row:hover { background: rgba(22, 119, 255, 0.14); }
+
+/* A group heading or sub-total in a fixed asset report. Tinted because the rest
+   of the row is deliberately blank, and an untinted blank row reads as a gap in
+   the data rather than as the structure of the report. */
+.asset-report-group > td {
+  background: rgba(0, 0, 0, 0.035) !important;
+  font-weight: 600;
+}
+[data-theme="dark"] .asset-report-group > td {
+  background: rgba(255, 255, 255, 0.06) !important;
+}

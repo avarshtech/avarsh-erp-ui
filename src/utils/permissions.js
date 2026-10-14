@@ -575,6 +575,12 @@ export const SCREENS = [
     description: 'Issuing assets to employees and taking them back. Shown on the asset itself.' },
   // verify is one scan; lock is closing and reopening the run, which decides
   // whether anybody may still scan into it.
+  // Read-only, and separate from the register: a report is a bulk read of the
+  // whole estate including every machine's cost, which is a different right
+  // from opening one asset.
+  { id: 'asset-reports', name: 'Asset Reports', section: 'assets', kind: 'dashboard',
+    path: '/assets/reports', ops: ['view'],
+    description: 'The nine fixed asset reports, with Excel, PDF and print.' },
   { id: 'asset-verification', name: 'Asset Verification', section: 'assets', kind: 'screen',
     path: '/assets/verification',
     routes: ['/assets/verification', '/assets/verification/:id'],
