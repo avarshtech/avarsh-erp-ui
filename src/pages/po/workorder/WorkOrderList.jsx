@@ -21,7 +21,7 @@ import { useBranch } from '../../../context/BranchContext';
 import { useBranchColumn } from '../../../components/branch/BranchField';
 
 const STATUS_OPTIONS = Object.values(PROD_PO_STATUS).map((v) => ({ value: v, label: getStatusLabel(v) }));
-const fmtDate = (d) => (d ? new Date(d).toLocaleDateString() : '—');
+const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-IN') : '—');
 const poValue = (r) => (r.items || []).reduce((s, i) => s + (i.plannedQty || 0) * (i.ratePerPiece || 0), 0);
 
 const WorkOrderList = () => {

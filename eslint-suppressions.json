@@ -580,22 +580,12 @@
       "count": 21
     }
   },
-  "src/pages/po/cutting/CuttingPoList.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/po/finishing/FinishingPoForm.jsx": {
     "no-restricted-syntax": {
       "count": 5
     }
   },
   "src/pages/po/order-mapping/PoOrderMappingDrawer.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/po/workorder/WorkOrderList.jsx": {
     "no-restricted-syntax": {
       "count": 1
     }
