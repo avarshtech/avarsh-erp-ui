@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, useCallback } from 'react';
-import { Typography, Collapse, Table, Space, Button } from 'antd';
+import { Typography, Collapse, Table, Space, Button, Alert } from 'antd';
 import {
   CodeOutlined, TableOutlined, BulbOutlined,
   ArrowRightOutlined, DownOutlined, UpOutlined,
@@ -180,6 +180,11 @@ const AiResultsDisplay = memo(function AiResultsDisplay({ response, onSuggestion
 
   return (
     <div>
+      {/* The API answers 200 with an error when the model's SQL is refused or fails */}
+      {response.error && (
+        <Alert type="error" showIcon title={response.error} style={{ marginBottom: 12 }} />
+      )}
+
       {/* Answer text — professional typography */}
       {response.answer && (
         <div style={{ marginBottom: hasData || hasSql ? 18 : 0 }}>

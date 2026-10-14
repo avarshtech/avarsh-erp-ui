@@ -75,7 +75,9 @@ export const deleteSavedReport = async (id) => {
 // AI Chat
 export const aiChat = async (data) => {
   const response = await axiosInstance.post('/reports/ai/chat', data);
-  return response.data;
+  const body = response.data || {};
+  // The API (AiChatResponse) sends naturalLanguageAnswer and generatedSql; the chat reads answer and sql
+  return { ...body, answer: body.answer ?? body.naturalLanguageAnswer, sql: body.sql ?? body.generatedSql };
 };
 
 // Execution Log
