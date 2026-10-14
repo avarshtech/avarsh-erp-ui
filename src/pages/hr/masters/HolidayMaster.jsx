@@ -4,11 +4,8 @@ import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select, DateP
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getHolidaysByYear, createHoliday, updateHoliday, deleteHoliday } from '../../../services/master/hrMasterService';
-import { getActiveUnits } from '../../../services/master/unitService';
-import { useBranch } from '../../../context/BranchContext';
 import { hasPermission } from '../../../utils/permissions';
 import PermissionGuard from '../../../components/PermissionGuard';
-import { HOLIDAY_TYPES } from '../../../utils/hrConstants';
 
 const { Text } = Typography;
 
@@ -18,7 +15,6 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const { message, modal } = App.useApp();
 
   // Units of the working branch only; "All branches" lists every unit
-  const { activeBranchId } = useBranch();
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -30,29 +26,12 @@ const HolidayMaster = ({ onDirtyChange }) => {
   const [form] = Form.useForm();
   const skipDirty = useRef(false);
 
-  const [units, setUnits] = useState([]);
   const [filterYear, setFilterYear] = useState(dayjs().year());
 
   const canAdd = hasPermission(MODULE_ID, 'add');
   const canUpdate = hasPermission(MODULE_ID, 'update');
   const canDelete = hasPermission(MODULE_ID, 'delete');
   const canView = hasPermission(MODULE_ID, 'view');
-
-  const unitOptions = useMemo(() =>
-    units.map(f => ({ value: f.id, label: f.unitName })),
-  [units]);
-
-  const unitMap = useMemo(() => {
-    const map = {};
-    units.forEach(f => { map[f.id] = f.unitName; });
-    return map;
-  }, [units]);
-
-  const holidayTypeMap = useMemo(() => {
-    const map = {};
-    HOLIDAY_TYPES.forEach(t => { map[t.value] = t; });
-    return map;
-  }, []);
 
   // Generate year options (current year -1 to +2)
   const yearOptions = useMemo(() => {
@@ -77,18 +56,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
     }
   }, [filterYear]);
 
-  const fetchUnits = useCallback(async () => {
-    try {
-      const result = await getActiveUnits(activeBranchId || undefined);
-      const list = Array.isArray(result) ? result : (result?.data || []);
-      setUnits(list);
-    } catch {
-      // Silent
-    }
-  }, [activeBranchId]);
-
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { fetchUnits(); }, [fetchUnits]);
 
   const columns = [
     {
@@ -102,21 +70,6 @@ const HolidayMaster = ({ onDirtyChange }) => {
       title: 'Name',
       dataIndex: 'name',
       sorter: (a, b) => (a.name || '').localeCompare(b.name || ''),
-    },
-    {
-      title: 'Type',
-      dataIndex: 'holidayType',
-      width: 140,
-      render: (val) => {
-        const ht = holidayTypeMap[val];
-        return ht ? <Tag color={ht.color}>{ht.label}</Tag> : (val || '—');
-      },
-    },
-    {
-      title: 'Unit',
-      dataIndex: 'unitId',
-      width: 120,
-      render: (val) => unitMap[val] || 'All',
     },
     {
       title: 'Paid',
@@ -322,21 +275,6 @@ const HolidayMaster = ({ onDirtyChange }) => {
                   </Form.Item>
                   <Form.Item name="holidayDate" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
                     <DatePicker format="DD MMM YYYY" style={{ width: '100%' }} />
-                  </Form.Item>
-                  <Form.Item name="holidayType" label="Holiday Type" rules={[{ required: true, message: 'Please select a type' }]}>
-                    <Select placeholder="Select type" options={HOLIDAY_TYPES} allowClear />
-                  </Form.Item>
-                  {/* unit_id is NOT NULL and the holiday lookup is scoped by
-                      unit, so a holiday cannot yet apply to all of them.
-                      Offering that as a blank option only produced a constraint
-                      error on save. */}
-                  <Form.Item
-                    name="unitId"
-                    label="Unit"
-                    tooltip="A holiday belongs to one unit. Add it once per unit if it applies to more than one."
-                    rules={[{ required: true, message: 'Select the unit this holiday applies to' }]}
-                  >
-                    <Select placeholder="Select unit" options={unitOptions} showSearch optionFilterProp="label" />
                   </Form.Item>
                   <Form.Item name="isPaid" label="Paid Holiday" valuePropName="checked">
                     <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />
