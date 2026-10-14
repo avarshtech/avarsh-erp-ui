@@ -6,11 +6,9 @@ import { getLoanById, getLoanRecoveries, recordLoanRecovery } from '../../../ser
 import { hasPermission } from '../../../utils/permissions';
 import { LOAN_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(LOAN_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const LoanView = () => {
   const { message } = App.useApp();
@@ -64,8 +62,8 @@ const LoanView = () => {
         width: 120,
         render: (val) => val ? dayjs(val).format('DD-MMM-YYYY') : '-',
       },
-      { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatCurrency },
-      { title: 'Balance After', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 130, align: 'right', render: formatCurrency },
+      { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatRupees },
+      { title: 'Balance After', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 130, align: 'right', render: formatRupees },
       {
         title: 'Source',
         key: 'source',
@@ -130,11 +128,11 @@ const LoanView = () => {
           <Descriptions.Item label="Employee">{loan.employeeName || '-'}</Descriptions.Item>
           <Descriptions.Item label="Employee No">{loan.employeeNo || '-'}</Descriptions.Item>
           <Descriptions.Item label="Loan Date">{loan.loanDate ? dayjs(loan.loanDate).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
-          <Descriptions.Item label="Amount">{formatCurrency(loan.amount)}</Descriptions.Item>
-          <Descriptions.Item label="EMI">{formatCurrency(loan.emiAmount)}</Descriptions.Item>
+          <Descriptions.Item label="Amount">{formatRupees(loan.amount)}</Descriptions.Item>
+          <Descriptions.Item label="EMI">{formatRupees(loan.emiAmount)}</Descriptions.Item>
           <Descriptions.Item label="Total Installments">{loan.totalInstallments ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="EMI Start Date">{loan.dueStartDate ? dayjs(loan.dueStartDate).format('DD-MMM-YYYY') : '-'}</Descriptions.Item>
-          <Descriptions.Item label="Balance">{formatCurrency(loan.balance)}</Descriptions.Item>
+          <Descriptions.Item label="Balance">{formatRupees(loan.balance)}</Descriptions.Item>
           <Descriptions.Item label="Purpose">{loan.purpose || '-'}</Descriptions.Item>
         </Descriptions>
       </Card>
@@ -177,7 +175,7 @@ const LoanView = () => {
           For repayments made outside payroll. Payroll records its own EMI deductions automatically.
         </p>
         <Descriptions size="small" column={1} style={{ marginBottom: 16 }}>
-          <Descriptions.Item label="Outstanding">{formatCurrency(loan.balance)}</Descriptions.Item>
+          <Descriptions.Item label="Outstanding">{formatRupees(loan.balance)}</Descriptions.Item>
         </Descriptions>
         <Form form={payForm} layout="vertical" initialValues={{ recoveryDate: dayjs(), amount: loan.emiAmount }}>
           <Form.Item
@@ -190,7 +188,7 @@ const LoanView = () => {
                   if (value == null) return Promise.resolve();
                   if (value <= 0) return Promise.reject(new Error('Must be greater than zero'));
                   if (Number(value) > Number(loan.balance)) {
-                    return Promise.reject(new Error(`Cannot exceed the outstanding ${formatCurrency(loan.balance)}`));
+                    return Promise.reject(new Error(`Cannot exceed the outstanding ${formatRupees(loan.balance)}`));
                   }
                   return Promise.resolve();
                 },

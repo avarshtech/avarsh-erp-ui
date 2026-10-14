@@ -3,6 +3,7 @@ import { Card, Row, Col, Descriptions, Divider, Button, Spin, Typography } from 
 import { PrinterOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSalarySlip } from '../../../services/hr/payrollService';
+import { formatAmount } from '../../../utils/formatters';
 
 const { Title, Text } = Typography;
 
@@ -11,8 +12,8 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '\u20B90.00';
+// The slip prints \u20B90.00 for a missing figure, where the other HR screens show a dash.
+const formatCurrency = (val) => formatAmount(val, { prefix: '\u20B9', minDecimals: 2, empty: '\u20B90.00' });
 
 const EarningRow = ({ label, value }) => (
   <Row justify="space-between" style={{ padding: '4px 0' }}>

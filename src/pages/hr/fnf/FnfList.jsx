@@ -8,12 +8,10 @@ import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(FNF_STATUS.map((s) => [s.value, s]));
 const reasonMap = Object.fromEntries(SEPARATION_REASONS.map((r) => [r.value, r.label]));
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const FnfList = () => {
   const navigate = useNavigate();
@@ -81,7 +79,7 @@ const FnfList = () => {
         key: 'totalEarnings',
         width: 140,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Total Deductions',
@@ -89,7 +87,7 @@ const FnfList = () => {
         key: 'totalDeductions',
         width: 140,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Net Settlement',
@@ -97,7 +95,7 @@ const FnfList = () => {
         key: 'netSettlement',
         width: 140,
         align: 'right',
-        render: (val) => <strong>{formatCurrency(val)}</strong>,
+        render: (val) => <strong>{formatRupees(val)}</strong>,
       },
       {
         title: 'Status',

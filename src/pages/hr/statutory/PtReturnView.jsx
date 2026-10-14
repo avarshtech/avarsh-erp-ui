@@ -7,11 +7,9 @@ import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import { recordEmployeeLabel } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 /**
  * Detail view for one Professional Tax return.
@@ -79,11 +77,11 @@ const PtReturnView = () => {
     },
     {
       title: 'Half-Yearly Gross', dataIndex: 'totalGross', key: 'totalGross',
-      width: 180, align: 'right', render: formatCurrency,
+      width: 180, align: 'right', render: formatRupees,
     },
     {
       title: 'PT Amount', dataIndex: 'ptAmount', key: 'ptAmount',
-      width: 150, align: 'right', render: formatCurrency,
+      width: 150, align: 'right', render: formatRupees,
     },
   ], []);
 
@@ -156,7 +154,7 @@ const PtReturnView = () => {
         </Col>
       </Row>
 
-      <Card size="small" title="Employee Records" extra={<strong>Total: {formatCurrency(total)}</strong>}>
+      <Card size="small" title="Employee Records" extra={<strong>Total: {formatRupees(total)}</strong>}>
         <Table
           rowKey="id"
           dataSource={records}

@@ -7,11 +7,9 @@ import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(BONUS_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const BonusList = () => {
   const navigate = useNavigate();
@@ -84,7 +82,7 @@ const BonusList = () => {
         key: 'totalAmount',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',

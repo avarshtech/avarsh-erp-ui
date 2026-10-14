@@ -5,11 +5,9 @@ import { getBonusRunById, getBonusRecords, approveBonus, markBonusPaid, cancelBo
 import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(BONUS_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 /**
  * Detail view for one bonus run.
@@ -123,11 +121,11 @@ const BonusRunView = () => {
     { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 200, ellipsis: true },
     {
       title: 'Salary Considered', dataIndex: 'totalSalary', key: 'totalSalary',
-      width: 160, align: 'right', render: formatCurrency,
+      width: 160, align: 'right', render: formatRupees,
     },
     {
       title: 'Bonus', dataIndex: 'bonusAmount', key: 'bonusAmount',
-      width: 140, align: 'right', render: formatCurrency,
+      width: 140, align: 'right', render: formatRupees,
     },
   ], []);
 
@@ -221,7 +219,7 @@ const BonusRunView = () => {
       <Card
         size="small"
         title="Bonus Records"
-        extra={<strong>Total: {formatCurrency(totalBonus)}</strong>}
+        extra={<strong>Total: {formatRupees(totalBonus)}</strong>}
       >
         <Table
           rowKey="id"

@@ -9,9 +9,7 @@ import { searchEmployees } from '../../../services/hr/employeeService';
 import { SEPARATION_REASONS, FNF_STATUS } from '../../../utils/hrConstants';
 import { employeeOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
+import { formatRupees } from '../../../utils/formatters';
 
 const FnfForm = () => {
   const { message } = App.useApp();
@@ -276,7 +274,7 @@ const FnfForm = () => {
                     <Divider />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
                       <span>Total Earnings</span>
-                      <span style={{ color: '#52c41a' }}>{formatCurrency(totalEarnings)}</span>
+                      <span style={{ color: '#52c41a' }}>{formatRupees(totalEarnings)}</span>
                     </div>
                   </Card>
                 </Col>
@@ -297,7 +295,7 @@ const FnfForm = () => {
                     <Divider />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}>
                       <span>Total Deductions</span>
-                      <span style={{ color: '#ff4d4f' }}>{formatCurrency(totalDeductions)}</span>
+                      <span style={{ color: '#ff4d4f' }}>{formatRupees(totalDeductions)}</span>
                     </div>
                   </Card>
                 </Col>
@@ -306,7 +304,7 @@ const FnfForm = () => {
               <Card style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px 0' }}>
                   <span style={{ fontSize: 20, fontWeight: 700 }}>
-                    Net Settlement: <span style={{ color: netSettlement >= 0 ? '#52c41a' : '#ff4d4f' }}>{formatCurrency(netSettlement)}</span>
+                    Net Settlement: <span style={{ color: netSettlement >= 0 ? '#52c41a' : '#ff4d4f' }}>{formatRupees(netSettlement)}</span>
                   </span>
                 </div>
               </Card>

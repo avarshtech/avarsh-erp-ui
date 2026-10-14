@@ -12,6 +12,7 @@ import dayjs from 'dayjs';
 import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
 import SalaryRecordDrawer from './SalaryRecordDrawer';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(PAYROLL_STATUS.map((s) => [s.value, s]));
 
@@ -19,9 +20,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const PayrollRunView = () => {
   const { message, modal } = App.useApp();
@@ -74,12 +72,12 @@ const PayrollRunView = () => {
       // every row. totalEarnings is the figure that belongs beside Deductions
       // and Net, because those three are what reconcile: earnings less
       // deductions is net. earnedGross excludes overtime and would not.
-      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatCurrency },
-      { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatCurrency },
-      { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatCurrency },
-      { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatCurrency },
-      { title: 'Deductions', dataIndex: 'totalDeductions', key: 'totalDeductions', width: 120, align: 'right', render: formatCurrency },
-      { title: 'Net', dataIndex: 'netSalary', key: 'netSalary', width: 120, align: 'right', render: formatCurrency },
+      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatRupees },
+      { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatRupees },
+      { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatRupees },
+      { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatRupees },
+      { title: 'Deductions', dataIndex: 'totalDeductions', key: 'totalDeductions', width: 120, align: 'right', render: formatRupees },
+      { title: 'Net', dataIndex: 'netSalary', key: 'netSalary', width: 120, align: 'right', render: formatRupees },
       {
         title: 'Slip',
         key: 'slip',
@@ -338,10 +336,10 @@ const PayrollRunView = () => {
           <Table.Summary fixed>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={3}><strong>Totals</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.earnings)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="right"><strong>{formatRupees(totals.earnings)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={4} colSpan={3} />
-              <Table.Summary.Cell index={7} align="right"><strong>{formatCurrency(totals.deductions)}</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={8} align="right"><strong>{formatCurrency(totals.net)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={7} align="right"><strong>{formatRupees(totals.deductions)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={8} align="right"><strong>{formatRupees(totals.net)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={9} />
             </Table.Summary.Row>
           </Table.Summary>

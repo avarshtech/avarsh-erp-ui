@@ -7,17 +7,15 @@ import { getFnfById, approveFnf, settleFnf, cancelFnf } from '../../../services/
 import { hasPermission } from '../../../utils/permissions';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(FNF_STATUS.map((s) => [s.value, s]));
 const reasonMap = Object.fromEntries(SEPARATION_REASONS.map((r) => [r.value, r.label]));
 
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
-
 const AmountRow = ({ label, value, bold }) => (
   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontWeight: bold ? 700 : 400 }}>
     <span>{label}</span>
-    <span>{formatCurrency(value)}</span>
+    <span>{formatRupees(value)}</span>
   </div>
 );
 
@@ -219,7 +217,7 @@ const FnfView = () => {
           <span style={{ fontSize: 24, fontWeight: 700 }}>
             Net Settlement:{' '}
             <span style={{ color: netSettlement >= 0 ? '#52c41a' : '#ff4d4f' }}>
-              {formatCurrency(netSettlement)}
+              {formatRupees(netSettlement)}
             </span>
           </span>
         </div>

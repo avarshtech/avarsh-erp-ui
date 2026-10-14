@@ -7,6 +7,7 @@ import { PAYROLL_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
 import { thenById } from '../../../utils/tableSort';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(PAYROLL_STATUS.map((s) => [s.value, s]));
 
@@ -14,9 +15,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const PayrollList = () => {
   const navigate = useNavigate();
@@ -76,7 +74,7 @@ const PayrollList = () => {
         key: 'totalGross',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Total Net',
@@ -84,7 +82,7 @@ const PayrollList = () => {
         key: 'totalNet',
         width: 150,
         align: 'right',
-        render: formatCurrency,
+        render: formatRupees,
       },
       {
         title: 'Status',

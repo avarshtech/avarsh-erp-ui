@@ -7,9 +7,7 @@ import { getActiveUnits } from '../../../services/master/unitService';
 import { useBranch } from '../../../context/BranchContext';
 import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
+import { formatRupees } from '../../../utils/formatters';
 
 const BonusWizard = () => {
   const { message } = App.useApp();
@@ -85,8 +83,8 @@ const BonusWizard = () => {
     () => [
       { title: 'Employee', dataIndex: 'employeeName', key: 'employeeName', width: 200, ellipsis: true },
       { title: 'Employee Code', dataIndex: 'employeeNo', key: 'employeeNo', width: 120 },
-      { title: 'Total Salary', dataIndex: 'totalSalary', key: 'totalSalary', width: 140, align: 'right', render: formatCurrency },
-      { title: 'Bonus Amount', dataIndex: 'bonusAmount', key: 'bonusAmount', width: 140, align: 'right', render: formatCurrency },
+      { title: 'Total Salary', dataIndex: 'totalSalary', key: 'totalSalary', width: 140, align: 'right', render: formatRupees },
+      { title: 'Bonus Amount', dataIndex: 'bonusAmount', key: 'bonusAmount', width: 140, align: 'right', render: formatRupees },
     ],
     [],
   );
@@ -212,7 +210,7 @@ const BonusWizard = () => {
           <div style={{ textAlign: 'center', padding: '40px 0' }}>
             <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
             <h3>Bonus Run Approved Successfully</h3>
-            <p>Total bonus of {formatCurrency(totalBonusAmount)} for {records.length} employees has been approved.</p>
+            <p>Total bonus of {formatRupees(totalBonusAmount)} for {records.length} employees has been approved.</p>
             <Button type="primary" onClick={() => navigate('/hr/bonus')} style={{ marginTop: 16 }}>
               Back to Bonus List
             </Button>

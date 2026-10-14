@@ -1,9 +1,7 @@
 import { Drawer, Descriptions, Divider, Row, Col, Typography, Tag } from 'antd';
+import { formatRupees } from '../../../utils/formatters';
 
 const { Text } = Typography;
-
-const money = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const days = (val) => (val != null ? Number(val).toString() : '-');
 
@@ -14,7 +12,7 @@ const Line = ({ label, value, hint, strong, tone }) => (
       <Text strong={strong}>{label}</Text>
       {hint && <div><Text type="secondary" style={{ fontSize: 12 }}>{hint}</Text></div>}
     </Col>
-    <Col><Text strong={strong} type={tone}>{money(value)}</Text></Col>
+    <Col><Text strong={strong} type={tone}>{formatRupees(value)}</Text></Col>
   </Row>
 );
 
@@ -57,12 +55,12 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           Each component is pro-rated by payable days over calendar days.
         </Text>
         <div style={{ marginTop: 8 }}>
-          <Line label="Basic" value={record.earnedBasic} hint={`Full month ${money(record.fixedBasic)}`} />
-          <Line label="DA" value={record.earnedDa} hint={`Full month ${money(record.fixedDa)}`} />
-          <Line label="HRA" value={record.earnedHra} hint={`Full month ${money(record.fixedHra)}`} />
-          <Line label="Conveyance" value={record.earnedCa} hint={`Full month ${money(record.fixedCa)}`} />
-          <Line label="Washing" value={record.earnedWa} hint={`Full month ${money(record.fixedWa)}`} />
-          <Line label="Other allowance" value={record.earnedOther} hint={`Full month ${money(record.fixedOther)}`} />
+          <Line label="Basic" value={record.earnedBasic} hint={`Full month ${formatRupees(record.fixedBasic)}`} />
+          <Line label="DA" value={record.earnedDa} hint={`Full month ${formatRupees(record.fixedDa)}`} />
+          <Line label="HRA" value={record.earnedHra} hint={`Full month ${formatRupees(record.fixedHra)}`} />
+          <Line label="Conveyance" value={record.earnedCa} hint={`Full month ${formatRupees(record.fixedCa)}`} />
+          <Line label="Washing" value={record.earnedWa} hint={`Full month ${formatRupees(record.fixedWa)}`} />
+          <Line label="Other allowance" value={record.earnedOther} hint={`Full month ${formatRupees(record.fixedOther)}`} />
           <Divider dashed style={{ margin: '8px 0' }} />
           <Line label="Earned gross" value={record.earnedGross} strong />
           {Number(record.otAmount) > 0 && (
@@ -79,13 +77,13 @@ const SalaryRecordDrawer = ({ record, open, onClose }) => (
           <Line
             label="PF (employee)"
             value={record.pfEmployee}
-            hint={record.pfWages != null ? `12% of PF wages ${money(record.pfWages)}` : undefined}
+            hint={record.pfWages != null ? `12% of PF wages ${formatRupees(record.pfWages)}` : undefined}
           />
           <Line
             label="ESI (employee)"
             value={record.esiEmployee}
             hint={Number(record.esiWages) > 0
-              ? `0.75% of ${money(record.esiWages)}`
+              ? `0.75% of ${formatRupees(record.esiWages)}`
               : 'Above the wage ceiling, so nothing is due'}
           />
           <Line label="Professional tax" value={record.professionalTax} hint="Slab amount, spread over the half year" />

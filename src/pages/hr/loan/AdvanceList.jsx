@@ -9,11 +9,9 @@ import { ADVANCE_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import { employeeOptions, recordEmployeeLabel } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(ADVANCE_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const monthName = (m) => (m >= 1 && m <= 12 ? dayjs().month(m - 1).format('MMM') : '-');
 
@@ -113,11 +111,11 @@ const AdvanceList = () => {
     },
     {
       title: 'Amount', dataIndex: 'amount', key: 'amount',
-      width: 130, align: 'right', render: formatCurrency,
+      width: 130, align: 'right', render: formatRupees,
     },
     {
       title: 'Recovered', dataIndex: 'recoveredAmount', key: 'recoveredAmount',
-      width: 130, align: 'right', render: formatCurrency,
+      width: 130, align: 'right', render: formatRupees,
     },
     {
       title: 'Recover In', key: 'recoverIn', width: 120,
@@ -199,7 +197,7 @@ const AdvanceList = () => {
           />
         </Col>
         <Col>
-          <strong>Outstanding: {formatCurrency(pendingTotal)}</strong>
+          <strong>Outstanding: {formatRupees(pendingTotal)}</strong>
         </Col>
       </Row>
 

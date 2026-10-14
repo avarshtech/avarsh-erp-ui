@@ -14,6 +14,7 @@ import { triggerBrowserDownload } from '../../../services/hr/attendanceService';
 import { unitOptions } from '../../../utils/hrLabels';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const { Text } = Typography;
 
@@ -21,9 +22,6 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ].map((label, i) => ({ value: i + 1, label }));
-
-const formatCurrency = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 /**
  * PF and ESI monthly filing.
@@ -127,14 +125,14 @@ const ContributionFiling = ({ scheme = 'PF' }) => {
         title: isPf ? 'UAN' : 'IP Number', dataIndex: 'identifier', key: 'identifier', width: 150,
         render: (v) => (v ? v : <Tag color="error">missing</Tag>),
       },
-      { title: 'Wages', dataIndex: 'wages', key: 'wages', width: 130, align: 'right', render: formatCurrency },
-      { title: 'Employee', dataIndex: 'employeeShare', key: 'employeeShare', width: 120, align: 'right', render: formatCurrency },
-      { title: 'Employer', dataIndex: 'employerShare', key: 'employerShare', width: 120, align: 'right', render: formatCurrency },
+      { title: 'Wages', dataIndex: 'wages', key: 'wages', width: 130, align: 'right', render: formatRupees },
+      { title: 'Employee', dataIndex: 'employeeShare', key: 'employeeShare', width: 120, align: 'right', render: formatRupees },
+      { title: 'Employer', dataIndex: 'employerShare', key: 'employerShare', width: 120, align: 'right', render: formatRupees },
     ];
     if (isPf) {
       base.push({
         title: 'of which EPS', dataIndex: 'epsShare', key: 'epsShare',
-        width: 130, align: 'right', render: formatCurrency,
+        width: 130, align: 'right', render: formatRupees,
       });
       base.push({
         title: 'NCP Days', dataIndex: 'nonContributingDays', key: 'nonContributingDays',

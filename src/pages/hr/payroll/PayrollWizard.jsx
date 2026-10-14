@@ -9,6 +9,7 @@ import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
 import SalaryRecordDrawer from './SalaryRecordDrawer';
 import { hasPermission } from '../../../utils/permissions';
+import { formatRupees } from '../../../utils/formatters';
 
 const MONTH_OPTIONS = [
   { value: 1, label: 'January' }, { value: 2, label: 'February' }, { value: 3, label: 'March' },
@@ -16,9 +17,6 @@ const MONTH_OPTIONS = [
   { value: 7, label: 'July' }, { value: 8, label: 'August' }, { value: 9, label: 'September' },
   { value: 10, label: 'October' }, { value: 11, label: 'November' }, { value: 12, label: 'December' },
 ];
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const PayrollWizard = () => {
   const { message } = App.useApp();
@@ -121,12 +119,12 @@ const PayrollWizard = () => {
       // every row. totalEarnings is the figure that belongs beside Deductions
       // and Net, because those three are what reconcile: earnings less
       // deductions is net. earnedGross excludes overtime and would not.
-      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatCurrency },
-      { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatCurrency },
-      { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatCurrency },
-      { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatCurrency },
-      { title: 'Deductions', dataIndex: 'totalDeductions', key: 'totalDeductions', width: 120, align: 'right', render: formatCurrency },
-      { title: 'Net', dataIndex: 'netSalary', key: 'netSalary', width: 120, align: 'right', render: formatCurrency },
+      { title: 'Earnings', dataIndex: 'totalEarnings', key: 'totalEarnings', width: 130, align: 'right', render: formatRupees },
+      { title: 'PF', dataIndex: 'pfEmployee', key: 'pfEmployee', width: 90, align: 'right', render: formatRupees },
+      { title: 'ESI', dataIndex: 'esiEmployee', key: 'esiEmployee', width: 90, align: 'right', render: formatRupees },
+      { title: 'PT', dataIndex: 'professionalTax', key: 'professionalTax', width: 90, align: 'right', render: formatRupees },
+      { title: 'Deductions', dataIndex: 'totalDeductions', key: 'totalDeductions', width: 120, align: 'right', render: formatRupees },
+      { title: 'Net', dataIndex: 'netSalary', key: 'netSalary', width: 120, align: 'right', render: formatRupees },
     ],
     [],
   );
@@ -268,10 +266,10 @@ const PayrollWizard = () => {
           <Table.Summary fixed>
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={3}><strong>Totals</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right"><strong>{formatCurrency(totals.earnings)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={3} align="right"><strong>{formatRupees(totals.earnings)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={4} colSpan={3} />
-              <Table.Summary.Cell index={7} align="right"><strong>{formatCurrency(totals.deductions)}</strong></Table.Summary.Cell>
-              <Table.Summary.Cell index={8} align="right"><strong>{formatCurrency(totals.net)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={7} align="right"><strong>{formatRupees(totals.deductions)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={8} align="right"><strong>{formatRupees(totals.net)}</strong></Table.Summary.Cell>
             </Table.Summary.Row>
           </Table.Summary>
         )}

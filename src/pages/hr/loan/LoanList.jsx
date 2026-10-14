@@ -9,11 +9,9 @@ import { hasPermission } from '../../../utils/permissions';
 import { getTablePagination } from '../../../utils/paginationConfig';
 import PageHeader from '../../../components/PageHeader';
 import LoanDrawer from './LoanDrawer';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(LOAN_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `\u20B9${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 const LoanList = () => {
   const { message } = App.useApp();
@@ -94,10 +92,10 @@ const LoanList = () => {
         // the current page, so sorting is left to the API.
         render: (val) => val ? dayjs(val).format('DD-MMM-YYYY') : '-',
       },
-      { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatCurrency },
-      { title: 'EMI', dataIndex: 'emiAmount', key: 'emiAmount', width: 100, align: 'right', render: formatCurrency },
+      { title: 'Amount', dataIndex: 'amount', key: 'amount', width: 120, align: 'right', render: formatRupees },
+      { title: 'EMI', dataIndex: 'emiAmount', key: 'emiAmount', width: 100, align: 'right', render: formatRupees },
       { title: 'Installments', dataIndex: 'totalInstallments', key: 'totalInstallments', width: 110, align: 'right' },
-      { title: 'Balance', dataIndex: 'balance', key: 'balance', width: 120, align: 'right', render: formatCurrency },
+      { title: 'Balance', dataIndex: 'balance', key: 'balance', width: 120, align: 'right', render: formatRupees },
       {
         title: 'Status',
         dataIndex: 'status',
@@ -128,7 +126,7 @@ const LoanList = () => {
                   <Popconfirm
                     title="Stop recovering this loan?"
                     description={outstanding > 0
-                      ? `${formatCurrency(outstanding)} is still outstanding and will be written off. Payroll will stop deducting the EMI.`
+                      ? `${formatRupees(outstanding)} is still outstanding and will be written off. Payroll will stop deducting the EMI.`
                       : 'Nothing is outstanding. The loan will be marked fully recovered.'}
                     okText={outstanding > 0 ? 'Write off and close' : 'Close'}
                     okButtonProps={outstanding > 0 ? { danger: true } : undefined}

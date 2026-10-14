@@ -8,11 +8,9 @@ import {
 import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { formatRupees } from '../../../utils/formatters';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
-
-const formatCurrency = (val) =>
-  val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-';
 
 /**
  * Detail view for one EL encashment run.
@@ -87,11 +85,11 @@ const ElEncashmentRunView = () => {
     },
     {
       title: 'Basic + DA', dataIndex: 'basicPlusDa', key: 'basicPlusDa',
-      width: 140, align: 'right', render: formatCurrency,
+      width: 140, align: 'right', render: formatRupees,
     },
     {
       title: 'Amount', dataIndex: 'elAmount', key: 'elAmount',
-      width: 140, align: 'right', render: formatCurrency,
+      width: 140, align: 'right', render: formatRupees,
     },
   ], []);
 
@@ -194,7 +192,7 @@ const ElEncashmentRunView = () => {
       <Card
         size="small"
         title="Encashment Records"
-        extra={<strong>Total: {formatCurrency(total)}</strong>}
+        extra={<strong>Total: {formatRupees(total)}</strong>}
       >
         <Table
           rowKey="id"
