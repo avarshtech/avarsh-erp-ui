@@ -1,7 +1,7 @@
 /**
  * Time & Action scheduling and delay engine — CR-TNA-001 §9 (scheduling), §10 (revision),
  * §11 (delay). Pure functions, no I/O; every figure of the §17 worked example reproduces
- * (asserted by e2e/specs/tna/01-engine-worked-example.spec.js).
+ * (asserted by tnaEngine.test.js, next to this file).
  *
  * Four separately held dates per activity (FR-5.5):
  *  - baseline        frozen at activation: forward pass from the order date, no actuals.
