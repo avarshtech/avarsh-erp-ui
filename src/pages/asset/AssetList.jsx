@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Card, Table } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../../components/PageHeader';
@@ -13,6 +13,7 @@ import { hasPermission } from '../../utils/permissions';
 import { getAssets } from '../../services/asset/assetService';
 import { ASSET_STATUS, ASSET_CONDITION, STATUS_REASON, toOptions } from '../../utils/assetConstants';
 import { buildAssetListColumns } from './assetListColumns';
+import AssetLabelDialog from './components/AssetLabelDialog';
 
 /** useServerList counts pages from 1; the API counts from 0. */
 const fetchPage = ({ page, ...rest }) => getAssets({ ...rest, page: page - 1 });
@@ -47,6 +48,10 @@ const AssetList = () => {
     'Could not load the asset register',
   );
   const canUpdate = hasPermission('assets', 'update');
+  // preserveSelectedRowKeys keeps the picks when the page changes: labelling a
+  // whole floor means ticking rows across several pages before printing.
+  const [picked, setPicked] = useState({ keys: [], rows: [] });
+  const [labelOpen, setLabelOpen] = useState(false);
 
   const openRow = useCallback((row) => navigate(`/assets/${row.id}`), [navigate]);
   const editRow = useCallback((row) => navigate(`/assets/${row.id}/edit`), [navigate]);
@@ -71,6 +76,13 @@ const AssetList = () => {
         title="Asset Register"
         subtitle="Every machine, device and vehicle the company owns, and where it is right now"
       >
+        {picked.keys.length > 0 && (
+          <ActionButton
+            action="print"
+            text={`Print ${picked.keys.length} Label${picked.keys.length === 1 ? '' : 's'}`}
+            onClick={() => setLabelOpen(true)}
+          />
+        )}
         <PermissionGuard module="asset-setup" operation="view">
           <ActionButton action="custom" text="Setup" onClick={() => navigate('/assets/setup')} />
         </PermissionGuard>
@@ -104,6 +116,11 @@ const AssetList = () => {
           loading={list.loading}
           rowKey="id"
           size="middle"
+          rowSelection={{
+            selectedRowKeys: picked.keys,
+            preserveSelectedRowKeys: true,
+            onChange: (keys, rows) => setPicked({ keys, rows }),
+          }}
           scroll={{ x: 'max-content' }}
           className="table-nowrap"
           pagination={getTablePagination({ ...list.pagination, total: list.total }, 'assets')}
@@ -118,6 +135,12 @@ const AssetList = () => {
           }}
         />
       </Card>
+
+      <AssetLabelDialog
+        open={labelOpen}
+        assets={picked.rows}
+        onClose={() => setLabelOpen(false)}
+      />
     </div>
   );
 };

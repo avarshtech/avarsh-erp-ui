@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { App, Card, Descriptions, Space, Spin, Steps, Table, Tag } from 'antd';
+import { App, Card, Descriptions, Spin, Steps, Table, Tag } from 'antd';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import PageHeader from '../../components/PageHeader';
-import { ActionButton } from '../../components/buttons';
 import { toastUnlessHandled } from '../../utils/apiError';
 import {
   approveTransfer, cancelTransfer, completeTransfer, dispatchTransfer,
@@ -12,6 +11,9 @@ import {
 import { conditionMeta, transferStatusMeta } from '../../utils/assetConstants';
 import TransferDecisionDialog from './components/TransferDecisionDialog';
 import TransferReceiptDialog from './components/TransferReceiptDialog';
+import TransferActionBar from './components/TransferActionBar';
+import { printAssetChallan } from '../../utils/assetChallanPrint';
+import { companyForPrint } from '../../utils/printCompany';
 
 const date = (v) => (v ? dayjs(v).format('DD-MM-YYYY') : '-');
 const stamp = (v) => (v ? dayjs(v).format('DD-MM-YYYY HH:mm') : '-');
@@ -78,7 +80,13 @@ const AssetTransferView = () => {
     onOk: () => run(() => submitTransfer(id, transfer.version), 'Sent for approval'),
   });
 
-  const can = (action) => transfer?.allowedActions?.includes(action);
+  /** The document the driver carries and the receiving unit signs. */
+  const printChallan = async () => {
+    const org = await companyForPrint();
+    if (!printAssetChallan(transfer, org)) {
+      message.warning('Your browser blocked the print window - allow pop-ups for this site.');
+    }
+  };
 
   const steps = transfer ? stepsFor(transfer) : null;
 
@@ -121,16 +129,14 @@ const AssetTransferView = () => {
         )}
         onBack={() => navigate('/assets/transfers')}
       >
-        <Space>
-          {can('edit') && <ActionButton action="edit" text="Edit" onClick={() => navigate(`/assets/transfers/${id}/edit`)} />}
-          {can('submit') && <ActionButton action="custom" text="Submit" onClick={submit} />}
-          {can('approve') && <ActionButton action="approve" text="Approve" onClick={() => setDialog('approve')} />}
-          {can('reject') && <ActionButton action="reject" text="Reject" onClick={() => setDialog('reject')} />}
-          {can('dispatch') && <ActionButton action="custom" text="Mark Dispatched" onClick={() => setDialog('dispatch')} />}
-          {can('complete') && <ActionButton action="custom" text="Complete Move" onClick={() => setDialog('complete')} />}
-          {can('receive') && <ActionButton action="custom" text="Receive" onClick={() => setReceiptOpen(true)} />}
-          {can('cancel') && <ActionButton action="cancel" text="Cancel" onClick={() => setDialog('cancel')} />}
-        </Space>
+        <TransferActionBar
+          transfer={transfer}
+          onEdit={() => navigate(`/assets/transfers/${id}/edit`)}
+          onSubmit={submit}
+          onDialog={setDialog}
+          onReceive={() => setReceiptOpen(true)}
+          onPrintChallan={printChallan}
+        />
       </PageHeader>
 
       <Spin spinning={loading}>

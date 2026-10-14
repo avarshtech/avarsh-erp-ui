@@ -25,6 +25,14 @@ export const getAssets = async (params = {}) =>
 
 export const getAsset = async (id) => (await axiosInstance.get(`${ASSETS}/${id}`)).data;
 
+/**
+ * By the code printed on the label, which is what a scanned QR carries. The
+ * sticker holds the asset ID rather than a database id, so the number a person
+ * can read off a scuffed label opens the same screen as the scan.
+ */
+export const getAssetByCode = async (code) =>
+  (await axiosInstance.get(`${ASSETS}/by-code/${encodeURIComponent(code)}`)).data;
+
 export const getAssetMovements = async (id) =>
   (await axiosInstance.get(`${ASSETS}/${id}/movements`)).data;
 

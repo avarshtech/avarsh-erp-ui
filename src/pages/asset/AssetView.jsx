@@ -17,6 +17,7 @@ import AssetAssignmentPanel from './components/AssetAssignmentPanel';
 import AssetDisposalDialog from './components/AssetDisposalDialog';
 import { hasPermission } from '../../utils/permissions';
 import AssetSpecList from './components/AssetSpecList';
+import AssetLabelDialog from './components/AssetLabelDialog';
 
 const date = (value) => (value ? dayjs(value).format('DD-MM-YYYY') : '-');
 const money = (value) => (value === null || value === undefined ? '-' : `₹${Number(value).toLocaleString('en-IN')}`);
@@ -33,6 +34,7 @@ const AssetView = () => {
   // sitting on the state from before the change.
   const [statusVersion, setStatusVersion] = useState(0);
   const [disposeOpen, setDisposeOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
   const canUpdate = hasPermission('assets', 'update');
   const canDispose = hasPermission('asset-disposals', 'add');
 
@@ -63,6 +65,9 @@ const AssetView = () => {
         subtitle={asset?.name}
         onBack={() => navigate('/assets')}
       >
+        <PermissionGuard module="assets" operation="view">
+          <ActionButton action="print" text="Print Label" onClick={() => setLabelOpen(true)} />
+        </PermissionGuard>
         {asset?.status !== 'DISPOSED' && (
           <PermissionGuard module="assets" operation="update">
             <ActionButton action="custom" text="Change Status" onClick={() => setStatusOpen(true)} />
@@ -156,6 +161,11 @@ const AssetView = () => {
                 setDisposeOpen(false);
                 navigate(`/assets/disposals?highlight=${saved.id}`);
               }}
+            />
+            <AssetLabelDialog
+              open={labelOpen}
+              assets={[asset]}
+              onClose={() => setLabelOpen(false)}
             />
             <AssetStatusDialog
               open={statusOpen}
