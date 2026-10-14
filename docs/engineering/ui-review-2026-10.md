@@ -20,7 +20,12 @@ rather than editing this file by hand.
   saved reports and the AI chat): `src/pages/{admin,approvals,sample-request,hr,reports}`, their
   services and the API behind them (`erp/{iam,approval,sampling,hr,reporting,ai}`). Batch 3 ids
   start at U305; it also adds one PO finding raised by lane B.
-- **Next batches, in plan order:** the shared code as a whole; then the Preview modules.
+- **Batch 4:** this batch was reviewed on the phase1 integration branch (3ceb9a2), not on `dev`, because phase1 has rewritten much of the shared code. It covers two areas:
+  - **The shared code as a whole:** `src/{components,hooks,context,layout,observability}`, `src/services/core`, the generic utils, `App.jsx`, `main.jsx`, `sw.js`, the login page and the dashboard. These findings are in the Shared section.
+  - **The Preview modules:** production finishing, production job work and job-work bill passing. These are in their own section. Each finding says which screens run on browser demo data and which on the API.
+  
+  Batch 4 ids start at U372. Three reviewers covered the batch: platform, components and Preview.
+- **Not yet reviewed by any batch:** Export Docs (`src/pages/expdoc` and the `expDoc*` utils), T&A, Virtual Factory, and the module-master loader hooks.
 - **Method:** nine reviewers, one per slice (orders; BOM; cut panel and garment process
   requirements; costing list and view; costing sheet; supplier PO form; supplier PO view and list;
   production POs; job-work POs), read every line of their slice against Appendix A of the plan and
@@ -56,7 +61,7 @@ Open findings by module and severity, with the estimate in developer hours. The 
 | Orders | 1 | 5 | 11 | 10 | 27 | 20.4 | 0 |
 | BOM (bill of materials, cut panel and garment process requirements) | 1 | 9 | 18 | 20 | 48 | 47.6 | 2 |
 | Costing | 2 | 7 | 20 | 16 | 45 | 57 | 0 |
-| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 45 | 24 | 83 | 111.1 | 2 |
+| Purchase orders (supplier, production and job-work POs) | 0 | 14 | 45 | 25 | 84 | 111.4 | 2 |
 | Inventory (GRN, QC, bill passing, issues, transfers, stock) | 0 | 10 | 20 | 11 | 41 | 84 | 0 |
 | Production (cutting, sewing, packing, production masters) | 0 | 8 | 14 | 7 | 29 | 70.8 | 0 |
 | Master data | 0 | 5 | 11 | 5 | 21 | 34.3 | 0 |
@@ -64,10 +69,11 @@ Open findings by module and severity, with the estimate in developer hours. The 
 | Sample requests | 1 | 5 | 10 | 5 | 21 | 28.5 | 0 |
 | HR and payroll | 0 | 4 | 12 | 4 | 20 | 35.5 | 0 |
 | Reports (report builder, saved reports, AI chat) | 1 | 4 | 4 | 3 | 12 | 15.5 | 0 |
-| Shared code, as used by these screens | 0 | 2 | 1 | 3 | 6 | 6.3 | 1 |
-| **Total** | **6** | **75** | **174** | **111** | **366** | **523.5** | **5** |
+| Shared code (components, hooks, context, layout, core services, generic utils) | 0 | 5 | 13 | 12 | 30 | 32.8 | 1 |
+| Preview modules (production finishing, production job work, job-work bill passing) | 0 | 2 | 9 | 6 | 17 | 38 | 0 |
+| **Total** | **6** | **80** | **195** | **127** | **408** | **588.3** | **5** |
 
-P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the lead against the code on `dev`.
+P0 and P1 together: 86 findings, about 185 h. Every one was re-checked by the lead against the code on `dev`.
 
 ## Orders
 
@@ -1751,6 +1757,15 @@ P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the le
 - **Fix:** Diff lines by id (variant, quantity, rate) plus PO date and T&C, and show an error state with Retry. *(visible: more change lines; an error panel)*
 - **Estimate:** 2 h
 
+#### U413 · P3 · correctness — On a PO with a revised delivery date the printed details strip has five cells in a four-column grid, so Tax Type wraps alone onto a second row beside three empty grey cells
+
+*Supplier PO print* — `src/utils/poPdfGenerator.js:426-436, 682-706`
+
+- **What happens:** A supplier PO whose delivery date was revised is printed: PO Date, PO Type, Delivery Date and Revised Delivery Date fill the first row, and Tax Type sits alone on a second row with the grid's grey background showing in the three empty cells. POs without a revision print a tidy single row.
+- **Fix:** Use five columns when the revised date is present (or always reserve the cell), so the strip stays one row. *(visible: the revised-PO print strip is one row)*
+- **Estimate:** 0.25 h
+- **Note:** Carried over from batch 1's unverified list; verified by the lead on phase1.
+
 ## Inventory (GRN, QC, bill passing, issues, transfers, stock)
 
 ### P1
@@ -3102,7 +3117,7 @@ P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the le
 - **Fix:** Return a generic message with the traceId and keep the detail in the log; add the branch condition to the distinct-values query. *(visible: a shorter error message)*
 - **Estimate:** 1 h
 
-## Shared code, as used by these screens
+## Shared code (components, hooks, context, layout, core services, generic utils)
 
 ### P1
 
@@ -3124,6 +3139,31 @@ P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the le
 - **Estimate:** 1 h
 - **Note:** The Owner Flutter app already applies this bypass; the web bar disagrees with both the server and the app.
 
+#### U372 · P1 · rule 37, rule 38 — The idle timeout says 'You have been logged out' but logs nobody out, so pressing F5 or opening a new tab carries on as the previous user
+
+*Session / idle timeout* — `src/hooks/useIdleTimeout.js:64-68; src/components/SessionExpiryGuard.jsx:254-292, 36-40; src/context/SessionContext.jsx:91-129; src/components/ProtectedRoute.jsx:19-38; src/services/auth/authService.js:342-371`
+
+- **What happens:** On a shared PC user A leaves a browser tab idle for 30 minutes. The 'Session Timed Out' modal opens, but nothing is cleared: the access token stays in memory, SessionContext keeps refreshing it before it expires, the refresh cookie and the sessionActive flag stay put, and the page data stays visible behind the mask. User B presses F5 (or opens the app in a new tab): ProtectedRoute sees sessionActive, initializeSession refreshes with A's cookie, and B is working as A. Logout happens only if someone clicks 'Go to Login'.
+- **Fix:** When isIdle turns true, run the logout (logoutUser, which revokes the refresh cookie and runs clearAll) straight away, then show the modal. Stop the proactive refresh while idle. *(visible: after an idle timeout, a reload lands on the login page instead of the previous user's session; the modal looks the same)*
+- **Estimate:** 2 h
+
+#### U373 · P1 · rule 1, rule 8 — After a laptop sleeps for 15-30 minutes the tab shows 'Session Expired' and its only button logs out, although the refresh cookie could have renewed the session silently
+
+*Session / token expiry after sleep* — `src/context/SessionContext.jsx:94-103; src/components/SessionExpiryGuard.jsx:36-40, 142-182; erp/../resources/application.properties:128 (access token 15 min)`
+
+- **What happens:** A merchandiser is halfway through a PO form and closes the lid for a 20-minute meeting (idle timeout is 30). On wake, checkSession finds the 15-minute access token already expired and calls markExpired without trying a refresh. The blocking modal offers only 'Go to Login', which calls logoutUser and revokes the still-valid refresh token. The unsaved form is lost, and any other open tab of the same user dies at its next refresh.
+- **Fix:** In checkSession, when secondsLeft <= 0 (or no token) and no refresh has been tried yet, call refreshSession first and mark expired only if it fails; also re-check on visibilitychange. *(visible: no 'Session Expired' modal after a short sleep while the session is still renewable)*
+- **Estimate:** 2 h
+
+#### U385 · P1 · rule 36, rule 28 — Bullet lists in Terms & Conditions show as numbered lists (and indents/alignment are lost) in the read-only T&C viewer and on the printed PO
+
+*RichTextEditor (T&C viewer) / PO print T&C* — `src/utils/sanitizeRichText.js:18-23; src/components/RichTextEditor.jsx:54-56, 73-86, 194-205; src/utils/poPdfGenerator.js:582, 905`
+
+- **What happens:** A merchandiser writes T&C with a bullet list in the editor; react-quill-new 3.8.3 saves getSemanticHTML() (<ul><li>). The sanitiser added for U206 re-emits quill.root.innerHTML, which in Quill 2 is <ol><li data-list="bullet"> with indent/alignment as ql-indent-N / ql-align-* classes. Those are only styled under .ql-editor (quill.snow.css), and neither the read-only div (.rich-text-readonly) nor the print .terms-content has that class, so a user without update rights and every supplier receiving the PO see 1. 2. 3. instead of bullets and lose nesting. The .rich-text-readonly list CSS is also only injected when an editor (edit mode) is mounted.
+- **Fix:** Have the sanitiser return quill.getSemanticHTML() (what the editor stores), or keep root markup but render it inside a .ql-editor container in both the viewer and the print; move the read-only CSS out of the edit-mode <style> block. *(visible: bullets, nesting and alignment render as the author typed them (restores the pre-U206 look))*
+- **Estimate:** 2 h
+- **Note:** Verified in node_modules: quill 2.0.3 formats/list.js ListContainer.tagName='OL' with data-list; react-quill-new lib/index.js:47 onChange passes getSemanticHTML. Commit 1bc1508 claimed byte-identical output; that holds only for HTML already in Quill root markup, not for what the current editor saves. Arguably P1 since it is on every PO print with a bulleted T&C. Raised to P1 by the lead: a regression from the U206 gate fix that shows on every printed PO with bulleted terms. Verified: react-quill-new saves getSemanticHTML() (lib/index.js:47), and sanitizeRichTextWith returns quill.root.innerHTML.
+
 ### P2
 
 #### U199 · P2 · rule 2 — Background image and attachment reads raise error toasts because fileService cannot make them silent
@@ -3133,6 +3173,106 @@ P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the le
 - **What happens:** The callers treat these reads as non-critical (empty catches), but getFilesByEntity/downloadFileAsBlob cannot pass silent: true, so the interceptor toasts every failure. With uploads lost on container restarts while their database rows survive (recorded 2026-09-23), opening an order or PO whose image is gone stacks 'Server error occurred. Please try again later.' toasts, one per image.
 - **Fix:** Give these service functions a request-config parameter and pass { silent: true } from the preview and suggestion reads. *(visible: the spurious toasts stop)*
 - **Estimate:** 1 h
+
+#### U374 · P2 · rule 8, rule 37 — An idle second tab's 'Go to Login' revokes the session the user is actively working in another tab
+
+*Session / idle timeout across tabs* — `src/hooks/useIdleTimeout.js:33-81; src/components/SessionExpiryGuard.jsx:36-40; src/services/auth/authService.js:207-223`
+
+- **What happens:** A user works in the PO form in tab 1 and left the PO list open in tab 2. Activity is tracked per tab, so tab 2 reaches its 30-minute idle timeout and says 'You have been logged out'. The user clicks 'Go to Login' there. That revokes the shared refresh cookie, so tab 1 gets 'Session Expired' within 15 minutes and loses unsaved input.
+- **Fix:** Share last activity across tabs (a localStorage timestamp and the storage event, or a BroadcastChannel) so that idle means idle in every tab. *(visible: a background tab no longer times out while another tab is in use)*
+- **Estimate:** 2 h
+
+#### U375 · P2 · rule 38 — Logout never clears the working branch, so the next user on the browser starts in the previous user's branch
+
+*Logout / shared PC* — `src/services/auth/sessionStore.js:111-115 (clearSessionActiveFlag, never called anywhere), 178-197 (clearAll); src/context/BranchContext.jsx:64-75`
+
+- **What happens:** User A switches the header branch to Chennai and logs out. User B (home branch Tirupur, allowed both branches) logs in on the same PC. activeBranchId is still 'Chennai', so reconcileStored keeps it: B's lists are filtered to Chennai and B's new documents default to Chennai (effectiveBranchId). The comment at sessionStore.js:113 says the next user starts at their own home branch, but the only function that removes the key is dead code.
+- **Fix:** Remove activeBranchId in clearAll (or call clearSessionActiveFlag from logout and expiry). *(visible: after another user's logout, a new login starts at the user's own home branch)*
+- **Estimate:** 0.5 h
+
+#### U376 · P2 · rule 37, rule 38 — Logging out in one tab leaves other tabs signed in, and after the next login those tabs silently switch to the new user
+
+*Session / multiple tabs* — `src/services/auth/sessionStore.js:178-197; src/services/auth/authService.js:207-223, 273-328; erp/iam/security/JwtAuthenticationFilter.java:40-60 (stateless access token)`
+
+- **What happens:** On a shared PC user A has two tabs open and logs out in one. Nothing listens for the storage change, so the other tab keeps A's in-memory access token and stays fully usable as A for up to 15 minutes. If user B then logs in in the first tab, A's remaining tab refreshes with B's cookie at its next refresh and carries on as B, still showing A's screens, store cache and header name.
+- **Fix:** Listen for the storage event on sessionActive/currentUser (or a BroadcastChannel): on removal, clear the session and go to /login; on a different user id, reload. *(visible: other tabs go to the login page when the user logs out in one)*
+- **Estimate:** 2 h
+
+#### U377 · P2 · rule 38, rule 13 — Logout does not clear the master-data store or the remembered list queries, so the next user in the same tab is served the previous user's cached lists
+
+*Logout / StoreContext and list memory* — `src/context/StoreContext.jsx:132-215 (clearStore has no caller); src/App.jsx:245-502 (StoreProvider sits above /login and survives logout); src/utils/listMemory.js:9-26; src/services/auth/sessionStore.js:178-197`
+
+- **What happens:** An admin opens screens that load the users, roles, suppliers and buyers keys into StoreContext, then logs out. Logout is an SPA navigation to /login, so StoreProvider is never remounted. A clerk logs in within 5 minutes, and every screen that reads those keys uses the admin's cached arrays (isCacheValid is still true) instead of fetching under the clerk's own permissions and branch. That includes the users list, which the clerk may not hold users.view for. The sessionStorage list memory (erp:list:<path>, holding search text and filters) also survives, so the clerk's first 'back to list' from a form opens the admin's last search.
+- **Fix:** Call clearStore on the authChange event when the session is cleared (or key the StoreProvider by user id), and remove the erp:list:* keys in clearAll. *(visible: the first screen after a user switch loads its masters afresh (a brief spinner))*
+- **Estimate:** 1 h
+
+#### U378 · P2 · rule 38, rule 37 — A browser's push subscription stays bound to the user who first enabled it, so after a user switch that user's notifications keep appearing on the PC and the new user gets none
+
+*Push notifications / shared browser* — `src/hooks/usePushNotification.js:20-37; src/services/auth/authService.js:207-223; erp/notification/service/PushSubscriptionService.java:24-46`
+
+- **What happens:** Merchandiser A enables notifications on a shared PC, then logs out; logout never unsubscribes. B logs in: usePushNotification finds the existing browser subscription, sets isSubscribed=true and never calls subscribePush for B, so the server keeps the endpoint under A. A's approval requests and PO updates (title and body) keep popping up as system notifications on that PC, and while B's app is visible they are forwarded into B's in-app notification centre (PUSH_RECEIVED). B receives no pushes on this browser at all.
+- **Fix:** On logout, call unsubscribePush for the current endpoint (keep the browser subscription). On login, when a subscription exists and permission is granted, call subscribePush so the endpoint is re-registered for the new user. *(visible: notifications on a shared PC follow whoever is signed in)*
+- **Estimate:** 2 h
+
+#### U379 · P2 · rule 38, rule 4 — Transactional API GETs fall back to a copy up to 30 minutes old whenever the network takes longer than 10 seconds, with nothing on screen saying the data is stale
+
+*Service worker / API caching* — `src/sw.js:115-128 (erp-api-data NetworkFirst, networkTimeoutSeconds 10, maxAge 30 min); src/sw.js:77-92 (users/roles in erp-master-data)`
+
+- **What happens:** On a slow factory connection a storekeeper opens the stock register or a PO list that takes 12 s. At 10 s the service worker answers with the copy cached 25 minutes earlier. The screen shows old stock balances and statuses as if they were live, and the user acts on them (issues stock, raises a PO, approves). Only bill passing and order mapping are network-only. Rule 38 asks for transactional GETs to be network-only.
+- **Fix:** Make the transactional routes NetworkOnly (or NetworkFirst with no networkTimeoutSeconds, so the cache is used only when the network actually fails) and keep only the master-data cache for offline viewing. *(visible: on a very slow network a list waits for the server instead of showing an older copy)*
+- **Estimate:** 1 h
+- **Note:** Commit 248224b deliberately kept offline viewing; confirm with the owner whether the 10 s timeout fallback (as opposed to offline-only fallback) is intended.
+
+#### U380 · P2 · rule 3 — After a screen crashes, moving to another screen from the menu still shows the error, and a crash in the layout, providers or login is a white page
+
+*Error boundary* — `src/layout/MainLayout.jsx:1039-1042; src/components/ErrorBoundary.jsx:22-39; src/App.jsx:238-505; src/main.jsx:12-16`
+
+- **What happens:** A screen throws during render and the boundary shows 'This screen could not be displayed'. The user clicks Orders in the sidebar: the URL changes, but the boundary is not keyed by location and keeps its error state, so the same error screen stays until 'Try again' or a reload. A render error in MainLayout, a provider or /login has no boundary at all, so React unmounts the tree and the user gets a blank page.
+- **Fix:** Key the boundary by location.pathname, and add an outer boundary around the providers and routes in App.jsx. *(visible: navigating away from a crashed screen opens the new screen; a shell crash shows the error card instead of a blank page)*
+- **Estimate:** 1 h
+- **Note:** Listed in the Appendix B baseline ('one boundary, not keyed by route') but not in the register.
+
+#### U386 · P2 · rule 4 — A slow approval-history response for the previous document can land last, so Approve/Reject acts on the previous document's request while the dialog names the current one
+
+*ApprovalActionBar* — `src/components/approval/ApprovalActionBar.jsx:86-105, 133-142`
+
+- **What happens:** On CostingView (or any view whose entityId changes without remounting the bar) the user moves from cost sheet A to B while A's getApprovalHistory is still in flight; B's response arrives first, then A's overwrites request. The bar now shows A's level, and Approve sends processApprovalAction(A.request.id) while the dialog and success toast say B's number.
+- **Fix:** Ignore stale responses (request token or AbortController keyed on entityType/entityId) and reset request when the entity changes. *(not visible)*
+- **Estimate:** 1 h
+- **Note:** Needs out-of-order responses; MyApprovals unmounts the bar on drawer close so it is safe there.
+
+#### U387 · P2 · rule 1, rule 4 — The unread badge is fetched once per session, so without push it never shows new notifications and 'Mark all read' stays disabled while unread rows are visible
+
+*NotificationCenter* — `src/components/NotificationCenter.jsx:93-97, 115-122, 215`
+
+- **What happens:** A user who has not enabled push (or whose SW message is lost) keeps the app open; new approval notifications arrive on the server. The bell badge stays at its login-time value (e.g. 0). Opening the panel lists the new unread rows, but unreadCount is not recomputed from them, so the badge stays 0 and the 'Mark all read' button is disabled (disabled={unreadCount === 0}).
+- **Fix:** Refresh the count when the panel opens (and on focus/visibility or a modest interval), or derive it from the loaded list when the panel is open. *(visible: the badge reflects new notifications; Mark all read enables when unread rows exist)*
+- **Estimate:** 1.5 h
+
+#### U388 · P2 · rule 22 — A quick vertical scroll of the notification list on a tablet can delete a notification with no undo
+
+*SwipeableNotificationItem* — `src/components/SwipeableNotificationItem.jsx:99-132`
+
+- **What happens:** On a tablet the user flicks the notification list up; the finger drifts 15 px sideways in ~25 ms. touchmove marks isDragging once |deltaX|>10 without comparing it to vertical movement, and touchend triggers when velocity |deltaX|/elapsed > 0.5 px/ms, so 15/25 = 0.6 fires the swipe-left branch and calls onDelete - the notification is deleted on the server with no confirm or undo.
+- **Fix:** Lock the gesture to horizontal only when |deltaX| clearly exceeds |deltaY|, require a minimum distance alongside the velocity test, and offer undo before deleting. *(visible: scrolling no longer deletes; deliberate swipes behave as now)*
+- **Estimate:** 1.5 h
+
+#### U389 · P2 · rule 38 — Laya AI conversations survive logout in sessionStorage, so the next user in the same tab sees them and sends them to the AI as their own history
+
+*Laya AI (GenieProvider)* — `src/components/genie/GenieProvider.jsx:7-20, 46-53; src/components/genie/useGenieChat.js:28-29, 37-42; src/services/auth/sessionStore.js:178-197; src/pages/master/genie/MasterAssistant.jsx:14`
+
+- **What happens:** On a shared factory PC, user A asks Laya on Master Data (storageKey 'master', shared by all users) or on a costing sheet about prices and buyers, then logs out. clearAll() removes only auth keys; 'avarsh-genie-threads' stays in sessionStorage. User B logs in in the same tab, opens Master Data and Laya: A's conversation is shown, and B's next question sends the last 12 of A's messages as history to /genie.
+- **Fix:** Remove 'avarsh-genie-threads' in clearAll() (and on branch change), or key the threads by user id. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U390 · P2 · rule 8 — Picking a Pantone suggestion and saving without pressing the tick stores the raw typed text instead of 'code / name'
+
+*PantoneColorInput (Item Master colour attribute)* — `src/components/PantoneColorInput.jsx:56-63, 93-111, 187-199`
+
+- **What happens:** In Item Master the user types '18-1662' in the colour attribute: onChange('') clears the value and the search runs. They click a suggestion; the input's blur timer (200 ms, stale closure with selectedCode=null) then calls onChange('18-1662'). The name box appears pre-filled with 'Flame Scarlet', but the user clicks the form's Save without pressing Enter or the tick, so the variant is saved with colour '18-1662' rather than '18-1662 TCX / Flame Scarlet' (and attribute-derived variant codes follow the wrong value).
+- **Fix:** Commit `${code} / ${name}` as soon as a suggestion is picked (the tick only renames), and drop the stale blur write when a suggestion was chosen. *(visible: the picked colour is kept even if the user does not press the tick)*
+- **Estimate:** 1.5 h
+- **Note:** Blur-timer ordering read from code, not reproduced in a browser.
 
 ### P3
 
@@ -3161,6 +3301,229 @@ P0 and P1 together: 81 findings, about 172 h. Every one was re-checked by the le
 - **Fix:** Move Input addonBefore/addonAfter into the deprecations table (→ Space.Compact) and re-derive the list as the reference describes. *(not visible)*
 - **Estimate:** 0.25 h
 - **Note:** Reported by lane A; verified against node_modules.
+
+#### U381 · P3 · rule 2 — Clicking a system notification never marks it read, because the service worker sends the PATCH to the app's own host without a token
+
+*Service worker / notification click* — `src/sw.js:274-277; public/_redirects:6-7; .env:2`
+
+- **What happens:** The API lives on api.avarshai.com, but notificationclick calls fetch('/api/v1/notifications/{id}/read') relative to the app origin (Netlify), with no Authorization header. The request never reaches the API, so the notification stays unread in the bell after the user has opened it from the system tray.
+- **Fix:** Leave mark-as-read to the page: open the target URL with the notification id (for example ?notificationId=) and have the app mark it read through axiosInstance. *(visible: notifications opened from the system tray show as read)*
+- **Estimate:** 1 h
+
+#### U382 · P3 · rule 1, rule 2 — A user without dashboard access who lands on '/' gets an 'Access denied' toast before being redirected
+
+*Dashboard* — `src/pages/Dashboard.jsx:80-102; src/App.jsx:266, 498; erp/dashboard/controller/DashboardController.java:15`
+
+- **What happens:** A storekeeper's role has no 'dashboard' key. They follow any route to '/' (the catch-all redirect, the logo, or an F5 on /login). Dashboard renders <Navigate>, but its effect has already called GET /dashboard, which the server refuses (403), so the interceptor shows 'Access denied' on the screen they are sent to.
+- **Fix:** Do the access check in the route (a PermissionRoute-style redirect) or skip the summary load when hasModuleAccess('dashboard') is false. *(visible: no stray 'Access denied' toast)*
+- **Estimate:** 0.5 h
+
+#### U383 · P3 · rule 2 — A failed blob download toasts a generic message instead of the server's reason
+
+*axiosInstance / file downloads* — `src/services/core/axiosInstance.js:179-215; src/services/core/fileService.js:66-72`
+
+- **What happens:** For responseType 'blob' the error body arrives as a Blob, so data.message and data.error are undefined. A 403 or 404 on a file download shows 'Access denied...' or 'Resource not found.', and a 400 with a specific reason shows 'An unexpected error occurred', instead of the server's message.
+- **Fix:** In the interceptor, when data is a Blob of type application/json, read its text and parse it before choosing the message. *(visible: download errors show the server's wording)*
+- **Estimate:** 0.5 h
+
+#### U384 · P3 · rule 27 — The header always shows 'User' under the name instead of the user's role
+
+*Header / user menu* — `src/layout/MainLayout.jsx:1018; src/services/auth/authService.js:81-101`
+
+- **What happens:** The session object built at login and refresh has `role` (the JWT role claim) but no `roleName`, so `currentUser?.roleName || 'User'` always falls back to 'User' for every account.
+- **Fix:** Read currentUser.role in the header. *(visible: the header shows the role name (e.g. 'Merchandiser') instead of 'User')*
+- **Estimate:** 0.25 h
+
+#### U391 · P3 · rule 33 — Notification rows and action chips, and the FileUpload drop area, can only be used with a mouse or touch
+
+*SwipeableNotificationItem / FileUpload* — `src/components/SwipeableNotificationItem.jsx:182-186, 217-221; src/components/FileUpload.jsx:325-371`
+
+- **What happens:** A keyboard user cannot open a notification or press its Approve/Reject chip (div/span with onClick, no role or tabIndex), and cannot open the file picker from the FileUpload area (div onClick; the hidden input has no name/id).
+- **Fix:** Give them role=button, tabIndex=0 and Enter/Space handlers (or use buttons), and an id/name on the hidden input. *(not visible)*
+- **Estimate:** 1 h
+
+#### U392 · P3 · rule 31 — The percentage and quantity variants of FormInputNumber pass addonAfter, which antd 6.2.2 deprecates on InputNumber (console warning)
+
+*FormInputNumber* — `src/components/form/FormInputNumber.jsx:26-33; callers src/pages/po/components/MarkerUploadCard.jsx:33; src/pages/po/workorder/WorkOrderForm.jsx:249`
+
+- **What happens:** Opening the Cutting PO marker card or the Work Order form logs 'addonAfter is deprecated, use Space.Compact' (node_modules/antd/es/input-number/index.js:150-151).
+- **Fix:** Render the % / UOM suffix with Space.Compact plus an addon (or the suffix prop) so the look is unchanged. *(not visible)*
+- **Estimate:** 0.5 h
+- **Note:** Distinct from U202 (Input, not InputNumber).
+
+#### U393 · P3 · rule 34 — Six shared components and two PermissionGuard exports are imported nowhere
+
+*Unused shared components* — `src/components/FilePreviewGrid.jsx; src/components/ImagePreview.jsx; src/components/SummaryCard.jsx; src/components/InfoPopover.jsx; src/components/ComingSoon.jsx; src/components/LoadingState.jsx; src/components/PermissionGuard.jsx:37-61 (withPermission, usePermission)`
+
+- **What happens:** grep over src/ finds no importer of these files or exports; they are maintained and reviewed for nothing (e.g. ImagePreview never resets its error state when src changes, a latent bug in dead code).
+- **Fix:** Delete them (knip will keep them out). *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U394 · P3 · rule 4 — Closing a quick-create drawer while it saves still runs the caller's onCreated, and also closes any drawer opened since
+
+*QuickCreateProvider* — `src/components/quickcreate/QuickCreateProvider.jsx:16-21; src/components/quickcreate/QuickCreateDrawer.jsx:31-41`
+
+- **What happens:** On the costing sheet the user clicks Create in New material, then closes the drawer and opens New buyer. The first save returns: done() (closed over the old request) calls the material row's onCreated and then setRequest(null), shutting the New buyer drawer the user is typing in.
+- **Fix:** In done(), act only if the request id still matches the open request (otherwise just call that request's onCreated). *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U395 · P3 · rule 28 — 'View All' on two dashboard cards is a plain href, so it reloads the whole app instead of navigating
+
+*Dashboard (Pending POs, Recent Orders cards)* — `src/components/dashboard/PendingPosCard.jsx:52; src/components/dashboard/RecentOrdersCard.jsx:49`
+
+- **What happens:** Clicking View All on Pending Supplier PO does a full page load: the in-memory access token is dropped and re-fetched via the refresh cookie, the store cache is cold and an installed PWA flashes the boot screen.
+- **Fix:** Use react-router Link (or navigate) for both links. *(visible: the list opens without a full reload)*
+- **Estimate:** 0.3 h
+
+## Preview modules (production finishing, production job work, job-work bill passing)
+
+### P1
+
+#### U396 · P1 · rule 10 — Three Finishing tabs write real production records while the screen's Preview banner says nothing entered there is saved to the server
+
+*Finishing - Receiving and External Process* — `src/utils/permissions.js:308-311, 573-574; src/components/PreviewBanner.jsx:15; src/pages/production/finishing/FinishingWorkspace.jsx:47; src/pages/production/finishing/ReceivingDrawer.jsx:125-133; src/pages/production/finishing/GarmentIssueDrawer.jsx:88; src/pages/production/finishing/GarmentReceiveDrawer.jsx:58; src/pages/production/finishing/GarmentCheckForm.jsx:89; src/services/production/finishingService.js:50-63; src/services/production/finishingProcessApi.js:1-5`
+
+- **What happens:** /production/finishing is flagged preview:true, so every tab shows 'Preview: data entered here is kept in this browser only and is not saved to the server', and the header says 'design preview on sample data'. A supervisor tries things out on the tabs. (1) Receiving > Record Receiving sends PUT /sewing/garment-issues/{id}/receipt to the production API. A full receipt moves the sewing note to ACKNOWLEDGED and it is no longer offered. The finishing RCV record is held only in a module-level object (finishingMockApi.js:18-30) and is gone on the next reload. (2) External Process > Issue Garments, Receive Garments and Garment Check call POST /finishing/process-issues, /process-returns and /garment-checks. Process issues and receipts against a Garment Process PO move that PO's balances and status (GarmentIssuePoLink), and so its billing. The user was told none of this reaches the server.
+- **Fix:** Narrow the banner to the mock tabs, either by tab (a per-tab preview flag) or by having PreviewBanner skip ?tab=external-process. Mark the Receiving drawer as live, or stop it posting to Sewing until Finishing receiving has its own API, and at cutover save both in one server transaction. *(visible: the banner disappears on External Process and the Receiving drawer says it posts to Sewing)*
+- **Estimate:** 3 h
+- **Note:** The External Process tab has been on the real API since the job-work release; it was put inside a preview workspace.
+
+#### U410 · P1 · rule 42, rule 51 — A confirmed deduction keeps its old amount after the bill's lines change, so the debit note and net payable come out wrong
+
+*Job-work Bill Passing* — `src/utils/jobWorkBillCalc.js:97-145, 157-189; src/services/inventory/jobWorkBill/jwbMockBills.js:98-130; src/pages/inventory/bill-passing/jobwork/JobWorkBillForm.jsx:53-60, 125`
+
+- **What happens:** A Garment Process PO line: 500 pcs invoiced at Rs 4.50 (2,250.00), 475 accepted. Propose deductions gives REJECTION_CHARGE 112.50 + GST, and the verifier confirms it. The clerk then corrects the vendor's invoice quantity to 480 (the vendor actually billed 480), so the line's rejection amount is now 22.50. mockUpdateBill re-derives the lines but leaves the confirmed deduction at 112.50. A second 'Propose' skips that line and type because confirmed rows are 'ruled', and no exception compares confirmed system deductions with the current line figures. Net payable = 2,160 + GST - (112.50 + GST): the vendor is under-paid by Rs 90 + GST, and the VDN prints 112.50 (25 pcs) when only 5 billed pieces were rejected.
+- **Fix:** Store the line figure each system deduction was proposed from, and raise a BLOCK exception (or reset the row to PROPOSED) when a save changes it. Add the case to jobWorkBillGolden.json so Stage 2's Java carries the same rule. *(visible: an edited bill asks to re-confirm the affected deductions)*
+- **Estimate:** 4 h
+- **Note:** Mock-backed today, but the rule is in the shared calculator that the Stage 2 Java must reproduce, so it survives the cutover.
+
+### P2
+
+#### U397 · P2 · rule 10, rule 1 — Finishing's mock tabs keep their data in a plain in-memory object, so every entry is lost on reload, although the banner says it is kept in this browser
+
+*Finishing - mock tabs* — `src/services/production/finishingService.js:1-8; src/services/production/finishingMockApi.js:18-30, 52-185; src/services/production/finishingMockData.js; src/utils/permissions.js:573-574`
+
+- **What happens:** A supervisor enters an hourly sheet, a checking sheet and a spot-wash batch. Each saves with a success toast and a document number. After a page refresh (or an app update, a logout, or a PWA restart) all of them have gone back to the seed rows. The banner said 'kept in this browser', which suggests localStorage, the way the Job Work preview behaves. Before go-live, Receiving (the RCV record), Hourly Stations, Spot Wash, Checking (and its auto-created alterations), Alterations, Metal Detection and needle log, Shade Segregation, the measurement chart (finishingMockData specPoints) and the Dashboard aggregates all need API endpoints. The seed orders and employees must be replaced by masters.
+- **Fix:** Either persist the mock through createDemoStore like Job Work, or change this screen's banner to say entries are lost on reload. Plan the API cutover per tab and flip USE_MOCK_FINISHING_DATA per tab, not for the whole module. *(visible: entries survive a reload (or the banner says they will not))*
+- **Estimate:** 2 h
+- **Note:** One finding for the mock dependency. The cutover itself is a module build, not estimated here.
+
+#### U398 · P2 · rule 5, rule 4 — Two finishing users receiving parts of one sewing note at the same time overwrite each other's receipt, because the receipt is sent as an absolute cumulative quantity with no version
+
+*Finishing - Receiving* — `src/pages/production/finishing/ReceivingDrawer.jsx:38-54, 84-86, 125-128; src/services/production/sewingApi.js:292-295; erp/production/sewing/service/SewGarmentIssueService.java:149-185; erp/production/sewing/dto/SewGarmentReceiptRequest.java:11-24`
+
+- **What happens:** Note GI-12 has 200 pcs of size M. Users A and B both open the drawer and see 0 already received. A records 120 and the UI sends receivedQty = 0 + 120. B records 50 a minute later and the UI sends 0 + 50. The server sets line.receivedQty = 50 (an absolute value, with no version check and no 'never below what was already received' check). Sewing now shows 50 of 200 received after 170 pieces arrived, and the note is offered again for 150.
+- **Fix:** Send the delta received now (or the version read), and have SewGarmentIssueService add it to the stored quantity under a row lock, refusing a total above currentQty. *(not visible)*
+- **Estimate:** 3 h
+
+#### U399 · P2 · rule 15, rule 6 — External Process lists only the newest 200 issues, receipts and checks, so an open issue outside that window cannot be received or checked
+
+*Finishing - External Process* — `src/services/production/finishingProcessApi.js:10-15, 27-30, 55-58; src/pages/production/finishing/GarmentProcessTab.jsx:38-44, 108, 128-130, 153; src/pages/production/finishing/GarmentCheckForm.jsx:39-41; erp/production/finishingroom/service/GarmentIssueService.java:54`
+
+- **What happens:** After a busy season there are 230 process issues. The tab fetches page 0, size 200, sorted by issueDate DESC and pages it in the browser. The oldest 30 are never loaded. An embroidery lot issued in the first week that is still with the vendor is missing from the Process PO list in 'Receive Garments' (built from openIssues) and in the New Garment Check picker. The vendor's DC cannot be booked from the UI, and the job-work bill (D3) cannot follow.
+- **Fix:** Page the three registers on the server (useServerList). Load the receive and check pickers with status=ISSUED,PARTIALLY_RETURNED (the API already filters by status) instead of reusing the page of 200. *(visible: the tables page on the server; old open issues appear in the pickers)*
+- **Estimate:** 4 h
+
+#### U400 · P2 · rule 42 — The Final AQL verdict counts every defect against the AQL 2.5 accept number, ignoring the critical zero-tolerance and minor AQL 4.0 rules the screen displays, and the browser sends that verdict
+
+*Finishing - Checking* — `src/pages/production/finishing/CheckingForm.jsx:83-90, 122; src/utils/finishingConstants.js:81-86, 110-123; src/pages/production/finishing/CheckingDefectsCard.jsx:22-27`
+
+- **What happens:** A Final check on a 500-pc lot (sample 50, Ac 3 / Re 4) logs one Critical defect (broken needle fragment). defects = 1 <= 3, so verdict = ACCEPTED, while the defect row shows 'Critical - Zero tolerance - any one rejects the lot'. The reverse also happens: 4 Minor defects (AQL 4.0 would accept) reject the lot. The client-computed verdict, sampleSize, acceptNo and rejectNo are saved as-is.
+- **Fix:** Compute the verdict per severity (any critical rejects; major vs AQL 2.5; minor vs AQL 4.0), and at cutover compute it on the server from the defect rows. Add Vitest cases for aqlSample and the verdict. *(visible: some lots change from Accepted to Rejected)*
+- **Estimate:** 3 h
+- **Note:** Mock-backed today; the rule lives in the screen, so it survives the cutover.
+
+#### U403 · P2 · rule 10, rule 11 — The whole Job Work workspace runs on a localStorage demo with no API behind it; this is what must change before it goes live
+
+*Job Work (outward tracker + inward)* — `src/services/production/jobwork/jobWorkTrackerEnv.js:1-6; src/services/production/jobwork/jobWorkTrackerApi.js:1-15; src/services/production/jobwork/jobWorkInwardApi.js:1-22; src/services/production/jobwork/demoStore.js:1-40; src/pages/production/jobwork/JobWorkWorkspace.jsx:69-91; src/pages/production/jobwork/receipts/ReceiptDrawer.jsx:52; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:58-66; src/utils/permissions.js:316-330`
+
+- **What happens:** Every facade (tracker, sheet, receipts, pull-backs, materials, inward orders, party stock, returns, statements) delegates to trackerMock*/inwardMock* over localStorage, and seeds dates relative to today. It is marked as a mock clearly (banner plus a purple 'Mock - no data is saved to the server' tag), so it is unlikely to be mistaken for real data. Before go-live: (a) the /api/v1/job-work/jobs, sheets, receipts, pull-backs, inward and party-stock endpoints do not exist; (b) the 'production-job-work' permission key exists only in the web app (permissions.js:316-318), so server ENFORCE refuses everything until the key and its grant migration ship; (c) DailyUpdateTab reads mock error details from e.details, which axios puts at e.response.data; (d) the vendor receipt sends vendorDcDate = the receipt date with no DC-date input, against D1 (DC no. plus DC date mandatory); (e) remove 'Reset demo data' and the seed.
+- **Fix:** Treat it as an API build. At cutover replace each facade body with axios, read error details from e.response.data, add a DC date field, ship the permission key, then remove preview:true. *(not visible)*
+- **Estimate:** 2 h
+- **Note:** One finding for the mock dependency; the API build itself is not estimated.
+
+#### U404 · P2 · rule 8 — A coordinator's unsaved daily-sheet figures are thrown away without asking when the date changes, the vendor changes, or the user leaves the page
+
+*Job Work - Daily Update* — `src/pages/production/jobwork/daily/useSheetEdits.js:11-18, 43-48; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:24-25, 103-109`
+
+- **What happens:** A coordinator types cumulative figures for 6 jobs after a vendor call, then changes the date picker to check yesterday. sheetKey (vendor|date) changes, setEdits({}) runs, and every typed figure is gone with no message. Picking another vendor shows only an info toast after the edits are already gone. Clicking another menu item unmounts the tab silently, because only beforeunload (closing the browser) is guarded.
+- **Fix:** Use useUnsavedChanges(dirtyIds.length > 0) for in-app navigation, and confirm before applying a vendor or date change while edits are dirty. *(visible: a confirm dialog before edits are discarded)*
+- **Estimate:** 2 h
+
+#### U405 · P2 · rule 4 — The daily sheet and the receipt drawer keep whichever response lands last, so a save can post one vendor's or job's figures under another
+
+*Job Work - Daily Update / Receipts* — `src/pages/production/jobwork/daily/useVendorSheet.js:11-27; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:52-61; src/pages/production/jobwork/receipts/ReceiptDrawer.jsx:29-32, 52`
+
+- **What happens:** On the live API, a coordinator picks vendor A and then quickly vendor B. If A's sheet response arrives after B's, the sheet shows A's jobs while vendorId = B, and Save posts {vendorId: B, jobs: [A's jobs]}. In ReceiptDrawer, switching the job quickly can leave job A's form and rows on screen, and postReceipt(jobId B, rows of A) then books A's colours and sizes against B. The mock's fixed latency hides this today.
+- **Fix:** Guard both loads with a request id or AbortController (useRecord), and send the vendor and job ids from the loaded sheet or form, not from the picker state. *(not visible)*
+- **Estimate:** 2 h
+
+#### U409 · P2 · rule 10, rule 11 — Job-work bills, their deductions and the Vendor Debit Note are a Stage 1 browser demo; this is what must change before it goes live
+
+*Job-work Bill Passing* — `src/services/inventory/jobWorkBill/jobWorkBillService.js:1-60; src/services/inventory/jobWorkBill/jwbDemoStore.js:1-30; src/pages/inventory/bill-passing/BillPassingList.jsx:29, 105; src/pages/inventory/bill-passing/jobwork/JobWorkBillForm.jsx:105-118; src/utils/vendorDebitNotePrint.js:72; erp/production/finishingroom/dto/GarmentReturnRequest.java:23-24`
+
+- **What happens:** All calls run against localStorage after a 300 ms timer; the billable POs and DCs come from a demo seed, not the live CPP and GPO, and VDN numbers are demo counters. The markers are good: a 'Demo' tag on list rows, a forced Preview banner, a 'Demo data' tag, a DEMO watermark on the VDN print, and the list opens on Supplier PO. Before go-live (owner sign-off of Stage 1 first): the inventory/billpassing/jobwork API plus EntityType.JOB_WORK_BILL; checks re-anchored to one inward DC (D2), which is not true today because GarmentCheckForm checks a whole process issue; vendorDcNo @NotBlank plus vendorDcDate on /finishing/process-returns and the cutting return (D1, which the API does not enforce or store today); the default source switched to All; and the jwb* demo files and JOB_WORK_BILL_DEMO removed.
+- **Fix:** Follow the Stage 2 plan (need-to-implement-the-proud-dove.md section 2); land the DC-date and DC-anchored check changes first, since the bill reads them. *(not visible)*
+- **Estimate:** 2 h
+- **Note:** Decided behaviour (D1-D9) is not reported as a defect. One finding for the mock dependency.
+
+#### U411 · P2 · rule 42 — The bill calculator rounds money with the Number.EPSILON trick, which rounds some half-paisa amounts down where the PO calculator and Java HALF_UP round up
+
+*Job-work Bill Passing* — `src/utils/jobWorkBillCalc.js:15, 43-47, 70-75, 78-97; src/utils/vendorDebitNotePrint.js:19, 46-50; src/utils/jobWorkPoCalc.js:15-25`
+
+- **What happens:** r2 = Math.round((x + EPSILON) * 100) / 100 only corrects values below about 1. GST at 5% on a taxable value of 10,240.90 is 512.045: the bill computes 512.04, while poValue (round2) and BigDecimal HALF_UP give 512.05. So the job-work PO and its bill disagree by a paisa, TAX_MISMATCH figures are off, and the golden file the Stage 2 Java must 'reproduce' encodes binary-float rounding that HALF_UP will not match. Other cases: 25.5 units x Rs 1.49 = 37.995 becomes 37.99, and 250.5 x 1.17 = 293.085 becomes 293.08.
+- **Fix:** Use round2/round3 from jobWorkPoCalc (decimal-string half-up) in jobWorkBillCalc and vendorDebitNotePrint, and add half-paisa cases to the golden file. *(visible: some amounts change by Rs 0.01)*
+- **Estimate:** 1.5 h
+
+### P3
+
+#### U401 · P3 · rule 7 — Defect rows are keyed by array index, so deleting a row moves its inputs onto the next defect
+
+*Finishing - Checking* — `src/pages/production/finishing/CheckingDefectsCard.jsx:41-44, 54`
+
+- **What happens:** Three defect rows; the user deletes the first one while the second row's Count input is focused or its select is open. The keys shift (rowKey = defects.indexOf(r)) and React reuses the components for different rows, so the focused or open control now belongs to a different defect.
+- **Fix:** Give each new defect row a monotonic key when it is added and use it as rowKey. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U402 · P3 · rule 2 — Catch blocks on Finishing's real-API calls add a second toast on top of the interceptor's
+
+*Finishing (API-backed tabs)* — `src/pages/production/finishing/ReceivingDrawer.jsx:53, 137; src/pages/production/finishing/GarmentProcessTab.jsx:43, 57; src/pages/production/finishing/GarmentReceiveDrawer.jsx:69; src/pages/production/finishing/GarmentCheckForm.jsx:44; src/pages/production/finishing/GarmentIssueDrawer.jsx:38; src/pages/production/finishing/CheckingForm.jsx:75`
+
+- **What happens:** Receive Garments is refused with 400 'Cannot receive 12 ... only 10 are still with the vendor'. The interceptor toasts it, and GarmentReceiveDrawer:69 toasts the same message again. The other locations add a generic second toast ('Failed to load ...'). The mock-backed catches (AlterationDrawer:96, CheckingForm:130, FinishingHourlyTab:55 and others) will duplicate the same way once they are cut over.
+- **Fix:** Use toastUnlessHandled(message, e, fallback) in each catch, as GarmentCheckForm:97 already does. *(visible: one toast instead of two)*
+- **Estimate:** 1 h
+
+#### U406 · P3 · rule 39, rule 36 — Inward print previews render in an unsandboxed same-origin iframe
+
+*Job Work - Inward statements / prints* — `src/pages/production/jobwork/inward/components/PrintPreviewDrawer.jsx:14; src/pages/production/jobwork/inward/statements/StatusReport.jsx:36; src/utils/jobWorkInward/inwardPrint.js:1-76`
+
+- **What happens:** The return challan, shortage report and status report are injected via <iframe srcDoc> with no sandbox attribute, so the document runs with the app's origin, cookies and token access. Every value goes through esc() today, so there is no live XSS, but one future unescaped field (a principal name, a defect text) becomes stored XSS in the app origin.
+- **Fix:** Add sandbox="allow-modals" (or an empty sandbox) to both iframes; printing already goes through openPrintWindow. *(not visible)*
+- **Estimate:** 0.5 h
+
+#### U407 · P3 · rule 42 — About 1,700 lines of pure job-work rules (stage plans, sheet and receipt validation, pull-back clamp and pay, knock-off, return charges) have no Vitest tests
+
+*Job Work - business rules* — `src/utils/jobWorkTracker/*.js (earnings, planRules, pullBackRules, sheetRules, snapshotRules, splitFigures, workingDays); src/utils/jobWorkInward/*.js (chargeRules, knockOff, materialRules, orderRules, partyStockRules, progressRules, returnRules)`
+
+- **What happens:** Only jobWorkBillCalc has tests (jobWorkBillCalc.test.js plus the golden JSON). At the API cutover these rules are the spec the Java must reproduce, for example clampOnApproval cutting the most-advanced lines first, splitBySize largest remainder, and knockOff oldest-challan-first. A regression in a rule that both the UI and the mock run would not be caught.
+- **Fix:** Add a golden-case Vitest file per rule module, like jobWorkBillGolden.json, before the Java port. *(not visible)*
+- **Estimate:** 6 h
+
+#### U408 · P3 · rule 9 — Pull-back pay is computed in unrounded floats per piece and per line, so the line amounts shown do not add up to the 'Vendor earns' total
+
+*Job Work - Pull-backs* — `src/utils/jobWorkTracker/earnings.js:45-81; src/services/production/jobwork/trackerMockPullBackContext.js:72-78; src/pages/production/jobwork/pullback/PullBackPayCard.jsx:36-37, 52; src/pages/production/jobwork/jwFormat.js:9`
+
+- **What happens:** A Work Order at Rs 12.50 per piece with three finishing stages in scope earns fin x 1/3 per stage. The per-piece amounts are recurring decimals (fin share x 1/3). Each line amount is perPiece x qty, rounded only when displayed, and the total sums the unrounded values, so the displayed lines can differ from the displayed total by a paisa. When pull-back pay feeds the vendor's bill at cutover, the paise will not reconcile.
+- **Fix:** Round the per-line amount to 2 dp (round2 from jobWorkPoCalc) and sum the rounded lines; pin it in the golden cases the Java will follow. *(visible: line amounts add up to the total)*
+- **Estimate:** 1 h
+
+#### U412 · P3 · rule 38 — The three preview stores in localStorage survive logout, so the next user of the browser sees the previous user's demo entries
+
+*Job Work / Job-work Bill Passing (demo stores)* — `src/services/production/jobwork/demoStore.js:9-40; src/services/production/jobwork/jobWorkTrackerStore.js:11; src/services/production/jobwork/inwardStore.js:9; src/services/inventory/jobWorkBill/jwbDemoStore.js:10; src/services/auth/sessionStore.js:178-197`
+
+- **What happens:** On a shared factory PC, user A enters principals (names, GSTINs, addresses) and job-work bills in the previews, then logs out. clearAll removes only currentUser and sessionActive, so user B, possibly on another branch, opens Job Work and sees A's entries. Rule 38 requires preview stores to be cleared on logout, expiry and branch change.
+- **Fix:** Remove the avarsh.*.mockStore.v1 keys in sessionStore.clearAll and on branch switch; the demo reseeds on next load. *(visible: previews start from the seed after logout)*
+- **Estimate:** 0.5 h
 
 ## Fixed by the test-release gate
 
@@ -3276,4 +3639,28 @@ POForm line-grid re-render cost, and POForm dead imports.
   - Invoice totals are recomputed server-side in BigDecimal.
   - The invoice generator escapes its values.
   - SampleRequestForm decides create versus update by `savedId`.
+- **Shared code (batch 4, phase1):**
+  - **Token refresh queue:** the flag is released on every path, and a shared lock dedupes concurrent refreshes.
+  - **Logout:** the API revokes the session even when the token has expired, and `clearAll` drops the service worker's API caches.
+  - **Branch switch:** clears the API caches.
+  - **Login:** the redirect target comes from router state, so there is no open redirect.
+  - **Sentry:** the scrub removes bodies, cookies, query strings and secret headers, and the user is sent as an id only.
+  - **useServerList:** drops stale responses.
+  - **chunkReload:** reloads at most once.
+  - **Other helpers checked:** `sanitizeRichText` (safe, but see the bullet-list finding), `printDoc` escaping, `inertBlob`, CSV formula escaping and the `tableSort` id tie-break.
+  - **Components:** the Genie panel renders model text as React nodes, quick-create cannot double-create, ApprovalReasonDialog has a loading guard, and every listener is removed on unmount.
+- **Preview modules (batch 4):** which screens use the API and which use demo data:
+  - **Finishing › External Process:** real API.
+  - **Finishing › Receiving:** posts a real sewing receipt.
+  - **Every other Finishing tab:** in-memory mock.
+  - **Job Work, outward and inward:** localStorage mock.
+  - **Job-work bill passing:** localStorage mock (Stage 1).
+  - The garment-check save adopts the record and sends `version`.
+  - The bill calculator's line arithmetic is golden-tested.
+  - The prints escape user text.
+- **Batch 1's unverified PO items, closed on phase1:**
+  - The revised-PO print strip is verified and added.
+  - POForm dead imports are refuted: lint reports none.
+  - The mapping drawer's per-line requests are by design: one call per allocation.
+  - POForm re-render cost and the accessibility gaps go to WS17 and the a11y pass.
 - **ESLint leads:** 36 `react-hooks/exhaustive-deps` warnings in these modules. Most are the stable `message`/`modal` from `App.useApp()`; the ones with a real consequence are recorded above.

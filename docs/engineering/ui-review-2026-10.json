@@ -5758,5 +5758,705 @@
     "estimateHours": 0.5,
     "status": "open",
     "note": "Reported by lane B; verified by the lead."
+  },
+  {
+    "id": "U372",
+    "module": "shared",
+    "screen": "Session / idle timeout",
+    "severity": "P1",
+    "rules": [
+      37,
+      38
+    ],
+    "title": "The idle timeout says 'You have been logged out' but logs nobody out, so pressing F5 or opening a new tab carries on as the previous user",
+    "location": "src/hooks/useIdleTimeout.js:64-68; src/components/SessionExpiryGuard.jsx:254-292, 36-40; src/context/SessionContext.jsx:91-129; src/components/ProtectedRoute.jsx:19-38; src/services/auth/authService.js:342-371",
+    "scenario": "On a shared PC user A leaves a browser tab idle for 30 minutes. The 'Session Timed Out' modal opens, but nothing is cleared: the access token stays in memory, SessionContext keeps refreshing it before it expires, the refresh cookie and the sessionActive flag stay put, and the page data stays visible behind the mask. User B presses F5 (or opens the app in a new tab): ProtectedRoute sees sessionActive, initializeSession refreshes with A's cookie, and B is working as A. Logout happens only if someone clicks 'Go to Login'.",
+    "fix": "When isIdle turns true, run the logout (logoutUser, which revokes the refresh cookie and runs clearAll) straight away, then show the modal. Stop the proactive refresh while idle.",
+    "visible": "visible: after an idle timeout, a reload lands on the login page instead of the previous user's session; the modal looks the same",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U373",
+    "module": "shared",
+    "screen": "Session / token expiry after sleep",
+    "severity": "P1",
+    "rules": [
+      1,
+      8
+    ],
+    "title": "After a laptop sleeps for 15-30 minutes the tab shows 'Session Expired' and its only button logs out, although the refresh cookie could have renewed the session silently",
+    "location": "src/context/SessionContext.jsx:94-103; src/components/SessionExpiryGuard.jsx:36-40, 142-182; erp/../resources/application.properties:128 (access token 15 min)",
+    "scenario": "A merchandiser is halfway through a PO form and closes the lid for a 20-minute meeting (idle timeout is 30). On wake, checkSession finds the 15-minute access token already expired and calls markExpired without trying a refresh. The blocking modal offers only 'Go to Login', which calls logoutUser and revokes the still-valid refresh token. The unsaved form is lost, and any other open tab of the same user dies at its next refresh.",
+    "fix": "In checkSession, when secondsLeft <= 0 (or no token) and no refresh has been tried yet, call refreshSession first and mark expired only if it fails; also re-check on visibilitychange.",
+    "visible": "visible: no 'Session Expired' modal after a short sleep while the session is still renewable",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U374",
+    "module": "shared",
+    "screen": "Session / idle timeout across tabs",
+    "severity": "P2",
+    "rules": [
+      8,
+      37
+    ],
+    "title": "An idle second tab's 'Go to Login' revokes the session the user is actively working in another tab",
+    "location": "src/hooks/useIdleTimeout.js:33-81; src/components/SessionExpiryGuard.jsx:36-40; src/services/auth/authService.js:207-223",
+    "scenario": "A user works in the PO form in tab 1 and left the PO list open in tab 2. Activity is tracked per tab, so tab 2 reaches its 30-minute idle timeout and says 'You have been logged out'. The user clicks 'Go to Login' there. That revokes the shared refresh cookie, so tab 1 gets 'Session Expired' within 15 minutes and loses unsaved input.",
+    "fix": "Share last activity across tabs (a localStorage timestamp and the storage event, or a BroadcastChannel) so that idle means idle in every tab.",
+    "visible": "visible: a background tab no longer times out while another tab is in use",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U375",
+    "module": "shared",
+    "screen": "Logout / shared PC",
+    "severity": "P2",
+    "rules": [
+      38
+    ],
+    "title": "Logout never clears the working branch, so the next user on the browser starts in the previous user's branch",
+    "location": "src/services/auth/sessionStore.js:111-115 (clearSessionActiveFlag, never called anywhere), 178-197 (clearAll); src/context/BranchContext.jsx:64-75",
+    "scenario": "User A switches the header branch to Chennai and logs out. User B (home branch Tirupur, allowed both branches) logs in on the same PC. activeBranchId is still 'Chennai', so reconcileStored keeps it: B's lists are filtered to Chennai and B's new documents default to Chennai (effectiveBranchId). The comment at sessionStore.js:113 says the next user starts at their own home branch, but the only function that removes the key is dead code.",
+    "fix": "Remove activeBranchId in clearAll (or call clearSessionActiveFlag from logout and expiry).",
+    "visible": "visible: after another user's logout, a new login starts at the user's own home branch",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U376",
+    "module": "shared",
+    "screen": "Session / multiple tabs",
+    "severity": "P2",
+    "rules": [
+      37,
+      38
+    ],
+    "title": "Logging out in one tab leaves other tabs signed in, and after the next login those tabs silently switch to the new user",
+    "location": "src/services/auth/sessionStore.js:178-197; src/services/auth/authService.js:207-223, 273-328; erp/iam/security/JwtAuthenticationFilter.java:40-60 (stateless access token)",
+    "scenario": "On a shared PC user A has two tabs open and logs out in one. Nothing listens for the storage change, so the other tab keeps A's in-memory access token and stays fully usable as A for up to 15 minutes. If user B then logs in in the first tab, A's remaining tab refreshes with B's cookie at its next refresh and carries on as B, still showing A's screens, store cache and header name.",
+    "fix": "Listen for the storage event on sessionActive/currentUser (or a BroadcastChannel): on removal, clear the session and go to /login; on a different user id, reload.",
+    "visible": "visible: other tabs go to the login page when the user logs out in one",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U377",
+    "module": "shared",
+    "screen": "Logout / StoreContext and list memory",
+    "severity": "P2",
+    "rules": [
+      38,
+      13
+    ],
+    "title": "Logout does not clear the master-data store or the remembered list queries, so the next user in the same tab is served the previous user's cached lists",
+    "location": "src/context/StoreContext.jsx:132-215 (clearStore has no caller); src/App.jsx:245-502 (StoreProvider sits above /login and survives logout); src/utils/listMemory.js:9-26; src/services/auth/sessionStore.js:178-197",
+    "scenario": "An admin opens screens that load the users, roles, suppliers and buyers keys into StoreContext, then logs out. Logout is an SPA navigation to /login, so StoreProvider is never remounted. A clerk logs in within 5 minutes, and every screen that reads those keys uses the admin's cached arrays (isCacheValid is still true) instead of fetching under the clerk's own permissions and branch. That includes the users list, which the clerk may not hold users.view for. The sessionStorage list memory (erp:list:<path>, holding search text and filters) also survives, so the clerk's first 'back to list' from a form opens the admin's last search.",
+    "fix": "Call clearStore on the authChange event when the session is cleared (or key the StoreProvider by user id), and remove the erp:list:* keys in clearAll.",
+    "visible": "visible: the first screen after a user switch loads its masters afresh (a brief spinner)",
+    "estimateHours": 1,
+    "status": "open"
+  },
+  {
+    "id": "U378",
+    "module": "shared",
+    "screen": "Push notifications / shared browser",
+    "severity": "P2",
+    "rules": [
+      38,
+      37
+    ],
+    "title": "A browser's push subscription stays bound to the user who first enabled it, so after a user switch that user's notifications keep appearing on the PC and the new user gets none",
+    "location": "src/hooks/usePushNotification.js:20-37; src/services/auth/authService.js:207-223; erp/notification/service/PushSubscriptionService.java:24-46",
+    "scenario": "Merchandiser A enables notifications on a shared PC, then logs out; logout never unsubscribes. B logs in: usePushNotification finds the existing browser subscription, sets isSubscribed=true and never calls subscribePush for B, so the server keeps the endpoint under A. A's approval requests and PO updates (title and body) keep popping up as system notifications on that PC, and while B's app is visible they are forwarded into B's in-app notification centre (PUSH_RECEIVED). B receives no pushes on this browser at all.",
+    "fix": "On logout, call unsubscribePush for the current endpoint (keep the browser subscription). On login, when a subscription exists and permission is granted, call subscribePush so the endpoint is re-registered for the new user.",
+    "visible": "visible: notifications on a shared PC follow whoever is signed in",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U379",
+    "module": "shared",
+    "screen": "Service worker / API caching",
+    "severity": "P2",
+    "rules": [
+      38,
+      4
+    ],
+    "title": "Transactional API GETs fall back to a copy up to 30 minutes old whenever the network takes longer than 10 seconds, with nothing on screen saying the data is stale",
+    "location": "src/sw.js:115-128 (erp-api-data NetworkFirst, networkTimeoutSeconds 10, maxAge 30 min); src/sw.js:77-92 (users/roles in erp-master-data)",
+    "scenario": "On a slow factory connection a storekeeper opens the stock register or a PO list that takes 12 s. At 10 s the service worker answers with the copy cached 25 minutes earlier. The screen shows old stock balances and statuses as if they were live, and the user acts on them (issues stock, raises a PO, approves). Only bill passing and order mapping are network-only. Rule 38 asks for transactional GETs to be network-only.",
+    "fix": "Make the transactional routes NetworkOnly (or NetworkFirst with no networkTimeoutSeconds, so the cache is used only when the network actually fails) and keep only the master-data cache for offline viewing.",
+    "visible": "visible: on a very slow network a list waits for the server instead of showing an older copy",
+    "estimateHours": 1,
+    "status": "open",
+    "note": "Commit 248224b deliberately kept offline viewing; confirm with the owner whether the 10 s timeout fallback (as opposed to offline-only fallback) is intended."
+  },
+  {
+    "id": "U380",
+    "module": "shared",
+    "screen": "Error boundary",
+    "severity": "P2",
+    "rules": [
+      3
+    ],
+    "title": "After a screen crashes, moving to another screen from the menu still shows the error, and a crash in the layout, providers or login is a white page",
+    "location": "src/layout/MainLayout.jsx:1039-1042; src/components/ErrorBoundary.jsx:22-39; src/App.jsx:238-505; src/main.jsx:12-16",
+    "scenario": "A screen throws during render and the boundary shows 'This screen could not be displayed'. The user clicks Orders in the sidebar: the URL changes, but the boundary is not keyed by location and keeps its error state, so the same error screen stays until 'Try again' or a reload. A render error in MainLayout, a provider or /login has no boundary at all, so React unmounts the tree and the user gets a blank page.",
+    "fix": "Key the boundary by location.pathname, and add an outer boundary around the providers and routes in App.jsx.",
+    "visible": "visible: navigating away from a crashed screen opens the new screen; a shell crash shows the error card instead of a blank page",
+    "estimateHours": 1,
+    "status": "open",
+    "note": "Listed in the Appendix B baseline ('one boundary, not keyed by route') but not in the register."
+  },
+  {
+    "id": "U381",
+    "module": "shared",
+    "screen": "Service worker / notification click",
+    "severity": "P3",
+    "rules": [
+      2
+    ],
+    "title": "Clicking a system notification never marks it read, because the service worker sends the PATCH to the app's own host without a token",
+    "location": "src/sw.js:274-277; public/_redirects:6-7; .env:2",
+    "scenario": "The API lives on api.avarshai.com, but notificationclick calls fetch('/api/v1/notifications/{id}/read') relative to the app origin (Netlify), with no Authorization header. The request never reaches the API, so the notification stays unread in the bell after the user has opened it from the system tray.",
+    "fix": "Leave mark-as-read to the page: open the target URL with the notification id (for example ?notificationId=) and have the app mark it read through axiosInstance.",
+    "visible": "visible: notifications opened from the system tray show as read",
+    "estimateHours": 1,
+    "status": "open"
+  },
+  {
+    "id": "U382",
+    "module": "shared",
+    "screen": "Dashboard",
+    "severity": "P3",
+    "rules": [
+      1,
+      2
+    ],
+    "title": "A user without dashboard access who lands on '/' gets an 'Access denied' toast before being redirected",
+    "location": "src/pages/Dashboard.jsx:80-102; src/App.jsx:266, 498; erp/dashboard/controller/DashboardController.java:15",
+    "scenario": "A storekeeper's role has no 'dashboard' key. They follow any route to '/' (the catch-all redirect, the logo, or an F5 on /login). Dashboard renders <Navigate>, but its effect has already called GET /dashboard, which the server refuses (403), so the interceptor shows 'Access denied' on the screen they are sent to.",
+    "fix": "Do the access check in the route (a PermissionRoute-style redirect) or skip the summary load when hasModuleAccess('dashboard') is false.",
+    "visible": "visible: no stray 'Access denied' toast",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U383",
+    "module": "shared",
+    "screen": "axiosInstance / file downloads",
+    "severity": "P3",
+    "rules": [
+      2
+    ],
+    "title": "A failed blob download toasts a generic message instead of the server's reason",
+    "location": "src/services/core/axiosInstance.js:179-215; src/services/core/fileService.js:66-72",
+    "scenario": "For responseType 'blob' the error body arrives as a Blob, so data.message and data.error are undefined. A 403 or 404 on a file download shows 'Access denied...' or 'Resource not found.', and a 400 with a specific reason shows 'An unexpected error occurred', instead of the server's message.",
+    "fix": "In the interceptor, when data is a Blob of type application/json, read its text and parse it before choosing the message.",
+    "visible": "visible: download errors show the server's wording",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U384",
+    "module": "shared",
+    "screen": "Header / user menu",
+    "severity": "P3",
+    "rules": [
+      27
+    ],
+    "title": "The header always shows 'User' under the name instead of the user's role",
+    "location": "src/layout/MainLayout.jsx:1018; src/services/auth/authService.js:81-101",
+    "scenario": "The session object built at login and refresh has `role` (the JWT role claim) but no `roleName`, so `currentUser?.roleName || 'User'` always falls back to 'User' for every account.",
+    "fix": "Read currentUser.role in the header.",
+    "visible": "visible: the header shows the role name (e.g. 'Merchandiser') instead of 'User'",
+    "estimateHours": 0.25,
+    "status": "open"
+  },
+  {
+    "id": "U385",
+    "module": "shared",
+    "screen": "RichTextEditor (T&C viewer) / PO print T&C",
+    "severity": "P1",
+    "rules": [
+      36,
+      28
+    ],
+    "title": "Bullet lists in Terms & Conditions show as numbered lists (and indents/alignment are lost) in the read-only T&C viewer and on the printed PO",
+    "location": "src/utils/sanitizeRichText.js:18-23; src/components/RichTextEditor.jsx:54-56, 73-86, 194-205; src/utils/poPdfGenerator.js:582, 905",
+    "scenario": "A merchandiser writes T&C with a bullet list in the editor; react-quill-new 3.8.3 saves getSemanticHTML() (<ul><li>). The sanitiser added for U206 re-emits quill.root.innerHTML, which in Quill 2 is <ol><li data-list=\"bullet\"> with indent/alignment as ql-indent-N / ql-align-* classes. Those are only styled under .ql-editor (quill.snow.css), and neither the read-only div (.rich-text-readonly) nor the print .terms-content has that class, so a user without update rights and every supplier receiving the PO see 1. 2. 3. instead of bullets and lose nesting. The .rich-text-readonly list CSS is also only injected when an editor (edit mode) is mounted.",
+    "fix": "Have the sanitiser return quill.getSemanticHTML() (what the editor stores), or keep root markup but render it inside a .ql-editor container in both the viewer and the print; move the read-only CSS out of the edit-mode <style> block.",
+    "visible": "visible: bullets, nesting and alignment render as the author typed them (restores the pre-U206 look)",
+    "estimateHours": 2,
+    "status": "open",
+    "note": "Verified in node_modules: quill 2.0.3 formats/list.js ListContainer.tagName='OL' with data-list; react-quill-new lib/index.js:47 onChange passes getSemanticHTML. Commit 1bc1508 claimed byte-identical output; that holds only for HTML already in Quill root markup, not for what the current editor saves. Arguably P1 since it is on every PO print with a bulleted T&C. Raised to P1 by the lead: a regression from the U206 gate fix that shows on every printed PO with bulleted terms. Verified: react-quill-new saves getSemanticHTML() (lib/index.js:47), and sanitizeRichTextWith returns quill.root.innerHTML."
+  },
+  {
+    "id": "U386",
+    "module": "shared",
+    "screen": "ApprovalActionBar",
+    "severity": "P2",
+    "rules": [
+      4
+    ],
+    "title": "A slow approval-history response for the previous document can land last, so Approve/Reject acts on the previous document's request while the dialog names the current one",
+    "location": "src/components/approval/ApprovalActionBar.jsx:86-105, 133-142",
+    "scenario": "On CostingView (or any view whose entityId changes without remounting the bar) the user moves from cost sheet A to B while A's getApprovalHistory is still in flight; B's response arrives first, then A's overwrites request. The bar now shows A's level, and Approve sends processApprovalAction(A.request.id) while the dialog and success toast say B's number.",
+    "fix": "Ignore stale responses (request token or AbortController keyed on entityType/entityId) and reset request when the entity changes.",
+    "visible": "not visible",
+    "estimateHours": 1,
+    "status": "open",
+    "note": "Needs out-of-order responses; MyApprovals unmounts the bar on drawer close so it is safe there."
+  },
+  {
+    "id": "U387",
+    "module": "shared",
+    "screen": "NotificationCenter",
+    "severity": "P2",
+    "rules": [
+      1,
+      4
+    ],
+    "title": "The unread badge is fetched once per session, so without push it never shows new notifications and 'Mark all read' stays disabled while unread rows are visible",
+    "location": "src/components/NotificationCenter.jsx:93-97, 115-122, 215",
+    "scenario": "A user who has not enabled push (or whose SW message is lost) keeps the app open; new approval notifications arrive on the server. The bell badge stays at its login-time value (e.g. 0). Opening the panel lists the new unread rows, but unreadCount is not recomputed from them, so the badge stays 0 and the 'Mark all read' button is disabled (disabled={unreadCount === 0}).",
+    "fix": "Refresh the count when the panel opens (and on focus/visibility or a modest interval), or derive it from the loaded list when the panel is open.",
+    "visible": "visible: the badge reflects new notifications; Mark all read enables when unread rows exist",
+    "estimateHours": 1.5,
+    "status": "open"
+  },
+  {
+    "id": "U388",
+    "module": "shared",
+    "screen": "SwipeableNotificationItem",
+    "severity": "P2",
+    "rules": [
+      22
+    ],
+    "title": "A quick vertical scroll of the notification list on a tablet can delete a notification with no undo",
+    "location": "src/components/SwipeableNotificationItem.jsx:99-132",
+    "scenario": "On a tablet the user flicks the notification list up; the finger drifts 15 px sideways in ~25 ms. touchmove marks isDragging once |deltaX|>10 without comparing it to vertical movement, and touchend triggers when velocity |deltaX|/elapsed > 0.5 px/ms, so 15/25 = 0.6 fires the swipe-left branch and calls onDelete - the notification is deleted on the server with no confirm or undo.",
+    "fix": "Lock the gesture to horizontal only when |deltaX| clearly exceeds |deltaY|, require a minimum distance alongside the velocity test, and offer undo before deleting.",
+    "visible": "visible: scrolling no longer deletes; deliberate swipes behave as now",
+    "estimateHours": 1.5,
+    "status": "open"
+  },
+  {
+    "id": "U389",
+    "module": "shared",
+    "screen": "Laya AI (GenieProvider)",
+    "severity": "P2",
+    "rules": [
+      38
+    ],
+    "title": "Laya AI conversations survive logout in sessionStorage, so the next user in the same tab sees them and sends them to the AI as their own history",
+    "location": "src/components/genie/GenieProvider.jsx:7-20, 46-53; src/components/genie/useGenieChat.js:28-29, 37-42; src/services/auth/sessionStore.js:178-197; src/pages/master/genie/MasterAssistant.jsx:14",
+    "scenario": "On a shared factory PC, user A asks Laya on Master Data (storageKey 'master', shared by all users) or on a costing sheet about prices and buyers, then logs out. clearAll() removes only auth keys; 'avarsh-genie-threads' stays in sessionStorage. User B logs in in the same tab, opens Master Data and Laya: A's conversation is shown, and B's next question sends the last 12 of A's messages as history to /genie.",
+    "fix": "Remove 'avarsh-genie-threads' in clearAll() (and on branch change), or key the threads by user id.",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U390",
+    "module": "shared",
+    "screen": "PantoneColorInput (Item Master colour attribute)",
+    "severity": "P2",
+    "rules": [
+      8
+    ],
+    "title": "Picking a Pantone suggestion and saving without pressing the tick stores the raw typed text instead of 'code / name'",
+    "location": "src/components/PantoneColorInput.jsx:56-63, 93-111, 187-199",
+    "scenario": "In Item Master the user types '18-1662' in the colour attribute: onChange('') clears the value and the search runs. They click a suggestion; the input's blur timer (200 ms, stale closure with selectedCode=null) then calls onChange('18-1662'). The name box appears pre-filled with 'Flame Scarlet', but the user clicks the form's Save without pressing Enter or the tick, so the variant is saved with colour '18-1662' rather than '18-1662 TCX / Flame Scarlet' (and attribute-derived variant codes follow the wrong value).",
+    "fix": "Commit `${code} / ${name}` as soon as a suggestion is picked (the tick only renames), and drop the stale blur write when a suggestion was chosen.",
+    "visible": "visible: the picked colour is kept even if the user does not press the tick",
+    "estimateHours": 1.5,
+    "status": "open",
+    "note": "Blur-timer ordering read from code, not reproduced in a browser."
+  },
+  {
+    "id": "U391",
+    "module": "shared",
+    "screen": "SwipeableNotificationItem / FileUpload",
+    "severity": "P3",
+    "rules": [
+      33
+    ],
+    "title": "Notification rows and action chips, and the FileUpload drop area, can only be used with a mouse or touch",
+    "location": "src/components/SwipeableNotificationItem.jsx:182-186, 217-221; src/components/FileUpload.jsx:325-371",
+    "scenario": "A keyboard user cannot open a notification or press its Approve/Reject chip (div/span with onClick, no role or tabIndex), and cannot open the file picker from the FileUpload area (div onClick; the hidden input has no name/id).",
+    "fix": "Give them role=button, tabIndex=0 and Enter/Space handlers (or use buttons), and an id/name on the hidden input.",
+    "visible": "not visible",
+    "estimateHours": 1,
+    "status": "open"
+  },
+  {
+    "id": "U392",
+    "module": "shared",
+    "screen": "FormInputNumber",
+    "severity": "P3",
+    "rules": [
+      31
+    ],
+    "title": "The percentage and quantity variants of FormInputNumber pass addonAfter, which antd 6.2.2 deprecates on InputNumber (console warning)",
+    "location": "src/components/form/FormInputNumber.jsx:26-33; callers src/pages/po/components/MarkerUploadCard.jsx:33; src/pages/po/workorder/WorkOrderForm.jsx:249",
+    "scenario": "Opening the Cutting PO marker card or the Work Order form logs 'addonAfter is deprecated, use Space.Compact' (node_modules/antd/es/input-number/index.js:150-151).",
+    "fix": "Render the % / UOM suffix with Space.Compact plus an addon (or the suffix prop) so the look is unchanged.",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open",
+    "note": "Distinct from U202 (Input, not InputNumber)."
+  },
+  {
+    "id": "U393",
+    "module": "shared",
+    "screen": "Unused shared components",
+    "severity": "P3",
+    "rules": [
+      34
+    ],
+    "title": "Six shared components and two PermissionGuard exports are imported nowhere",
+    "location": "src/components/FilePreviewGrid.jsx; src/components/ImagePreview.jsx; src/components/SummaryCard.jsx; src/components/InfoPopover.jsx; src/components/ComingSoon.jsx; src/components/LoadingState.jsx; src/components/PermissionGuard.jsx:37-61 (withPermission, usePermission)",
+    "scenario": "grep over src/ finds no importer of these files or exports; they are maintained and reviewed for nothing (e.g. ImagePreview never resets its error state when src changes, a latent bug in dead code).",
+    "fix": "Delete them (knip will keep them out).",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U394",
+    "module": "shared",
+    "screen": "QuickCreateProvider",
+    "severity": "P3",
+    "rules": [
+      4
+    ],
+    "title": "Closing a quick-create drawer while it saves still runs the caller's onCreated, and also closes any drawer opened since",
+    "location": "src/components/quickcreate/QuickCreateProvider.jsx:16-21; src/components/quickcreate/QuickCreateDrawer.jsx:31-41",
+    "scenario": "On the costing sheet the user clicks Create in New material, then closes the drawer and opens New buyer. The first save returns: done() (closed over the old request) calls the material row's onCreated and then setRequest(null), shutting the New buyer drawer the user is typing in.",
+    "fix": "In done(), act only if the request id still matches the open request (otherwise just call that request's onCreated).",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U395",
+    "module": "shared",
+    "screen": "Dashboard (Pending POs, Recent Orders cards)",
+    "severity": "P3",
+    "rules": [
+      28
+    ],
+    "title": "'View All' on two dashboard cards is a plain href, so it reloads the whole app instead of navigating",
+    "location": "src/components/dashboard/PendingPosCard.jsx:52; src/components/dashboard/RecentOrdersCard.jsx:49",
+    "scenario": "Clicking View All on Pending Supplier PO does a full page load: the in-memory access token is dropped and re-fetched via the refresh cookie, the store cache is cold and an installed PWA flashes the boot screen.",
+    "fix": "Use react-router Link (or navigate) for both links.",
+    "visible": "visible: the list opens without a full reload",
+    "estimateHours": 0.3,
+    "status": "open"
+  },
+  {
+    "id": "U396",
+    "module": "preview",
+    "screen": "Finishing - Receiving and External Process",
+    "severity": "P1",
+    "rules": [
+      10
+    ],
+    "title": "Three Finishing tabs write real production records while the screen's Preview banner says nothing entered there is saved to the server",
+    "location": "src/utils/permissions.js:308-311, 573-574; src/components/PreviewBanner.jsx:15; src/pages/production/finishing/FinishingWorkspace.jsx:47; src/pages/production/finishing/ReceivingDrawer.jsx:125-133; src/pages/production/finishing/GarmentIssueDrawer.jsx:88; src/pages/production/finishing/GarmentReceiveDrawer.jsx:58; src/pages/production/finishing/GarmentCheckForm.jsx:89; src/services/production/finishingService.js:50-63; src/services/production/finishingProcessApi.js:1-5",
+    "scenario": "/production/finishing is flagged preview:true, so every tab shows 'Preview: data entered here is kept in this browser only and is not saved to the server', and the header says 'design preview on sample data'. A supervisor tries things out on the tabs. (1) Receiving > Record Receiving sends PUT /sewing/garment-issues/{id}/receipt to the production API. A full receipt moves the sewing note to ACKNOWLEDGED and it is no longer offered. The finishing RCV record is held only in a module-level object (finishingMockApi.js:18-30) and is gone on the next reload. (2) External Process > Issue Garments, Receive Garments and Garment Check call POST /finishing/process-issues, /process-returns and /garment-checks. Process issues and receipts against a Garment Process PO move that PO's balances and status (GarmentIssuePoLink), and so its billing. The user was told none of this reaches the server.",
+    "fix": "Narrow the banner to the mock tabs, either by tab (a per-tab preview flag) or by having PreviewBanner skip ?tab=external-process. Mark the Receiving drawer as live, or stop it posting to Sewing until Finishing receiving has its own API, and at cutover save both in one server transaction.",
+    "visible": "visible: the banner disappears on External Process and the Receiving drawer says it posts to Sewing",
+    "estimateHours": 3,
+    "status": "open",
+    "note": "The External Process tab has been on the real API since the job-work release; it was put inside a preview workspace."
+  },
+  {
+    "id": "U397",
+    "module": "preview",
+    "screen": "Finishing - mock tabs",
+    "severity": "P2",
+    "rules": [
+      10,
+      1
+    ],
+    "title": "Finishing's mock tabs keep their data in a plain in-memory object, so every entry is lost on reload, although the banner says it is kept in this browser",
+    "location": "src/services/production/finishingService.js:1-8; src/services/production/finishingMockApi.js:18-30, 52-185; src/services/production/finishingMockData.js; src/utils/permissions.js:573-574",
+    "scenario": "A supervisor enters an hourly sheet, a checking sheet and a spot-wash batch. Each saves with a success toast and a document number. After a page refresh (or an app update, a logout, or a PWA restart) all of them have gone back to the seed rows. The banner said 'kept in this browser', which suggests localStorage, the way the Job Work preview behaves. Before go-live, Receiving (the RCV record), Hourly Stations, Spot Wash, Checking (and its auto-created alterations), Alterations, Metal Detection and needle log, Shade Segregation, the measurement chart (finishingMockData specPoints) and the Dashboard aggregates all need API endpoints. The seed orders and employees must be replaced by masters.",
+    "fix": "Either persist the mock through createDemoStore like Job Work, or change this screen's banner to say entries are lost on reload. Plan the API cutover per tab and flip USE_MOCK_FINISHING_DATA per tab, not for the whole module.",
+    "visible": "visible: entries survive a reload (or the banner says they will not)",
+    "estimateHours": 2,
+    "status": "open",
+    "note": "One finding for the mock dependency. The cutover itself is a module build, not estimated here."
+  },
+  {
+    "id": "U398",
+    "module": "preview",
+    "screen": "Finishing - Receiving",
+    "severity": "P2",
+    "rules": [
+      5,
+      4
+    ],
+    "title": "Two finishing users receiving parts of one sewing note at the same time overwrite each other's receipt, because the receipt is sent as an absolute cumulative quantity with no version",
+    "location": "src/pages/production/finishing/ReceivingDrawer.jsx:38-54, 84-86, 125-128; src/services/production/sewingApi.js:292-295; erp/production/sewing/service/SewGarmentIssueService.java:149-185; erp/production/sewing/dto/SewGarmentReceiptRequest.java:11-24",
+    "scenario": "Note GI-12 has 200 pcs of size M. Users A and B both open the drawer and see 0 already received. A records 120 and the UI sends receivedQty = 0 + 120. B records 50 a minute later and the UI sends 0 + 50. The server sets line.receivedQty = 50 (an absolute value, with no version check and no 'never below what was already received' check). Sewing now shows 50 of 200 received after 170 pieces arrived, and the note is offered again for 150.",
+    "fix": "Send the delta received now (or the version read), and have SewGarmentIssueService add it to the stored quantity under a row lock, refusing a total above currentQty.",
+    "visible": "not visible",
+    "estimateHours": 3,
+    "status": "open"
+  },
+  {
+    "id": "U399",
+    "module": "preview",
+    "screen": "Finishing - External Process",
+    "severity": "P2",
+    "rules": [
+      15,
+      6
+    ],
+    "title": "External Process lists only the newest 200 issues, receipts and checks, so an open issue outside that window cannot be received or checked",
+    "location": "src/services/production/finishingProcessApi.js:10-15, 27-30, 55-58; src/pages/production/finishing/GarmentProcessTab.jsx:38-44, 108, 128-130, 153; src/pages/production/finishing/GarmentCheckForm.jsx:39-41; erp/production/finishingroom/service/GarmentIssueService.java:54",
+    "scenario": "After a busy season there are 230 process issues. The tab fetches page 0, size 200, sorted by issueDate DESC and pages it in the browser. The oldest 30 are never loaded. An embroidery lot issued in the first week that is still with the vendor is missing from the Process PO list in 'Receive Garments' (built from openIssues) and in the New Garment Check picker. The vendor's DC cannot be booked from the UI, and the job-work bill (D3) cannot follow.",
+    "fix": "Page the three registers on the server (useServerList). Load the receive and check pickers with status=ISSUED,PARTIALLY_RETURNED (the API already filters by status) instead of reusing the page of 200.",
+    "visible": "visible: the tables page on the server; old open issues appear in the pickers",
+    "estimateHours": 4,
+    "status": "open"
+  },
+  {
+    "id": "U400",
+    "module": "preview",
+    "screen": "Finishing - Checking",
+    "severity": "P2",
+    "rules": [
+      42
+    ],
+    "title": "The Final AQL verdict counts every defect against the AQL 2.5 accept number, ignoring the critical zero-tolerance and minor AQL 4.0 rules the screen displays, and the browser sends that verdict",
+    "location": "src/pages/production/finishing/CheckingForm.jsx:83-90, 122; src/utils/finishingConstants.js:81-86, 110-123; src/pages/production/finishing/CheckingDefectsCard.jsx:22-27",
+    "scenario": "A Final check on a 500-pc lot (sample 50, Ac 3 / Re 4) logs one Critical defect (broken needle fragment). defects = 1 <= 3, so verdict = ACCEPTED, while the defect row shows 'Critical - Zero tolerance - any one rejects the lot'. The reverse also happens: 4 Minor defects (AQL 4.0 would accept) reject the lot. The client-computed verdict, sampleSize, acceptNo and rejectNo are saved as-is.",
+    "fix": "Compute the verdict per severity (any critical rejects; major vs AQL 2.5; minor vs AQL 4.0), and at cutover compute it on the server from the defect rows. Add Vitest cases for aqlSample and the verdict.",
+    "visible": "visible: some lots change from Accepted to Rejected",
+    "estimateHours": 3,
+    "status": "open",
+    "note": "Mock-backed today; the rule lives in the screen, so it survives the cutover."
+  },
+  {
+    "id": "U401",
+    "module": "preview",
+    "screen": "Finishing - Checking",
+    "severity": "P3",
+    "rules": [
+      7
+    ],
+    "title": "Defect rows are keyed by array index, so deleting a row moves its inputs onto the next defect",
+    "location": "src/pages/production/finishing/CheckingDefectsCard.jsx:41-44, 54",
+    "scenario": "Three defect rows; the user deletes the first one while the second row's Count input is focused or its select is open. The keys shift (rowKey = defects.indexOf(r)) and React reuses the components for different rows, so the focused or open control now belongs to a different defect.",
+    "fix": "Give each new defect row a monotonic key when it is added and use it as rowKey.",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U402",
+    "module": "preview",
+    "screen": "Finishing (API-backed tabs)",
+    "severity": "P3",
+    "rules": [
+      2
+    ],
+    "title": "Catch blocks on Finishing's real-API calls add a second toast on top of the interceptor's",
+    "location": "src/pages/production/finishing/ReceivingDrawer.jsx:53, 137; src/pages/production/finishing/GarmentProcessTab.jsx:43, 57; src/pages/production/finishing/GarmentReceiveDrawer.jsx:69; src/pages/production/finishing/GarmentCheckForm.jsx:44; src/pages/production/finishing/GarmentIssueDrawer.jsx:38; src/pages/production/finishing/CheckingForm.jsx:75",
+    "scenario": "Receive Garments is refused with 400 'Cannot receive 12 ... only 10 are still with the vendor'. The interceptor toasts it, and GarmentReceiveDrawer:69 toasts the same message again. The other locations add a generic second toast ('Failed to load ...'). The mock-backed catches (AlterationDrawer:96, CheckingForm:130, FinishingHourlyTab:55 and others) will duplicate the same way once they are cut over.",
+    "fix": "Use toastUnlessHandled(message, e, fallback) in each catch, as GarmentCheckForm:97 already does.",
+    "visible": "visible: one toast instead of two",
+    "estimateHours": 1,
+    "status": "open"
+  },
+  {
+    "id": "U403",
+    "module": "preview",
+    "screen": "Job Work (outward tracker + inward)",
+    "severity": "P2",
+    "rules": [
+      10,
+      11
+    ],
+    "title": "The whole Job Work workspace runs on a localStorage demo with no API behind it; this is what must change before it goes live",
+    "location": "src/services/production/jobwork/jobWorkTrackerEnv.js:1-6; src/services/production/jobwork/jobWorkTrackerApi.js:1-15; src/services/production/jobwork/jobWorkInwardApi.js:1-22; src/services/production/jobwork/demoStore.js:1-40; src/pages/production/jobwork/JobWorkWorkspace.jsx:69-91; src/pages/production/jobwork/receipts/ReceiptDrawer.jsx:52; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:58-66; src/utils/permissions.js:316-330",
+    "scenario": "Every facade (tracker, sheet, receipts, pull-backs, materials, inward orders, party stock, returns, statements) delegates to trackerMock*/inwardMock* over localStorage, and seeds dates relative to today. It is marked as a mock clearly (banner plus a purple 'Mock - no data is saved to the server' tag), so it is unlikely to be mistaken for real data. Before go-live: (a) the /api/v1/job-work/jobs, sheets, receipts, pull-backs, inward and party-stock endpoints do not exist; (b) the 'production-job-work' permission key exists only in the web app (permissions.js:316-318), so server ENFORCE refuses everything until the key and its grant migration ship; (c) DailyUpdateTab reads mock error details from e.details, which axios puts at e.response.data; (d) the vendor receipt sends vendorDcDate = the receipt date with no DC-date input, against D1 (DC no. plus DC date mandatory); (e) remove 'Reset demo data' and the seed.",
+    "fix": "Treat it as an API build. At cutover replace each facade body with axios, read error details from e.response.data, add a DC date field, ship the permission key, then remove preview:true.",
+    "visible": "not visible",
+    "estimateHours": 2,
+    "status": "open",
+    "note": "One finding for the mock dependency; the API build itself is not estimated."
+  },
+  {
+    "id": "U404",
+    "module": "preview",
+    "screen": "Job Work - Daily Update",
+    "severity": "P2",
+    "rules": [
+      8
+    ],
+    "title": "A coordinator's unsaved daily-sheet figures are thrown away without asking when the date changes, the vendor changes, or the user leaves the page",
+    "location": "src/pages/production/jobwork/daily/useSheetEdits.js:11-18, 43-48; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:24-25, 103-109",
+    "scenario": "A coordinator types cumulative figures for 6 jobs after a vendor call, then changes the date picker to check yesterday. sheetKey (vendor|date) changes, setEdits({}) runs, and every typed figure is gone with no message. Picking another vendor shows only an info toast after the edits are already gone. Clicking another menu item unmounts the tab silently, because only beforeunload (closing the browser) is guarded.",
+    "fix": "Use useUnsavedChanges(dirtyIds.length > 0) for in-app navigation, and confirm before applying a vendor or date change while edits are dirty.",
+    "visible": "visible: a confirm dialog before edits are discarded",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U405",
+    "module": "preview",
+    "screen": "Job Work - Daily Update / Receipts",
+    "severity": "P2",
+    "rules": [
+      4
+    ],
+    "title": "The daily sheet and the receipt drawer keep whichever response lands last, so a save can post one vendor's or job's figures under another",
+    "location": "src/pages/production/jobwork/daily/useVendorSheet.js:11-27; src/pages/production/jobwork/daily/DailyUpdateTab.jsx:52-61; src/pages/production/jobwork/receipts/ReceiptDrawer.jsx:29-32, 52",
+    "scenario": "On the live API, a coordinator picks vendor A and then quickly vendor B. If A's sheet response arrives after B's, the sheet shows A's jobs while vendorId = B, and Save posts {vendorId: B, jobs: [A's jobs]}. In ReceiptDrawer, switching the job quickly can leave job A's form and rows on screen, and postReceipt(jobId B, rows of A) then books A's colours and sizes against B. The mock's fixed latency hides this today.",
+    "fix": "Guard both loads with a request id or AbortController (useRecord), and send the vendor and job ids from the loaded sheet or form, not from the picker state.",
+    "visible": "not visible",
+    "estimateHours": 2,
+    "status": "open"
+  },
+  {
+    "id": "U406",
+    "module": "preview",
+    "screen": "Job Work - Inward statements / prints",
+    "severity": "P3",
+    "rules": [
+      39,
+      36
+    ],
+    "title": "Inward print previews render in an unsandboxed same-origin iframe",
+    "location": "src/pages/production/jobwork/inward/components/PrintPreviewDrawer.jsx:14; src/pages/production/jobwork/inward/statements/StatusReport.jsx:36; src/utils/jobWorkInward/inwardPrint.js:1-76",
+    "scenario": "The return challan, shortage report and status report are injected via <iframe srcDoc> with no sandbox attribute, so the document runs with the app's origin, cookies and token access. Every value goes through esc() today, so there is no live XSS, but one future unescaped field (a principal name, a defect text) becomes stored XSS in the app origin.",
+    "fix": "Add sandbox=\"allow-modals\" (or an empty sandbox) to both iframes; printing already goes through openPrintWindow.",
+    "visible": "not visible",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U407",
+    "module": "preview",
+    "screen": "Job Work - business rules",
+    "severity": "P3",
+    "rules": [
+      42
+    ],
+    "title": "About 1,700 lines of pure job-work rules (stage plans, sheet and receipt validation, pull-back clamp and pay, knock-off, return charges) have no Vitest tests",
+    "location": "src/utils/jobWorkTracker/*.js (earnings, planRules, pullBackRules, sheetRules, snapshotRules, splitFigures, workingDays); src/utils/jobWorkInward/*.js (chargeRules, knockOff, materialRules, orderRules, partyStockRules, progressRules, returnRules)",
+    "scenario": "Only jobWorkBillCalc has tests (jobWorkBillCalc.test.js plus the golden JSON). At the API cutover these rules are the spec the Java must reproduce, for example clampOnApproval cutting the most-advanced lines first, splitBySize largest remainder, and knockOff oldest-challan-first. A regression in a rule that both the UI and the mock run would not be caught.",
+    "fix": "Add a golden-case Vitest file per rule module, like jobWorkBillGolden.json, before the Java port.",
+    "visible": "not visible",
+    "estimateHours": 6,
+    "status": "open"
+  },
+  {
+    "id": "U408",
+    "module": "preview",
+    "screen": "Job Work - Pull-backs",
+    "severity": "P3",
+    "rules": [
+      9
+    ],
+    "title": "Pull-back pay is computed in unrounded floats per piece and per line, so the line amounts shown do not add up to the 'Vendor earns' total",
+    "location": "src/utils/jobWorkTracker/earnings.js:45-81; src/services/production/jobwork/trackerMockPullBackContext.js:72-78; src/pages/production/jobwork/pullback/PullBackPayCard.jsx:36-37, 52; src/pages/production/jobwork/jwFormat.js:9",
+    "scenario": "A Work Order at Rs 12.50 per piece with three finishing stages in scope earns fin x 1/3 per stage. The per-piece amounts are recurring decimals (fin share x 1/3). Each line amount is perPiece x qty, rounded only when displayed, and the total sums the unrounded values, so the displayed lines can differ from the displayed total by a paisa. When pull-back pay feeds the vendor's bill at cutover, the paise will not reconcile.",
+    "fix": "Round the per-line amount to 2 dp (round2 from jobWorkPoCalc) and sum the rounded lines; pin it in the golden cases the Java will follow.",
+    "visible": "visible: line amounts add up to the total",
+    "estimateHours": 1,
+    "status": "open"
+  },
+  {
+    "id": "U409",
+    "module": "preview",
+    "screen": "Job-work Bill Passing",
+    "severity": "P2",
+    "rules": [
+      10,
+      11
+    ],
+    "title": "Job-work bills, their deductions and the Vendor Debit Note are a Stage 1 browser demo; this is what must change before it goes live",
+    "location": "src/services/inventory/jobWorkBill/jobWorkBillService.js:1-60; src/services/inventory/jobWorkBill/jwbDemoStore.js:1-30; src/pages/inventory/bill-passing/BillPassingList.jsx:29, 105; src/pages/inventory/bill-passing/jobwork/JobWorkBillForm.jsx:105-118; src/utils/vendorDebitNotePrint.js:72; erp/production/finishingroom/dto/GarmentReturnRequest.java:23-24",
+    "scenario": "All calls run against localStorage after a 300 ms timer; the billable POs and DCs come from a demo seed, not the live CPP and GPO, and VDN numbers are demo counters. The markers are good: a 'Demo' tag on list rows, a forced Preview banner, a 'Demo data' tag, a DEMO watermark on the VDN print, and the list opens on Supplier PO. Before go-live (owner sign-off of Stage 1 first): the inventory/billpassing/jobwork API plus EntityType.JOB_WORK_BILL; checks re-anchored to one inward DC (D2), which is not true today because GarmentCheckForm checks a whole process issue; vendorDcNo @NotBlank plus vendorDcDate on /finishing/process-returns and the cutting return (D1, which the API does not enforce or store today); the default source switched to All; and the jwb* demo files and JOB_WORK_BILL_DEMO removed.",
+    "fix": "Follow the Stage 2 plan (need-to-implement-the-proud-dove.md section 2); land the DC-date and DC-anchored check changes first, since the bill reads them.",
+    "visible": "not visible",
+    "estimateHours": 2,
+    "status": "open",
+    "note": "Decided behaviour (D1-D9) is not reported as a defect. One finding for the mock dependency."
+  },
+  {
+    "id": "U410",
+    "module": "preview",
+    "screen": "Job-work Bill Passing",
+    "severity": "P1",
+    "rules": [
+      42,
+      51
+    ],
+    "title": "A confirmed deduction keeps its old amount after the bill's lines change, so the debit note and net payable come out wrong",
+    "location": "src/utils/jobWorkBillCalc.js:97-145, 157-189; src/services/inventory/jobWorkBill/jwbMockBills.js:98-130; src/pages/inventory/bill-passing/jobwork/JobWorkBillForm.jsx:53-60, 125",
+    "scenario": "A Garment Process PO line: 500 pcs invoiced at Rs 4.50 (2,250.00), 475 accepted. Propose deductions gives REJECTION_CHARGE 112.50 + GST, and the verifier confirms it. The clerk then corrects the vendor's invoice quantity to 480 (the vendor actually billed 480), so the line's rejection amount is now 22.50. mockUpdateBill re-derives the lines but leaves the confirmed deduction at 112.50. A second 'Propose' skips that line and type because confirmed rows are 'ruled', and no exception compares confirmed system deductions with the current line figures. Net payable = 2,160 + GST - (112.50 + GST): the vendor is under-paid by Rs 90 + GST, and the VDN prints 112.50 (25 pcs) when only 5 billed pieces were rejected.",
+    "fix": "Store the line figure each system deduction was proposed from, and raise a BLOCK exception (or reset the row to PROPOSED) when a save changes it. Add the case to jobWorkBillGolden.json so Stage 2's Java carries the same rule.",
+    "visible": "visible: an edited bill asks to re-confirm the affected deductions",
+    "estimateHours": 4,
+    "status": "open",
+    "note": "Mock-backed today, but the rule is in the shared calculator that the Stage 2 Java must reproduce, so it survives the cutover."
+  },
+  {
+    "id": "U411",
+    "module": "preview",
+    "screen": "Job-work Bill Passing",
+    "severity": "P2",
+    "rules": [
+      42
+    ],
+    "title": "The bill calculator rounds money with the Number.EPSILON trick, which rounds some half-paisa amounts down where the PO calculator and Java HALF_UP round up",
+    "location": "src/utils/jobWorkBillCalc.js:15, 43-47, 70-75, 78-97; src/utils/vendorDebitNotePrint.js:19, 46-50; src/utils/jobWorkPoCalc.js:15-25",
+    "scenario": "r2 = Math.round((x + EPSILON) * 100) / 100 only corrects values below about 1. GST at 5% on a taxable value of 10,240.90 is 512.045: the bill computes 512.04, while poValue (round2) and BigDecimal HALF_UP give 512.05. So the job-work PO and its bill disagree by a paisa, TAX_MISMATCH figures are off, and the golden file the Stage 2 Java must 'reproduce' encodes binary-float rounding that HALF_UP will not match. Other cases: 25.5 units x Rs 1.49 = 37.995 becomes 37.99, and 250.5 x 1.17 = 293.085 becomes 293.08.",
+    "fix": "Use round2/round3 from jobWorkPoCalc (decimal-string half-up) in jobWorkBillCalc and vendorDebitNotePrint, and add half-paisa cases to the golden file.",
+    "visible": "visible: some amounts change by Rs 0.01",
+    "estimateHours": 1.5,
+    "status": "open"
+  },
+  {
+    "id": "U412",
+    "module": "preview",
+    "screen": "Job Work / Job-work Bill Passing (demo stores)",
+    "severity": "P3",
+    "rules": [
+      38
+    ],
+    "title": "The three preview stores in localStorage survive logout, so the next user of the browser sees the previous user's demo entries",
+    "location": "src/services/production/jobwork/demoStore.js:9-40; src/services/production/jobwork/jobWorkTrackerStore.js:11; src/services/production/jobwork/inwardStore.js:9; src/services/inventory/jobWorkBill/jwbDemoStore.js:10; src/services/auth/sessionStore.js:178-197",
+    "scenario": "On a shared factory PC, user A enters principals (names, GSTINs, addresses) and job-work bills in the previews, then logs out. clearAll removes only currentUser and sessionActive, so user B, possibly on another branch, opens Job Work and sees A's entries. Rule 38 requires preview stores to be cleared on logout, expiry and branch change.",
+    "fix": "Remove the avarsh.*.mockStore.v1 keys in sessionStore.clearAll and on branch switch; the demo reseeds on next load.",
+    "visible": "visible: previews start from the seed after logout",
+    "estimateHours": 0.5,
+    "status": "open"
+  },
+  {
+    "id": "U413",
+    "module": "po",
+    "screen": "Supplier PO print",
+    "severity": "P3",
+    "rules": [],
+    "title": "On a PO with a revised delivery date the printed details strip has five cells in a four-column grid, so Tax Type wraps alone onto a second row beside three empty grey cells",
+    "location": "src/utils/poPdfGenerator.js:426-436, 682-706",
+    "scenario": "A supplier PO whose delivery date was revised is printed: PO Date, PO Type, Delivery Date and Revised Delivery Date fill the first row, and Tax Type sits alone on a second row with the grid's grey background showing in the three empty cells. POs without a revision print a tidy single row.",
+    "fix": "Use five columns when the revised date is present (or always reserve the cell), so the strip stays one row.",
+    "visible": "visible: the revised-PO print strip is one row",
+    "estimateHours": 0.25,
+    "status": "open",
+    "note": "Carried over from batch 1's unverified list; verified by the lead on phase1."
   }
 ]
