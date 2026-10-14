@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { Table, Empty } from 'antd';
 import dayjs from 'dayjs';
-import { formatCurrency, formatNumber } from '../../../utils/formatters';
+import { formatNumber } from '../../../utils/formatters';
 
 /**
  * Formats a cell value based on the field type from the report definition.
@@ -15,7 +15,9 @@ const formatCellValue = (value, fieldType) => {
     case 'DATETIME':
       return dayjs(value).isValid() ? dayjs(value).format('DD-MMM-YYYY HH:mm') : '\u2014';
     case 'CURRENCY':
-      return formatCurrency(value);
+      // No symbol: a report column does not say its currency (orders and the USD price columns
+      // are not rupees), and the Excel and PDF exports print the plain number too (U307)
+      return formatNumber(value, 2);
     case 'NUMBER':
       return formatNumber(value, 2);
     case 'BOOLEAN':
