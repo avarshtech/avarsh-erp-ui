@@ -227,7 +227,7 @@ const OrderList = () => {
       width: 100,
       align: 'right',
       sorter: true,
-      render: (qty) => <Text strong>{(qty || 0).toLocaleString()}</Text>,
+      render: (qty) => <Text strong>{(qty || 0).toLocaleString('en-IN')}</Text>,
     },
     {
       title: 'Total Value',

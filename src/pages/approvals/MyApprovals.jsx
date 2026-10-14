@@ -113,7 +113,7 @@ const MyApprovals = () => {
       dataIndex: 'submittedAt',
       key: 'submittedAt',
       sorter: (a, b) => new Date(a.submittedAt) - new Date(b.submittedAt),
-      render: (ts) => (ts ? new Date(ts).toLocaleString() : '—'),
+      render: (ts) => (ts ? new Date(ts).toLocaleString('en-IN') : '—'),
     },
     {
       title: 'Waiting',

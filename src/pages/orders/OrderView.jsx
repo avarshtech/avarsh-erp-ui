@@ -365,7 +365,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   </td>
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <Text strong>{(row.total || 0).toLocaleString()}</Text>
+                  <Text strong>{(row.total || 0).toLocaleString('en-IN')}</Text>
                 </td>
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   <Text>{fmtCurrency(row.rowValue)}</Text>
@@ -381,7 +381,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
               ))}
               <td style={{ ...tdStyle, textAlign: 'right' }}>
                 <Text strong style={{ color: 'var(--success-color, #10b981)' }}>
-                  {grandQty.toLocaleString()}
+                  {grandQty.toLocaleString('en-IN')}
                 </Text>
               </td>
               <td style={tdStyle} />
@@ -751,7 +751,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
           />
           <DetailCard.Field
             label="Order Qty"
-            value={<Text strong>{(totalOrderQty || 0).toLocaleString()}</Text>}
+            value={<Text strong>{(totalOrderQty || 0).toLocaleString('en-IN')}</Text>}
             span={8}
           />
           <DetailCard.Field
@@ -778,13 +778,13 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
             <Card
               size="small"
               title={<Space><BankOutlined /><span>Branch Allocation</span></Space>}
-              extra={unallocated > 0 ? <Tag color="warning">{unallocated.toLocaleString()} pcs unallocated</Tag> : <Tag color="success">Fully allocated</Tag>}
+              extra={unallocated > 0 ? <Tag color="warning">{unallocated.toLocaleString('en-IN')} pcs unallocated</Tag> : <Tag color="success">Fully allocated</Tag>}
               style={{ marginBottom: 16 }}
             >
               <Space wrap>
                 {rows.map((a) => (
                   <Tag key={a.branchId} color="geekblue">
-                    {a.branchName || branchName(a.branchId)}{a.unitName ? ` / ${a.unitName}` : ''}: <Text strong>{(a.qty || 0).toLocaleString()}</Text> pcs
+                    {a.branchName || branchName(a.branchId)}{a.unitName ? ` / ${a.unitName}` : ''}: <Text strong>{(a.qty || 0).toLocaleString('en-IN')}</Text> pcs
                   </Tag>
                 ))}
                 {rows.length === 0 && <Text type="secondary">Not allocated to any branch yet</Text>}
@@ -835,7 +835,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
                   width: 100,
                   align: 'center',
                   onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
-                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString('en-IN')}</Text>,
                 },
                 {
                   title: 'Avg Price',
@@ -883,7 +883,7 @@ const OrderView = ({ open, orderData, pendingAction, onClose, onStatusChange }) 
               subtitle={line.destination || undefined}
               amount={fmtCurrency(line.lineTotal)}
               pills={[
-                { label: 'Qty', value: (line.lineQty || 0).toLocaleString() },
+                { label: 'Qty', value: (line.lineQty || 0).toLocaleString('en-IN') },
                 // The committed date never changes. When an upstream slip (a supplier PO or a
                 // sample request running late) has been applied to the order, the date the line
                 // is now tracking to follows it, with the cause on hover.

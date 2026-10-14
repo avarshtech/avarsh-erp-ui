@@ -1977,7 +1977,7 @@ const BOMForm = () => {
                   const colorOptions = Object.entries(colorQtyMap).map(([name, total]) => ({
                     value: name,
                     qty: total,
-                    label: `${name} — ${total.toLocaleString()}`,
+                    label: `${name} — ${total.toLocaleString('en-IN')}`,
                   }));
 
                   // A saved BOM persists only the number. Resolve it back to a colour when
@@ -1988,7 +1988,7 @@ const BOMForm = () => {
                   const resolvedColor = record.overrideBaseQtyColor || (qtyMatches.length === 1 ? qtyMatches[0].value : null);
                   const showSaved = !resolvedColor && savedQty > 0;
                   const options = showSaved
-                    ? [{ value: SAVED_BASE_QTY, qty: savedQty, label: `Saved — ${savedQty.toLocaleString()}` }, ...colorOptions]
+                    ? [{ value: SAVED_BASE_QTY, qty: savedQty, label: `Saved — ${savedQty.toLocaleString('en-IN')}` }, ...colorOptions]
                     : colorOptions;
 
                   return (
@@ -2019,7 +2019,7 @@ const BOMForm = () => {
                 if (!qty) return null;
                 return (
                   <Text style={{ fontSize: 10, color: 'var(--text-secondary)', lineHeight: 1.3, display: 'block', textAlign: 'center' }}>
-                    Base Qty ({color || 'All'}) — {qty.toLocaleString()}
+                    Base Qty ({color || 'All'}) — {qty.toLocaleString('en-IN')}
                   </Text>
                 );
               })()}
@@ -2444,12 +2444,12 @@ const BOMForm = () => {
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                             <Text strong style={{ fontSize: 13 }}>{line.buyerPoNo}</Text>
-                            <Text strong style={{ fontSize: 15, color: 'var(--primary-color)' }}>{line.lineQty.toLocaleString()}</Text>
+                            <Text strong style={{ fontSize: 15, color: 'var(--primary-color)' }}>{line.lineQty.toLocaleString('en-IN')}</Text>
                           </div>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                             {line.colors.map((c, ci) => (
                               <Tag key={ci} style={{ margin: 0, fontSize: 11 }}>
-                                {c.name}: <strong>{c.qty.toLocaleString()}</strong>
+                                {c.name}: <strong>{c.qty.toLocaleString('en-IN')}</strong>
                               </Tag>
                             ))}
                           </div>
@@ -2750,7 +2750,7 @@ const BOMForm = () => {
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text strong>{opt.buyerPoNo}</Text>
-                <Text strong style={{ color: 'var(--primary-color)', fontSize: 16 }}>{opt.qty.toLocaleString()} pcs</Text>
+                <Text strong style={{ color: 'var(--primary-color)', fontSize: 16 }}>{opt.qty.toLocaleString('en-IN')} pcs</Text>
               </div>
             </Card>
           ))}
@@ -2872,7 +2872,7 @@ const BOMForm = () => {
                       placeholder="Select Buyer PO to proceed"
                       value={line.selectedBuyerPoNo || undefined}
                       onChange={(v) => updateLine(matchByLineKey, 'selectedBuyerPoNo', v)}
-                      options={matchingPOs.map((ol) => ({ value: ol.buyerPoNo, label: `${ol.buyerPoNo} (${ol.lineQty.toLocaleString()} pcs)` }))}
+                      options={matchingPOs.map((ol) => ({ value: ol.buyerPoNo, label: `${ol.buyerPoNo} (${ol.lineQty.toLocaleString('en-IN')} pcs)` }))}
                     />
                   )}
                 </div>
@@ -2939,7 +2939,7 @@ const BOMForm = () => {
                                   <td style={{
                                     padding: '3px 8px', textAlign: 'center', borderBottom: '1px solid var(--border-color, #f5f5f5)', fontWeight: 600,
                                     background: isColorMatch ? 'var(--oq-total-cell)' : undefined,
-                                  }}>{cr.qty.toLocaleString()}</td>
+                                  }}>{cr.qty.toLocaleString('en-IN')}</td>
                                 </tr>
                               );
                             }),
@@ -2984,7 +2984,7 @@ const BOMForm = () => {
                               <Text strong={isSelected} style={{ fontSize: 12, color: isSelected ? 'var(--primary-color)' : noMatch ? 'var(--text-muted)' : undefined }}>{opt.label}</Text>
                             </div>
                             <Tag color={noMatch ? 'default' : 'blue'} style={{ fontSize: 12, margin: 0 }}>
-                              {noMatch ? 'No match' : `${qty.toLocaleString()} pcs`}
+                              {noMatch ? 'No match' : `${qty.toLocaleString('en-IN')} pcs`}
                             </Tag>
                           </div>
                         </Card>

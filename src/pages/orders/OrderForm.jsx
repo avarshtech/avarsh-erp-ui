@@ -621,7 +621,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                     </td>
                   ))}
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    <Text strong>{(row.total || 0).toLocaleString()}</Text>
+                    <Text strong>{(row.total || 0).toLocaleString('en-IN')}</Text>
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <Text>{`${currSymbol} ${(row.rowValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</Text>
@@ -651,7 +651,7 @@ const SizeBreakdownTable = ({ line, currency, onLineChange, readOnly, sizePreset
                 ))}
                 <td style={{ ...tdStyle, textAlign: 'right' }}>
                   <Text strong style={{ color: grandQty > 0 ? 'var(--success-color, #10b981)' : 'var(--error-color)', fontSize: 14 }}>
-                    {grandQty.toLocaleString()}
+                    {grandQty.toLocaleString('en-IN')}
                   </Text>
                 </td>
                 <td style={tdStyle}></td>
@@ -1712,7 +1712,7 @@ const OrderForm = () => {
         <Tag color="blue">#{idx + 1}</Tag>
         <Text strong>{destShort}</Text>
         <Text type="secondary">|</Text>
-        <Text>Qty: {(line.lineQty || 0).toLocaleString()}</Text>
+        <Text>Qty: {(line.lineQty || 0).toLocaleString('en-IN')}</Text>
         <Text type="secondary">|</Text>
         <Text style={{ color: 'var(--success-color, #10b981)' }}>
           {getCurrencySymbol(formCurrency)}{' '}
@@ -2142,7 +2142,7 @@ const OrderForm = () => {
                 styles={{ body: { padding: '12px 16px' } }}
               >
                 <div style={{ fontSize: 12, color: 'var(--text-secondary, #8c8c8c)', marginBottom: 4 }}>Order Qty</div>
-                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }}>{totalOrderQty.toLocaleString()}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--primary-color)' }}>{totalOrderQty.toLocaleString('en-IN')}</div>
               </Card>
             </Col>
             <Col xs={12} sm={8} md={6} lg={4}>
@@ -2491,7 +2491,7 @@ const OrderForm = () => {
                   width: 100,
                   align: 'center',
                   onCell: (record) => ({ rowSpan: record._rowSpan, style: { verticalAlign: 'middle' } }),
-                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString()}</Text>,
+                  render: (v) => <Text strong style={{ fontSize: 13 }}>{v.toLocaleString('en-IN')}</Text>,
                 },
                 {
                   title: 'Avg Price',
@@ -2531,7 +2531,7 @@ const OrderForm = () => {
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={2} align="center">
                       <Text strong style={{ fontSize: 15 }}>
-                        {totalOrderQty.toLocaleString()}
+                        {totalOrderQty.toLocaleString('en-IN')}
                       </Text>
                     </Table.Summary.Cell>
                     <Table.Summary.Cell index={3} align="center">

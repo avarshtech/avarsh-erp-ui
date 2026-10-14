@@ -83,7 +83,7 @@ const OrderSampleRequestSummaryCard = ({ orderNo }) => {
       style={{ marginTop: 16 }}
       extra={state.totalCourierCost > 0 && (
         <Text type="secondary" style={{ fontSize: 12 }}>
-          Sample courier cost against this order: <Text strong>{state.totalCourierCost.toLocaleString()}</Text>
+          Sample courier cost against this order: <Text strong>{state.totalCourierCost.toLocaleString('en-IN')}</Text>
         </Text>
       )}
     >

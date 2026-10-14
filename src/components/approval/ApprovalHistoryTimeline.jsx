@@ -18,7 +18,7 @@ const ACTION_META = {
   CANCEL: { color: 'gray', icon: <StopOutlined />, label: 'Cancelled' },
 };
 
-const formatTs = (ts) => (ts ? new Date(ts).toLocaleString() : '');
+const formatTs = (ts) => (ts ? new Date(ts).toLocaleString('en-IN') : '');
 
 /**
  * Renders the approval history of an entity from the centralized approval engine.

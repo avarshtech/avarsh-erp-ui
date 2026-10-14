@@ -402,7 +402,7 @@ const BOMView = ({ open, bomData, onClose }) => {
             <Text type="secondary" style={{ fontSize: 10, lineHeight: 1.3 }}>No style<br />image</Text>
           </div>
         ),
-        highlight: orderQty ? { label: 'Order Qty', value: orderQty.toLocaleString() } : undefined,
+        highlight: orderQty ? { label: 'Order Qty', value: orderQty.toLocaleString('en-IN') } : undefined,
       }}
       footer={
         <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -438,7 +438,7 @@ const BOMView = ({ open, bomData, onClose }) => {
           <DetailCard.Field label="Season" value={season} span={4} />
           <DetailCard.Field
             label="Order Qty"
-            value={orderQty ? orderQty.toLocaleString() : undefined}
+            value={orderQty ? orderQty.toLocaleString('en-IN') : undefined}
             span={4}
           />
         </DetailCard>

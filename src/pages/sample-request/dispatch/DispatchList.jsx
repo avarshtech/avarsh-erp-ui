@@ -201,7 +201,7 @@ const DispatchList = () => {
       key: 'courierCost',
       width: 100,
       align: 'right',
-      render: (v) => (v != null ? v.toLocaleString() : '—'),
+      render: (v) => (v != null ? v.toLocaleString('en-IN') : '—'),
     },
     {
       title: 'Dispatched Date',

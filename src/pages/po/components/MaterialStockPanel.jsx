@@ -16,7 +16,7 @@ const reqUom = (r) => r.reqUom || stockUom(r);
 const Uom = ({ children }) => (children
   ? <Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>{children}</Text>
   : null);
-const qty = (v, uom) => <span style={{ whiteSpace: 'nowrap' }}>{(v || 0).toLocaleString()}<Uom>{uom}</Uom></span>;
+const qty = (v, uom) => <span style={{ whiteSpace: 'nowrap' }}>{(v || 0).toLocaleString('en-IN')}<Uom>{uom}</Uom></span>;
 // Stock is this item AND variant (another colour of the item is not this line's stock)
 const hint = (label, text) => <Tooltip title={text}><span style={{ borderBottom: '1px dotted' }}>{label}</span></Tooltip>;
 const STALE_MS = 48 * 60 * 60 * 1000;
@@ -84,7 +84,7 @@ const MaterialStockPanel = ({ rows = [], materialType = 'fabric', loading = fals
     { title: 'Shortage / Surplus', dataIndex: 'shortageSurplus', width: 160, align: 'right',
       render: (v, r) => (
         <Tag color={v < 0 ? 'red' : 'green'}>
-          {v < 0 ? '▼ ' : '▲ '}{Math.abs(v || 0).toLocaleString()} {stockUom(r)}
+          {v < 0 ? '▼ ' : '▲ '}{Math.abs(v || 0).toLocaleString('en-IN')} {stockUom(r)}
         </Tag>
       ) },
   ], [materialType, allocatedEditable, handleAllocated]);

@@ -127,7 +127,7 @@ const DispatchView = ({ open, dispatchId, onClose, onEdit }) => {
               </Field>
               <Field label="Packages">{current.packages}</Field>
               <Field label="Courier Cost">
-                {current.courierCost != null ? current.courierCost.toLocaleString() : null}
+                {current.courierCost != null ? current.courierCost.toLocaleString('en-IN') : null}
               </Field>
               {current.buyingOffice && <Field label="Buying Office">{current.buyingOffice}</Field>}
               {current.handedOverTo && <Field label="Handed Over To">{current.handedOverTo}</Field>}

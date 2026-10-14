@@ -108,8 +108,8 @@ const ProductionPoView = ({ open, onClose, poType, record, onChanged }) => {
             )}
           </>
         )}
-        <Descriptions.Item label="Order Qty">{(record.totalOrderQty || 0).toLocaleString()}</Descriptions.Item>
-        <Descriptions.Item label="Planned Qty">{(record.totalPlannedQty || 0).toLocaleString()} ({record.allowancePercent}% allow.)</Descriptions.Item>
+        <Descriptions.Item label="Order Qty">{(record.totalOrderQty || 0).toLocaleString('en-IN')}</Descriptions.Item>
+        <Descriptions.Item label="Planned Qty">{(record.totalPlannedQty || 0).toLocaleString('en-IN')} ({record.allowancePercent}% allow.)</Descriptions.Item>
         {showVariance && (
           <Descriptions.Item label="Consumption Variance">
             <Tag color={vStatus.tagColor}>{variance >= 0 ? '+' : ''}{variance.toFixed(2)}% · {vStatus.label}</Tag>

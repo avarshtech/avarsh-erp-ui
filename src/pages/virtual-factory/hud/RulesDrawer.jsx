@@ -49,7 +49,7 @@ export default function RulesDrawer({ open, onClose, rules, onSave, updatedAt })
     >
       <p style={{ marginTop: 0, color: 'var(--text-secondary)' }}>
         The score combines five areas by these weights (they need not add up to 100). An area with no data today is left out.
-        {updatedAt ? ` Last changed ${new Date(updatedAt).toLocaleString()}.` : ' These are the built-in defaults.'}
+        {updatedAt ? ` Last changed ${new Date(updatedAt).toLocaleString('en-IN')}.` : ' These are the built-in defaults.'}
         {!editable && ' Only a superuser can change them.'}
       </p>
       <Form form={form} layout="horizontal" labelCol={{ span: 15 }} wrapperCol={{ span: 9 }} labelWrap initialValues={rules} disabled={!editable} size="small">

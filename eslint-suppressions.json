@@ -62,18 +62,8 @@
       "count": 1
     }
   },
-  "src/components/approval/ApprovalHistoryTimeline.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/components/branch/BranchField.jsx": {
     "react-refresh/only-export-components": {
-      "count": 1
-    }
-  },
-  "src/components/dashboard/RecentOrdersCard.jsx": {
-    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -146,36 +136,22 @@
       "count": 2
     }
   },
-  "src/pages/approvals/MyApprovals.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/bom/BOMForm.jsx": {
     "max-lines": {
       "count": 1
     },
     "no-console": {
       "count": 3
-    },
-    "no-restricted-syntax": {
-      "count": 9
     }
   },
   "src/pages/bom/BOMView.jsx": {
     "max-lines": {
       "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 2
     }
   },
   "src/pages/bom/ConsumptionMatrixDialog.jsx": {
     "max-lines": {
       "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 2
     },
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -183,9 +159,6 @@
   },
   "src/pages/bom/ProcessAllowanceModal.jsx": {
     "max-lines": {
-      "count": 1
-    },
-    "no-restricted-syntax": {
       "count": 1
     },
     "react-hooks/set-state-in-effect": {
@@ -535,11 +508,6 @@
       "count": 2
     }
   },
-  "src/pages/orders/OrderBranchAllocation.jsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
   "src/pages/orders/OrderForm.jsx": {
     "max-lines": {
       "count": 1
@@ -547,24 +515,13 @@
     "no-console": {
       "count": 1
     },
-    "no-restricted-syntax": {
-      "count": 6
-    },
     "react-hooks/set-state-in-effect": {
-      "count": 1
-    }
-  },
-  "src/pages/orders/OrderList.jsx": {
-    "no-restricted-syntax": {
       "count": 1
     }
   },
   "src/pages/orders/OrderView.jsx": {
     "max-lines": {
       "count": 1
-    },
-    "no-restricted-syntax": {
-      "count": 7
     }
   },
   "src/pages/po/BomLineSelectionDrawer.jsx": {
@@ -613,26 +570,6 @@
       "count": 1
     }
   },
-  "src/pages/po/SizeColorMatrix.jsx": {
-    "no-restricted-syntax": {
-      "count": 4
-    }
-  },
-  "src/pages/po/components/MaterialStockPanel.jsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
-  "src/pages/po/components/OrderCoveragePanel.jsx": {
-    "no-restricted-syntax": {
-      "count": 2
-    }
-  },
-  "src/pages/po/components/ProductionApprovalTimeline.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/po/components/ProductionEngineHistory.jsx": {
     "react-hooks/set-state-in-effect": {
       "count": 1
@@ -640,27 +577,17 @@
   },
   "src/pages/po/components/ProductionPoView.jsx": {
     "no-restricted-syntax": {
-      "count": 23
-    }
-  },
-  "src/pages/po/cutting/CuttingPoForm.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
+      "count": 21
     }
   },
   "src/pages/po/cutting/CuttingPoList.jsx": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 1
     }
   },
   "src/pages/po/finishing/FinishingPoForm.jsx": {
     "no-restricted-syntax": {
       "count": 5
-    }
-  },
-  "src/pages/po/finishing/FinishingPoList.jsx": {
-    "no-restricted-syntax": {
-      "count": 2
     }
   },
   "src/pages/po/order-mapping/PoOrderMappingDrawer.jsx": {
@@ -670,7 +597,7 @@
   },
   "src/pages/po/workorder/WorkOrderList.jsx": {
     "no-restricted-syntax": {
-      "count": 3
+      "count": 1
     }
   },
   "src/pages/production/packing/CartonGroupEditor.jsx": {
@@ -688,15 +615,7 @@
       "count": 1
     }
   },
-  "src/pages/reports/ReportBuilderPage.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/reports/components/AiResultsDisplay.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    },
     "react-hooks/preserve-manual-memoization": {
       "count": 1
     }
@@ -716,38 +635,8 @@
       "count": 1
     }
   },
-  "src/pages/sample-request/OrderSampleRequestSummaryCard.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/sample-request/dispatch/DispatchList.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/sample-request/dispatch/DispatchView.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/sample-request/form/MaterialsColumns.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
-  "src/pages/sample-request/form/SectionHeader.jsx": {
-    "no-restricted-syntax": {
-      "count": 1
-    }
-  },
   "src/pages/sample-request/invoice/SampleInvoiceForm.jsx": {
     "max-lines": {
-      "count": 1
-    }
-  },
-  "src/pages/virtual-factory/hud/RulesDrawer.jsx": {
-    "no-restricted-syntax": {
       "count": 1
     }
   },
@@ -884,7 +773,7 @@
       "count": 2
     },
     "no-restricted-syntax": {
-      "count": 8
+      "count": 1
     }
   },
   "src/utils/permissions.js": {

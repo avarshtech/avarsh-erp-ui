@@ -567,7 +567,7 @@ const ProcessAllowanceModal = ({
             );
           })() : (
             <Text>
-              <Text strong>Purchase Qty</Text> = Base Qty ({baseQty.toLocaleString()})
+              <Text strong>Purchase Qty</Text> = Base Qty ({baseQty.toLocaleString('en-IN')})
               {isFabric && <> + Loss ({((baseQty * totalLossPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })})</>}
               {' '}+ Rejection ({((baseQty * totalRejPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })})
               {' '}+ Shipment ({((baseQty * totalShipmentPercent) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}) ={' '}

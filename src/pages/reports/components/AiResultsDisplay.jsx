@@ -26,7 +26,7 @@ const extractMetrics = (answer, data) => {
   }
 
   if (data?.length > 0 && metrics.length === 0) {
-    metrics.push({ label: 'Records Found', value: data.length.toLocaleString() });
+    metrics.push({ label: 'Records Found', value: data.length.toLocaleString('en-IN') });
     metrics.push({ label: 'Fields', value: Object.keys(data[0]).length.toString() });
   }
 

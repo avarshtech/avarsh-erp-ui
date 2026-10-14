@@ -33,7 +33,7 @@ const SectionHeader = ({ srNo, header }) => (
       <Field label="Garment Name">{header?.garmentName}</Field>
       <Field label="Buyer">{header?.buyerName}</Field>
       <Field label="Season">{header?.season}</Field>
-      {header?.orderQty != null && <Field label="Order Qty">{header.orderQty.toLocaleString()} pcs</Field>}
+      {header?.orderQty != null && <Field label="Order Qty">{header.orderQty.toLocaleString('en-IN')} pcs</Field>}
       {header?.buyerCountry && <Field label="Consignee Country">{header.buyerCountry}</Field>}
     </Row>
   </Card>

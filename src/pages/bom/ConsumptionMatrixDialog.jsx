@@ -267,12 +267,12 @@ const ConsumptionMatrixDialog = ({
                       colorOrdTotal += oq;
                       return (
                         <td key={size} style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px' }}>
-                          <Text type="secondary" style={{ fontSize: 11 }}>{oq ? oq.toLocaleString() : '—'}</Text>
+                          <Text type="secondary" style={{ fontSize: 11 }}>{oq ? oq.toLocaleString('en-IN') : '—'}</Text>
                         </td>
                       );
                     })}
                     <td style={{ ...tdStyle, textAlign: 'center', padding: '4px 6px', ...stickyLastCol }}>
-                      <Text strong style={{ fontSize: 11 }}>{colorOrdTotal ? colorOrdTotal.toLocaleString() : '—'}</Text>
+                      <Text strong style={{ fontSize: 11 }}>{colorOrdTotal ? colorOrdTotal.toLocaleString('en-IN') : '—'}</Text>
                     </td>
                   </tr>
                   <tr>

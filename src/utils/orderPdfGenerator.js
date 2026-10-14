@@ -97,7 +97,7 @@ const buildSizeMatrix = (line, currency) => {
         const q = row.quantities?.[s] || 0;
         return `<td class="m-sz-val">${q > 0 ? q : '<span class="m-zero">·</span>'}</td>`;
       }).join('')}
-      <td class="m-total-col">${(row.total || 0).toLocaleString()}</td>
+      <td class="m-total-col">${(row.total || 0).toLocaleString('en-IN')}</td>
       <td class="m-value-col">${fmtMoney(row.rowValue || 0, currency)}</td>
     </tr>`).join('');
 
@@ -105,7 +105,7 @@ const buildSizeMatrix = (line, currency) => {
     <tr class="m-totals-row">
       <td class="m-color-col"><strong>Total Qty</strong></td>
       ${sizes.map((s) => `<td class="m-sz-val m-total-sz">${colQty[s] > 0 ? `<strong>${colQty[s]}</strong>` : '<span class="m-zero">·</span>'}</td>`).join('')}
-      <td class="m-total-col m-grand-qty"><strong>${grandQty.toLocaleString()}</strong></td>
+      <td class="m-total-col m-grand-qty"><strong>${grandQty.toLocaleString('en-IN')}</strong></td>
       <td class="m-value-col m-grand-val"><strong>${fmtMoney(grandVal, currency)}</strong></td>
     </tr>`;
 
@@ -164,7 +164,7 @@ const buildOrderLinesHtml = (orderLines, currency) => {
           ${line.leadTime != null ? `<span class="ltag ltag-lead">Lead: ${escInline(line.leadTime)} days</span>` : ''}
         </div>
         <div class="line-totals-chip">
-          <span class="lchip-qty">${(line.lineQty || 0).toLocaleString()} pcs</span>
+          <span class="lchip-qty">${(line.lineQty || 0).toLocaleString('en-IN')} pcs</span>
           <span class="lchip-sep">|</span>
           <span class="lchip-val">${fmtMoney(line.lineTotal || 0, currency)}</span>
         </div>
@@ -230,7 +230,7 @@ const buildOrderHtml = (order, org) => {
       }
       assortRows += `<td class="a-c"><span style="font-weight:600;font-family:monospace;font-size:7.5px;">${escInline(po.buyerPoNo)}</span> <span style="color:#94a3b8;">/</span> <span style="color:#475569;">${escInline(po.destination)}</span></td>`;
       if (idx === 0) {
-        assortRows += `<td class="a-c" style="vertical-align:middle;font-weight:600;" rowspan="${group.poLines.length}">${group.totalQty.toLocaleString()}</td>`;
+        assortRows += `<td class="a-c" style="vertical-align:middle;font-weight:600;" rowspan="${group.poLines.length}">${group.totalQty.toLocaleString('en-IN')}</td>`;
         assortRows += `<td class="a-c" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(avgPrice, currency)}</td>`;
         assortRows += `<td class="a-c a-val" style="vertical-align:middle;" rowspan="${group.poLines.length}">${fmtMoney(group.totalValue, currency)}</td>`;
       }
@@ -574,7 +574,7 @@ const buildOrderHtml = (order, org) => {
           ${fieldRow('Costing Ref', order.costingId ? `<span style="font-family:monospace;color:#4338ca;">${escInline(order.costingId)}</span>` : null)}
           ${fieldRow('Order Date', fmtDate(order.orderDate))}
           ${fieldRow('Total Lines', (order.orderLines || []).length)}
-          ${fieldRow('Total Quantity', `<strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong>`)}
+          ${fieldRow('Total Quantity', `<strong>${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</strong>`)}
         </table>
       </div>
     </div>
@@ -621,7 +621,7 @@ const buildOrderHtml = (order, org) => {
         <tfoot>
           <tr>
             <td colspan="2"><strong>Grand Total</strong></td>
-            <td class="a-c"><strong>${(order.totalOrderQty || 0).toLocaleString()} pcs</strong></td>
+            <td class="a-c"><strong>${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</strong></td>
             <td class="a-c"></td>
             <td class="a-c"><strong>${fmtMoney(order.totalOrderValue || 0, currency)}</strong></td>
           </tr>
@@ -648,7 +648,7 @@ const buildOrderHtml = (order, org) => {
         </div>
         <div class="tot-row">
           <span class="tl">Total Quantity</span>
-          <span class="tv">${(order.totalOrderQty || 0).toLocaleString()} pcs</span>
+          <span class="tv">${(order.totalOrderQty || 0).toLocaleString('en-IN')} pcs</span>
         </div>
         <div class="tot-row tot-grand">
           <span class="tl">Order Value</span>

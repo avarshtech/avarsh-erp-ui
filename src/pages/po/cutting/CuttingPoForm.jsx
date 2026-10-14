@@ -246,7 +246,7 @@ const CuttingPoForm = () => {
             <Col xs={24} md={12}>
               <Form.Item name="orderAllocationId" label="Branch Allocation" rules={[{ required: true, message: 'Select the branch allocation this PO is raised against' }]}>
                 <FormSelect placeholder={order ? 'Select branch allocation' : 'Select an order first'} disabled={!order} onChange={handleAllocationSelect}
-                  options={allocations.map((a) => ({ value: a.id, label: `${a.branchName}${a.unitName ? ` / ${a.unitName}` : ''} · ${(a.qty || 0).toLocaleString()} pcs` }))} />
+                  options={allocations.map((a) => ({ value: a.id, label: `${a.branchName}${a.unitName ? ` / ${a.unitName}` : ''} · ${(a.qty || 0).toLocaleString('en-IN')} pcs` }))} />
               </Form.Item>
             </Col>
           )}

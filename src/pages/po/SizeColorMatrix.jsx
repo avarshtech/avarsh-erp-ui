@@ -20,7 +20,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable =
     { title: 'Color', dataIndex: 'color', key: 'color', width: 120 },
     { title: 'Size', dataIndex: 'size', key: 'size', width: 80 },
     { title: 'Order Qty', dataIndex: 'orderQty', key: 'orderQty', width: 100, align: 'right',
-      render: (q) => (q || 0).toLocaleString() },
+      render: (q) => (q || 0).toLocaleString('en-IN') },
     { title: 'Allowance %', dataIndex: 'allowancePercent', key: 'allowancePercent', width: 120, align: 'right',
       render: (val, _, index) => (editable && allowanceEditable)
         ? <InputNumber size="small" min={0} max={50} value={val} onChange={(v) => handleFieldChange(index, 'allowancePercent', v)} style={{ width: 80 }} {...numericInputProps} />
@@ -29,7 +29,7 @@ const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable =
     { title: 'Planned Qty', dataIndex: 'plannedQty', key: 'plannedQty', width: 110, align: 'right',
       render: (q, _, index) => plannedQtyEditable
         ? <InputNumber size="small" min={0} value={q} onChange={(v) => handleFieldChange(index, 'plannedQty', v)} style={{ width: 100 }} {...numericInputProps} />
-        : <Text strong>{(q || 0).toLocaleString()}</Text>,
+        : <Text strong>{(q || 0).toLocaleString('en-IN')}</Text>,
     },
     { title: 'Rate/Pc', dataIndex: 'ratePerPiece', key: 'ratePerPiece', width: 120, align: 'right',
       render: (val, _, index) => editable
@@ -58,9 +58,9 @@ const SizeColorMatrix = ({ items, onChange, editable = true, allowanceEditable =
         <Table.Summary fixed>
           <Table.Summary.Row>
             <Table.Summary.Cell index={0} colSpan={2}><Text strong>Totals</Text></Table.Summary.Cell>
-            <Table.Summary.Cell index={2} align="right"><Text strong>{totals.orderQty.toLocaleString()}</Text></Table.Summary.Cell>
+            <Table.Summary.Cell index={2} align="right"><Text strong>{totals.orderQty.toLocaleString('en-IN')}</Text></Table.Summary.Cell>
             <Table.Summary.Cell index={3} />
-            <Table.Summary.Cell index={4} align="right"><Text strong>{totals.plannedQty.toLocaleString()}</Text></Table.Summary.Cell>
+            <Table.Summary.Cell index={4} align="right"><Text strong>{totals.plannedQty.toLocaleString('en-IN')}</Text></Table.Summary.Cell>
             <Table.Summary.Cell index={5} />
             <Table.Summary.Cell index={6} align="right"><Text strong>{totals.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</Text></Table.Summary.Cell>
           </Table.Summary.Row>

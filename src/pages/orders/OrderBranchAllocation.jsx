@@ -172,10 +172,10 @@ const OrderBranchAllocation = ({ open, orderId, onClose, onSaved }) => {
       )}
     >
       <Space wrap style={{ marginBottom: 16 }}>
-        <Tag>Order qty: <Text strong>{total.toLocaleString()}</Text></Tag>
-        <Tag color="blue">Allocated: <Text strong>{allocated.toLocaleString()}</Text></Tag>
+        <Tag>Order qty: <Text strong>{total.toLocaleString('en-IN')}</Text></Tag>
+        <Tag color="blue">Allocated: <Text strong>{allocated.toLocaleString('en-IN')}</Text></Tag>
         <Tag color={unallocated < 0 ? 'error' : unallocated > 0 ? 'warning' : 'success'}>
-          {unallocated < 0 ? `Over by ${Math.abs(unallocated).toLocaleString()}` : `Unallocated: ${unallocated.toLocaleString()}`}
+          {unallocated < 0 ? `Over by ${Math.abs(unallocated).toLocaleString('en-IN')}` : `Unallocated: ${unallocated.toLocaleString('en-IN')}`}
         </Tag>
         {duplicateBranch && <Tag color="error">A branch appears twice</Tag>}
       </Space>

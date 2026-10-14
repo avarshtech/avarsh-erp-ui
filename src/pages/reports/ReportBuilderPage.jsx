@@ -272,7 +272,7 @@ const ReportBuilderPage = () => {
             )}
             {hasResults && (
               <Tag color="var(--primary-color)" style={{ fontSize: 13, padding: '2px 10px' }}>
-                {pagination.total.toLocaleString()} records
+                {pagination.total.toLocaleString('en-IN')} records
               </Tag>
             )}
           </Space>

@@ -41,7 +41,7 @@ const OrderCoveragePanel = ({ orderQty = 0, authorizedQty = 0, thisPoQty = 0, po
           type="warning"
           showIcon
           style={{ marginTop: 10 }}
-          title={`This PO would authorize ${Math.abs(remaining).toLocaleString()} pcs over the order quantity of ${orderQty.toLocaleString()}.`}
+          title={`This PO would authorize ${Math.abs(remaining).toLocaleString('en-IN')} pcs over the order quantity of ${orderQty.toLocaleString('en-IN')}.`}
         />
       )}
     </Card>

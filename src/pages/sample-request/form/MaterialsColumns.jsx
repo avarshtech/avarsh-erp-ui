@@ -79,7 +79,7 @@ export const buildMaterialsColumns = ({
       // and no BOM consumption to draw, so a figure here would be invented.
       if (isMaterialScope) return lockedCell('—');
       const qty = computeSampleQtyRequired(line, sampleQty, sizes, colourName);
-      return <Text strong>{qty ? qty.toLocaleString() : '—'}</Text>;
+      return <Text strong>{qty ? qty.toLocaleString('en-IN') : '—'}</Text>;
     },
   },
   {
