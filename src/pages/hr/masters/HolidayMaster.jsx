@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
-import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select, DatePicker } from 'antd';
+import { Form, Input, Button, Space, App, Tag, Switch, Typography, Select } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, CloseOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getHolidaysByYear, createHoliday, updateHoliday, deleteHoliday } from '../../../services/master/hrMasterService';
@@ -274,7 +275,7 @@ const HolidayMaster = ({ onDirtyChange }) => {
                     <Input placeholder="e.g. Republic Day" maxLength={200} />
                   </Form.Item>
                   <Form.Item name="holidayDate" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
-                    <DatePicker format="DD MMM YYYY" style={{ width: '100%' }} />
+                    <DateInput style={{ width: '100%' }} />
                   </Form.Item>
                   <Form.Item name="isPaid" label="Paid Holiday" valuePropName="checked">
                     <Switch checkedChildren="Paid" unCheckedChildren="Unpaid" />

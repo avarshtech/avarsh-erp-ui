@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import MasterSplitView from '../../../components/MasterSplitView';
-import { Form, Input, InputNumber, Button, Space, App, DatePicker } from 'antd';
+import { Form, Input, InputNumber, Button, Space, App } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { hasPermission } from '../../../utils/permissions';
@@ -188,7 +189,7 @@ const PtSlabMaster = ({ onDirtyChange }) => {
         <InputNumber style={{ width: '100%' }} min={0} prefix={'\u20B9'} />
       </Form.Item>
       <Form.Item name="effectiveFrom" label="Effective From" rules={[{ required: true, message: 'Select date' }]}>
-        <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+        <DateInput style={{ width: '100%' }} />
       </Form.Item>
       <Space>
         <PermissionGuard module={MODULE_ID} operation={selectedId ? 'update' : 'add'}>

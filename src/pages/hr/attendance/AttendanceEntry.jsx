@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  App, Card, Form, Select, DatePicker, InputNumber, Input,
+  App, Card, Form, Select, InputNumber, Input,
   Button, Row, Col, Space, Tag, Alert,
 } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, TableOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -155,7 +156,7 @@ const AttendanceEntry = () => {
 
             <Col xs={24} sm={12} md={8}>
               <Form.Item name="attendanceDate" label="Date" rules={[{ required: true, message: 'Date is required' }]}>
-                <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
 

@@ -1955,3 +1955,44 @@ textarea.ant-input:active {
   max-height: none !important;
   overflow: visible !important;
 }
+
+/* ── Masked time and date fields ──────────────────────────────────────────
+   The greyed template sits behind the typed digits, so the separator is on
+   screen from the start and never has to be typed. Alignment depends on every
+   glyph being the same width, which is what tabular-nums buys us - without it
+   the ghost drifts a pixel per digit and the colon visibly jumps. */
+.masked-input {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.masked-input .ant-input,
+.masked-input .ant-input-affix-wrapper input {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.masked-input-ghost {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-inline: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--ant-color-text-placeholder, rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+  white-space: pre;
+  overflow: hidden;
+}
+/* The already-typed part is reserved as blank space so the rest of the
+   template lines up with the real characters underneath it. */
+.masked-input-ghost-typed {
+  visibility: hidden;
+}
+/* An affix wrapper adds the prefix icon's width, so the ghost starts further in. */
+.masked-input:has(.ant-input-affix-wrapper) .masked-input-ghost {
+  padding-inline-start: 35px;
+}
+.masked-input-disabled .masked-input-ghost {
+  opacity: 0.5;
+}

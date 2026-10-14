@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { App, Alert, Card, Form, Select, DatePicker, Button, InputNumber, Row, Col, Divider, Space, Spin, Descriptions, Tag } from 'antd';
+import { App, Alert, Card, Form, Select, Button, InputNumber, Row, Col, Divider, Space, Spin, Descriptions, Tag } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { CalculatorOutlined, CheckCircleOutlined, SaveOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -235,7 +236,7 @@ const FnfForm = () => {
               </Col>
               <Col xs={24} sm={12} md={8}>
                 <Form.Item name="lastWorkingDate" label="Last Working Date" rules={[{ required: true, message: 'Required' }]}>
-                  <DatePicker style={{ width: '100%' }} />
+                  <DateInput style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12} md={8}>

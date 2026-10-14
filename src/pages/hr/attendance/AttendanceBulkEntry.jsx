@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Alert, App, Table, Button, Select, DatePicker, InputNumber, Input, Row, Col, Space } from 'antd';
+import { Alert, App, Table, Button, Select, InputNumber, Input, Row, Col, Space } from 'antd';
+import DateInput from '../../../components/DateInput';
 import TimeInput from '../../../components/TimeInput';
 import { SaveOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -270,7 +271,7 @@ const AttendanceBulkEntry = () => {
       />
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col xs={24} sm={8} md={6}>
-          <DatePicker
+          <DateInput
             value={selectedDate}
             onChange={setSelectedDate}
             style={{ width: '100%' }}

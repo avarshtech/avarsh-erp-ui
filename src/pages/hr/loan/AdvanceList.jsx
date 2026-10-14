@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm, Alert, Drawer, Form, InputNumber, DatePicker } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { PlusOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getAllAdvances, createAdvance, recoverAdvance, waiveAdvance } from '../../../services/hr/advanceService';
@@ -236,7 +237,7 @@ const AdvanceList = () => {
             />
           </Form.Item>
           <Form.Item name="advanceDate" label="Advance Date" rules={[{ required: true, message: 'Required' }]}>
-            <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item
             name="amount"

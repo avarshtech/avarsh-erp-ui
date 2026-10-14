@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  App, Descriptions, Tag, Table, Tabs, Button, Space, Dropdown, Spin, Card, DatePicker,
+  App, Descriptions, Tag, Table, Tabs, Button, Space, Dropdown, Spin, Card,
 } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { EditOutlined, DownOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -14,6 +15,7 @@ import {
 } from '../../../utils/hrConstants';
 import { isStoredFile, isOpenableLink, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
+import EmployeePhoto from '../../../components/EmployeePhoto';
 import SalaryStructureDrawer from './SalaryStructureDrawer';
 
 const getLabel = (list, value) => list.find((i) => i.value === value)?.label || value || '-';
@@ -125,9 +127,8 @@ const EmployeeView = () => {
             Last working day. Payroll uses this to pro-rate the final month and to
             flag that the employee left partway through it.
           </p>
-          <DatePicker
+          <DateInput
             style={{ width: '100%' }}
-            format="DD-MMM-YYYY"
             defaultValue={leaving}
             onChange={(d) => { leaving = d; }}
           />
@@ -314,7 +315,10 @@ const EmployeeView = () => {
         backPath="/hr/employees"
         status={<Tag color={getStatusColor(employee.status)}>{getLabel(EMPLOYEE_STATUS, employee.status)}</Tag>}
       >
-        <Space>
+        <Space align="start" size="middle">
+          {/* Top right, next to the actions: a face is how people recognise a
+              record, and it belongs with the name rather than buried in a tab. */}
+          <EmployeePhoto employeeId={Number(id)} employeeName={employee.fullName} canEdit={canUpdate} size={84} />
           {canUpdate && (
             <>
               <Button icon={<EditOutlined />} onClick={() => navigate(`/hr/employees/edit/${id}`)}>Edit</Button>

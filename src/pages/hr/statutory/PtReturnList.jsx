@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form, DatePicker } from 'antd';
+import { App, Table, Tag, Button, Select, Space, Row, Col, Modal, Form } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { PlusOutlined, CheckOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getAllPtReturns, generatePtReturn, filePtReturn } from '../../../services/hr/statutoryService';
@@ -210,12 +211,12 @@ const PtReturnList = () => {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="periodFrom" label="Period From" rules={[{ required: true, message: 'Required' }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="periodTo" label="Period To" rules={[{ required: true, message: 'Required' }]}>
-                <DatePicker style={{ width: '100%' }} />
+                <DateInput style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>

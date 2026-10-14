@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, DatePicker, Input, Descriptions, Alert, Tooltip } from 'antd';
+import { App, Table, Tag, Button, Space, Tabs, Drawer, Form, Select, Input, Descriptions, Alert, Tooltip } from 'antd';
+import DateInput from '../../../components/DateInput';
 import TimeInput from '../../../components/TimeInput';
 import { afterRuleSameDay } from '../../../utils/timeRules';
 import { PlusOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons';
@@ -334,7 +335,7 @@ const GatePassList = () => {
             />
           </Form.Item>
           <Form.Item name="date" label="Date" rules={[{ required: true, message: 'Please select a date' }]}>
-            <DatePicker style={{ width: '100%' }} />
+            <DateInput style={{ width: '100%' }} />
           </Form.Item>
           <Form.Item name="type" label="Type" rules={[{ required: true, message: 'Please select type' }]}>
             <Select options={GATE_PASS_TYPE} placeholder="Select Type" />

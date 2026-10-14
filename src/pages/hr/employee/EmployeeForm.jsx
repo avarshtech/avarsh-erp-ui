@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  App, Form, Input, Select, DatePicker, Switch, Button, Tabs, Card,
+  App, Form, Input, Select, Switch, Button, Tabs, Card,
   Row, Col, InputNumber, Table, Space, Spin, Upload, Tooltip,
 } from 'antd';
+import DateInput from '../../../components/DateInput';
 import { SaveOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined, UploadOutlined, DownloadOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -21,6 +22,7 @@ import {
 import { uploadFile } from '../../../services/core/fileService';
 import { isStoredFile, downloadStoredFile } from '../../../utils/documentFile';
 import PageHeader from '../../../components/PageHeader';
+import EmployeePhoto from '../../../components/EmployeePhoto';
 import { unitOptions } from '../../../utils/hrLabels';
 import useUnsavedChanges from '../../../hooks/useUnsavedChanges';
 
@@ -462,7 +464,7 @@ const EmployeeForm = () => {
                 },
               ]}
             >
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           <Col xs={24} sm={12} md={8}><Form.Item label="Marital Status" name="maritalStatus" rules={[{ required: true, message: 'Marital status is required' }]}><Select showSearch optionFilterProp="label" options={MARITAL_STATUS} /></Form.Item></Col>
@@ -603,7 +605,7 @@ const EmployeeForm = () => {
                 }),
               ]}
             >
-              <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" />
+              <DateInput style={{ width: '100%' }} />
             </Form.Item>
           </Col>
           {/*
@@ -633,7 +635,7 @@ const EmployeeForm = () => {
                   }),
                 ]}
               >
-                <DatePicker style={{ width: '100%' }} format="DD-MMM-YYYY" allowClear />
+                <DateInput style={{ width: '100%' }} allowClear />
               </Form.Item>
             </Col>
           )}
@@ -734,7 +736,12 @@ const EmployeeForm = () => {
         title={isEdit ? 'Edit Employee' : 'New Employee'}
         backPath="/hr/employees"
       >
-        <Space>
+        <Space align="start" size="middle">
+          {/* A photo is a file against an employee id, so there is nothing to
+              attach it to until the employee is saved. On a new employee the
+              control is left out rather than shown dead, and the hint under the
+              Save button says where to find it. */}
+          {isEdit && <EmployeePhoto employeeId={Number(id)} employeeName={form.getFieldValue('fullName')} canEdit size={84} />}
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/hr/employees')}>Back</Button>
           <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>Save</Button>
         </Space>
