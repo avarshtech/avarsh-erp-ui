@@ -6,9 +6,10 @@
  * event handlers, iframes, images, links — is dropped; the text inside a script element may survive
  * as plain, escaped text, which is harmless.
  *
- * Quill then writes the content back out in its own markup — the same HTML the editor saved — so
- * content made in the editor renders exactly as it did before it was sanitised. (Its semantic HTML
- * would draw lists and indents differently in the viewer and on the printed PO.)
+ * Quill then writes the content back out the way the editor saves it: react-quill-new stores
+ * getSemanticHTML() (real <ul>/<ol> lists, spaces as &nbsp;), so the sanitised HTML is that same
+ * output and stored content renders exactly as it did. Its internal markup (root.innerHTML) would turn
+ * bullet lists into <ol data-list="bullet">, which prints as 1. 2. 3. outside the editor.
  */
 
 /** The formats RichTextEditor offers; stored HTML is reduced to these. */
@@ -19,7 +20,7 @@ export const sanitizeRichTextWith = (Quill, html) => {
   if (!html) return '';
   const quill = new Quill(document.createElement('div'), { formats: RICH_TEXT_FORMATS });
   quill.setContents(quill.clipboard.convert({ html: String(html) }), 'silent');
-  return quill.root.innerHTML;
+  return quill.getSemanticHTML();
 };
 
 let quillLoad;
