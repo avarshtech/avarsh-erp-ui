@@ -28,6 +28,12 @@ const usePushNotification = () => {
         registration.pushManager.getSubscription().then((sub) => {
           if (sub) {
             setIsSubscribed(true);
+            // Logout unbinds the browser from the user who left, so bind it to whoever is signed
+            // in now; the server keeps one row per user and endpoint.
+            if (Notification.permission === 'granted') {
+              const { endpoint, keys } = sub.toJSON();
+              subscribePush({ endpoint, keys: { p256dh: keys?.p256dh, auth: keys?.auth } }, { silent: true }).catch(() => {});
+            }
           } else if (Notification.permission === 'granted') {
             // Permission already granted (e.g., PWA reinstall or cleared subscription)
             // Auto-subscribe without prompting

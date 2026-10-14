@@ -10,6 +10,25 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  * @param {number} warningSeconds  — seconds of warning countdown before logout
  * @returns {{ isIdle: boolean, isWarning: boolean, remainingSeconds: number, resetIdle: () => void }}
  */
+// Last activity in ANY tab of this browser. Idle has to mean idle everywhere: an idle timeout ends
+// the session for every tab, so a tab left in the background must not end it while the user works
+// in another.
+const SHARED_ACTIVITY_KEY = 'avarsh-last-activity';
+const shareActivity = (time) => {
+  try {
+    localStorage.setItem(SHARED_ACTIVITY_KEY, String(time));
+  } catch {
+    // Storage unavailable: this tab judges by its own activity alone
+  }
+};
+const sharedActivity = () => {
+  try {
+    return Number(localStorage.getItem(SHARED_ACTIVITY_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+};
+
 const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
   // Seeded on mount rather than in the useRef initializer, which would call
   // Date.now() on every render.
@@ -24,6 +43,7 @@ const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
   // Reset idle timer (called on user activity or "Stay Logged In" click)
   const resetIdle = useCallback(() => {
     lastActivityRef.current = Date.now();
+    shareActivity(lastActivityRef.current);
     setIsWarning(false);
     setIsIdle(false);
     setRemainingSeconds(warningSeconds);
@@ -38,6 +58,7 @@ const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
       if (now - throttleRef.current < 1000) return;
       throttleRef.current = now;
       lastActivityRef.current = now;
+      shareActivity(now);
 
       // If we're in warning state, any activity dismisses it
       setIsWarning((prev) => {
@@ -59,7 +80,8 @@ const useIdleTimeout = (idleTimeoutMs, warningSeconds) => {
     const interval = setInterval(() => {
       // Null until the activity effect has run, which is always before the
       // first tick; treat that window as "just active".
-      const elapsed = Date.now() - (lastActivityRef.current ?? Date.now());
+      const lastActivity = Math.max(lastActivityRef.current ?? Date.now(), sharedActivity());
+      const elapsed = Date.now() - lastActivity;
 
       if (elapsed >= idleTimeoutMs) {
         // Fully idle — trigger logout

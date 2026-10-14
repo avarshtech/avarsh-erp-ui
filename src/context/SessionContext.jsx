@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/auth/authService';
+import { useNavigate } from 'react-router-dom';
+import { endSession, getTokenExpirySeconds, isAuthenticated, refreshSession as refreshSessionService } from '../services/auth/authService';
+import { clearAll, hasSessionActiveFlag, onLogoutElsewhere } from '../services/auth/sessionStore';
 import { getCurrentUser } from '../utils/permissions';
 import useIdleTimeout from '../hooks/useIdleTimeout';
 import useIsPwa from '../hooks/useIsPwa';
@@ -87,21 +89,34 @@ export const SessionProvider = ({ children }) => {
     }, 1000);
   }, [clearCountdown, markExpired]);
 
+  // A token that ran out while the refresh cookie may still be good (a laptop that slept): one
+  // silent refresh is tried before the session is declared expired. 'pending' while it runs.
+  const expiryRefreshRef = useRef(null);
+
   // Periodic check — attempts proactive silent refresh before showing warning modal
   const checkSession = useCallback(() => {
     if (isExpiredRef.current) return;
 
-    if (!isAuthenticated()) {
+    const secondsLeft = getTokenExpirySeconds();
+    if (!isAuthenticated() || (secondsLeft !== null && secondsLeft <= 0)) {
+      if (expiryRefreshRef.current === 'pending') return;
+      // No session flag means the session was ended on purpose (logout, idle timeout): nothing to renew
+      if (expiryRefreshRef.current !== 'failed' && hasSessionActiveFlag()) {
+        expiryRefreshRef.current = 'pending';
+        refreshSessionService().then((success) => {
+          expiryRefreshRef.current = success ? null : 'failed';
+          if (success) resetWarningState();
+          else markExpired();
+        });
+        return;
+      }
       markExpired();
       return;
     }
 
-    const secondsLeft = getTokenExpirySeconds();
     if (secondsLeft === null) return;
 
-    if (secondsLeft <= 0) {
-      markExpired();
-    } else if (secondsLeft <= WARNING_THRESHOLD_SECONDS && !proactiveRefreshAttemptedRef.current) {
+    if (secondsLeft <= WARNING_THRESHOLD_SECONDS && !proactiveRefreshAttemptedRef.current) {
       // Attempt a proactive silent refresh in the background.
       // If it succeeds, the user never sees the warning modal.
       proactiveRefreshAttemptedRef.current = true;
@@ -132,12 +147,36 @@ export const SessionProvider = ({ children }) => {
   useEffect(() => {
     checkSession();
     timerRef.current = setInterval(checkSession, CHECK_INTERVAL_MS);
+    // A tab that comes back (the laptop woke, the user switched back) is checked at once
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') checkSession();
+    };
+    document.addEventListener('visibilitychange', onVisible);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      document.removeEventListener('visibilitychange', onVisible);
       clearCountdown();
     };
   }, [checkSession, clearCountdown]);
+
+  // The idle timeout really ends the session when it says so: the refresh token is revoked and
+  // nothing of the session stays in the browser, so F5 or a new tab lands on the login page. The
+  // 'Session Timed Out' dialog stays up until the user leaves it.
+  const idleEndedRef = useRef(false);
+  useEffect(() => {
+    if (!isIdleExpired || idleEndedRef.current) return;
+    idleEndedRef.current = true;
+    endSession();
+  }, [isIdleExpired]);
+
+  // A logout in another tab of this browser ends the session in this one too
+  const navigate = useNavigate();
+  useEffect(() => onLogoutElsewhere(() => {
+    clearAll();
+    window.dispatchEvent(new Event('authChange'));
+    navigate('/login', { replace: true });
+  }), [navigate]);
 
   // ── PWA: Proactive periodic refresh to keep session alive (no idle logout) ──
   useEffect(() => {

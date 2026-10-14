@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
+import { getAccessToken } from '../services/auth/sessionStore';
 
 /**
  * Global Store Context
@@ -213,6 +214,17 @@ export const StoreProvider = ({ children }) => {
   const clearStore = useCallback(() => {
     setState(initialState);
   }, []);
+
+  // The store sits above /login and outlives a logout, so the masters loaded for one user would
+  // be served to the next. A session that ends (logout, timeout, a failed refresh) empties it;
+  // a login or a token refresh, which leave a token in memory, do not.
+  useEffect(() => {
+    const onAuthChange = () => {
+      if (!getAccessToken()) clearStore();
+    };
+    window.addEventListener('authChange', onAuthChange);
+    return () => window.removeEventListener('authChange', onAuthChange);
+  }, [clearStore]);
 
   /**
    * Add item to a collection

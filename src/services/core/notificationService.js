@@ -7,11 +7,12 @@ const BASE = '/notifications';
 export const getVapidPublicKey = () =>
   axiosInstance.get(`${BASE}/vapid-public-key`).then((res) => res.data);
 
-export const subscribePush = (subscription) =>
-  axiosInstance.post(`${BASE}/subscribe`, subscription);
+// `config` carries request options such as { silent: true } for the calls made at login and logout
+export const subscribePush = (subscription, config = {}) =>
+  axiosInstance.post(`${BASE}/subscribe`, subscription, config);
 
-export const unsubscribePush = (endpoint) =>
-  axiosInstance.delete(`${BASE}/subscribe`, { data: { endpoint } });
+export const unsubscribePush = (endpoint, config = {}) =>
+  axiosInstance.delete(`${BASE}/subscribe`, { data: { endpoint }, ...config });
 
 // ─── Notifications ───
 

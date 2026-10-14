@@ -15,8 +15,10 @@ import {
   hasSessionActiveFlag,
   clearAll,
   executeTokenRefresh,
+  announceLogout,
 } from './sessionStore';
 import { applyUpdate, checkForUpdate } from '../../utils/swRegistration';
+import { unsubscribePush } from '../core/notificationService';
 
 // ── PWA Detection ───────────────────────────────────────────────────────────
 
@@ -204,7 +206,31 @@ export const getToken = () => getAccessToken();
  * code. When that happens the browser navigates to /login and nothing after the
  * applyUpdate() call runs — callers must not rely on this resolving.
  */
-export const logoutUser = async () => {
+/**
+ * Stop this browser's push notifications going to the user who is leaving. The browser keeps its
+ * subscription; the next user's login binds it to them (usePushNotification). Never holds up a
+ * logout: no service worker means nothing to do, and a slow answer is not waited for.
+ */
+const unbindPush = () => Promise.race([
+  (async () => {
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration?.();
+      const subscription = await registration?.pushManager?.getSubscription();
+      if (subscription?.endpoint) await unsubscribePush(subscription.endpoint, { silent: true });
+    } catch {
+      // Not subscribed, or the server refused: the session ends regardless
+    }
+  })(),
+  new Promise((resolve) => { setTimeout(resolve, 3000); }),
+]);
+
+/**
+ * End the session everywhere it lives: push notifications are unbound from the user, the server
+ * revokes the refresh token and clears its cookie, this tab forgets the session (clearAll), and
+ * this browser's other tabs are told to do the same. Used by logout and by the idle timeout.
+ */
+export const endSession = async () => {
+  await unbindPush();
   // Attempt server-side logout to revoke refresh token and clear the HttpOnly cookie.
   try {
     await axiosInstance.post('/auth/logout');
@@ -214,6 +240,11 @@ export const logoutUser = async () => {
 
   clearAll();
   window.dispatchEvent(new Event('authChange'));
+  announceLogout();
+};
+
+export const logoutUser = async () => {
+  await endSession();
 
   // Ask the server one last time rather than trusting the background check —
   // a build deployed minutes ago may not have been picked up yet.
