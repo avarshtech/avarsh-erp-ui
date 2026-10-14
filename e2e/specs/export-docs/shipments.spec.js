@@ -10,7 +10,7 @@
  *
  * A shipment closes when every packing list and invoice on it is released. Those are still a
  * browser mock with no demo cartons for these buyers, so the close itself is driven through
- * the API here (its rule is unit-tested in e2e/unit/shipment-bridge.spec.js), and the spec
+ * the API here (its rule is unit-tested in src/services/expdoc/shipmentBridge.test.js), and the spec
  * checks what the screen does with a closed shipment. Every shipment a spec makes is its own,
  * so the specs can run again on the same stack.
  */

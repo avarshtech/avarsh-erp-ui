@@ -134,14 +134,12 @@ sends its API calls to another machine (a plain `npm run dev`), so a run cannot 
 
 ## Projects
 
-On 2026-10-13, `npx playwright test --list` counted 1,058 tests in 140 files in
+On 2026-10-13, `npx playwright test --list` counted 919 tests in 126 files in
 `playwright.config.js`, and 7 in 3 files in `playwright.demo.config.js`.
 
 | Project | Specs | Notes |
 |---|---|---|
 | `setup` | `global-setup.js` | Logs in once and saves `e2e/.auth/user.json`. Every module project depends on it. |
-| `unit` | `e2e/unit/` | Node only: pure calculators and models. No browser, login or API. |
-| `tna-engine` | `specs/tna/01-engine*.spec.js` | Node only: the T&A engine against the CR-TNA-001 worked example. |
 | `smoke` | `specs/smoke/` | What CI runs on every push: the route sweep (every parameter-free route in `SCREENS` loads with no page error, console error or warning), the fixtures' own checks, and each core module's records in the API and on its list. Signs in per test, so it needs no `setup`. On the dev server the sweep also catches React and antd warnings, which production builds strip. |
 | `legacy` | `e2e/costing.spec.js`, `e2e/costing-full-entry.spec.js` | The original costing specs. |
 | `master-data`, `costing`, `orders`, `bom`, `po`, `production-po`, `cutting`, `sewing`, `virtual-factory`, `tna`, `sample-requests`, `hr`, `admin`, `approvals`, `inventory`, `reports`, `validation`, `grn-qc`, `export-docs` | `specs/<project>/` | One folder per module. Where the files are numbered, they run in order and build on each other. |
@@ -186,7 +184,6 @@ e2e/
   helpers/              api-client (API login and seeding), navigation (navigateWithAuth),
                         antd-helpers, and per-module seed and data builders
   specs/<project>/      one folder per project
-  unit/                 Node-only tests (project "unit")
   data/, fixtures/      datasets and upload fixtures
 ```
 

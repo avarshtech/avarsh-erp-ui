@@ -42,11 +42,7 @@ export default defineConfig({
       testMatch: /global-setup\.js/,
     },
 
-    // ── Unit (Node only: pure calculators, no browser, no login) ──
-    {
-      name: 'unit',
-      testDir: './e2e/unit',
-    },
+    // Pure logic tests (calculators, models, the T&A engine) run in Vitest, next to their modules.
 
     // ── Legacy (existing costing tests) ────────────────────
     {
@@ -167,17 +163,9 @@ export default defineConfig({
       dependencies: ['setup'],
     },
     {
-      // Time & Action engine — pure functions asserted against the CR-TNA-001 §17 worked
-      // example. Imports the engine directly: no browser, no login, no backend.
-      name: 'tna-engine',
-      testDir: './e2e/specs/tna',
-      testMatch: /01-engine.*\.spec\.js$/,
-    },
-    {
       // Time & Action screens — read-only, derived plans (mock data until the API lands).
       name: 'tna',
       testDir: './e2e/specs/tna',
-      testIgnore: /01-engine/,
       timeout: 120000,
       use: {
         browserName: 'chromium',

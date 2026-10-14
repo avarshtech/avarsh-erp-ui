@@ -9,11 +9,6 @@
       "count": 1
     }
   },
-  "e2e/unit/job-work-bill-mock.spec.js": {
-    "prefer-const": {
-      "count": 1
-    }
-  },
   "src/App.jsx": {
     "max-lines": {
       "count": 1
