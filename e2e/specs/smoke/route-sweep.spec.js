@@ -17,22 +17,18 @@
  *     E2E_BASE_URL=http://localhost:3001 E2E_PASSWORD=admin123 \
  *     npx playwright test --project=smoke
  *
+ * Each test signs in through the API (authedPage) and fails on a page error, console error or
+ * warning (consoleGuard), so the smoke project needs no setup project or saved login.
+ *
  * Prerequisites: the e2e API (H2 seed) and the dev server.
  */
-import { test, expect } from '@playwright/test';
 import process from 'process';
 import { SCREENS } from '../../../src/utils/permissions.js';
-import { navigateWithAuth } from '../../helpers/navigation.js';
+import { test, expect } from '../../fixtures.js';
 
-// Noise that does not come from the screen's code: the dev server does not serve the service
-// worker, a failed request is the network's report (the screen's handling of it is what counts),
-// and React's DevTools advert.
-const IGNORED = [
-  /Service worker registration failed/i,
-  /unsupported MIME type/i,
-  /Failed to load resource/i,
-  /React DevTools/i,
-];
+// Warnings too: React's and antd's warnings are what this sweep is for (helpers/console-noise.js
+// lists what is ignored).
+test.use({ consoleGuardLevels: ['error', 'warning'] });
 
 const sections = (process.env.SWEEP_SECTIONS || '')
   .split(',')
@@ -45,23 +41,11 @@ const screens = SCREENS.filter(
 
 test.describe('Route sweep', () => {
   for (const screen of screens) {
-    test(`${screen.section} › ${screen.name} (${screen.path}) loads cleanly`, async ({ page }) => {
-      const problems = [];
-      page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
-      page.on('console', (msg) => {
-        if (msg.type() !== 'error' && msg.type() !== 'warning') return;
-        const text = msg.text();
-        if (!IGNORED.some((pattern) => pattern.test(text))) {
-          problems.push(`${msg.type()}: ${text.split('\n')[0]}`);
-        }
-      });
+    test(`${screen.section} › ${screen.name} (${screen.path}) loads cleanly`, async ({ authedPage, consoleGuard }) => {
+      await authedPage.goto(screen.path);
 
-      await navigateWithAuth(page, screen.path);
-
-      await expect(page.locator('#main-content')).toBeVisible();
-      await expect(page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 20000 });
-
-      expect(problems, problems.join('\n')).toEqual([]);
+      await expect(authedPage.locator('#main-content')).toBeVisible();
+      await expect(authedPage.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 20000 });
     });
   }
 });

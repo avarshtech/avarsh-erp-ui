@@ -313,6 +313,18 @@ export default defineConfig([
     },
   },
   {
+    // e2e/fixtures.js `consoleGuard` works by being requested; a test names it and never reads it.
+    files: ['e2e/**/*.{js,mjs}'],
+    rules: {
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^_|^consoleGuard$',
+        destructuredArrayIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
+    },
+  },
+  {
     // Language rules for every JavaScript file (standard rules 29 and 36).
     files: ['**/*.{js,jsx,mjs}'],
     rules: {
