@@ -314,7 +314,10 @@ const EmployeeView = () => {
         title={employee.fullName}
         backPath="/hr/employees"
         status={<Tag color={getStatusColor(employee.status)}>{getLabel(EMPLOYEE_STATUS, employee.status)}</Tag>}
-        avatar={<EmployeePhoto employeeId={Number(id)} employeeName={employee.fullName} canEdit={canUpdate} />}
+        /* Read-only here, whatever the user's rights: this screen shows a
+           record, it does not change one. Replacing and removing the photo sit
+           with every other edit, behind the Edit button. */
+        avatar={<EmployeePhoto employeeId={Number(id)} employeeName={employee.fullName} />}
       >
         <Space align="center" size="small">
           {canUpdate && (

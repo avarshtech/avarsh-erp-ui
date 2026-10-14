@@ -22,6 +22,11 @@ import { toastUnlessHandled } from '../utils/apiError';
  * the rest of the time the header is a name and a face. Clicking the photo
  * opens it full size, which is what clicking a photo should do.
  *
+ * Viewing and downloading need no {@code canEdit}; replacing and removing do.
+ * The employee's own page leaves it off - a screen that shows a record should
+ * not change one - so the photo is changed where the rest of the record is,
+ * behind Edit, or on the way in on a new employee.
+ *
  * The newest PHOTO wins. Replacing one uploads the new file and removes the old
  * only once the new is safely stored, so a failed upload cannot leave the
  * record with no photo at all.
