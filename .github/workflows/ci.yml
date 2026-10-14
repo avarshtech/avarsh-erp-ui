@@ -37,6 +37,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
+      # Before anything is fetched: every package comes from registry.npmjs.org with an integrity hash
+      - name: Lockfile sources and hashes
+        run: npm run check:lockfile
+
       - name: Install
         run: npm ci
 
@@ -63,6 +67,9 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Bundle within budget (budgets.json)
+        run: npm run check:bundle
 
       - name: Audit shipped dependencies (high and critical fail)
         run: npm audit --omit=dev --audit-level=high
