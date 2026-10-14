@@ -59,6 +59,7 @@ import { PO_STATUS, LINE_ITEM_STATUS, PO_TYPE, PO_TYPE_OPTIONS, BOM_UNLOCK_STATU
 import { getBomByOrderNo, updateBomLinePoStatus } from '../../services/bom/bomService';
 import { CONSUMPTION_MODE } from '../../utils/bomConstants';
 import { formatNumber } from '../../utils/formatters';
+import { poLineAmount, poLineTax, poTotals } from '../../utils/poAmounts';
 import { getVariantStockAvailability } from '../../services/inventory/inventoryService';
 import BomLineSelectionDrawer from './BomLineSelectionDrawer';
 import FabricStagesDialog from './FabricStagesDialog';
@@ -659,7 +660,7 @@ const POForm = () => {
           const qty = parseFloat(updated.qty) || 0;
           const unitPrice = parseFloat(updated.unitPrice) || 0;
           const gstPercent = parseFloat(updated.gstPercent) || 0;
-          updated.amount = parseFloat((qty * unitPrice * (1 + gstPercent / 100)).toFixed(2));
+          updated.amount = poLineAmount(qty, unitPrice, gstPercent);
           return updated;
         }
         return item;
@@ -739,9 +740,7 @@ const POForm = () => {
             const unitPrice = (rawPrice !== null && rawPrice !== undefined && rawPrice > 0) ? rawPrice : '';
             const qty = parseFloat(li.qty) || 0;
             const numericPrice = parseFloat(unitPrice) || 0;
-            const amount = parseFloat(
-              (qty * numericPrice * (1 + gst / 100)).toFixed(2)
-            );
+            const amount = poLineAmount(qty, numericPrice, gst);
 
             return {
               ...li,
@@ -1095,38 +1094,7 @@ const POForm = () => {
   }, [variantIdsKey]);
 
   // Calculate totals
-  const totals = useMemo(() => {
-    const subtotal = lineItems.reduce((sum, item) => {
-      return sum + (parseFloat(item.qty) || 0) * (parseFloat(item.unitPrice) || 0);
-    }, 0);
-
-    let sgst = 0;
-    let cgst = 0;
-    let igst = 0;
-
-    lineItems.forEach((item) => {
-      const base = (parseFloat(item.qty) || 0) * (parseFloat(item.unitPrice) || 0);
-      const gstPercent = parseFloat(item.gstPercent) || 0;
-      const gstAmount = (base * gstPercent) / 100;
-
-      if (isIgstApplicable) {
-        igst += gstAmount;
-      } else {
-        sgst += gstAmount / 2;
-        cgst += gstAmount / 2;
-      }
-    });
-
-    const grandTotal = isIgstApplicable ? subtotal + igst : subtotal + sgst + cgst;
-
-    return {
-      subtotal: parseFloat(subtotal.toFixed(2)),
-      sgst: parseFloat(sgst.toFixed(2)),
-      cgst: parseFloat(cgst.toFixed(2)),
-      igst: parseFloat(igst.toFixed(2)),
-      grandTotal: parseFloat(grandTotal.toFixed(2)),
-    };
-  }, [lineItems, isIgstApplicable]);
+  const totals = useMemo(() => poTotals(lineItems, isIgstApplicable), [lineItems, isIgstApplicable]);
 
   // GST Breakup by percentage
   const gstBreakup = useMemo(() => {
@@ -1365,27 +1333,7 @@ const POForm = () => {
         const qty = parseFloat(item.qty) || 0;
         const unitPrice = parseFloat(item.unitPrice) || 0;
         const gstPercent = parseFloat(item.gstPercent) || 0;
-        const taxableBase = qty * unitPrice;
-
-        let cgst = 0,
-          sgst = 0,
-          igst = 0;
-        let cgstValue = 0,
-          sgstValue = 0,
-          igstValue = 0;
-
-        if (isIgst) {
-          igst = gstPercent;
-          igstValue = parseFloat(((taxableBase * gstPercent) / 100).toFixed(2));
-        } else {
-          const halfGst = gstPercent / 2;
-          cgst = halfGst;
-          sgst = halfGst;
-          cgstValue = parseFloat(((taxableBase * halfGst) / 100).toFixed(2));
-          sgstValue = parseFloat(((taxableBase * halfGst) / 100).toFixed(2));
-        }
-
-        const taxValue = parseFloat((cgstValue + sgstValue + igstValue).toFixed(2));
+        const { cgst, sgst, igst, cgstValue, sgstValue, igstValue, taxValue } = poLineTax(qty * unitPrice, gstPercent, isIgst);
 
         return {
           itemId: item.itemId,
