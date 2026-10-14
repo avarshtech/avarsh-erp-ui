@@ -3,8 +3,8 @@
 //   npx vitest run src/utils/formatters.test.js
 import { describe, test, expect } from 'vitest';
 import {
-  formatCurrency, formatDate, formatFileSize, formatNumber, formatPercentage, formatQuantity,
-  getCurrencySymbol, getInitials,
+  formatAmount, formatCurrency, formatDate, formatFileSize, formatInr, formatMoney, formatNumber,
+  formatPercentage, formatQuantity, formatRupees, getCurrencySymbol, getInitials,
 } from './formatters';
 
 describe('currency', () => {
@@ -98,5 +98,32 @@ describe('getInitials', () => {
     expect(getInitials('   ')).toBe('');
     expect(getInitials(null)).toBe('');
     expect(getInitials(42)).toBe('');
+  });
+});
+
+// Each preset replaced local copies on the screens. The copies are kept here as they were, and every preset
+// must give their text for every value, called alone and the way a table calls `render` (value, row, index).
+describe('the presets give the text of the local copies they replaced', () => {
+  const VALUES = [null, undefined, 0, -0, 1, -1, 1.5, 0.125, 1.005, 2.675, 0.0049, 99.999, 1234.5678, -98765.4321,
+    100000, 10000000, 123456789.123456, 1e21, '1500', '12.345', '-7.5', '', ' ', NaN, Infinity, 'abc', true, false];
+  const ROW = { id: 1, name: 'row', empty: 'x', prefix: 'y' };
+
+  const COPIES = [
+    ['formatRupees: HR lists and views (formatCurrency), SalaryRecordDrawer (money)', formatRupees,
+      (val) => (val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '-')],
+    ['SalarySlipView formatCurrency: a missing figure prints ₹0.00',
+      (val) => formatAmount(val, { prefix: '₹', minDecimals: 2, empty: '₹0.00' }),
+      (val) => (val != null ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '₹0.00')],
+    ['formatMoney: Cut Panel and Garment Process PO lines (money)', formatMoney,
+      (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+    ['formatInr: job-work PO lists (money), JobWorkPoHero and JobWorkValueSummary (inr)', formatInr,
+      (v) => `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+  ];
+
+  test.each(COPIES)('%s', (_, preset, copy) => {
+    for (const value of VALUES) {
+      expect(preset(value), String(value)).toBe(copy(value));
+      expect(preset(value, ROW, 0), `${String(value)} as render`).toBe(copy(value, ROW, 0));
+    }
   });
 });
