@@ -1,104 +1,160 @@
-name: E2E Tests
+name: E2E
 
+# Playwright against a throwaway stack on the runner: the erp-purchase API (e2e profile, H2 in
+# memory, seeded at boot) and this UI built with `vite build --mode e2e`.
+#
+# - Every push to dev runs the smoke project (route sweep, fixture checks, core-module lists)
+#   against `vite preview` of the e2e build.
+# - Nightly runs the full suite against the preview build, and in a second job the dev-server
+#   lane: the smoke project again (React and antd warnings exist only in development builds) and
+#   the @dev-server specs, which import /src modules that only the dev server serves.
+# - workflow_dispatch runs either, on any branch.
+#
+# OWNER ACTION: the API checkout needs the repository secret REPO_TOKEN, a token that can read
+# avarshtech/erp-purchase. Until it exists, every run fails at "Check out the API".
 on:
+  push:
+    branches: [dev]
+  schedule:
+    # 20:30 UTC = 02:00 IST. Scheduled runs use the workflow on the DEFAULT branch, so the
+    # checkout below names dev explicitly.
+    - cron: '30 20 * * *'
   workflow_dispatch:
     inputs:
-      module:
-        description: 'Module to test (empty for all)'
-        required: false
+      suite:
+        description: 'smoke, or full (the full suite plus the dev-server lane)'
         type: choice
-        options:
-          - ''
-          - master-data
-          - costing
-          - orders
-          - bom
-          - po
-          - admin
-          - validation
-  # Trigger after deploy (uncomment and configure webhook)
-  # repository_dispatch:
-  #   types: [deploy-complete]
+        options: [smoke, full]
+        default: smoke
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   e2e:
+    name: e2e (${{ matrix.lane }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    timeout-minutes: ${{ matrix.lane == 'full' && 180 || 45 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: ${{ fromJSON((github.event_name == 'schedule' || inputs.suite == 'full') && '["full","dev-server"]' || '["smoke"]') }}
+    env:
+      E2E_API_URL: http://localhost:8088/api/v1
+      E2E_PASSWORD: admin123
+      # The preview build is served on 4173; the dev-server lane uses 3001.
+      E2E_BASE_URL: ${{ matrix.lane == 'dev-server' && 'http://localhost:3001' || 'http://localhost:4173' }}
     steps:
-      - name: Checkout UI repo
+      - name: Check out the UI
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
 
-      - name: Checkout API repo
+      - name: Check out the API
         uses: actions/checkout@v4
         with:
           repository: avarshtech/erp-purchase
+          ref: master
           path: erp-purchase
           token: ${{ secrets.REPO_TOKEN }}
 
-      - name: Setup Java 25
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
+          distribution: temurin
           java-version: '25'
-          distribution: 'temurin'
+          cache: gradle
+          cache-dependency-path: |
+            erp-purchase/*.gradle*
+            erp-purchase/gradle/wrapper/gradle-wrapper.properties
 
-      - name: Setup Node 22
+      - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version-file: .nvmrc
+          cache: npm
 
-      - name: Install UI dependencies
+      - name: Install
         run: npm ci
 
-      - name: Install Playwright browsers
+      - name: Build the API
+        working-directory: erp-purchase
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar --no-daemon --console=plain
+
+      - name: Start the API (e2e profile, port 8088)
+        run: |
+          jar=$(ls erp-purchase/build/libs/*.jar | grep -v -- '-plain' | head -n 1)
+          echo "Starting $jar"
+          SERVER_PORT=8088 nohup java -jar "$jar" --spring.profiles.active=e2e > api.log 2>&1 &
+
+      - name: Build the UI (e2e mode)
+        if: matrix.lane != 'dev-server'
+        run: npx vite build --mode e2e
+
+      - name: Serve the UI (vite preview on 4173)
+        if: matrix.lane != 'dev-server'
+        run: nohup npx vite preview --mode e2e --port 4173 --strictPort > ui.log 2>&1 &
+
+      - name: Serve the UI (dev server on 3001)
+        if: matrix.lane == 'dev-server'
+        run: nohup npx vite --mode e2e --port 3001 --strictPort > ui.log 2>&1 &
+
+      - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Start API (H2 in-memory)
+      - name: Wait for the API
         run: |
-          cd erp-purchase
-          chmod +x gradlew
-          SPRING_PROFILES_ACTIVE=e2e SERVER_PORT=8088 ./gradlew bootRun --quiet &
-          echo "Waiting for API..."
-          for i in $(seq 1 90); do
-            if curl -sf http://localhost:8088/api/v1/categories -H "Content-Type: application/json" > /dev/null 2>&1; then
-              echo "API is ready!"
-              break
-            fi
-            if [ $i -eq 90 ]; then
-              echo "API failed to start"
-              exit 1
-            fi
+          # The e2e profile exposes the readiness probe. /actuator/health is the fallback, but in
+          # the e2e profile it can answer 503 while readiness is UP, so readiness is tried first.
+          for i in $(seq 1 120); do
+            if curl -sf http://localhost:8088/actuator/health/readiness | grep -q '"UP"'; then echo "API ready (readiness)"; exit 0; fi
+            if curl -sf http://localhost:8088/actuator/health | grep -q '"UP"'; then echo "API ready (health)"; exit 0; fi
+            sleep 5
+          done
+          echo "The API did not become ready in 10 minutes"; tail -n 100 api.log; exit 1
+
+      - name: Wait for the UI
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf "$E2E_BASE_URL/" > /dev/null; then break; fi
             sleep 2
           done
+          curl -sf "$E2E_BASE_URL/" > /dev/null || { tail -n 50 ui.log; exit 1; }
+          # The dev server compiles on first request; warm it so the first login does not time out.
+          if [ "${{ matrix.lane }}" = "dev-server" ]; then curl -sf "$E2E_BASE_URL/src/main.jsx" > /dev/null; fi
 
-      - name: Start UI dev server
-        run: |
-          VITE_API_BASE_URL=http://localhost:8088/api/v1 npm run dev &
-          echo "Waiting for UI..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-              echo "UI is ready!"
-              break
-            fi
-            sleep 2
-          done
+      - name: Smoke
+        if: matrix.lane == 'smoke'
+        run: npx playwright test --project=smoke
 
-      - name: Run E2E Tests
-        run: |
-          MODULE="${{ github.event.inputs.module || '' }}"
-          if [ -n "$MODULE" ]; then
-            echo "Running module: $MODULE"
-            npx playwright test --project="$MODULE"
-          else
-            echo "Running all modules"
-            npx playwright test
-          fi
+      - name: Full suite (preview build)
+        if: matrix.lane == 'full'
+        run: npx playwright test --grep-invert @dev-server
 
-      - name: Upload test report
-        uses: actions/upload-artifact@v4
+      - name: Dev-server lane
+        if: matrix.lane == 'dev-server'
+        # One run, so one report: the smoke project plus the three @dev-server files.
+        run: >-
+          npx playwright test e2e/specs/smoke
+          e2e/specs/export-docs/sticker-templates.spec.js
+          e2e/specs/export-docs/packing-list-blocks.spec.js
+          e2e/specs/export-docs/shipments.spec.js
+
+      - name: Upload the report, junit and traces
         if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: e2e-report
-          path: e2e-report/
+          name: e2e-${{ matrix.lane }}-${{ github.run_number }}
+          path: |
+            e2e-report/
+            test-results/
+            api.log
+            ui.log
           retention-days: 14
+          if-no-files-found: ignore
