@@ -3,9 +3,9 @@ import { Typography } from 'antd';
 import { ArrowRightOutlined } from '@ant-design/icons';
 import ColorDot from '../../../components/ColorDot';
 import { NO_PROCESS_LABEL } from '../../../utils/cutPanelConstants';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * Colour-wise summary (PRD §8.4, BR-08, AC-16): every order colour, its panels and the
@@ -29,7 +29,7 @@ const CprColourSummary = memo(function CprColourSummary({ summary }) {
                 {p.chain.map((c, i) => (
                   <span key={`${c.seq}-${c.process}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     {i > 0 && <ArrowRightOutlined style={{ fontSize: 10, color: 'var(--text-muted)' }} aria-hidden />}
-                    <span>{c.process} <Text type="secondary" style={{ fontSize: 12 }}>{n(c.qty)}</Text></span>
+                    <span>{c.process} <Text type="secondary" style={{ fontSize: 12 }}>{formatCount(c.qty)}</Text></span>
                   </span>
                 ))}
               </div>

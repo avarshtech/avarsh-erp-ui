@@ -3,10 +3,9 @@ import { Alert, App, Card, Col, Form, Row, Typography } from 'antd';
 import RequirementOrderSelect from '../shared/RequirementOrderSelect';
 import FactSheet from '../../../components/FactSheet';
 import { requestedByProcess } from '../../../utils/garmentProcessCalc';
-import { formatDate } from '../../../utils/formatters';
+import { formatCount, formatDate } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * A. Order details (PRD §7): Order No. is the only input; the rest is fetched and locked.
@@ -34,7 +33,7 @@ const GprOrderSection = memo(function GprOrderSection({ doc, order, orders, sibl
     { label: 'Garment', value: order.garmentDescription },
   ] : [];
   const tiles = order ? [
-    { label: 'Order Qty', value: n(order.totalQty), accent: true },
+    { label: 'Order Qty', value: formatCount(order.totalQty), accent: true },
     { label: 'Delivery Date', value: formatDate(order.deliveryDate, 'DD-MM-YYYY') },
   ] : [];
 
@@ -60,7 +59,7 @@ const GprOrderSection = memo(function GprOrderSection({ doc, order, orders, sibl
           showIcon
           style={{ marginTop: 12 }}
           title="Already requested on this order (open requirements — shown, not blocked)"
-          description={requested.map((r) => `${r.label}: ${n(r.total)} (${r.requirementNos.join(', ')})`).join(' · ')}
+          description={requested.map((r) => `${r.label}: ${formatCount(r.total)} (${r.requirementNos.join(', ')})`).join(' · ')}
         />
       )}
     </Card>

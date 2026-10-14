@@ -4,11 +4,10 @@ import StatusTag from '../../../components/StatusTag';
 import { JOB_WORK_PO_STATUS_CONFIG } from '../../../utils/statusConfig';
 import { jobWorkPoStatusLabel } from '../../../utils/jobWorkPoStatus';
 import { JOB_WORK_PO_PATH } from '../../../utils/jobWorkConstants';
-import { formatDate } from '../../../utils/formatters';
+import { formatCount, formatDate } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
-const num = (title, dataIndex, extra = {}) => ({ title, dataIndex, align: 'right', width: 84, render: n, ...extra });
+const num = (title, dataIndex, extra = {}) => ({ title, dataIndex, align: 'right', width: 84, render: formatCount, ...extra });
 
 const STEP_COLOR = { 'Not allocated': 'default', 'Partially allocated': 'warning', 'Fully allocated': 'success' };
 
@@ -23,11 +22,11 @@ export const stepColumns = (source) => [
     render: (label, r) => (r.detail ? <span>{label} <Text type="secondary">({r.detail})</Text></span> : <strong>{label}</strong>),
   },
   num('Required', 'required'),
-  num('In draft PO', 'inDraft', { render: (v) => (v ? n(v) : '—') }),
+  num('In draft PO', 'inDraft', { render: (v) => (v ? formatCount(v) : '—') }),
   num("PO'd", 'allocated'),
-  num('Completed', 'completed', { render: (v) => (v ? n(v) : '—') }),
-  num('Released', 'released', { render: (v) => (v ? n(v) : '—') }),
-  num('Balance', 'balance', { render: (v) => <strong>{n(v)}</strong> }),
+  num('Completed', 'completed', { render: (v) => (v ? formatCount(v) : '—') }),
+  num('Released', 'released', { render: (v) => (v ? formatCount(v) : '—') }),
+  num('Balance', 'balance', { render: (v) => <strong>{formatCount(v)}</strong> }),
   { title: 'Coverage', dataIndex: 'coverage', width: 110, render: (v) => <Progress percent={v} size="small" /> },
   { title: 'Status', dataIndex: 'status', width: 136, render: (v) => <Tag color={STEP_COLOR[v]}>{v}</Tag> },
 ];
@@ -42,8 +41,8 @@ export const poColumns = [
   { title: 'Process', dataIndex: 'processLabel' },
   { title: 'Job Worker', dataIndex: 'vendorName' },
   num('PO Qty', 'poQty'),
-  num("PO'd", 'allocated', { render: (v) => (v ? n(v) : '—') }),
-  num('Received', 'received', { render: (v) => (v ? n(v) : '—') }),
+  num("PO'd", 'allocated', { render: (v) => (v ? formatCount(v) : '—') }),
+  num('Received', 'received', { render: (v) => (v ? formatCount(v) : '—') }),
   {
     title: 'Status', dataIndex: 'status', width: 150,
     render: (s) => <StatusTag status={s} config={JOB_WORK_PO_STATUS_CONFIG} getLabel={jobWorkPoStatusLabel} />,

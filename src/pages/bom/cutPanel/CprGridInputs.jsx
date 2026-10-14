@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { InputNumber, Tooltip, Typography } from 'antd';
 import { processLabel } from '../../../utils/cutPanelCalc';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 const EDITED = { background: 'color-mix(in srgb, var(--warning-color, #faad14) 18%, transparent)' };
 
 /**
@@ -30,8 +30,8 @@ export const QtyInput = ({ row, size, idx, editable, onQty, focusNext }) => {
   const cell = row.sizes[size] || { baseQty: 0, calculatedQty: 0, requiredQty: 0 };
   if (!(cell.baseQty > 0)) return <Text type="secondary" style={{ fontSize: 12 }}>N/A</Text>;
   const differs = Number(cell.requiredQty) !== cell.calculatedQty;
-  const tip = differs ? `Calculated ${n(cell.calculatedQty)}` : undefined;
-  if (!editable) return <Tooltip title={tip}><span style={{ ...(differs && EDITED), padding: '0 4px' }}>{n(cell.requiredQty)}</span></Tooltip>;
+  const tip = differs ? `Calculated ${formatCount(cell.calculatedQty)}` : undefined;
+  if (!editable) return <Tooltip title={tip}><span style={{ ...(differs && EDITED), padding: '0 4px' }}>{formatCount(cell.requiredQty)}</span></Tooltip>;
   return (
     <Tooltip title={tip}>
       <InputNumber

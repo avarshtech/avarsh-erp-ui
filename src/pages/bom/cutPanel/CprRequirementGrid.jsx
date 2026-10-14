@@ -7,9 +7,9 @@ import { buildGridColumns } from './cprGridColumns';
 import { buildGridRows } from './cprGridRows';
 import CprGridToolbar from './CprGridToolbar';
 import CprFabricPanelSummary from './CprFabricPanelSummary';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 /**
  * Section 3 — Cut Panel Requirement grid (PRD §8.3). Size columns come from the order's
@@ -87,9 +87,9 @@ const CprRequirementGrid = memo(function CprRequirementGrid({ doc, order, editab
             <Table.Summary.Row>
               <Table.Summary.Cell index={0} colSpan={4 + offset}><strong>Total cut panel requirement</strong></Table.Summary.Cell>
               {order.sizes.map((s, i) => (
-                <Table.Summary.Cell key={s} index={4 + offset + i} align="right"><strong>{n(totals.bySize[s])}</strong></Table.Summary.Cell>
+                <Table.Summary.Cell key={s} index={4 + offset + i} align="right"><strong>{formatCount(totals.bySize[s])}</strong></Table.Summary.Cell>
               ))}
-              <Table.Summary.Cell index={4 + offset + order.sizes.length} align="right"><strong>{n(totals.totalQty)}</strong></Table.Summary.Cell>
+              <Table.Summary.Cell index={4 + offset + order.sizes.length} align="right"><strong>{formatCount(totals.totalQty)}</strong></Table.Summary.Cell>
               <Table.Summary.Cell index={5 + offset + order.sizes.length} colSpan={2} />
             </Table.Summary.Row>
           </Table.Summary>

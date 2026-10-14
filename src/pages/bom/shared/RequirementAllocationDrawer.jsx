@@ -3,9 +3,9 @@ import { Alert, Col, Drawer, Row, Skeleton, Statistic, Table, Typography } from 
 import useRequirementAllocation from './useRequirementAllocation';
 import { stepColumns, poColumns } from './requirementAllocationColumns';
 import { coveragePct } from '../../../utils/jobWorkAllocation';
+import { formatCount } from '../../../utils/formatters';
 
 const { Title, Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 const TOTALS = [
   ['Required', 'required'], ['In draft PO', 'inDraft'], ["PO'd", 'allocated'],
@@ -21,7 +21,7 @@ const AllocationContent = ({ source, docId, load }) => {
     <>
       <Row gutter={[16, 8]} style={{ marginBottom: 16 }}>
         {TOTALS.map(([label, key]) => (
-          <Col key={key} xs={8} md={4}><Statistic title={label} value={n(totals[key])} /></Col>
+          <Col key={key} xs={8} md={4}><Statistic title={label} value={formatCount(totals[key])} /></Col>
         ))}
       </Row>
       <Text type="secondary">

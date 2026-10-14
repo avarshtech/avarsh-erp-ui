@@ -4,9 +4,9 @@ import ColorDot from '../../../components/ColorDot';
 import { lineTotal, needsReason, processLabel, varianceOf } from '../../../utils/cutPanelCalc';
 import { CPR_WRN } from '../../../utils/cutPanelConstants';
 import { QtyInput, SeqInput } from './CprGridInputs';
+import { formatCount } from '../../../utils/formatters';
 
 const { Text } = Typography;
-const n = (v) => Number(v || 0).toLocaleString('en-IN');
 
 const span = (row, full, refSpan) => {
   if (row.type === 'group') return { colSpan: full };
@@ -31,7 +31,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
               <Button type="text" size="small" icon={open ? <DownOutlined /> : <RightOutlined />} aria-label={open ? 'Collapse group' : 'Expand group'} onClick={() => handlers.toggleGroup(row.gk)} />
               <strong>{row.fabricName}</strong><Text type="secondary">{row.fabricCode}</Text>
               <ColorDot hex={row.color.hex} name={row.color.name} /><strong>{row.color.name}</strong>
-              <Text type="secondary">Order {n(row.orderQty)} · incl. allowance {n(row.orderQtyAllow)} · {row.lineCount} line(s)</Text>
+              <Text type="secondary">Order {formatCount(row.orderQty)} · incl. allowance {formatCount(row.orderQtyAllow)} · {row.lineCount} line(s)</Text>
             </span>
           );
         }
@@ -63,7 +63,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
       render: (_, row) => {
         if (row.type === 'group') return null;
         return row.type === 'ref'
-          ? <Text type="secondary">{n(row.base[size])}</Text>
+          ? <Text type="secondary">{formatCount(row.base[size])}</Text>
           : <QtyInput row={row} size={size} idx={idx} editable={editable} onQty={handlers.onQty} focusNext={focusNext} />;
       },
     })),
@@ -72,8 +72,8 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
       render: (_, row) => {
         if (row.type === 'group') return null;
         return row.type === 'ref'
-          ? <Text type="secondary">{n(Object.values(row.base).reduce((s, v) => s + (v || 0), 0))}</Text>
-          : <strong>{n(lineTotal(row))}</strong>;
+          ? <Text type="secondary">{formatCount(Object.values(row.base).reduce((s, v) => s + (v || 0), 0))}</Text>
+          : <strong>{formatCount(lineTotal(row))}</strong>;
       },
     },
     {
@@ -81,7 +81,7 @@ export const buildGridColumns = ({ order, editable, orderAllowancePct, handlers,
       render: (_, row) => {
         if (row.type !== 'line' || !needsReason(row, orderAllowancePct)) return row.type === 'line' ? <Text type="secondary">—</Text> : null;
         const v = varianceOf(row);
-        const why = [v > 0 && `${CPR_WRN.WRN_01} (+${n(v)})`, v < 0 && `${CPR_WRN.WRN_02} (${n(v)})`,
+        const why = [v > 0 && `${CPR_WRN.WRN_01} (+${formatCount(v)})`, v < 0 && `${CPR_WRN.WRN_02} (${formatCount(v)})`,
           Number(row.allowancePct) !== Number(orderAllowancePct) && CPR_WRN.WRN_04].filter(Boolean).join('; ');
         return editable
           ? <Tooltip title={why}><Input size="small" name={`reason-${row.key}`} aria-label={`Reason for ${processLabel(row)} variance`} placeholder="Reason required" status={row.varianceReason?.trim() ? undefined : 'warning'} value={row.varianceReason} maxLength={300} onChange={(e) => handlers.onReason(row.key, e.target.value)} /></Tooltip>
