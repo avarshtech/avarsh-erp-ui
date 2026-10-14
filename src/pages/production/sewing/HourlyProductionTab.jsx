@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Card, Space, DatePicker, InputNumber, Spin, Tag, Alert } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App, Button, Card, Space, DatePicker, InputNumber, Spin, Tag, Alert } from 'antd';
 import dayjs from 'dayjs';
 import { ActionButton } from '../../../components/buttons';
 import EmptyState from '../../../components/EmptyState';
@@ -20,7 +20,7 @@ const LIGHT_KEY = { GREEN: 'green', YELLOW: 'yellow', RED: 'red' };
  * preview between keystroke and save.
  */
 const HourlyProductionTab = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [plans, setPlans] = useState([]);
   const [shifts, setShifts] = useState([]);
   const [operators, setOperators] = useState([]);
@@ -30,8 +30,15 @@ const HourlyProductionTab = () => {
   const [date, setDate] = useState(dayjs().format('YYYY-MM-DD'));
   const [shiftId, setShiftId] = useState(null);
   const [sheet, setSheet] = useState(null);
+  // The plan / date / shift the open sheet was loaded for: the save goes there, whatever the pickers show (U261)
+  const [sheetSlot, setSheetSlot] = useState(null);
+  const [sheetFailed, setSheetFailed] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [opened, setOpened] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const sheetRequest = useRef(0);
+  const confirming = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -50,17 +57,54 @@ const HourlyProductionTab = () => {
   // The plan carries the operations the grid may book against and the SAM the
   // efficiency preview is measured with, so it is fetched in full.
   useEffect(() => {
-    if (!planId) { setPlan(null); return; }
-    getPlan(planId).then(setPlan).catch(() => message.error('Failed to load the plan'));
+    if (!planId) { setPlan(null); return undefined; }
+    let current = true;
+    getPlan(planId)
+      .then((p) => { if (current) setPlan(p); })
+      .catch(() => { if (current) message.error('Failed to load the plan'); });
+    return () => { current = false; };
   }, [planId, message]);
 
+  // Each change of plan, date or shift closes the open sheet and opens that slot's; a reply for a slot
+  // no longer chosen is dropped, so a slow or failed load never leaves another slot's sheet under the pickers.
   const loadSheet = useCallback(async () => {
     if (!planId || !shiftId) return;
-    try { setSheet(await getHourlySheet({ planId, date, shiftId })); }
-    catch { message.error('Failed to load the hourly sheet'); }
+    const request = sheetRequest.current + 1;
+    sheetRequest.current = request;
+    const slot = { planId, date, shiftId };
+    setSheet(null); setSheetSlot(null); setSheetFailed(false); setDirty(false);
+    try {
+      const loadedSheet = await getHourlySheet(slot);
+      if (sheetRequest.current !== request) return;
+      setSheet(loadedSheet); setSheetSlot(slot); setOpened(true);
+    } catch {
+      if (sheetRequest.current !== request) return;
+      setSheetFailed(true);
+      message.error('Failed to load the hourly sheet');
+    }
   }, [planId, date, shiftId, message]);
 
   useEffect(() => { loadSheet(); }, [loadSheet]);
+
+  /** Typed rows are only discarded after a yes: a change of plan, date or shift opens another sheet. */
+  const switchSlot = (apply) => (value) => {
+    if (!dirty) { apply(value); return; }
+    // The date picker reports the same choice again when focus moves to the dialog: ask once
+    if (confirming.current) return;
+    confirming.current = true;
+    // Opened after the picker has finished with the key or click that chose the value
+    setTimeout(() => modal.confirm({
+      afterClose: () => { confirming.current = false; },
+      title: 'Discard unsaved entries?',
+      content: 'This sheet has changes that are not saved. Opening another plan, date or shift discards them.',
+      okText: 'Discard',
+      okButtonProps: { danger: true },
+      cancelText: 'Keep editing',
+      onOk: () => apply(value),
+    }), 0);
+  };
+
+  const editSheet = useCallback((next) => { setSheet(next); setDirty(true); }, []);
 
   /** The plan's last operation is what the line's finished output is read from. */
   const lastOperationId = useMemo(() => (plan?.operations || [])
@@ -86,15 +130,16 @@ const HourlyProductionTab = () => {
 
   const toPayload = useCallback(() => ({
     id: sheet.id ?? undefined,
-    planId,
-    sheetDate: date,
-    shiftId,
+    planId: sheetSlot.planId,
+    sheetDate: sheetSlot.date,
+    shiftId: sheetSlot.shiftId,
     presentOperators: sheet.presentOperators,
     remarks: sheet.remarks,
     rows: sheet.rows,
-  }), [sheet, planId, date, shiftId]);
+  }), [sheet, sheetSlot]);
 
   const handleSave = async () => {
+    if (!sheet || !sheetSlot) return;
     setSaving(true);
     try {
       // Warn before posting: the server refuses the same clash on save, but the
@@ -105,11 +150,24 @@ const HourlyProductionTab = () => {
         return;
       }
       setSheet(await saveHourlySheet(toPayload()));
+      setDirty(false);
       message.success('Hourly production saved');
     } catch (e) {
       message.error(e?.response?.data?.message || 'Failed to save the sheet');
     } finally { setSaving(false); }
   };
+
+  const slotPickers = (
+    <>
+      <FormSelect value={planId} style={{ width: 320 }}
+        options={plans.map((p) => ({ value: p.id, label: `${p.line} · ${p.orderNo} · ${p.styleNo}` }))}
+        onChange={switchSlot(setPlanId)} />
+      <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(date)}
+        onChange={switchSlot((d) => setDate(d.format('YYYY-MM-DD')))} />
+      <FormSelect value={shiftId} style={{ width: 150 }} placeholder="Shift"
+        options={shifts.map((s) => ({ value: s.id, label: s.name }))} onChange={switchSlot(setShiftId)} />
+    </>
+  );
 
   // Without a plan or a shift there is no sheet to open: say what is missing instead of spinning
   if (loaded && (!plans.length || !shifts.length)) {
@@ -121,7 +179,28 @@ const HourlyProductionTab = () => {
       </Card>
     );
   }
-  if (!plan || !sheet) return <Card><div style={{ textAlign: 'center', padding: 60 }}><Spin /></div></Card>;
+  // The first sheet opens behind the page spinner, as before; later switches keep the pickers on screen
+  if (!plan || (!sheet && !sheetFailed && !opened)) {
+    return <Card><div style={{ textAlign: 'center', padding: 60 }}><Spin /></div></Card>;
+  }
+  if (!sheet) {
+    return (
+      <div>
+        <Card style={{ marginBottom: 16 }}>
+          <Space size="middle" wrap>
+            {slotPickers}
+            {sheetFailed
+              ? (
+                <span style={{ color: 'var(--error-color)' }}>
+                  Could not load this sheet. <Button type="link" size="small" onClick={loadSheet}>Try again</Button>
+                </span>
+              )
+              : <Spin size="small" />}
+          </Space>
+        </Card>
+      </div>
+    );
+  }
 
   const light = TRAFFIC_COLORS[LIGHT_KEY[live?.trafficLight] ?? 'red'];
   const orderReceipts = receipts.filter((r) => r.orderId === plan.orderId);
@@ -130,19 +209,13 @@ const HourlyProductionTab = () => {
     <div>
       <Card style={{ marginBottom: 16 }}>
         <Space size="middle" wrap>
-          <FormSelect value={planId} style={{ width: 320 }}
-            options={plans.map((p) => ({ value: p.id, label: `${p.line} · ${p.orderNo} · ${p.styleNo}` }))}
-            onChange={setPlanId} />
-          <DatePicker format="DD-MMM-YYYY" allowClear={false} value={dayjs(date)}
-            onChange={(d) => setDate(d.format('YYYY-MM-DD'))} />
-          <FormSelect value={shiftId} style={{ width: 150 }} placeholder="Shift"
-            options={shifts.map((s) => ({ value: s.id, label: s.name }))} onChange={setShiftId} />
+          {slotPickers}
           <Space size="small">
             <span style={{ color: 'var(--text-secondary)' }}>Manpower:</span>
             <span>planned <strong>{sheet.plannedOperators}</strong></span>
             <span>present</span>
             <InputNumber size="small" min={0} max={sheet.plannedOperators} value={sheet.presentOperators}
-              style={{ width: 64 }} onChange={(v) => setSheet((prev) => ({ ...prev, presentOperators: v ?? 0 }))} />
+              style={{ width: 64 }} onChange={(v) => editSheet((prev) => ({ ...prev, presentOperators: v ?? 0 }))} />
             {live?.absenteeismPct > (sheet.absenteeismAlertPct ?? 10)
               && <Tag color="red">Absenteeism {live.absenteeismPct}%</Tag>}
           </Space>
@@ -198,7 +271,7 @@ const HourlyProductionTab = () => {
       </Card>
 
       <HourlyGrid sheet={sheet} operators={operators} operations={plan.operations || []}
-        lastOperationId={lastOperationId} targetPerDay={sheet.targetPerDay || 0} onChange={setSheet} />
+        lastOperationId={lastOperationId} targetPerDay={sheet.targetPerDay || 0} onChange={editSheet} />
     </div>
   );
 };
