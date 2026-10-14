@@ -405,7 +405,8 @@ test.describe.serial('Item — CRUD', () => {
       if (await conversion.isVisible().catch(() => false)) await conversion.fill('12');
       await modal.locator('#hsnCode').fill('610910');
       await antInputNumberFill(page, '#defaultAllowance', 5.5);
-      await expect(modal.locator('#isActive')).toBeChecked(); // default true
+      // Active is edit-only since 2026-09-11 (a new item is always active), so no checkbox on create.
+      await expect(modal.locator('#isActive')).toHaveCount(0);
 
       // Variant name is REQUIRED (>= 5 chars) and is the item's searchable identity.
       await modal.getByPlaceholder(/e\.g\. Single Jersey|Variant Name/i).first().fill(variantName);

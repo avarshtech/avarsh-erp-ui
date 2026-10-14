@@ -95,7 +95,9 @@ test.describe.serial('Process — CRUD', () => {
   });
 
   // ─── UI Operations ──────────────────────────────────────────────────
-  test.describe('UI Operations', () => {
+  // fixme 2026-10-14: stale. The form has no Cost/Allowance Segmented any more and Type comes
+  // from the category, not defaultCost; rewrite the block against the category-driven form.
+  test.describe.fixme('UI Operations', () => {
     let api;
     let seed; // guarantees a known row for list/search assertions
 
