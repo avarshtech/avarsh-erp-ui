@@ -173,6 +173,7 @@ const LoanView = () => {
       >
         <p style={{ color: 'rgba(0,0,0,0.55)', marginTop: 0 }}>
           For repayments made outside payroll. Payroll records its own EMI deductions automatically.
+          While a processed payroll run that deducts this EMI awaits approval, approve the run first.
         </p>
         <Descriptions size="small" column={1} style={{ marginBottom: 16 }}>
           <Descriptions.Item label="Outstanding">{formatRupees(loan.balance)}</Descriptions.Item>
