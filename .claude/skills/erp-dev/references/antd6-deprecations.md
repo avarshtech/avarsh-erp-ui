@@ -1,25 +1,41 @@
 # Ant Design 6 deprecations — the list that actually warns
 
-Transcribed from the `warning.deprecated(...)` calls in `node_modules/antd/es/**`
+Transcribed from the deprecation warnings (`warning.deprecated(...)`, the destructured
+`deprecated(...)` and `warning(cond, 'deprecated', ...)`) in `node_modules/antd/es/**`
 at antd **6.2.2**, not from the docs, which lag behind and in places contradict
 the runtime. Verified against the installed package on 2026-09-09, when a repo
-sweep found 303 warning-emitting usages and cleared all of them.
+sweep found 303 warning-emitting usages and cleared all of them. Corrected on
+2026-10-13: Input's addons and TextArea `bordered` warn too, and these runtime
+warnings were missing: Drawer `destroyInactivePanel`, Tabs `indicatorSize`,
+Breadcrumb `routes`, ConfigProvider `autoInsertSpaceInButton`, Image preview
+`maskClassName` / `rootClassName` / `mask`, notification `btn`, Table
+`locale.filterCheckall`, `DatePicker.QuarterPicker`.
 
 ## How to re-derive this list after an antd upgrade
 
 The runtime is the source of truth. Do not trust `@deprecated` JSDoc alone — the
-tags include props that never warn (`Input`'s `addonAfter`, `Modal`'s
-`afterClose`), and a JSDoc block containing a code example will fool a naive
-"comment above declaration" parser.
+tags include props that never warn (`Modal`'s `afterClose`), and a JSDoc block
+containing a code example will fool a naive "comment above declaration" parser.
 
 ```bash
-grep -rn --include=*.js "\.deprecated(" node_modules/antd/es/ | sed "s|^.*es/||"
+# Every deprecation call, including the destructured `const { deprecated } = devUseWarning(...)`
+# form in input/Input.js and input/TextArea.js, which a plain "\.deprecated(" grep misses
+grep -rnE --include=*.js "(^|[^A-Za-z_])deprecated\(" node_modules/antd/es/ | grep -v _util/warning.js
+# Warnings raised as warning(cond, 'deprecated', ...) instead (List, showArrow, indicatorSize, ...)
+grep -rn --include=*.js "'deprecated'," node_modules/antd/es/
 ```
 
 Then read the array literal a few lines above each hit — most are of the form
 `[['oldProp', 'newProp'], ...].forEach(...)`. Component-scope the result: `bordered`
 warns on Card and Select but is perfectly valid on Table and Descriptions, and
 `direction` warns on Space but not on ConfigProvider.
+
+When in doubt, render it: `NODE_ENV=development node` with `react-dom/server`'s
+`renderToString` and a patched `console.error` prints exactly what a component
+warns about (this is how Input's addon warnings were confirmed on 2026-10-12).
+
+The lint rules in `eslint.config.js` (`ANTD_DEPRECATED_PROPS` and the selectors
+after it) follow this file. Update both together.
 
 A component-scoped scanner and a codemod live in the audit scratchpad pattern:
 parse JSX opening tags with brace/quote depth tracking so a `width` inside a
@@ -35,9 +51,16 @@ nested `style={{ }}` is never mistaken for a top-level prop.
 - **`Space` `direction` → `orientation`.** Same values, so it is a pure rename —
   but `direction` is still correct on ConfigProvider, so rename by component.
 - **`Alert` `message` → `title`.** The single largest category in this codebase.
-- **`InputNumber` addons.** antd points at `Space.Compact`, which is a structural
-  rewrite. `suffix` / `prefix` are supported, warning-free, and already the
-  convention here — prefer them for units (`%`, `PCS`, `MTR`).
+- **`Input` and `InputNumber` addons.** `addonBefore` / `addonAfter` warn on
+  both (`input/Input.js`, `input-number/index.js`); an earlier version of this
+  file called Input's valid, because the plain `.deprecated(` grep missed
+  Input's destructured call. antd points at `Space.Compact`, which is a
+  structural rewrite. `suffix` / `prefix` are supported, warning-free, and
+  already the convention here — prefer them for units (`%`, `PCS`, `MTR`).
+- **`Timeline` items `children` / `dot`** warn as `items.children` →
+  `items.content` and `items.dot` → `items.icon`. On 2026-10-12 three screens
+  still used them: CostingHistoryModal, POView (activity notes),
+  PoOrderMappingDrawer.
 - **Inline style props fold into `styles`**, not into `style`.
 - **`Divider orientation="left"` warns, but not as a deprecation.** In 6.2.2
   `orientation` means horizontal/vertical; a placement value (`left`, `right`,
@@ -65,12 +88,16 @@ nested `style={{ }}` is never mistaken for a top-level prop.
 | Timeline | `mode="left"` / `mode="right"` | `mode="start"` / `mode="end"` |
 | Timeline | `pending`, `pendingDot` | a pending node in `items` |
 | Drawer | `width`, `height` | `size` |
+| Drawer | `destroyInactivePanel` | `destroyOnHidden` |
+| Drawer | `destroyOnClose` | `destroyOnHidden` (documented deprecated; 6.2.2 maps it silently, no warning) |
 | Modal | `destroyOnClose` | `destroyOnHidden` |
 | Modal | `autoFocusButton` | `focusable.autoFocusButton` |
 | Modal | `focusTriggerAfterClose` | `focusable.focusTriggerAfterClose` |
 | Tabs | `tabPosition` | `tabPlacement` |
 | Tabs | `destroyInactiveTabPane` | `destroyOnHidden` |
 | Tabs | `popupClassName` | `classNames.popup` |
+| Tabs | `indicatorSize` | `indicator={{ size }}` |
+| Breadcrumb | `routes` | `items` |
 | Collapse | `destroyInactivePanel` | `destroyOnHidden` |
 | Collapse | `expandIconPosition` | `expandIconPlacement` |
 | Collapse.Panel | `disabled` | `collapsible="disabled"` |
@@ -83,7 +110,8 @@ nested `style={{ }}` is never mistaken for a top-level prop.
 | Progress | `trailColor` | `railColor` |
 | Progress | `gapPosition` | `gapPlacement` |
 | Progress.Line | `strokeWidth` | `size` |
-| Card, Cascader, DatePicker, Input, InputNumber, Select, TreeSelect | `bordered` | `variant` |
+| Card, Cascader, DatePicker, Input, Input.TextArea, InputNumber, Select, TreeSelect | `bordered` | `variant` |
+| Input, InputNumber | `addonBefore`, `addonAfter` | `prefix` / `suffix`, or `Space.Compact` |
 | Tag | `bordered={false}` | `variant="filled"` |
 | Tag | `color="*-inverse"` | `variant="solid"` |
 | TimePicker | `addon` | `renderExtraFooter` |
@@ -94,17 +122,22 @@ nested `style={{ }}` is never mistaken for a top-level prop.
 | Table (column) | `filterDropdownOpen` | `filterDropdownProps.open` |
 | Table (column) | `onFilterDropdownOpenChange` | `filterDropdownProps.onOpenChange` |
 | Table | `pagination.position` | `pagination.placement` |
-| Table | `onSelectInvert`, `onSelectAll`, `onSelectNone`, `onSelectMultiple` | `onChange` |
+| Table | `onSelectInvert`, `onSelectAll`, `onSelectNone`, `onSelectMultiple` | `onChange` (in 6.2.2 only `onSelectInvert` warns, and only when it fires) |
+| Table | `locale.filterCheckall` | `locale.filterCheckAll` |
 | Transfer | `operations` | `actions` |
 | Image (preview) | `visible` / `onVisibleChange` | `open` / `onOpenChange` |
 | Image (preview) | `toolbarRender` | `actionsRender` |
+| Image (preview) | `maskClassName` / `rootClassName` | `classNames.cover` / `classNames.root` |
+| Image (preview) | `mask` as a ReactNode | `cover` |
+| notification (`open`, `success`, …) | `message` / `btn` | `title` / `actions` |
 | ConfigProvider | `dropdownMatchSelectWidth` | `popupMatchSelectWidth` |
+| ConfigProvider | `autoInsertSpaceInButton` | `button={{ autoInsertSpace }}` |
 
 ## Select-family (Select, TreeSelect, Cascader, AutoComplete, DatePicker)
 
 | Old | New |
 |---|---|
-| `dropdownRender` | `popupRender` |
+| `dropdownRender` (also on Dropdown) | `popupRender` |
 | `onDropdownVisibleChange`, `onPopupVisibleChange` | `onOpenChange` |
 | `dropdownMatchSelectWidth` | `popupMatchSelectWidth` |
 | `dropdownClassName`, `popupClassName` | `classNames.popup.root` |
@@ -145,7 +178,8 @@ Merge into one object when a component needs several:
 | `Statistic.Countdown` | `Statistic.Timer type="countdown"` |
 | `BackTop` | `FloatButton.BackTop` |
 | `Tabs.TabPane`, `Timeline.Item`, `Breadcrumb.Item`, `Mentions.Option` | the parent's `items` prop |
-| `Anchor`/`Menu`/`Descriptions`/`Collapse` children | `items` |
+| `Anchor`/`Menu`/`Descriptions`/`Collapse` children | `items` (Anchor and Menu warn; Descriptions.Item and Collapse.Panel children are deprecated in the docs but silent in 6.2.2) |
+| `DatePicker.QuarterPicker` | `<DatePicker picker="quarter">` |
 | `Select.Option` / `Select.OptGroup` | `options` |
 | `List` (the whole component — 6.2.2 warns "deprecated … will be removed in next major version", `antd/es/list/index.js:196`) | plain `ul`/`li` markup or a `Table` |
 | `Dropdown placement="bottomCenter"` etc. | drop the `Center` suffix |
@@ -153,5 +187,5 @@ Merge into one object when a component needs several:
 ## Still valid — do not "fix" these
 
 `bordered` on **Table** and **Descriptions**; `size="default"` on **Skeleton**;
-`afterClose` on **Modal** (only Alert's is deprecated); `addonAfter`/`addonBefore`
-on **Input** (only InputNumber's warns); `getPopupContainer` everywhere.
+`afterClose` on **Modal** (only Alert's is deprecated); `prefix`/`suffix` on
+**Input** and **InputNumber**; `getPopupContainer` everywhere.
