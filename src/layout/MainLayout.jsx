@@ -48,11 +48,18 @@ import { hasModuleAccess, PREVIEW_SCREEN_IDS, PREVIEW_MESSAGE } from "../utils/p
 import PreviewBanner from "../components/PreviewBanner";
 
 /** A menu label with the "Preview" tag of a browser-only screen (SCREENS `preview`). */
+// A submenu label has 172px; a full-size tag (72px) pushed "Carton Stickers" and "Export Invoices"
+// past it, so the menu cut the label to "…" and hid the tag. The compact tag (~48px) fits, and the
+// tag never shrinks: an over-long label is what gets shortened. On a submenu heading antd renders
+// this span without its title wrapper and gives it a 10px start margin; zero it so the heading lines
+// up with its neighbours.
 const withPreviewTag = (label) => (
-  <span>
-    {label}
+  <span style={{ display: 'inline-flex', alignItems: 'center', maxWidth: '100%', verticalAlign: 'middle', marginInlineStart: 0 }}>
+    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
     <Tooltip title={PREVIEW_MESSAGE}>
-      <Tag color="orange" style={{ marginInlineStart: 6, marginInlineEnd: 0 }}>Preview</Tag>
+      <Tag color="orange" className="menu-preview-tag" style={{ marginInlineStart: 6, marginInlineEnd: 0, flexShrink: 0 }}>
+        Preview
+      </Tag>
     </Tooltip>
   </span>
 );

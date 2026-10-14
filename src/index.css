@@ -738,6 +738,13 @@ body {
   font-weight: 500 !important;
 }
 
+/* The "Preview" tag in the side menu: compact, so it fits beside a submenu label (172px). */
+.sidebar-menu .ant-tag.menu-preview-tag {
+  padding: 0 5px !important;
+  font-size: 10px;
+  line-height: 16px;
+}
+
 /* Dropdown */
 .ant-dropdown-menu {
   background: var(--card-bg) !important;

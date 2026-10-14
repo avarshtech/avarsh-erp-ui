@@ -127,7 +127,7 @@ export default defineConfig({
     // is wasted work, and on Windows a report the reporter still holds open (EBUSY) crashes the watcher.
     watch: {
       ignored: ['**/e2e-report/**', '**/test-results/**', '**/playwright-report/**', '**/blob-report/**',
-        '**/coverage/**', '**/.playwright-mcp/**', '**/.kilo/**', '**/docs/**'],
+        '**/coverage/**', '**/.playwright-mcp/**', '**/.kilo/**', '**/.claude/worktrees/**', '**/docs/**'],
     },
   },
 })
