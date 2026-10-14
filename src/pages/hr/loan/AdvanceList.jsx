@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App, Table, Tag, Button, Select, Space, Row, Col, Popconfirm, Alert, Drawer, Form, InputNumber, DatePicker } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, StopOutlined } from '@ant-design/icons';
@@ -57,12 +57,28 @@ const AdvanceList = () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // The picker opens on the first 200 active employees and searches the server as the user types,
+  // so an employee past that first page can still be found (U352).
+  const loadEmployees = useCallback((search) => searchEmployees({
+    status: 'ACTIVE',
+    search: search && search.trim() ? search.trim() : undefined,
+    size: 200,
+  })
+    .then((r) => setEmployees(Array.isArray(r) ? r : r?.content || []))
+    .catch((err) => message.error(err?.response?.data?.message || 'Could not load employees')), [message]);
+
+  // onSearch fires on every keystroke, so wait until typing pauses
+  const searchTimer = useRef(null);
+  const handleEmployeeSearch = useCallback((search) => {
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => loadEmployees(search), 300);
+  }, [loadEmployees]);
+
   useEffect(() => {
-    if (!drawerOpen) return;
-    searchEmployees({ status: 'ACTIVE', size: 200 })
-      .then((r) => setEmployees(Array.isArray(r) ? r : r?.content || []))
-      .catch((err) => message.error(err?.response?.data?.message || 'Could not load employees'));
-  }, [drawerOpen, message]);
+    if (!drawerOpen) return undefined;
+    loadEmployees();
+    return () => clearTimeout(searchTimer.current);
+  }, [drawerOpen, loadEmployees]);
 
   const act = useCallback(async (fn, id, done) => {
     try {
@@ -228,7 +244,8 @@ const AdvanceList = () => {
           <Form.Item name="employeeId" label="Employee" rules={[{ required: true, message: 'Select an employee' }]}>
             <Select
               showSearch
-              optionFilterProp="label"
+              filterOption={false}
+              onSearch={handleEmployeeSearch}
               placeholder="Select employee"
               options={employeeOptions(employees)}
             />
