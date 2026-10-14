@@ -7,6 +7,7 @@ import { getAllFnfSettlements } from '../../../services/hr/fnfService';
 import { FNF_STATUS, SEPARATION_REASONS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
 
 const statusMap = Object.fromEntries(FNF_STATUS.map((s) => [s.value, s]));
 const reasonMap = Object.fromEntries(SEPARATION_REASONS.map((r) => [r.value, r.label]));
@@ -64,7 +65,7 @@ const FnfList = () => {
         key: 'lastWorkingDate',
         width: 140,
         render: (val) => (val ? dayjs(val).format('DD MMM YYYY') : '-'),
-        sorter: (a, b) => (a.lastWorkingDate || '').localeCompare(b.lastWorkingDate || ''),
+        sorter: thenById((a, b) => (a.lastWorkingDate || '').localeCompare(b.lastWorkingDate || '')),
         defaultSortOrder: 'descend',
       },
       {

@@ -6,6 +6,7 @@ import { getAllBonusRuns } from '../../../services/hr/bonusService';
 import { BONUS_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
 
 const statusMap = Object.fromEntries(BONUS_STATUS.map((s) => [s.value, s]));
 
@@ -52,7 +53,7 @@ const BonusList = () => {
         render: (_, r) => (r.yearFrom && r.yearTo
           ? `${r.yearFrom}-${String(r.yearTo).slice(2)} (Apr ${r.yearFrom} to Mar ${r.yearTo})`
           : '-'),
-        sorter: (a, b) => (a.yearFrom || 0) - (b.yearFrom || 0),
+        sorter: thenById((a, b) => (a.yearFrom || 0) - (b.yearFrom || 0)),
         defaultSortOrder: 'descend',
       },
       {

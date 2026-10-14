@@ -11,6 +11,7 @@ import useCuttingMasters from '../../../hooks/useCuttingMasters';
 import { formatNumber } from '../../../utils/formatters';
 import { getActiveParts } from '../../../services/master/partsService';
 import { listReCutEntries, addReCutEntry, getCutPos, getRolls } from '../../../services/production/cuttingService';
+import { thenById } from '../../../utils/tableSort';
 
 const EMPTY_DRAFT = { entryDate: null, cuttingPoId: null, lineName: null, part: null, stNo: '', rollNo: null, qty: null, monitor: '', reason: null, qcSign: '' };
 
@@ -56,7 +57,7 @@ const ReCutRegisterTab = () => {
   }, [entries, cutPos]);
 
   const columns = useMemo(() => [
-    { title: 'Date', dataIndex: 'entryDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY'), sorter: (a, b) => a.entryDate.localeCompare(b.entryDate), defaultSortOrder: 'descend' },
+    { title: 'Date', dataIndex: 'entryDate', width: 110, render: (v) => dayjs(v).format('DD-MMM-YYYY'), sorter: thenById((a, b) => a.entryDate.localeCompare(b.entryDate)), defaultSortOrder: 'descend' },
     { title: 'Cut PO', dataIndex: 'cuttingPoNo', width: 145 },
     { title: 'Line', dataIndex: 'lineName', width: 90, align: 'center' },
     { title: 'Part', dataIndex: 'part', width: 100 },

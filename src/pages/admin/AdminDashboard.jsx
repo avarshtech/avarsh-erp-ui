@@ -20,6 +20,7 @@ import LiveActivityFeedEnableCard from '../../components/LiveActivityFeed/LiveAc
 import EmptyState from '../../components/EmptyState';
 import { ActionButton } from '../../components/buttons';
 import { getTablePagination } from '../../utils/paginationConfig';
+import { thenById } from '../../utils/tableSort';
 
 dayjs.extend(relativeTime);
 
@@ -122,7 +123,7 @@ const AdminDashboard = () => {
       title: 'Time',
       dataIndex: 'activityTimestamp',
       width: 170,
-      sorter: (a, b) => dayjs(a.activityTimestamp).unix() - dayjs(b.activityTimestamp).unix(),
+      sorter: thenById((a, b) => dayjs(a.activityTimestamp).unix() - dayjs(b.activityTimestamp).unix()),
       defaultSortOrder: 'descend',
       render: (val) => val ? (
         <Tooltip title={dayjs(val).format('YYYY-MM-DD HH:mm:ss')}>

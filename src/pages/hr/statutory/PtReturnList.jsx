@@ -10,6 +10,7 @@ import { PT_RETURN_STATUS } from '../../../utils/hrConstants';
 import { hasPermission } from '../../../utils/permissions';
 import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
 
 const statusMap = Object.fromEntries(PT_RETURN_STATUS.map((s) => [s.value, s]));
 
@@ -103,7 +104,7 @@ const PtReturnList = () => {
           r.periodFrom && r.periodTo
             ? `${dayjs(r.periodFrom).format('DD MMM YYYY')} - ${dayjs(r.periodTo).format('DD MMM YYYY')}`
             : '-',
-        sorter: (a, b) => (a.periodFrom || '').localeCompare(b.periodFrom || ''),
+        sorter: thenById((a, b) => (a.periodFrom || '').localeCompare(b.periodFrom || '')),
         defaultSortOrder: 'descend',
       },
       {

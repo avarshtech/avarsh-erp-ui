@@ -9,6 +9,7 @@ import { EL_ENCASHMENT_STATUS, EMPLOYEE_CATEGORY } from '../../../utils/hrConsta
 import { hasPermission } from '../../../utils/permissions';
 import { unitOptions } from '../../../utils/hrLabels';
 import PageHeader from '../../../components/PageHeader';
+import { thenById } from '../../../utils/tableSort';
 
 const statusMap = Object.fromEntries(EL_ENCASHMENT_STATUS.map((s) => [s.value, s]));
 
@@ -100,7 +101,7 @@ const ElEncashmentList = () => {
         dataIndex: 'year',
         key: 'year',
         width: 100,
-        sorter: (a, b) => (a.year || 0) - (b.year || 0),
+        sorter: thenById((a, b) => (a.year || 0) - (b.year || 0)),
         defaultSortOrder: 'descend',
       },
       {
