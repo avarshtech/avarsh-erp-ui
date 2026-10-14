@@ -262,7 +262,7 @@ const SampleInvoiceList = () => {
         open={viewId != null}
         invoiceId={viewId}
         onClose={() => setViewId(null)}
-        onPrint={(inv) => { if (!printSampleInvoice(inv, profile)) message.error('Pop-up blocked — allow pop-ups to print'); }}
+        onPrint={(inv) => { if (!printSampleInvoice(inv, withExportingBranch(profile, inv))) message.error('Pop-up blocked — allow pop-ups to print'); }}
         onDuplicate={handleDuplicate}
         onCancelInvoice={handleCancel}
         canCancel={canCancel}
