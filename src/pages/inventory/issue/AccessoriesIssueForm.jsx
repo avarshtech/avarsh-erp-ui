@@ -134,6 +134,9 @@ const AccessoriesIssueForm = () => {
             itemId: it.id,
             itemCode: it.itemCode,
             issueQty: it.issueQty,
+            // The BOM line and its variant, so stock comes off this row's colour only (U222)
+            bomLineId: it.bomLineId,
+            variantId: it.variantId,
           })),
         });
         message.success(`${saved.issueNumber} issued — stock cleared from inventory`);

@@ -65,7 +65,8 @@ const AccessoriesIssueItemTable = ({ items = [], onItemChange }) => {
 
   return (
     <Table
-      rowKey="id"
+      // Two variants of one item are two BOM lines with the same item id (U222)
+      rowKey={(r) => r.bomLineId ?? r.id}
       columns={columns}
       dataSource={items}
       pagination={false}
